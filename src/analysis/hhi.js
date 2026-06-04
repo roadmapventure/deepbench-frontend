@@ -1,9 +1,9 @@
-// src/analysis/hhi.js — v5.0.0
+// src/analysis/hhi.js — v5.0.1
 // DeepBench v5 — HHI vendor concentration scoring
 // DETERMINISTIC — no AI badge. Pure math only.
 // Carried forward exactly from v4.x App.jsx computeVendorConc()
 
-import { resolveNIGP, NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
+import { resolveNIGP, NIGP_CLASS as NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
 import { shortLabel } from "../utils.js";
 
 export function computeVendorConc(rows, mapping, totalSpend) {

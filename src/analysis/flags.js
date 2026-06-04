@@ -1,9 +1,9 @@
-// src/analysis/flags.js — v5.0.0
+// src/analysis/flags.js — v5.0.1
 // DeepBench v5 — 6 procurement flag algorithms
 // DETERMINISTIC — no AI badge. Pure math/logic only.
 // Carried forward exactly from v4.x App.jsx computeFlags()
 
-import { resolveNIGP, NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
+import { resolveNIGP, NIGP_CLASS as NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
 import { fmtFull, fmtPct, shortLabel } from "../utils.js";
 
 export function computeFlags(rows, mapping, totalSpend) {
