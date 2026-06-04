@@ -1,1 +1,160 @@
+// src/data/agents.js — v5.0.0
+// DeepBench v5 — Authoritative agent roster
+// Single source of truth. useAgents() hook wraps this array.
+// Do NOT define agents anywhere else.
 
+import { T } from "../tokens.js";
+
+export const AGENTS = [
+  {
+    id: "chloe", name: "Chloe Okafor", role: "Junior Procurement Analyst",
+    code: "JR-01", hiredOn: "Feb 2025", trainer: "RMV", arch: "LLM Prompt",
+    specialty: "Quick Analysis · Anything Obvious",
+    salary: 60000, value: 60000, hourly: 31, reportHrs: 2, reportCost: 63,
+    docs: 0, classes: 0, chunks: 0, skill: 18, situational: 10,
+    trainable: false, trainableBy: "RMV", revenueModel: "Freemium · Included",
+    quip: '"I spot the obvious stuff fast."', color: T.brass,
+  },
+  {
+    id: "mike", name: "Mike Alvarez", role: "Senior Procurement Analyst",
+    code: "SR-02", hiredOn: "Jun 2023", trainer: "RMV", arch: "LLM Deep Prompt",
+    specialty: "Industry Best-Practice Analysis",
+    salary: 90000, value: 90000, hourly: 47, reportHrs: 3, reportCost: 141,
+    docs: 0, classes: 0, chunks: 0, skill: 42, situational: 25,
+    trainable: false, trainableBy: "RMV", revenueModel: "Teaser · 10% NIGP split",
+    quip: '"Industry patterns are where I shine."', color: T.brass,
+  },
+  {
+    id: "bob", name: "Bob Whitfield", role: "Professional Procurement Analyst",
+    code: "PR-04", hiredOn: "May 2021", trainer: "Gov't", arch: "RAG",
+    specialty: "Legal & Internal Audits",
+    salary: 120000, value: 130000, hourly: 68, reportHrs: 5, reportCost: 339,
+    docs: 50, classes: 10, chunks: 842, skill: 71, situational: 25,
+    trainable: true, trainableBy: "Gov't", revenueModel: "Offer · 20% consultant split",
+    quip: '"Legally, where are we?"', color: T.moss,
+  },
+  {
+    id: "christy", name: "Christy Park", role: "Marketing Designer",
+    code: "MK-05", hiredOn: "Aug 2023", trainer: "RMV", arch: "LLM Format",
+    specialty: "Formatting · Executive Presentation",
+    salary: 90000, value: 90000, hourly: 47, reportHrs: 3, reportCost: 141,
+    docs: 0, classes: 0, chunks: 0, skill: 36, situational: 5,
+    trainable: false, trainableBy: "RMV", revenueModel: "Split · 50% RMV",
+    quip: '"Make it look like a cover story."', color: T.brass,
+  },
+  {
+    id: "robyn", name: "Robyn Castellanos", role: "NIGP Consultant",
+    code: "CN-03", hiredOn: "Jan 2016", trainer: "NIGP", arch: "RAG + Deep Prompt",
+    specialty: "NIGP Best-Practice · Strategy",
+    salary: 175000, value: 200000, hourly: 104, reportHrs: 5, reportCost: 521,
+    docs: 100, classes: 25, chunks: 1685, skill: 88, situational: 35,
+    trainable: true, trainableBy: "NIGP", revenueModel: "Split · 50% NIGP · $260/rpt",
+    quip: `"Next year's strategy, not last year's report."`, color: T.brass,
+  },
+  {
+    id: "brent", name: "Brent Matthews", role: "Data Research Specialist",
+    code: "DR-06", hiredOn: "Mar 2018", trainer: "RMV", arch: "RAG + Web Agent",
+    specialty: "Gov't Portal Retrieval · Open Records · Data Acquisition",
+    salary: 115000, value: 140000, hourly: 60, reportHrs: 1, reportCost: 60,
+    docs: 0, classes: 0, chunks: 0, skill: 79, situational: 40,
+    trainable: true, trainableBy: "RMV + Self", revenueModel: "Usage · Per Fetch",
+    quip: `"If it's on a government server, I'll find it."`,
+    color: T.moss, isWebAgent: true,
+  },
+  {
+    id: "pat", name: "Pat Smiley", role: "Intern Researcher",
+    code: "IR-07", hiredOn: "Jan 2026", trainer: "None", arch: "No Training",
+    specialty: "Basic Web Research (Untrained)",
+    salary: 0, value: 0, hourly: 0, reportHrs: 1, reportCost: 0,
+    docs: 0, classes: 0, chunks: 0, skill: 12, situational: 5,
+    trainable: false, trainableBy: "None", revenueModel: "Demo Only",
+    quip: `"I'm just here to learn... I think."`,
+    color: T.muted, isWebAgent: true, isIntern: true, noMemory: true,
+  },
+];
+
+// ── Pronouns ──────────────────────────────────────────────────────────────────
+export const AGENT_PRONOUNS = {
+  chloe:   { subject:"she", object:"her", possessive:"her" },
+  mike:    { subject:"he",  object:"him", possessive:"his" },
+  bob:     { subject:"he",  object:"him", possessive:"his" },
+  christy: { subject:"she", object:"her", possessive:"her" },
+  robyn:   { subject:"she", object:"her", possessive:"her" },
+  brent:   { subject:"he",  object:"him", possessive:"his" },
+  pat:     { subject:"she", object:"her", possessive:"her" },
+};
+
+// ── Training form constants ───────────────────────────────────────────────────
+export const STANDARD_CATEGORIES = [
+  "Compliance","Jurisdiction","Best Practice","Internal",
+  "Standards","Methodology","Playbook","Template","Statute",
+];
+export const BRENT_CATEGORIES = [
+  "Portal Navigation","Data Schema","Export Method","Auth Pattern",
+  "State Portal","Open Records","Research Method","Data Dictionary",
+];
+export const JURISDICTIONS = [
+  "All","Federal","Texas","California","Florida","New York","Illinois",
+];
+export const FLAG_TRIGGERS = [
+  { id:"maverick",      label:"Maverick Spend" },
+  { id:"po-split",      label:"PO Splitting"   },
+  { id:"spike",         label:"Spend Spike"    },
+  { id:"single-source", label:"Single Source"  },
+  { id:"vendor-hhi",    label:"Vendor HHI"     },
+  { id:"long-tail",     label:"Long-Tail"      },
+];
+
+// ── BEE_SCENARIOS for Test My Team ───────────────────────────────────────────
+export const BEE_SCENARIOS = [
+  {
+    id:"maverick", flag:"🔴", flagLabel:"Maverick Spend",
+    title:"High Uncontracted IT Purchases",
+    meta:"$2.1M outside master agreements · 847 txns · 23 vendors",
+    amount:"$2,142,880 at risk",
+    queryText:"High uncontracted technology spend $2.1M across 847 transactions with 23 vendors, no master agreements, maverick spend",
+    jurisdiction:"Texas",
+  },
+  {
+    id:"posplit", flag:"🟠", flagLabel:"PO Splitting",
+    title:"Suspicious Sub-Threshold Orders",
+    meta:"14 POs same vendor · 30 days · Under $49,500",
+    amount:"$674,200 structured",
+    queryText:"14 purchase orders to same vendor in 30 days all under $49500 threshold, suspected bid splitting, Public Works",
+    jurisdiction:"Texas",
+  },
+  {
+    id:"concentration", flag:"🔴", flagLabel:"Vendor Concentration",
+    title:"Single Vendor: 34% of Facilities",
+    meta:"HHI: 3,240 · $18.7M of $55M budget",
+    amount:"$18,720,000 single source",
+    queryText:"Single vendor controls 34% of facilities spend HHI 3240 highly concentrated single source risk $18.7M",
+    jurisdiction:"Texas",
+  },
+  {
+    id:"spike", flag:"🟡", flagLabel:"Spend Spike",
+    title:"December Surge — Year End",
+    meta:"340% above avg · $4.2M in final 3 weeks · 12 depts",
+    amount:"$4,200,000 spike",
+    queryText:"December spending surge 340% above monthly average $4.2M in final 3 weeks year-end spending rush 12 departments",
+    jurisdiction:"Texas",
+  },
+  {
+    id:"full", flag:"🔵", flagLabel:"Combined Risk",
+    title:"Full Austin 2025 Portfolio",
+    meta:"$372M total · All 6 flags · 264 NIGP classes · 2,847 vendors",
+    amount:"$372,988,798 total",
+    queryText:"Full procurement portfolio $372M total spend 2847 vendors 264 NIGP classes all risk flags maverick PO splitting vendor concentration",
+    jurisdiction:"Texas",
+  },
+];
+
+// ── Fetch portal states ───────────────────────────────────────────────────────
+export const FETCH_STATES = [
+  { key:"maryland",   name:"Maryland",   portal:"MD-VIEW · Comptroller",  years:["2025","2024","2023","2022"], live:true,  url:"https://interactive2.marylandtaxes.gov/MDVIEW/" },
+  { key:"illinois",   name:"Illinois",   portal:"IL Comptroller",          years:["2025","2024","2023","2022"], live:true,  url:"https://illinoiscomptroller.gov/financial-reports-data/expenditures-state-spending/statewide" },
+  { key:"oregon",     name:"Oregon",     portal:"OregonBuys · Socrata",    years:["2024","2023","2022"],        live:false, url:"https://data.oregon.gov" },
+  { key:"texas",      name:"Texas",      portal:"CAPPS · DIR",              years:["2025","2024"],               live:false, url:"https://www.txsmartbuy.gov" },
+  { key:"california", name:"California", portal:"Cal eProcure",             years:["2025","2024"],               live:false, url:"https://eprocure.dgs.ca.gov" },
+  { key:"florida",    name:"Florida",    portal:"MyFloridaMarket",          years:["2025","2024"],               live:false, url:"https://www.myfloridamarketplace.com" },
+];
