@@ -1,4 +1,4 @@
-// src/contexts/AnalyzerContext.jsx — v5.0.0
+// src/contexts/AnalyzerContext.jsx — v5.0.1
 // DeepBench v5 — Analyzer state scoped to task route
 // Lifted here so state persists when navigating between analyzer tabs.
 
@@ -6,7 +6,7 @@ import { createContext, useContext, useState, useRef, useCallback, useMemo } fro
 import Papa from "papaparse";
 import { TENANT_ID } from "../config.js";
 import { parseAmt, shortLabel } from "../tokens.js";
-import { resolveNIGP, NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
+import { resolveNIGP, NIGP_CLASS as NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
 
 const AnalyzerContext = createContext(null);
 
