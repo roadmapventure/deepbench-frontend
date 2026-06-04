@@ -1,9 +1,9 @@
-// src/screens/analyzer/LocalSpendTab.jsx — v5.0.0
+// src/screens/analyzer/LocalSpendTab.jsx — v5.0.1
 // Local Spend tab — city/state filter, local vs out-of-area breakdown
 
 import { T, display, body, mono, fmtFull, fmtPct, fmt, PALETTE } from "../../tokens.js";
 import { Card, Corners, PctBar } from "../../components/SharedUI.jsx";
-import { resolveNIGP, NIGP_CLASS_LOOKUP } from "../../nigp-lookup.js";
+import { resolveNIGP, NIGP_CLASS as NIGP_CLASS_LOOKUP } from "../../nigp-lookup.js";
 import { shortLabel } from "../../tokens.js";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
