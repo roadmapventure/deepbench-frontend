@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | useAIActivity.js | AI call log — module-level store for AIActivityPanel
 // src/hooks/useAIActivity.js — v5.0.0
 // Module-level AI call log. Any component calls logAICall() to record.
 // AIActivityPanel reads the same store — no context provider needed.

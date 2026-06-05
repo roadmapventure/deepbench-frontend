@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | PersonnelScreen.jsx | Personnel file — Profile, Resume, Training, Playbook tabs
 // src/screens/PersonnelScreen.jsx — v5.0.0
 // DeepBench v5 — Personnel File (/bench/:agentId)
 // Tabs: Profile · Resume · Training · Playbook · Workflow (stub) · Projects (stub)
@@ -51,6 +52,7 @@ const AGENT_COMPLETED = {
   brent:[{id:11,title:"Oregon OregonBuys PO Export",type:"Web Fetch",completedOn:"May 22"}],
 };
 
+// FEATURE: PE-01 — Profile tab
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
 function ProfileTab({ agent, entries, layers }) {
   const pronouns      = AGENT_PRONOUNS[agent.id] || { subject:"they", object:"them", possessive:"their" };
@@ -277,6 +279,7 @@ function ProfileTab({ agent, entries, layers }) {
   );
 }
 
+// FEATURE: PE-03 — Training tab
 // ── Tab: Training ─────────────────────────────────────────────────────────────
 function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
   const [expandedIds, setExpandedIds] = useState({});
@@ -391,6 +394,7 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
   );
 }
 
+// FEATURE: PE-04 — Playbook tab
 // ── Tab: Playbook ─────────────────────────────────────────────────────────────
 function PlaybookTab({ agent }) {
   const firstName  = agent.name.split(" ")[0];
@@ -461,6 +465,8 @@ function StubTab({ title, desc }) {
   );
 }
 
+// FEATURE: PE-05 — Workflow tab stub
+// FEATURE: PE-06 — Projects tab stub
 // ── Personnel Screen ──────────────────────────────────────────────────────────
 export default function PersonnelScreen() {
   const { agentId } = useParams();

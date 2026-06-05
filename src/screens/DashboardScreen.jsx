@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | DashboardScreen.jsx | Work dashboard — task list, stats strip, chat panel
 // src/screens/DashboardScreen.jsx — v5.0.0
 // DeepBench v5 — Work Dashboard (/)
 // Task list from Supabase + stats strip + chat panel
@@ -30,6 +31,7 @@ const PRIORITY_STYLES = {
   "Low":    { bg:"rgba(120,109,82,.08)", color:"#786d52", border:"#c8bb9a" },
 };
 
+// FEATURE: DB-15 — NIGP demo task pre-load
 // ── Mock tasks (replace with Supabase in Phase 0) ─────────────────────────────
 const MOCK_TASKS = [
   { id:1, title:"NIGP Demo — Austin FY2025 Spend Analysis", agent:"Robyn Castellanos", agentId:"robyn", type:"Data Analysis", status:"completed", priority:"High", due:"Jun 15", preview:"Full portfolio analysis: $372M, 264 NIGP classes, 2,847 vendors. All 6 risk flags computed.", hasHITL:false, created:"Jun 1" },
@@ -46,6 +48,7 @@ const MOCK_COMPLETED = [
   { id:12, title:"Sole-Source Justification Review", agent:"Bob Whitfield", agentId:"bob", type:"Compliance Review", completedOn:"May 15" },
 ];
 
+// FEATURE: DB-09 — AI routing/switchboard topic map
 // ── Chat topic → agent routing ─────────────────────────────────────────────
 const TOPIC_MAP = {
   analysis:   { agentId:"robyn",   label:"Data Analysis",      desc:"Spend analysis, trend identification, executive data narratives" },
@@ -108,6 +111,7 @@ function TaskCard({ task, onClick }) {
   );
 }
 
+// FEATURE: DB-14 — Live RAG + AI call (chat panel sends to /api/brief)
 // ── Chat Panel ────────────────────────────────────────────────────────────────
 function ChatPanel() {
   const agents = useAgents();
@@ -245,6 +249,7 @@ function ChatPanel() {
         <div style={{background:`rgba(182,135,58,.2)`,border:`1px solid rgba(182,135,58,.4)`,padding:"2px 8px",fontFamily:mono,fontSize:8,color:T.brassLight,fontWeight:700,letterSpacing:1}}>● Online</div>
       </div>
 
+      {/* FEATURE: DB-07 — Chat panel topic pills */}
       {/* Topic pills */}
       <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
         <div style={{fontFamily:mono,fontSize:8,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",marginBottom:7}}>Select by Topic</div>
@@ -261,6 +266,7 @@ function ChatPanel() {
         </div>
       </div>
 
+      {/* FEATURE: DB-08 — Chat direct agent pills */}
       {/* Agent pills */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.line}`,background:T.cardAlt,flexShrink:0}}>
         <div style={{fontFamily:mono,fontSize:8,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>— or select agent directly —</div>
@@ -310,6 +316,7 @@ function ChatPanel() {
                   <span style={{fontFamily:mono,fontSize:8,color:T.moss,marginLeft:"auto"}}>● Online</span>
                 </div>
               )}
+              {/* FEATURE: DB-10 — Knowledge tier badge */}
               {/* Topic description badge — only on topic-selected intros */}
               {msg.isIntro && msg.topicDesc && (
                 <div style={{background:`rgba(182,135,58,.08)`,border:`1px solid rgba(182,135,58,.2)`,padding:"7px 10px",fontFamily:mono,fontSize:8,color:T.brassDeep,letterSpacing:.5,marginBottom:4}}>
@@ -330,6 +337,7 @@ function ChatPanel() {
                 <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"9px 11px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}
                   dangerouslySetInnerHTML={{__html: msg.content.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}}/>
               )}
+              {/* FEATURE: DB-11 — Provenance chips */}
               {/* Provenance chips — Tier 1 (Trained) only */}
               {msg.tier==="trained" && msg.sourceDocs?.length>0 && (
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
@@ -339,10 +347,12 @@ function ChatPanel() {
                   ))}
                 </div>
               )}
+              {/* FEATURE: DB-12 — General knowledge disclaimer */}
               {/* General knowledge disclaimer */}
               {msg.tier==="general" && (
                 <div style={{fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic",marginTop:3}}>This answer draws on general knowledge, not DeepBench training. Treat as a starting point.</div>
               )}
+              {/* FEATURE: DB-13 — Save as Assignment */}
               {/* Save as Assignment */}
               {!msg.isRouting && (
                 <button onClick={()=>navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent(msg.content.slice(0,200))}`)}
@@ -382,6 +392,7 @@ function ChatPanel() {
   );
 }
 
+// FEATURE: DB-01 — Task list (main dashboard screen)
 // ── Dashboard Screen ──────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const navigate = useNavigate();
@@ -415,12 +426,14 @@ export default function DashboardScreen() {
             <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work dashboard.</div>
             <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,lineHeight:1.5}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
           </div>
+          {/* FEATURE: DB-06 — Assign New Work button */}
           <button onClick={()=>navigate("/work/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
             <span style={{fontSize:14}}>+</span> Assign New Work
           </button>
         </div>
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
+        {/* FEATURE: DB-02 — Stats strip */}
         {/* Stats strip */}
         <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`}}>
           {[["Active Tasks",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
@@ -450,6 +463,7 @@ export default function DashboardScreen() {
               <TaskCard key={task.id} task={task} onClick={()=>navigate(`/work/${task.id}`)}/>
             ))}
 
+            {/* FEATURE: DB-03 — Show more drawer */}
             {hiddenCount > 0 && (
               <div onClick={()=>setDrawerOpen(d=>!d)} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                 <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:1.5,textTransform:"uppercase"}}>{drawerOpen?"▴ Show fewer":"▾ Show more tasks"}</span>
@@ -457,6 +471,7 @@ export default function DashboardScreen() {
               </div>
             )}
 
+            {/* FEATURE: DB-04 — Recently completed */}
             {/* Recently completed */}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:2,textTransform:"uppercase",marginTop:8,marginBottom:8}}>Recently Completed</div>
             {completedTasks.map(task => (

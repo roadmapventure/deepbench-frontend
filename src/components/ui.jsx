@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | ui.jsx | Supplementary shared UI components
 // src/components/ui.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
 

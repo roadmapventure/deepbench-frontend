@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | ResumeTab.jsx | Personnel Resume tab — role prompt CRUD, inline edit
+// FEATURE: PE-02 — Resume tab
 // src/screens/personnel/ResumeTab.jsx — v5.0.0
 // DeepBench v5 — Resume tab: role_prompt CRUD
 // ConfigCard with inline edit, Set Default, User Selectable toggle, Delete

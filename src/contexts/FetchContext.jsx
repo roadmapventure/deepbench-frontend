@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | FetchContext.jsx | Fetch agent state context — persists through navigation
 // src/contexts/FetchContext.jsx — v5.0.0
 // DeepBench v5 — Persistent fetch agent state
 // Must survive navigation away from the fetch screen and back.

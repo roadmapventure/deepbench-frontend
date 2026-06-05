@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | config.js | Multi-tenancy stubs + environment config
+// FEATURE: SH-02 — Environment config + tenant identity
 // src/config.js — v5.0.0
 // DeepBench v5 — Multi-tenancy stubs + environment config
 // Phase 1: all hardcoded constants. Phase 2: swap for Clerk JWT.

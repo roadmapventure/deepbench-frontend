@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | AIActivityPanel.jsx | AI activity panel — grouped calls, cost, latency log
+// FEATURE: AI-03 — AIActivityPanel — activity panel
 // src/components/AIActivityPanel.jsx — v5.0.0
 // AI Activity Panel: grouped by type, cost+count+latency, checklist (PRD 9.4, 9.8, 9.9)
 

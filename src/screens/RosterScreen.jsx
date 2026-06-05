@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | RosterScreen.jsx | The Bench — 7-agent grid, cards, stats, Add a Player
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -10,6 +11,7 @@ import { Corners, SkillBar } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 
+// FEATURE: RO-02 — Agent cards + workload
 function AgentCard({ agent, onViewProfile, onAddTraining }) {
   const [open, setOpen] = useState(false);
   const borderColor = agent.trainable ? agent.color : T.line;
@@ -140,6 +142,7 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
   );
 }
 
+// FEATURE: RO-01 — All 7 agents
 export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();
@@ -164,6 +167,7 @@ export default function RosterScreen() {
               These are your agents. Click any team member to view their profile, assign them work, or add to their training. Ready to grow your bench? Add a new player and start building their expertise.
             </div>
           </div>
+          {/* FEATURE: RO-03 — Add a Player button */}
           <button onClick={()=>navigate("/bench/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
             <span style={{fontSize:14}}>＋</span> Add a Player
           </button>

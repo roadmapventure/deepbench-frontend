@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | flags.js | 6 procurement flag algorithms — deterministic, no AI
 // src/analysis/flags.js — v5.0.1
 // DeepBench v5 — 6 procurement flag algorithms
 // DETERMINISTIC — no AI badge. Pure math/logic only.

@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | AssignWorkScreen.jsx | Assign new work — task type, goal, planning agent, step plan
 // src/screens/AssignWorkScreen.jsx — v5.0.0
 // Planning agent: streaming plan generation, agent suggestion, change log,
 // draft save, "Approve Plan & Launch" (PRD 9.2)
@@ -11,6 +12,7 @@ import { Corners, AgentAvatar, AiBadge, Toast } from "../components/SharedUI.jsx
 import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 
+// FEATURE: AW-01 — Task type tiles
 const TASK_TYPES = [
   { id:"analysis",  icon:"📊", label:"Data Analysis",     desc:"Analyze spend CSV — flags, HHI, vendor risk, AI briefing" },
   { id:"fetch",     icon:"🌐", label:"Web Data Fetch",     desc:"Brent fetches live data from a government portal" },
@@ -19,6 +21,8 @@ const TASK_TYPES = [
   { id:"review",    icon:"✅", label:"Compliance Review",  desc:"Review a purchase or contract for compliance flags" },
 ];
 
+// FEATURE: AW-05 — Step plan generation (planning agent structured output)
+// FEATURE: AI-05 — Planning agent structured output via tool use
 // ── Call planning agent (Haiku, structured output via tool use) ───────────────
 async function callPlanningAgent(taskType, goal, agents, priorQAs = []) {
   const t0 = Date.now();
@@ -136,6 +140,7 @@ function StepCard({ step, agent, onRemove, index }) {
   );
 }
 
+// FEATURE: AW-03 — Two-panel layout (goal + living plan)
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function AssignWorkScreen() {
   const navigate   = useNavigate();
@@ -237,6 +242,7 @@ export default function AssignWorkScreen() {
             <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:3}}>Work Dashboard · Assign New Work</div>
             <div style={{fontFamily:display,fontSize:28,fontWeight:500,color:T.navy,letterSpacing:"-.5px"}}>What do you need done?</div>
           </div>
+          {/* FEATURE: AW-10 — Persistent save state indicator */}
           {/* Save state indicator */}
           {saveLabel && (
             <div style={{fontFamily:mono,fontSize:9,color:saveState==="ready"?T.moss:saveState==="saved"?T.moss:T.brassDeep,padding:"5px 12px",background:saveState==="ready"||saveState==="saved"?`${T.moss}10`:`${T.brass}08`,border:`1px solid ${saveState==="ready"||saveState==="saved"?T.moss:T.brass}30`,marginTop:4}}>
@@ -275,6 +281,7 @@ export default function AssignWorkScreen() {
               <AiBadge/> {generating?"Planning agent is building your task…":planGenerated?"Re-generate Plan":"Generate Plan"}
             </button>
 
+            {/* FEATURE: AW-04 — Planning agent clarifying questions */}
             {/* Clarifying questions */}
             {questions.length>0 && (
               <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 16px",position:"relative"}}>
@@ -317,6 +324,7 @@ export default function AssignWorkScreen() {
 
             {!generating && planGenerated && (
               <>
+                {/* FEATURE: AW-06 — Agent suggestion + brass glow */}
                 {/* Agent suggestion */}
                 {selectedAgentObj && (
                   <div style={{background:T.card,border:`2px solid ${T.brass}`,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10,position:"relative"}}>
@@ -330,6 +338,7 @@ export default function AssignWorkScreen() {
                       </div>
                       {agentReason && <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{agentReason}</div>}
                     </div>
+                    {/* FEATURE: AW-07 — Agent swap + dynamic replanning */}
                     {/* Swap agent */}
                     <select value={selectedAgent||""} onChange={e=>{setSelectedAgent(e.target.value);setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Agent swapped to ${agents.find(a=>a.id===e.target.value)?.name}`,archivedSteps:steps.map(s=>s.label).join(", ")}]);}}
                       style={{fontFamily:body,fontSize:11,background:T.cardAlt,border:`1px solid ${T.line}`,padding:"4px 8px",cursor:"pointer",color:T.navy}}>
@@ -352,6 +361,7 @@ export default function AssignWorkScreen() {
                   ))}
                 </div>
 
+                {/* FEATURE: AW-08 — Change log collapsible */}
                 {/* Change log */}
                 {changeLog.length>0 && (
                   <div style={{marginBottom:10}}>
@@ -367,6 +377,8 @@ export default function AssignWorkScreen() {
                   </div>
                 )}
 
+                {/* FEATURE: AW-11 — Approve Plan & Launch button */}
+                {/* FEATURE: AW-09 — Save draft awaiting-input */}
                 {/* Approve + Save Draft */}
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={handleApprove}

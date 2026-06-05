@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | utils.js | Shared utility functions — sanitize, compute delta, readiness
 // src/utils.js — v5.0.0
 // DeepBench v5 — Shared utility functions
 

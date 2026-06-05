@@ -1,3 +1,6 @@
+// DeepBench v5.1.0 | TestTeamScreen.jsx | Test My Team — multi-agent query runner, prompt diff
+// FEATURE: TT-01 — Multi-agent query runner
+// FEATURE: TT-02 — Prompt comparison/diff
 // src/screens/TestTeamScreen.jsx — v5.0.0
 // DeepBench v5 — Test My Team (/bench/test)
 // 3 stages: pick agents → pick BEE scenario → results with prompt + RAG reveal + delta panel

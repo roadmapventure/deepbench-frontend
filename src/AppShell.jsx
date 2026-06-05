@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | AppShell.jsx | App shell — header, nav tabs, AI dot, activity panel, help modal
+// FEATURE: SH-05 — AppShell header, nav tabs, AI dot, activity panel trigger, help modal
 // src/AppShell.jsx — v5.0.0
 // DeepBench v5 — App shell: header, Work/Bench nav tabs, shared layout
 // Wraps every authenticated screen.
@@ -8,6 +10,7 @@ import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
 import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
+import DebugOverlay from "./components/DebugOverlay.jsx";
 
 // ── Global style injection ────────────────────────────────────────────────────
 let _styleInjected = false;
@@ -20,6 +23,7 @@ function injectGlobalStyle() {
 }
 
 // ── App Header ────────────────────────────────────────────────────────────────
+// FEATURE: SH-05 — App header (logo, nav tabs, AI status dot, AI panel trigger, help button)
 export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{} }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -130,6 +134,7 @@ export function AppShell({ children, headerProps = {}, toast }) {
       <HelpModal open={helpOpen} onClose={()=>setHelpOpen(false)}/>
       {aiPanelOpen && <AIActivityPanel onClose={()=>setAiPanelOpen(false)}/>}
       {toast && <Toast toast={toast}/>}
+      <DebugOverlay />
     </div>
   );
 }

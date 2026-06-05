@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | agents.js | Authoritative agent roster + scenario data
+// FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
 // Single source of truth. useAgents() hook wraps this array.
