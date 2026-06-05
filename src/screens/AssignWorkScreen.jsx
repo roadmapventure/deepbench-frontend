@@ -1,16 +1,14 @@
-// DeepBench v5.1.0 | AssignWorkScreen.jsx | Assign new work — task type, goal, planning agent, step plan
-// src/screens/AssignWorkScreen.jsx — v5.0.0
-// Planning agent: streaming plan generation, agent suggestion, change log,
-// draft save, "Approve Plan & Launch" (PRD 9.2)
+// DeepBench v5.1.1 | AssignWorkScreen.jsx | Assign work screen
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, AgentAvatar, AiBadge, Toast } from "../components/SharedUI.jsx";
+import { Corners, AgentAvatar, AiBadge, Toast, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
+import { supabase } from "../lib/supabase.js";
 
 // FEATURE: AW-01 — Task type tiles
 const TASK_TYPES = [
@@ -224,10 +222,33 @@ export default function AssignWorkScreen() {
     setTimeout(()=>{ setSaveState("draft"); showToast("Saved as draft — return to answer remaining questions"); },600);
   };
 
-  const handleApprove = () => {
-    if (!selectedAgent||!steps.length) { showToast("Generate a plan first","⚠"); return; }
+  // FEATURE: SH-06 — Supabase tasks integration
+  const handleApprove = async () => {
+    if (!selectedAgent || !steps.length) { showToast("Generate a plan first", "⚠"); return; }
     setSaveState("saving");
-    setTimeout(()=>{ setSaveState("saved"); showToast("Task launched ✦"); setTimeout(()=>navigate("/"),900); },700);
+    const taskTypeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || selectedType || "Data Analysis";
+    const { error } = await supabase.from("tasks").insert({
+      tenant_id:  TENANT_ID,
+      title:      goal.trim() || "Untitled Task",
+      agent_id:   selectedAgent,
+      agent:      selectedAgentObj?.name || selectedAgent,
+      type:       taskTypeLabel,
+      status:     "pending",
+      priority:   "Normal",
+      preview:    goal.slice(0, 120),
+      has_hitl:   steps.some(s => s.type === "hitl"),
+      steps:      steps,
+      created_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("Task save error:", error);
+      showToast("Save failed — check console", "✕");
+      setSaveState("ready");
+      return;
+    }
+    setSaveState("saved");
+    showToast("Task launched ✦");
+    setTimeout(() => navigate("/"), 900);
   };
 
   const selectedAgentObj = agents.find(a=>a.id===selectedAgent);
@@ -379,8 +400,10 @@ export default function AssignWorkScreen() {
 
                 {/* FEATURE: AW-11 — Approve Plan & Launch button */}
                 {/* FEATURE: AW-09 — Save draft awaiting-input */}
+                {/* FEATURE: SH-06 — Supabase tasks integration */}
                 {/* Approve + Save Draft */}
-                <div style={{display:"flex",gap:8}}>
+                <div style={{display:"flex",gap:8,position:"relative"}}>
+                  <FeatureBadge id="SH-06" />
                   <button onClick={handleApprove}
                     style={{flex:1,padding:"12px",background:`linear-gradient(135deg,${T.navy},${T.navyMid})`,border:"none",color:T.brassLight,fontFamily:display,fontSize:14,fontWeight:700,cursor:"pointer"}}>
                     Approve Plan & Launch ▸

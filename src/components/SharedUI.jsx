@@ -62,6 +62,13 @@ export const Toast = ({ toast }) => {
   );
 };
 
+// ── FeatureBadge — invisible anchor for DebugOverlay feature-ID tagging ─────
+// Renders a zero-size absolutely positioned element; DebugOverlay attaches the
+// visible label when ?debug=features is active. Parent must be position:relative.
+export const FeatureBadge = ({ id }) => (
+  <span data-feature-id={id} aria-hidden="true" style={{position:"absolute",top:0,left:0,width:0,height:0,overflow:"visible",pointerEvents:"none"}}/>
+);
+
 // ── AiBadge — ✦ AI badge for AI-touched elements ────────────────────────────
 export const AiBadge = ({ style }) => (
   <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,...style}}>✦ AI</span>

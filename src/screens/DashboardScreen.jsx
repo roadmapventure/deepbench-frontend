@@ -1,18 +1,16 @@
-// DeepBench v5.1.0 | DashboardScreen.jsx | Work dashboard — task list, stats strip, chat panel
-// src/screens/DashboardScreen.jsx — v5.0.0
-// DeepBench v5 — Work Dashboard (/)
-// Task list from Supabase + stats strip + chat panel
+// DeepBench v5.1.1 | DashboardScreen.jsx | Work dashboard — task list, stats, chat panel
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, display, body, mono, GLOBAL_CSS } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, Toast, AgentAvatar, AiBadge } from "../components/SharedUI.jsx";
+import { Corners, Toast, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { FETCH_API_BASE } from "../config.js";
+import { supabase } from "../lib/supabase.js";
 
 // ── Status + Priority styles ──────────────────────────────────────────────────
 const STATUS_STYLES = {
@@ -32,21 +30,20 @@ const PRIORITY_STYLES = {
 };
 
 // FEATURE: DB-15 — NIGP demo task pre-load
-// ── Mock tasks (replace with Supabase in Phase 0) ─────────────────────────────
-const MOCK_TASKS = [
-  { id:1, title:"NIGP Demo — Austin FY2025 Spend Analysis", agent:"Robyn Castellanos", agentId:"robyn", type:"Data Analysis", status:"completed", priority:"High", due:"Jun 15", preview:"Full portfolio analysis: $372M, 264 NIGP classes, 2,847 vendors. All 6 risk flags computed.", hasHITL:false, created:"Jun 1" },
-  { id:2, title:"Illinois Q1 2025 Expenditure Fetch", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", status:"needs-review", priority:"Normal", due:"Jun 20", preview:"Brent navigated IL Comptroller portal and downloaded statewide expenditures. File ready for analysis.", hasHITL:true, created:"Jun 3" },
-  { id:3, title:"Vendor Concentration Briefing — City of Austin", agent:"Bob Whitfield", agentId:"bob", type:"Data Analysis", status:"in-progress", priority:"High", due:"Jun 18", preview:"Analyzing HHI scores and single-source risk across facilities spend. Compliance review in progress.", hasHITL:true, created:"Jun 4" },
-  { id:4, title:"Q2 Procurement Strategy Memo", agent:"Robyn Castellanos", agentId:"robyn", type:"Document Draft", status:"action-required", priority:"Normal", due:"Jun 22", preview:"Human review required: approve the strategic recommendations before final delivery to CPO.", hasHITL:true, created:"Jun 2" },
-  { id:5, title:"Maryland FY2025 Vendor Payment Data", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", status:"pending", priority:"Normal", due:"Jun 25", preview:"Scheduled fetch from MD-VIEW portal. Brent will navigate and download vendor payment CSV.", hasHITL:false, created:"Jun 5" },
-  { id:6, title:"Contract Coverage Gap Analysis", agent:"Mike Alvarez", agentId:"mike", type:"Data Analysis", status:"awaiting-input", priority:"Low", due:"TBD", preview:"Awaiting your input: which fiscal year should this analysis cover?", hasHITL:true, created:"Jun 5" },
-];
-
-const MOCK_COMPLETED = [
-  { id:10, title:"FY2024 Annual Spend Report", agent:"Robyn Castellanos", agentId:"robyn", type:"Data Analysis", completedOn:"May 28" },
-  { id:11, title:"Oregon OregonBuys PO Export", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", completedOn:"May 22" },
-  { id:12, title:"Sole-Source Justification Review", agent:"Bob Whitfield", agentId:"bob", type:"Compliance Review", completedOn:"May 15" },
-];
+// MOCK FALLBACK (remove after Supabase confirmed working)
+// const MOCK_TASKS = [
+//   { id:1, title:"NIGP Demo — Austin FY2025 Spend Analysis", agent:"Robyn Castellanos", agentId:"robyn", type:"Data Analysis", status:"completed", priority:"High", due:"Jun 15", preview:"Full portfolio analysis: $372M, 264 NIGP classes, 2,847 vendors. All 6 risk flags computed.", hasHITL:false, created:"Jun 1" },
+//   { id:2, title:"Illinois Q1 2025 Expenditure Fetch", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", status:"needs-review", priority:"Normal", due:"Jun 20", preview:"Brent navigated IL Comptroller portal and downloaded statewide expenditures. File ready for analysis.", hasHITL:true, created:"Jun 3" },
+//   { id:3, title:"Vendor Concentration Briefing — City of Austin", agent:"Bob Whitfield", agentId:"bob", type:"Data Analysis", status:"in-progress", priority:"High", due:"Jun 18", preview:"Analyzing HHI scores and single-source risk across facilities spend. Compliance review in progress.", hasHITL:true, created:"Jun 4" },
+//   { id:4, title:"Q2 Procurement Strategy Memo", agent:"Robyn Castellanos", agentId:"robyn", type:"Document Draft", status:"action-required", priority:"Normal", due:"Jun 22", preview:"Human review required: approve the strategic recommendations before final delivery to CPO.", hasHITL:true, created:"Jun 2" },
+//   { id:5, title:"Maryland FY2025 Vendor Payment Data", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", status:"pending", priority:"Normal", due:"Jun 25", preview:"Scheduled fetch from MD-VIEW portal. Brent will navigate and download vendor payment CSV.", hasHITL:false, created:"Jun 5" },
+//   { id:6, title:"Contract Coverage Gap Analysis", agent:"Mike Alvarez", agentId:"mike", type:"Data Analysis", status:"awaiting-input", priority:"Low", due:"TBD", preview:"Awaiting your input: which fiscal year should this analysis cover?", hasHITL:true, created:"Jun 5" },
+// ];
+// const MOCK_COMPLETED = [
+//   { id:10, title:"FY2024 Annual Spend Report", agent:"Robyn Castellanos", agentId:"robyn", type:"Data Analysis", completedOn:"May 28" },
+//   { id:11, title:"Oregon OregonBuys PO Export", agent:"Brent Matthews", agentId:"brent", type:"Web Fetch", completedOn:"May 22" },
+//   { id:12, title:"Sole-Source Justification Review", agent:"Bob Whitfield", agentId:"bob", type:"Compliance Review", completedOn:"May 15" },
+// ];
 
 // FEATURE: DB-09 — AI routing/switchboard topic map
 // ── Chat topic → agent routing ─────────────────────────────────────────────
@@ -396,24 +393,63 @@ function ChatPanel() {
 // ── Dashboard Screen ──────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState(MOCK_TASKS);
+  const [tasks, setTasks] = useState([]);
+  const [completedTasks, setCompletedTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // TODO: replace with Supabase query when Phase 0 complete
-  // const tasks = await supabase.from('tasks').select('*').eq('tenant_id', TENANT_ID).order('created_at', {ascending:false})
+  // FEATURE: SH-06 — Supabase tasks integration
+  useEffect(() => {
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("tenant_id", TENANT_ID)
+      .neq("status", "completed")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error("Tasks fetch error:", error); }
+        else {
+          setTasks((data || []).map(t => ({
+            ...t,
+            agentId: t.agent_id,
+            hasHITL: t.has_hitl,
+          })));
+        }
+        setLoading(false);
+      });
+  }, []);
 
-  const activeTasks    = tasks.filter(t => t.status !== "completed");
-  const completedTasks = MOCK_COMPLETED;
-  const visibleActive  = drawerOpen ? activeTasks : activeTasks.slice(0,3);
-  const hiddenCount    = Math.max(0, activeTasks.length - 3);
+  useEffect(() => {
+    supabase
+      .from("tasks")
+      .select("id, title, agent, agent_id, type, completed_on")
+      .eq("tenant_id", TENANT_ID)
+      .eq("status", "completed")
+      .order("completed_on", { ascending: false })
+      .limit(5)
+      .then(({ data, error }) => {
+        if (error) { console.error("Completed tasks fetch error:", error); }
+        else {
+          setCompletedTasks((data || []).map(t => ({
+            ...t,
+            agentId: t.agent_id,
+            completedOn: t.completed_on,
+          })));
+        }
+      });
+  }, []);
+
+  const activeTasks   = tasks.filter(t => t.status !== "completed");
+  const visibleActive = drawerOpen ? activeTasks : activeTasks.slice(0,3);
+  const hiddenCount   = Math.max(0, activeTasks.length - 3);
 
   const stats = {
-    active:       activeTasks.length,
-    inProgress:   tasks.filter(t=>t.status==="in-progress").length,
-    needsReview:  tasks.filter(t=>t.status==="needs-review"||t.status==="action-required").length,
-    completed:    41, // mock
-    agentsWorking:4,  // mock
+    active:        activeTasks.length,
+    inProgress:    tasks.filter(t=>t.status==="in-progress").length,
+    needsReview:   tasks.filter(t=>t.status==="needs-review"||t.status==="action-required").length,
+    completed:     completedTasks.length,
+    agentsWorking: 4,  // mock
   };
 
   return (
@@ -435,7 +471,8 @@ export default function DashboardScreen() {
 
         {/* FEATURE: DB-02 — Stats strip */}
         {/* Stats strip */}
-        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`}}>
+        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`,position:"relative"}}>
+          <FeatureBadge id="SH-06" />
           {[["Active Tasks",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
@@ -453,7 +490,13 @@ export default function DashboardScreen() {
           <div>
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
 
-            {activeTasks.length === 0 && (
+            {loading && (
+              <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
+                <div style={{fontFamily:mono,fontSize:13,color:T.brass,fontStyle:"italic"}}>Loading tasks…</div>
+              </div>
+            )}
+
+            {!loading && activeTasks.length === 0 && (
               <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
                 <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>No active assignments — assign new work above.</div>
               </div>
