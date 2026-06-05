@@ -228,17 +228,15 @@ export default function AssignWorkScreen() {
     setSaveState("saving");
     const taskTypeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || selectedType || "Data Analysis";
     const { error } = await supabase.from("tasks").insert({
-      tenant_id:  TENANT_ID,
-      title:      goal.trim() || "Untitled Task",
-      agent_id:   selectedAgent,
-      agent:      selectedAgentObj?.name || selectedAgent,
-      type:       taskTypeLabel,
-      status:     "pending",
-      priority:   "Normal",
-      preview:    goal.slice(0, 120),
-      has_hitl:   steps.some(s => s.type === "hitl"),
-      steps:      steps,
-      created_at: new Date().toISOString(),
+      tenant_id: TENANT_ID,
+      title:     goal.trim() || "Untitled Task",
+      agent_id:  selectedAgent,
+      type:      taskTypeLabel,
+      status:    "pending",
+      priority:  "Normal",
+      preview:   goal.slice(0, 120),
+      has_hitl:  steps.some(s => s.type === "hitl"),
+      steps:     steps,
     });
     if (error) {
       console.error("Task save error:", error);

@@ -393,6 +393,7 @@ function ChatPanel() {
 // ── Dashboard Screen ──────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const navigate = useNavigate();
+  const allAgents = useAgents();
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -414,6 +415,7 @@ export default function DashboardScreen() {
             ...t,
             agentId: t.agent_id,
             hasHITL: t.has_hitl,
+            agent:   allAgents.find(a => a.id === t.agent_id)?.name || t.agent_id,
           })));
         }
         setLoading(false);
@@ -423,18 +425,21 @@ export default function DashboardScreen() {
   useEffect(() => {
     supabase
       .from("tasks")
-      .select("id, title, agent, agent_id, type, completed_on")
+      .select("id, title, agent_id, type, status, updated_at")
       .eq("tenant_id", TENANT_ID)
       .eq("status", "completed")
-      .order("completed_on", { ascending: false })
+      .order("updated_at", { ascending: false })
       .limit(5)
       .then(({ data, error }) => {
         if (error) { console.error("Completed tasks fetch error:", error); }
         else {
           setCompletedTasks((data || []).map(t => ({
             ...t,
-            agentId: t.agent_id,
-            completedOn: t.completed_on,
+            agentId:     t.agent_id,
+            agent:       allAgents.find(a => a.id === t.agent_id)?.name || t.agent_id,
+            completedOn: t.updated_at
+              ? new Date(t.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : "—",
           })));
         }
       });
