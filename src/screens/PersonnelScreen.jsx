@@ -9,6 +9,7 @@ import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar, Toast, AiBadge } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
@@ -496,7 +497,8 @@ export default function PersonnelScreen() {
 
   return (
     <AppShell toast={toast} headerProps={{ backLabel:"The Bench", onBack:()=>navigate("/bench") }}>
-      <div style={{display:"flex",flex:1,overflow:"hidden",flexDirection:"column"}}>
+      <div style={{display:"flex",flex:1,overflow:"hidden",flexDirection:"column",position:"relative"}}>
+        <FeatureBadge id="PE-01" />
 
         {/* Page header */}
         <div style={{background:T.cardAlt,padding:"16px 24px 0",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>

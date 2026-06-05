@@ -10,7 +10,8 @@ import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
 import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
-import DebugOverlay from "./components/DebugOverlay.jsx";
+import DebugOverlay, { DebugOverlayProvider } from "./components/DebugOverlay.jsx";
+import FeatureBadge from "./components/FeatureBadge.jsx";
 
 // ── Global style injection ────────────────────────────────────────────────────
 let _styleInjected = false;
@@ -126,16 +127,19 @@ export function AppShell({ children, headerProps = {}, toast }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   return (
-    <div style={{minHeight:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
-      <AppHeader {...headerProps} onHelp={()=>setHelpOpen(true)} onAIPanel={()=>setAiPanelOpen(o=>!o)}/>
-      <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
-        {children}
+    <DebugOverlayProvider>
+      <div style={{minHeight:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column",position:"relative"}}>
+        <FeatureBadge id="SH-05" />
+        <AppHeader {...headerProps} onHelp={()=>setHelpOpen(true)} onAIPanel={()=>setAiPanelOpen(o=>!o)}/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
+          {children}
+        </div>
+        <HelpModal open={helpOpen} onClose={()=>setHelpOpen(false)}/>
+        {aiPanelOpen && <AIActivityPanel onClose={()=>setAiPanelOpen(false)}/>}
+        {toast && <Toast toast={toast}/>}
+        <DebugOverlay />
       </div>
-      <HelpModal open={helpOpen} onClose={()=>setHelpOpen(false)}/>
-      {aiPanelOpen && <AIActivityPanel onClose={()=>setAiPanelOpen(false)}/>}
-      {toast && <Toast toast={toast}/>}
-      <DebugOverlay />
-    </div>
+    </DebugOverlayProvider>
   );
 }
 

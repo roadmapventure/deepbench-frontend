@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, AiBadge } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 
 // ── Mock tasks ────────────────────────────────────────────────────────────────
@@ -166,7 +167,8 @@ export default function TaskInstructionsScreen() {
 
   return (
     <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
-      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px"}}>
+      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px",position:"relative"}}>
+        <FeatureBadge id="TI-01" />
 
         {/* Breadcrumb */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,fontFamily:mono,fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase"}}>

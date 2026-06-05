@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 
@@ -157,7 +158,8 @@ export default function RosterScreen() {
 
   return (
     <AppShell>
-      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 48px",background:T.paperDeep}}>
+      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 48px",background:T.paperDeep,position:"relative"}}>
+        <FeatureBadge id="RO-01" />
 
         {/* Masthead */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>

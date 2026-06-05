@@ -1,69 +1,33 @@
 // DeepBench v5.1.0 | DebugOverlay.jsx | Feature ID debug overlay — triggered by ?debug=features
-import { useState, useEffect } from "react";
+import { useState, createContext, useContext } from "react";
 
-function attachBadges() {
-  const tagged = document.querySelectorAll("[data-feature-id]");
-  tagged.forEach(el => {
-    if (el.querySelector(".db-feature-badge")) return;
-    const id = el.getAttribute("data-feature-id");
-    if (!id) return;
-    const badge = document.createElement("div");
-    badge.className = "db-feature-badge";
-    badge.textContent = id;
-    Object.assign(badge.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      fontFamily: '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace',
-      fontSize: "10px",
-      background: "#b6873a",
-      color: "#12243c",
-      padding: "2px 4px",
-      borderRadius: "2px",
-      opacity: "0.85",
-      pointerEvents: "none",
-      zIndex: "9990",
-      whiteSpace: "nowrap",
-      lineHeight: "1.2",
-      fontWeight: "700",
-    });
-    const pos = getComputedStyle(el).position;
-    if (pos === "static") el.style.position = "relative";
-    el.appendChild(badge);
-  });
+const DebugContext = createContext({ isDebugActive: false, toggleDebug: () => {} });
+
+export function useDebugOverlay() {
+  return useContext(DebugContext);
 }
 
-function removeBadges() {
-  document.querySelectorAll(".db-feature-badge").forEach(b => b.remove());
-  document.querySelectorAll("[data-feature-id]").forEach(el => {
-    if (el.style.position === "relative" && el.getAttribute("data-feature-id")) {
-      el.style.position = "";
-    }
-  });
+export function DebugOverlayProvider({ children }) {
+  const isDebugUrl = typeof window !== "undefined" &&
+    window.location.search.includes("debug=features");
+  const [active, setActive] = useState(isDebugUrl);
+  return (
+    <DebugContext.Provider value={{ isDebugActive: active, toggleDebug: () => setActive(o => !o) }}>
+      {children}
+    </DebugContext.Provider>
+  );
 }
 
 export default function DebugOverlay() {
   const isDebugUrl = typeof window !== "undefined" &&
     window.location.search.includes("debug=features");
+  const { isDebugActive, toggleDebug } = useDebugOverlay();
 
-  const [active, setActive] = useState(isDebugUrl);
-
-  useEffect(() => {
-    if (active) {
-      attachBadges();
-      const obs = new MutationObserver(() => attachBadges());
-      obs.observe(document.body, { childList: true, subtree: true });
-      return () => { obs.disconnect(); removeBadges(); };
-    } else {
-      removeBadges();
-    }
-  }, [active]);
-
-  if (!isDebugUrl && !active) return null;
+  if (!isDebugUrl && !isDebugActive) return null;
 
   return (
     <button
-      onClick={() => setActive(o => !o)}
+      onClick={toggleDebug}
       style={{
         position: "fixed",
         bottom: 18,
@@ -72,7 +36,7 @@ export default function DebugOverlay() {
         color: "#12243c",
         border: "none",
         padding: "7px 14px",
-        fontFamily: '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace',
+        fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
         fontSize: 11,
         fontWeight: 700,
         cursor: "pointer",
@@ -82,7 +46,7 @@ export default function DebugOverlay() {
         letterSpacing: 0.5,
       }}
     >
-      {active ? "✕ Feature IDs" : "⊞ Feature IDs"}
+      {isDebugActive ? "✕ Feature IDs" : "⊞ Feature IDs"}
     </button>
   );
 }

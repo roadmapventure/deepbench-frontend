@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono, ACTION_COLORS_FETCH, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useFetch } from "../contexts/FetchContext.jsx";
 import { FETCH_STATES } from "../data/agents.js";
 import { FETCH_API_BASE as FETCH_BASE } from "../config.js";
@@ -306,7 +307,8 @@ export default function FetchScreen() {
 
   return (
     <AppShell headerProps={{ showHelp:true }}>
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative"}}>
+        <FeatureBadge id="FT-01" />
         {fetchScreen === "running"
           ? <RunningScreen taskId={taskId}/>
           : <ConfigureScreen taskId={taskId}/>

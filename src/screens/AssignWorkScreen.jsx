@@ -9,6 +9,7 @@ import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, AgentAvatar, AiBadge, Toast } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 
@@ -234,7 +235,8 @@ export default function AssignWorkScreen() {
 
   return (
     <AppShell toast={toast} headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
-      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"20px 28px 60px"}}>
+      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"20px 28px 60px",position:"relative"}}>
+        <FeatureBadge id="AW-01" />
 
         {/* Header */}
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>

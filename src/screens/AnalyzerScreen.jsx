@@ -20,6 +20,7 @@ import { useAnalyzer, FIELD_DEFS } from "../contexts/AnalyzerContext.jsx";
 import { useFetch } from "../contexts/FetchContext.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import AIReviewTab      from "./analyzer/AIReviewTab.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import VendorDiversityTab from "./analyzer/VendorDiversityTab.jsx";
 import LocalSpendTab    from "./analyzer/LocalSpendTab.jsx";
 
@@ -69,7 +70,8 @@ function DataSourceScreen({ taskId }) {
     } catch(e) { setError("Demo failed: " + e.message); }
   };
   return (
-    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px"}}>
+    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px",position:"relative"}}>
+      <FeatureBadge id="AZ-01" />
       <div style={{fontFamily:mono,fontSize:10,letterSpacing:3,textTransform:"uppercase",color:T.brass,marginBottom:10}}>Roadmap Venture · Procurement Intelligence</div>
       <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
       <p style={{fontSize:13.5,color:T.muted,lineHeight:1.65,maxWidth:580,marginBottom:28}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>

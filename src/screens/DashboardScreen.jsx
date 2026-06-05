@@ -9,6 +9,7 @@ import { T, display, body, mono, GLOBAL_CSS } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, Toast, AgentAvatar, AiBadge } from "../components/SharedUI.jsx";
+import FeatureBadge from "../components/FeatureBadge.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { logAICall } from "../hooks/useAIActivity.js";
@@ -242,7 +243,8 @@ function ChatPanel() {
   };
 
   return (
-    <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:600}}>
+    <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:600,position:"relative"}}>
+      <FeatureBadge id="DB-07" />
       {/* Header */}
       <div style={{background:T.navy,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
         <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}}/></div>
@@ -418,7 +420,8 @@ export default function DashboardScreen() {
 
   return (
     <AppShell toast={toast}>
-      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px"}}>
+      <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px",position:"relative"}}>
+        <FeatureBadge id="DB-01" />
 
         {/* Masthead */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
@@ -435,7 +438,8 @@ export default function DashboardScreen() {
 
         {/* FEATURE: DB-02 — Stats strip */}
         {/* Stats strip */}
-        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`}}>
+        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`,position:"relative"}}>
+          <FeatureBadge id="DB-02" />
           {[["Active Tasks",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
