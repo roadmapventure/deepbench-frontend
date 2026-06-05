@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | SharedUI.jsx | Shared Treasury UI components — AiBadge, AgentAvatar, FlagCard, etc.
+// FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
 // Used across all screens. Import from here, never re-define in screen files.

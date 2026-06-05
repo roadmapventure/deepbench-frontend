@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | VendorDiversityTab.jsx | Analyzer Vendor Diversity tab — HHI, Lorenz curve
+// FEATURE: AZ-14 — Tab: Vendor Diversity/HHI
 // src/screens/analyzer/VendorDiversityTab.jsx — v5.0.0
 // Vendor Diversity / HHI tab — Lorenz curve, traffic lights, category dominance
 

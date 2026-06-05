@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | AIReviewTab.jsx | Analyzer AI Review tab — agent picker, briefing generation
+// FEATURE: AZ-15 — Tab: AI Review
 // src/screens/analyzer/AIReviewTab.jsx — v5.0.0
 // AI Review tab — 3-stage agent picker, briefing generation, results + Christy upsell
 

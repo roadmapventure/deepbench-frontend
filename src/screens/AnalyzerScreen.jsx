@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | AnalyzerScreen.jsx | NIGP spend analyzer — CSV upload, column mapping, 12+ tabs
 // src/screens/AnalyzerScreen.jsx — v5.0.0
 // DeepBench v5 — NIGP Analyzer (/work/[taskId]/analyze)
 // Orchestrates all 10+ tabs. Imports sub-components for complex tabs.
@@ -45,6 +46,8 @@ const NAV_GROUPS = [
   ]},
 ];
 
+// FEATURE: AZ-01 — CSV upload + PapaParse
+// FEATURE: AZ-18 — Austin demo pre-load
 // ── Data source landing screen ──────────────────────────────────────────────
 function DataSourceScreen({ taskId }) {
   const { processFile, setError } = useAnalyzer();
@@ -124,6 +127,7 @@ function DataSourceScreen({ taskId }) {
   );
 }
 
+// FEATURE: AZ-02 — Column mapping screen
 // ── Column mapping screen ───────────────────────────────────────────────────
 function MappingScreen() {
   const { columns, fileName, mapping, setMapping, error, runAnalysis, activeTab, setStage, setActiveTab } = useAnalyzer();
@@ -208,6 +212,7 @@ function AnalyzerView({ taskId }) {
   const renderTab = () => {
     if (!data) return null;
 
+    // FEATURE: AZ-06 — Tab: Dashboard/Overview
     if (activeTab==="overview") return (
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
         {data.flags.length>0&&(
@@ -252,6 +257,7 @@ function AnalyzerView({ taskId }) {
       </div>
     );
 
+    // FEATURE: AZ-07 — Tab: Categories
     if (activeTab==="categories") return (
       <Card title="All Categories — Full Spend Breakdown" subtitle={`${data.classArr.length} categories`} span2>
         <ResponsiveContainer width="100%" height={Math.max(500,data.classArr.length*26)}>
@@ -268,6 +274,7 @@ function AnalyzerView({ taskId }) {
       </Card>
     );
 
+    // FEATURE: AZ-08 — Tab: Treemap
     if (activeTab==="treemap") {
       setTreemapTotal(data.totalSpend);
       return (
@@ -281,6 +288,7 @@ function AnalyzerView({ taskId }) {
       );
     }
 
+    // FEATURE: AZ-09 — Tab: Vendors
     if (activeTab==="vendors"&&data.hasVendor) return (
       <Card title="Top 15 Vendors by Spend" span2>
         <ResponsiveContainer width="100%" height={440}>
@@ -297,6 +305,7 @@ function AnalyzerView({ taskId }) {
       </Card>
     );
 
+    // FEATURE: AZ-10 — Tab: Departments
     if (activeTab==="departments"&&data.hasDept) return (
       <Card title="Spend by Department" span2>
         <ResponsiveContainer width="100%" height={Math.max(430,data.deptArr.length*28)}>
@@ -312,6 +321,7 @@ function AnalyzerView({ taskId }) {
       </Card>
     );
 
+    // FEATURE: AZ-11 — Tab: Timeline
     if (activeTab==="timeline"&&data.hasDate) return (
       <Card title="Monthly Spend" subtitle="Total procurement spend by month" span2>
         <ResponsiveContainer width="100%" height={380}>
@@ -329,6 +339,7 @@ function AnalyzerView({ taskId }) {
       </Card>
     );
 
+    // FEATURE: AZ-12 — Tab: Concerns/Flags
     if (activeTab==="flags") return (
       <div>
         <div style={{marginBottom:18}}>
@@ -351,14 +362,17 @@ function AnalyzerView({ taskId }) {
       </div>
     );
 
+    // FEATURE: AZ-13 — Tab: Local Spend
     if (activeTab==="localspend") return (
       <LocalSpendTab data={data} mapping={mapping} localViewBy={localViewBy} setLocalViewBy={setLocalViewBy} localSelected={localSelected} setLocalSelected={setLocalSelected} localApplied={localApplied} setLocalApplied={setLocalApplied}/>
     );
 
+    // FEATURE: AZ-14 — Tab: Vendor Diversity/HHI
     if (activeTab==="concentration") return (
       <VendorDiversityTab vc={vc} data={data} hhiTooltipVisible={hhiTooltipVisible} setHhiTooltipVisible={setHhiTooltipVisible}/>
     );
 
+    // FEATURE: AZ-15 — Tab: AI Review
     if (activeTab==="aibriefing") return (
       <AIReviewTab data={data} fileName={fileName} agents={agents} mapping={mapping}
         aiReviewStage={aiReviewStage} setAiReviewStage={setAiReviewStage}
@@ -371,6 +385,7 @@ function AnalyzerView({ taskId }) {
       />
     );
 
+    // FEATURE: AZ-16 — Tab: Cleanup
     if (activeTab==="cleanup") return (
       <div>
         <div style={{marginBottom:16}}>
@@ -403,6 +418,7 @@ function AnalyzerView({ taskId }) {
       </div>
     );
 
+    // FEATURE: AZ-17 — Tab: Full Table
     if (activeTab==="table") return (
       <Card title="Full Category Table" subtitle="All categories with spend breakdown" span2>
         <input placeholder="Search category name or code…" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} style={{width:"100%",boxSizing:"border-box",marginBottom:14,background:T.cardAlt,border:`1px solid ${T.line}`,padding:"9px 14px",color:T.ink,fontSize:13,outline:"none",fontFamily:body}}/>

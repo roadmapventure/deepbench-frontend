@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | tokens.js | Treasury design system — colors, fonts, formatters
+// FEATURE: SH-01 — Treasury design tokens
 // src/tokens.js — v5.0.0
 // DeepBench v5 — Treasury Design System Constants
 // Single source of truth for all colors, fonts, and shared UI patterns.

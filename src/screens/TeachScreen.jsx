@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | TeachScreen.jsx | Teach an agent — upload doc, AI metadata, ingest to RAG
+// FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
 // Upload doc → extract text → AI metadata → form → save to Supabase via /api/ingest

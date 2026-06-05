@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | useAgents.js | Agent roster hook — wraps AGENTS data array
+// FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
 // Returns the agent roster. Swap internals for Supabase query when auth arrives.
 // All components use this hook — never import AGENTS directly from data/agents.js.

@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | useAIStatus.js | Universal AI status dot — pulsing brass indicator
+// FEATURE: AI-02 — Universal AI status dot
 // src/hooks/useAIStatus.js — v5.0.0
 // Global AI status indicator — any component writes to this, one indicator renders.
 // The pulsing brass dot in the header reflects whatever is active across the app.

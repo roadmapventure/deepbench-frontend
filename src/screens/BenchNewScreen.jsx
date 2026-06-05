@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | BenchNewScreen.jsx | Add a Player — agent creation wizard stub
 // src/screens/BenchNewScreen.jsx — v5.0.0
 // DeepBench v5 — Add a Player (/bench/new)
 // 2-step wizard UI stubbed with Coming Soon

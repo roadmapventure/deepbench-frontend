@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | main.jsx | App entry point — React root + all routes
+// FEATURE: SH-04 — All routes
 // src/main.jsx — v5.0.0
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

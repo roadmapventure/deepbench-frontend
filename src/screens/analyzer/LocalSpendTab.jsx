@@ -1,3 +1,5 @@
+// DeepBench v5.1.0 | LocalSpendTab.jsx | Analyzer Local Spend tab — city/state filter, breakdown
+// FEATURE: AZ-13 — Tab: Local Spend
 // src/screens/analyzer/LocalSpendTab.jsx — v5.0.1
 // Local Spend tab — city/state filter, local vs out-of-area breakdown
 

@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | FetchScreen.jsx | Fetch agent — configure portal, SSE event log, screenshot stream
 // src/screens/FetchScreen.jsx — v5.0.0
 // DeepBench v5 — Fetch Agent (/work/[taskId]/fetch)
 // Configure screen + running screen with SSE event log + screenshot pane
@@ -11,6 +12,8 @@ import { useFetch } from "../contexts/FetchContext.jsx";
 import { FETCH_STATES } from "../data/agents.js";
 import { FETCH_API_BASE as FETCH_BASE } from "../config.js";
 
+// FEATURE: FT-01 — Fetch config
+// FEATURE: FT-06 — Pat selectable as fetch agent
 // ── Configure Screen ──────────────────────────────────────────────────────────
 function ConfigureScreen({ taskId }) {
   const navigate = useNavigate();
@@ -86,6 +89,9 @@ function ConfigureScreen({ taskId }) {
   );
 }
 
+// FEATURE: FT-02 — SSE connection to Railway
+// FEATURE: FT-03 — Agent running screen
+// FEATURE: FT-04 — Post-fetch download + analyze button
 // ── Running Screen ────────────────────────────────────────────────────────────
 function RunningScreen({ taskId }) {
   const navigate = useNavigate();

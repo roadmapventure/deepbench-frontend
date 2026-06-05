@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | TaskInstructionsScreen.jsx | Task instructions — step timeline, HITL, editing
 // src/screens/TaskInstructionsScreen.jsx — v5.0.0
 // DeepBench v5 — Task instructions + step detail (/work/[taskId])
 // Step timeline with HITL/sub-agent badges, per-step comment textarea,
@@ -89,6 +90,7 @@ function StepRow({ step, index, navigate }) {
             <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 6px",background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,marginLeft:"auto"}}>{ss.label}</span>
           </div>
 
+          {/* FEATURE: TI-04 — Inline step editing */}
           {/* Step text — editable inline */}
           {editing ? (
             <div style={{marginBottom:6}}>
@@ -125,6 +127,7 @@ function StepRow({ step, index, navigate }) {
           {isHITL && step.status==="waiting" && !step.text.toLowerCase().includes("data source") && (
             <button style={{fontFamily:mono,fontSize:8,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 10px",cursor:"pointer",fontWeight:700,textTransform:"uppercase",letterSpacing:.3}}>Approve ✓</button>
           )}
+          {/* FEATURE: TI-08 — View Brent CTA (sub-agent navigation) */}
           {isSubAgent && (
             <button onClick={()=>navigate(`/bench/${step.agentId||"brent"}`)}
               style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",background:"rgba(45,111,181,.1)",border:`1px solid rgba(45,111,181,.3)`,padding:"5px 10px",cursor:"pointer",fontWeight:700,textTransform:"uppercase",letterSpacing:.3,whiteSpace:"nowrap"}}>View {step.agentName?.split(" ")[0]||"Brent"} →</button>
@@ -148,6 +151,8 @@ function StepRow({ step, index, navigate }) {
   );
 }
 
+// FEATURE: TI-01 — Step timeline
+// FEATURE: TI-02 — HITL step navigation
 // ── Task Instructions Screen ──────────────────────────────────────────────────
 export default function TaskInstructionsScreen() {
   const { taskId } = useParams();
@@ -187,7 +192,9 @@ export default function TaskInstructionsScreen() {
                 {task.hasHITL&&<span style={{fontFamily:mono,fontSize:8,padding:"1px 7px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.3)`,fontWeight:700}}>● HUMAN STEPS: {steps.filter(s=>s.type==="hitl").length}</span>}
               </div>
             </div>
-            {/* Re-run All + Mark Complete */}
+            {/* FEATURE: TI-05 — Re-run All button */}
+          {/* FEATURE: TI-06 — Mark Complete button */}
+          {/* Re-run All + Mark Complete */}
             <div style={{display:"flex",gap:8,flexShrink:0}}>
               <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
               <button style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
@@ -209,6 +216,7 @@ export default function TaskInstructionsScreen() {
 
           {/* Steps */}
           <div>
+            {/* FEATURE: TI-07 — Chat transcript section */}
             {/* ── This task started from a conversation ── */}
           {task.fromChat && (
             <div style={{background:`rgba(45,111,181,.05)`,border:`1px solid rgba(45,111,181,.2)`,padding:"12px 16px",marginBottom:14,position:"relative"}}>

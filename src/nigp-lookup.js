@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | nigp-lookup.js | NIGP Commodity Codes — 18th Edition lookup table
 // nigp-lookup.js — v5.0.0
 // NIGP Commodity Codes — 18th Edition
 // Extracted from official NIGP PDF (264 class codes, 8,239 subclass codes)

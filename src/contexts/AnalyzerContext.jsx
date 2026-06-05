@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | AnalyzerContext.jsx | Analyzer state context — persists across tab navigation
 // src/contexts/AnalyzerContext.jsx — v5.0.1
 // DeepBench v5 — Analyzer state scoped to task route
 // Lifted here so state persists when navigating between analyzer tabs.

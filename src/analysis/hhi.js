@@ -1,3 +1,4 @@
+// DeepBench v5.1.0 | hhi.js | HHI vendor concentration scoring — deterministic, no AI
 // src/analysis/hhi.js — v5.0.1
 // DeepBench v5 — HHI vendor concentration scoring
 // DETERMINISTIC — no AI badge. Pure math only.
