@@ -1,4 +1,4 @@
-// DeepBench v5.1.9 | TaskInstructionsScreen.jsx | Step merge + color fix
+// DeepBench v5.1.10 | TaskInstructionsScreen.jsx | AG-04 Michelle presence
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -240,6 +240,8 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
     </div>
   );
 }
+
+const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
 
 // FEATURE: TI-01 — Step timeline
 // FEATURE: TI-02 — HITL step navigation
@@ -581,6 +583,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
               </div>
             )}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
+            {/* FEATURE: AG-04 — Michelle Manning agent presence */}
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
+              <FeatureBadge id="AG-04" />
+              {updatingPlan && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
+              <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {updatingPlan ? "is updating your plan..." : "created this plan"}</span>
+            </div>
             <StepList
               activeSteps={mergedSteps.active}
               archivedSteps={mergedSteps.archived}
