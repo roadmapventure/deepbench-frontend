@@ -1,16 +1,13 @@
-// DeepBench v5.1.0 | FetchScreen.jsx | Fetch agent — configure portal, SSE event log, screenshot stream
-// src/screens/FetchScreen.jsx — v5.0.0
-// DeepBench v5 — Fetch Agent (/work/[taskId]/fetch)
-// Configure screen + running screen with SSE event log + screenshot pane
+// DeepBench v5.1.2 | FetchScreen.jsx | Fetch screen + CSV Storage save
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono, ACTION_COLORS_FETCH, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners } from "../components/SharedUI.jsx";
 import { useFetch } from "../contexts/FetchContext.jsx";
 import { FETCH_STATES } from "../data/agents.js";
-import { FETCH_API_BASE as FETCH_BASE } from "../config.js";
+import { FETCH_API_BASE as FETCH_BASE, TENANT_ID } from "../config.js";
 
 // FEATURE: FT-01 — Fetch config
 // FEATURE: FT-06 — Pat selectable as fetch agent
@@ -92,6 +89,7 @@ function ConfigureScreen({ taskId }) {
 // FEATURE: FT-02 — SSE connection to Railway
 // FEATURE: FT-03 — Agent running screen
 // FEATURE: FT-04 — Post-fetch download + analyze button
+// FEATURE: SH-07 — Save fetched CSV to Supabase Storage
 // ── Running Screen ────────────────────────────────────────────────────────────
 function RunningScreen({ taskId }) {
   const navigate = useNavigate();
@@ -104,6 +102,36 @@ function RunningScreen({ taskId }) {
   } = useFetch();
 
   useEffect(() => { scrollToLatest(); }, [fetchEvents, scrollToLatest]);
+
+  const uploadedRef = useRef(false);
+  useEffect(() => {
+    if (!fetchComplete?.success || !fetchComplete.filePath || uploadedRef.current) return;
+    uploadedRef.current = true;
+    (async () => {
+      try {
+        const downloadUrl = `${FETCH_BASE}/agent/download?file=${encodeURIComponent(fetchComplete.filePath)}`;
+        const csvRes = await fetch(downloadUrl);
+        if (!csvRes.ok) return;
+        const blob = await csvRes.blob();
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const uploadRes = await fetch("/api/upload-csv", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ fileBase64: base64, taskId, tenantId: TENANT_ID }),
+        });
+        const json = await uploadRes.json();
+        if (json.path) console.log("Fetched CSV saved to Storage:", json.path);
+        else if (json.error) console.error("Fetched CSV Storage error:", json.error);
+      } catch (err) {
+        console.error("Fetched CSV Storage save failed:", err);
+      }
+    })();
+  }, [fetchComplete, taskId]);
 
   const portal      = FETCH_STATES.find(s => s.key === fetchState);
   const isPat       = fetchAgentId === "pat";

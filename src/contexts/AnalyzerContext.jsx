@@ -1,7 +1,4 @@
-// DeepBench v5.1.0 | AnalyzerContext.jsx | Analyzer state context — persists across tab navigation
-// src/contexts/AnalyzerContext.jsx — v5.0.1
-// DeepBench v5 — Analyzer state scoped to task route
-// Lifted here so state persists when navigating between analyzer tabs.
+// DeepBench v5.1.2 | AnalyzerContext.jsx | Analyzer state + CSV Storage sync
 
 import { createContext, useContext, useState, useRef, useCallback, useMemo } from "react";
 import Papa from "papaparse";
@@ -145,7 +142,8 @@ export function AnalyzerProvider({ children }) {
   const hiddenInputRef = useRef();
 
   // ── processFile ──────────────────────────────────────────────────────────
-  const processFile = useCallback(file => {
+  // FEATURE: SH-07 — CSV Storage upload after processFile
+  const processFile = useCallback((file, taskId) => {
     if (!file) return;
     setLoading(true); setError(""); setFileName(file.name);
     fileStore.current = file;
@@ -158,6 +156,26 @@ export function AnalyzerProvider({ children }) {
         setMapping(autoDetect(cols));
         setStage("map");
         setLoading(false);
+        if (taskId && taskId !== "1") {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const base64 = e.target.result.split(",")[1];
+              const res = await fetch("/api/upload-csv", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ fileBase64: base64, taskId, tenantId: TENANT_ID }),
+              });
+              const json = await res.json();
+              if (json.path) console.log("CSV saved to Storage:", json.path);
+              else if (json.error) console.error("CSV Storage upload error:", json.error);
+            } catch (err) {
+              console.error("CSV Storage upload failed:", err);
+            }
+          };
+          reader.onerror = (err) => console.error("CSV read for upload failed:", err);
+          reader.readAsDataURL(file);
+        }
       },
       error: e => { setError("Parse error: " + e.message); setLoading(false); },
     });

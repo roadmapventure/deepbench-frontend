@@ -1,9 +1,6 @@
-// DeepBench v5.1.0 | AnalyzerScreen.jsx | NIGP spend analyzer — CSV upload, column mapping, 12+ tabs
-// src/screens/AnalyzerScreen.jsx — v5.0.0
-// DeepBench v5 — NIGP Analyzer (/work/[taskId]/analyze)
-// Orchestrates all 10+ tabs. Imports sub-components for complex tabs.
+// DeepBench v5.1.2 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -11,10 +8,11 @@ import {
 } from "recharts";
 import { T, display, body, mono, PALETTE, fmtFull, fmtPct, fmt, shortLabel, parseAmt, toTC } from "../tokens.js";
 import { TENANT_ID, FETCH_API_BASE } from "../config.js";
+import { supabase } from "../lib/supabase.js";
 import { AppShell } from "../AppShell.jsx";
 import {
   Corners, Card, PctBar, PctBarLabel, Tip, TreeCell, setTreemapTotal,
-  TimelinePctLabel, FlagCard, AiBadge,
+  TimelinePctLabel, FlagCard, AiBadge, FeatureBadge,
 } from "../components/SharedUI.jsx";
 import { useAnalyzer, FIELD_DEFS } from "../contexts/AnalyzerContext.jsx";
 import { useFetch } from "../contexts/FetchContext.jsx";
@@ -48,18 +46,53 @@ const NAV_GROUPS = [
 
 // FEATURE: AZ-01 — CSV upload + PapaParse
 // FEATURE: AZ-18 — Austin demo pre-load
+// FEATURE: SH-07 — Auto-load CSV from Storage on return visit
 // ── Data source landing screen ──────────────────────────────────────────────
 function DataSourceScreen({ taskId }) {
   const { processFile, setError } = useAnalyzer();
   const navigate = useNavigate();
   const hiddenRef = useRef();
-  const scC = (
-    <>
-      {[["top:4px;left:4px","border-top:1.5px solid #b6873a;border-left:1.5px solid #b6873a"],["top:4px;right:4px","border-top:1.5px solid #b6873a;border-right:1.5px solid #b6873a"],["bottom:4px;left:4px","border-bottom:1.5px solid #b6873a;border-left:1.5px solid #b6873a"],["bottom:4px;right:4px","border-bottom:1.5px solid #b6873a;border-right:1.5px solid #b6873a"]].map(([pos],i)=>(
-        <div key={i} style={{position:"absolute",...Object.fromEntries(pos.split(";").map(s=>[s.split(":")[0],s.split(":")[1]])),width:9,height:9,...Object.fromEntries([["top:4px;left:4px","borderTop:1.5px solid #b6873a,borderLeft:1.5px solid #b6873a"],["top:4px;right:4px","borderTop:1.5px solid #b6873a,borderRight:1.5px solid #b6873a"],["bottom:4px;left:4px","borderBottom:1.5px solid #b6873a,borderLeft:1.5px solid #b6873a"],["bottom:4px;right:4px","borderBottom:1.5px solid #b6873a,borderRight:1.5px solid #b6873a"]][i][1].split(",").map(s=>[s.split(":")[0],s.split(":")[1]]))}}/>
-      ))}
-    </>
-  );
+  const [storageLoading, setStorageLoading] = useState(false);
+
+  useEffect(() => {
+    if (!taskId) return;
+    if (taskId === "1") {
+      (async () => {
+        try {
+          const res = await fetch("/Austin_2025Data_.csv");
+          if (!res.ok) throw new Error("Could not load demo file");
+          const blob = await res.blob();
+          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }));
+        } catch (e) { setError("Demo failed: " + e.message); }
+      })();
+      return;
+    }
+    setStorageLoading(true);
+    (async () => {
+      try {
+        const { data: taskData, error: taskErr } = await supabase
+          .from("tasks")
+          .select("csv_path")
+          .eq("id", taskId)
+          .single();
+        if (taskErr || !taskData?.csv_path) { setStorageLoading(false); return; }
+        const { data: signedData, error: signErr } = await supabase.storage
+          .from("task-data")
+          .createSignedUrl(taskData.csv_path, 3600);
+        if (signErr || !signedData?.signedUrl) { setStorageLoading(false); return; }
+        const csvRes = await fetch(signedData.signedUrl);
+        if (!csvRes.ok) { setStorageLoading(false); return; }
+        const blob = await csvRes.blob();
+        const fileName = taskData.csv_path.split("/").pop() || "file.csv";
+        console.log("Loaded previous CSV:", taskData.csv_path);
+        processFile(new File([blob], fileName, { type: "text/csv" }));
+      } catch (e) {
+        console.error("Auto-load from Storage failed:", e);
+        setStorageLoading(false);
+      }
+    })();
+  }, [taskId]);
+
   const loadDemo = async () => {
     try {
       const res = await fetch("/Austin_2025Data_.csv");
@@ -68,8 +101,19 @@ function DataSourceScreen({ taskId }) {
       processFile(new File([blob], "Austin_2025Data_.csv", { type:"text/csv" }));
     } catch(e) { setError("Demo failed: " + e.message); }
   };
+
+  if (storageLoading) return (
+    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:8}}>Loading your previous data…</div>
+        <div style={{fontFamily:mono,fontSize:12,color:T.brass,letterSpacing:1}}>Retrieving CSV from Supabase Storage</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px"}}>
+    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px",position:"relative"}}>
+      <FeatureBadge id="SH-07" />
       <div style={{fontFamily:mono,fontSize:10,letterSpacing:3,textTransform:"uppercase",color:T.brass,marginBottom:10}}>Roadmap Venture · Procurement Intelligence</div>
       <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
       <p style={{fontSize:13.5,color:T.muted,lineHeight:1.65,maxWidth:580,marginBottom:28}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>
@@ -117,9 +161,9 @@ function DataSourceScreen({ taskId }) {
           <span style={{fontSize:24,marginBottom:10,display:"block"}}>📂</span>
           <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:T.navy,marginBottom:5}}>Upload Your Own File</div>
           <div style={{fontSize:12,color:T.muted,lineHeight:1.6,flex:1}}>Drop or select a procurement CSV from your system.</div>
-          <div onClick={()=>hiddenRef.current.click()} onDrop={e=>{e.preventDefault();processFile(e.dataTransfer.files[0]);}} onDragOver={e=>e.preventDefault()}>
+          <div onClick={()=>hiddenRef.current.click()} onDrop={e=>{e.preventDefault();processFile(e.dataTransfer.files[0], taskId);}} onDragOver={e=>e.preventDefault()}>
             <div style={{marginTop:14,display:"inline-block",padding:"9px 18px",fontWeight:700,fontSize:12,fontFamily:display,cursor:"pointer",background:"transparent",border:`1.5px solid ${T.brass}`,color:T.brassDeep}}>↑ Upload CSV</div>
-            <input ref={hiddenRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>processFile(e.target.files[0])}/>
+            <input ref={hiddenRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>processFile(e.target.files[0], taskId)}/>
           </div>
         </div>
       </div>
