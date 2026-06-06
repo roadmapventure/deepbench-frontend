@@ -415,7 +415,7 @@ function ChatPanel() {
                       taskType: TOPIC_TO_TASK_TYPE[selectedTopic] || null,
                       timestamp: new Date().toISOString(),
                     }));
-                    navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent((userMsg?.content || msg.content).slice(0,200))}`);
+                    navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent((userMsg?.content || "").slice(0,200))}`);
                   }}
                     style={{background:"transparent",border:"none",color:`${T.brass}80`,fontFamily:mono,fontSize:8,cursor:"pointer",padding:"3px 0",letterSpacing:.5,textDecoration:"underline",display:"block",marginTop:3}}>
                     + Save as Assignment

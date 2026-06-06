@@ -152,7 +152,8 @@ export default function AssignWorkScreen() {
   const agents     = useAgents();
 
   const prefillAgent = params.get("agent");
-  const prefillGoal  = params.get("q") ? decodeURIComponent(params.get("q")) : "";
+  const rawQ         = params.get("q") ? decodeURIComponent(params.get("q")) : "";
+  const prefillGoal  = rawQ.split("?")[0].trim();
 
   const [selectedType,    setSelectedType]    = useState(null);
   const [goal,            setGoal]            = useState(prefillGoal);
@@ -196,7 +197,7 @@ export default function AssignWorkScreen() {
         }
       } catch(e) { /* ignore */ }
     }
-  }, []);
+  }, [params, agents]);
 
   const showToast = (msg,icon="✓") => { setToast({msg,icon}); setTimeout(()=>setToast(null),3000); };
 
