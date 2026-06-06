@@ -1,4 +1,4 @@
-// DeepBench v5.1.1 | AssignWorkScreen.jsx | Assign work screen
+// DeepBench v5.1.3 | AssignWorkScreen.jsx | Assign work screen
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -79,13 +79,14 @@ Return a JSON object using the plan_task tool.`;
   }];
 
   try {
-    const res = await fetch("/api/brief", {
+    const res = await fetch("/api/plan", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
-        messages:[{role:"user",content:userMsg}],
-        systemPrompt, tools,
-        agent_id:"chloe", tenant_id:TENANT_ID,
-        skipRag:true, max_tokens:1200,
+        messages: [{role:"user", content:userMsg}],
+        systemPrompt,
+        tools,
+        max_tokens: 1200,
+        tenant_id: TENANT_ID,
       })
     });
     const data = await res.json();
@@ -295,10 +296,13 @@ export default function AssignWorkScreen() {
               placeholder="Describe what you need in plain English. The planning agent will break it into steps and suggest agents…"
               style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
 
-            <button onClick={generatePlan} disabled={!canGenerate||generating}
-              style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:14}}>
-              <AiBadge/> {generating?"Planning agent is building your task…":planGenerated?"Re-generate Plan":"Generate Plan"}
-            </button>
+            <div style={{position:"relative",marginBottom:14}}>
+              <FeatureBadge id="AW-04" />
+              <button onClick={generatePlan} disabled={!canGenerate||generating}
+                style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <AiBadge/> {generating?"Planning agent is building your task…":planGenerated?"Re-generate Plan":"Generate Plan"}
+              </button>
+            </div>
 
             {/* FEATURE: AW-04 — Planning agent clarifying questions */}
             {/* Clarifying questions */}
