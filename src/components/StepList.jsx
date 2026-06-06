@@ -1,4 +1,4 @@
-// DeepBench v5.1.9 | StepList.jsx | patch2 — threaded rendering
+// DeepBench v5.1.10p | StepList.jsx | AG-04b isUpdating pulse prop
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
@@ -341,6 +341,7 @@ export default function StepList({
   answers,
   setAnswers,
   updatingPlan,
+  isUpdating = false,
   onUpdatePlan,
   navigate,
   isCompleted = false,
@@ -356,8 +357,8 @@ export default function StepList({
       <FeatureBadge id="TI-09" />
 
       {/* Active steps + threaded pending-archive cards */}
-      {activeSteps.map((step, i) => (
-        <Fragment key={step.id ?? `step-${i}`}>
+      {activeSteps.map((step, i) => {
+        const card = (
           <StepCard
             step={step}
             index={i}
@@ -370,15 +371,24 @@ export default function StepList({
             isCompleted={isCompleted}
             onRemoveStep={onRemoveStep}
           />
-          {step.pendingArchive && (
-            <ThreadedArchiveCard
-              oldStep={step.pendingArchive}
-              onArchive={() => onArchiveStep && onArchiveStep(step.pendingArchive)}
-              onKeep={() => onKeepStep && onKeepStep(step, step.pendingArchive)}
-            />
-          )}
-        </Fragment>
-      ))}
+        );
+        return (
+          <Fragment key={step.id ?? `step-${i}`}>
+            {/* FEATURE: AG-04b — Update Plan thinking state */}
+            {isUpdating
+              ? <div style={{ opacity: 0.6, animation: "pdot 2s ease-in-out infinite" }}>{card}</div>
+              : card
+            }
+            {step.pendingArchive && (
+              <ThreadedArchiveCard
+                oldStep={step.pendingArchive}
+                onArchive={() => onArchiveStep && onArchiveStep(step.pendingArchive)}
+                onKeep={() => onKeepStep && onKeepStep(step, step.pendingArchive)}
+              />
+            )}
+          </Fragment>
+        );
+      })}
 
       {/* Review status line — shown after any regeneration */}
       {hasRegenerated && (

@@ -1,4 +1,4 @@
-// DeepBench v5.1.10 | TaskInstructionsScreen.jsx | AG-04 Michelle presence
+// DeepBench v5.1.10p | TaskInstructionsScreen.jsx | AG-04a+b avatar + thinking state
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase.js";
 import { TENANT_ID } from "../config.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
 import StepList from "../components/StepList.jsx";
+import MichelleAvatar from "../components/MichelleAvatar.jsx";
 
 // FEATURE: TI-03 — Task loaded from Supabase
 // FEATURE: AW-13 — Clarifying questions as HITL step
@@ -583,12 +584,38 @@ where needed. Use the plan_task tool to return a structured plan.`;
               </div>
             )}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
-            {/* FEATURE: AG-04 — Michelle Manning agent presence */}
+            {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
-              <FeatureBadge id="AG-04" />
+              <FeatureBadge id="AG-04a" />
+              <MichelleAvatar size="sm" />
               {updatingPlan && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
               <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {updatingPlan ? "is updating your plan..." : "created this plan"}</span>
             </div>
+
+            {/* FEATURE: AG-04b — Michelle is thinking overlay */}
+            {updatingPlan && (
+              <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(221,213,190,0.4)",borderRadius:6,padding:12,marginBottom:10,position:"relative"}}>
+                <FeatureBadge id="AG-04b" />
+                <MichelleAvatar size="md" />
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <span style={{fontFamily:body,fontSize:14,color:T.navy}}>Michelle is thinking...</span>
+                    <div style={{width:14,height:14,border:`2px solid rgba(182,135,58,0.2)`,borderTopColor:T.brass,borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
+                  </div>
+                  <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep}}>
+                    Reviewing your plan and identifying what needs to change.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* FEATURE: AG-04b — Update Plan thinking state */}
+            {updatingPlan && (
+              <div style={{height:3,width:"100%",background:"rgba(182,135,58,0.15)",overflow:"hidden",marginBottom:8}}>
+                <div style={{height:"100%",background:`linear-gradient(90deg,transparent 0%,${T.brass} 50%,transparent 100%)`,backgroundSize:"200% 100%",animation:"shimmer 1.4s linear infinite"}}/>
+              </div>
+            )}
+
             <StepList
               activeSteps={mergedSteps.active}
               archivedSteps={mergedSteps.archived}
@@ -598,6 +625,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
               answers={answers}
               setAnswers={setAnswers}
               updatingPlan={updatingPlan}
+              isUpdating={updatingPlan}
               onUpdatePlan={handleUpdatePlan}
               navigate={navigate}
               isCompleted={isCompleted}

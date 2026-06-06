@@ -1,4 +1,4 @@
-// DeepBench v5.1.10 | AssignWorkScreen.jsx | AG-04 Michelle presence
+// DeepBench v5.1.10p | AssignWorkScreen.jsx | AG-04a avatar in byline
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -11,6 +11,7 @@ import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
 import StepList from "../components/StepList.jsx";
+import MichelleAvatar from "../components/MichelleAvatar.jsx";
 
 const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
 
@@ -432,10 +433,11 @@ export default function AssignWorkScreen() {
               </button>
             </div>
 
-            {/* FEATURE: AG-04 — Michelle Manning agent presence */}
+            {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             {(generating || questions.length > 0) && (
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
-                <FeatureBadge id="AG-04" />
+                <FeatureBadge id="AG-04a" />
+                <MichelleAvatar size="sm" />
                 {generating && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
                 <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} is asking these questions</span>
               </div>
@@ -472,10 +474,11 @@ export default function AssignWorkScreen() {
           <div>
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 3 — Living Plan</div>
 
-            {/* FEATURE: AG-04 — Michelle Manning agent presence */}
+            {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             {(generating || planGenerated) && (
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
-                <FeatureBadge id="AG-04" />
+                <FeatureBadge id="AG-04a" />
+                <MichelleAvatar size="sm" />
                 {generating && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
                 <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {generating ? "is building your plan..." : "built this plan"}</span>
               </div>
