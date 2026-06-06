@@ -55,10 +55,13 @@ function DataSourceScreen({ taskId }) {
   const [storageLoading, setStorageLoading] = useState(false);
 
   useEffect(() => {
-    if (autoLoaded) return;
-    if (!taskId) return;
+    console.log("Auto-load check:", { taskId, autoLoaded });
+    if (autoLoaded) { console.log("Already loaded, skipping"); return; }
+    if (!taskId) { console.log("No taskId, skipping"); return; }
+    console.log("Starting auto-load for taskId:", taskId);
     setAutoLoaded(true);
     if (taskId === "1") {
+      console.log("Demo task detected, loading Austin CSV");
       (async () => {
         try {
           const res = await fetch("/Austin_2025Data_.csv");
