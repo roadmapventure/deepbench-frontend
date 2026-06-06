@@ -1,4 +1,4 @@
-// DeepBench v5.1.5 | TaskInstructionsScreen.jsx | Task instructions
+// DeepBench v5.1.6 | TaskInstructionsScreen.jsx | Task instructions
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -286,10 +286,11 @@ export default function TaskInstructionsScreen() {
     </AppShell>
   );
 
-  const agent     = agents.find(a => a.id === (task.agentId || task.agent_id));
-  const steps     = task.steps || [];
-  const doneCount = steps.filter(s => s.status === "done" || s.status === "skipped").length;
-  const progress  = steps.length ? Math.round(doneCount / steps.length * 100) : 0;
+  const agent      = agents.find(a => a.id === (task.agentId || task.agent_id));
+  const steps      = task.steps || [];
+  const doneCount  = steps.filter(s => s.status === "done" || s.status === "skipped").length;
+  const progress   = steps.length ? Math.round(doneCount / steps.length * 100) : 0;
+  const chatOrigin = task.fromChat || task.chat_origin;
 
   return (
     <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
@@ -344,7 +345,7 @@ export default function TaskInstructionsScreen() {
           {/* Steps */}
           <div>
             {/* FEATURE: TI-07 — Chat transcript section */}
-            {task.fromChat && (
+            {chatOrigin && (
               <div style={{background:`rgba(45,111,181,.05)`,border:`1px solid rgba(45,111,181,.2)`,padding:"12px 16px",marginBottom:14,position:"relative"}}>
                 <Corners color="#2d6fb5"/>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
@@ -354,11 +355,11 @@ export default function TaskInstructionsScreen() {
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                     <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0,paddingTop:1}}>YOU</div>
-                    <div style={{background:T.navy,color:T.card,padding:"6px 10px",fontSize:11,fontFamily:body,lineHeight:1.5,flex:1}}>{task.fromChat.question}</div>
+                    <div style={{background:T.navy,color:T.card,padding:"6px 10px",fontSize:11,fontFamily:body,lineHeight:1.5,flex:1}}>{chatOrigin.question}</div>
                   </div>
                   <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,flexShrink:0,paddingTop:1}}>{task.fromChat.agentName.split(" ")[0].toUpperCase()}</div>
-                    <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"6px 10px",fontSize:11,fontFamily:body,color:T.mutedDeep,lineHeight:1.5,flex:1}}>{task.fromChat.answer}</div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,flexShrink:0,paddingTop:1}}>{chatOrigin.agentName?.split(" ")[0].toUpperCase()}</div>
+                    <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"6px 10px",fontSize:11,fontFamily:body,color:T.mutedDeep,lineHeight:1.5,flex:1}}>{chatOrigin.answer}</div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-// DeepBench v5.1.5 | AssignWorkScreen.jsx | Assign work screen
+// DeepBench v5.1.6 | AssignWorkScreen.jsx | Assign work screen
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -171,6 +171,18 @@ export default function AssignWorkScreen() {
   const goalRef         = useRef(null);
   const lastAutoGoalRef = useRef("");
 
+  const [chatContext, setChatContext] = useState(null);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem('chatContext');
+    if (raw && params.get('from') === 'chat') {
+      try {
+        setChatContext(JSON.parse(raw));
+        sessionStorage.removeItem('chatContext');
+      } catch(e) { /* ignore */ }
+    }
+  }, []);
+
   const showToast = (msg,icon="✓") => { setToast({msg,icon}); setTimeout(()=>setToast(null),3000); };
 
   const pendingQs   = questions.filter(q=>!answers[q.id]);
@@ -253,6 +265,13 @@ export default function AssignWorkScreen() {
         })),
         planSummary: steps.length > 0 ? `${steps.length} step plan` : "",
       },
+      chat_origin: chatContext ? {
+        agentId: chatContext.agentId,
+        agentName: chatContext.agentName,
+        question: chatContext.userQuestion,
+        answer: chatContext.agentAnswer,
+        timestamp: chatContext.timestamp,
+      } : null,
     });
     if (error) {
       console.error("Task save error:", error);
@@ -318,6 +337,31 @@ export default function AssignWorkScreen() {
           {/* LEFT: Goal + clarifying questions */}
           <div>
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 2 — Describe Your Goal</div>
+            {/* FEATURE: AW-12 — Chat context shown + saved */}
+            {chatContext && (
+              <div style={{background:"rgba(45,111,181,.05)",border:"1px solid rgba(45,111,181,.2)",padding:"12px 16px",marginBottom:12,position:"relative"}}>
+                <FeatureBadge id="AW-12" />
+                <div style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:8}}>
+                  Started from a conversation with {chatContext.agentName}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{display:"flex",gap:10}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0}}>YOU</div>
+                    <div style={{background:T.navy,color:T.card,padding:"6px 10px",fontSize:11,fontFamily:body,lineHeight:1.5,flex:1}}>
+                      {chatContext.userQuestion}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,flexShrink:0}}>
+                      {chatContext.agentName?.split(" ")[0].toUpperCase()}
+                    </div>
+                    <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"6px 10px",fontSize:11,fontFamily:body,color:T.mutedDeep,lineHeight:1.5,flex:1}}>
+                      {chatContext.agentAnswer}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <textarea value={goal} onChange={e=>setGoal(e.target.value)} ref={goalRef}
               placeholder="Describe what you need in plain English. The planning agent will break it into steps and suggest agents…"
               style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>

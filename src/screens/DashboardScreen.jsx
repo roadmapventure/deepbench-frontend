@@ -1,4 +1,4 @@
-// DeepBench v5.1.1 | DashboardScreen.jsx | Work dashboard — task list, stats, chat panel
+// DeepBench v5.1.6 | DashboardScreen.jsx | Work dashboard
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -350,12 +350,29 @@ function ChatPanel() {
                 <div style={{fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic",marginTop:3}}>This answer draws on general knowledge, not DeepBench training. Treat as a starting point.</div>
               )}
               {/* FEATURE: DB-13 — Save as Assignment */}
+              {/* FEATURE: AW-12 — Save as Assignment passes chat context */}
               {/* Save as Assignment */}
               {!msg.isRouting && (
-                <button onClick={()=>navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent(msg.content.slice(0,200))}`)}
-                  style={{background:"transparent",border:"none",color:`${T.brass}80`,fontFamily:mono,fontSize:8,cursor:"pointer",padding:"3px 0",letterSpacing:.5,textDecoration:"underline",display:"block",marginTop:3}}>
-                  + Save as Assignment
-                </button>
+                <div style={{position:"relative"}}>
+                  <FeatureBadge id="AW-12" />
+                  <button onClick={() => {
+                    const msgIndex = messages.indexOf(msg);
+                    const userMsg = messages.slice(0, msgIndex)
+                      .filter(m => m.role === "user")
+                      .pop();
+                    sessionStorage.setItem('chatContext', JSON.stringify({
+                      agentId: msg.agentId,
+                      agentName: agents.find(a => a.id === msg.agentId)?.name || "",
+                      userQuestion: userMsg?.content || "",
+                      agentAnswer: msg.content || "",
+                      timestamp: new Date().toISOString(),
+                    }));
+                    navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent((userMsg?.content || msg.content).slice(0,200))}`);
+                  }}
+                    style={{background:"transparent",border:"none",color:`${T.brass}80`,fontFamily:mono,fontSize:8,cursor:"pointer",padding:"3px 0",letterSpacing:.5,textDecoration:"underline",display:"block",marginTop:3}}>
+                    + Save as Assignment
+                  </button>
+                </div>
               )}
             </div>
           );
