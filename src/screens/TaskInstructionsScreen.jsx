@@ -250,7 +250,7 @@ export default function TaskInstructionsScreen() {
   const agents     = useAgents();
 
   const [task,         setTask]         = useState(null);
-  const [mergedSteps,  setMergedSteps]  = useState({ active: [], pendingArchive: [], archived: [] });
+  const [mergedSteps,  setMergedSteps]  = useState({ active: [], archived: [] });
   const [loading,      setLoading]      = useState(true);
   const [taskError,    setTaskError]    = useState(null);
   const [answers,      setAnswers]      = useState({});
@@ -473,20 +473,28 @@ where needed. Use the plan_task tool to return a structured plan.`;
     setTask(prev => ({ ...prev, status: 'completed' }));
   };
 
-  const handleArchiveStep = (step) => {
+  const handleArchiveStep = (oldStep) => {
     setMergedSteps(prev => ({
-      ...prev,
-      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
-      archived: [...prev.archived, { ...step, mergeStatus: "archived" }],
+      active: prev.active.map(s =>
+        s.pendingArchive?.label === oldStep.label
+          ? { ...s, pendingArchive: undefined }
+          : s
+      ),
+      archived: [...prev.archived, { ...oldStep, mergeStatus: "archived" }],
     }));
   };
 
-  const handleKeepStep = (step) => {
-    setMergedSteps(prev => ({
-      ...prev,
-      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
-      active: [...prev.active, { ...step, mergeStatus: "unchanged" }],
-    }));
+  const handleKeepStep = (parentStep, oldStep) => {
+    setMergedSteps(prev => {
+      const idx = prev.active.findIndex(s => s.label === parentStep.label);
+      const cleaned = prev.active.map(s =>
+        s.label === parentStep.label
+          ? { ...s, pendingArchive: undefined }
+          : s
+      );
+      cleaned.splice(idx + 1, 0, { ...oldStep, mergeStatus: "unchanged" });
+      return { ...prev, active: cleaned };
+    });
   };
 
   return (
@@ -575,7 +583,6 @@ where needed. Use the plan_task tool to return a structured plan.`;
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             <StepList
               activeSteps={mergedSteps.active}
-              pendingArchive={mergedSteps.pendingArchive}
               archivedSteps={mergedSteps.archived}
               onArchiveStep={handleArchiveStep}
               onKeepStep={handleKeepStep}

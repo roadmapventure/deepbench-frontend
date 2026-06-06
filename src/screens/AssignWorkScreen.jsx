@@ -172,7 +172,7 @@ export default function AssignWorkScreen() {
     }
   }, [prefillAgent, agents]);
   const [steps,           setSteps]           = useState([]);
-  const [mergedSteps,     setMergedSteps]     = useState({ active: [], pendingArchive: [], archived: [] });
+  const [mergedSteps,     setMergedSteps]     = useState({ active: [], archived: [] });
   const [questions,       setQuestions]       = useState([]);
   const [answers,         setAnswers]         = useState({});
   const [planSummary,     setPlanSummary]      = useState("");
@@ -258,20 +258,28 @@ export default function AssignWorkScreen() {
     setMergedSteps(prev => ({ ...prev, active: prev.active.filter(x=>x.id!==id) }));
   };
 
-  const handleArchiveStep = (step) => {
+  const handleArchiveStep = (oldStep) => {
     setMergedSteps(prev => ({
-      ...prev,
-      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
-      archived: [...prev.archived, { ...step, mergeStatus: "archived" }],
+      active: prev.active.map(s =>
+        s.pendingArchive?.label === oldStep.label
+          ? { ...s, pendingArchive: undefined }
+          : s
+      ),
+      archived: [...prev.archived, { ...oldStep, mergeStatus: "archived" }],
     }));
   };
 
-  const handleKeepStep = (step) => {
-    setMergedSteps(prev => ({
-      ...prev,
-      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
-      active: [...prev.active, { ...step, mergeStatus: "unchanged" }],
-    }));
+  const handleKeepStep = (parentStep, oldStep) => {
+    setMergedSteps(prev => {
+      const idx = prev.active.findIndex(s => s.label === parentStep.label);
+      const cleaned = prev.active.map(s =>
+        s.label === parentStep.label
+          ? { ...s, pendingArchive: undefined }
+          : s
+      );
+      cleaned.splice(idx + 1, 0, { ...oldStep, mergeStatus: "unchanged" });
+      return { ...prev, active: cleaned };
+    });
   };
 
   const answerQ = (id, val) => {
@@ -287,7 +295,7 @@ export default function AssignWorkScreen() {
 
   // FEATURE: SH-06 — Supabase tasks integration
   const handleApprove = async () => {
-    const activeSteps = mergedSteps.active.map(({ mergeStatus, ...s }) => s);
+    const activeSteps = mergedSteps.active.map(({ mergeStatus, pendingArchive, ...s }) => s);
     if (!selectedAgent || !activeSteps.length) { showToast("Generate a plan first", "⚠"); return; }
     setSaveState("saving");
     const taskTypeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || selectedType || "Data Analysis";
@@ -499,7 +507,6 @@ export default function AssignWorkScreen() {
                 <div style={{marginBottom:10}}>
                   <StepList
                     activeSteps={mergedSteps.active}
-                    pendingArchive={mergedSteps.pendingArchive}
                     archivedSteps={mergedSteps.archived}
                     onArchiveStep={handleArchiveStep}
                     onKeepStep={handleKeepStep}

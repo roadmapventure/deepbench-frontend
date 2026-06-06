@@ -1,10 +1,10 @@
-// DeepBench v5.1.9 | StepList.jsx | patch — color + archive approval
+// DeepBench v5.1.9 | StepList.jsx | patch2 — threaded rendering
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
-// FEATURE: TI-11 — Inline pending-archive approval + archived drawer
+// FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
 // FEATURE: TI-13 — Color coding preserved through regeneration
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { FeatureBadge } from "./SharedUI.jsx";
 import { AGENTS } from "../data/agents.js";
@@ -35,52 +35,60 @@ function AgentInitials({ name = "?", size = 18 }) {
   );
 }
 
-// ── Pending archive row — inline warning before user approves ─────────────────
-function PendingArchiveCard({ step, onArchiveStep, onKeepStep }) {
+// ── Threaded archive card — indented inline below its replacement step ────────
+function ThreadedArchiveCard({ oldStep, onArchive, onKeep }) {
   return (
-    <div style={{
-      border: "1px dashed #d1d5db",
-      backgroundColor: "#f9fafb",
-      borderRadius: 6,
-      padding: "12px 14px",
-      marginBottom: 8,
-      opacity: 0.85,
-    }}>
-      <div style={{ fontFamily: display, fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>
-        {step.label}
+    <div style={{ marginLeft: 32, marginBottom: 8 }}>
+      <div style={{
+        fontFamily: mono, fontSize: 10, color: "#9ca3af",
+        textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4,
+      }}>
+        ↳ PREVIOUSLY THIS STEP
       </div>
-      {step.text && (
-        <div style={{ fontFamily: body, fontSize: 12, color: "#9ca3af", lineHeight: 1.5, marginBottom: 8 }}>
-          {step.text}
+      <div style={{
+        border: "1px dashed #d1d5db",
+        borderLeft: "3px solid #d1d5db",
+        backgroundColor: "#f9fafb",
+        borderRadius: 6,
+        padding: "10px 12px",
+        opacity: 0.9,
+      }}>
+        <div style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: "#6b7280", marginBottom: 2 }}>
+          {oldStep.label}
         </div>
-      )}
-      {/* Warning */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10 }}>
-        <span style={{ color: "#92400e", fontSize: 13, lineHeight: 1 }}>⚠</span>
-        <span style={{ fontFamily: body, fontSize: 12, color: "#92400e", lineHeight: 1.4 }}>
-          This step may no longer be needed after the plan update.
-        </span>
-      </div>
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button
-          onClick={() => onKeepStep && onKeepStep(step)}
-          style={{
-            background: "transparent", border: "1px solid #6b7280",
-            color: "#374151", padding: "5px 14px", cursor: "pointer",
-            fontFamily: body, fontSize: 12, borderRadius: 3,
-          }}>
-          Keep
-        </button>
-        <button
-          onClick={() => onArchiveStep && onArchiveStep(step)}
-          style={{
-            background: "#a83319", color: "#ffffff", border: "none",
-            padding: "5px 14px", cursor: "pointer",
-            fontFamily: body, fontSize: 12, fontWeight: 600, borderRadius: 3,
-          }}>
-          Archive
-        </button>
+        {oldStep.text && (
+          <div style={{ fontFamily: body, fontSize: 12, color: "#9ca3af", lineHeight: 1.5, marginBottom: 4 }}>
+            {oldStep.text}
+          </div>
+        )}
+        {/* Warning */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, marginBottom: 8 }}>
+          <span style={{ color: "#92400e", fontSize: 13, lineHeight: 1 }}>⚠</span>
+          <span style={{ fontFamily: body, fontSize: 11, color: "#92400e", lineHeight: 1.4 }}>
+            This step may no longer be needed.
+          </span>
+        </div>
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button
+            onClick={onKeep}
+            style={{
+              background: "white", border: "1px solid #6b7280",
+              color: "#374151", padding: "5px 12px", cursor: "pointer",
+              fontFamily: body, fontSize: 12, borderRadius: 3,
+            }}>
+            Keep
+          </button>
+          <button
+            onClick={onArchive}
+            style={{
+              background: "#a83319", color: "#ffffff", border: "none",
+              padding: "5px 12px", cursor: "pointer",
+              fontFamily: body, fontSize: 12, fontWeight: 600, borderRadius: 3,
+            }}>
+            Archive
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -323,9 +331,9 @@ function StepCard({
 }
 
 // ── StepList ──────────────────────────────────────────────────────────────────
+// FEATURE: TI-11 — Threaded archive approval
 export default function StepList({
   activeSteps = [],
-  pendingArchive = [],
   archivedSteps = [],
   readOnly = false,
   onArchiveStep,
@@ -340,40 +348,55 @@ export default function StepList({
 }) {
   const [archivedOpen, setArchivedOpen] = useState(false);
 
+  const pendingCount = activeSteps.filter(s => s.pendingArchive !== undefined).length;
+  const hasRegenerated = pendingCount > 0 || archivedSteps.length > 0;
+
   return (
     <div style={{ position: "relative" }}>
       <FeatureBadge id="TI-09" />
 
-      {/* Active steps */}
+      {/* Active steps + threaded pending-archive cards */}
       {activeSteps.map((step, i) => (
-        <StepCard
-          key={step.id ?? `step-${i}`}
-          step={step}
-          index={i}
-          readOnly={readOnly}
-          answers={answers}
-          setAnswers={setAnswers}
-          updatingPlan={updatingPlan}
-          onUpdatePlan={onUpdatePlan}
-          navigate={navigate}
-          isCompleted={isCompleted}
-          onRemoveStep={onRemoveStep}
-        />
+        <Fragment key={step.id ?? `step-${i}`}>
+          <StepCard
+            step={step}
+            index={i}
+            readOnly={readOnly}
+            answers={answers}
+            setAnswers={setAnswers}
+            updatingPlan={updatingPlan}
+            onUpdatePlan={onUpdatePlan}
+            navigate={navigate}
+            isCompleted={isCompleted}
+            onRemoveStep={onRemoveStep}
+          />
+          {step.pendingArchive && (
+            <ThreadedArchiveCard
+              oldStep={step.pendingArchive}
+              onArchive={() => onArchiveStep && onArchiveStep(step.pendingArchive)}
+              onKeep={() => onKeepStep && onKeepStep(step, step.pendingArchive)}
+            />
+          )}
+        </Fragment>
       ))}
 
-      {/* Pending archive rows — TI-11 inline approval */}
-      {pendingArchive.map((step, i) => (
-        <PendingArchiveCard
-          key={step.id ?? `pending-${i}`}
-          step={step}
-          onArchiveStep={onArchiveStep}
-          onKeepStep={onKeepStep}
-        />
-      ))}
+      {/* Review status line — shown after any regeneration */}
+      {hasRegenerated && (
+        <div style={{
+          fontFamily: body, fontSize: 11, textAlign: "center",
+          marginTop: 4, marginBottom: 8,
+          color: pendingCount > 0 ? "#92400e" : "#5a7538",
+        }}>
+          {pendingCount > 0
+            ? `${pendingCount} step${pendingCount !== 1 ? "s" : ""} awaiting your review ↑`
+            : "All plan changes reviewed ✓"
+          }
+        </div>
+      )}
 
       {/* Archived drawer — only shown when steps have been explicitly archived */}
       {archivedSteps.length > 0 && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 4 }}>
           <button
             onClick={() => setArchivedOpen(o => !o)}
             style={{
@@ -381,7 +404,11 @@ export default function StepList({
               fontFamily: body, fontSize: 12, color: "#9ca3af", padding: "4px 0",
               display: "flex", alignItems: "center", gap: 4,
             }}>
-            Previous Steps ({archivedSteps.length}) {archivedOpen ? "▴" : "▾"}
+            {pendingCount === 0
+              ? `✓ Previous Steps (${archivedSteps.length}) — all reviewed`
+              : `Previous Steps (${archivedSteps.length})`
+            }
+            {" "}{archivedOpen ? "▴" : "▾"}
           </button>
 
           {archivedOpen && archivedSteps.map((step, i) => {
