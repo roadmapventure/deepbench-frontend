@@ -354,9 +354,19 @@ export default function TaskInstructionsScreen() {
         .map(q => `Q: ${q.q}\nA: ${q.a || "(not answered)"}`)
         .join("\n\n");
 
-      const userMsg = `Task goal: ${goalContext}\n\nClarifying answers:\n${qaContext}\n\nGenerate an updated step-by-step plan based on these answers.`;
+      const stepsContext = task.steps?.length > 0
+        ? `\n\nCurrent task steps (keep relevant ones, replace or remove outdated ones based on the answers above):\n${task.steps.map((s,i) => `${i+1}. [${s.type?.toUpperCase()}] ${s.label}: ${s.text}`).join('\n')}`
+        : '';
 
-      const systemPrompt = `You are a procurement task planning agent for DeepBench. \nGenerate a structured plan for the task goal provided, incorporating the user's answers \nto clarifying questions. Use the plan_task tool to return a structured plan.`;
+      const userMsg = `Task goal: ${goalContext}\n\nClarifying answers:\n${qaContext}${stepsContext}\n\nGenerate an updated step-by-step plan based on these answers.`;
+
+      const systemPrompt = `You are Michelle Manning, a senior project planner for DeepBench.
+Your job is to create and refine task plans for a team of AI agents.
+When given a task goal and clarifying answers, generate an optimized
+multi-step plan that assigns each step to the most appropriate agent.
+If current steps are provided, keep steps that are still relevant,
+update steps that need changes based on the answers, and add new steps
+where needed. Use the plan_task tool to return a structured plan.`;
 
       const res = await fetch("/api/plan", {
         method: "POST",
