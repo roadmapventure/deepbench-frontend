@@ -109,6 +109,7 @@ function computeVendorConc(rows, mapping, totalSpend) {
 // Used by runAnalysis and processFile (autoAnalyze path) to avoid duplication.
 function computeAnalysisData(results, mapping) {
   const { amount:aC="", nigp:nC="", vendor:vC="", contract:cC="", po:pC="", department:dC="", vendor_city:cityC="", vendor_state:sC="", date:dtC="", description:descC="" } = mapping || {};
+  const str = (val) => (val == null || typeof val !== 'string') ? '' : val;
   const rows=[], byClass={}, byVendor={}, byDept={}, byMonth={};
   let total=0, txCount=0, skipped=0, unrecognized=0;
   const dirtyRows=[];
@@ -122,7 +123,7 @@ function computeAnalysisData(results, mapping) {
     const { classCode, label } = resolveNIGP(rawCode);
     const isMissing     = !rawCode || String(rawCode).trim()==='' || String(rawCode).trim()==='0';
     const isPlaceholder = !isMissing && String(rawCode).replace(/\D/g,'').length < 3;
-    const isUnrecognized = !isMissing && !isPlaceholder && typeof label === 'string' && label.startsWith("Unrecognized");
+    const isUnrecognized = !isMissing && !isPlaceholder && str(label).startsWith("Unrecognized");
 
     if (isMissing || isPlaceholder || isUnrecognized) {
       unrecognized++;
@@ -130,7 +131,7 @@ function computeAnalysisData(results, mapping) {
     }
 
     const key = `${classCode}|${label}`;
-    if (!byClass[key]) byClass[key] = { label, displayLabel:shortLabel(label), classCode, total:0, count:0 };
+    if (!byClass[key]) byClass[key] = { label, displayLabel:shortLabel(str(label) || `Class ${classCode}`), classCode, total:0, count:0 };
     byClass[key].total += amt; byClass[key].count++;
 
     if (vC && row[vC]) { const v=String(row[vC]).trim()||"Unknown"; if(!byVendor[v])byVendor[v]={name:v,total:0,count:0}; byVendor[v].total+=amt; byVendor[v].count++; }
