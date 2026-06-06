@@ -1,4 +1,4 @@
-// DeepBench v5.1.3 | AssignWorkScreen.jsx | Assign work screen
+// DeepBench v5.1.4 | AssignWorkScreen.jsx | Assign work screen
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -12,11 +12,16 @@ import { supabase } from "../lib/supabase.js";
 
 // FEATURE: AW-01 — Task type tiles
 const TASK_TYPES = [
-  { id:"analysis",  icon:"📊", label:"Data Analysis",     desc:"Analyze spend CSV — flags, HHI, vendor risk, AI briefing" },
-  { id:"fetch",     icon:"🌐", label:"Web Data Fetch",     desc:"Brent fetches live data from a government portal" },
-  { id:"document",  icon:"📝", label:"Document Draft",     desc:"Draft a report, memo, or procurement document" },
-  { id:"research",  icon:"🔍", label:"Research Question",  desc:"Answer a procurement question using agent expertise" },
-  { id:"review",    icon:"✅", label:"Compliance Review",  desc:"Review a purchase or contract for compliance flags" },
+  { id:"analysis",  icon:"📊", label:"Data Analysis",     desc:"Analyze spend CSV — flags, HHI, vendor risk, AI briefing",
+    defaultGoal:"Analyze the procurement spend data for this task and identify key trends, vendor concentration risks, maverick spend, and savings opportunities." },
+  { id:"fetch",     icon:"🌐", label:"Web Data Fetch",     desc:"Brent fetches live data from a government portal",
+    defaultGoal:"Fetch the latest procurement expenditure data from the state portal for the specified date range and download the CSV file." },
+  { id:"document",  icon:"📝", label:"Document Draft",     desc:"Draft a report, memo, or procurement document",
+    defaultGoal:"Draft a professional procurement report based on the analysis and findings from this task, suitable for executive review." },
+  { id:"research",  icon:"🔍", label:"Research Question",  desc:"Answer a procurement question using agent expertise",
+    defaultGoal:"Research and summarize the key findings, market trends, and strategic recommendations relevant to this procurement question." },
+  { id:"review",    icon:"✅", label:"Compliance Review",  desc:"Review a purchase or contract for compliance flags",
+    defaultGoal:"Review the procurement data and contracts for compliance issues, policy violations, sole-source risks, and regulatory concerns." },
 ];
 
 // FEATURE: AW-05 — Step plan generation (planning agent structured output)
@@ -163,7 +168,8 @@ export default function AssignWorkScreen() {
   const [showChangeLog,   setShowChangeLog]    = useState(false);
   const [saveState,       setSaveState]        = useState("idle"); // idle|draft|ready|saving|saved
   const [toast,           setToast]            = useState(null);
-  const goalRef = useRef(null);
+  const goalRef         = useRef(null);
+  const lastAutoGoalRef = useRef("");
 
   const showToast = (msg,icon="✓") => { setToast({msg,icon}); setTimeout(()=>setToast(null),3000); };
 
@@ -274,9 +280,20 @@ export default function AssignWorkScreen() {
 
         {/* Task type tiles */}
         <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 1 — Select Task Type</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:20}}>
+        {/* FEATURE: AW-14 — Task type tile pre-populates goal textarea */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:20,position:"relative"}}>
+          <FeatureBadge id="AW-14" />
           {TASK_TYPES.map(tt=>(
-            <div key={tt.id} onClick={()=>{setSelectedType(tt.id);setPlanGenerated(false);}}
+            <div key={tt.id} onClick={()=>{
+              const isCustomGoal = goal.trim() && goal !== lastAutoGoalRef.current;
+              if (!isCustomGoal) {
+                setGoal(tt.defaultGoal);
+                lastAutoGoalRef.current = tt.defaultGoal;
+              }
+              setSelectedType(tt.id);
+              setPlanGenerated(false);
+              setTimeout(() => goalRef.current?.focus(), 50);
+            }}
               style={{background:selectedType===tt.id?`${T.brass}10`:T.card,border:`1.5px solid ${selectedType===tt.id?T.brass:T.line}`,padding:"12px 10px",textAlign:"center",cursor:"pointer",transition:"all .15s",position:"relative"}}>
               {selectedType===tt.id&&<Corners/>}
               <div style={{fontSize:18,marginBottom:5}}>{tt.icon}</div>
