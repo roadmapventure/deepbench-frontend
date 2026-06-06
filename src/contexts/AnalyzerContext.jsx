@@ -103,8 +103,66 @@ function computeVendorConc(rows, mapping, totalSpend) {
   return{vendorArr,cumulativeCurve,hhi,v50,v75,v90,catDominance};
 }
 
+// ── computeAnalysisData ───────────────────────────────────────────────────────
+// Pure helper — processes full Papa results with an explicit mapping object.
+// Used by runAnalysis and processFile (autoAnalyze path) to avoid duplication.
+function computeAnalysisData(results, mapping) {
+  const { amount:aC, nigp:nC, vendor:vC, contract:cC, po:pC, department:dC, vendor_state:sC, vendor_city:cityC, date:dtC } = mapping;
+  const rows=[], byClass={}, byVendor={}, byDept={}, byMonth={};
+  let total=0, txCount=0, skipped=0, unrecognized=0;
+  const dirtyRows=[];
+
+  for (const row of results.data || []) {
+    const amt = parseAmt(row[aC]);
+    if (isNaN(amt) || amt <= 0) { skipped++; continue; }
+    row._amt = amt; rows.push(row);
+
+    const rawCode = row[nC];
+    const { classCode, label } = resolveNIGP(rawCode);
+    const isMissing     = !rawCode || String(rawCode).trim()==='' || String(rawCode).trim()==='0';
+    const isPlaceholder = !isMissing && String(rawCode).replace(/\D/g,'').length < 3;
+    const isUnrecognized = !isMissing && !isPlaceholder && label.startsWith("Unrecognized");
+
+    if (isMissing || isPlaceholder || isUnrecognized) {
+      unrecognized++;
+      dirtyRows.push({ rawCode:isMissing?'(blank)':String(rawCode).trim(), classCode, issue:isMissing?'Missing Code':isPlaceholder?'Code Too Short':'Unrecognized Class', description:row[mapping.description]||row['COMMODITY_DESCRIPTION']||'', vendor:vC?(String(row[vC]||'').trim()||'Unknown'):'', amount:amt, po:mapping.po?String(row[mapping.po]||'').trim():'', date:dtC?String(row[dtC]||'').trim():'', rawRow:row });
+    }
+
+    const key = `${classCode}|${label}`;
+    if (!byClass[key]) byClass[key] = { label, displayLabel:shortLabel(label), classCode, total:0, count:0 };
+    byClass[key].total += amt; byClass[key].count++;
+
+    if (vC && row[vC]) { const v=String(row[vC]).trim()||"Unknown"; if(!byVendor[v])byVendor[v]={name:v,total:0,count:0}; byVendor[v].total+=amt; byVendor[v].count++; }
+    if (dC && row[dC]) { const d=String(row[dC]).trim()||"Unknown"; if(!byDept[d])byDept[d]={name:d,total:0,count:0}; byDept[d].total+=amt; byDept[d].count++; }
+    if (dtC && row[dtC]) { const m=String(row[dtC]).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/); if(m){const mo=m[1].padStart(2,"0"),yr=m[3].length===2?"20"+m[3]:m[3],k=`${yr}-${mo}`;if(!byMonth[k])byMonth[k]={month:k,total:0,count:0};byMonth[k].total+=amt;byMonth[k].count++;} }
+    total += amt; txCount++;
+  }
+
+  const classArr  = Object.values(byClass).sort((a,b)=>b.total-a.total);
+  const vendorArr = Object.values(byVendor).sort((a,b)=>b.total-a.total);
+  const deptArr   = Object.values(byDept).sort((a,b)=>b.total-a.total);
+  const monthArr  = Object.values(byMonth).sort((a,b)=>a.month.localeCompare(b.month));
+  const flags     = computeFlags(rows, mapping);
+  const vendorConc = computeVendorConc(rows, mapping, total);
+  const cityValues  = cityC ? [...new Set(rows.map(r=>String(r[cityC]||"").trim()).filter(Boolean))].sort() : [];
+  const stateValues = sC    ? [...new Set(rows.map(r=>String(r[sC]||"").trim().toUpperCase()).filter(Boolean))].sort() : [];
+
+  return {
+    classArr, vendorArr, deptArr, monthArr,
+    totalSpend: total, txCount, skipped, unrecognized,
+    hasVendor: !!mapping.vendor && vendorArr.length > 0,
+    hasDept:   !!mapping.department && deptArr.length > 0,
+    hasDate:   monthArr.length > 0,
+    hasContract: !!mapping.contract,
+    rowCount: (results.data || []).length,
+    flags, vendorConc, dirtyRows, rows,
+    cityValues, stateValues,
+    hasCityField:  !!cityC,
+    hasStateField: !!sC,
+  };
+}
+
 // ── Module-level file store ───────────────────────────────────────────────────
-// Holds raw File object for re-parse (same pattern as v4)
 export const fileStore = { current: null };
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -143,10 +201,40 @@ export function AnalyzerProvider({ children }) {
 
   // ── processFile ──────────────────────────────────────────────────────────
   // FEATURE: SH-07 — CSV Storage upload after processFile
-  const processFile = useCallback((file, taskId) => {
+  // autoAnalyze=true: skip mapping screen, run full analysis immediately (demo task)
+  const processFile = useCallback((file, taskId, autoAnalyze = false) => {
     if (!file) return;
     setLoading(true); setError(""); setFileName(file.name);
     fileStore.current = file;
+
+    if (autoAnalyze) {
+      // Full parse — no preview, no map stage, go directly to analyze
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: results => {
+          try {
+            const cols = Object.keys(results.data[0] || {});
+            if (!cols.length) { setError("No columns found."); setLoading(false); return; }
+            const detectedMapping = autoDetect(cols);
+            setColumns(cols);
+            setMapping(detectedMapping);
+            if (!detectedMapping.amount) {
+              // Amount column not detected — fall back to mapping screen
+              setStage("map");
+              setLoading(false);
+              return;
+            }
+            setData(computeAnalysisData(results, detectedMapping));
+            setActiveTab("overview");
+            setStage("analyze");
+          } catch(e) { setError(e.message); }
+          setLoading(false);
+        },
+        error: e => { setError("Parse error: " + e.message); setLoading(false); },
+      });
+      return;
+    }
+
     Papa.parse(file, {
       header: true, skipEmptyLines: true, preview: 5,
       complete: results => {
@@ -189,59 +277,7 @@ export function AnalyzerProvider({ children }) {
       header: true, skipEmptyLines: true,
       complete: results => {
         try {
-          const { amount:aC, nigp:nC, vendor:vC, contract:cC, po:pC, department:dC, vendor_state:sC, vendor_city:cityC, date:dtC } = mapping;
-          const rows=[], byClass={}, byVendor={}, byDept={}, byMonth={};
-          let total=0, txCount=0, skipped=0, unrecognized=0;
-          const dirtyRows=[];
-
-          for (const row of results.data || []) {
-            const amt = parseAmt(row[aC]);
-            if (isNaN(amt) || amt <= 0) { skipped++; continue; }
-            row._amt = amt; rows.push(row);
-
-            const rawCode = row[nC];
-            const { classCode, label } = resolveNIGP(rawCode);
-            const isMissing     = !rawCode || String(rawCode).trim()==='' || String(rawCode).trim()==='0';
-            const isPlaceholder = !isMissing && String(rawCode).replace(/\D/g,'').length < 3;
-            const isUnrecognized = !isMissing && !isPlaceholder && label.startsWith("Unrecognized");
-
-            if (isMissing || isPlaceholder || isUnrecognized) {
-              unrecognized++;
-              dirtyRows.push({ rawCode:isMissing?'(blank)':String(rawCode).trim(), classCode, issue:isMissing?'Missing Code':isPlaceholder?'Code Too Short':'Unrecognized Class', description:row[mapping.description]||row['COMMODITY_DESCRIPTION']||'', vendor:vC?(String(row[vC]||'').trim()||'Unknown'):'', amount:amt, po:mapping.po?String(row[mapping.po]||'').trim():'', date:dtC?String(row[dtC]||'').trim():'', rawRow:row });
-            }
-
-            const key = `${classCode}|${label}`;
-            if (!byClass[key]) byClass[key] = { label, displayLabel:shortLabel(label), classCode, total:0, count:0 };
-            byClass[key].total += amt; byClass[key].count++;
-
-            if (vC && row[vC]) { const v=String(row[vC]).trim()||"Unknown"; if(!byVendor[v])byVendor[v]={name:v,total:0,count:0}; byVendor[v].total+=amt; byVendor[v].count++; }
-            if (dC && row[dC]) { const d=String(row[dC]).trim()||"Unknown"; if(!byDept[d])byDept[d]={name:d,total:0,count:0}; byDept[d].total+=amt; byDept[d].count++; }
-            if (dtC && row[dtC]) { const m=String(row[dtC]).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/); if(m){const mo=m[1].padStart(2,"0"),yr=m[3].length===2?"20"+m[3]:m[3],k=`${yr}-${mo}`;if(!byMonth[k])byMonth[k]={month:k,total:0,count:0};byMonth[k].total+=amt;byMonth[k].count++;} }
-            total += amt; txCount++;
-          }
-
-          const classArr  = Object.values(byClass).sort((a,b)=>b.total-a.total);
-          const vendorArr = Object.values(byVendor).sort((a,b)=>b.total-a.total);
-          const deptArr   = Object.values(byDept).sort((a,b)=>b.total-a.total);
-          const monthArr  = Object.values(byMonth).sort((a,b)=>a.month.localeCompare(b.month));
-          const flags     = computeFlags(rows, mapping);
-          const vendorConc = computeVendorConc(rows, mapping, total);
-          const cityValues  = cityC ? [...new Set(rows.map(r=>String(r[cityC]||"").trim()).filter(Boolean))].sort() : [];
-          const stateValues = sC    ? [...new Set(rows.map(r=>String(r[sC]||"").trim().toUpperCase()).filter(Boolean))].sort() : [];
-
-          setData({
-            classArr, vendorArr, deptArr, monthArr,
-            totalSpend: total, txCount, skipped, unrecognized,
-            hasVendor: !!mapping.vendor && vendorArr.length > 0,
-            hasDept:   !!mapping.department && deptArr.length > 0,
-            hasDate:   monthArr.length > 0,
-            hasContract: !!mapping.contract,
-            rowCount: (results.data || []).length,
-            flags, vendorConc, dirtyRows, rows,
-            cityValues, stateValues,
-            hasCityField:  !!cityC,
-            hasStateField: !!sC,
-          });
+          setData(computeAnalysisData(results, mapping));
           setActiveTab("overview");
           setStage("analyze");
         } catch(e) { setError(e.message); }

@@ -62,7 +62,8 @@ function DataSourceScreen({ taskId }) {
           const res = await fetch("/Austin_2025Data_.csv");
           if (!res.ok) throw new Error("Could not load demo file");
           const blob = await res.blob();
-          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }));
+          // autoAnalyze=true: full parse, skip mapping screen, go direct to dashboard
+          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }), null, true);
         } catch (e) { setError("Demo failed: " + e.message); }
       })();
       return;
