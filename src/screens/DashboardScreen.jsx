@@ -1,4 +1,4 @@
-// DeepBench v5.1.6 | DashboardScreen.jsx | Work dashboard
+// DeepBench v5.1.7 | DashboardScreen.jsx | Work dashboard
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -585,8 +585,12 @@ export default function DashboardScreen() {
             )}
 
             {/* FEATURE: DB-04 — Recently completed */}
+            {/* FEATURE: DB-16 — Real Supabase completed tasks */}
             {/* Recently completed */}
-            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:2,textTransform:"uppercase",marginTop:8,marginBottom:8}}>Recently Completed</div>
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:2,textTransform:"uppercase",marginTop:8,marginBottom:8,position:"relative"}}>
+              <FeatureBadge id="DB-16" />
+              Recently Completed
+            </div>
             {completedTasks.map(task => (
               <div key={task.id} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,marginBottom:6,opacity:.85,cursor:"pointer",transition:"border-color .15s"}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}

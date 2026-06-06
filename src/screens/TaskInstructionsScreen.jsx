@@ -1,4 +1,4 @@
-// DeepBench v5.1.6 | TaskInstructionsScreen.jsx | Task instructions
+// DeepBench v5.1.7 | TaskInstructionsScreen.jsx | Task instructions
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -74,7 +74,7 @@ const STATUS_STYLE = {
 };
 
 // ── Step component ────────────────────────────────────────────────────────────
-function StepRow({ step, index, navigate }) {
+function StepRow({ step, index, navigate, isCompleted }) {
   const [editing, setEditing]   = useState(false);
   const [editText, setEditText] = useState(step.text);
   const [comment,  setComment]  = useState("");
@@ -142,39 +142,45 @@ function StepRow({ step, index, navigate }) {
                     Q{q.id || qi + 1}
                   </div>
                   <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
-                  <input
-                    placeholder="Your answer (optional)..."
-                    style={{width:"100%",padding:"6px 8px",fontSize:12,
-                      fontFamily:body,border:`1px solid ${T.line}`,
-                      background:T.card,color:T.ink,boxSizing:"border-box"}}
-                  />
+                  {!isCompleted && (
+                    <input
+                      placeholder="Your answer (optional)..."
+                      style={{width:"100%",padding:"6px 8px",fontSize:12,
+                        fontFamily:body,border:`1px solid ${T.line}`,
+                        background:T.card,color:T.ink,boxSizing:"border-box"}}
+                    />
+                  )}
                 </div>
               ))}
-              <button style={{marginTop:10,background:T.brass,color:T.navy,
-                border:"none",padding:"7px 18px",fontFamily:display,
-                fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                Update Plan →
-              </button>
+              {!isCompleted && (
+                <button style={{marginTop:10,background:T.brass,color:T.navy,
+                  border:"none",padding:"7px 18px",fontFamily:display,
+                  fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                  Update Plan →
+                </button>
+              )}
             </div>
           )}
 
           {/* Per-step comment textarea */}
-          <textarea
-            value={comment}
-            onChange={e=>setComment(e.target.value)}
-            placeholder="Add a comment or instruction for this step…"
-            style={{width:"100%",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"6px 10px",fontFamily:body,fontSize:11,color:T.ink,resize:"none",outline:"none",lineHeight:1.5,height:38,boxSizing:"border-box",transition:"height .15s",marginTop:6}}
-            onFocus={e=>e.target.style.height="64px"}
-            onBlur={e=>{if(!e.target.value)e.target.style.height="38px";}}
-          />
+          {!isCompleted && (
+            <textarea
+              value={comment}
+              onChange={e=>setComment(e.target.value)}
+              placeholder="Add a comment or instruction for this step…"
+              style={{width:"100%",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"6px 10px",fontFamily:body,fontSize:11,color:T.ink,resize:"none",outline:"none",lineHeight:1.5,height:38,boxSizing:"border-box",transition:"height .15s",marginTop:6}}
+              onFocus={e=>e.target.style.height="64px"}
+              onBlur={e=>{if(!e.target.value)e.target.style.height="38px";}}
+            />
+          )}
         </div>
 
         {/* Right action buttons */}
         <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,marginTop:2}}>
-          {isHITL && step.status==="waiting" && step.text && step.text.toLowerCase().includes("data source") && (
+          {!isCompleted && isHITL && step.status==="waiting" && step.text && step.text.toLowerCase().includes("data source") && (
             <button style={{fontFamily:mono,fontSize:8,color:T.navy,background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",padding:"5px 10px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:.3}}>Open Data Source →</button>
           )}
-          {isHITL && step.status==="waiting" && step.text && !step.text.toLowerCase().includes("data source") && !step.questions && (
+          {!isCompleted && isHITL && step.status==="waiting" && step.text && !step.text.toLowerCase().includes("data source") && !step.questions && (
             <button style={{fontFamily:mono,fontSize:8,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 10px",cursor:"pointer",fontWeight:700,textTransform:"uppercase",letterSpacing:.3}}>Approve ✓</button>
           )}
           {/* FEATURE: TI-08 — View Brent CTA (sub-agent navigation) */}
@@ -182,16 +188,18 @@ function StepRow({ step, index, navigate }) {
             <button onClick={()=>navigate(`/bench/${step.agentId||"brent"}`)}
               style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",background:"rgba(45,111,181,.1)",border:`1px solid rgba(45,111,181,.3)`,padding:"5px 10px",cursor:"pointer",fontWeight:700,textTransform:"uppercase",letterSpacing:.3,whiteSpace:"nowrap"}}>View {step.agentName?.split(" ")[0]||"Brent"} →</button>
           )}
-          {!editing && (
+          {!isCompleted && !editing && (
             <button onClick={()=>setEditing(true)}
               style={{fontFamily:mono,fontSize:8,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"5px 10px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.3}}>Edit</button>
           )}
-          <button style={{fontFamily:mono,fontSize:8,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"5px 10px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.3}}>Re-run</button>
+          {!isCompleted && (
+            <button style={{fontFamily:mono,fontSize:8,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"5px 10px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.3}}>Re-run</button>
+          )}
         </div>
       </div>
 
       {/* HITL action strip for waiting steps (no questions — those use Update Plan) */}
-      {isHITL && step.status==="waiting" && !step.questions && (
+      {!isCompleted && isHITL && step.status==="waiting" && !step.questions && (
         <div style={{display:"flex",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid rgba(168,51,25,.2)`}}>
           <button style={{background:T.moss,color:"#fff",border:"none",padding:"7px 18px",fontFamily:display,fontSize:12,fontWeight:700,cursor:"pointer"}}>Review & Approve →</button>
           <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"7px 14px",fontFamily:body,fontSize:12,cursor:"pointer"}}>Request Changes</button>
@@ -286,11 +294,12 @@ export default function TaskInstructionsScreen() {
     </AppShell>
   );
 
-  const agent      = agents.find(a => a.id === (task.agentId || task.agent_id));
-  const steps      = task.steps || [];
-  const doneCount  = steps.filter(s => s.status === "done" || s.status === "skipped").length;
-  const progress   = steps.length ? Math.round(doneCount / steps.length * 100) : 0;
-  const chatOrigin = task.fromChat || task.chat_origin;
+  const agent       = agents.find(a => a.id === (task.agentId || task.agent_id));
+  const steps       = task.steps || [];
+  const doneCount   = steps.filter(s => s.status === "done" || s.status === "skipped").length;
+  const progress    = steps.length ? Math.round(doneCount / steps.length * 100) : 0;
+  const chatOrigin  = task.fromChat || task.chat_origin;
+  const isCompleted = task?.status === 'completed';
 
   return (
     <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
@@ -301,6 +310,15 @@ export default function TaskInstructionsScreen() {
           <button onClick={()=>navigate("/")} style={{background:"transparent",border:"none",color:T.brass,cursor:"pointer",fontFamily:mono,fontSize:9,letterSpacing:1,textTransform:"uppercase",padding:0}}>Work Dashboard</button>
           <span>›</span><span style={{color:T.ink}}>Task Instructions</span>
         </div>
+
+        {/* FEATURE: TI-09 — Read-only completed banner */}
+        {isCompleted && (
+          <div style={{position:"relative",background:"rgba(90,117,56,.08)",border:"1px solid rgba(90,117,56,.2)",padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10,fontFamily:mono,fontSize:11,color:"#5a7538"}}>
+            <FeatureBadge id="TI-09" />
+            <span>✓</span>
+            <span>This task was completed on {task.completedOn || new Date(task.updated_at).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+          </div>
+        )}
 
         {/* Task header */}
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 20px",marginBottom:16,position:"relative"}}>
@@ -323,10 +341,12 @@ export default function TaskInstructionsScreen() {
             </div>
             {/* FEATURE: TI-05 — Re-run All button */}
             {/* FEATURE: TI-06 — Mark Complete button */}
-            <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
-              <button style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
-            </div>
+            {!isCompleted && (
+              <div style={{display:"flex",gap:8,flexShrink:0}}>
+                <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
+                <button style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
+              </div>
+            )}
           </div>
           {/* CTA */}
           <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end"}}>
@@ -367,7 +387,7 @@ export default function TaskInstructionsScreen() {
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {steps.map((step,i)=>(
-                <StepRow key={step.id} step={step} index={i} navigate={navigate}/>
+                <StepRow key={step.id} step={step} index={i} navigate={navigate} isCompleted={isCompleted}/>
               ))}
             </div>
           </div>
