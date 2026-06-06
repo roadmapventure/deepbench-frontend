@@ -108,7 +108,7 @@ function computeVendorConc(rows, mapping, totalSpend) {
 // Pure helper — processes full Papa results with an explicit mapping object.
 // Used by runAnalysis and processFile (autoAnalyze path) to avoid duplication.
 function computeAnalysisData(results, mapping) {
-  const { amount:aC, nigp:nC, vendor:vC, contract:cC, po:pC, department:dC, vendor_state:sC, vendor_city:cityC, date:dtC } = mapping;
+  const { amount:aC="", nigp:nC="", vendor:vC="", contract:cC="", po:pC="", department:dC="", vendor_city:cityC="", vendor_state:sC="", date:dtC="", description:descC="" } = mapping || {};
   const rows=[], byClass={}, byVendor={}, byDept={}, byMonth={};
   let total=0, txCount=0, skipped=0, unrecognized=0;
   const dirtyRows=[];
@@ -122,7 +122,7 @@ function computeAnalysisData(results, mapping) {
     const { classCode, label } = resolveNIGP(rawCode);
     const isMissing     = !rawCode || String(rawCode).trim()==='' || String(rawCode).trim()==='0';
     const isPlaceholder = !isMissing && String(rawCode).replace(/\D/g,'').length < 3;
-    const isUnrecognized = !isMissing && !isPlaceholder && label.startsWith("Unrecognized");
+    const isUnrecognized = !isMissing && !isPlaceholder && typeof label === 'string' && label.startsWith("Unrecognized");
 
     if (isMissing || isPlaceholder || isUnrecognized) {
       unrecognized++;
