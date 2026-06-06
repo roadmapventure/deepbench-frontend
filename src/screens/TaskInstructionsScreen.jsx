@@ -133,8 +133,8 @@ function StepRow({ step, index, navigate }) {
           {step.questions && step.questions.length > 0 && (
             <div style={{marginTop:8}}>
               <FeatureBadge id="AW-13" />
-              {step.questions.map(q => (
-                <div key={q.id} style={{marginTop:8,padding:"8px 10px",
+              {step.questions.map((q, qi) => (
+                <div key={q.id ?? qi} style={{marginTop:8,padding:"8px 10px",
                   background:"rgba(182,135,58,0.06)",
                   border:"1px solid rgba(182,135,58,0.2)"}}>
                   <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
@@ -238,9 +238,11 @@ export default function TaskInstructionsScreen() {
       };
 
       // Prepend HITL clarifying-questions step if there are unanswered questions
+      console.log("plan_history:", normalizedTask.plan_history);
       const pendingQuestions = normalizedTask.plan_history?.questions?.filter(
         q => !q.a || q.a.trim() === ""
       ) || [];
+      console.log("pendingQuestions:", pendingQuestions);
       if (pendingQuestions.length > 0) {
         const clarifyStep = {
           id: 0,
