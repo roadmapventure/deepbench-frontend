@@ -1,4 +1,4 @@
-// DeepBench v5.1.7 | TaskInstructionsScreen.jsx | Task instructions
+// DeepBench v5.1.8 | TaskInstructionsScreen.jsx | Task instructions
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,6 +11,7 @@ import { TENANT_ID } from "../config.js";
 
 // FEATURE: TI-03 — Task loaded from Supabase
 // FEATURE: AW-13 — Clarifying questions as HITL step
+// FEATURE: AW-16 — Update Plan button regenerates steps
 
 // ── Mock tasks (demo fallback — taskId=1 only) ────────────────────────────────
 /*
@@ -74,7 +75,7 @@ const STATUS_STYLE = {
 };
 
 // ── Step component ────────────────────────────────────────────────────────────
-function StepRow({ step, index, navigate, isCompleted }) {
+function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers, updatingPlan, onUpdatePlan }) {
   const [editing, setEditing]   = useState(false);
   const [editText, setEditText] = useState(step.text);
   const [comment,  setComment]  = useState("");
@@ -133,31 +134,55 @@ function StepRow({ step, index, navigate, isCompleted }) {
           {step.questions && step.questions.length > 0 && (
             <div style={{marginTop:8}}>
               <FeatureBadge id="AW-13" />
-              {step.questions.map((q, qi) => (
-                <div key={q.id ?? qi} style={{marginTop:8,padding:"8px 10px",
-                  background:"rgba(182,135,58,0.06)",
-                  border:"1px solid rgba(182,135,58,0.2)"}}>
-                  <div style={{fontFamily:mono,fontSize:10,color:T.brass,
-                    marginBottom:3,fontWeight:700}}>
-                    Q{q.id || qi + 1}
-                  </div>
-                  <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
-                  {!isCompleted && (
-                    <input
-                      placeholder="Your answer (optional)..."
-                      style={{width:"100%",padding:"6px 8px",fontSize:12,
-                        fontFamily:body,border:`1px solid ${T.line}`,
-                        background:T.card,color:T.ink,boxSizing:"border-box"}}
-                    />
-                  )}
+              {updatingPlan ? (
+                <div style={{
+                  padding:"20px 16px",
+                  background:"rgba(182,135,58,.04)",
+                  border:`1px solid rgba(182,135,58,.2)`,
+                  fontFamily:mono,fontSize:11,
+                  color:T.brass,textAlign:"center"
+                }}>
+                  ✦ Regenerating plan with your answers...
                 </div>
-              ))}
-              {!isCompleted && (
-                <button style={{marginTop:10,background:T.brass,color:T.navy,
-                  border:"none",padding:"7px 18px",fontFamily:display,
-                  fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                  Update Plan →
-                </button>
+              ) : (
+                <>
+                  {step.questions.map((q, qi) => (
+                    <div key={q.id ?? qi} style={{marginTop:8,padding:"8px 10px",
+                      background:"rgba(182,135,58,0.06)",
+                      border:"1px solid rgba(182,135,58,0.2)"}}>
+                      <div style={{fontFamily:mono,fontSize:10,color:T.brass,
+                        marginBottom:3,fontWeight:700}}>
+                        Q{q.id || qi + 1}
+                      </div>
+                      <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
+                      {!isCompleted && (
+                        <input
+                          placeholder="Your answer (optional)..."
+                          value={answers[q.id] || ""}
+                          onChange={e => setAnswers(prev => ({
+                            ...prev, [q.id]: e.target.value
+                          }))}
+                          style={{width:"100%",padding:"6px 8px",fontSize:12,
+                            fontFamily:body,border:`1px solid ${T.line}`,
+                            background:T.card,color:T.ink,boxSizing:"border-box"}}
+                        />
+                      )}
+                    </div>
+                  ))}
+                  {/* FEATURE: AW-16 — Update Plan button regenerates steps */}
+                  {!isCompleted && (
+                    <div style={{position:"relative",marginTop:10}}>
+                      <FeatureBadge id="AW-16" />
+                      <button
+                        onClick={() => onUpdatePlan && onUpdatePlan(step.questions)}
+                        style={{background:T.brass,color:T.navy,
+                          border:"none",padding:"7px 18px",fontFamily:display,
+                          fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        Update Plan →
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -217,9 +242,11 @@ export default function TaskInstructionsScreen() {
   const navigate   = useNavigate();
   const agents     = useAgents();
 
-  const [task,      setTask]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [taskError, setTaskError] = useState(null);
+  const [task,         setTask]         = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [taskError,    setTaskError]    = useState(null);
+  const [answers,      setAnswers]      = useState({});
+  const [updatingPlan, setUpdatingPlan] = useState(false);
 
   useEffect(() => {
     async function loadTask() {
@@ -310,6 +337,107 @@ export default function TaskInstructionsScreen() {
     if (task.created) return task.created;
     return "recently";
   })();
+
+  // FEATURE: AW-16 — Update Plan button regenerates steps
+  const handleUpdatePlan = async (pendingQuestions) => {
+    if (updatingPlan) return;
+    setUpdatingPlan(true);
+
+    try {
+      const answeredQuestions = pendingQuestions.map(q => ({
+        ...q,
+        a: answers[q.id] || q.a || ""
+      }));
+
+      const goalContext = task.preview || task.title;
+      const qaContext = answeredQuestions
+        .map(q => `Q: ${q.q}\nA: ${q.a || "(not answered)"}`)
+        .join("\n\n");
+
+      const userMsg = `Task goal: ${goalContext}\n\nClarifying answers:\n${qaContext}\n\nGenerate an updated step-by-step plan based on these answers.`;
+
+      const systemPrompt = `You are a procurement task planning agent for DeepBench. \nGenerate a structured plan for the task goal provided, incorporating the user's answers \nto clarifying questions. Use the plan_task tool to return a structured plan.`;
+
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: userMsg }],
+          systemPrompt,
+          tools: [{
+            name: "plan_task",
+            description: "Generate a structured task plan",
+            input_schema: {
+              type: "object",
+              required: ["steps", "questions", "agentId", "planSummary"],
+              properties: {
+                planSummary: { type: "string" },
+                agentId: { type: "string" },
+                steps: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "number" },
+                      icon: { type: "string" },
+                      label: { type: "string" },
+                      type: { type: "string" },
+                      status: { type: "string" },
+                      text: { type: "string" },
+                      agentId: { type: "string" },
+                      agentName: { type: "string" }
+                    }
+                  }
+                },
+                questions: { type: "array", items: { type: "object" } }
+              }
+            }
+          }],
+          max_tokens: 1200,
+          tenant_id: TENANT_ID,
+        })
+      });
+
+      const data = await res.json();
+      const toolBlock = data.content?.find(b => b.type === "tool_use");
+
+      if (!toolBlock?.input?.steps) {
+        throw new Error("No steps returned from planning agent");
+      }
+
+      const newSteps = toolBlock.input.steps;
+
+      if (taskId && taskId !== "1") {
+        await supabase.from("tasks").update({
+          steps: newSteps,
+          plan_history: {
+            questions: answeredQuestions,
+            planSummary: toolBlock.input.planSummary || "",
+          },
+          status: task.status === "awaiting-input" ? "pending" : task.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", taskId)
+        .eq("tenant_id", TENANT_ID);
+      }
+
+      setTask(prev => ({
+        ...prev,
+        steps: newSteps,
+        plan_history: {
+          questions: answeredQuestions,
+        },
+        status: prev.status === "awaiting-input" ? "pending" : prev.status,
+      }));
+
+      setAnswers({});
+
+    } catch(err) {
+      console.error("Update plan failed:", err);
+    } finally {
+      setUpdatingPlan(false);
+    }
+  };
 
   const handleMarkComplete = async () => {
     if (!taskId || taskId === "1") return;
@@ -407,7 +535,8 @@ export default function TaskInstructionsScreen() {
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {steps.map((step,i)=>(
-                <StepRow key={step.id} step={step} index={i} navigate={navigate} isCompleted={isCompleted}/>
+                <StepRow key={step.id} step={step} index={i} navigate={navigate} isCompleted={isCompleted}
+                  answers={answers} setAnswers={setAnswers} updatingPlan={updatingPlan} onUpdatePlan={handleUpdatePlan}/>
               ))}
             </div>
           </div>
