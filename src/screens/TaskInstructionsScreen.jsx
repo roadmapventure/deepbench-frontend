@@ -301,6 +301,26 @@ export default function TaskInstructionsScreen() {
   const chatOrigin  = task.fromChat || task.chat_origin;
   const isCompleted = task?.status === 'completed';
 
+  const completedDateStr = (() => {
+    if (task.completedOn) return task.completedOn;
+    if (task.updated_at) {
+      const d = new Date(task.updated_at);
+      if (!isNaN(d)) return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    }
+    if (task.created) return task.created;
+    return "recently";
+  })();
+
+  const handleMarkComplete = async () => {
+    if (!taskId || taskId === "1") return;
+    await supabase
+      .from('tasks')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', taskId)
+      .eq('tenant_id', TENANT_ID);
+    setTask(prev => ({ ...prev, status: 'completed' }));
+  };
+
   return (
     <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
       <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px"}}>
@@ -316,7 +336,7 @@ export default function TaskInstructionsScreen() {
           <div style={{position:"relative",background:"rgba(90,117,56,.08)",border:"1px solid rgba(90,117,56,.2)",padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10,fontFamily:mono,fontSize:11,color:"#5a7538"}}>
             <FeatureBadge id="TI-09" />
             <span>✓</span>
-            <span>This task was completed on {task.completedOn || new Date(task.updated_at).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+            <span>This task was completed on {completedDateStr}</span>
           </div>
         )}
 
@@ -344,7 +364,7 @@ export default function TaskInstructionsScreen() {
             {!isCompleted && (
               <div style={{display:"flex",gap:8,flexShrink:0}}>
                 <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
-                <button style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
+                <button onClick={handleMarkComplete} style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
               </div>
             )}
           </div>
