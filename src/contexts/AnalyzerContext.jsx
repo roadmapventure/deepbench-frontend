@@ -227,9 +227,18 @@ export function AnalyzerProvider({ children }) {
               setLoading(false);
               return;
             }
-            setData(computeAnalysisData(results, detectedMapping));
-            setActiveTab("overview");
-            setStage("analyze");
+            console.log("Running computeAnalysisData, rows:", results.data.length);
+            try {
+              const result = computeAnalysisData(results, detectedMapping);
+              setData(result);
+              setActiveTab("overview");
+              setStage("analyze");
+            } catch(err) {
+              console.error("computeAnalysisData failed:", err);
+              console.error("Stack:", err.stack);
+              setError("Analysis failed: " + err.message);
+              setStage("overview");
+            }
           } catch(e) { setError(e.message); }
           setLoading(false);
         },
