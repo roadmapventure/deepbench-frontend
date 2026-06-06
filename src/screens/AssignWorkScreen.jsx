@@ -378,9 +378,12 @@ export default function AssignWorkScreen() {
                 </div>
               </div>
             )}
-            <textarea value={goal} onChange={e=>setGoal(e.target.value)} ref={goalRef}
-              placeholder="Describe what you need in plain English. The planning agent will break it into steps and suggest agents…"
-              style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
+            <div style={{position:"relative"}}>
+              <FeatureBadge id="AW-12" />
+              <textarea value={goal} onChange={e=>setGoal(e.target.value)} ref={goalRef}
+                placeholder="Describe what you need in plain English. The planning agent will break it into steps and suggest agents…"
+                style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
+            </div>
 
             <div style={{position:"relative",marginBottom:14}}>
               <FeatureBadge id="AW-04" />
