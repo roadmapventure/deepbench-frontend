@@ -184,8 +184,16 @@ export default function AssignWorkScreen() {
     const raw = sessionStorage.getItem('chatContext');
     if (raw && params.get('from') === 'chat') {
       try {
-        setChatContext(JSON.parse(raw));
+        const parsed = JSON.parse(raw);
+        setChatContext(parsed);
         sessionStorage.removeItem('chatContext');
+        if (parsed.taskType) {
+          setSelectedType(parsed.taskType);
+          const tile = TASK_TYPES.find(t => t.id === parsed.taskType);
+          if (tile && !prefillGoal) {
+            setGoal(tile.defaultGoal);
+          }
+        }
       } catch(e) { /* ignore */ }
     }
   }, []);

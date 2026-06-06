@@ -56,6 +56,15 @@ const TOPIC_MAP = {
   formatting: { agentId:"christy", label:"Formatting & Design", desc:"Executive presentation, board reports, branded formatting" },
 };
 
+const TOPIC_TO_TASK_TYPE = {
+  analysis:   "analysis",
+  research:   "fetch",
+  writing:    "document",
+  compliance: "review",
+  strategy:   "research",
+  formatting: "document",
+};
+
 // ── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({ task, onClick }) {
   const s = STATUS_STYLES[task.status]  || STATUS_STYLES["pending"];
@@ -365,6 +374,7 @@ function ChatPanel() {
                       agentName: agents.find(a => a.id === msg.agentId)?.name || "",
                       userQuestion: userMsg?.content || "",
                       agentAnswer: msg.content,
+                      taskType: TOPIC_TO_TASK_TYPE[selectedTopic] || null,
                       timestamp: new Date().toISOString(),
                     }));
                     navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent((userMsg?.content || msg.content).slice(0,200))}`);
