@@ -52,9 +52,12 @@ function DataSourceScreen({ taskId }) {
   const { processFile, setError } = useAnalyzer();
   const navigate = useNavigate();
   const hiddenRef = useRef();
+  const autoLoadedRef = useRef(false);
   const [storageLoading, setStorageLoading] = useState(false);
 
   useEffect(() => {
+    if (autoLoadedRef.current) return;
+    autoLoadedRef.current = true;
     if (!taskId) return;
     if (taskId === "1") {
       (async () => {

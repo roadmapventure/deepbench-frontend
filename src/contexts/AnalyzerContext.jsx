@@ -243,7 +243,10 @@ export function AnalyzerProvider({ children }) {
         const cols = Object.keys(results.data[0] || {});
         if (!cols.length) { setError("No columns found."); setLoading(false); return; }
         setColumns(cols);
-        setMapping(savedMapping || autoDetect(cols));
+        const resolvedMapping = savedMapping
+          ? Object.fromEntries(Object.entries(savedMapping).map(([k, v]) => [k, typeof v === "string" ? v : ""]))
+          : autoDetect(cols);
+        setMapping(resolvedMapping);
         setStage("map");
         setLoading(false);
         if (taskId && taskId !== "1") {
