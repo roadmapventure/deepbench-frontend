@@ -250,7 +250,7 @@ export default function TaskInstructionsScreen() {
   const agents     = useAgents();
 
   const [task,         setTask]         = useState(null);
-  const [mergedSteps,  setMergedSteps]  = useState(null);
+  const [mergedSteps,  setMergedSteps]  = useState({ active: [], pendingArchive: [], archived: [] });
   const [loading,      setLoading]      = useState(true);
   const [taskError,    setTaskError]    = useState(null);
   const [answers,      setAnswers]      = useState({});
@@ -262,7 +262,7 @@ export default function TaskInstructionsScreen() {
       if (taskId === "1") {
         const mockTask = MOCK_TASKS[1];
         setTask(mockTask);
-        setMergedSteps(mergeSteps([], mockTask.steps || []));
+        setMergedSteps(mergeSteps([], mockTask.steps || [], []));
         setLoading(false);
         return;
       }
@@ -306,7 +306,7 @@ export default function TaskInstructionsScreen() {
       }
 
       setTask(normalizedTask);
-      setMergedSteps(mergeSteps([], normalizedTask.steps || []));
+      setMergedSteps(mergeSteps([], normalizedTask.steps || [], []));
       setLoading(false);
     }
     loadTask();
@@ -442,7 +442,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
         .eq("tenant_id", TENANT_ID);
       }
 
-      const merged = mergeSteps(mergedSteps?.active ?? [], newSteps);
+      const merged = mergeSteps(mergedSteps.active, newSteps, mergedSteps.archived);
       setMergedSteps(merged);
 
       setTask(prev => ({
@@ -471,6 +471,22 @@ where needed. Use the plan_task tool to return a structured plan.`;
       .eq('id', taskId)
       .eq('tenant_id', TENANT_ID);
     setTask(prev => ({ ...prev, status: 'completed' }));
+  };
+
+  const handleArchiveStep = (step) => {
+    setMergedSteps(prev => ({
+      ...prev,
+      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
+      archived: [...prev.archived, { ...step, mergeStatus: "archived" }],
+    }));
+  };
+
+  const handleKeepStep = (step) => {
+    setMergedSteps(prev => ({
+      ...prev,
+      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
+      active: [...prev.active, { ...step, mergeStatus: "unchanged" }],
+    }));
   };
 
   return (
@@ -558,8 +574,11 @@ where needed. Use the plan_task tool to return a structured plan.`;
             )}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             <StepList
-              activeSteps={mergedSteps?.active ?? []}
-              archivedSteps={mergedSteps?.archived ?? []}
+              activeSteps={mergedSteps.active}
+              pendingArchive={mergedSteps.pendingArchive}
+              archivedSteps={mergedSteps.archived}
+              onArchiveStep={handleArchiveStep}
+              onKeepStep={handleKeepStep}
               readOnly={false}
               answers={answers}
               setAnswers={setAnswers}

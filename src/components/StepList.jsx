@@ -1,19 +1,24 @@
-// DeepBench v5.1.9 | StepList.jsx | Shared step list renderer
-// FEATURE: TI-10 — Brass left border on new/changed steps
-// FEATURE: TI-11 — Archived steps collapsible drawer
+// DeepBench v5.1.9 | StepList.jsx | patch — color + archive approval
+// FEATURE: TI-10 — Richer color treatment on new/changed steps
+// FEATURE: TI-11 — Inline pending-archive approval + archived drawer
 // FEATURE: TI-12 — Agent attribution on every step
 // FEATURE: TI-13 — Color coding preserved through regeneration
 
 import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { AiBadge, FeatureBadge } from "./SharedUI.jsx";
+import { FeatureBadge } from "./SharedUI.jsx";
 import { AGENTS } from "../data/agents.js";
 
-const TYPE_BORDER = {
-  hitl:     "#a83319",
-  subagent: "#3b82f6",
-  agent:    "#b6873a",
+// Type → visual theme
+const TYPE_THEME = {
+  hitl:     { border: "#a83319", bg: "#fdf4f2" },
+  subagent: { border: "#3b82f6", bg: "#f0f5ff" },
+  agent:    { border: "#b6873a", bg: "#fdf8f0" },
 };
+
+function getTheme(type) {
+  return TYPE_THEME[type] || TYPE_THEME.agent;
+}
 
 function AgentInitials({ name = "?", size = 18 }) {
   const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -30,6 +35,58 @@ function AgentInitials({ name = "?", size = 18 }) {
   );
 }
 
+// ── Pending archive row — inline warning before user approves ─────────────────
+function PendingArchiveCard({ step, onArchiveStep, onKeepStep }) {
+  return (
+    <div style={{
+      border: "1px dashed #d1d5db",
+      backgroundColor: "#f9fafb",
+      borderRadius: 6,
+      padding: "12px 14px",
+      marginBottom: 8,
+      opacity: 0.85,
+    }}>
+      <div style={{ fontFamily: display, fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>
+        {step.label}
+      </div>
+      {step.text && (
+        <div style={{ fontFamily: body, fontSize: 12, color: "#9ca3af", lineHeight: 1.5, marginBottom: 8 }}>
+          {step.text}
+        </div>
+      )}
+      {/* Warning */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10 }}>
+        <span style={{ color: "#92400e", fontSize: 13, lineHeight: 1 }}>⚠</span>
+        <span style={{ fontFamily: body, fontSize: 12, color: "#92400e", lineHeight: 1.4 }}>
+          This step may no longer be needed after the plan update.
+        </span>
+      </div>
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button
+          onClick={() => onKeepStep && onKeepStep(step)}
+          style={{
+            background: "transparent", border: "1px solid #6b7280",
+            color: "#374151", padding: "5px 14px", cursor: "pointer",
+            fontFamily: body, fontSize: 12, borderRadius: 3,
+          }}>
+          Keep
+        </button>
+        <button
+          onClick={() => onArchiveStep && onArchiveStep(step)}
+          style={{
+            background: "#a83319", color: "#ffffff", border: "none",
+            padding: "5px 14px", cursor: "pointer",
+            fontFamily: body, fontSize: 12, fontWeight: 600, borderRadius: 3,
+          }}>
+          Archive
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Active step card ───────────────────────────────────────────────────────────
 function StepCard({
   step, index, readOnly,
   answers, setAnswers, updatingPlan, onUpdatePlan,
@@ -40,38 +97,34 @@ function StepCard({
   const isHITL = step.type === "hitl";
   const isSub  = step.type === "subagent";
   const isNew  = step.mergeStatus === "new";
-
-  const borderColor = TYPE_BORDER[step.type] || TYPE_BORDER.agent;
-  const bgColor     = isNew ? "#fdf8f0" : "#ffffff";
+  const theme  = getTheme(step.type);
 
   const agentRecord = AGENTS.find(a => a.id === step.agentId);
   const agentName   = step.agentName || agentRecord?.name || "";
   const agentCode   = agentRecord?.code || "";
 
-  // ── Type badge ────────────────────────────────────────────────────────────
+  // ── Type badge (filled) ───────────────────────────────────────────────────
   const typeBadge = isHITL ? (
     <span style={{
-      fontFamily: mono, fontSize: 7.5, padding: "1px 6px",
-      background: "rgba(168,51,25,.1)", color: "#a83319",
-      border: "1px solid rgba(168,51,25,.3)", fontWeight: 700,
-      textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap",
+      fontFamily: mono, fontSize: 10, padding: "2px 8px",
+      background: "#a83319", color: "#ffffff",
+      fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap",
     }}>NEEDS YOUR INPUT</span>
   ) : isSub ? (
     <span style={{
-      fontFamily: mono, fontSize: 7.5, padding: "1px 6px",
-      background: "rgba(59,130,246,.1)", color: "#3b82f6",
-      border: "1px solid rgba(59,130,246,.3)", fontWeight: 700,
-      whiteSpace: "nowrap",
+      fontFamily: mono, fontSize: 10, padding: "2px 8px",
+      background: "#3b82f6", color: "#ffffff",
+      fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap",
     }}>SUB-AGENT</span>
   ) : (
     <span style={{
-      fontFamily: mono, fontSize: 7.5, padding: "1px 6px",
-      background: "rgba(182,135,58,.1)", color: T.brassDeep,
-      border: "1px solid rgba(182,135,58,.25)", whiteSpace: "nowrap",
+      fontFamily: mono, fontSize: 10, padding: "2px 8px",
+      background: "#b6873a", color: "#ffffff",
+      fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap",
     }}>
       {agentName && agentCode
-        ? `${agentName.split(" ")[0]} ${agentCode}`
-        : <AiBadge />}
+        ? `${agentName.split(" ")[0]} · ${agentCode}`
+        : "Agent"}
     </span>
   );
 
@@ -93,28 +146,39 @@ function StepCard({
 
   return (
     <div style={{
-      background: bgColor,
-      border: "1px solid #e5e7eb",
-      borderLeft: `3px solid ${borderColor}`,
+      background: theme.bg,
+      border: `1px solid ${theme.border}`,
+      borderLeft: `3px solid ${theme.border}`,
       borderRadius: 6,
       padding: "12px 14px",
       marginBottom: 8,
       position: "relative",
     }}>
+      {/* NEW pill — top-right corner */}
+      {isNew && (
+        <div style={{
+          position: "absolute", top: 8, right: 8,
+          background: "#5a7538", color: "#ffffff",
+          fontFamily: mono, fontSize: 9, fontWeight: 700,
+          padding: "2px 7px", borderRadius: 2, letterSpacing: 0.3,
+          pointerEvents: "none",
+        }}>NEW</div>
+      )}
+
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         {/* Step number circle */}
         <div style={{
           width: 24, height: 24, borderRadius: "50%",
-          background: T.cardAlt, border: `1.5px solid ${borderColor}`,
+          background: "rgba(255,255,255,0.7)", border: `1.5px solid ${theme.border}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: mono, fontSize: 9, fontWeight: 700, color: borderColor,
+          fontFamily: mono, fontSize: 9, fontWeight: 700, color: theme.border,
           flexShrink: 0, marginTop: 2,
         }}>
           {String(index + 1).padStart(2, "0")}
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: isNew ? 40 : 0 }}>
           {/* Label + type badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
             <span style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy }}>
@@ -142,7 +206,7 @@ function StepCard({
             </div>
           )}
 
-          {/* HITL questions panel (AW-13 / AW-16) — shown when onUpdatePlan provided */}
+          {/* HITL questions panel (AW-13 / AW-16) — when onUpdatePlan provided */}
           {step.questions && step.questions.length > 0 && onUpdatePlan && (
             <div style={{ marginTop: 8 }}>
               <FeatureBadge id="AW-13" />
@@ -207,7 +271,7 @@ function StepCard({
               onChange={e => setComment(e.target.value)}
               placeholder="Add a comment or instruction for this step…"
               style={{
-                width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`,
+                width: "100%", background: "rgba(255,255,255,0.6)", border: `1px solid ${T.lineSoft}`,
                 padding: "6px 10px", fontFamily: body, fontSize: 11, color: T.ink,
                 resize: "none", outline: "none", lineHeight: 1.5, height: 38,
                 boxSizing: "border-box", transition: "height .15s", marginTop: 6,
@@ -220,7 +284,7 @@ function StepCard({
           {/* Output area — readOnly=true */}
           {readOnly && step.output && (
             <div style={{
-              background: T.cardAlt, border: `1px solid ${T.lineSoft}`,
+              background: "rgba(255,255,255,0.6)", border: `1px solid ${T.lineSoft}`,
               padding: "8px 10px", fontFamily: body, fontSize: 11,
               color: T.mutedDeep, lineHeight: 1.5, marginTop: 6,
             }}>
@@ -230,12 +294,12 @@ function StepCard({
         </div>
 
         {/* Right-side action buttons */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0, marginTop: isNew ? 28 : 0 }}>
           {isSub && navigate && (
             <button onClick={() => navigate(`/bench/${step.agentId || "brent"}`)}
               style={{
                 fontFamily: mono, fontSize: 8, color: "#3b82f6",
-                background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.3)",
+                background: "rgba(59,130,246,.15)", border: "1px solid rgba(59,130,246,.4)",
                 padding: "5px 10px", cursor: "pointer", fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.3, whiteSpace: "nowrap",
               }}>
@@ -258,10 +322,14 @@ function StepCard({
   );
 }
 
+// ── StepList ──────────────────────────────────────────────────────────────────
 export default function StepList({
   activeSteps = [],
+  pendingArchive = [],
   archivedSteps = [],
   readOnly = false,
+  onArchiveStep,
+  onKeepStep,
   answers,
   setAnswers,
   updatingPlan,
@@ -293,7 +361,17 @@ export default function StepList({
         />
       ))}
 
-      {/* Archived steps drawer — TI-11 */}
+      {/* Pending archive rows — TI-11 inline approval */}
+      {pendingArchive.map((step, i) => (
+        <PendingArchiveCard
+          key={step.id ?? `pending-${i}`}
+          step={step}
+          onArchiveStep={onArchiveStep}
+          onKeepStep={onKeepStep}
+        />
+      ))}
+
+      {/* Archived drawer — only shown when steps have been explicitly archived */}
       {archivedSteps.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <button
@@ -307,16 +385,16 @@ export default function StepList({
           </button>
 
           {archivedOpen && archivedSteps.map((step, i) => {
-            const borderColor = TYPE_BORDER[step.type] || TYPE_BORDER.agent;
+            const theme = getTheme(step.type);
             return (
               <div key={step.id ?? `archived-${i}`} style={{
                 background: "#f3f4f6",
                 border: "1px solid #e5e7eb",
-                borderLeft: `3px solid ${borderColor}`,
+                borderLeft: `3px solid ${theme.border}`,
                 borderRadius: 6,
                 padding: "10px 14px",
                 marginBottom: 6,
-                opacity: 0.7,
+                opacity: 0.6,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <div style={{
@@ -332,10 +410,7 @@ export default function StepList({
                   </span>
                 </div>
                 {step.text && (
-                  <div style={{
-                    fontFamily: body, fontSize: 11, color: "#9ca3af",
-                    lineHeight: 1.5, marginLeft: 28,
-                  }}>
+                  <div style={{ fontFamily: body, fontSize: 11, color: "#9ca3af", lineHeight: 1.5, marginLeft: 28 }}>
                     {step.text}
                   </div>
                 )}

@@ -172,7 +172,7 @@ export default function AssignWorkScreen() {
     }
   }, [prefillAgent, agents]);
   const [steps,           setSteps]           = useState([]);
-  const [mergedSteps,     setMergedSteps]     = useState(null);
+  const [mergedSteps,     setMergedSteps]     = useState({ active: [], pendingArchive: [], archived: [] });
   const [questions,       setQuestions]       = useState([]);
   const [answers,         setAnswers]         = useState({});
   const [planSummary,     setPlanSummary]      = useState("");
@@ -235,8 +235,9 @@ export default function AssignWorkScreen() {
         }]);
       }
       const newSteps = p.steps || [];
-      const currentActive = mergedSteps?.active ?? [];
-      setMergedSteps(mergeSteps(currentActive, newSteps));
+      const currentActive = mergedSteps.active;
+      const alreadyArchived = mergedSteps.archived;
+      setMergedSteps(mergeSteps(currentActive, newSteps, alreadyArchived));
       setSteps(newSteps);
       setQuestions(p.questions||[]);
       setPlanSummary(p.planSummary||"");
@@ -254,7 +255,23 @@ export default function AssignWorkScreen() {
     const s = steps.find(x=>x.id===id);
     if (s) setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Removed step: ${s.label}`,archivedSteps:s.label}]);
     setSteps(prev=>prev.filter(x=>x.id!==id));
-    setMergedSteps(prev=>prev ? { ...prev, active: prev.active.filter(x=>x.id!==id) } : prev);
+    setMergedSteps(prev => ({ ...prev, active: prev.active.filter(x=>x.id!==id) }));
+  };
+
+  const handleArchiveStep = (step) => {
+    setMergedSteps(prev => ({
+      ...prev,
+      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
+      archived: [...prev.archived, { ...step, mergeStatus: "archived" }],
+    }));
+  };
+
+  const handleKeepStep = (step) => {
+    setMergedSteps(prev => ({
+      ...prev,
+      pendingArchive: prev.pendingArchive.filter(s => s.id !== step.id),
+      active: [...prev.active, { ...step, mergeStatus: "unchanged" }],
+    }));
   };
 
   const answerQ = (id, val) => {
@@ -270,7 +287,8 @@ export default function AssignWorkScreen() {
 
   // FEATURE: SH-06 — Supabase tasks integration
   const handleApprove = async () => {
-    if (!selectedAgent || !steps.length) { showToast("Generate a plan first", "⚠"); return; }
+    const activeSteps = mergedSteps.active.map(({ mergeStatus, ...s }) => s);
+    if (!selectedAgent || !activeSteps.length) { showToast("Generate a plan first", "⚠"); return; }
     setSaveState("saving");
     const taskTypeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || selectedType || "Data Analysis";
     const qas = questions.map(q => ({ q: q.q, a: answers[q.id] || "" }));
@@ -282,8 +300,8 @@ export default function AssignWorkScreen() {
       status:       "pending",
       priority:     "Normal",
       preview:      goal.slice(0, 120),
-      has_hitl:     steps.some(s => s.type === "hitl"),
-      steps:        steps,
+      has_hitl:     activeSteps.some(s => s.type === "hitl"),
+      steps:        activeSteps,
       plan_history: {
         questions: qas.map((qa, i) => ({
           id: i + 1,
@@ -480,8 +498,11 @@ export default function AssignWorkScreen() {
                 {/* Steps */}
                 <div style={{marginBottom:10}}>
                   <StepList
-                    activeSteps={mergedSteps?.active ?? []}
-                    archivedSteps={mergedSteps?.archived ?? []}
+                    activeSteps={mergedSteps.active}
+                    pendingArchive={mergedSteps.pendingArchive}
+                    archivedSteps={mergedSteps.archived}
+                    onArchiveStep={handleArchiveStep}
+                    onKeepStep={handleKeepStep}
                     readOnly={false}
                     onRemoveStep={removeStep}
                   />

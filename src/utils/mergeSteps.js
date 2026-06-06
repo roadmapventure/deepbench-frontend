@@ -1,5 +1,6 @@
-// DeepBench v5.1.9 | mergeSteps.js | Shared step merge utility
+// DeepBench v5.1.9 | mergeSteps.js | patch — pending-archive status
 // FEATURE: TI-09 — Shared step merge service
+// FEATURE: TI-11 — Archive approval flow
 
 const HITL_KEYWORDS = ["review", "approval", "confirm", "clarify", "upload", "provide"];
 const SUBAGENT_KEYWORDS = ["brent", "sub-agent", "fetch", "research"];
@@ -15,7 +16,10 @@ function normalizeLabel(label = "") {
   return label.toLowerCase().trim();
 }
 
-export function mergeSteps(currentSteps = [], incomingSteps = []) {
+// currentSteps   — active steps currently shown (mergedSteps.active)
+// incomingSteps  — new steps returned by the planner
+// alreadyArchived — steps already in the drawer; passed through unchanged
+export function mergeSteps(currentSteps = [], incomingSteps = [], alreadyArchived = []) {
   const currentMap = new Map(
     currentSteps.map(s => [normalizeLabel(s.label), s])
   );
@@ -32,13 +36,13 @@ export function mergeSteps(currentSteps = [], incomingSteps = []) {
   });
 
   const incomingKeys = new Set(incomingSteps.map(s => normalizeLabel(s.label)));
-  const archived = currentSteps
+  const pendingArchive = currentSteps
     .filter(s => !incomingKeys.has(normalizeLabel(s.label)))
     .map(s => ({
       ...s,
       type: s.type || "agent",
-      mergeStatus: "archived",
+      mergeStatus: "pending-archive",
     }));
 
-  return { active, archived };
+  return { active, pendingArchive, archived: [...alreadyArchived] };
 }
