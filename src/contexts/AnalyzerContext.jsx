@@ -177,6 +177,7 @@ export function AnalyzerProvider({ children }) {
   const [error,    setError]    = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [searchTerm, setSearchTerm] = useState("");
+  const [autoLoaded, setAutoLoaded] = useState(false);
 
   const [localViewBy,  setLocalViewBy]  = useState("city");
   const [localSelected, setLocalSelected] = useState("");
@@ -371,6 +372,7 @@ export function AnalyzerProvider({ children }) {
     // Derived
     dirtyCount, highFlags, availableTabs,
     // Actions
+    autoLoaded, setAutoLoaded,
     processFile, runAnalysis,
     loadAgentConfigOptions, setSessionConfig,
     // Helpers

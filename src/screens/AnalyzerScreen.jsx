@@ -49,16 +49,15 @@ const NAV_GROUPS = [
 // FEATURE: SH-07 — Auto-load CSV from Storage on return visit
 // ── Data source landing screen ──────────────────────────────────────────────
 function DataSourceScreen({ taskId }) {
-  const { processFile, setError } = useAnalyzer();
+  const { autoLoaded, setAutoLoaded, processFile, setError } = useAnalyzer();
   const navigate = useNavigate();
   const hiddenRef = useRef();
-  const autoLoadedRef = useRef(false);
   const [storageLoading, setStorageLoading] = useState(false);
 
   useEffect(() => {
-    if (autoLoadedRef.current) return;
-    autoLoadedRef.current = true;
+    if (autoLoaded) return;
     if (!taskId) return;
+    setAutoLoaded(true);
     if (taskId === "1") {
       (async () => {
         try {
