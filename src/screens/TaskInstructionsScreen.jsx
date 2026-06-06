@@ -1,17 +1,19 @@
-// DeepBench v5.1.0 | TaskInstructionsScreen.jsx | Task instructions — step timeline, HITL, editing
-// src/screens/TaskInstructionsScreen.jsx — v5.0.0
-// DeepBench v5 — Task instructions + step detail (/work/[taskId])
-// Step timeline with HITL/sub-agent badges, per-step comment textarea,
-// inline step edit, Re-run All, Mark Complete, View Brent → sub-agent CTA
+// DeepBench v5.1.5 | TaskInstructionsScreen.jsx | Task instructions
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, AiBadge } from "../components/SharedUI.jsx";
+import { Corners, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { supabase } from "../lib/supabase.js";
+import { TENANT_ID } from "../config.js";
 
-// ── Mock tasks ────────────────────────────────────────────────────────────────
+// FEATURE: TI-03 — Task loaded from Supabase
+// FEATURE: AW-13 — Clarifying questions as HITL step
+
+// ── Mock tasks (demo fallback — taskId=1 only) ────────────────────────────────
+/*
 const MOCK_TASKS = {
   1: {
     id:1, title:"NIGP Demo — Austin FY2025 Spend Analysis", agentId:"robyn", agent:"Robyn Castellanos",
@@ -42,6 +44,26 @@ const MOCK_TASKS = {
     ],
   },
 };
+*/
+
+const MOCK_TASKS = {
+  1: {
+    id:1, title:"NIGP Demo — Austin FY2025 Spend Analysis", agentId:"robyn", agent:"Robyn Castellanos",
+    type:"Data Analysis", status:"completed", priority:"High", created:"Jun 1",
+    preview:"Full portfolio analysis: $372M, 264 NIGP classes, 2,847 vendors.",
+    hasHITL:true,
+    fromChat:{ agentId:"robyn", agentName:"Robyn Castellanos", question:"Can you analyze Austin's FY2025 spend for vendor concentration risk?", answer:"Happy to — I'll run a full HHI analysis across all vendor classes. Let me set up the task." },
+    steps:[
+      { id:1, icon:"👤", label:"Human in the Loop",            type:"hitl",     status:"done",    text:"Load your data source — select a sample dataset, fetch live portal data via Brent, or upload your own file.",     note:"Completed — Austin FY2025 demo loaded" },
+      { id:2, icon:"🌐", label:"Call Brent — Fetch Live Data", type:"subagent", status:"skipped", text:"If a live data source was selected, Robyn will delegate to Brent Matthews to navigate the portal and retrieve the file. Brent will write field notes to his training after each run.", note:"Sub-agent handoff · Skipped — demo data used", agentId:"brent", agentName:"Brent Matthews" },
+      { id:3, icon:"🗂", label:"Map & Validate Columns",       type:"agent",    status:"done",    text:"Robyn mapped all 21 columns. Amount, NIGP, vendor, date auto-detected." },
+      { id:4, icon:"📊", label:"Run Data Analysis",            type:"agent",    status:"done",    text:"11,711 transactions analyzed. 6 risk flags identified. HHI: 892 (competitive)." },
+      { id:5, icon:"⚑", label:"Flag Anomalies",               type:"agent",    status:"done",    text:"Maverick spend: $2.1M (5.7%). PO splitting: 14 instances. Single-source: 3 categories." },
+      { id:6, icon:"📝", label:"Generate Executive Briefing",  type:"agent",    status:"done",    text:"Briefing generated. 4 sections: Portfolio Overview, Risk Assessment, Strategic Opportunities, Bottom Line." },
+      { id:7, icon:"👤", label:"Human in the Loop",            type:"hitl",     status:"done",    text:"Review and approve the executive briefing.", note:"Approved Jun 1" },
+    ],
+  },
+};
 
 const STATUS_STYLE = {
   done:    { label:"Done",    color:T.moss,      bg:`rgba(90,117,56,.12)`,  border:`rgba(90,117,56,.25)` },
@@ -63,7 +85,7 @@ function StepRow({ step, index, navigate }) {
 
   const bdC  = isHITL     ? "rgba(168,51,25,.25)"   : isSubAgent ? "rgba(45,111,181,.25)" : T.line;
   const bgC  = isHITL     ? "rgba(168,51,25,.04)"   : isSubAgent ? "rgba(45,111,181,.04)" : T.card;
-  const lbC  = isHITL     ? T.flag                  : isSubAgent ? "#2d6fb5"              : T.lineSoft;
+  const lbC  = isHITL     ? "rgba(168,51,25,.25)"   : isSubAgent ? "rgba(45,111,181,.25)" : T.lineSoft;
   const nmC  = isHITL     ? T.flag                  : isSubAgent ? "#2d6fb5"              : T.muted;
   const ttC  = isHITL     ? T.flag                  : isSubAgent ? "#2d6fb5"              : T.navy;
 
@@ -79,7 +101,7 @@ function StepRow({ step, index, navigate }) {
         {/* Step number + icon */}
         <div style={{flexShrink:0,textAlign:"center",minWidth:28,paddingTop:1}}>
           <div style={{fontFamily:mono,fontSize:8,color:nmC,fontWeight:700,marginBottom:3}}>{String(index+1).padStart(2,"0")}</div>
-          <div style={{fontSize:16}}>{step.icon}</div>
+          <div style={{fontSize:16}}>{step.icon || "•"}</div>
         </div>
 
         {/* Content */}
@@ -91,7 +113,6 @@ function StepRow({ step, index, navigate }) {
           </div>
 
           {/* FEATURE: TI-04 — Inline step editing */}
-          {/* Step text — editable inline */}
           {editing ? (
             <div style={{marginBottom:6}}>
               <textarea value={editText} onChange={e=>setEditText(e.target.value)} rows={3}
@@ -108,12 +129,37 @@ function StepRow({ step, index, navigate }) {
           )}
           {step.note&&<div style={{fontFamily:mono,fontSize:8,color:isHITL?T.flag:isSubAgent?"#2d6fb5":T.moss,letterSpacing:.3,fontStyle:"italic",marginBottom:6}}>{step.note}</div>}
 
+          {/* AW-13 — Clarifying questions rendered in HITL step */}
+          {step.questions && step.questions.length > 0 && (
+            <div style={{marginTop:8}}>
+              <FeatureBadge id="AW-13" />
+              {step.questions.map(q => (
+                <div key={q.id} style={{marginTop:8,padding:"8px 10px",
+                  background:"rgba(182,135,58,0.06)",
+                  border:"1px solid rgba(182,135,58,0.2)"}}>
+                  <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
+                  <input
+                    placeholder="Your answer (optional)..."
+                    style={{width:"100%",padding:"6px 8px",fontSize:12,
+                      fontFamily:body,border:`1px solid ${T.line}`,
+                      background:T.card,color:T.ink,boxSizing:"border-box"}}
+                  />
+                </div>
+              ))}
+              <button style={{marginTop:10,background:T.brass,color:T.navy,
+                border:"none",padding:"7px 18px",fontFamily:display,
+                fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                Update Plan →
+              </button>
+            </div>
+          )}
+
           {/* Per-step comment textarea */}
           <textarea
             value={comment}
             onChange={e=>setComment(e.target.value)}
             placeholder="Add a comment or instruction for this step…"
-            style={{width:"100%",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"6px 10px",fontFamily:body,fontSize:11,color:T.ink,resize:"none",outline:"none",lineHeight:1.5,height:38,boxSizing:"border-box",transition:"height .15s"}}
+            style={{width:"100%",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"6px 10px",fontFamily:body,fontSize:11,color:T.ink,resize:"none",outline:"none",lineHeight:1.5,height:38,boxSizing:"border-box",transition:"height .15s",marginTop:6}}
             onFocus={e=>e.target.style.height="64px"}
             onBlur={e=>{if(!e.target.value)e.target.style.height="38px";}}
           />
@@ -121,10 +167,10 @@ function StepRow({ step, index, navigate }) {
 
         {/* Right action buttons */}
         <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,marginTop:2}}>
-          {isHITL && step.status==="waiting" && step.text.toLowerCase().includes("data source") && (
+          {isHITL && step.status==="waiting" && step.text && step.text.toLowerCase().includes("data source") && (
             <button style={{fontFamily:mono,fontSize:8,color:T.navy,background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",padding:"5px 10px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:.3}}>Open Data Source →</button>
           )}
-          {isHITL && step.status==="waiting" && !step.text.toLowerCase().includes("data source") && (
+          {isHITL && step.status==="waiting" && step.text && !step.text.toLowerCase().includes("data source") && !step.questions && (
             <button style={{fontFamily:mono,fontSize:8,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 10px",cursor:"pointer",fontWeight:700,textTransform:"uppercase",letterSpacing:.3}}>Approve ✓</button>
           )}
           {/* FEATURE: TI-08 — View Brent CTA (sub-agent navigation) */}
@@ -140,8 +186,8 @@ function StepRow({ step, index, navigate }) {
         </div>
       </div>
 
-      {/* HITL action strip for waiting steps */}
-      {isHITL && step.status==="waiting" && (
+      {/* HITL action strip for waiting steps (no questions — those use Update Plan) */}
+      {isHITL && step.status==="waiting" && !step.questions && (
         <div style={{display:"flex",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid rgba(168,51,25,.2)`}}>
           <button style={{background:T.moss,color:"#fff",border:"none",padding:"7px 18px",fontFamily:display,fontSize:12,fontWeight:700,cursor:"pointer"}}>Review & Approve →</button>
           <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"7px 14px",fontFamily:body,fontSize:12,cursor:"pointer"}}>Request Changes</button>
@@ -158,11 +204,86 @@ export default function TaskInstructionsScreen() {
   const { taskId } = useParams();
   const navigate   = useNavigate();
   const agents     = useAgents();
-  const task       = MOCK_TASKS[parseInt(taskId)] || MOCK_TASKS[1];
-  const agent      = agents.find(a => a.id === task.agentId);
-  const steps      = task.steps || [];
-  const doneCount  = steps.filter(s=>s.status==="done"||s.status==="skipped").length;
-  const progress   = steps.length ? Math.round(doneCount/steps.length*100) : 0;
+
+  const [task,      setTask]      = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [taskError, setTaskError] = useState(null);
+
+  useEffect(() => {
+    async function loadTask() {
+      // Special case: demo task id=1 uses mock data
+      if (taskId === "1") {
+        setTask(MOCK_TASKS[1]);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('tenant_id', TENANT_ID)
+        .single();
+      if (error || !data) {
+        setTaskError("Task not found");
+        setLoading(false);
+        return;
+      }
+      const normalizedTask = {
+        ...data,
+        agent: agents.find(a => a.id === data.agent_id)?.name || data.agent_id,
+        created: new Date(data.created_at).toLocaleDateString('en-US',
+          { month: 'short', day: 'numeric' }),
+        hasHITL: data.has_hitl,
+        steps: data.steps || [],
+      };
+
+      // Prepend HITL clarifying-questions step if there are unanswered questions
+      const pendingQuestions = normalizedTask.plan_history?.questions?.filter(
+        q => !q.a || q.a.trim() === ""
+      ) || [];
+      if (pendingQuestions.length > 0) {
+        const clarifyStep = {
+          id: 0,
+          icon: "❓",
+          label: "Clarifying Questions",
+          type: "hitl",
+          status: "waiting",
+          text: "The planning agent has questions before proceeding. Answer them to refine your plan.",
+          questions: pendingQuestions,
+        };
+        normalizedTask.steps = [clarifyStep, ...normalizedTask.steps];
+      }
+
+      setTask(normalizedTask);
+      setLoading(false);
+    }
+    loadTask();
+  }, [taskId, agents]);
+
+  if (loading) return (
+    <AppShell headerProps={{ backLabel: "Dashboard", onBack: () => navigate("/") }}>
+      <div style={{ flex:1, display:"flex", alignItems:"center",
+        justifyContent:"center", color:T.brass,
+        fontFamily:mono, fontSize:13 }}>
+        Loading task...
+      </div>
+    </AppShell>
+  );
+
+  if (taskError || !task) return (
+    <AppShell headerProps={{ backLabel: "Dashboard", onBack: () => navigate("/") }}>
+      <div style={{ flex:1, display:"flex", alignItems:"center",
+        justifyContent:"center", color:T.flag,
+        fontFamily:mono, fontSize:13 }}>
+        {taskError || "Task not found"}
+      </div>
+    </AppShell>
+  );
+
+  const agent     = agents.find(a => a.id === (task.agentId || task.agent_id));
+  const steps     = task.steps || [];
+  const doneCount = steps.filter(s => s.status === "done" || s.status === "skipped").length;
+  const progress  = steps.length ? Math.round(doneCount / steps.length * 100) : 0;
 
   return (
     <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
@@ -176,10 +297,11 @@ export default function TaskInstructionsScreen() {
 
         {/* Task header */}
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 20px",marginBottom:16,position:"relative"}}>
+          <FeatureBadge id="TI-03" />
           <Corners/>
           <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
             <div style={{width:44,height:44,borderRadius:"50%",border:`1.5px solid ${agent?.color||T.brass}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:18,fontWeight:700,color:agent?.color||T.brass,flexShrink:0}}>
-              {task.agent[0]}
+              {task.agent?.[0] || "?"}
             </div>
             <div style={{flex:1}}>
               <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.navy,marginBottom:3,lineHeight:1.2}}>{task.title}</div>
@@ -193,8 +315,7 @@ export default function TaskInstructionsScreen() {
               </div>
             </div>
             {/* FEATURE: TI-05 — Re-run All button */}
-          {/* FEATURE: TI-06 — Mark Complete button */}
-          {/* Re-run All + Mark Complete */}
+            {/* FEATURE: TI-06 — Mark Complete button */}
             <div style={{display:"flex",gap:8,flexShrink:0}}>
               <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
               <button style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
@@ -217,27 +338,26 @@ export default function TaskInstructionsScreen() {
           {/* Steps */}
           <div>
             {/* FEATURE: TI-07 — Chat transcript section */}
-            {/* ── This task started from a conversation ── */}
-          {task.fromChat && (
-            <div style={{background:`rgba(45,111,181,.05)`,border:`1px solid rgba(45,111,181,.2)`,padding:"12px 16px",marginBottom:14,position:"relative"}}>
-              <Corners color="#2d6fb5"/>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                <span style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>This task started from a conversation</span>
-                <AiBadge/>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0,paddingTop:1}}>YOU</div>
-                  <div style={{background:T.navy,color:T.card,padding:"6px 10px",fontSize:11,fontFamily:body,lineHeight:1.5,flex:1}}>{task.fromChat.question}</div>
+            {task.fromChat && (
+              <div style={{background:`rgba(45,111,181,.05)`,border:`1px solid rgba(45,111,181,.2)`,padding:"12px 16px",marginBottom:14,position:"relative"}}>
+                <Corners color="#2d6fb5"/>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  <span style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>This task started from a conversation</span>
+                  <AiBadge/>
                 </div>
-                <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,flexShrink:0,paddingTop:1}}>{task.fromChat.agentName.split(" ")[0].toUpperCase()}</div>
-                  <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"6px 10px",fontSize:11,fontFamily:body,color:T.mutedDeep,lineHeight:1.5,flex:1}}>{task.fromChat.answer}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0,paddingTop:1}}>YOU</div>
+                    <div style={{background:T.navy,color:T.card,padding:"6px 10px",fontSize:11,fontFamily:body,lineHeight:1.5,flex:1}}>{task.fromChat.question}</div>
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,flexShrink:0,paddingTop:1}}>{task.fromChat.agentName.split(" ")[0].toUpperCase()}</div>
+                    <div style={{background:T.cardAlt,border:`1px solid ${T.line}`,padding:"6px 10px",fontSize:11,fontFamily:body,color:T.mutedDeep,lineHeight:1.5,flex:1}}>{task.fromChat.answer}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
+            )}
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {steps.map((step,i)=>(
                 <StepRow key={step.id} step={step} index={i} navigate={navigate}/>
