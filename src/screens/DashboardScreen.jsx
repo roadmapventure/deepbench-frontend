@@ -164,7 +164,7 @@ function ChatPanel() {
     const t0 = Date.now();
     try {
       const others = agents.filter(a=>!a.isIntern&&a.id!==agent.id).map(a=>`${a.id}: ${a.name} — ${a.specialty}`).join("\n");
-      const prompt = `Current agent: ${agent.name} (${agent.specialty})\nUser question: ${userMsg}\nOther available agents:\n${others}\n\nIs ${agent.name} the best agent for this question? If not, which agent ID would be better and why (one sentence)? Reply JSON: {"isMatch":true/false,"suggestId":"agent_id_or_null","suggestReason":"reason or null"}`;
+      const prompt = `Current agent: ${agent.name} (${agent.specialty})\nUser question: ${userMsg}\nOther available agents:\n${others}\n\nOnly suggest a different agent if the current agent is CLEARLY the wrong fit — meaning the question is completely outside their specialty. If the current agent can reasonably handle the question, reply isMatch: true even if another agent might be marginally better. Be conservative — most questions should stay with the current agent.\n\nReply JSON only: {"isMatch":true/false,"suggestId":"agent_id_or_null","suggestReason":"reason or null"}`;
       const res = await fetch("/api/brief",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({messages:[{role:"user",content:prompt}],agent_id:"chloe",tenant_id:TENANT_ID,skipRag:true,max_tokens:120})});
       const data = await res.json();
@@ -233,12 +233,50 @@ function ChatPanel() {
     clearAIStatus();
   };
 
+  // Send directly to API — skips routing check (used after routing decision)
+  const sendMessageDirect = async (userMsg, agent) => {
+    if (!userMsg || !agent || loading) return;
+    setLoading(true);
+    setAIStatus(`${agent.name.split(" ")[0]} is thinking…`);
+    const t0 = Date.now();
+    try {
+      const res = await fetch("/api/brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role:"user", content:userMsg }],
+          agent_id: agent.id,
+          tenant_id: TENANT_ID,
+          ragContext: { queryText: userMsg, jurisdiction: "All", triggers: [] },
+        }),
+      });
+      const json = await res.json();
+      const text = json.content?.[0]?.text || json.error || "No response";
+      const ragRetrieved = json._debug?.rag_retrieved;
+      const tier = ragRetrieved ? "trained" : json._debug?.similarity > 0.3 ? "trained" : "informed";
+      const sourceDocs = json._debug?.rag_entries?.map(e=>e.title).filter(Boolean) || [];
+      logAICall({type:"chat",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:json.usage?.output_tokens||0,tier,agentId:agent.id,location:"Dashboard chat"});
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        agentId: agent.id,
+        content: text,
+        tier,
+        sourceDocs,
+        debug: json._debug,
+      }]);
+    } catch(e) {
+      setMessages(prev => [...prev, { role:"assistant", agentId:agent.id, content:"Something went wrong — please try again.", tier:"general" }]);
+    }
+    setLoading(false);
+    clearAIStatus();
+  };
+
   // Accept routing suggestion
   const acceptRouting = (msg) => {
     const agent = agents.find(a=>a.id===msg.suggestId);
     if (!agent) return;
     setSelectedAgent(agent);
-    setInput(msg.originalMsg||"");
+    sendMessageDirect(msg.originalMsg, agent);
   };
 
   const TIER_STYLES = {
@@ -336,7 +374,7 @@ function ChatPanel() {
                   <div style={{fontSize:12,color:T.mutedDeep,lineHeight:1.5,marginBottom:8}}>{msg.content}</div>
                   <div style={{display:"flex",gap:7}}>
                     <button onClick={()=>acceptRouting(msg)} style={{background:"#2d6fb5",color:"#fff",border:"none",padding:"5px 14px",fontFamily:display,fontSize:11,fontWeight:700,cursor:"pointer"}}>Route to {msg.suggestName?.split(" ")[0]} →</button>
-                    <button onClick={()=>sendMessage()} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:11,cursor:"pointer"}}>Stay with {agents.find(a=>a.id===msg.agentId)?.name.split(" ")[0]}</button>
+                    <button onClick={()=>sendMessageDirect(msg.originalMsg, selectedAgent)} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:11,cursor:"pointer"}}>Stay with {agents.find(a=>a.id===msg.agentId)?.name.split(" ")[0]}</button>
                   </div>
                 </div>
               ) : (
