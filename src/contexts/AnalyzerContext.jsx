@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useRef, useCallback, useMemo } from "react";
 import Papa from "papaparse";
 import { TENANT_ID } from "../config.js";
+import { supabase } from "../lib/supabase.js";
 import { parseAmt, shortLabel } from "../tokens.js";
 import { resolveNIGP, NIGP_CLASS as NIGP_CLASS_LOOKUP } from "../nigp-lookup.js";
 
@@ -202,7 +203,8 @@ export function AnalyzerProvider({ children }) {
   // ── processFile ──────────────────────────────────────────────────────────
   // FEATURE: SH-07 — CSV Storage upload after processFile
   // autoAnalyze=true: skip mapping screen, run full analysis immediately (demo task)
-  const processFile = useCallback((file, taskId, autoAnalyze = false) => {
+  // savedMapping: restore a previously saved column mapping on return visit
+  const processFile = useCallback((file, taskId, autoAnalyze = false, savedMapping = null) => {
     if (!file) return;
     setLoading(true); setError(""); setFileName(file.name);
     fileStore.current = file;
@@ -241,7 +243,7 @@ export function AnalyzerProvider({ children }) {
         const cols = Object.keys(results.data[0] || {});
         if (!cols.length) { setError("No columns found."); setLoading(false); return; }
         setColumns(cols);
-        setMapping(autoDetect(cols));
+        setMapping(savedMapping || autoDetect(cols));
         setStage("map");
         setLoading(false);
         if (taskId && taskId !== "1") {
@@ -270,7 +272,8 @@ export function AnalyzerProvider({ children }) {
   }, []);
 
   // ── runAnalysis ──────────────────────────────────────────────────────────
-  const runAnalysis = useCallback(() => {
+  // FEATURE: AZ-03 — column mapping saved to Supabase
+  const runAnalysis = useCallback((taskId) => {
     if (!mapping.amount) { setError("Please assign the Spend Amount column."); return; }
     setLoading(true); setError("");
     Papa.parse(fileStore.current, {
@@ -280,6 +283,15 @@ export function AnalyzerProvider({ children }) {
           setData(computeAnalysisData(results, mapping));
           setActiveTab("overview");
           setStage("analyze");
+          if (taskId && taskId !== "1") {
+            supabase.from("tasks")
+              .update({ mapping })
+              .eq("id", taskId)
+              .eq("tenant_id", TENANT_ID)
+              .then(({ error }) => {
+                if (error) console.error("Mapping save failed:", error.message);
+              });
+          }
         } catch(e) { setError(e.message); }
         setLoading(false);
       },

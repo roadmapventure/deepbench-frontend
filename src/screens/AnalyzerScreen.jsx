@@ -73,7 +73,7 @@ function DataSourceScreen({ taskId }) {
       try {
         const { data: taskData, error: taskErr } = await supabase
           .from("tasks")
-          .select("csv_path")
+          .select("csv_path, mapping")
           .eq("id", taskId)
           .single();
         if (taskErr || !taskData?.csv_path) { setStorageLoading(false); return; }
@@ -86,7 +86,7 @@ function DataSourceScreen({ taskId }) {
         const blob = await csvRes.blob();
         const fileName = taskData.csv_path.split("/").pop() || "file.csv";
         console.log("Loaded previous CSV:", taskData.csv_path);
-        processFile(new File([blob], fileName, { type: "text/csv" }));
+        processFile(new File([blob], fileName, { type: "text/csv" }), null, false, taskData.mapping || null);
       } catch (e) {
         console.error("Auto-load from Storage failed:", e);
         setStorageLoading(false);
@@ -173,8 +173,9 @@ function DataSourceScreen({ taskId }) {
 }
 
 // FEATURE: AZ-02 — Column mapping screen
+// FEATURE: AZ-02 — Column mapping screen
 // ── Column mapping screen ───────────────────────────────────────────────────
-function MappingScreen() {
+function MappingScreen({ taskId }) {
   const { columns, fileName, mapping, setMapping, error, runAnalysis, activeTab, setStage, setActiveTab } = useAnalyzer();
   return (
     <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 40px"}}>
@@ -185,7 +186,7 @@ function MappingScreen() {
         </div>
         <div style={{display:"flex",gap:10}}>
           {activeTab==="updatefile"&&<button onClick={()=>{setStage("analyze");setActiveTab("overview");}} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontSize:13,fontFamily:body}}>Cancel</button>}
-          <button onClick={runAnalysis} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
+          <button onClick={()=>runAnalysis(taskId)} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
         </div>
       </div>
       <div style={{display:"grid",gap:10}}>
@@ -213,7 +214,7 @@ function MappingScreen() {
       </div>
       {error&&<div style={{marginTop:14,background:`${T.flag}10`,border:`1px solid ${T.flag}44`,padding:"12px 16px",color:T.flag,fontSize:14}}>⚠ {error}</div>}
       <div style={{display:"flex",gap:10,marginTop:20,justifyContent:"flex-end"}}>
-        <button onClick={runAnalysis} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"12px 24px",cursor:"pointer",fontSize:15,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
+        <button onClick={()=>runAnalysis(taskId)} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"12px 24px",cursor:"pointer",fontSize:15,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
       </div>
     </div>
   );
@@ -596,7 +597,7 @@ export default function AnalyzerScreen() {
   return (
     <AppShell headerProps={{ rightContent:headerRight }}>
       {stage==="overview" && <DataSourceScreen taskId={taskId}/>}
-      {stage==="map"      && <MappingScreen/>}
+      {stage==="map"      && <MappingScreen taskId={taskId}/>}
       {stage==="analyze"  && <AnalyzerView taskId={taskId}/>}
       {error&&stage!=="analyze"&&(
         <div style={{margin:"0 28px",background:`${T.flag}10`,border:`1px solid ${T.flag}44`,padding:"12px 16px",color:T.flag,fontSize:14}}>⚠ {error}</div>
