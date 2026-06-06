@@ -364,7 +364,7 @@ function ChatPanel() {
                       agentId: msg.agentId,
                       agentName: agents.find(a => a.id === msg.agentId)?.name || "",
                       userQuestion: userMsg?.content || "",
-                      agentAnswer: msg.content || "",
+                      agentAnswer: msg.content,
                       timestamp: new Date().toISOString(),
                     }));
                     navigate(`/work/new?from=chat&agent=${msg.agentId}&q=${encodeURIComponent((userMsg?.content || msg.content).slice(0,200))}`);

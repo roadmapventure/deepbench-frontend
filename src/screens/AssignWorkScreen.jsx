@@ -156,7 +156,14 @@ export default function AssignWorkScreen() {
 
   const [selectedType,    setSelectedType]    = useState(null);
   const [goal,            setGoal]            = useState(prefillGoal);
-  const [selectedAgent,   setSelectedAgent]   = useState(prefillAgent||null);
+  const [selectedAgent,   setSelectedAgent]   = useState(null);
+
+  useEffect(() => {
+    if (prefillAgent && agents.length > 0) {
+      const agentObj = agents.find(a => a.id === prefillAgent);
+      if (agentObj) setSelectedAgent(agentObj);
+    }
+  }, [prefillAgent, agents]);
   const [steps,           setSteps]           = useState([]);
   const [questions,       setQuestions]       = useState([]);
   const [answers,         setAnswers]         = useState({});
@@ -250,7 +257,7 @@ export default function AssignWorkScreen() {
     const { error } = await supabase.from("tasks").insert({
       tenant_id:    TENANT_ID,
       title:        goal.trim() || "Untitled Task",
-      agent_id:     selectedAgent,
+      agent_id:     selectedAgent?.id || selectedAgent,
       type:         taskTypeLabel,
       status:       "pending",
       priority:     "Normal",
@@ -284,7 +291,7 @@ export default function AssignWorkScreen() {
     setTimeout(() => navigate("/"), 900);
   };
 
-  const selectedAgentObj = agents.find(a=>a.id===selectedAgent);
+  const selectedAgentObj = selectedAgent?.id ? selectedAgent : agents.find(a=>a.id===selectedAgent);
 
   return (
     <AppShell toast={toast} headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
@@ -433,7 +440,7 @@ export default function AssignWorkScreen() {
                     </div>
                     {/* FEATURE: AW-07 — Agent swap + dynamic replanning */}
                     {/* Swap agent */}
-                    <select value={selectedAgent||""} onChange={e=>{setSelectedAgent(e.target.value);setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Agent swapped to ${agents.find(a=>a.id===e.target.value)?.name}`,archivedSteps:steps.map(s=>s.label).join(", ")}]);}}
+                    <select value={selectedAgent?.id||selectedAgent||""} onChange={e=>{setSelectedAgent(e.target.value);setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Agent swapped to ${agents.find(a=>a.id===e.target.value)?.name}`,archivedSteps:steps.map(s=>s.label).join(", ")}]);}}
                       style={{fontFamily:body,fontSize:11,background:T.cardAlt,border:`1px solid ${T.line}`,padding:"4px 8px",cursor:"pointer",color:T.navy}}>
                       {agents.filter(a=>!a.isIntern).map(a=><option key={a.id} value={a.id}>{a.name.split(" ")[0]}</option>)}
                     </select>
@@ -450,7 +457,7 @@ export default function AssignWorkScreen() {
                 {/* Steps */}
                 <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
                   {steps.map((step,i)=>(
-                    <StepCard key={step.id} step={step} index={i} agent={agents.find(a=>a.id===(step.agentId||selectedAgent))} onRemove={removeStep}/>
+                    <StepCard key={step.id} step={step} index={i} agent={agents.find(a=>a.id===(step.agentId||selectedAgent?.id||selectedAgent))} onRemove={removeStep}/>
                   ))}
                 </div>
 
@@ -489,8 +496,23 @@ export default function AssignWorkScreen() {
 
             {!generating && !planGenerated && (
               <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"40px 24px",textAlign:"center"}}>
-                <div style={{fontSize:24,marginBottom:10}}>📋</div>
-                <div style={{fontFamily:display,fontSize:14,color:T.muted}}>Select a task type and describe your goal — the planning agent will build your step-by-step plan.</div>
+                {selectedAgentObj ? (
+                  <>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:12}}>
+                      <AgentAvatar who={selectedAgentObj.id} size={36} ring={true}/>
+                      <div style={{textAlign:"left"}}>
+                        <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{selectedAgentObj.name}</div>
+                        <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,letterSpacing:.5}}>PRE-SELECTED FROM CONVERSATION</div>
+                      </div>
+                    </div>
+                    <div style={{fontFamily:display,fontSize:13,color:T.muted}}>Select a task type and describe your goal — the planning agent will build your step-by-step plan.</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{fontSize:24,marginBottom:10}}>📋</div>
+                    <div style={{fontFamily:display,fontSize:14,color:T.muted}}>Select a task type and describe your goal — the planning agent will build your step-by-step plan.</div>
+                  </>
+                )}
               </div>
             )}
           </div>
