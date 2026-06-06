@@ -137,6 +137,10 @@ function StepRow({ step, index, navigate }) {
                 <div key={q.id ?? qi} style={{marginTop:8,padding:"8px 10px",
                   background:"rgba(182,135,58,0.06)",
                   border:"1px solid rgba(182,135,58,0.2)"}}>
+                  <div style={{fontFamily:mono,fontSize:10,color:T.brass,
+                    marginBottom:3,fontWeight:700}}>
+                    Q{q.id || qi + 1}
+                  </div>
                   <div style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:6}}>{q.q}</div>
                   <input
                     placeholder="Your answer (optional)..."

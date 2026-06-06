@@ -1,4 +1,4 @@
-// DeepBench v5.1.4 | AssignWorkScreen.jsx | Assign work screen
+// DeepBench v5.1.5 | AssignWorkScreen.jsx | Assign work screen
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -234,16 +234,25 @@ export default function AssignWorkScreen() {
     if (!selectedAgent || !steps.length) { showToast("Generate a plan first", "⚠"); return; }
     setSaveState("saving");
     const taskTypeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || selectedType || "Data Analysis";
+    const qas = questions.map(q => ({ q: q.q, a: answers[q.id] || "" }));
     const { error } = await supabase.from("tasks").insert({
-      tenant_id: TENANT_ID,
-      title:     goal.trim() || "Untitled Task",
-      agent_id:  selectedAgent,
-      type:      taskTypeLabel,
-      status:    "pending",
-      priority:  "Normal",
-      preview:   goal.slice(0, 120),
-      has_hitl:  steps.some(s => s.type === "hitl"),
-      steps:     steps,
+      tenant_id:    TENANT_ID,
+      title:        goal.trim() || "Untitled Task",
+      agent_id:     selectedAgent,
+      type:         taskTypeLabel,
+      status:       "pending",
+      priority:     "Normal",
+      preview:      goal.slice(0, 120),
+      has_hitl:     steps.some(s => s.type === "hitl"),
+      steps:        steps,
+      plan_history: {
+        questions: qas.map((qa, i) => ({
+          id: i + 1,
+          q: qa.q,
+          a: qa.a || "",
+        })),
+        planSummary: steps.length > 0 ? `${steps.length} step plan` : "",
+      },
     });
     if (error) {
       console.error("Task save error:", error);
