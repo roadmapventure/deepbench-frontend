@@ -1,4 +1,4 @@
-// DeepBench v5.1.14 | AssignWorkScreen.jsx | DB-17 Michelle titles
+// DeepBench v5.1.14p | AssignWorkScreen.jsx | DB-17 title fixes
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -332,6 +332,16 @@ export default function AssignWorkScreen() {
     setSaveState(newPending===0?"ready":"draft");
   };
 
+  // FIX: DB-17p — Wire step label editing in draft state
+  const handleStepLabelChange = (stepId, newLabel) => {
+    setMergedSteps(prev => ({
+      ...prev,
+      active: prev.active.map(s =>
+        s.id === stepId ? { ...s, label: newLabel } : s
+      ),
+    }));
+  };
+
   const handleSaveDraft = () => {
     setSaveState("saving");
     setTimeout(()=>{ setSaveState("draft"); showToast("Saved as draft — return to answer remaining questions"); },600);
@@ -452,7 +462,8 @@ export default function AssignWorkScreen() {
                   titleEdited: prev.titleEdited || prev.taskTitle !== prev.michelleTitle,
                 }));
               }}
-              onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.paperDeep}`; }}
+              // FIX: DB-17p — hover color T.line (visible on T.paperDeep background, unlike T.paperDeep itself)
+              onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.line}`; }}
               onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
               style={{
                 width:"100%", fontFamily:display, fontSize:20, fontWeight:500,
@@ -604,6 +615,7 @@ export default function AssignWorkScreen() {
                 )}
 
                 {/* Steps */}
+                {/* FIX: DB-17p — onStepLabelChange wired for draft state editing */}
                 <div style={{marginBottom:10}}>
                   <StepList
                     activeSteps={mergedSteps.active}
@@ -612,6 +624,7 @@ export default function AssignWorkScreen() {
                     onKeepStep={handleKeepStep}
                     readOnly={false}
                     onRemoveStep={removeStep}
+                    onStepLabelChange={handleStepLabelChange}
                   />
                 </div>
 

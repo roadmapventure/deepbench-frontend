@@ -1,4 +1,4 @@
-// DeepBench v5.1.14 | TaskInstructionsScreen.jsx | DB-17 editable titles
+// DeepBench v5.1.14p | TaskInstructionsScreen.jsx | DB-17 title fixes
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -270,7 +270,8 @@ export default function TaskInstructionsScreen() {
         setTask(mockTask);
         setEditableTitle(mockTask.title || "");
         savedTitleRef.current = mockTask.title || "";
-        setMergedSteps(mergeSteps([], mockTask.steps || [], []));
+        // FIX: DB-17p — initial load sets steps directly; no mergeSteps() on load
+        setMergedSteps({ active: mockTask.steps || [], archived: [] });
         setLoading(false);
         return;
       }
@@ -314,7 +315,8 @@ export default function TaskInstructionsScreen() {
       setTask(normalizedTask);
       setEditableTitle(normalizedTask.title || "");
       savedTitleRef.current = normalizedTask.title || "";
-      setMergedSteps(mergeSteps([], normalizedTask.steps || [], []));
+      // FIX: DB-17p — initial load sets steps directly; no mergeSteps() on load
+      setMergedSteps({ active: normalizedTask.steps || [], archived: [] });
       setLoading(false);
     }
     loadTask();
@@ -388,18 +390,23 @@ export default function TaskInstructionsScreen() {
   };
 
   // FEATURE: DB-17 — Save step label to Supabase on blur
-  const handleStepLabelChange = (stepId, newLabel) => {
+  // FIX: DB-17p — async handler awaits PATCH; writes full steps array with title_edited flag
+  const handleStepLabelChange = async (stepId, newLabel) => {
     if (!taskId || taskId === "1") return;
-    setMergedSteps(prev => {
-      const updatedActive = prev.active.map(s =>
-        s.id === stepId ? { ...s, label: newLabel, title_edited: true } : s
-      );
-      const stepsForDb = updatedActive.map(({ mergeStatus, pendingArchive, ...s }) => s);
-      supabase.from("tasks").update({ steps: stepsForDb, updated_at: new Date().toISOString() })
-        .eq("id", taskId).eq("tenant_id", TENANT_ID)
-        .then(({ error }) => { if (error) console.error("Step label save error:", error); });
-      return { ...prev, active: updatedActive };
-    });
+    const updatedActive = mergedSteps.active.map(s =>
+      s.id === stepId ? { ...s, label: newLabel, title_edited: true } : s
+    );
+    setMergedSteps(prev => ({ ...prev, active: updatedActive }));
+    const stepsForDb = updatedActive.map(({ mergeStatus, pendingArchive, ...s }) => s);
+    try {
+      await supabase.from("tasks").update({
+        steps: stepsForDb,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", taskId).eq("tenant_id", TENANT_ID);
+    } catch (e) {
+      console.error("Step label save error:", e);
+    }
   };
 
   // FEATURE: AW-16 — Update Plan button regenerates steps
@@ -596,7 +603,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
             <div style={{width:44,height:44,borderRadius:"50%",border:`1.5px solid ${agent?.color||T.brass}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:18,fontWeight:700,color:agent?.color||T.brass,flexShrink:0}}>
               {task.agent?.[0] || "?"}
             </div>
-            <div style={{flex:1}}>
+            {/* FIX: DB-17p — minWidth:0 prevents title overflow into status badge / buttons */}
+            <div style={{flex:1, minWidth:0}}>
               {/* FEATURE: DB-17 — Editable task title */}
               <input
                 value={editableTitle}

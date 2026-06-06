@@ -1,4 +1,4 @@
-// DeepBench v5.1.14 | StepList.jsx | DB-17 step label inline editing
+// DeepBench v5.1.14p | StepList.jsx | DB-17 step editing draft state
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
