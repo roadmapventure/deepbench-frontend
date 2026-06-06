@@ -1,4 +1,4 @@
-// DeepBench v5.1.6 | AssignWorkScreen.jsx | Assign work screen
+// DeepBench v5.1.9 | AssignWorkScreen.jsx | Step merge wired
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -9,8 +9,14 @@ import { Corners, AgentAvatar, AiBadge, Toast, FeatureBadge } from "../component
 import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
+import { mergeSteps } from "../utils/mergeSteps.js";
+import StepList from "../components/StepList.jsx";
 
 // FEATURE: AW-01 — Task type tiles
+// FEATURE: TI-09 — Step merge wired
+// FEATURE: TI-10 — Brass left border on new/changed steps
+// FEATURE: TI-11 — Archived steps collapsible drawer
+// FEATURE: TI-12 — Agent attribution on every step
 const TASK_TYPES = [
   { id:"analysis",  icon:"📊", label:"Data Analysis",     desc:"Analyze spend CSV — flags, HHI, vendor risk, AI briefing",
     defaultGoal:"Analyze the procurement spend data for this task and identify key trends, vendor concentration risks, maverick spend, and savings opportunities." },
@@ -166,6 +172,7 @@ export default function AssignWorkScreen() {
     }
   }, [prefillAgent, agents]);
   const [steps,           setSteps]           = useState([]);
+  const [mergedSteps,     setMergedSteps]     = useState(null);
   const [questions,       setQuestions]       = useState([]);
   const [answers,         setAnswers]         = useState({});
   const [planSummary,     setPlanSummary]      = useState("");
@@ -227,7 +234,10 @@ export default function AssignWorkScreen() {
           archivedSteps: steps.map(s=>s.label).join(", "),
         }]);
       }
-      setSteps(p.steps||[]);
+      const newSteps = p.steps || [];
+      const currentActive = mergedSteps?.active ?? [];
+      setMergedSteps(mergeSteps(currentActive, newSteps));
+      setSteps(newSteps);
       setQuestions(p.questions||[]);
       setPlanSummary(p.planSummary||"");
       setAgentReason(p.agentReason||"");
@@ -244,6 +254,7 @@ export default function AssignWorkScreen() {
     const s = steps.find(x=>x.id===id);
     if (s) setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Removed step: ${s.label}`,archivedSteps:s.label}]);
     setSteps(prev=>prev.filter(x=>x.id!==id));
+    setMergedSteps(prev=>prev ? { ...prev, active: prev.active.filter(x=>x.id!==id) } : prev);
   };
 
   const answerQ = (id, val) => {
@@ -467,10 +478,13 @@ export default function AssignWorkScreen() {
                 )}
 
                 {/* Steps */}
-                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
-                  {steps.map((step,i)=>(
-                    <StepCard key={step.id} step={step} index={i} agent={agents.find(a=>a.id===(step.agentId||selectedAgent?.id||selectedAgent))} onRemove={removeStep}/>
-                  ))}
+                <div style={{marginBottom:10}}>
+                  <StepList
+                    activeSteps={mergedSteps?.active ?? []}
+                    archivedSteps={mergedSteps?.archived ?? []}
+                    readOnly={false}
+                    onRemoveStep={removeStep}
+                  />
                 </div>
 
                 {/* FEATURE: AW-08 — Change log collapsible */}

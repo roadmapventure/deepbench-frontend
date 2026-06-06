@@ -1,4 +1,4 @@
-// DeepBench v5.1.8 | TaskInstructionsScreen.jsx | Task instructions
+// DeepBench v5.1.9 | TaskInstructionsScreen.jsx | Step merge + color fix
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8,10 +8,17 @@ import { Corners, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { supabase } from "../lib/supabase.js";
 import { TENANT_ID } from "../config.js";
+import { mergeSteps } from "../utils/mergeSteps.js";
+import StepList from "../components/StepList.jsx";
 
 // FEATURE: TI-03 — Task loaded from Supabase
 // FEATURE: AW-13 — Clarifying questions as HITL step
 // FEATURE: AW-16 — Update Plan button regenerates steps
+// FEATURE: TI-09 — Step merge service wired
+// FEATURE: TI-10 — Brass left border on new/changed steps
+// FEATURE: TI-11 — Archived steps collapsible drawer
+// FEATURE: TI-12 — Agent attribution on every step
+// FEATURE: TI-13 — Color coding preserved through regeneration
 
 // ── Mock tasks (demo fallback — taskId=1 only) ────────────────────────────────
 /*
@@ -243,6 +250,7 @@ export default function TaskInstructionsScreen() {
   const agents     = useAgents();
 
   const [task,         setTask]         = useState(null);
+  const [mergedSteps,  setMergedSteps]  = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [taskError,    setTaskError]    = useState(null);
   const [answers,      setAnswers]      = useState({});
@@ -252,7 +260,9 @@ export default function TaskInstructionsScreen() {
     async function loadTask() {
       // Special case: demo task id=1 uses mock data
       if (taskId === "1") {
-        setTask(MOCK_TASKS[1]);
+        const mockTask = MOCK_TASKS[1];
+        setTask(mockTask);
+        setMergedSteps(mergeSteps([], mockTask.steps || []));
         setLoading(false);
         return;
       }
@@ -296,6 +306,7 @@ export default function TaskInstructionsScreen() {
       }
 
       setTask(normalizedTask);
+      setMergedSteps(mergeSteps([], normalizedTask.steps || []));
       setLoading(false);
     }
     loadTask();
@@ -431,6 +442,9 @@ where needed. Use the plan_task tool to return a structured plan.`;
         .eq("tenant_id", TENANT_ID);
       }
 
+      const merged = mergeSteps(mergedSteps?.active ?? [], newSteps);
+      setMergedSteps(merged);
+
       setTask(prev => ({
         ...prev,
         steps: newSteps,
@@ -543,12 +557,17 @@ where needed. Use the plan_task tool to return a structured plan.`;
               </div>
             )}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {steps.map((step,i)=>(
-                <StepRow key={step.id} step={step} index={i} navigate={navigate} isCompleted={isCompleted}
-                  answers={answers} setAnswers={setAnswers} updatingPlan={updatingPlan} onUpdatePlan={handleUpdatePlan}/>
-              ))}
-            </div>
+            <StepList
+              activeSteps={mergedSteps?.active ?? []}
+              archivedSteps={mergedSteps?.archived ?? []}
+              readOnly={false}
+              answers={answers}
+              setAnswers={setAnswers}
+              updatingPlan={updatingPlan}
+              onUpdatePlan={handleUpdatePlan}
+              navigate={navigate}
+              isCompleted={isCompleted}
+            />
           </div>
 
           {/* Right sidebar */}
