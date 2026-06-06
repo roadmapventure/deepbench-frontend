@@ -1,6 +1,6 @@
-// DeepBench v5.1.10p | TaskInstructionsScreen.jsx | AG-04a+b avatar + thinking state
+// DeepBench v5.1.14 | TaskInstructionsScreen.jsx | DB-17 editable titles
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
@@ -258,6 +258,9 @@ export default function TaskInstructionsScreen() {
   const [taskError,    setTaskError]    = useState(null);
   const [answers,      setAnswers]      = useState({});
   const [updatingPlan, setUpdatingPlan] = useState(false);
+  // FEATURE: DB-17 — Editable task title
+  const [editableTitle, setEditableTitle] = useState("");
+  const savedTitleRef = useRef("");
 
   useEffect(() => {
     async function loadTask() {
@@ -265,6 +268,8 @@ export default function TaskInstructionsScreen() {
       if (taskId === "1") {
         const mockTask = MOCK_TASKS[1];
         setTask(mockTask);
+        setEditableTitle(mockTask.title || "");
+        savedTitleRef.current = mockTask.title || "";
         setMergedSteps(mergeSteps([], mockTask.steps || [], []));
         setLoading(false);
         return;
@@ -290,11 +295,9 @@ export default function TaskInstructionsScreen() {
       };
 
       // Prepend HITL clarifying-questions step if there are unanswered questions
-      console.log("plan_history:", normalizedTask.plan_history);
       const pendingQuestions = normalizedTask.plan_history?.questions?.filter(
         q => !q.a || q.a.trim() === ""
       ) || [];
-      console.log("pendingQuestions:", pendingQuestions);
       if (pendingQuestions.length > 0) {
         const clarifyStep = {
           id: 0,
@@ -309,6 +312,8 @@ export default function TaskInstructionsScreen() {
       }
 
       setTask(normalizedTask);
+      setEditableTitle(normalizedTask.title || "");
+      savedTitleRef.current = normalizedTask.title || "";
       setMergedSteps(mergeSteps([], normalizedTask.steps || [], []));
       setLoading(false);
     }
@@ -351,6 +356,51 @@ export default function TaskInstructionsScreen() {
     if (task.created) return task.created;
     return "recently";
   })();
+
+  // FEATURE: DB-17 — Michelle title generation helper
+  const callTitleAgent = async (goal, steps) => {
+    try {
+      const res = await fetch("/api/title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal, steps }),
+      });
+      if (!res.ok) return { taskTitle: null, stepTitles: [] };
+      const data = await res.json();
+      return {
+        taskTitle: typeof data.taskTitle === "string" ? data.taskTitle : null,
+        stepTitles: Array.isArray(data.stepTitles) ? data.stepTitles : [],
+      };
+    } catch {
+      return { taskTitle: null, stepTitles: [] };
+    }
+  };
+
+  // FEATURE: DB-17 — Save task title to Supabase on blur
+  const handleTitleBlur = async (newTitle) => {
+    if (!taskId || taskId === "1" || newTitle === savedTitleRef.current) return;
+    const updateData = { title: newTitle, updated_at: new Date().toISOString() };
+    if (!task?.title_edited) updateData.title_edited = true;
+    await supabase.from("tasks").update(updateData)
+      .eq("id", taskId).eq("tenant_id", TENANT_ID);
+    savedTitleRef.current = newTitle;
+    setTask(prev => ({ ...prev, title: newTitle, title_edited: true }));
+  };
+
+  // FEATURE: DB-17 — Save step label to Supabase on blur
+  const handleStepLabelChange = (stepId, newLabel) => {
+    if (!taskId || taskId === "1") return;
+    setMergedSteps(prev => {
+      const updatedActive = prev.active.map(s =>
+        s.id === stepId ? { ...s, label: newLabel, title_edited: true } : s
+      );
+      const stepsForDb = updatedActive.map(({ mergeStatus, pendingArchive, ...s }) => s);
+      supabase.from("tasks").update({ steps: stepsForDb, updated_at: new Date().toISOString() })
+        .eq("id", taskId).eq("tenant_id", TENANT_ID)
+        .then(({ error }) => { if (error) console.error("Step label save error:", error); });
+      return { ...prev, active: updatedActive };
+    });
+  };
 
   // FEATURE: AW-16 — Update Plan button regenerates steps
   const handleUpdatePlan = async (pendingQuestions) => {
@@ -445,8 +495,27 @@ where needed. Use the plan_task tool to return a structured plan.`;
         .eq("tenant_id", TENANT_ID);
       }
 
-      const merged = mergeSteps(mergedSteps.active, newSteps, mergedSteps.archived);
-      setMergedSteps(merged);
+      // FEATURE: DB-17 — Apply Michelle's titles to new steps only (Task 4)
+      let mergedToSet = mergeSteps(mergedSteps.active, newSteps, mergedSteps.archived);
+      const newlyAddedSteps = mergedToSet.active.filter(s => s.mergeStatus === "new");
+      if (newlyAddedSteps.length > 0) {
+        try {
+          const titleRes = await callTitleAgent(goalContext, newlyAddedSteps);
+          if (titleRes.stepTitles.length > 0) {
+            let titleIndex = 0;
+            const titledActive = mergedToSet.active.map(s => {
+              if (s.mergeStatus === "new" && s.title_edited !== true) {
+                return { ...s, label: titleRes.stepTitles[titleIndex++] || s.label };
+              }
+              return s;
+            });
+            mergedToSet = { ...mergedToSet, active: titledActive };
+          }
+        } catch {
+          // title errors are non-fatal
+        }
+      }
+      setMergedSteps(mergedToSet);
 
       setTask(prev => ({
         ...prev,
@@ -528,7 +597,24 @@ where needed. Use the plan_task tool to return a structured plan.`;
               {task.agent?.[0] || "?"}
             </div>
             <div style={{flex:1}}>
-              <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.navy,marginBottom:3,lineHeight:1.2}}>{task.title}</div>
+              {/* FEATURE: DB-17 — Editable task title */}
+              <input
+                value={editableTitle}
+                onChange={e => setEditableTitle(e.target.value)}
+                onFocus={e => { e.target.style.borderBottom = `2px solid ${T.brass}`; }}
+                onBlur={e => {
+                  e.target.style.borderBottom = "2px solid transparent";
+                  handleTitleBlur(e.target.value);
+                }}
+                onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.paperDeep}`; }}
+                onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
+                style={{
+                  width:"100%", fontFamily:display, fontSize:18, fontWeight:600,
+                  color:T.navy, background:"transparent", border:"none",
+                  borderBottom:"2px solid transparent", outline:"none",
+                  padding:0, marginBottom:3, lineHeight:1.2, boxSizing:"border-box",
+                }}
+              />
               <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{task.agent}</span>
                 <span style={{color:T.lineSoft}}>·</span>
@@ -585,8 +671,10 @@ where needed. Use the plan_task tool to return a structured plan.`;
             )}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
             {/* FEATURE: AG-04a — Michelle avatar placeholder */}
+            {/* FEATURE: DB-17 — Michelle Manning title generation */}
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
               <FeatureBadge id="AG-04a" />
+              <FeatureBadge id="DB-17" />
               <MichelleAvatar size="sm" />
               {updatingPlan && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
               <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {updatingPlan ? "is updating your plan..." : "created this plan"}</span>
@@ -629,6 +717,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
               onUpdatePlan={handleUpdatePlan}
               navigate={navigate}
               isCompleted={isCompleted}
+              onStepLabelChange={isCompleted ? undefined : handleStepLabelChange}
             />
           </div>
 

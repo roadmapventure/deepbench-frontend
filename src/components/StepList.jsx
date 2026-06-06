@@ -1,10 +1,10 @@
-// DeepBench v5.1.10p | StepList.jsx | AG-04b isUpdating pulse prop
+// DeepBench v5.1.14 | StepList.jsx | DB-17 step label inline editing
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
 // FEATURE: TI-13 — Color coding preserved through regeneration
 
-import { useState, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { FeatureBadge } from "./SharedUI.jsx";
 import { AGENTS } from "../data/agents.js";
@@ -98,9 +98,11 @@ function ThreadedArchiveCard({ oldStep, onArchive, onKeep }) {
 function StepCard({
   step, index, readOnly,
   answers, setAnswers, updatingPlan, onUpdatePlan,
-  navigate, isCompleted, onRemoveStep,
+  navigate, isCompleted, onRemoveStep, onStepLabelChange,
 }) {
   const [comment, setComment] = useState("");
+  const [labelValue, setLabelValue] = useState(step.label);
+  useEffect(() => { setLabelValue(step.label); }, [step.label]);
 
   const isHITL = step.type === "hitl";
   const isSub  = step.type === "subagent";
@@ -188,10 +190,30 @@ function StepCard({
         {/* Content */}
         <div style={{ flex: 1, minWidth: 0, paddingRight: isNew ? 40 : 0 }}>
           {/* Label + type badge */}
+          {/* FEATURE: DB-17 — Step label inline editing */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
-            <span style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy }}>
-              {step.label}
-            </span>
+            {onStepLabelChange ? (
+              <input
+                value={labelValue}
+                onChange={e => setLabelValue(e.target.value)}
+                onFocus={e => { e.target.style.borderBottom = `2px solid ${T.brass}`; }}
+                onBlur={e => {
+                  e.target.style.borderBottom = "2px solid transparent";
+                  if (e.target.value !== step.label) onStepLabelChange(step.id, e.target.value);
+                }}
+                onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.paperDeep}`; }}
+                onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
+                style={{
+                  fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy,
+                  background: "transparent", border: "none", borderBottom: "2px solid transparent",
+                  outline: "none", padding: 0, minWidth: 80, boxSizing: "border-box",
+                }}
+              />
+            ) : (
+              <span style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy }}>
+                {step.label}
+              </span>
+            )}
             {typeBadge}
           </div>
 
@@ -346,6 +368,7 @@ export default function StepList({
   navigate,
   isCompleted = false,
   onRemoveStep,
+  onStepLabelChange,
 }) {
   const [archivedOpen, setArchivedOpen] = useState(false);
 
@@ -370,6 +393,7 @@ export default function StepList({
             navigate={navigate}
             isCompleted={isCompleted}
             onRemoveStep={onRemoveStep}
+            onStepLabelChange={onStepLabelChange}
           />
         );
         return (

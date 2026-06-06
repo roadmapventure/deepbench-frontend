@@ -1,4 +1,4 @@
-// DeepBench v5.1.10p | AssignWorkScreen.jsx | AG-04a avatar in byline
+// DeepBench v5.1.14 | AssignWorkScreen.jsx | DB-17 Michelle titles
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -120,6 +120,30 @@ Return a JSON object using the plan_task tool.`;
   } catch(e) { return { ok:false, error:e.message }; }
 }
 
+// FEATURE: DB-17 — Michelle Manning title generation
+async function callTitleAgent(goal, steps) {
+  try {
+    const res = await fetch("/api/title", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal, steps }),
+    });
+    if (!res.ok) return { taskTitle: null, stepTitles: [] };
+    const data = await res.json();
+    return {
+      taskTitle: typeof data.taskTitle === "string" ? data.taskTitle : null,
+      stepTitles: Array.isArray(data.stepTitles) ? data.stepTitles : [],
+    };
+  } catch {
+    return { taskTitle: null, stepTitles: [] };
+  }
+}
+
+function resolveTitle(suggested, goal) {
+  if (suggested && suggested.trim().length > 0) return suggested;
+  return goal.split(" ").slice(0, 8).join(" ");
+}
+
 // ── Step Card ─────────────────────────────────────────────────────────────────
 function StepCard({ step, agent, onRemove, index }) {
   const isHITL = step.type==="hitl", isSub = step.type==="subagent";
@@ -186,6 +210,8 @@ export default function AssignWorkScreen() {
   const [showChangeLog,   setShowChangeLog]    = useState(false);
   const [saveState,       setSaveState]        = useState("idle"); // idle|draft|ready|saving|saved
   const [toast,           setToast]            = useState(null);
+  // FEATURE: DB-17 — Michelle Manning title generation
+  const [titleData,       setTitleData]        = useState({ taskTitle: "", michelleTitle: "", stepTitles: [], titleEdited: false });
   const goalRef         = useRef(null);
   const lastAutoGoalRef = useRef("");
 
@@ -240,14 +266,29 @@ export default function AssignWorkScreen() {
       const newSteps = p.steps || [];
       const currentActive = mergedSteps.active;
       const alreadyArchived = mergedSteps.archived;
-      setMergedSteps(mergeSteps(currentActive, newSteps, alreadyArchived));
-      setSteps(newSteps);
+
+      // FEATURE: DB-17 — Call title agent after plan returns
+      const titleRes = await callTitleAgent(goal, newSteps);
+      const titledNewSteps = newSteps.map((s, i) => ({
+        ...s,
+        label: titleRes.stepTitles[i] || s.label,
+      }));
+
+      setMergedSteps(mergeSteps(currentActive, titledNewSteps, alreadyArchived));
+      setSteps(titledNewSteps);
       setQuestions(p.questions||[]);
       setPlanSummary(p.planSummary||"");
       setAgentReason(p.agentReason||"");
       if (p.agentId) setSelectedAgent(p.agentId);
       setPlanGenerated(true);
       setSaveState(p.questions?.length?"draft":"ready");
+
+      // Set task title from Michelle's suggestion (DB-17)
+      setTitleData(prev => {
+        if (prev.titleEdited) return { ...prev, stepTitles: titleRes.stepTitles };
+        const resolved = resolveTitle(titleRes.taskTitle, goal);
+        return { taskTitle: resolved, michelleTitle: resolved, stepTitles: titleRes.stepTitles, titleEdited: false };
+      });
     } else {
       showToast("Planning agent failed: "+result.error,"⚠");
     }
@@ -305,7 +346,8 @@ export default function AssignWorkScreen() {
     const qas = questions.map(q => ({ q: q.q, a: answers[q.id] || "" }));
     const { error } = await supabase.from("tasks").insert({
       tenant_id:    TENANT_ID,
-      title:        goal.trim() || "Untitled Task",
+      title:        titleData.taskTitle || goal.trim() || "Untitled Task",
+      title_edited: titleData.titleEdited,
       agent_id:     selectedAgent?.id || selectedAgent,
       type:         taskTypeLabel,
       status:       "pending",
@@ -386,6 +428,41 @@ export default function AssignWorkScreen() {
             </div>
           ))}
         </div>
+
+        {/* FEATURE: DB-17 — Michelle Manning title generation */}
+        {planGenerated && !generating && (
+          <div style={{marginBottom:16,position:"relative"}}>
+            <FeatureBadge id="DB-17" />
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
+              <MichelleAvatar size="sm" />
+              <span style={{fontFamily:body,fontSize:11,color:T.muted}}>
+                {titleData.titleEdited
+                  ? "Task title (edited)"
+                  : `${MICHELLE.initials} · ${MICHELLE.name} · ${MICHELLE.code} suggested this title`}
+              </span>
+            </div>
+            <input
+              value={titleData.taskTitle}
+              onChange={e => setTitleData(prev => ({ ...prev, taskTitle: e.target.value }))}
+              onFocus={e => { e.target.style.borderBottom = `2px solid ${T.brass}`; }}
+              onBlur={e => {
+                e.target.style.borderBottom = "2px solid transparent";
+                setTitleData(prev => ({
+                  ...prev,
+                  titleEdited: prev.titleEdited || prev.taskTitle !== prev.michelleTitle,
+                }));
+              }}
+              onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.paperDeep}`; }}
+              onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
+              style={{
+                width:"100%", fontFamily:display, fontSize:20, fontWeight:500,
+                color:T.navy, background:"transparent", border:"none",
+                borderBottom:"2px solid transparent", outline:"none",
+                padding:"2px 0", letterSpacing:"-0.3px", boxSizing:"border-box",
+              }}
+            />
+          </div>
+        )}
 
         {/* Two-column: conversation left, plan right */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
