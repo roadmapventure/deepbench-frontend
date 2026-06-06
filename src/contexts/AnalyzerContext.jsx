@@ -120,7 +120,7 @@ function computeAnalysisData(results, mapping) {
     row._amt = amt; rows.push(row);
 
     const rawCode = row[nC];
-    const { classCode, label } = resolveNIGP(rawCode);
+    const { classCode, classLabel: label } = resolveNIGP(rawCode);
     const isMissing     = !rawCode || String(rawCode).trim()==='' || String(rawCode).trim()==='0';
     const isPlaceholder = !isMissing && String(rawCode).replace(/\D/g,'').length < 3;
     const isUnrecognized = !isMissing && !isPlaceholder && str(label).startsWith("Unrecognized");
