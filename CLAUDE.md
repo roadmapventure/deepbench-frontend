@@ -62,19 +62,47 @@ Signs a session is too big: kickoff doc has >4 tasks, >3 files being modified, s
 
 Every session increments the minor version. Current base: **v5.1.x**
 
-Version header format — **line 1 of every .jsx and .js file touched:**
+### Version Header — line 1 of every .jsx and .js file touched:
 ```js
 // DeepBench v5.1.X | filename.jsx | brief description
 ```
 
-Feature ID comment format:
+### Feature ID comment:
 ```jsx
 {/* FEATURE: XX-00 — Description */}   // JSX
 // FEATURE: XX-00 — Description         // JS
 ```
 
-Session name format: `S[number]-[FEATURE-ID]-[short-name]`
-Example: `S08-DB16-completed-tasks`
+### Session Naming Format:
+```
+v5.1.X — S[number]-[FEATURE-ID]-[short-name]
+Example: v5.1.15 — S15a-DB-dashboard-ux
+```
+
+### Commit Message Format:
+```
+v5.1.X | [FEATURE-ID] | brief description of what changed
+Example: v5.1.15 | DB-UX | dashboard layout and card spacing updates
+```
+
+### Patch Session Naming Format:
+```
+v5.1.Xp — S[number]p-[FEATURE-ID]-[short-name]
+Example: v5.1.15p — S15p-DB-dashboard-ux-patch
+```
+
+### Patch Commit Message Format:
+```
+v5.1.Xp | [FEATURE-ID] | brief description of patch
+Example: v5.1.15p | DB-UX | fix card click handler after QA
+```
+
+### Rules:
+- Version number leads every session name, commit message, and file header
+- Patch increments add `p` suffix — never skip straight to next integer on a patch
+- Sub-sessions (a/b) increment normally: S15a = v5.1.15, S15b = v5.1.16
+- Docs-only commits use format: `docs: v5.1.X | brief description`
+- Never reuse a version number across sessions
 
 ---
 
