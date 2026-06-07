@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | tokens.js | Treasury design system — colors, fonts, formatters
+// DeepBench v5.1.15 | tokens.js | Treasury design system — colors, fonts, formatters
 // FEATURE: SH-01 — Treasury design tokens
 // src/tokens.js — v5.0.0
 // DeepBench v5 — Treasury Design System Constants
@@ -46,6 +46,7 @@ export const GLOBAL_CSS = `
 @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 @keyframes aiBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes aiDiamondBeat { 0%{transform:rotate(45deg) scale(1);opacity:1} 14%{transform:rotate(45deg) scale(1.6);opacity:1} 28%{transform:rotate(45deg) scale(1);opacity:0.85} 42%{transform:rotate(45deg) scale(1.35);opacity:1} 70%{transform:rotate(45deg) scale(1);opacity:0.9} 100%{transform:rotate(45deg) scale(1);opacity:1} }
 .upload-blink { animation: borderPulse 2s ease-in-out infinite; }
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { margin:0; padding:0; width:100%; min-height:100vh; background:#ddd5be; }

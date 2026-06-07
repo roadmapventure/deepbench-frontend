@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | SharedUI.jsx | Shared Treasury UI components — AiBadge, AgentAvatar, FlagCard, etc.
+// DeepBench v5.1.15 | SharedUI.jsx | Shared Treasury UI components — AiBadge, AgentAvatar, FlagCard, etc.
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
+import AIDiamond from "./AIDiamond.jsx";
 
 // ── Corners — brass SVG corner ornaments ─────────────────────────────────────
 export const Corners = ({ color = T.brass }) => (
@@ -69,9 +70,11 @@ export const FeatureBadge = ({ id }) => (
   <span data-feature-id={id} aria-hidden="true" style={{position:"absolute",top:0,left:0,width:0,height:0,overflow:"visible",pointerEvents:"none"}}/>
 );
 
-// ── AiBadge — ✦ AI badge for AI-touched elements ────────────────────────────
+// ── AiBadge — AI heartbeat diamond badge for AI-touched elements ─────────────
 export const AiBadge = ({ style }) => (
-  <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,...style}}>✦ AI</span>
+  <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
+    <AIDiamond size="6px" color={T.brass}/> AI
+  </span>
 );
 
 // ── AISugg — "AI SUGGESTED" badge for form fields ────────────────────────────

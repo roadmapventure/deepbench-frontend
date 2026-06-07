@@ -1,4 +1,4 @@
-// DeepBench v5.1.7 | DashboardScreen.jsx | Work dashboard
+// DeepBench v5.1.15 | DashboardScreen.jsx | Work Dashboard
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -529,12 +529,12 @@ export default function DashboardScreen() {
         {/* Masthead */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
           <div>
-            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work dashboard.</div>
+            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work... Defined</div>
             <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,lineHeight:1.5}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
           </div>
           {/* FEATURE: DB-06 — Assign New Work button */}
           <button onClick={()=>navigate("/work/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
-            <span style={{fontSize:14}}>+</span> Assign New Work
+            <span style={{fontSize:14}}>+</span> Create a new Task
           </button>
         </div>
         <div style={{height:2,background:T.brass,marginBottom:20}}/>

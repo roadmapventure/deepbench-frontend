@@ -1,8 +1,5 @@
-// DeepBench v5.1.0 | AppShell.jsx | App shell — header, nav tabs, AI dot, activity panel, help modal
-// FEATURE: SH-05 — AppShell header, nav tabs, AI dot, activity panel trigger, help modal
-// src/AppShell.jsx — v5.0.0
-// DeepBench v5 — App shell: header, Work/Bench nav tabs, shared layout
-// Wraps every authenticated screen.
+// DeepBench v5.1.15 | AppShell.jsx | App shell — header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel, help modal
+// FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, help modal
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -11,6 +8,7 @@ import { useAIStatus } from "./hooks/useAIStatus.js";
 import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
+import AIDiamond from "./components/AIDiamond.jsx";
 
 // ── Global style injection ────────────────────────────────────────────────────
 let _styleInjected = false;
@@ -22,8 +20,59 @@ function injectGlobalStyle() {
   _styleInjected = true;
 }
 
+// ── NavTab — single Work/Bench tab with hover state ───────────────────────────
+function NavTab({ isActive, onClick, icon, label, hasBorderLeft }) {
+  const [hovered, setHovered] = useState(false);
+
+  const textColor = isActive
+    ? "#b6873a"
+    : hovered
+    ? "rgba(255,255,255,0.8)"
+    : "rgba(255,255,255,0.45)";
+
+  const bg = isActive
+    ? "rgba(182,135,58,0.09)"
+    : hovered
+    ? "rgba(182,135,58,0.06)"
+    : "transparent";
+
+  const iconOpacity = isActive ? 1 : hovered ? 0.9 : 0.6;
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 9,
+        padding: "0 28px",
+        fontFamily: mono,
+        fontSize: 12,
+        fontWeight: isActive ? 700 : 500,
+        color: textColor,
+        background: bg,
+        border: "none",
+        borderLeft: hasBorderLeft ? "1px solid rgba(182,135,58,0.3)" : "none",
+        borderRight: "1px solid rgba(182,135,58,0.3)",
+        borderBottom: isActive ? "3px solid #b6873a" : "3px solid transparent",
+        cursor: "pointer",
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        height: "100%",
+        transition: "color .15s, background .15s",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: 17, lineHeight: 1, opacity: iconOpacity }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
 // ── App Header ────────────────────────────────────────────────────────────────
-// FEATURE: SH-05 — App header (logo, nav tabs, AI status dot, AI panel trigger, help button)
+// FEATURE: SH-05 — App header (logo, Work Dashboard / Bench Dashboard nav tabs, AI status dot, AI panel trigger, help button)
 export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{} }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,7 +84,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
   const isBench = location.pathname.startsWith("/bench");
 
   return (
-    <div style={{background:T.navy,color:T.card,padding:"0 28px",display:"flex",alignItems:"center",height:60,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:12}}>
+    <div style={{background:T.navy,color:T.card,padding:"0 28px",display:"flex",alignItems:"center",height:60,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:12,position:"relative"}}>
       {/* Logo */}
       <div onClick={()=>navigate("/")} style={{width:36,height:36,borderRadius:"50%",background:T.brass,color:T.navy,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontWeight:700,fontSize:15,border:`2px solid ${T.card}`,flexShrink:0,cursor:"pointer"}}>
         DB
@@ -47,18 +96,22 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </div>
       </div>
 
-      {/* Work / Bench nav tabs */}
-      <div style={{display:"flex",alignItems:"stretch",height:60,marginLeft:24}}>
-        <button
+      {/* Work Dashboard / Bench Dashboard nav tabs — centered absolutely */}
+      <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
+        <NavTab
+          isActive={isWork}
           onClick={()=>navigate("/")}
-          style={{display:"flex",alignItems:"center",gap:7,padding:"0 20px",fontFamily:body,fontSize:13,fontWeight:isWork?600:500,color:isWork?"#f8f2e2":"rgba(184,197,216,.6)",background:"transparent",border:"none",borderBottom:isWork?`3px solid ${T.brass}`:"3px solid transparent",cursor:"pointer",letterSpacing:.2,marginBottom:-3,transition:"color .15s, border-color .15s"}}>
-          <span style={{fontSize:13}}>📋</span> Work
-        </button>
-        <button
+          icon="📋"
+          label="Work"
+          hasBorderLeft={true}
+        />
+        <NavTab
+          isActive={isBench}
           onClick={()=>navigate("/bench")}
-          style={{display:"flex",alignItems:"center",gap:7,padding:"0 20px",fontFamily:body,fontSize:13,fontWeight:isBench?600:500,color:isBench?"#f8f2e2":"rgba(184,197,216,.6)",background:"transparent",border:"none",borderBottom:isBench?`3px solid ${T.brass}`:"3px solid transparent",cursor:"pointer",letterSpacing:.2,marginBottom:-3,transition:"color .15s, border-color .15s"}}>
-          <span style={{fontSize:13}}>👥</span> Bench
-        </button>
+          icon="👥"
+          label="Bench"
+          hasBorderLeft={false}
+        />
       </div>
 
       <div style={{flex:1}}/>
@@ -81,8 +134,11 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </button>
       )}
 
-      {/* ✦ AI Activity Panel trigger */}
-      <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:5}}>✦ AI</button>
+      {/* AI Activity Panel trigger */}
+      <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
+        <AIDiamond size="7px" color={T.brassLight}/> AI
+      </button>
+
       {/* Help button */}
       {showHelp && (
         <button onClick={onHelp} style={{background:"transparent",border:`1px solid ${T.card}40`,color:T.card,padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:body,display:"flex",alignItems:"center",gap:6}}>

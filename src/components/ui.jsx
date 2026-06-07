@@ -1,8 +1,9 @@
-// DeepBench v5.1.0 | ui.jsx | Supplementary shared UI components
+// DeepBench v5.1.15 | ui.jsx | Supplementary shared UI components
 // src/components/ui.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
 
 import { T, display, body, mono } from "../tokens.js";
+import AIDiamond from "./AIDiamond.jsx";
 import { fmtPct, skillLabel } from "../utils.js";
 
 // ── Corner ornaments ──────────────────────────────────────────────────────────
@@ -62,10 +63,10 @@ export const Toast = ({ toast }) => {
   );
 };
 
-// ── ✦ AI badge ────────────────────────────────────────────────────────────────
+// ── AI heartbeat diamond badge ────────────────────────────────────────────────
 export const AIBadge = ({ style }) => (
-  <span style={{ fontFamily: mono, fontSize: 8, background: `rgba(182,135,58,0.15)`, border: `1px solid ${T.brass}40`, padding: "1px 5px", color: T.brassDeep, letterSpacing: 0.5, fontWeight: 700, ...style }}>
-    ✦ AI
+  <span style={{ fontFamily: mono, fontSize: 8, background: `rgba(182,135,58,0.15)`, border: `1px solid ${T.brass}40`, padding: "1px 5px", color: T.brassDeep, letterSpacing: 0.5, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3, ...style }}>
+    <AIDiamond size="6px" color={T.brassDeep}/> AI
   </span>
 );
 
