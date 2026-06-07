@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p4b | TaskInstructionsScreen.jsx | DB-17p4b sync answers snapshot before Update Plan merge
+// DeepBench v5.1.14p4c | TaskInstructionsScreen.jsx | DB-17p4c fix task.steps + retry planning agent
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -559,11 +559,57 @@ where needed. Use the plan_task tool to return a structured plan.`;
         })
       });
 
-      const data = await res.json();
-      const toolBlock = data.content?.find(b => b.type === "tool_use");
+      let data = await res.json();
+      let toolBlock = data.content?.find(b => b.type === "tool_use");
+
+      // FIX: DB-17p4c — retry once if planning agent returns no steps
+      if (!toolBlock?.input?.steps?.length) {
+        console.warn("Planning agent returned no steps — retrying once");
+        const retryRes = await fetch("/api/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: userMsg }],
+            systemPrompt,
+            tools: [{
+              name: "plan_task",
+              description: "Generate a structured task plan",
+              input_schema: {
+                type: "object",
+                required: ["steps", "questions", "agentId", "planSummary"],
+                properties: {
+                  planSummary: { type: "string" },
+                  agentId: { type: "string" },
+                  steps: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "number" },
+                        icon: { type: "string" },
+                        label: { type: "string" },
+                        type: { type: "string" },
+                        status: { type: "string" },
+                        text: { type: "string" },
+                        agentId: { type: "string" },
+                        agentName: { type: "string" }
+                      }
+                    }
+                  },
+                  questions: { type: "array", items: { type: "object" } }
+                }
+              }
+            }],
+            max_tokens: 1200,
+            tenant_id: TENANT_ID,
+          })
+        });
+        const retryData = await retryRes.json();
+        toolBlock = retryData.content?.find(b => b.type === "tool_use");
+      }
 
       if (!toolBlock?.input?.steps) {
-        throw new Error("No steps returned from planning agent");
+        throw new Error("No steps returned from planning agent after retry");
       }
 
       const newSteps = toolBlock.input.steps;
@@ -630,10 +676,10 @@ where needed. Use the plan_task tool to return a structured plan.`;
       );
       setMergedSteps(mergedToSet);
 
-      // FIX: DB-17p4a — use stepsToMerge not raw newSteps to preserve unanswered HITL steps
+      // FIX: DB-17p4c — use mergedToSet.active not stepsToMerge for task.steps
       setTask(prev => ({
         ...prev,
-        steps: stepsToMerge,
+        steps: mergedToSet.active,
         plan_history: {
           questions: answeredQuestions,
         },
