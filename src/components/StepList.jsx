@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p | StepList.jsx | DB-17 step editing draft state
+// DeepBench v5.1.14p2 | StepList.jsx | DB-17p2 step card header layout
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
@@ -191,7 +191,8 @@ function StepCard({
         <div style={{ flex: 1, minWidth: 0, paddingRight: isNew ? 40 : 0 }}>
           {/* Label + type badge */}
           {/* FEATURE: DB-17 — Step label inline editing */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+          {/* FIX: DB-17p2 — right-justify badge; title gets flex:1 and wraps without truncation */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 2 }}>
             {onStepLabelChange ? (
               <input
                 value={labelValue}
@@ -206,15 +207,15 @@ function StepCard({
                 style={{
                   fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy,
                   background: "transparent", border: "none", borderBottom: "2px solid transparent",
-                  outline: "none", padding: 0, minWidth: 80, boxSizing: "border-box",
+                  outline: "none", padding: 0, flex: 1, boxSizing: "border-box",
                 }}
               />
             ) : (
-              <span style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy }}>
+              <span style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy, flex: 1 }}>
                 {step.label}
               </span>
             )}
-            {typeBadge}
+            <div style={{ flexShrink: 0, marginLeft: 8 }}>{typeBadge}</div>
           </div>
 
           {/* Agent attribution — TI-12 */}

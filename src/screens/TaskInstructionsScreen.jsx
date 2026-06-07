@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p | TaskInstructionsScreen.jsx | DB-17 title fixes
+// DeepBench v5.1.14p2 | TaskInstructionsScreen.jsx | DB-17p2 step init rewrite
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -262,6 +262,21 @@ export default function TaskInstructionsScreen() {
   const [editableTitle, setEditableTitle] = useState("");
   const savedTitleRef = useRef("");
 
+  // FIX: DB-17p2 — Three named step operations, each with single responsibility.
+  // A. Initial load: set Supabase steps directly, NEVER calls mergeSteps().
+  const initializeStepsFromSupabase = (fetchedSteps) => {
+    const steps = Array.isArray(fetchedSteps) ? fetchedSteps : [];
+    setMergedSteps({ active: steps, archived: [] });
+  };
+  // B. First plan generation: merge from empty baseline (no prior active steps).
+  const initializeStepsFromFirstPlan = (newSteps) => {
+    setMergedSteps(mergeSteps([], newSteps, []));
+  };
+  // C. Update Plan regeneration: merge with current active + archived via functional updater.
+  const updateStepsFromPlan = (newSteps) => {
+    setMergedSteps(prev => mergeSteps(prev.active, newSteps, prev.archived));
+  };
+
   useEffect(() => {
     async function loadTask() {
       // Special case: demo task id=1 uses mock data
@@ -270,8 +285,8 @@ export default function TaskInstructionsScreen() {
         setTask(mockTask);
         setEditableTitle(mockTask.title || "");
         savedTitleRef.current = mockTask.title || "";
-        // FIX: DB-17p — initial load sets steps directly; no mergeSteps() on load
-        setMergedSteps({ active: mockTask.steps || [], archived: [] });
+        // FIX: DB-17p2 — Operation A: initial load, no mergeSteps()
+        initializeStepsFromSupabase(mockTask.steps);
         setLoading(false);
         return;
       }
@@ -315,11 +330,12 @@ export default function TaskInstructionsScreen() {
       setTask(normalizedTask);
       setEditableTitle(normalizedTask.title || "");
       savedTitleRef.current = normalizedTask.title || "";
-      // FIX: DB-17p — initial load sets steps directly; no mergeSteps() on load
-      setMergedSteps({ active: normalizedTask.steps || [], archived: [] });
+      // FIX: DB-17p2 — Operation A: initial load, no mergeSteps()
+      initializeStepsFromSupabase(normalizedTask.steps);
       setLoading(false);
     }
     loadTask();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, agents]);
 
   if (loading) return (
@@ -359,6 +375,24 @@ export default function TaskInstructionsScreen() {
     return "recently";
   })();
 
+  // FIX: DB-17p2 — Canonical Supabase write for steps.
+  // Writes full array every time. Preserves pendingArchive. Strips only mergeStatus (React-internal).
+  // NEVER called inside a state setter — always called after state is updated.
+  const saveStepsToSupabase = async (steps, extraUpdates = {}) => {
+    if (!taskId || taskId === "1") return;
+    try {
+      const stepsForDb = steps.map(({ mergeStatus, ...s }) => s);
+      const { error } = await supabase
+        .from("tasks")
+        .update({ steps: stepsForDb, updated_at: new Date().toISOString(), ...extraUpdates })
+        .eq("id", taskId)
+        .eq("tenant_id", TENANT_ID);
+      if (error) console.error("saveStepsToSupabase error:", error);
+    } catch (err) {
+      console.error("saveStepsToSupabase exception:", err);
+    }
+  };
+
   // FEATURE: DB-17 — Michelle title generation helper
   const callTitleAgent = async (goal, steps) => {
     try {
@@ -390,23 +424,14 @@ export default function TaskInstructionsScreen() {
   };
 
   // FEATURE: DB-17 — Save step label to Supabase on blur
-  // FIX: DB-17p — async handler awaits PATCH; writes full steps array with title_edited flag
+  // FIX: DB-17p2 — uses canonical saveStepsToSupabase; pendingArchive preserved in write
   const handleStepLabelChange = async (stepId, newLabel) => {
     if (!taskId || taskId === "1") return;
     const updatedActive = mergedSteps.active.map(s =>
       s.id === stepId ? { ...s, label: newLabel, title_edited: true } : s
     );
     setMergedSteps(prev => ({ ...prev, active: updatedActive }));
-    const stepsForDb = updatedActive.map(({ mergeStatus, pendingArchive, ...s }) => s);
-    try {
-      await supabase.from("tasks").update({
-        steps: stepsForDb,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", taskId).eq("tenant_id", TENANT_ID);
-    } catch (e) {
-      console.error("Step label save error:", e);
-    }
+    await saveStepsToSupabase(updatedActive);
   };
 
   // FEATURE: AW-16 — Update Plan button regenerates steps
@@ -488,20 +513,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
 
       const newSteps = toolBlock.input.steps;
 
-      if (taskId && taskId !== "1") {
-        await supabase.from("tasks").update({
-          steps: newSteps,
-          plan_history: {
-            questions: answeredQuestions,
-            planSummary: toolBlock.input.planSummary || "",
-          },
-          status: task.status === "awaiting-input" ? "pending" : task.status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", taskId)
-        .eq("tenant_id", TENANT_ID);
-      }
-
+      // FIX: DB-17p2 — Operation C: compute merge FIRST, then save merged (with pendingArchive),
+      // then set state. Never write raw newSteps — always write the merged result.
       // FEATURE: DB-17 — Apply Michelle's titles to new steps only (Task 4)
       let mergedToSet = mergeSteps(mergedSteps.active, newSteps, mergedSteps.archived);
       const newlyAddedSteps = mergedToSet.active.filter(s => s.mergeStatus === "new");
@@ -522,6 +535,14 @@ where needed. Use the plan_task tool to return a structured plan.`;
           // title errors are non-fatal
         }
       }
+      // FIX: DB-17p2 — save merged steps (with pendingArchive preserved) + plan_history in one write
+      await saveStepsToSupabase(mergedToSet.active, {
+        plan_history: {
+          questions: answeredQuestions,
+          planSummary: toolBlock.input.planSummary || "",
+        },
+        status: task.status === "awaiting-input" ? "pending" : task.status,
+      });
       setMergedSteps(mergedToSet);
 
       setTask(prev => ({
@@ -552,28 +573,29 @@ where needed. Use the plan_task tool to return a structured plan.`;
     setTask(prev => ({ ...prev, status: 'completed' }));
   };
 
-  const handleArchiveStep = (oldStep) => {
-    setMergedSteps(prev => ({
-      active: prev.active.map(s =>
-        s.pendingArchive?.label === oldStep.label
-          ? { ...s, pendingArchive: undefined }
-          : s
-      ),
-      archived: [...prev.archived, { ...oldStep, mergeStatus: "archived" }],
-    }));
+  // FIX: DB-17p2 — handleArchiveStep persists cleared pendingArchive to Supabase
+  const handleArchiveStep = async (oldStep) => {
+    const updatedActive = mergedSteps.active.map(s =>
+      s.pendingArchive?.label === oldStep.label
+        ? { ...s, pendingArchive: undefined }
+        : s
+    );
+    const updatedArchived = [...mergedSteps.archived, { ...oldStep, mergeStatus: "archived" }];
+    setMergedSteps({ active: updatedActive, archived: updatedArchived });
+    await saveStepsToSupabase(updatedActive);
   };
 
-  const handleKeepStep = (parentStep, oldStep) => {
-    setMergedSteps(prev => {
-      const idx = prev.active.findIndex(s => s.label === parentStep.label);
-      const cleaned = prev.active.map(s =>
-        s.label === parentStep.label
-          ? { ...s, pendingArchive: undefined }
-          : s
-      );
-      cleaned.splice(idx + 1, 0, { ...oldStep, mergeStatus: "unchanged" });
-      return { ...prev, active: cleaned };
-    });
+  // FIX: DB-17p2 — handleKeepStep persists reinstated step to Supabase
+  const handleKeepStep = async (parentStep, oldStep) => {
+    const idx = mergedSteps.active.findIndex(s => s.label === parentStep.label);
+    const updatedActive = mergedSteps.active.map(s =>
+      s.label === parentStep.label
+        ? { ...s, pendingArchive: undefined }
+        : s
+    );
+    updatedActive.splice(idx + 1, 0, { ...oldStep, mergeStatus: "unchanged" });
+    setMergedSteps({ ...mergedSteps, active: updatedActive });
+    await saveStepsToSupabase(updatedActive);
   };
 
   return (
