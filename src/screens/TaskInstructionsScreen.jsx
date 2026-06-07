@@ -1,4 +1,5 @@
-// DeepBench v5.1.14p4d | TaskInstructionsScreen.jsx | DB-17p4d clean stepsContext before LLM call
+// DeepBench v5.1.17 | TaskInstructionsScreen.jsx | S15c — Task Instructions UX polish
+// FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -186,7 +187,7 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
                         style={{background:T.brass,color:T.navy,
                           border:"none",padding:"7px 18px",fontFamily:display,
                           fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                        Update Plan →
+                        Update Steps →
                       </button>
                     </div>
                   )}
@@ -347,7 +348,7 @@ export default function TaskInstructionsScreen() {
   }, [taskId, agents]);
 
   if (loading) return (
-    <AppShell headerProps={{ backLabel: "Dashboard", onBack: () => navigate("/") }}>
+    <AppShell headerProps={{ showAIPanel: false }}>
       <div style={{ flex:1, display:"flex", alignItems:"center",
         justifyContent:"center", color:T.brass,
         fontFamily:mono, fontSize:13 }}>
@@ -357,7 +358,7 @@ export default function TaskInstructionsScreen() {
   );
 
   if (taskError || !task) return (
-    <AppShell headerProps={{ backLabel: "Dashboard", onBack: () => navigate("/") }}>
+    <AppShell headerProps={{ showAIPanel: false }}>
       <div style={{ flex:1, display:"flex", alignItems:"center",
         justifyContent:"center", color:T.flag,
         fontFamily:mono, fontSize:13 }}>
@@ -738,7 +739,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
   };
 
   return (
-    <AppShell headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
+    <AppShell headerProps={{ showAIPanel: false }}>
       <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px"}}>
 
         {/* Breadcrumb */}
@@ -838,7 +839,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
                 </div>
               </div>
             )}
-            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Step-by-Step Instructions</div>
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Steps</div>
             {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             {/* FEATURE: DB-17 — Michelle Manning title generation */}
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>

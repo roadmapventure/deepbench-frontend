@@ -1,4 +1,5 @@
-// DeepBench v5.1.14p2 | StepList.jsx | DB-17p2 step card header layout
+// DeepBench v5.1.17 | StepList.jsx | S15c — rename Update Steps + move below textarea
+// FEATURE: TI-UX-15c — Rename "Update Plan →" to "Update Steps →"; move below comment textarea
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
 // FEATURE: TI-12 — Agent attribution on every step
@@ -275,21 +276,6 @@ function StepCard({
                       )}
                     </div>
                   ))}
-                  {/* FEATURE: AW-16 — Update Plan button */}
-                  {!isCompleted && (
-                    <div style={{ position: "relative", marginTop: 10 }}>
-                      <FeatureBadge id="AW-16" />
-                      <button
-                        onClick={() => onUpdatePlan(step.questions)}
-                        style={{
-                          background: T.brass, color: T.navy, border: "none",
-                          padding: "7px 18px", fontFamily: display, fontSize: 12,
-                          fontWeight: 700, cursor: "pointer",
-                        }}>
-                        Update Plan →
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -310,6 +296,23 @@ function StepCard({
               onFocus={e => e.target.style.height = "64px"}
               onBlur={e => { if (!e.target.value) e.target.style.height = "38px"; }}
             />
+          )}
+
+          {/* FEATURE: TI-UX-15c — Update Steps button moved below comment textarea (AW-UX-08 pattern) */}
+          {/* FEATURE: AW-16 — Update Steps button regenerates steps */}
+          {step.questions && step.questions.length > 0 && onUpdatePlan && !updatingPlan && !isCompleted && (
+            <div style={{ position: "relative", marginTop: 10 }}>
+              <FeatureBadge id="AW-16" />
+              <button
+                onClick={() => onUpdatePlan(step.questions)}
+                style={{
+                  background: T.brass, color: T.navy, border: "none",
+                  padding: "7px 18px", fontFamily: display, fontSize: 12,
+                  fontWeight: 700, cursor: "pointer",
+                }}>
+                Update Steps →
+              </button>
+            </div>
           )}
 
           {/* Output area — readOnly=true */}
