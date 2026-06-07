@@ -1,4 +1,4 @@
-// DeepBench v5.1.16 | AssignWorkScreen.jsx | S15b-A — Assign Work label + nav + icon updates
+// DeepBench v5.1.17 | AssignWorkScreen.jsx | S15b-B — Generating state, step labels, agent hover card
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -10,7 +10,6 @@ import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
-import StepList from "../components/StepList.jsx";
 import MichelleAvatar from "../components/MichelleAvatar.jsx";
 
 const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
@@ -105,13 +104,11 @@ Return a JSON object using the plan_task tool.`;
     });
     const data = await res.json();
     const latency = Date.now()-t0;
-    // Find tool_use block
     const toolBlock = data.content?.find(b=>b.type==="tool_use"&&b.name==="plan_task");
     if (toolBlock?.input) {
       logAICall({type:"planning",model:"claude-haiku-4-5",latencyMs:latency,tokens:data.usage?.output_tokens||0,location:"Assign Work"});
       return { ok:true, plan:toolBlock.input };
     }
-    // Fallback: parse text
     const text = data.content?.find(b=>b.type==="text")?.text||"";
     const json = text.replace(/```json|```/g,"").trim();
     const plan = JSON.parse(json);
@@ -144,40 +141,130 @@ function resolveTitle(suggested, goal) {
   return goal.split(" ").slice(0, 8).join(" ");
 }
 
-// ── Step Card ─────────────────────────────────────────────────────────────────
-function StepCard({ step, agent, onRemove, index }) {
-  const isHITL = step.type==="hitl", isSub = step.type==="subagent";
-  const bl = isHITL?T.flag:isSub?"#2d6fb5":T.brassDeep;
+// FEATURE: AW-UX-10 — Agent hover card — read-only agent info on step card agent badge
+function AgentHoverCard({ agent }) {
+  if (!agent) return null;
   return (
-    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`3px solid ${bl}`,padding:"11px 14px",position:"relative",display:"flex",gap:10,alignItems:"flex-start"}}>
-      <div style={{flexShrink:0,textAlign:"center",minWidth:24}}>
-        <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:2}}>{String(index+1).padStart(2,"0")}</div>
-        <div>{step.icon}</div>
-      </div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
-          <span style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{step.label}</span>
-          {isHITL && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.3)`,fontWeight:700}}>● HUMAN</span>}
-          {isSub  && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:`1px solid rgba(45,111,181,.3)`,fontWeight:700}}>⇆ SUB-AGENT · {step.agentName||"Brent"}</span>}
-          {!isHITL&&!isSub && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent <AiBadge/></span>}
+    <div style={{
+      position: "absolute",
+      bottom: "calc(100% + 6px)",
+      left: 0,
+      zIndex: 50,
+      background: T.navy,
+      border: `1px solid rgba(182,135,58,0.3)`,
+      borderRadius: 8,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+      padding: "10px 12px",
+      minWidth: 190,
+      pointerEvents: "none",
+    }}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <div style={{width:28,height:28,borderRadius:"50%",border:`1.5px solid ${agent.color||T.brass}`,background:T.navyMid,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:mono,fontSize:9,fontWeight:700,color:agent.color||T.brass,flexShrink:0}}>
+          {agent.name.split(" ").map(n=>n[0]).join("")}
         </div>
-        {agent && !isHITL && !isSub && (
-          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
-            <AgentAvatar who={agent.id} size={14} ring={false}/>
-            <span style={{fontFamily:mono,fontSize:9,color:T.brassDeep}}>{agent.name.split(" ")[0]}</span>
-            <AiBadge/>
-          </div>
-        )}
-        <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5}}>{step.text}</div>
-        {step.note && <div style={{fontFamily:mono,fontSize:8,color:isHITL?T.flag:isSub?"#2d6fb5":T.moss,marginTop:3,fontStyle:"italic"}}>{step.note}</div>}
+        <div>
+          <div style={{fontFamily:body,fontSize:12,fontWeight:600,color:"#fff",lineHeight:1.2}}>{agent.name}</div>
+          <div style={{fontFamily:mono,fontSize:9,color:"rgba(182,135,58,0.8)"}}>{agent.code}</div>
+        </div>
       </div>
-      <button onClick={()=>onRemove(step.id)} title="Remove step"
-        style={{background:"transparent",border:"none",color:T.muted,cursor:"pointer",fontSize:12,padding:"0 4px",flexShrink:0,lineHeight:1}}>✕</button>
+      <div style={{fontFamily:body,fontSize:10,color:"rgba(255,255,255,0.65)",marginBottom:agent.quip?5:0}}>{agent.role}</div>
+      {agent.quip && (
+        <div style={{fontFamily:body,fontSize:10,color:"rgba(255,255,255,0.45)",fontStyle:"italic"}}>{agent.quip.replace(/^"|"$/g,"")}</div>
+      )}
     </div>
   );
 }
 
-// FEATURE: AW-03 — Two-panel layout (goal + living plan)
+// ── Step Card ─────────────────────────────────────────────────────────────────
+function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveStep, onKeepStep }) {
+  const [hovered, setHovered] = useState(false);
+  const [labelValue, setLabelValue] = useState(step.label);
+  useEffect(() => { setLabelValue(step.label); }, [step.label]);
+
+  const isHITL = step.type==="hitl", isSub = step.type==="subagent";
+  const bl = isHITL?T.flag:isSub?"#2d6fb5":T.brassDeep;
+  const isNew = step.mergeStatus === "new";
+
+  return (
+    <>
+      <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`3px solid ${bl}`,padding:"11px 14px",position:"relative",display:"flex",gap:10,alignItems:"flex-start",marginBottom:step.pendingArchive?0:8,borderRadius:4}}>
+        {isNew && (
+          <div style={{position:"absolute",top:7,right:32,background:T.moss,color:"#fff",fontFamily:mono,fontSize:8,fontWeight:700,padding:"1px 6px",borderRadius:2,letterSpacing:0.3,pointerEvents:"none"}}>NEW</div>
+        )}
+        <div style={{flexShrink:0,textAlign:"center",minWidth:24}}>
+          <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:2}}>{String(index+1).padStart(2,"0")}</div>
+          <div>{step.icon}</div>
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6,marginBottom:3}}>
+            {onStepLabelChange ? (
+              <input
+                value={labelValue}
+                onChange={e => setLabelValue(e.target.value)}
+                onFocus={e => { e.target.style.borderBottom = `2px solid ${T.brass}`; }}
+                onBlur={e => {
+                  e.target.style.borderBottom = "2px solid transparent";
+                  if (e.target.value !== step.label) onStepLabelChange(step.id, e.target.value);
+                }}
+                onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.line}`; }}
+                onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
+                style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy,background:"transparent",border:"none",borderBottom:"2px solid transparent",outline:"none",padding:0,flex:1,boxSizing:"border-box"}}
+              />
+            ) : (
+              <span style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy,flex:1}}>{step.label}</span>
+            )}
+            <div style={{flexShrink:0,display:"flex",gap:4,alignItems:"center"}}>
+              {isHITL && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.3)`,fontWeight:700}}>● HUMAN</span>}
+              {isSub  && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:`1px solid rgba(45,111,181,.3)`,fontWeight:700}}>⇆ SUB-AGENT</span>}
+              {!isHITL&&!isSub && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent <AiBadge/></span>}
+            </div>
+          </div>
+          {/* FEATURE: AW-UX-10 — Agent name badge is hover target → shows AgentHoverCard */}
+          {agent && !isHITL && !isSub && (
+            <div style={{marginBottom:4}}>
+              <span
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+                style={{position:"relative",cursor:"default",display:"inline-flex",alignItems:"center",gap:5}}
+              >
+                <AgentAvatar who={agent.id} size={14} ring={false}/>
+                <span style={{fontFamily:mono,fontSize:9,color:T.brassDeep}}>{agent.name} · {agent.code}</span>
+                <AiBadge/>
+                {hovered && <AgentHoverCard agent={agent}/>}
+              </span>
+            </div>
+          )}
+          {isHITL && (
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+              <div style={{width:14,height:14,borderRadius:"50%",border:`1px solid ${T.lineSoft}`,background:T.cardAlt,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:mono,fontSize:7,fontWeight:700,color:T.muted}}>Y</div>
+              <span style={{fontFamily:body,fontSize:11,color:T.muted}}>You · Action Required</span>
+            </div>
+          )}
+          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5}}>{step.text}</div>
+          {step.note && <div style={{fontFamily:mono,fontSize:8,color:isHITL?T.flag:isSub?"#2d6fb5":T.moss,marginTop:3,fontStyle:"italic"}}>{step.note}</div>}
+        </div>
+        <button onClick={()=>onRemove(step.id)} title="Remove step"
+          style={{background:"transparent",border:"none",color:T.muted,cursor:"pointer",fontSize:12,padding:"0 4px",flexShrink:0,lineHeight:1}}>✕</button>
+      </div>
+      {/* Inline archive threading for merged/replaced steps */}
+      {step.pendingArchive && onArchiveStep && onKeepStep && (
+        <div style={{marginLeft:32,marginBottom:8}}>
+          <div style={{fontFamily:mono,fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:0.5,marginBottom:3}}>↳ PREVIOUSLY THIS STEP</div>
+          <div style={{border:"1px dashed #d1d5db",borderLeft:"3px solid #d1d5db",background:"#f9fafb",borderRadius:4,padding:"9px 12px",opacity:0.9}}>
+            <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:"#6b7280",marginBottom:2}}>{step.pendingArchive.label}</div>
+            {step.pendingArchive.text && <div style={{fontFamily:body,fontSize:11,color:"#9ca3af",lineHeight:1.5,marginBottom:4}}>{step.pendingArchive.text}</div>}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
+              <button onClick={()=>onKeepStep(step, step.pendingArchive)} style={{background:"white",border:"1px solid #6b7280",color:"#374151",padding:"4px 10px",cursor:"pointer",fontFamily:body,fontSize:11,borderRadius:3}}>Keep</button>
+              <button onClick={()=>onArchiveStep(step.pendingArchive)} style={{background:T.flag,color:"#fff",border:"none",padding:"4px 10px",cursor:"pointer",fontFamily:body,fontSize:11,fontWeight:600,borderRadius:3}}>Archive</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// FEATURE: AW-03 — Two-panel layout (goal + instructions)
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function AssignWorkScreen() {
   const navigate   = useNavigate();
@@ -255,7 +342,6 @@ export default function AssignWorkScreen() {
     const result = await callPlanningAgent(selectedType, goal, agents, qas);
     if (result.ok) {
       const p = result.plan;
-      // Archive old steps to change log if plan is being regenerated
       if (steps.length > 0) {
         setChangeLog(prev=>[...prev,{
           ts: new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
@@ -283,7 +369,6 @@ export default function AssignWorkScreen() {
       setPlanGenerated(true);
       setSaveState(p.questions?.length?"draft":"ready");
 
-      // Set task title from Michelle's suggestion (DB-17)
       setTitleData(prev => {
         if (prev.titleEdited) return { ...prev, stepTitles: titleRes.stepTitles };
         const resolved = resolveTitle(titleRes.taskTitle, goal);
@@ -407,7 +492,6 @@ export default function AssignWorkScreen() {
             <div style={{fontFamily:display,fontSize:28,fontWeight:500,color:T.navy,letterSpacing:"-.5px"}}>What do you need done?</div>
           </div>
           {/* FEATURE: AW-10 — Persistent save state indicator */}
-          {/* Save state indicator */}
           {saveLabel && (
             <div style={{fontFamily:mono,fontSize:9,color:saveState==="ready"?T.moss:saveState==="saved"?T.moss:T.brassDeep,padding:"5px 12px",background:saveState==="ready"||saveState==="saved"?`${T.moss}10`:`${T.brass}08`,border:`1px solid ${saveState==="ready"||saveState==="saved"?T.moss:T.brass}30`,marginTop:4}}>
               {saveState==="ready"||saveState==="saved"?"✓ ":""}{saveLabel}
@@ -464,7 +548,6 @@ export default function AssignWorkScreen() {
                   titleEdited: prev.titleEdited || prev.taskTitle !== prev.michelleTitle,
                 }));
               }}
-              // FIX: DB-17p — hover color T.line (visible on T.paperDeep background, unlike T.paperDeep itself)
               onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = `2px dashed ${T.line}`; }}
               onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderBottom = "2px solid transparent"; }}
               style={{
@@ -477,7 +560,7 @@ export default function AssignWorkScreen() {
           </div>
         )}
 
-        {/* Two-column: conversation left, plan right */}
+        {/* Two-column: conversation left, instructions right */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
 
           {/* LEFT: Goal + clarifying questions */}
@@ -515,14 +598,18 @@ export default function AssignWorkScreen() {
                 style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
             </div>
 
-            {/* FEATURE: AW-UX-03 — AI icon on Generate Plan / Re-generate Plan button */}
-            <div style={{position:"relative",marginBottom:14}}>
-              <FeatureBadge id="AW-04" />
-              <button onClick={generatePlan} disabled={!canGenerate||generating}
-                style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                <AiBadge/> {generating?"Planning agent is building your task…":planGenerated?"Re-generate Plan":"Generate Plan"}
-              </button>
-            </div>
+            {/* FEATURE: AW-UX-03 — AI icon on Generate Plan button */}
+            {/* FEATURE: AW-UX-08 — Generate Plan shown above (first generation only); Re-generate moved below questions */}
+            {/* Generate Plan — shown only before first generation */}
+            {!planGenerated && (
+              <div style={{position:"relative",marginBottom:14}}>
+                <FeatureBadge id="AW-04" />
+                <button onClick={generatePlan} disabled={!canGenerate||generating}
+                  style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <AiBadge/> {generating ? "Planning agent is building your task…" : "Generate Plan"}
+                </button>
+              </div>
+            )}
 
             {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             {(generating || questions.length > 0) && (
@@ -560,6 +647,17 @@ export default function AssignWorkScreen() {
                 )}
               </div>
             )}
+
+            {/* FEATURE: AW-UX-08 — Re-generate Plan button moved below Clarifying Questions */}
+            {planGenerated && (
+              <div style={{position:"relative",marginTop:12}}>
+                <FeatureBadge id="AW-UX-08" />
+                <button onClick={generatePlan} disabled={!canGenerate||generating}
+                  style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <AiBadge/> {generating ? "Planning agent is building your task…" : "Re-generate Plan"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* RIGHT: Instructions */}
@@ -567,51 +665,35 @@ export default function AssignWorkScreen() {
             {/* FEATURE: AW-UX-02 — Step 3 renamed to INSTRUCTIONS + AI badge */}
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 3 — INSTRUCTIONS <AiBadge/></div>
 
-            {/* FEATURE: AG-04a — Michelle avatar placeholder */}
+            {/* FEATURE: AG-04a — Michelle byline (generating + post-generation) */}
             {(generating || planGenerated) && (
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
                 <FeatureBadge id="AG-04a" />
                 <MichelleAvatar size="sm" />
                 {generating && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
-                <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {generating ? "is building your plan..." : "built this plan"}</span>
+                <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {generating ? "is building your instructions…" : "built this plan"}</span>
               </div>
             )}
 
+            {/* FEATURE: AW-UX-06 — Generating state: human message from MICHELLE.name */}
             {generating && (
-              <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"32px",textAlign:"center"}}>
-                <div style={{display:"flex",justifyContent:"center",gap:4,marginBottom:12}}>
+              <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"32px",textAlign:"center",position:"relative"}}>
+                <FeatureBadge id="AW-UX-06" />
+                <div style={{display:"flex",justifyContent:"center",gap:4,marginBottom:16}}>
                   {[0,.15,.3].map((d,i)=><span key={i} style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:T.brass,animation:`dbounce 1.2s ${d}s infinite`}}/>)}
                 </div>
-                <div style={{fontFamily:display,fontSize:14,color:T.navy,fontWeight:600}}>Planning agent is building your task…</div>
-                <div style={{fontFamily:mono,fontSize:10,color:T.muted,marginTop:6,fontStyle:"italic"}}>Analyzing goal · Suggesting agents · Detecting HITL steps</div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+                  <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
+                  <div style={{fontFamily:body,fontSize:13,color:T.navy}}>{`${MICHELLE.name} is building your instructions…`}</div>
+                </div>
               </div>
             )}
 
             {!generating && planGenerated && (
               <>
-                {/* FEATURE: AW-06 — Agent suggestion + brass glow */}
-                {/* Agent suggestion */}
-                {selectedAgentObj && (
-                  <div style={{background:T.card,border:`2px solid ${T.brass}`,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-                    <Corners/>
-                    <AgentAvatar who={selectedAgentObj.id} size={36} ring={true}/>
-                    <div style={{flex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1}}>
-                        <span style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{selectedAgentObj.name}</span>
-                        <span style={{fontFamily:mono,fontSize:8,padding:"1px 5px",background:`${T.brass}15`,color:T.brassDeep,border:`1px solid ${T.brass}40`}}>SUGGESTED</span>
-                        <AiBadge/>
-                      </div>
-                      {agentReason && <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{agentReason}</div>}
-                    </div>
-                    {/* FEATURE: AW-07 — Agent swap + dynamic replanning */}
-                    {/* Swap agent */}
-                    <select value={selectedAgent?.id||selectedAgent||""} onChange={e=>{setSelectedAgent(e.target.value);setChangeLog(prev=>[...prev,{ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),reason:`Agent swapped to ${agents.find(a=>a.id===e.target.value)?.name}`,archivedSteps:steps.map(s=>s.label).join(", ")}]);}}
-                      style={{fontFamily:body,fontSize:11,background:T.cardAlt,border:`1px solid ${T.line}`,padding:"4px 8px",cursor:"pointer",color:T.navy}}>
-                      {agents.filter(a=>!a.isIntern).map(a=><option key={a.id} value={a.id}>{a.name.split(" ")[0]}</option>)}
-                    </select>
-                  </div>
-                )}
+                {/* FEATURE: AW-UX-09 — Agent card removed; each step has its own agent attribution */}
 
+                {/* FEATURE: AW-UX-07 — Step label section (confirmed: no "tasks"/"plan items" label exists here) */}
                 {/* Plan summary */}
                 {planSummary && (
                   <div style={{background:`${T.brass}06`,border:`1px solid ${T.brass}20`,padding:"7px 12px",fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10,display:"flex",gap:6,alignItems:"flex-start"}}>
@@ -619,22 +701,33 @@ export default function AssignWorkScreen() {
                   </div>
                 )}
 
+                {/* FEATURE: AW-UX-10 — Steps rendered with per-step agent hover card */}
                 {/* Steps */}
-                {/* FIX: DB-17p — onStepLabelChange wired for draft state editing */}
-                <div style={{marginBottom:10}}>
-                  <StepList
-                    activeSteps={mergedSteps.active}
-                    archivedSteps={mergedSteps.archived}
-                    onArchiveStep={handleArchiveStep}
-                    onKeepStep={handleKeepStep}
-                    readOnly={false}
-                    onRemoveStep={removeStep}
-                    onStepLabelChange={handleStepLabelChange}
-                  />
+                <div style={{marginBottom:10,position:"relative"}}>
+                  <FeatureBadge id="AW-UX-10" />
+                  {mergedSteps.active.map((step, i) => {
+                    const agent = agents.find(a => a.id === step.agentId);
+                    return (
+                      <StepCard
+                        key={step.id}
+                        step={step}
+                        agent={agent}
+                        onRemove={removeStep}
+                        index={i}
+                        onStepLabelChange={handleStepLabelChange}
+                        onArchiveStep={handleArchiveStep}
+                        onKeepStep={handleKeepStep}
+                      />
+                    );
+                  })}
+                  {mergedSteps.archived.length > 0 && (
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textAlign:"center",padding:"4px 0",opacity:.7}}>
+                      {mergedSteps.archived.length} step{mergedSteps.archived.length!==1?"s":""} archived from previous plan
+                    </div>
+                  )}
                 </div>
 
                 {/* FEATURE: AW-08 — Change log collapsible */}
-                {/* Change log */}
                 {changeLog.length>0 && (
                   <div style={{marginBottom:10}}>
                     <button onClick={()=>setShowChangeLog(o=>!o)} style={{width:"100%",padding:"7px 12px",background:"transparent",border:`1px solid ${T.lineSoft}`,color:T.muted,fontFamily:mono,fontSize:9,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
@@ -653,7 +746,6 @@ export default function AssignWorkScreen() {
                 {/* FEATURE: AW-UX-05 — CTA renamed from "Approve Plan & Launch" to "Approve Steps & Launch" */}
                 {/* FEATURE: AW-09 — Save draft awaiting-input */}
                 {/* FEATURE: SH-06 — Supabase tasks integration */}
-                {/* Approve + Save Draft */}
                 <div style={{display:"flex",gap:8,position:"relative"}}>
                   <FeatureBadge id="SH-06" />
                   <button onClick={handleApprove}
