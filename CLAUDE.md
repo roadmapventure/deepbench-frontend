@@ -224,7 +224,7 @@ For any Supabase operation: verify column names against actual schema before wri
 > **This section should be updated at the end of each session.**
 > For current session state, see docs/SESSIONS.md.
 
-**Current version in dev:** v5.1.17 (commit a72e1bd)
+**Current version in dev:** v5.1.17 (commit 4c3f425)
 **Next session:** S15a — Dashboard UX Review
 **Do NOT merge dev → main** — John has not confirmed.
 
