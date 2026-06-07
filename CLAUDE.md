@@ -199,3 +199,16 @@ For any Supabase operation: verify column names against actual schema before wri
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
+
+---
+
+## 13. After Every Commit
+
+After every successful commit and push, always do the following without being told:
+
+1. Update the Current Session State in Section 12 of this file — increment the version number to reflect the commit.
+2. Commit and push that change to dev with message: `docs: update version state after [session name]`
+
+Do NOT mark a feature as ✅ Done in docs/FEATURES.md until John explicitly confirms QA passed and the session is closed. Features stay at their current status until John says: "Close [FEATURE-ID] — mark complete"
+
+When John says that, update docs/FEATURES.md — change the feature status to ✅ Done and session column to the closed session name, then commit and push with message: `docs: mark [FEATURE-ID] complete`
