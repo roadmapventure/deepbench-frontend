@@ -185,8 +185,7 @@ For any Supabase operation: verify column names against actual schema before wri
 ## 12. Current Session State
 
 > **This section should be updated at the end of each session.**
-> For the definitive session queue, see Google Drive Session Queue doc.
-> Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
+> For current session state, see docs/SESSIONS.md.
 
 **Current version in dev:** v5.1.14p4d (commit e3b7f9d)
 **Next session:** S15a — Dashboard UX Review
