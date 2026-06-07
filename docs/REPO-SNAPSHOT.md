@@ -3,9 +3,13 @@
 > Last generated: 2026-06-07
 >
 > To regenerate: tell Claude Code:
-> "Regenerate docs/REPO-SNAPSHOT.md from current local source
->  reading C:\Projects\deepbench-frontend\src and C:\Projects\deepbench-backend.
->  Then commit and push to dev."
+> "Regenerate docs/REPO-SNAPSHOT.md from current local source —
+>  read C:\Projects\deepbench-frontend\src,
+>  C:\Projects\deepbench-backend,
+>  C:\Projects\nigp-analyzer\src, and
+>  C:\Projects\nigp-analyzer-agent-api.
+>  Commit and push to dev with message:
+>  docs: regenerate REPO-SNAPSHOT from local source"
 
 ---
 
@@ -134,18 +138,68 @@ This prevents:
 
 ---
 
+## NIGP Analyzer Standalone App (`nigp-analyzer/src/`)
+
+Separate standalone React + Vite app. Routes: `/` → NIGPAnalyzer, `/admin` → TeamBuilder.
+Deployed independently; shares the Treasury design system and calls the same Vercel API routes (`/api/brief`, `/api/agent-configs`, `/api/web-memory-patch`).
+
+| File | Description | Key Exports |
+|------|-------------|-------------|
+| `src/main.jsx` | Root entry — React Router, routes `/` and `/admin` | `createRoot`, `Routes` |
+| `src/App.jsx` | Full NIGP Spend Analyzer (v4.2.14, ~1,900 LOC) — inline Treasury tokens, CSV upload, column mapping, 12 tabs (overview, categories, treemap, vendors, timeline, flags, localspend, concentration, aibriefing, table, updatefile, cleanup), Fetch Agent SSE UI, AI Review multi-agent picker with session-persistent config selection | `NIGPAnalyzer` (default) |
+| `src/nigp-lookup.js` | NIGP commodity codes — 264 class codes + 8,239 subclass lookup (standalone copy) | `NIGP_CLASS`, `resolveNIGP` |
+| `src/PersonnelScreen.jsx` | Personnel / training workspace — tabs: Profile, Resume, Training, Playbook, Assignments, Completed Projects; live `agent_configs` from Supabase | `PersonnelScreen` (default) |
+| `src/RagAdmin_v2.jsx` | RAG knowledge base admin — seed entries, entry CRUD, category/jurisdiction/flag-trigger tagging, BEE test scenarios, computeDelta text analysis | `RagAdmin_v2` (default) |
+| `src/TeamBuilder.jsx` | Standalone agent roster admin — 7 agents (Chloe, Mike, Bob, Christy, Robyn, Brent, Pat), knowledge library drawer, training management, routes to PersonnelScreen | `TeamBuilder` (default) |
+
+### NIGP Analyzer — Inline Constants (App.jsx)
+
+| Constant | Description |
+|----------|-------------|
+| `FETCH_STATES` | 6 state portal configs (Maryland live, Illinois live; Texas, California, Florida, Oregon stubbed) |
+| `AI_AGENTS` | 5 reviewer agents with skill/cost/arch metadata (Chloe, Mike, Bob, Robyn, Christy) |
+| `PAT_AGENT` | Pat Smiley — intern baseline, `noMemory:true`, no RAG, used for benchmark comparison |
+| `NAV_GROUPS` | 4 tab groups: Overview, Analysis, Strategy, Data |
+| `FIELD_DEFS` | 10 field definitions with synonym auto-detection for CSV column mapping |
+
+---
+
+## NIGP Analyzer Agent API (`nigp-analyzer-agent-api/src/`)
+
+Standalone Express backend (v4.3.1). Deployed to Railway. Serves SSE-streamed ReAct agent runs for the NIGP Analyzer Fetch Agent UI.
+
+| File | Description | Key Exports / Routes |
+|------|-------------|-------------|
+| `src/server.js` | Express server — CORS, crash-save (SIGSEGV), SIGTERM run-preservation; routes: `GET /health`, `GET /states`, `GET /agent/run` (SSE), `GET /agent/download`; writes failed/terminated runs directly to Supabase `agent_run_log` | `app` |
+| `src/agent.js` | ReAct agent loop (v4.3.1) — Playwright Chromium, Claude screenshots, BASE_SYSTEM prompt, SEARCH action (max 3/run), MAX_STEPS=25, MAX_RUN=5m, isCancelled hook, onStep callback | `runAgent` |
+| `src/stateRegistry.js` | 3 state portal configs: Maryland MD-VIEW (vendor payments), Oregon OregonBuys (POs, Socrata), Illinois Comptroller (expenditures) | `STATE_REGISTRY`, `getState`, `listStates` |
+
+### Agent API — Routes Detail
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/health` | GET | Liveness check — returns `{status:"ok", timestamp}` |
+| `/states` | GET | List available state portals with keys, names, fiscal years |
+| `/agent/run` | GET (SSE) | Launch ReAct agent run; streams `start`, `step`, `downloaded`, `complete`, `error`, `end` events; query params: `state`, `year`, `dateFrom`, `dateTo`, `noMemory` |
+| `/agent/download` | GET | Proxy temp CSV file from agent run to browser; path validated to `/tmp/` only |
+
+---
+
 ## Summary
 
-| | Frontend | Backend |
-|---|---|---|
-| Source files | 37 | 3 |
-| Screens / routes | 10 + 4 sub-tabs | — |
-| Context providers | 2 | — |
-| Custom hooks | 3 | — |
-| Analysis modules | 3 | — |
-| Shared components | 7 | — |
-| Est. LOC | ~7,500 | ~1,000 |
+| | Frontend | Backend | NIGP Analyzer | Agent API |
+|---|---|---|---|---|
+| Source files | 38 | 3 | 6 | 3 |
+| Screens / routes | 10 + 4 sub-tabs | — | 3 screens, 2 routes | — |
+| Context providers | 2 | — | — | — |
+| Custom hooks | 3 | — | — | — |
+| Analysis modules | 3 | — | inline in App.jsx | — |
+| Shared components | 7 | — | inline in App.jsx | — |
+| API routes | — | 4 (SSE) | — | 4 (SSE) |
+| Est. LOC | ~7,500 | ~1,000 | ~2,800 | ~700 |
 
 **Frontend stack:** React 18 · React Router · Supabase · Recharts · PapaParse · Anthropic SDK  
 **Backend stack:** Express.js · Playwright · Anthropic SDK · SSE streaming  
-**Key patterns:** Context providers for shared state · Module-level stores for AI activity/status · Treasury design system via `tokens.js` · ReAct agent loop with screenshot-based reasoning
+**NIGP Analyzer stack:** React 18 · Vite · Recharts · PapaParse · inline Treasury tokens  
+**Agent API stack:** Express.js · Playwright · Anthropic SDK · Supabase REST · SSE streaming  
+**Key patterns:** Context providers for shared state · Module-level stores for AI activity/status · Treasury design system via `tokens.js` · ReAct agent loop with screenshot-based reasoning · SIGTERM/crash save to Supabase on Railway shutdown
