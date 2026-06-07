@@ -3,18 +3,14 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> **Source of truth:** Google Drive Feature Inventory
+> Last synced from Google Drive: 2026-06-07
 > Drive ID: `1NNRE65of3bj7wMzHg3cVIFKq_k1CHvdKicFsW5V8L-I`
-> This file is a static snapshot. For live session assignments, check Drive.
-
-Last synced: 2026-06-07
 
 ---
 
 ## Feature ID Format
 
 `[AREA]-[NUMBER]`
-
 Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables
 
 ---
@@ -58,10 +54,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | DB-17 | Task title editable inline + Michelle suggested | ✅ Done | S14 |
 | DB-18 | Auto-select best agent via AI | ❌ Missing | S13 (deferred) |
 
-**DB-17 Implementation Notes:**
-- Michelle generates concise title + step names on first draft
-- `title_edited` flag — user owns title after first edit, never overwritten
-- `api/title.js`: direct Claude Haiku call (Supabase agent_configs wired in S-BENCH-01)
+**DB-17 Notes:** Michelle generates concise title + step names on first draft. `title_edited` flag — user owns title after first edit, never overwritten. `api/title.js`: direct Claude Haiku call; Supabase agent_configs wired in S-BENCH-01.
 
 ---
 
@@ -208,9 +201,11 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
 
-**AI-10 Notes:** Accessible via "+ AI" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered. Builds with mock data in S-AI-01; live data wires after S11/AI-11.
+**AI-10 Notes:** Accessible via "+ AI" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered (expandable). Builds with mock data in S-AI-01; live data wires after S11/AI-11.
 
-**AI-12 Notes:** Per-task, per-step breakdown: tokens in/out, model used, latency, RAG hits/misses, confidence, timestamp. Exportable report for IT/procurement governance. Distinct from AI-10 (Activity Panel = global view; AI-12 = deep dive per task).
+**AI-11 Notes:** Logs per step: step_id, agent_id, model, tokens_in, tokens_out, latency_ms, rag_hits, confidence_score, timestamp. Data source for AI-10 and AI-12.
+
+**AI-12 Notes:** Per-task, per-step breakdown: tokens in/out, model used, latency, RAG hits/misses, confidence, timestamp. Exportable report for IT/procurement governance. Distinct from AI-10 (Activity Panel = global view; AI-12 = deep dive per task). Builds with mock data in S-AI-01; live data after S11.
 
 ---
 
@@ -247,15 +242,16 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ---
 
-## Session Order
+## Full Session Order
 
 ### Work Side
 | Session | Feature | Status |
 |---------|---------|--------|
-| S15a | Dashboard UX Review | ← NEXT |
-| S15b | Assign Work UX Review | Queued |
-| S15c | Task Instructions UX Review | Queued |
-| S-AI-01 | AI Activity Panel (AI-10) + AI Audit Screen (AI-12) | After S15 |
+| S15a | UX Review — Dashboard | ← NEXT |
+| S15b | UX Review — Assign Work | Queued |
+| S15c | UX Review — Task Instructions | Queued |
+| S-AI-01 Part A | AI Activity Panel (AI-10) | After S15c |
+| S-AI-01 Part B | AI Audit Screen (AI-12) | After Part A |
 
 ### Bench Side (begins after S-AI-01)
 | Session | Feature |
@@ -264,17 +260,22 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | S-BENCH-02 | Personnel File audit |
 | S-BENCH-03 | Teach screen audit |
 | S-BENCH-04 | Test Team audit |
-| S-UX-BENCH-01 through 04 | Bench UX reviews |
+| S-UX-BENCH-01 | UX Review — Roster / Bench screen |
+| S-UX-BENCH-02 | UX Review — Personnel File |
+| S-UX-BENCH-03 | UX Review — Teach screen |
+| S-UX-BENCH-04 | UX Review — Test Team |
 
-### Deferred (resume after Bench)
+### Deferred (resume after Bench side complete)
 | Session | Feature |
 |---------|---------|
-| S11 | Execution loop + AI-11 log (Q5 needed first) |
-| S11b | Pat execution + fetch agent |
-| S12 | AW-17 Michelle multi-agent |
-| S13 | DB-18 Auto-select agent |
-| S-DELIVER-01/02/03 | Deliverable layer |
-| S-POLISH-01 | Known issue fixes |
+| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Execution loop (Q5 needed first) |
+| S11b | TI-17 + FT-06 — Pat execution + fetch agent |
+| S12 | AW-17 — Michelle assigns steps to multiple agents |
+| S13 | DB-18 — Auto-select best agent |
+| S-DELIVER-01 | DL-01 — Step output type label |
+| S-DELIVER-02 | DL-02 — Deliverables Card (right panel) |
+| S-DELIVER-03 | DL-03 — Per-step deliverable access inline |
+| S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
 
 ---
 

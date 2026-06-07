@@ -1,15 +1,38 @@
 # DeepBench v5.1 — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Claude Code is self-contained — it has no memory of previous sessions,
-> no Drive access, no awareness of prior conversations.
-> Every kickoff doc must be fully self-contained with no external references.
+> Last updated: 2026-06-07a | Category K + L added | Bug library added
 
 ---
 
-## Session Scope Rules
+## Section 1: Session Naming & Versioning
 
-1. One feature per session (one Feature ID or tightly related group)
+Session name format: `S[number]-[FEATURE-ID]-[short-name]`
+
+Version header — line 1 of every .jsx and .js file touched:
+```js
+// DeepBench v5.1.X | filename.jsx | brief description
+```
+
+Feature ID comment:
+```jsx
+{/* FEATURE: XX-00 — Description */}   // JSX
+// FEATURE: XX-00 — Description         // JS
+```
+
+Sub-session rule:
+- S[X]a takes its version as normal
+- S[X]b takes the NEXT increment
+- Both have fully separate kickoff docs
+
+Branch: commit directly to `dev`. No feature branches.
+`dev → main` only when John explicitly confirms.
+
+---
+
+## Section 2: Session Scope Rules
+
+1. One feature per session
 2. Max 3 files modified per session
 3. Max 4 tasks per kickoff doc
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
@@ -17,45 +40,13 @@
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
-**Signs a session is too big:**
-- Kickoff doc has more than 4 tasks
-- More than 3 files being modified
-- Session runs longer than 20 minutes
-- Claude Code starts compacting
-
-If too big: split into S[X]a and S[X]b. S[X]a must be QA-closed before S[X]b begins.
+**Signs a session is too big:** kickoff doc has >4 tasks, >3 files modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
 
 ---
 
-## Session Naming & Versioning
+## Section 3: Mandatory Kickoff Doc Structure
 
-Session name format: `S[number]-[FEATURE-ID]-[short-name]`
-Example: `S08-DB16-completed-tasks`
-
-Sub-session rule:
-- S[X]a takes the version it would have gotten as a full session
-- S[X]b takes the NEXT increment
-- Both must have fully separate kickoff docs
-
-**Version header — line 1 of every .jsx and .js file touched:**
-```js
-// DeepBench v5.1.X | filename.jsx | brief description
-```
-
-**Feature ID comment:**
-```jsx
-{/* FEATURE: XX-00 — Description */}   // JSX files
-// FEATURE: XX-00 — Description         // JS files
-```
-
-Branch: commit directly to `dev`. No feature branches.
-`dev → main` only when John explicitly confirms.
-
----
-
-## Mandatory Kickoff Doc Structure
-
-Every kickoff doc must contain these 10 sections in order:
+Every kickoff doc must have these 10 sections in order:
 
 1. **SESSION** header (name, version, branch, files to read first)
 2. **CONTEXT** (what the feature does, why it exists)
@@ -63,173 +54,250 @@ Every kickoff doc must contain these 10 sections in order:
 4. **TASKS** (max 4, each with exact code spec)
 5. **DESIGN RULES** (tokens, fonts, styling — required for UI sessions)
 6. **SCOPE RULES** (what NOT to touch)
-7. **NODE.JS TEST** (must run and pass before commit)
-8. **CLAUDE CODE VERIFICATION CHECKLIST** (Claude Code completes this)
+7. **NODE.JS TEST** (full code written out — not described, not referenced)
+8. **CLAUDE CODE VERIFICATION CHECKLIST**
 9. **COMMIT instruction**
-10. **MANUAL QA CHECKLIST** (John completes this after deploy)
+10. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
-**Critical:** Every kickoff doc must include:
-- Instruction to read `CLAUDE.md` first (list all files to read in Step 0)
-- The full Node.js test written out (not referenced — actual code)
-- The full verification checklist (copied from this doc)
-- All context needed — **no "as discussed" references**
-- Design system tokens when UI work is involved
+Claude Code has no memory and no Drive access. Every kickoff doc must be fully self-contained — no "as discussed" or "refer to standards" references.
 
-**Do NOT write kickoff docs that say "refer to standards" — Claude Code cannot access this file.**
+**Kickoff doc compliance check before issuing:**
+- [ ] All 10 sections present
+- [ ] Node.js test is full code (not described)
+- [ ] Category K tests if touching mergedSteps or Supabase JSONB
+- [ ] Category L live API test if touching any api/ endpoint
+- [ ] Manual QA is session-specific
+- [ ] No external references
+- [ ] Design tokens present if UI work
+- [ ] Files to read listed in Step 0
 
 ---
 
-## Node.js Test Requirements
+## Section 4: Node.js Test Requirements
 
-Every session must include a Node.js test file that:
-- Tests the core logic before any code is committed
-- Uses **no imports from the app** (pure Node.js only)
-- Runs with: `node test-[session-id].mjs`
-- Is **deleted** before committing
+Every session must include a Node.js test file:
+- Pure Node.js only — no app imports
+- Run with: `node test-[session-id].mjs`
+- Deleted before committing
 - Must show `ALL TESTS PASS` to proceed
 
 ### Test Categories
 
-Pick the relevant categories for the session:
-
 **A. Data Shape Tests**
 **B. Logic Tests**
-**C. String Safety Tests** — required for any string operations
+**C. String Safety Tests** — required for any string operations on potentially undefined
 **D. Component Lifecycle Tests** — required for useEffect / useRef
-**E. SessionStore / URL Param Tests** — required for any navigation
+**E. SessionStore / URL Param Tests** — required for any navigate() or storage
 **F. Supabase Column Alignment Tests** — required for any DB operations
-**G. API Response Tests** — required for any Anthropic API calls
+**G. API Response Tests** — required for Anthropic API calls
 **H. Routing / Navigation Tests** — required for any navigate() calls
 **I. Step Merge Logic Tests** — required for any plan regeneration work
 **J. UI Stub / Byline Tests** — required for agent presence / attribution UI
-   - Verify stub object has all required keys (name, code, initials)
-   - Verify no undefined values in any byline state
-   - Verify pulsing dot logic: shown in loading states, hidden in static states
-   - Verify all label strings compose correctly from stub without inline literals
-**K. mergedSteps / Supabase JSONB Tests** — required for mergedSteps/Supabase sessions
-**L. API Endpoint Tests** — required for api/ endpoint sessions (live API test)
+- Stub has all required keys (name, code, initials)
+- No undefined values in any byline state
+- Pulsing dot logic correct: shown in loading, hidden in static
+- Label strings compose correctly from stub without inline literals
+
+**K. Component State Initialization Tests** — REQUIRED for any session touching mergedSteps, initial load, Supabase JSONB reads/writes, or pendingArchive. Added after S14/S14p duplicate-step bugs. Non-negotiable.
+
+Mandatory K tests:
+- `initializeStepsFromSupabase()` does NOT call `mergeSteps()`
+- No duplicate step IDs on initial load (test with 1 step, 3 steps, null, undefined)
+- `initializeStepsFromFirstPlan()` calls `mergeSteps([], new, [])`
+- `updateStepsFromPlan()` calls `mergeSteps(active, new, archived)`
+- `saveStepsToSupabase()` writes FULL array preserving `pendingArchive`
+- `handleApprove` strips `pendingArchive` ONLY from approved step
+- Round-trip: write → re-read → all data intact
+- Active/archived split on load by `mergeStatus` field
+- Unanswered HITL detection uses `q.a` (persisted) not ephemeral state
+- Label-based dedup (not ID-based) for LLM-generated steps
+- Answers snapshot overlaid before unanswered detection fires
+
+**L. Live API Integration Tests** — REQUIRED for any session that modifies an `api/` endpoint, modifies code that calls an `api/` endpoint, adds retry logic, or changes any payload sent to an API endpoint. Added after S14p4b — a change to `handleUpdatePlan` caused the planning agent to intermittently return no steps. Pure logic tests cannot catch LLM response shape issues. A live call test catches these before the code ships.
+
+How to run: `node --env-file=.env.local test-[session-id]-api.mjs`
+Requires `ANTHROPIC_API_KEY` in `.env.local`. Delete before committing.
+
+Mandatory L tests for any `api/plan.js` change or call site change:
+- POST to `/api/plan` with a representative goal and steps
+- Confirm response contains a `tool_use` block (not text)
+- Confirm `tool_use` block has `input.steps` array
+- Confirm `input.steps.length > 0`
+- Confirm each step has: `id`, `label`, `type`, `text` fields
+- Log `PLAN API: PASS` or `PLAN API: FAIL` explicitly
+- If FAIL: do NOT commit — fix the payload first
+
+Mandatory L tests for any `api/title.js` change:
+- Real call with representative goal and steps array
+- Confirm response has `taskTitle` (string, non-empty)
+- Confirm response has `stepTitles` (array, length matches input)
+- Log `TITLE API: PASS` or `TITLE API: FAIL` explicitly
+
+Retry logic tests (when adding retry to any API call):
+- Simulate first call returning empty steps — confirm retry fires
+- Simulate retry returning valid steps — confirm flow continues
+- Simulate both calls failing — confirm error thrown with "after retry"
+- Confirm retry uses identical payload to first call
+- Confirm retry does not fire when first call succeeds
+
+Payload integrity tests (when stepsContext or payload changes):
+- Build full `userMsg` string with test data
+- Confirm `stepsContext` includes step label, type, and text
+- Confirm `stepsContext` does NOT include `mergeStatus` or `pendingArchive`
+- Confirm `answeredQuestions` reads `q.a` not a separate answers object
+- Confirm `task.steps` used for `stepsContext` is `mergedToSet.active` (not `stepsToMerge` or raw `newSteps`)
 
 ---
 
-## Claude Code Verification Checklist
+## Section 5: Claude Code Verification Checklist
 
-Claude Code completes these before committing. Every item must be checked.
+Complete every item before committing.
 
 ### Always Required
-- [ ] Version header updated to `vX.X.X` on every file touched
-- [ ] `FEATURE: [ID]` comment present in every file touched
+- [ ] Version header on every file touched
+- [ ] `FEATURE: [ID]` comment at every change location
 - [ ] Node.js test — ALL TESTS PASS
 - [ ] `npm run build` — zero errors
-- [ ] Zero red errors in browser console (check after Vercel deploy)
+- [ ] Zero red errors in browser console after deploy
 
 ### Feature ID Badge Audit (every session)
 - [ ] FeatureBadge added for this session's feature ID
-- [ ] Badge is inside a wrapper with `position: relative`
-- [ ] Badge renders unconditionally OR is on always-visible outer wrapper
-- [ ] If section is conditional: badge added to BOTH outer wrapper AND inside section
-- [ ] Test with `?debug=features` on dev URL — confirm badge visible
+- [ ] Badge inside wrapper with `position: relative`
+- [ ] Badge renders unconditionally or on always-visible outer wrapper
+- [ ] Test with `?debug=features` on dev URL
 
 ### Component Lifecycle (for any useEffect or useRef)
 - [ ] Will this component re-mount? If yes, useRef is NOT safe
-- [ ] Run-once guards use context state (survives re-mounts) not useRef
-- [ ] useEffect dependency array is correct — list all dependencies
-- [ ] No infinite loops — trace what triggers the effect
+- [ ] Run-once guards use context state (not useRef)
+- [ ] useEffect dependency array correct
+- [ ] No infinite loops
 
 ### Supabase Operations (for any DB read/write)
 - [ ] All column names verified against actual schema
-- [ ] No columns inserted that don't exist in schema
-- [ ] Error handling present (`console.error` only — never block user)
+- [ ] No columns inserted that don't exist
+- [ ] Error handling: `console.error` only — never block user
 - [ ] Loading state shown while data fetches
 
 ### String Safety (for any string operations on data)
 - [ ] No raw `.startsWith()` / `.replace()` / `.trim()` on potentially undefined
-- [ ] `str()` helper or `typeof` guard applied to all row-derived string calls
-- [ ] Tested with null and undefined inputs in Node test
+- [ ] `str()` helper or `typeof` guard applied
+- [ ] Tested with null and undefined in Node test
 
-### Navigation / Session Storage (for any navigate() or storage)
+### Navigation / Session Storage
 - [ ] `sessionStorage.setItem` called synchronously before `navigate()`
 - [ ] `q` URL param uses user content not agent content
-- [ ] URL debug params stripped from goal/content fields
 - [ ] Agent ID resolves to full agent object before use in UI
 
 ### Step Color Coding Preservation (for any plan regeneration work)
-- [ ] Every step output from `mergeSteps()` retains its `type` field (agent | hitl | subagent)
-- [ ] Color rendering tested before AND after a plan regeneration cycle
-- [ ] New steps render with brass left border (`#b6873a`)
-- [ ] Unchanged steps render normally with existing color coding intact
-- [ ] Archived steps render in grey collapsible drawer — no color coding
-- [ ] HITL steps remain flag red (`#a83319`) after regeneration
-- [ ] Sub-agent steps remain blue after regeneration
-- [ ] Agent steps remain brass (`#b6873a`) after regeneration
+- [ ] Every step output from `mergeSteps()` retains its `type` field
+- [ ] Color rendering tested before AND after regeneration cycle
+- [ ] New steps: brass left border `#b6873a`
+- [ ] HITL steps: flag red `#a83319` after regeneration
+- [ ] Sub-agent steps: blue after regeneration
+- [ ] Archived steps: grey collapsible drawer
+- [ ] Agent steps: brass `#b6873a` after regeneration
 
-### Agent Presence / Byline UI (for any agent attribution work)
-- [ ] Agent stub defined once per file — no inline string literals
-- [ ] Pulsing dot uses `animate-pulse` + brass (`#b6873a`), 4×4px `rounded-full`
-- [ ] Dot is removed (not just hidden) when loading state resolves
-- [ ] Byline uses Inter `text-xs` — no borders or cards around it
-- [ ] All label states tested against stub in Node.js test category J
+### Agent Presence / Byline UI
+- [ ] Agent stub defined once per file
+- [ ] Pulsing dot: `animate-pulse` + brass `#b6873a`, 4×4px `rounded-full`
+- [ ] Dot removed (not just hidden) when loading resolves
+- [ ] Byline: Inter `text-xs`, no borders or cards
+
+### Category K — Component State Initialization
+- [ ] `initializeStepsFromSupabase()` — no `mergeSteps()` call
+- [ ] `initializeStepsFromFirstPlan()` — `mergeSteps([], new, [])`
+- [ ] `updateStepsFromPlan()` — `mergeSteps(active, new, archived)`
+- [ ] Each operation has its own code path — no sharing
+- [ ] `saveStepsToSupabase()` writes full array with archived
+- [ ] `pendingArchive` preserved in all writes
+- [ ] `handleApprove` strips `pendingArchive` from approved step only
+- [ ] Unanswered detection uses answers snapshot not stale state
+- [ ] Label-based dedup (not ID-based)
+- [ ] Active/archived split on load by `mergeStatus`
+
+### Category L — Live API Integration
+- [ ] Live API test file written and run before commit
+- [ ] `test-[session]-api.mjs` deleted before commit
+- [ ] `PLAN API: PASS` confirmed in test output
+- [ ] `TITLE API: PASS` confirmed (if title.js involved)
+- [ ] Retry logic tested: empty → retry → success path confirmed
+- [ ] Retry logic tested: empty → retry → empty → error thrown
+- [ ] Payload integrity: no `mergeStatus`/`pendingArchive` in `stepsContext`
+- [ ] `task.steps` for `stepsContext` is `mergedToSet.active` after Update Plan
 
 ---
 
-## Browser Test Checklist
+## Section 6: Browser Test Checklist
 
-Claude Code runs this after every Vercel deploy before reporting back:
-
-1. Open the dev URL
-2. Open browser DevTools → Console tab
-3. Screenshot console — confirm zero red errors
-4. Navigate to the screen being tested
-5. Run the feature's specific test steps
-6. Test with `?debug=features` — confirm feature ID badge visible
-7. Watch the screen for 5 seconds — confirm no loops or flickering
-8. Check Network tab for any 4xx/5xx errors
+After every Vercel deploy:
+1. Open dev URL
+2. DevTools → Console → zero red errors
+3. Navigate to screen being tested
+4. Run feature-specific test steps
+5. Test with `?debug=features` — confirm badge visible
+6. Watch 5 seconds — no loops or flickering
+7. Network tab — no 4xx/5xx errors
 
 **Dev URL:** `https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app`
 
 ---
 
-## Manual QA Checklist Rules
+## Section 7: Manual QA Checklist Rules
 
-John runs these after every deploy. This is the final gate — session does not close until all items pass.
+John runs these after every deploy. Session does not close until all items pass.
 
-- Steps in logical user flow order (navigate → interact → observe)
+Rules:
+- Steps in logical user flow order
 - Each step = single observable action with clear PASS/FAIL answer
-- Specific enough to have a clear PASS/FAIL answer
 - Include regression steps for any screen touched
 - Maximum 12 steps per session
 - Always end with: *"Report back PASS/FAIL/NEW REQUIREMENT for each item"*
 
-If FAIL: Claude writes a patch kickoff doc to fix it before moving on.
-If NEW REQUIREMENT: Claude adds it to `docs/FEATURES.md` and the Feature Inventory in Google Drive.
-Session only closes when ALL items PASS.
+If FAIL: write a patch kickoff doc before moving on.
+If NEW REQUIREMENT: add to `docs/FEATURES.md` and Google Drive Feature Inventory.
 
 ---
 
-## Known Issues Log
+## Section 8: Known Bug Patterns (learn from these — test for them explicitly)
 
-| ID | Issue | Root Cause | Fix | Status |
-|----|-------|------------|-----|--------|
-| POLISH-01 | Update Plan immediate click race — unanswered questions disappear (browser refresh restores) | Stale closure in `handleUpdatePlan` reads `mergedSteps` before `setMergedSteps` from `handleAnswerChange` commits | Add `useRef` to always hold latest `mergedSteps`: `const mergedStepsRef = useRef(mergedSteps); useEffect(() => { mergedStepsRef.current = mergedSteps; }, [mergedSteps]);` then read `mergedStepsRef.current` in `handleUpdatePlan`. File: `TaskInstructionsScreen.jsx` only. | Deferred to S-POLISH-01 |
+| Bug | Root Cause | Fix | Test Category |
+|-----|------------|-----|---------------|
+| BUG-1: `mergeSteps` called on initial load → duplicate steps | `initializeStepsFromSupabase` called merge instead of direct set | Direct set only, no merge | K initial load |
+| BUG-2: `pendingArchive` stripped from Supabase write | `saveStepsToSupabase` wrote active only | Write full array including archived | K round-trip |
+| BUG-3: Unanswered HITL detection reads stale React state | `handleUpdatePlan` read state before `setMergedSteps` committed | Build answers snapshot before running detection | K answers snapshot |
+| BUG-4: ID-based dedup fails for LLM-regenerated step IDs | LLM generates new IDs each time | Dedup by `label.toLowerCase().trim()` not by ID | K label dedup |
+| BUG-5: `task.steps` set to `stepsToMerge` (pre-merge) instead of `mergedToSet.active` (post-merge) → bad `stepsContext` → LLM returns no steps | `setTask` used wrong source | `setTask` uses `mergedToSet.active` for steps field | L payload integrity |
+| BUG-6: LLM intermittently returns no steps (no retry) | No retry on empty response | Retry once on empty steps response | L retry logic |
+| BUG-7: Ephemeral `answers[q.id]` state lost on refresh | Answers stored in React state only | Persist answers on `step.questions[n].a` in Supabase | K answer persistence |
+| BUG-8: Archived steps lost after Update Plan | Save wrote active only | `saveStepsToSupabase` writes `[...active, ...archived]` | K supabase write |
 
 ---
 
-## New Requirements During Build
+## Section 9: S-POLISH-01 — Deferred Known Issues
 
-When a new requirement is discovered during a session:
+### Fix 1: Update Plan immediate click race condition
 
-1. Add to this file under a `## Discovered Requirements` section with format:
-   `[FEATURE-ID] | Description — Found: S[X]. Planned session: S[Y]`
-2. Claude Code reports it at end of session for John to review
-3. John adds it to the Feature Inventory in Google Drive
+**Symptom:** Answer 1 question, click Update Plan immediately → unanswered questions disappear. Browser refresh restores them.
 
-### Discovered Requirements
+**Root cause:** Stale closure in `handleUpdatePlan` reads `mergedSteps` before `setMergedSteps` from `handleAnswerChange` commits.
 
-| ID | Description | Found | Planned |
-|----|-------------|-------|---------|
-| DB-16 | Completed task cards clickable | S06 | S08 ✅ Done |
-| DB-17 | Task title editable + AI-suggested | S06 | S14 ✅ Done |
-| DB-18 | Auto-select best agent when none chosen | S07 | S13 (deferred) |
-| AW-15 | Pre-populated goal appends instead of replaces | S05 | post-core |
-| AW-16 | Update Plan button wires answers + regenerates | S06 | S09 ✅ Done |
-| TI-13 | Step color coding lost after regeneration | BUG | S10a ✅ Fixed |
-| SH-10 | React error boundary | S03 | S-future |
+**Fix:** Add `useRef` to always hold latest `mergedSteps`:
+```js
+const mergedStepsRef = useRef(mergedSteps);
+useEffect(() => { mergedStepsRef.current = mergedSteps; }, [mergedSteps]);
+```
+Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps`.
+3-line change. File: `TaskInstructionsScreen.jsx` only.
+
+**Status:** Deferred — acceptable behavior for now. Fix after all other sessions complete.
+
+---
+
+## Section 10: Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-06b | Sub-session versioning, category J |
+| 2026-06-06c | Drive scope rule |
+| 2026-06-06i | Category K added — component state initialization. Three-operation separation mandated. `saveStepsToSupabase` canonical function mandated. |
+| 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
