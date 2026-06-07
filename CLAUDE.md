@@ -255,6 +255,27 @@ When porting a feature from NIGP to DeepBench:
 
 ---
 
+## 15. Claude.ai Quick Fetch URLs
+
+When starting a Claude.ai planning session, fetch these URLs to orient without needing Google Drive:
+
+**CLAUDE.md (this file):**
+`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/CLAUDE.md`
+
+**Feature backlog:**
+`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/FEATURES.md`
+
+**Session state + log:**
+`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/SESSIONS.md`
+
+**Standards + testing:**
+`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/STANDARDS.md`
+
+**Architecture:**
+`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/ARCHITECTURE.md`
+
+---
+
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
