@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p4 | TaskInstructionsScreen.jsx | DB-17p4 persist answers
+// DeepBench v5.1.14p4a | TaskInstructionsScreen.jsx | DB-17p4 persist answers
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -618,9 +618,10 @@ where needed. Use the plan_task tool to return a structured plan.`;
       );
       setMergedSteps(mergedToSet);
 
+      // FIX: DB-17p4a — use stepsToMerge not raw newSteps to preserve unanswered HITL steps
       setTask(prev => ({
         ...prev,
-        steps: newSteps,
+        steps: stepsToMerge,
         plan_history: {
           questions: answeredQuestions,
         },
