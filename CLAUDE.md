@@ -44,6 +44,15 @@ Branch strategy: commit directly to `dev`. **Never merge `dev → main` without 
 6. **`npm run build` must pass before any commit.**
 7. **If compacting starts — STOP.** Exit session, start fresh.
 8. **Never merge `dev → main`** without John's explicit sign-off.
+9. **Never compress silently.** If context compression is approaching, STOP immediately and alert John with this exact message:
+
+   > "⚠️ WARNING: Session is approaching compression.
+   > Recommend stopping here to preserve context integrity.
+   > Current progress: [summarize what was completed this session].
+   > Remaining tasks: [list what is not yet done].
+   > Start a new session to continue."
+
+   Do NOT proceed with compression. Do NOT compress automatically. Wait for John's response. John will either confirm stop or explicitly say "continue" to override.
 
 Signs a session is too big: kickoff doc has >4 tasks, >3 files being modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
 
