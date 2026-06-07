@@ -1,251 +1,202 @@
-# DeepBench Frontend — Project Intelligence
+# DeepBench — Claude Code Session Briefing
 
-## Project Overview
+> **Read this file first, every session, before touching any code.**
+> This is the single source of truth for how to work in this codebase.
+> Full detail on architecture, standards, and testing lives in `/docs/`.
 
-DeepBench v5.1.x is an AI agent workforce platform that helps government procurement teams automate work activities, store domain knowledge, and analyze procurement strategy based on real spend data. Targeted at procurement directors, CPOs, and government agencies.
+---
 
-**Live URL:** https://deepbench.roadmapventure.com
+## 1. What This App Is
 
-## Tech Stack
+**DeepBench v5.1** — AI workforce platform for government procurement intelligence.
+- Live: `https://deepbench.roadmapventure.com`
+- Dev: `https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app`
+- Owner: John Leonard / Roadmap Venture
+- Repos: `roadmapventure/deepbench-frontend` (this repo) + `roadmapventure/deepbench-backend` (Railway)
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + Vite |
-| Hosting | Vercel |
-| Database | Supabase (PostgreSQL + pgvector) |
-| AI | Anthropic Claude (Haiku for routing/planning, Sonnet for agents) |
-| Embeddings | OpenAI text-embedding-3-small |
-| Backend | Railway — Node.js (deepbench-backend) |
-| CSV Parsing | PapaParse (client-side) |
+DeepBench is the platform shell. The NIGP Spend Analyzer is the data analysis engine inside it, reached via task assignment at `/work/[taskId]/analyze`.
 
-## Design System — Treasury
+---
 
-**Colors:**
-- `brass` `#b6873a` — primary accent, AI indicators, CTAs
-- `navy` `#12243c` — headers, backgrounds, authority
-- `paperDeep` `#ddd5be` — page background
-- `moss` `#5a7538` — success, trainable agents, approvals
-- `flagRed` `#a83319` — alerts, HITL required, compliance flags
+## 2. Stack
 
-**Typography:**
-- `Fraunces` — display/headings (serif, editorial)
-- `Inter` — body text
-- `JetBrains Mono` — labels, codes, metadata, monospace UI
+| Layer | Tech |
+|-------|------|
+| Frontend | React + Vite, deployed to Vercel |
+| Backend | Node.js + Playwright, deployed to Railway |
+| Database | Supabase (tasks, RAG, agent configs, run logs) |
+| Storage | Supabase Storage bucket `task-data` |
+| AI | Anthropic Claude (Haiku for classification/routing, Sonnet for reasoning/briefings) |
+| Embeddings | OpenAI `text-embedding-3-small` for RAG |
+| Auth | None in Phase 1 — single hardcoded `CURRENT_USER` |
 
-Import from `src/tokens.js`. Never hardcode colors or fonts in component files.
+Branch strategy: commit directly to `dev`. **Never merge `dev → main` without John's explicit confirmation.**
 
-## Branch Strategy
+---
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Production — deploys to Vercel automatically |
-| `dev` | Staging — integration branch |
-| `feature/[ID]-[name]` | Per-session feature branches (e.g. `feature/S01-tagging-and-overlay`) |
+## 3. Session Rules (Non-Negotiable)
 
-PRs go `feature → dev → main`. Never commit directly to `main` or `dev`.
+1. **Read `CLAUDE.md` first** — you're doing it now. Good.
+2. **One feature per session** — one Feature ID or tightly related group.
+3. **Max 3 files modified per session.**
+4. **Max 4 tasks per session.**
+5. **Node.js test must pass before any commit.** Run: `node test-[session-id].mjs`
+6. **`npm run build` must pass before any commit.**
+7. **If compacting starts — STOP.** Exit session, start fresh.
+8. **Never merge `dev → main`** without John's explicit sign-off.
 
-## File Version Header Standard
+Signs a session is too big: kickoff doc has >4 tasks, >3 files being modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
 
-Every `.jsx` and `.js` file in `src/` must have this as its **first line**:
+---
 
+## 4. Versioning
+
+Every session increments the minor version. Current base: **v5.1.x**
+
+Version header format — **line 1 of every .jsx and .js file touched:**
 ```js
-// DeepBench v5.1.0 | [filename] | [brief description]
+// DeepBench v5.1.X | filename.jsx | brief description
 ```
 
-Example:
-```js
-// DeepBench v5.1.0 | DashboardScreen.jsx | Work dashboard — task list, stats, chat panel
-```
-
-## Feature ID Standard
-
-Every major component, tab, panel, and function block gets a comment tag immediately before the relevant code:
-
+Feature ID comment format:
 ```jsx
-{/* FEATURE: DB-07 — Chat panel topic pills */}
+{/* FEATURE: XX-00 — Description */}   // JSX
+// FEATURE: XX-00 — Description         // JS
 ```
+
+Session name format: `S[number]-[FEATURE-ID]-[short-name]`
+Example: `S08-DB16-completed-tasks`
+
+---
+
+## 5. Design System — Treasury Palette (Locked)
+
+All tokens live in `src/tokens.js`. Never hardcode these values — always use the token.
+
+```
+Background:  #ddd5be (paperDeep)   #f8f2e2 (card)    #f2ead4 (cardAlt)
+Navy:        #12243c  #1a2e4a  #0b1929
+Brass:       #b6873a  #886224  #e4c786
+Moss:        #5a7538  #a6bc82
+Flag red:    #a83319
+Muted:       #786d52  #58503a
+Lines:       #c8bb9a  #d8cbac
+```
+
+Fonts: `Fraunces` (display/serif), `Inter` (body), `JetBrains Mono` (mono/labels)
+Corner ornaments: 9px brass SVG, absolute positioned on cards.
+
+---
+
+## 6. Agent Roster (Current — `src/data/agents.js`)
+
+| Code | Name | Role |
+|------|------|------|
+| JR-01 | Chloe Okafor | Junior Procurement Analyst |
+| SR-02 | Mike Alvarez | Senior Procurement Analyst |
+| PR-04 | Bob Whitfield | Professional Analyst / Legal |
+| MK-05 | Christy Park | Marketing Designer |
+| CN-03 | Robyn Castellanos | NIGP Consultant / Strategist |
+| DR-06 | Brent Matthews | Web Agent (Railway + Playwright) |
+| IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
+
+**Michelle Manning (PP-01)** — to be added in S-BENCH-01. Until then, use only this stub where needed:
 ```js
-// FEATURE: SH-06 — Supabase tasks integration
+const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" }
+```
+Michelle's system prompt lives in Supabase `agent_configs` — NOT in code. Do not hardcode it.
+
+---
+
+## 7. Three Named Step Operations (Locked — do not change)
+
+```
+initializeStepsFromSupabase()    — direct set, no mergeSteps
+initializeStepsFromFirstPlan()   — mergeSteps([], new, [])
+updateStepsFromPlan()            — mergeSteps(active, new, archived)
 ```
 
-See the Feature ID Reference Map below for the full ID list.
+`mergeSteps()` is the single source of truth for step state.
+`saveStepsToSupabase()` writes full array including archived.
+`pendingArchive` preserved in all writes — stripped only on user approve.
+Answers persisted on `step.questions[n].a` — not ephemeral state.
+`stepsContext` for LLM strips `mergeStatus`, `pendingArchive`, `title_edited`.
 
-## Feature ID Reference Map
+---
 
-### Shell (SH)
-| ID | Location |
-|----|---------|
-| SH-01 | `src/tokens.js` |
-| SH-02 | `src/config.js` |
-| SH-03 | `src/hooks/useAgents.js` + `src/data/agents.js` |
-| SH-04 | `src/main.jsx` — all routes |
-| SH-05 | `src/AppShell.jsx` — header, nav tabs, AI dot, activity panel trigger, help modal |
+## 8. AI Call Standards
 
-### Dashboard (DB)
-| ID | Feature |
-|----|---------|
-| DB-01 | Task list |
-| DB-02 | Stats strip |
-| DB-03 | Show more drawer |
-| DB-04 | Recently completed |
-| DB-05 | Awaiting-input status |
-| DB-06 | Assign New Work button |
-| DB-07 | Chat topic pills |
-| DB-08 | Chat direct agent pills |
-| DB-09 | AI routing/switchboard |
-| DB-10 | Knowledge tier badge |
-| DB-11 | Provenance chips |
-| DB-12 | General knowledge disclaimer |
-| DB-13 | Save as Assignment |
-| DB-14 | Live RAG + AI call |
-| DB-15 | NIGP demo task pre-load |
+| Rule | Requirement |
+|------|-------------|
+| Model selection | Haiku for classification/routing/short answers. Sonnet only for complex reasoning, ReAct loops, long-form briefings. |
+| Structured output | Use Claude tool use / `response_format` for structured data. Never parse free-text JSON. |
+| Token budgeting | Every Claude call must have explicit `max_tokens`. |
+| Streaming | Only where UX benefit justifies server overhead (task planning, AI Review). Not for routing/classification. |
+| `✦ AI` badge | Every AI-touched UI element gets this badge. Deterministic logic (flags, HHI, column detection) does NOT. |
 
-### Assign Work (AW)
-| ID | Feature |
-|----|---------|
-| AW-01 | Task type tiles |
-| AW-02 | Free-form goal input |
-| AW-03 | Two-panel layout |
-| AW-04 | Planning agent clarifying questions |
-| AW-05 | Step plan generation |
-| AW-06 | Agent suggestion + brass glow |
-| AW-07 | Agent swap + dynamic replanning |
-| AW-08 | Change log collapsible |
-| AW-09 | Save draft awaiting-input |
-| AW-10 | Persistent save state indicator |
-| AW-11 | Approve Plan & Launch button |
-| AW-12 | Pre-populate from chat (from=chat param) |
-| AW-13 | Chat transcript shown in task |
+---
 
-### Task Instructions (TI)
-| ID | Feature |
-|----|---------|
-| TI-01 | Step timeline |
-| TI-02 | HITL step navigation |
-| TI-03 | Step history from Supabase |
-| TI-04 | Inline step editing |
-| TI-05 | Re-run All button |
-| TI-06 | Mark Complete button |
-| TI-07 | Chat transcript section |
-| TI-08 | View Brent CTA |
+## 9. Critical Code Patterns
 
-### Analyzer (AZ)
-| ID | Feature |
-|----|---------|
-| AZ-01 | CSV upload + PapaParse |
-| AZ-02 | Column mapping screen |
-| AZ-03 | Column mapping saved to Supabase |
-| AZ-04 | CSV upload to Supabase Storage |
-| AZ-05 | CSV load from Supabase Storage |
-| AZ-06 | Tab: Dashboard/Overview |
-| AZ-07 | Tab: Categories |
-| AZ-08 | Tab: Treemap |
-| AZ-09 | Tab: Vendors |
-| AZ-10 | Tab: Departments |
-| AZ-11 | Tab: Timeline |
-| AZ-12 | Tab: Concerns/Flags |
-| AZ-13 | Tab: Local Spend |
-| AZ-14 | Tab: Vendor Diversity/HHI |
-| AZ-15 | Tab: AI Review |
-| AZ-16 | Tab: Cleanup |
-| AZ-17 | Tab: Full Table |
-| AZ-18 | Austin demo pre-load |
+**String safety** — never raw `.startsWith()` / `.replace()` / `.trim()` on potentially undefined:
+```js
+// Wrong
+row.vendor.startsWith('A')
+// Right — use str() helper or typeof guard
+str(row.vendor).startsWith('A')
+```
 
-### Fetch (FT)
-| ID | Feature |
-|----|---------|
-| FT-01 | Fetch config |
-| FT-02 | SSE connection to Railway |
-| FT-03 | Agent running screen |
-| FT-04 | Post-fetch download + analyze button |
-| FT-05 | CSV save to Supabase Storage |
-| FT-06 | Pat selectable as fetch agent |
+**Navigation + sessionStorage** — always synchronous before navigate():
+```js
+sessionStorage.setItem('key', value);  // MUST be before navigate()
+navigate('/destination');
+```
 
-### Roster (RO)
-| ID | Feature |
-|----|---------|
-| RO-01 | All 7 agents |
-| RO-02 | Agent cards + workload |
-| RO-03 | Add a Player button |
+**useEffect + useRef** — if component re-mounts, useRef is NOT safe for run-once guards. Use context state instead.
 
-### Personnel (PE)
-| ID | Feature |
-|----|---------|
-| PE-01 | Profile tab |
-| PE-02 | Resume tab |
-| PE-03 | Training tab |
-| PE-04 | Playbook tab |
-| PE-05 | Workflow tab stub |
-| PE-06 | Projects tab stub |
+**Agent ID** — must resolve to full agent object before use in any UI.
 
-### Teach (TC)
-| ID | Feature |
-|----|---------|
-| TC-01 | Upload + ingest + RAG |
+---
 
-### Test Team (TT)
-| ID | Feature |
-|----|---------|
-| TT-01 | Multi-agent query runner |
-| TT-02 | Prompt comparison/diff |
+## 10. Before Every Commit — Checklist
 
-### AI Layer (AI)
-| ID | Location |
-|----|---------|
-| AI-01 | `SharedUI.jsx` — AiBadge component |
-| AI-02 | `AppShell.jsx` + `useAIStatus.js` — universal AI status dot |
-| AI-03 | `AIActivityPanel.jsx` — activity panel |
-| AI-04 | `DashboardScreen` — intelligent agent routing |
-| AI-05 | `AssignWorkScreen` — planning agent structured output |
-| AI-06 | `DashboardScreen` — semantic similarity score |
-| AI-07 | `web-memory.js` — synthesis logging |
-| AI-08 | `backend/src/agent.js` — Brent ReAct agent |
-| AI-09 | `api/ingest.js` + `api/rag-query.js` — RAG pipeline |
+- [ ] Version header updated (`// DeepBench v5.1.X`) on every file touched
+- [ ] `FEATURE: [ID]` comment present in every file touched
+- [ ] Node.js test — **ALL TESTS PASS**
+- [ ] `npm run build` — zero errors
+- [ ] FeatureBadge added for this session's feature ID
+- [ ] Zero red errors in browser console after Vercel deploy
+- [ ] `?debug=features` on dev URL — confirm feature badge visible
 
-## Key Architectural Decisions
+---
 
-- **No hardcoded selectors** — agents learn through training, not brittle CSS/XPath selectors
-- **Deterministic + AI split** — deterministic code handles known fields; AI handles unknown elements
-- **Client-side CSV processing** — PapaParse runs in browser; no client data stored or transmitted (HIPAA/compliance advantage)
-- **Single-shot LLM calls** — most use cases use one call; agentic multi-step only when step N+1 depends on step N output
-- **No two-model arbitration** — avoid using two LLMs to check each other; use deterministic grounding checks instead
-- **RAG before LLM** — always retrieve relevant knowledge chunks before calling the model; inject as Layer 02
+## 11. Supabase Schema Reference
 
-## Agent Roster
+**`tasks` table key columns:** `id`, `tenant_id`, `title`, `agent_id`, `type`, `status`, `priority`, `due`, `steps` (JSONB), `mapping` (JSONB), `ai_result` (JSONB), `csv_path`, `has_hitl`
 
-| Agent | Code | Architecture | Notes |
-|-------|------|-------------|-------|
-| Brent Matthews | DR-06 | RAG + Web Agent | Self-learning, government portal specialist |
-| Pat Smiley | IR-07 | No Training | Intern, no memory, demo only |
-| Chloe Okafor | JR-01 | LLM Prompt | Junior analyst, fast/obvious tasks |
-| Mike Alvarez | SR-02 | LLM Deep Prompt | Senior, industry best-practice |
-| Bob Whitfield | PR-04 | RAG | Legal & compliance, trainable |
-| Christy Park | MK-05 | LLM Format | Marketing/formatting |
-| Robyn Castellanos | CN-03 | RAG + Deep Prompt | NIGP consultant, highest skill |
+**Storage bucket:** `task-data` — path pattern: `{tenant_id}/{task_id}/{filename}.csv`
 
-## Supabase Schema
+**Existing tables:** `knowledge_entries`, `agent_configs`, `agent_run_log` — all have `tenant_id` column.
 
-**Tables:**
-- `tasks` — work assignments with status, agent, tenant
-- `steps` — JSONB step arrays per task
-- `agent_configs` — per-agent prompt layer configuration
-- `knowledge_entries` — RAG training documents (with embeddings)
-- `agent_run_log` — AI call audit trail
+For any Supabase operation: verify column names against actual schema before writing. Never insert columns that don't exist.
 
-**Storage:**
-- Bucket: `task-data/{tenant}/{taskId}/file.csv`
+---
 
-## Railway Backend
+## 12. Current Session State
 
-**Service:** `deepbench-backend`
-- Brent ReAct web agent (Playwright + Claude Sonnet)
-- SSE streaming for live agent events
-- `stateRegistry` for run state management
-- Env var: `VITE_FETCH_API_URL` → Railway URL
+> **This section should be updated at the end of each session.**
+> For the definitive session queue, see Google Drive Session Queue doc.
+> Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-## Build & Deploy Rules
+**Current version in dev:** v5.1.14p4d (commit e3b7f9d)
+**Next session:** S15a — Dashboard UX Review
+**Do NOT merge dev → main** — John has not confirmed.
 
-1. Always run `npm run build` before committing — **zero build errors required**
-2. Never commit `.env` files or API keys
-3. Vercel auto-deploys `main` branch; `dev` branch has preview deployments
-4. All feature work on `feature/[ID]-[name]` branches; PR to `dev` first
+**Open blocking question:**
+- Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
+
+---
+
+*Full standards and testing detail: `/docs/STANDARDS.md`*
+*Full feature inventory: `/docs/FEATURES.md`*
+*Full architecture: `/docs/ARCHITECTURE.md`*
