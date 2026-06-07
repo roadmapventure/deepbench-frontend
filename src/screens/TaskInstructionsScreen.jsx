@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p3 | TaskInstructionsScreen.jsx | DB-17p3 preserve unanswered HITL
+// DeepBench v5.1.14p4 | TaskInstructionsScreen.jsx | DB-17p4 persist answers
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -242,25 +242,6 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
   );
 }
 
-// FIX: DB-17p3 — preserve unanswered HITL steps on Update Plan
-// A HITL step is unanswered if every question has no answer in the `answers` state object.
-function getUnansweredHitlSteps(activeSteps, answers) {
-  return activeSteps.filter(step => {
-    if (step.type !== "hitl") return false;
-    if (!step.questions || step.questions.length === 0) return false;
-    return step.questions.every(q =>
-      !answers[q.id] || answers[q.id].trim() === ""
-    );
-  });
-}
-
-// Deduplicate unanswered steps from newSteps then prepend them so mergeSteps preserves them.
-function buildStepsToMerge(unanswered, newSteps) {
-  const deduped = newSteps.filter(s =>
-    !unanswered.some(u => u.id === s.id)
-  );
-  return [...unanswered, ...deduped];
-}
 
 const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
 
@@ -276,17 +257,20 @@ export default function TaskInstructionsScreen() {
   const [mergedSteps,  setMergedSteps]  = useState({ active: [], archived: [] });
   const [loading,      setLoading]      = useState(true);
   const [taskError,    setTaskError]    = useState(null);
-  const [answers,      setAnswers]      = useState({});
   const [updatingPlan, setUpdatingPlan] = useState(false);
   // FEATURE: DB-17 — Editable task title
   const [editableTitle, setEditableTitle] = useState("");
-  const savedTitleRef = useRef("");
+  const savedTitleRef  = useRef("");
+  const saveTimerRef   = useRef(null);
 
   // FIX: DB-17p2 — Three named step operations, each with single responsibility.
   // A. Initial load: set Supabase steps directly, NEVER calls mergeSteps().
   const initializeStepsFromSupabase = (fetchedSteps) => {
     const steps = Array.isArray(fetchedSteps) ? fetchedSteps : [];
-    setMergedSteps({ active: steps, archived: [] });
+    // FIX: DB-17p4 — separate active from archived using persisted mergeStatus
+    const active   = steps.filter(s => s.mergeStatus !== "archived");
+    const archived = steps.filter(s => s.mergeStatus === "archived");
+    setMergedSteps({ active, archived });
   };
   // B. First plan generation: merge from empty baseline (no prior active steps).
   const initializeStepsFromFirstPlan = (newSteps) => {
@@ -334,7 +318,11 @@ export default function TaskInstructionsScreen() {
       const pendingQuestions = normalizedTask.plan_history?.questions?.filter(
         q => !q.a || q.a.trim() === ""
       ) || [];
-      if (pendingQuestions.length > 0) {
+      // FIX: DB-17p4 — skip if clarify step already saved in DB steps (answers may be persisted)
+      const alreadyHasClarifyStep = normalizedTask.steps.some(
+        s => s.type === "hitl" && s.questions?.length > 0
+      );
+      if (!alreadyHasClarifyStep && pendingQuestions.length > 0) {
         const clarifyStep = {
           id: 0,
           icon: "❓",
@@ -401,7 +389,10 @@ export default function TaskInstructionsScreen() {
   const saveStepsToSupabase = async (steps, extraUpdates = {}) => {
     if (!taskId || taskId === "1") return;
     try {
-      const stepsForDb = steps.map(({ mergeStatus, ...s }) => s);
+      // FIX: DB-17p4 — preserve mergeStatus:"archived" so initializeStepsFromSupabase can restore archived drawer
+      const stepsForDb = steps.map(({ mergeStatus, ...s }) =>
+        mergeStatus === "archived" ? { ...s, mergeStatus } : s
+      );
       const { error } = await supabase
         .from("tasks")
         .update({ steps: stepsForDb, updated_at: new Date().toISOString(), ...extraUpdates })
@@ -411,6 +402,49 @@ export default function TaskInstructionsScreen() {
     } catch (err) {
       console.error("saveStepsToSupabase exception:", err);
     }
+  };
+
+  // FIX: DB-17p4 — debounced write for answer persistence (500ms)
+  const debouncedSave = (activeSteps, archivedSteps) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveStepsToSupabase([...activeSteps, ...archivedSteps]);
+    }, 500);
+  };
+
+  // FIX: DB-17p4 — derive answers object from step objects (no separate useState)
+  // Keeps StepList.jsx prop interface compatible without modifying that file.
+  const answers = {};
+  for (const step of mergedSteps.active) {
+    for (const q of (step.questions || [])) {
+      if (q.id !== undefined) answers[q.id] = q.a || "";
+    }
+  }
+
+  // FIX: DB-17p4 — write answer directly onto step.questions[n].a + debounced DB save
+  const handleAnswerChange = (questionId, value) => {
+    setMergedSteps(prev => {
+      const updatedActive = prev.active.map(step => {
+        if (!(step.questions || []).some(q => String(q.id) === String(questionId))) return step;
+        return {
+          ...step,
+          questions: step.questions.map(q =>
+            String(q.id) === String(questionId) ? { ...q, a: value } : q
+          ),
+        };
+      });
+      debouncedSave(updatedActive, prev.archived);
+      return { ...prev, active: updatedActive };
+    });
+  };
+
+  // FIX: DB-17p4 — setAnswers proxy: StepList calls setAnswers(prev => ({...prev, [q.id]: val}))
+  // Intercept functional updater, find changed key, write to step object via handleAnswerChange.
+  const setAnswers = (updaterFn) => {
+    const newAnswers = typeof updaterFn === "function" ? updaterFn(answers) : updaterFn;
+    const changedId = Object.keys(newAnswers).find(k => newAnswers[k] !== (answers[k] || ""));
+    if (changedId === undefined) return;
+    handleAnswerChange(changedId, newAnswers[changedId]);
   };
 
   // FEATURE: DB-17 — Michelle title generation helper
@@ -451,7 +485,7 @@ export default function TaskInstructionsScreen() {
       s.id === stepId ? { ...s, label: newLabel, title_edited: true } : s
     );
     setMergedSteps(prev => ({ ...prev, active: updatedActive }));
-    await saveStepsToSupabase(updatedActive);
+    await saveStepsToSupabase([...updatedActive, ...mergedSteps.archived]);
   };
 
   // FEATURE: AW-16 — Update Plan button regenerates steps
@@ -460,9 +494,10 @@ export default function TaskInstructionsScreen() {
     setUpdatingPlan(true);
 
     try {
+      // FIX: DB-17p4 — answers now live on q.a, no separate state needed
       const answeredQuestions = pendingQuestions.map(q => ({
         ...q,
-        a: answers[q.id] || q.a || ""
+        a: q.a || ""
       }));
 
       const goalContext = task.preview || task.title;
@@ -533,10 +568,20 @@ where needed. Use the plan_task tool to return a structured plan.`;
 
       const newSteps = toolBlock.input.steps;
 
-      // FIX: DB-17p3 — preserve unanswered HITL steps on Update Plan
-      // Inject unanswered HITL steps at the front so mergeSteps marks them "unchanged".
-      const unanswered = getUnansweredHitlSteps(mergedSteps.active, answers);
-      const stepsToMerge = buildStepsToMerge(unanswered, newSteps);
+      // FIX: DB-17p4 — unanswered HITL steps preserved via persisted q.a
+      // A step is unanswered if ALL questions have empty .a field.
+      // Dedup by label — matches how mergeSteps works (LLM IDs are not stable).
+      const unansweredHitlSteps = mergedSteps.active.filter(step => {
+        if (step.type !== "hitl") return false;
+        if (!step.questions?.length) return false;
+        return step.questions.every(q => !q.a || q.a.trim() === "");
+      });
+      const dedupedNewSteps = newSteps.filter(s =>
+        !unansweredHitlSteps.some(u =>
+          u.label.toLowerCase().trim() === s.label?.toLowerCase().trim()
+        )
+      );
+      const stepsToMerge = [...unansweredHitlSteps, ...dedupedNewSteps];
 
       // FIX: DB-17p2 — Operation C: compute merge FIRST, then save merged (with pendingArchive),
       // then set state. Never write raw newSteps — always write the merged result.
@@ -560,14 +605,17 @@ where needed. Use the plan_task tool to return a structured plan.`;
           // title errors are non-fatal
         }
       }
-      // FIX: DB-17p2 — save merged steps (with pendingArchive preserved) + plan_history in one write
-      await saveStepsToSupabase(mergedToSet.active, {
-        plan_history: {
-          questions: answeredQuestions,
-          planSummary: toolBlock.input.planSummary || "",
-        },
-        status: task.status === "awaiting-input" ? "pending" : task.status,
-      });
+      // FIX: DB-17p4 — save both active and archived so archived steps persist across refreshes
+      await saveStepsToSupabase(
+        [...mergedToSet.active, ...mergedToSet.archived],
+        {
+          plan_history: {
+            questions: answeredQuestions,
+            planSummary: toolBlock.input.planSummary || "",
+          },
+          status: task.status === "awaiting-input" ? "pending" : task.status,
+        }
+      );
       setMergedSteps(mergedToSet);
 
       setTask(prev => ({
@@ -578,8 +626,6 @@ where needed. Use the plan_task tool to return a structured plan.`;
         },
         status: prev.status === "awaiting-input" ? "pending" : prev.status,
       }));
-
-      setAnswers({});
 
     } catch(err) {
       console.error("Update plan failed:", err);
@@ -607,7 +653,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
     );
     const updatedArchived = [...mergedSteps.archived, { ...oldStep, mergeStatus: "archived" }];
     setMergedSteps({ active: updatedActive, archived: updatedArchived });
-    await saveStepsToSupabase(updatedActive);
+    // FIX: DB-17p4 — save both so archived steps survive refresh
+    await saveStepsToSupabase([...updatedActive, ...updatedArchived]);
   };
 
   // FIX: DB-17p2 — handleKeepStep persists reinstated step to Supabase
@@ -620,7 +667,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
     );
     updatedActive.splice(idx + 1, 0, { ...oldStep, mergeStatus: "unchanged" });
     setMergedSteps({ ...mergedSteps, active: updatedActive });
-    await saveStepsToSupabase(updatedActive);
+    // FIX: DB-17p4 — save both so archived steps survive refresh
+    await saveStepsToSupabase([...updatedActive, ...mergedSteps.archived]);
   };
 
   return (
