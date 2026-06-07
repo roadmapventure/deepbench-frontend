@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p | AssignWorkScreen.jsx | DB-17 title fixes
+// DeepBench v5.1.16 | AssignWorkScreen.jsx | S15b-A — Assign Work label + nav + icon updates
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -395,11 +395,13 @@ export default function AssignWorkScreen() {
   const selectedAgentObj = selectedAgent?.id ? selectedAgent : agents.find(a=>a.id===selectedAgent);
 
   return (
-    <AppShell toast={toast} headerProps={{ backLabel:"Dashboard", onBack:()=>navigate("/") }}>
+    // FEATURE: AW-UX-01 — Dashboard back button + AI panel button removed from Assign Work header
+    <AppShell toast={toast} headerProps={{ showAIPanel: false }}>
       <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"20px 28px 60px"}}>
 
         {/* Header */}
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4,position:"relative"}}>
+          <FeatureBadge id="AW-UX-01" />
           <div>
             <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:3}}>Work Dashboard · Assign New Work</div>
             <div style={{fontFamily:display,fontSize:28,fontWeight:500,color:T.navy,letterSpacing:"-.5px"}}>What do you need done?</div>
@@ -513,6 +515,7 @@ export default function AssignWorkScreen() {
                 style={{width:"100%",minHeight:90,padding:"10px 12px",fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:"vertical",outline:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
             </div>
 
+            {/* FEATURE: AW-UX-03 — AI icon on Generate Plan / Re-generate Plan button */}
             <div style={{position:"relative",marginBottom:14}}>
               <FeatureBadge id="AW-04" />
               <button onClick={generatePlan} disabled={!canGenerate||generating}
@@ -532,6 +535,7 @@ export default function AssignWorkScreen() {
             )}
 
             {/* FEATURE: AW-04 — Planning agent clarifying questions */}
+            {/* FEATURE: AW-UX-04 — AI icon on Clarifying Questions label */}
             {/* Clarifying questions */}
             {questions.length>0 && (
               <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 16px",position:"relative"}}>
@@ -558,9 +562,10 @@ export default function AssignWorkScreen() {
             )}
           </div>
 
-          {/* RIGHT: Living plan */}
+          {/* RIGHT: Instructions */}
           <div>
-            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 3 — Living Plan</div>
+            {/* FEATURE: AW-UX-02 — Step 3 renamed to INSTRUCTIONS + AI badge */}
+            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 3 — INSTRUCTIONS <AiBadge/></div>
 
             {/* FEATURE: AG-04a — Michelle avatar placeholder */}
             {(generating || planGenerated) && (
@@ -644,7 +649,8 @@ export default function AssignWorkScreen() {
                   </div>
                 )}
 
-                {/* FEATURE: AW-11 — Approve Plan & Launch button */}
+                {/* FEATURE: AW-11 — Approve Steps & Launch button */}
+                {/* FEATURE: AW-UX-05 — CTA renamed from "Approve Plan & Launch" to "Approve Steps & Launch" */}
                 {/* FEATURE: AW-09 — Save draft awaiting-input */}
                 {/* FEATURE: SH-06 — Supabase tasks integration */}
                 {/* Approve + Save Draft */}
@@ -652,7 +658,7 @@ export default function AssignWorkScreen() {
                   <FeatureBadge id="SH-06" />
                   <button onClick={handleApprove}
                     style={{flex:1,padding:"12px",background:`linear-gradient(135deg,${T.navy},${T.navyMid})`,border:"none",color:T.brassLight,fontFamily:display,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                    Approve Plan & Launch ▸
+                    Approve Steps & Launch ▸
                   </button>
                   {!allAnswered && (
                     <button onClick={handleSaveDraft} style={{padding:"12px 16px",background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,cursor:"pointer"}}>Save Draft</button>

@@ -73,7 +73,7 @@ function NavTab({ isActive, onClick, icon, label, hasBorderLeft }) {
 
 // ── App Header ────────────────────────────────────────────────────────────────
 // FEATURE: SH-05 — App header (logo, Work Dashboard / Bench Dashboard nav tabs, AI status dot, AI panel trigger, help button)
-export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{} }) {
+export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{}, showAIPanel = true }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, cleanup } = useAIStatus();
@@ -135,9 +135,11 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       )}
 
       {/* AI Activity Panel trigger */}
-      <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
-        <AIDiamond size="7px" color={T.brassLight}/> AI
-      </button>
+      {showAIPanel && (
+        <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
+          <AIDiamond size="7px" color={T.brassLight}/> AI
+        </button>
+      )}
 
       {/* Help button */}
       {showHelp && (
