@@ -44,15 +44,6 @@ Branch strategy: commit directly to `dev`. **Never merge `dev → main` without 
 6. **`npm run build` must pass before any commit.**
 7. **If compacting starts — STOP.** Exit session, start fresh.
 8. **Never merge `dev → main`** without John's explicit sign-off.
-9. **Never compress silently.** If context compression is approaching, STOP immediately and alert John with this exact message:
-
-   > "⚠️ WARNING: Session is approaching compression.
-   > Recommend stopping here to preserve context integrity.
-   > Current progress: [summarize what was completed this session].
-   > Remaining tasks: [list what is not yet done].
-   > Start a new session to continue."
-
-   Do NOT proceed with compression. Do NOT compress automatically. Wait for John's response. John will either confirm stop or explicitly say "continue" to override.
 
 Signs a session is too big: kickoff doc has >4 tasks, >3 files being modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
 
@@ -62,47 +53,19 @@ Signs a session is too big: kickoff doc has >4 tasks, >3 files being modified, s
 
 Every session increments the minor version. Current base: **v5.1.x**
 
-### Version Header — line 1 of every .jsx and .js file touched:
+Version header format — **line 1 of every .jsx and .js file touched:**
 ```js
 // DeepBench v5.1.X | filename.jsx | brief description
 ```
 
-### Feature ID comment:
+Feature ID comment format:
 ```jsx
 {/* FEATURE: XX-00 — Description */}   // JSX
 // FEATURE: XX-00 — Description         // JS
 ```
 
-### Session Naming Format:
-```
-v5.1.X — S[number]-[FEATURE-ID]-[short-name]
-Example: v5.1.15 — S15a-DB-dashboard-ux
-```
-
-### Commit Message Format:
-```
-v5.1.X | [FEATURE-ID] | brief description of what changed
-Example: v5.1.15 | DB-UX | dashboard layout and card spacing updates
-```
-
-### Patch Session Naming Format:
-```
-v5.1.Xp — S[number]p-[FEATURE-ID]-[short-name]
-Example: v5.1.15p — S15p-DB-dashboard-ux-patch
-```
-
-### Patch Commit Message Format:
-```
-v5.1.Xp | [FEATURE-ID] | brief description of patch
-Example: v5.1.15p | DB-UX | fix card click handler after QA
-```
-
-### Rules:
-- Version number leads every session name, commit message, and file header
-- Patch increments add `p` suffix — never skip straight to next integer on a patch
-- Sub-sessions (a/b) increment normally: S15a = v5.1.15, S15b = v5.1.16
-- Docs-only commits use format: `docs: v5.1.X | brief description`
-- Never reuse a version number across sessions
+Session name format: `S[number]-[FEATURE-ID]-[short-name]`
+Example: `S08-DB16-completed-tasks`
 
 ---
 
@@ -222,73 +185,19 @@ For any Supabase operation: verify column names against actual schema before wri
 ## 12. Current Session State
 
 > **This section should be updated at the end of each session.**
-> For current session state, see docs/SESSIONS.md.
+> For the definitive session queue, see Google Drive Session Queue doc.
+> Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-**Current version in dev:** v5.1.17 (commit 678586c)
-**Next session:** S15a — Dashboard UX Review
+**Current version in dev:** v5.1.17 (commit 8b40037)
+**Next session:** S16 — AI Audit implementation
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**
 - Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
-
----
-
-## 14. NIGP Source Repo — Read-Only Reference
-
-Local path: `C:\Projects\nigp-analyzer`
-GitHub: `roadmapventure/nigp-analyzer`
-Rule: **READ ONLY — never modify, never commit to this repo.**
-Only commit to deepbench-frontend on dev branch.
-
-When porting a feature from NIGP to DeepBench:
-1. Read the specified NIGP source file(s) directly
-2. Understand the logic, data shapes, and edge cases as-built
-3. Adapt to DeepBench patterns before integrating:
-   - Replace NIGP tokens/colors with DeepBench Treasury palette (`src/tokens.js`)
-   - Replace NIGP component structure with DeepBench conventions
-   - Replace NIGP naming conventions with DeepBench naming conventions
-   - Add version header and FEATURE comment to every file touched
-   - Add ✦ AI badge if the ported feature has any AI-touched elements
-4. Never rewrite from scratch — always extract from working NIGP code
-5. Node.js test must cover the ported logic before committing
-6. If NIGP code references a library not in DeepBench `package.json`, flag it before proceeding — do not install without John's confirmation
-
----
-
-## 15. Claude.ai Quick Fetch URLs
-
-When starting a Claude.ai planning session, fetch these URLs to orient without needing Google Drive:
-
-**CLAUDE.md (this file):**
-`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/CLAUDE.md`
-
-**Feature backlog:**
-`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/FEATURES.md`
-
-**Session state + log:**
-`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/SESSIONS.md`
-
-**Standards + testing:**
-`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/STANDARDS.md`
-
-**Architecture:**
-`https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/ARCHITECTURE.md`
+- Q-S16: Architect Checklist tab in AI Audit — in scope for S16 or deferred?
 
 ---
 
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
-
----
-
-## 13. After Every Commit
-
-After every successful commit and push, always do the following without being told:
-
-1. Update the Current Session State in Section 12 of this file — increment the version number to reflect the commit.
-2. Commit and push that change to dev with message: `docs: update version state after [session name]`
-
-Do NOT mark a feature as ✅ Done in docs/FEATURES.md until John explicitly confirms QA passed and the session is closed. Features stay at their current status until John says: "Close [FEATURE-ID] — mark complete"
-
-When John says that, update docs/FEATURES.md — change the feature status to ✅ Done and session column to the closed session name, then commit and push with message: `docs: mark [FEATURE-ID] complete`

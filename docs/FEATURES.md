@@ -40,7 +40,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | DB-03 | Show more drawer | ✅ Done | DONE |
 | DB-04 | Recently completed section | 🔶 Partial (mock only) | — |
 | DB-05 | "Awaiting your input" draft state | ✅ Done | DONE |
-| DB-06 | Assign New Work button | ✅ Done | DONE |
+| DB-06 | Assign New Work button → "Create a new Task" | ✅ Done | S15a |
 | DB-07 | Chat panel — topic pills | ✅ Done | DONE |
 | DB-08 | Chat panel — direct agent pills | ✅ Done | DONE |
 | DB-09 | Chat panel — AI routing / switchboard | ✅ Done | DONE |
@@ -53,6 +53,9 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | DB-16 | Completed task cards clickable → Task Instructions | ✅ Done | S08 |
 | DB-17 | Task title editable inline + Michelle suggested | ✅ Done | S14 |
 | DB-18 | Auto-select best agent via AI | ❌ Missing | S13 (deferred) |
+| DB-19 | Module naming — Work/Bench dashboards | ✅ Done | S15a |
+| DB-20 | Nav tab styling — brass borders, active states | ✅ Done | S15a |
+| DB-21 | AIDiamond.jsx — animated heartbeat AI indicator | ✅ Done | S15a |
 
 **DB-17 Notes:** Michelle generates concise title + step names on first draft. `title_edited` flag — user owns title after first edit, never overwritten. `api/title.js`: direct Claude Haiku call; Supabase agent_configs wired in S-BENCH-01.
 
@@ -78,6 +81,12 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AW-15 | Pre-populated goal appends not replaces | 🔶 Partial | post-core |
 | AW-16 | Update Plan wires answers + regenerates | ✅ Done | S09 |
 | AW-17 | Michelle assigns steps to multiple agents | ❌ Missing | S12 (deferred) |
+| AW-18 | Assign Work terminology standardized (Tasks/Instructions) | ✅ Done | S15b-A |
+| AW-19 | Top nav cleanup + AI icon additions | ✅ Done | S15b-A |
+| AW-20 | CTA renamed to "Approve Steps & Launch" | ✅ Done | S15b-A |
+| AW-21 | Michelle Manning humanized as planning agent PP-01 | ✅ Done | S15b-B |
+| AW-22 | Per-step agent attribution on step cards | ✅ Done | S15b-B |
+| AW-23 | Read-only hover agent info card | ✅ Done | S15b-B |
 
 ---
 
@@ -103,6 +112,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | TI-16 | Step output storage to Supabase JSONB | ❌ Missing | S11 (deferred, Q5 needed) |
 | TI-17 | Pat execution via Railway | ❌ Missing | S11b (deferred) |
 | TI-18 | HITL step gate — pauses execution | ❌ Missing | S-future |
+| TI-19 | Header renamed to "Steps" | ✅ Done | S15c |
+| TI-20 | Nav buttons removed from Task Instructions | ✅ Done | S15c |
+| TI-21 | CTA renamed "Update Steps →" | ✅ Done | S15c |
+| TI-22 | Update Steps button repositioned below HITL comment textarea | ✅ Done | S15c |
 
 ---
 
@@ -200,6 +213,9 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AI-10 | AI Activity Panel — header entry point, grouped by AI type | 🔶 Partial | S-AI-01 Part A |
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
+| AI-13 | AI Audit drawer — right-side overlay, persistent header button | 🔶 Partial (design done) | S16 |
+| AI-14 | AI Audit — lifetime metrics: 3 sections (Activity Type, LLM grouping, placeholder) | 🔶 Partial (design done) | S16 |
+| AI-15 | Architect Checklist tab in AI Audit | ❌ Missing | Q-S16 DECISION NEEDED |
 
 **AI-10 Notes:** Accessible via "+ AI" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered (expandable). Builds with mock data in S-AI-01; live data wires after S11/AI-11.
 
@@ -258,10 +274,14 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 ### Work Side
 | Session | Feature | Status |
 |---------|---------|--------|
-| S15a | UX Review — Dashboard | ← NEXT |
-| S15b | UX Review — Assign Work | Queued |
-| S15c | UX Review — Task Instructions | Queued |
-| S-AI-01 Part A | AI Activity Panel (AI-10) | After S15c |
+| S15a | UX Review — Dashboard | ✅ DONE |
+| S15b-A | UX Review — Assign Work Part A | ✅ DONE |
+| S15b-B | UX Review — Assign Work Part B | ✅ DONE |
+| S15c | UX Review — Task Instructions | ✅ DONE |
+
+
+| S16 | AI Audit implementation (AI-13, AI-14, AI-15?) | ← NEXT |
+| S-AI-01 Part A | AI Activity Panel (AI-10) | After S16 |
 | S-AI-01 Part B | AI Audit Screen (AI-12) | After Part A |
 
 ### Bench Side (begins after S-AI-01)
