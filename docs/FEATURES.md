@@ -222,6 +222,17 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AG-05 | api/plan.js reads Michelle prompt from Supabase | ❌ Missing | S-BENCH-01 LOCKED |
 | AG-06 | Michelle surgical replanning directive | ❌ Missing | S-BENCH-01 LOCKED |
 
+**S-BENCH-01 Michelle Manning — Full Spec:**
+- Code: `PP-01` | Role: Project Planner | `isPlanner: true`
+- Roster position: between Mike Alvarez (SR-02) and Pat Smiley (IR-07)
+- Quip: *"I map the mission before anyone moves."*
+- Avatar: real photo (not silhouette) — replaces `MichelleAvatar.jsx` placeholder
+- System prompt: lives in Supabase `agent_configs` — NOT in code [LOCKED]
+- `api/plan.js` and `api/title.js` read her prompt from Supabase [LOCKED]
+- Fully trainable via Teach + RAG pipeline [LOCKED]
+- Stub in use until S-BENCH-01: `const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" }`
+- **Do not add Michelle to `agents.js` or remove the stub before S-BENCH-01**
+
 ---
 
 ## DELIVERABLES — DL (deferred — after Bench work)
