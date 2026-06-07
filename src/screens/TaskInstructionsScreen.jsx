@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p4a | TaskInstructionsScreen.jsx | DB-17p4 persist answers
+// DeepBench v5.1.14p4b | TaskInstructionsScreen.jsx | DB-17p4b sync answers snapshot before Update Plan merge
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -568,10 +568,22 @@ where needed. Use the plan_task tool to return a structured plan.`;
 
       const newSteps = toolBlock.input.steps;
 
-      // FIX: DB-17p4 — unanswered HITL steps preserved via persisted q.a
+      // FIX: DB-17p4b — sync answers snapshot before Update Plan merge
+      // FIX: DB-17p4b — use answers snapshot not mergedSteps.active
+      // to avoid stale state when Update Plan fires within 500ms of last keystroke
+      const activeWithCurrentAnswers = mergedSteps.active.map(step => {
+        if (step.type !== "hitl" || !step.questions?.length) return step;
+        return {
+          ...step,
+          questions: step.questions.map(q => ({
+            ...q,
+            a: answers[q.id] !== undefined ? answers[q.id] : (q.a || "")
+          }))
+        };
+      });
       // A step is unanswered if ALL questions have empty .a field.
       // Dedup by label — matches how mergeSteps works (LLM IDs are not stable).
-      const unansweredHitlSteps = mergedSteps.active.filter(step => {
+      const unansweredHitlSteps = activeWithCurrentAnswers.filter(step => {
         if (step.type !== "hitl") return false;
         if (!step.questions?.length) return false;
         return step.questions.every(q => !q.a || q.a.trim() === "");
@@ -586,7 +598,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
       // FIX: DB-17p2 — Operation C: compute merge FIRST, then save merged (with pendingArchive),
       // then set state. Never write raw newSteps — always write the merged result.
       // FEATURE: DB-17 — Apply Michelle's titles to new steps only (Task 4)
-      let mergedToSet = mergeSteps(mergedSteps.active, stepsToMerge, mergedSteps.archived);
+      let mergedToSet = mergeSteps(activeWithCurrentAnswers, stepsToMerge, mergedSteps.archived);
       const newlyAddedSteps = mergedToSet.active.filter(s => s.mergeStatus === "new");
       if (newlyAddedSteps.length > 0) {
         try {
