@@ -1,4 +1,4 @@
-// DeepBench v5.1.14p4c | TaskInstructionsScreen.jsx | DB-17p4c fix task.steps + retry planning agent
+// DeepBench v5.1.14p4d | TaskInstructionsScreen.jsx | DB-17p4d clean stepsContext before LLM call
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -505,8 +505,15 @@ export default function TaskInstructionsScreen() {
         .map(q => `Q: ${q.q}\nA: ${q.a || "(not answered)"}`)
         .join("\n\n");
 
-      const stepsContext = task.steps?.length > 0
-        ? `\n\nCurrent task steps (keep relevant ones, replace or remove outdated ones based on the answers above):\n${task.steps.map((s,i) => `${i+1}. [${s.type?.toUpperCase()}] ${s.label}: ${s.text}`).join('\n')}`
+      // FIX: DB-17p4d — clean steps for LLM context (strip mergeStatus/pendingArchive)
+      const cleanStepsForContext = (mergedSteps.active || [])
+        .filter(s => s.mergeStatus !== "archived")
+        .map(({ mergeStatus, pendingArchive, title_edited, ...rest }) => rest);
+
+      const stepsContext = cleanStepsForContext.length > 0
+        ? `\n\nCurrent task steps (keep relevant ones, replace or remove outdated ones based on the answers above):\n${cleanStepsForContext.map((s,i) =>
+            `${i+1}. [${s.type?.toUpperCase()}] ${s.label}: ${s.text}`
+          ).join('\n')}`
         : '';
 
       const userMsg = `Task goal: ${goalContext}\n\nClarifying answers:\n${qaContext}${stepsContext}\n\nGenerate an updated step-by-step plan based on these answers.`;
