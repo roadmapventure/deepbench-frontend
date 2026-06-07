@@ -205,6 +205,28 @@ For any Supabase operation: verify column names against actual schema before wri
 
 ---
 
+## 14. NIGP Source Repo — Read-Only Reference
+
+Local path: `C:\Projects\nigp-analyzer`
+GitHub: `roadmapventure/nigp-analyzer`
+Rule: **READ ONLY — never modify, never commit to this repo.**
+Only commit to deepbench-frontend on dev branch.
+
+When porting a feature from NIGP to DeepBench:
+1. Read the specified NIGP source file(s) directly
+2. Understand the logic, data shapes, and edge cases as-built
+3. Adapt to DeepBench patterns before integrating:
+   - Replace NIGP tokens/colors with DeepBench Treasury palette (`src/tokens.js`)
+   - Replace NIGP component structure with DeepBench conventions
+   - Replace NIGP naming conventions with DeepBench naming conventions
+   - Add version header and FEATURE comment to every file touched
+   - Add ✦ AI badge if the ported feature has any AI-touched elements
+4. Never rewrite from scratch — always extract from working NIGP code
+5. Node.js test must cover the ported logic before committing
+6. If NIGP code references a library not in DeepBench `package.json`, flag it before proceeding — do not install without John's confirmation
+
+---
+
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
