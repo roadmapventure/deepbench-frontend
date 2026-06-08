@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | agents.js | Authoritative agent roster + scenario data
+// DeepBench v5.1.20 | agents.js | Add AVATAR_CFG for illustrated SVG portraits
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -74,6 +74,17 @@ export const AGENTS = [
     color: T.muted, isWebAgent: true, isIntern: true, noMemory: true,
   },
 ];
+
+// FEATURE: RO-04 — Avatar config for illustrated SVG portraits
+export const AVATAR_CFG = {
+  chloe:  { skin:"#e8c9a8", hair:"#6b3a1e", collar:"#f0e6d2", extra:"freckles", border:T.brass  },
+  mike:   { skin:"#d4a378", hair:"#3a3a3a", collar:"#24364f", extra:"glasses",  border:T.brass  },
+  bob:    { skin:"#e5c19a", hair:"#5a4a3a", collar:"#2a3a52", extra:"tie",      border:T.moss   },
+  christy:{ skin:"#dba77d", hair:"#2a1a1a", collar:T.brass,   extra:"bob",      border:T.brass  },
+  robyn:  { skin:"#c48b62", hair:"#8a3418", collar:"#5a2f3d", extra:"bun",      border:T.brass  },
+  brent:  { skin:"#d4a870", hair:"#2c3e2d", collar:"#1a2e1a", extra:"field",    border:T.moss   },
+  pat:    { skin:"#e8c9a0", hair:"#8b4513", collar:"#c0c0c0", extra:"bob",      border:T.muted  },
+};
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
 export const AGENT_PRONOUNS = {

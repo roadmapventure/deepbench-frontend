@@ -1,4 +1,4 @@
-// DeepBench v5.1.15 | SharedUI.jsx | Shared Treasury UI components — AiBadge, AgentAvatar, FlagCard, etc.
+// DeepBench v5.1.20 | SharedUI.jsx | Add AgentAvatar illustrated SVG portrait component
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
+import { AVATAR_CFG } from "../data/agents.js";
 
 // ── Corners — brass SVG corner ornaments ─────────────────────────────────────
 export const Corners = ({ color = T.brass }) => (
@@ -93,18 +94,9 @@ export const AiStatusDot = ({ message, style }) => {
   );
 };
 
-// ── AgentAvatar — SVG avatar per agent ID ────────────────────────────────────
-export const AgentAvatar = ({ who, size = 68, ring = true }) => {
-  const cfg = {
-    chloe:   { skin:"#e8c9a8", hair:"#6b3a1e", collar:"#f0e6d2", extra:"freckles", border:T.brass },
-    mike:    { skin:"#d4a378", hair:"#3a3a3a", collar:"#24364f", extra:"glasses",  border:T.brass },
-    bob:     { skin:"#e5c19a", hair:"#5a4a3a", collar:"#2a3a52", extra:"tie",      border:T.moss  },
-    christy: { skin:"#dba77d", hair:"#2a1a1a", collar:T.brass,   extra:"bob",      border:T.brass },
-    robyn:   { skin:"#c48b62", hair:"#8a3418", collar:"#5a2f3d", extra:"bun",      border:T.brass },
-    brent:   { skin:"#d4a870", hair:"#2c3e2d", collar:"#1a2e1a", extra:"field",    border:T.moss  },
-    pat:     { skin:"#e8c9a0", hair:"#8b4513", collar:"#c0c0c0", extra:"bob",      border:T.muted },
-  };
-  const c = cfg[who] || cfg.chloe;
+// FEATURE: RO-04 — Illustrated SVG portrait per agent; used on Roster and Work screens
+export function AgentAvatar({ who, size = 68, ring = true }) {
+  const c = AVATAR_CFG[who] || AVATAR_CFG.chloe;
   const uid = `av-${who}-${Math.random().toString(36).slice(2,7)}`;
   return (
     <svg width={size} height={size} viewBox="0 0 72 72" style={{display:"block",flexShrink:0}}>
@@ -136,7 +128,7 @@ export const AgentAvatar = ({ who, size = 68, ring = true }) => {
       {ring&&<circle cx="36" cy="36" r="34.5" fill="none" stroke={c.border} strokeWidth="0.5" strokeDasharray="0.5 2" opacity="0.5"/>}
     </svg>
   );
-};
+}
 
 // ── FlagCard — collapsible procurement flag card ──────────────────────────────
 export const FlagCard = ({ severity, title, summary, detail, amount, count, recommendation, totalSpend }) => {

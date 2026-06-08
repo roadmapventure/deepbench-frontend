@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | RosterScreen.jsx | The Bench — 7-agent grid, cards, stats, Add a Player
+// DeepBench v5.1.20 | RosterScreen.jsx | NIGP visual port — illustrated SVG avatars, stats strip + link
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -7,10 +7,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, SkillBar } from "../components/SharedUI.jsx";
+import { Corners, SkillBar, AgentAvatar } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 
+// FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload
 function AgentCard({ agent, onViewProfile, onAddTraining }) {
   const [open, setOpen] = useState(false);
@@ -25,9 +26,7 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
 
       {/* Badge header — click navigates to personnel */}
       <div onClick={()=>onViewProfile(agent)} style={{padding:"15px 16px 12px",display:"flex",gap:12,alignItems:"flex-start",borderBottom:`1px dashed ${T.line}`,cursor:"pointer"}}>
-        <div style={{width:68,height:68,borderRadius:"50%",border:`2px solid ${agent.color}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:26,fontWeight:700,color:agent.color,flexShrink:0}}>
-          {agent.name[0]}
-        </div>
+        <AgentAvatar who={agent.id} size={68} ring={true}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,letterSpacing:1.2,fontWeight:600,marginBottom:2}}>{agent.code} · EST. {agent.hiredOn.toUpperCase()}</div>
           <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.navy,letterSpacing:"-.2px",lineHeight:1.1,marginBottom:3}}>{agent.name}</div>
@@ -167,10 +166,6 @@ export default function RosterScreen() {
               These are your agents. Click any team member to view their profile, assign them work, or add to their training. Ready to grow your bench? Add a new player and start building their expertise.
             </div>
           </div>
-          {/* FEATURE: RO-03 — Add a Player button */}
-          <button onClick={()=>navigate("/bench/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
-            <span style={{fontSize:14}}>＋</span> Add a Player
-          </button>
         </div>
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
@@ -189,6 +184,11 @@ export default function RosterScreen() {
             </div>
           ))}
           <div style={{flex:1}}/>
+          <button
+            onClick={() => navigate("/bench/new")}
+            style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:"#8fa3bf", background:"transparent", border:"none", cursor:"pointer", letterSpacing:.5 }}>
+            + Add a Player
+          </button>
           <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
         </div>
 
