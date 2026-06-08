@@ -213,12 +213,21 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.19 (commit ac5a791)
-**Next session:** S-MIGRATE-01 — NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3
+**Next session:** S-MIGRATE-UX — UX/UI design for Roster + Personnel screens (walk through screens 1-by-1, produce kickoff doc for S-MIGRATE-01 coding session)
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**
 - Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
+
+**Migration decisions locked 2026-06-08 (S-MIGRATE-UX design session):**
+- NIGP and DeepBench share the same Supabase instance (confirmed via env vars)
+- Migration approach: design-first (Option B) — never import NIGP file structure; port only live API wiring logic
+- All existing API endpoints needed for migration already exist in DeepBench: `/api/load-entries`, `/api/agent-configs`, `/api/ingest`, `/api/extract`, `/api/brief`, `/api/rag-query`
+- S-MIGRATE-01 split into: S-MIGRATE-UX (design, produces kickoff doc) → S-MIGRATE-01 (coding session)
+- PE-03 (Training tab) is mock-only — needs live `/api/load-entries` wiring
+- PE-04 (Playbook tab) has static hardcoded formats — needs live `output_format` CRUD matching ResumeTab pattern
+- ResumeTab pattern (ConfigCard + AddConfigForm + apiGetConfigs/apiPatchConfig/apiDeleteConfig) is the proven model — Playbook tab follows same pattern
 
 **Architecture decisions made 2026-06-08 (not yet in ARCHITECTURE.md — S-ARCH-01 will write it):**
 - Four-layer architecture locked: Shared Foundation / Product Modules / Agent Capability Services / Platform Services

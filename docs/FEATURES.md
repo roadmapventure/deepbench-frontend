@@ -173,7 +173,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | PE-01 | Profile tab | ✅ Done | DONE |
 | PE-02 | Resume tab | ✅ Done | DONE |
 | PE-03 | Training tab (from Supabase) | 🔶 Partial (mock only) | — |
-| PE-04 | Playbook tab | ✅ Done | DONE |
+| PE-04 | Playbook tab | 🔶 Partial (static mock — no live Supabase CRUD) | S-MIGRATE-01 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
 
@@ -309,7 +309,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | Session | Feature | Status |
 |---------|---------|--------|
 | S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ✅ DONE |
-| S-MIGRATE-01 | NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3 | ← NEXT |
+| S-MIGRATE-UX | UX/UI design — Roster + Personnel screens (walk through 1-by-1, produce kickoff doc) | ← NEXT |
+| S-MIGRATE-01 | NIGP migration coding session — live Training tab (PE-03), live Playbook tab (PE-04), per UX design from S-MIGRATE-UX | ⏳ Pending kickoff doc |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
