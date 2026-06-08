@@ -182,6 +182,20 @@ Retrieved at query time. Deepens with every uploaded document.
 
 MD files are valid training documents — same pipeline as PDFs, skip extraction, go straight to chunking and embedding. The Teach screen supports `.md` uploads.
 
+### Three Training Material Types
+
+Not all training material is the same. The Teach screen distinguishes three types:
+
+| Type | What it captures | Where it goes | Example |
+|------|-----------------|---------------|---------|
+| **Knowledge** | Facts, domain expertise, reference material | RAG → pgvector | NIGP standards doc, procurement regulations |
+| **Behavioral** | How the agent thinks, communicates, prioritizes | System prompt → `agent_configs` | John-Profile.md, persona description |
+| **Reasoning Pattern** | How decisions were reached — the arc of thinking, not just the conclusion | RAG → pgvector, tagged `training_type = 'reasoning'` | Session transcripts, decision logs, annotated case studies |
+
+Reasoning Pattern material is the most valuable and the hardest to replicate. It teaches an agent to run the same diagnostic process on a new problem — not just recall past answers. A session transcript where a human works from a vague problem to a named architecture is more valuable training than a document stating the architecture conclusion alone.
+
+The Teach screen will support tagging uploaded documents by training type. Reasoning Pattern documents are retrieved at higher weight during complex planning and analysis tasks.
+
 ---
 
 ## 4. Per-Agent LLM Assignment + BYOK [LOCKED — Design Target]
