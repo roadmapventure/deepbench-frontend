@@ -212,8 +212,8 @@ For any Supabase operation: verify column names against actual schema before wri
 > For the definitive session queue, see Google Drive Session Queue doc.
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-**Current version in dev:** v5.1.19 (commit ac5a791)
-**Next session:** S-MIGRATE-01-design — Design session: produce coding kickoff doc for S-MIGRATE-01 (visual port of Roster + Personnel File from NIGP). Read `docs/kickoffs/S-MIGRATE-UX-design-notes.md` at session start.
+**Current version in dev:** v5.1.21 (commit 8660e42)
+**Next session:** S-MIGRATE-02 — Coding session: Training tab live wiring + Playbook tab CRUD. Read kickoff doc when created.
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
@@ -224,7 +224,7 @@ For any Supabase operation: verify column names against actual schema before wri
 - NIGP and DeepBench share the same Supabase instance (confirmed via env vars)
 - Migration approach: design-first (Option B) — never import NIGP file structure; port only live API wiring logic
 - All existing API endpoints needed for migration already exist in DeepBench: `/api/load-entries`, `/api/agent-configs`, `/api/ingest`, `/api/extract`, `/api/brief`, `/api/rag-query`
-- Session chain: S-MIGRATE-UX (done) → S-MIGRATE-01-design (next) → S-MIGRATE-01 coding → S-MIGRATE-02 coding
+- Session chain: S-MIGRATE-UX (done) → S-MIGRATE-01-design (done) → S-MIGRATE-01a (done, 621eb31) → S-MIGRATE-01b (done, 8660e42) → S-MIGRATE-02 (next)
 - ResumeTab pattern (ConfigCard + AddConfigForm + apiGetConfigs/apiPatchConfig/apiDeleteConfig) is the proven model — Playbook tab follows same pattern
 
 **UX decisions locked 2026-06-08 (S-MIGRATE-UX — full detail in docs/kickoffs/S-MIGRATE-UX-design-notes.md):**
