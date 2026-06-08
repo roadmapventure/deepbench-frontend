@@ -213,8 +213,8 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.19 (commit ac5a791)
-**Next session:** S-ARCH-01 — Write full ARCHITECTURE.md north star document
-**Kickoff doc:** `docs/kickoffs/arch-design-notes.md` — read this before writing ARCHITECTURE.md
+**Next session:** S-MIGRATE-01 — NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3
+**Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**

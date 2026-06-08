@@ -3,8 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last synced from Google Drive: 2026-06-07
-> Drive ID: `1NNRE65of3bj7wMzHg3cVIFKq_k1CHvdKicFsW5V8L-I`
+> Last updated: 2026-06-08 | Session: S-ARCH-01
 
 ---
 
@@ -309,8 +308,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 ### Architecture + Migration (inserted before Bench side — decided 2026-06-08)
 | Session | Feature | Status |
 |---------|---------|--------|
-| S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ← NEXT |
-| S-MIGRATE-01 | NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3 | — |
+| S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ✅ DONE |
+| S-MIGRATE-01 | NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3 | ← NEXT |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
