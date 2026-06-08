@@ -213,7 +213,7 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.19 (commit ac5a791)
-**Next session:** S-MIGRATE-UX — UX/UI design for Roster + Personnel screens (walk through screens 1-by-1, produce kickoff doc for S-MIGRATE-01 coding session)
+**Next session:** S-MIGRATE-01-design — Design session: produce coding kickoff doc for S-MIGRATE-01 (visual port of Roster + Personnel File from NIGP). Read `docs/kickoffs/S-MIGRATE-UX-design-notes.md` at session start.
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
@@ -224,10 +224,15 @@ For any Supabase operation: verify column names against actual schema before wri
 - NIGP and DeepBench share the same Supabase instance (confirmed via env vars)
 - Migration approach: design-first (Option B) — never import NIGP file structure; port only live API wiring logic
 - All existing API endpoints needed for migration already exist in DeepBench: `/api/load-entries`, `/api/agent-configs`, `/api/ingest`, `/api/extract`, `/api/brief`, `/api/rag-query`
-- S-MIGRATE-01 split into: S-MIGRATE-UX (design, produces kickoff doc) → S-MIGRATE-01 (coding session)
-- PE-03 (Training tab) is mock-only — needs live `/api/load-entries` wiring
-- PE-04 (Playbook tab) has static hardcoded formats — needs live `output_format` CRUD matching ResumeTab pattern
+- Session chain: S-MIGRATE-UX (done) → S-MIGRATE-01-design (next) → S-MIGRATE-01 coding → S-MIGRATE-02 coding
 - ResumeTab pattern (ConfigCard + AddConfigForm + apiGetConfigs/apiPatchConfig/apiDeleteConfig) is the proven model — Playbook tab follows same pattern
+
+**UX decisions locked 2026-06-08 (S-MIGRATE-UX — full detail in docs/kickoffs/S-MIGRATE-UX-design-notes.md):**
+- Roster: adopt NIGP "Build your analyst team." design — illustrated SVG avatars, 5-stop labeled skill bar, NIGP headline. "Add a Player" moves to subtle `+` in stats strip. Vacancy card stays as primary /bench/new entry point. "Test My Team" removed → documented as WK-XX for future.
+- Personnel File: adopt NIGP left-sidebar nav layout. 2 nav groups only: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section. "Assignments" and "Completed Projects" become sections on Profile tab (mock data). "← Team Builder" button gone.
+- S-MIGRATE-01 scope: visual port only (RO-04, PE-07, PE-08, PE-09) — 3 files max: RosterScreen.jsx, PersonnelScreen.jsx, agents.js
+- S-MIGRATE-02 scope: data wiring (PE-03 Training live, PE-04 Playbook live CRUD)
+- Future (not in S-MIGRATE-01/02): Resume/Training/Playbook sub-page design from NIGP; Training inline Teach+Test deprecates TeachScreen + TestTeamScreen; Assignments/Completed live wiring
 
 **Architecture decisions made 2026-06-08 (not yet in ARCHITECTURE.md — S-ARCH-01 will write it):**
 - Four-layer architecture locked: Shared Foundation / Product Modules / Agent Capability Services / Platform Services

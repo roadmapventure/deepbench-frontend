@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-08 | Session: S-ARCH-01
+> Last updated: 2026-06-08 | Session: S-MIGRATE-UX
 
 ---
 
@@ -163,6 +163,11 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-01 | Roster screen — all 7 agents including Pat | ✅ Done | DONE |
 | RO-02 | Agent cards with workload indicators | ✅ Done | DONE |
 | RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
+| RO-04 | NIGP visual port — illustrated SVG avatars, 5-stop labeled skill bar, NIGP headline/subtitle, "Add a Player" subtle in stats strip | ❌ Missing | S-MIGRATE-01 |
+| RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
+
+**WK-XX — Test My Team (future, not yet scheduled):**
+Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
 
 ---
 
@@ -172,10 +177,24 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 |----|---------|--------|---------|
 | PE-01 | Profile tab | ✅ Done | DONE |
 | PE-02 | Resume tab | ✅ Done | DONE |
-| PE-03 | Training tab (from Supabase) | 🔶 Partial (mock only) | — |
-| PE-04 | Playbook tab | 🔶 Partial (static mock — no live Supabase CRUD) | S-MIGRATE-01 |
+| PE-03 | Training tab live wiring (from Supabase /api/load-entries) | 🔶 Partial (mock only) | S-MIGRATE-02 |
+| PE-04 | Playbook tab live wiring (output_format CRUD — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-02 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
+| PE-07 | NIGP left-sidebar nav layout (replaces horizontal tabs); 2 groups: OVERVIEW + CONFIGURE only | ❌ Missing | S-MIGRATE-01 |
+| PE-08 | Active Work Assignments section on Profile tab (mock data) | ❌ Missing | S-MIGRATE-01 |
+| PE-09 | Recently Completed section on Profile tab (mock data) | ❌ Missing | S-MIGRATE-01 |
+
+**PE design decisions locked 2026-06-08 (S-MIGRATE-UX):**
+- Left nav replaces horizontal tab bar. Nav groups: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section.
+- "Assignments" and "Completed Projects" removed as nav items → become sections on Profile tab (PE-08, PE-09).
+- "← Team Builder" bottom-left button → removed.
+- Top nav handled by DeepBench AppShell (Work + Bench) — no NIGP-specific buttons.
+- Profile tab layout: NIGP 2-col (ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right).
+- Avatar on Profile tab: initial circle only (illustrated avatar is Roster-only).
+- Future: Resume/Training/Playbook sub-page design pulled from NIGP in a dedicated design session.
+- Future: Training inline Teach+Test sub-views (NIGP pattern) will deprecate TeachScreen.jsx + TestTeamScreen.jsx.
+- Future: Assignments + Completed live wiring to tasks table (separate session).
 
 ---
 
@@ -309,8 +328,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | Session | Feature | Status |
 |---------|---------|--------|
 | S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ✅ DONE |
-| S-MIGRATE-UX | UX/UI design — Roster + Personnel screens (walk through 1-by-1, produce kickoff doc) | ← NEXT |
-| S-MIGRATE-01 | NIGP migration coding session — live Training tab (PE-03), live Playbook tab (PE-04), per UX design from S-MIGRATE-UX | ⏳ Pending kickoff doc |
+| S-MIGRATE-UX | UX/UI design — Roster + Personnel screens walk-through, design decisions locked | ✅ DONE |
+| S-MIGRATE-01-design | Design session: produce coding kickoff doc for S-MIGRATE-01 | ← NEXT |
+| S-MIGRATE-01 | **Visual port**: Roster NIGP design (RO-04) + Personnel left-nav layout (PE-07, PE-08, PE-09) | ⏳ Pending kickoff doc |
+| S-MIGRATE-02 | **Data wiring**: Training tab live (PE-03) + Playbook tab live CRUD (PE-04) | ⏳ Pending |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
