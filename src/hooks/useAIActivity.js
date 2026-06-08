@@ -90,7 +90,8 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     return;
   }
 
-  const entries = (data || []).map(row => ({
+  // Replace store entirely with DB state — DB is authoritative on every panel open
+  _log = (data || []).map(row => ({
     id:        row.id,
     type:      row.ai_type,
     model:     row.model || 'claude-haiku-4-5',
@@ -103,11 +104,6 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     ts:        row.created_at,
     _fromDB:   true,
   }));
-
-  // Seed store — deduplicate against any same-session entries already present
-  const existingIds = new Set(_log.filter(e => e._fromDB).map(e => e.id));
-  const newEntries = entries.filter(e => !existingIds.has(e.id));
-  _log = [..._log.filter(e => !e._fromDB), ...newEntries].slice(0, 500);
   notify();
 }
 
