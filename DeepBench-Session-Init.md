@@ -50,7 +50,7 @@ https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/ARC
 - STANDARDS → when generating a kickoff doc
 - ENV-VARS → when designing features that call external services
 - REPO-SNAPSHOT → only when filesystem MCP is unavailable (see Step 11)
-- ARCHITECTURE → when a feature touches core architectural decisions
+- ARCHITECTURE → when session adds a new capability route, touches Layer 1–3 boundaries, involves migration work, or covers S-MIGRATE-01 / S-BENCH-01 / S-INFRA-01 or any session in that chain. Not needed for isolated UI fixes or small feature patches.
 
 ---
 
