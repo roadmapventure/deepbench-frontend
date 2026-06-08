@@ -1,7 +1,4 @@
-// DeepBench v5.1.0 | PersonnelScreen.jsx | Personnel file — Profile, Resume, Training, Playbook tabs
-// src/screens/PersonnelScreen.jsx — v5.0.0
-// DeepBench v5 — Personnel File (/bench/:agentId)
-// Tabs: Profile · Resume · Training · Playbook · Workflow (stub) · Projects (stub)
+// DeepBench v5.1.21 | PersonnelScreen.jsx | NIGP visual port — left-sidebar nav, Profile tab 2-col layout
 
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -53,9 +50,9 @@ const AGENT_COMPLETED = {
 };
 
 // FEATURE: PE-01 — Profile tab
+// FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
 function ProfileTab({ agent, entries, layers }) {
-  const pronouns      = AGENT_PRONOUNS[agent.id] || { subject:"they", object:"them", possessive:"their" };
   const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   const rc            = readinessColor;
   const fmt           = fmt$;
@@ -78,50 +75,27 @@ function ProfileTab({ agent, entries, layers }) {
 
   return (
     <>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
-      {/* Left: profile card + assignments */}
-      <div>
-        {/* Header card */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"18px 20px",marginBottom:14,position:"relative"}}>
-          <Corners/>
-          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
-            <div style={{width:64,height:64,borderRadius:"50%",border:`2px solid ${agent.color}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:26,fontWeight:700,color:agent.color,flexShrink:0}}>{agent.name[0]}</div>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,letterSpacing:1.3,fontWeight:600,marginBottom:2}}>{agent.code} · EST. {agent.hiredOn.toUpperCase()}</div>
-              <div style={{fontFamily:display,fontSize:22,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
-              <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:8}}>{agent.role}</div>
-              <div style={{fontFamily:display,fontStyle:"italic",fontSize:13,color:T.mutedDeep,marginBottom:10,borderLeft:`3px solid ${T.brass}`,paddingLeft:10}}>{agent.quip}</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.arch}</span>
-                {agent.trainable&&<span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`}}>● Trainable</span>}
-                {agent.isWebAgent&&!agent.isIntern&&<span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:"rgba(90,117,56,.12)",color:T.moss,border:"1px solid rgba(90,117,56,.3)"}}>🌐 Web Agent</span>}
-                {agent.isIntern&&<span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:"rgba(120,109,82,.1)",color:T.muted,border:"1px solid rgba(120,109,82,.3)"}}>👩‍💼 Intern</span>}
-              </div>
-            </div>
-          </div>
-          <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${T.lineSoft}`}}>
-            <div style={{fontFamily:body,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.4,fontWeight:600,marginBottom:8}}>Specialty</div>
-            <div style={{fontSize:12.5,color:T.ink,lineHeight:1.6}}>{agent.specialty}</div>
-          </div>
-        </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,alignItems:"start"}}>
 
-        {/* Skill bar card */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",marginBottom:14,position:"relative"}}>
-          <Corners/>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-            <div style={{fontFamily:body,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.4,fontWeight:600}}>Skill Level</div>
-            <div style={{fontFamily:mono,fontSize:11,color:agent.color===T.moss?T.moss:T.brassDeep,fontWeight:700}}>{skillLabel(agent.skill)} · {agent.skill}/100</div>
+      {/* ── Left column: ID Badge + Compensation ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+        {/* ID Badge card */}
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
+          <Corners color={agent.color}/>
+          <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
+          <div style={{width:92,height:92,borderRadius:"50%",border:`2px solid ${agent.color}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:36,fontWeight:700,color:agent.color,margin:"0 auto 12px"}}>
+            {agent.name[0]}
           </div>
-          <SkillBar skill={agent.skill} color={agent.color}/>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:10,borderTop:`1px solid ${T.lineSoft}`}}>
-            <div>
-              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Situational Awareness</div>
-              <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:agent.situational>=30?T.brass:T.muted}}>{agent.situational}%</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Trainable By</div>
-              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:T.navy}}>{agent.trainableBy}</div>
-            </div>
+          <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
+          <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
+            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.code}</span>
+            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
+            {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
+          </div>
+          <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
+            "{agent.quip}"
           </div>
         </div>
 
@@ -149,12 +123,12 @@ function ProfileTab({ agent, entries, layers }) {
         </div>
       </div>
 
-      {/* Right: readiness + intelligence config + quick stats */}
+      {/* ── Right column: Readiness + Intel Config + Quick Stats ── */}
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
         {/* Readiness score */}
         <div style={{background:T.navy,padding:"14px 18px",position:"relative",border:`1px solid rgba(182,135,58,.3)`}}>
-          <div style={{position:"absolute",top:4,left:4,width:9,height:9,borderTop:`1.5px solid ${T.brass}`,borderLeft:`1.5px solid ${T.brass}`,opacity:.5}}/>
-          <div style={{position:"absolute",bottom:4,right:4,width:9,height:9,borderBottom:`1.5px solid ${T.brass}`,borderRight:`1.5px solid ${T.brass}`,opacity:.5}}/>
+          <Corners color={T.brass}/>
           <div style={{fontFamily:mono,fontSize:8.5,color:T.brassLight,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:7}}>Agent Readiness Score</div>
           <div style={{display:"flex",alignItems:"flex-end",gap:12,marginBottom:9}}>
             <div style={{fontFamily:display,fontSize:44,fontWeight:700,color:rc(readiness),lineHeight:1}}>{readiness}</div>
@@ -213,12 +187,25 @@ function ProfileTab({ agent, entries, layers }) {
               </div>
             ))}
           </div>
+          <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:10,marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>Situational Awareness</div>
+              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:agent.situational>=30?T.brass:T.muted}}>{agent.situational}%</div>
+            </div>
+            <div style={{height:4,background:`${T.lineSoft}`,borderRadius:2}}>
+              <div style={{height:"100%",width:`${agent.situational}%`,background:agent.situational>=30?T.brass:T.muted,borderRadius:2}}/>
+            </div>
+          </div>
+          <div>
+            <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Skill Level</div>
+            <SkillBar skill={agent.skill} color={agent.color}/>
+          </div>
         </div>
       </div>
     </div>
 
     {/* ── Active Work Assignments ── */}
-    <div style={{marginTop:4,gridColumn:"1/-1"}}>
+    <div style={{marginTop:18}}>
       <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
       {agentTasks.length===0 ? (
         <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
@@ -320,8 +307,6 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
           </div>
         ))}
         <div style={{flex:1}}/>
-        <button onClick={()=>navigate(`/bench/test?agent=${agent.id}`)} style={{background:"transparent",border:`1px solid ${T.brassLight}`,color:T.brassLight,padding:"6px 14px",fontFamily:body,fontSize:12,fontWeight:600,cursor:"pointer",marginRight:7}}>🐝 Test Agent</button>
-        {agent.trainable&&<button onClick={()=>navigate(`/bench/${agent.id}/teach`)} style={{background:T.brass,border:"none",color:T.navy,padding:"6px 14px",fontFamily:body,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Courses</button>}
       </div>
 
       {/* How it works */}
@@ -344,7 +329,7 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
       {entries.length===0&&(
         <div style={{background:`${T.brass}06`,border:`1px solid ${T.brass}20`,padding:"40px",textAlign:"center"}}>
           <div style={{fontFamily:display,fontSize:16,fontWeight:600,color:T.navy,marginBottom:8}}>No training entries yet</div>
-          {agent.trainable&&<button onClick={()=>navigate(`/bench/${agent.id}/teach`)} style={{background:`linear-gradient(135deg,${T.moss},#3a5828)`,border:"none",color:"#fff",padding:"10px 20px",cursor:"pointer",fontFamily:display,fontSize:13,fontWeight:700}}>Teach {agent.name.split(" ")[0]} something →</button>}
+          {agent.trainable&&<div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Use the Training tab to add courses.</div>}
         </div>
       )}
 
@@ -454,19 +439,7 @@ function PlaybookTab({ agent }) {
   );
 }
 
-// ── Stub tab ──────────────────────────────────────────────────────────────────
-function StubTab({ title, desc }) {
-  return (
-    <div style={{background:`${T.brass}06`,border:`1px dashed ${T.line}`,padding:"60px 40px",textAlign:"center"}}>
-      <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.navy,marginBottom:8}}>{title}</div>
-      <div style={{fontFamily:body,fontSize:13,color:T.muted}}>{desc}</div>
-      <div style={{fontFamily:mono,fontSize:10,color:T.line,marginTop:8}}>Coming in Phase 2</div>
-    </div>
-  );
-}
-
-// FEATURE: PE-05 — Workflow tab stub
-// FEATURE: PE-06 — Projects tab stub
+// FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
 // ── Personnel Screen ──────────────────────────────────────────────────────────
 export default function PersonnelScreen() {
   const { agentId } = useParams();
@@ -482,85 +455,115 @@ export default function PersonnelScreen() {
     setTimeout(()=>setToast(null),3000);
   };
 
-  const layers   = computeLayers(agent, entries);
+  const layers    = computeLayers(agent, entries);
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
 
-  const TABS = [
-    { id:"profile",  label:"Profile" },
-    { id:"resume",   label:"Resume" },
-    { id:"training", label:"Training" },
-    { id:"playbook", label:"Playbook" },
-    { id:"workflow", label:"Workflow" },
-    { id:"projects", label:"Projects" },
+  // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
+  const NAV_GROUPS = [
+    { id:"overview",  label:"OVERVIEW",  tabs:[{ id:"profile",  label:"Profile",  icon:"◈" }] },
+    { id:"configure", label:"CONFIGURE", tabs:[
+      { id:"resume",   label:"Resume",   icon:"▣" },
+      { id:"training", label:"Training", icon:"◎" },
+      { id:"playbook", label:"Playbook", icon:"⬟" },
+    ]},
   ];
+
+  // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
+  const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
 
   return (
     <AppShell toast={toast} headerProps={{ backLabel:"The Bench", onBack:()=>navigate("/bench") }}>
-      <div style={{display:"flex",flex:1,overflow:"hidden",flexDirection:"column"}}>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
-        {/* Page header */}
-        <div style={{background:T.cardAlt,padding:"16px 24px 0",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
-          {/* Breadcrumb */}
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
-            Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeTab.charAt(0).toUpperCase()+activeTab.slice(1)}
-          </div>
-          {/* Title row */}
-          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:13}}>
-            <div>
-              <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
-                The personnel file of {agent.name}.
-              </div>
-              <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
-                Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level analyst
-              </div>
+        {/* ── Left sidebar nav ── */}
+        <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
+
+          {/* Agent identity strip */}
+          <div style={{ padding:"16px 14px 14px", borderBottom:`1px solid ${T.lineSoft}` }}>
+            <div style={{ width:44, height:44, borderRadius:"50%", border:`2px solid ${agent.color}`, background:T.paperDeep, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:display, fontSize:18, fontWeight:700, color:agent.color, marginBottom:8 }}>
+              {agent.name[0]}
             </div>
-            {/* Three stat badges */}
-            <div style={{display:"flex",gap:16,alignItems:"center",paddingBottom:2}}>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
-              </div>
-              <div style={{width:1,height:30,background:T.lineSoft}}/>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                  {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                </div>
-              </div>
-              <div style={{width:1,height:30,background:T.lineSoft}}/>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                  {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                </div>
-              </div>
-              <div style={{width:1,height:30,background:T.lineSoft}}/>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>navigate(`/bench/${agentId}/teach`)} disabled={!agent.trainable} style={{background:agent.trainable?`linear-gradient(135deg,${T.moss},#3a5828)`:T.line,border:"none",color:agent.trainable?"#fff":T.muted,padding:"8px 16px",cursor:agent.trainable?"pointer":"not-allowed",fontFamily:display,fontSize:12,fontWeight:700}}>Teach</button>
-                <button onClick={()=>navigate(`/bench/test?agent=${agentId}`)} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"8px 14px",cursor:"pointer",fontFamily:body,fontSize:12}}>Test</button>
-              </div>
-            </div>
+            <div style={{ fontFamily:display, fontSize:13, fontWeight:600, color:T.navy, lineHeight:1.2 }}>{agent.name}</div>
+            <div style={{ fontFamily:mono, fontSize:8, color:T.muted, marginTop:2 }}>{agent.code}</div>
           </div>
 
-          {/* Tab nav */}
-          <div style={{display:"flex",gap:0}}>
-            {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setActiveTab(t.id)}
-                style={{padding:"8px 18px",fontFamily:body,fontSize:13,fontWeight:activeTab===t.id?600:400,color:activeTab===t.id?T.navy:T.muted,background:"transparent",border:"none",borderBottom:activeTab===t.id?`2px solid ${T.brass}`:"2px solid transparent",cursor:"pointer",marginBottom:-2,transition:"all .15s"}}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* Nav groups */}
+          {NAV_GROUPS.map(g => (
+            <div key={g.id} style={{ paddingTop:16 }}>
+              <div style={{ fontFamily:mono, fontSize:8, color:T.muted, textTransform:"uppercase", letterSpacing:1.6, fontWeight:700, padding:"0 14px 6px" }}>
+                {g.label}
+              </div>
+              {g.tabs.map(t => (
+                <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+                  width:"100%", textAlign:"left", padding:"8px 14px",
+                  fontFamily:body, fontSize:12,
+                  fontWeight: activeTab === t.id ? 600 : 400,
+                  color: activeTab === t.id ? T.navy : T.mutedDeep,
+                  background: activeTab === t.id ? `${T.brass}14` : "transparent",
+                  border:"none",
+                  borderLeft: activeTab === t.id ? `2px solid ${T.brass}` : "2px solid transparent",
+                  cursor:"pointer", display:"flex", alignItems:"center", gap:8,
+                }}>
+                  <span style={{ fontFamily:mono, fontSize:10, color: activeTab === t.id ? T.brassDeep : T.muted }}>{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          ))}
         </div>
 
-        {/* Content */}
-        <div style={{flex:1,overflowY:"auto",padding:"20px 24px 64px",background:T.paperDeep}}>
-          {activeTab==="profile"  && <ProfileTab agent={agent} entries={entries} layers={layers}/>}
-          {activeTab==="resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
-          {activeTab==="training" && <TrainingTab agent={agent} entries={entries} setEntries={setEntries} showToast={showToast} navigate={navigate}/>}
-          {activeTab==="playbook" && <PlaybookTab agent={agent}/>}
-          {activeTab==="workflow" && <StubTab title="Workflow Configuration" desc="Define multi-step automation flows — when to call sub-agents, how to handle errors, and what to do when data is incomplete."/>}
-          {activeTab==="projects" && <StubTab title="Projects" desc="Track which projects this agent has contributed to, and see their output history across engagements."/>}
+        {/* ── Right content area ── */}
+        <div style={{ display:"flex", flex:1, overflow:"hidden", flexDirection:"column" }}>
+
+          {/* Page header */}
+          <div style={{background:T.cardAlt,padding:"16px 24px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
+            {/* Breadcrumb — FEATURE: PE-09 */}
+            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
+              Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeLabel}
+            </div>
+            {/* Title row */}
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
+                  The personnel file of {agent.name}.
+                </div>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
+                  Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
+                </div>
+              </div>
+              {/* Stat badges */}
+              <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                </div>
+                <div style={{width:1,height:30,background:T.lineSoft}}/>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                    {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                  </div>
+                </div>
+                <div style={{width:1,height:30,background:T.lineSoft}}/>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                    {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab content */}
+          <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
+            {/* FEATURE: PE-08 */}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers}/>}
+            {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
+            {activeTab === "training" && <TrainingTab agent={agent} entries={entries} setEntries={setEntries} showToast={showToast} navigate={navigate}/>}
+            {activeTab === "playbook" && <PlaybookTab agent={agent}/>}
+          </div>
+
         </div>
       </div>
     </AppShell>
