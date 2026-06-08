@@ -1,4 +1,4 @@
-// DeepBench v5.1.15 | AppShell.jsx | App shell — header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel, help modal
+// DeepBench v5.1.18 | AppShell.jsx | App shell — header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel, help modal
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, help modal
 
 import { useNavigate, useLocation } from "react-router-dom";
@@ -137,7 +137,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       {/* AI Activity Panel trigger */}
       {showAIPanel && (
         <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
-          <AIDiamond size="7px" color={T.brassLight}/> AI
+          <AIDiamond size="7px" color={T.brassLight}/> AI Audit
         </button>
       )}
 

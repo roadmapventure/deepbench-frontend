@@ -1,11 +1,19 @@
-// DeepBench v5.1.0 | AIActivityPanel.jsx | AI activity panel — grouped calls, cost, latency log
-// FEATURE: AI-03 — AIActivityPanel — activity panel
-// src/components/AIActivityPanel.jsx — v5.0.0
-// AI Activity Panel: grouped by type, cost+count+latency, checklist (PRD 9.4, 9.8, 9.9)
+// DeepBench v5.1.18 | AIActivityPanel.jsx | AI audit panel — renamed, By LLM + By Agent sections
+// FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 
 import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { useAIActivity, AI_TYPES } from "../hooks/useAIActivity.js";
+import { useAIActivity, AI_TYPES, MODEL_PROVIDER } from "../hooks/useAIActivity.js";
+
+const AGENT_NAMES = {
+  chloe:   { name: "Chloe Okafor",      code: "JR-01" },
+  mike:    { name: "Mike Alvarez",       code: "SR-02" },
+  bob:     { name: "Bob Whitfield",      code: "PR-04" },
+  christy: { name: "Christy Park",       code: "MK-05" },
+  robyn:   { name: "Robyn Castellanos",  code: "CN-03" },
+  brent:   { name: "Brent Matthews",     code: "DR-06" },
+  pat:     { name: "Pat Smiley",         code: "IR-07" },
+};
 import { Corners } from "./SharedUI.jsx";
 
 const CHECKLIST = [
@@ -43,7 +51,7 @@ function TypeRow({ d, expanded, onToggle }) {
         {/* Stats */}
         {d.total > 0 ? (
           <div style={{display:"flex",gap:14,flexShrink:0}}>
-            {[["Calls",d.total],["30d",d.last30],[`Cost`,fmt$(d.cost)],[`Avg`,d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+            {[["Total",d.total],[`Cost`,fmt$(d.cost)],[`Avg`,d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
               <div key={k} style={{textAlign:"right"}}>
                 <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
                 <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
@@ -87,7 +95,7 @@ function TypeRow({ d, expanded, onToggle }) {
 }
 
 export default function AIActivityPanel({ onClose }) {
-  const { byType, totalCost, totalCalls, clearAILog } = useAIActivity();
+  const { byType, byLLM, byAgent, modelsInUse, totalCost, totalCalls } = useAIActivity();
   const [expanded, setExpanded] = useState({});
   const [tab, setTab]           = useState("activity"); // activity | checklist
 
@@ -104,20 +112,18 @@ export default function AIActivityPanel({ onClose }) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontFamily:mono,fontSize:9,color:T.brassLight,letterSpacing:2,textTransform:"uppercase",marginBottom:3}}>AI Transparency · DeepBench</div>
-            <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.card}}>AI Activity Panel</div>
+            <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.card}}>AI Audit</div>
           </div>
           <button onClick={onClose} style={{background:"transparent",border:`1px solid rgba(255,255,255,.2)`,color:"rgba(255,255,255,.6)",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
         {/* Total strip */}
         <div style={{display:"flex",gap:16,marginTop:10}}>
-          {[["Total Calls",totalCalls],["Session Cost",fmt$(totalCost)],["Active Types",activeTypes.length+"/"+phase1Types.length]].map(([k,v])=>(
+          {[["Total Calls",totalCalls],["Total Cost",fmt$(totalCost)],["Active Types",activeTypes.length+"/"+phase1Types.length],["Models in Use",modelsInUse]].map(([k,v])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1}}>{k}</div>
               <div style={{fontFamily:display,fontSize:16,fontWeight:600,color:T.brassLight}}>{v}</div>
             </div>
           ))}
-          <div style={{flex:1}}/>
-          <button onClick={clearAILog} style={{fontFamily:mono,fontSize:8,color:"rgba(255,255,255,.35)",background:"transparent",border:"1px solid rgba(255,255,255,.15)",padding:"3px 8px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,alignSelf:"flex-end"}}>Clear Log</button>
         </div>
       </div>
 
@@ -139,7 +145,55 @@ export default function AIActivityPanel({ onClose }) {
             {phase1Types.map(d => (
               <TypeRow key={d.type} d={d} expanded={!!expanded[d.type]} onToggle={()=>toggle(d.type)}/>
             ))}
-            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:16}}>v5.x · Planned AI Types</div>
+
+            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>By LLM</div>
+            {Object.values(byLLM).length === 0
+              ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",marginBottom:8}}>No LLM calls logged yet.</div>
+              : Object.values(byLLM).map(d => (
+                <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:d.calls>0?T.moss:T.lineSoft,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.model}</div>
+                    <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
+                  </div>
+                  <div style={{display:"flex",gap:14,flexShrink:0}}>
+                    {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                      <div key={k} style={{textAlign:"right"}}>
+                        <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                        <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            }
+
+            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>By Agent</div>
+            {Object.values(byAgent).length === 0
+              ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",marginBottom:8}}>No agent calls logged yet.</div>
+              : Object.values(byAgent).map(d => {
+                const info = AGENT_NAMES[d.agentId] || { name: d.agentId, code: "—" };
+                return (
+                  <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
+                      <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.code}</div>
+                    </div>
+                    <div style={{display:"flex",gap:14,flexShrink:0}}>
+                      {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                        <div key={k} style={{textAlign:"right"}}>
+                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                          <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            }
+
+            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>Future Tracking · Planned</div>
             {phase2Types.map(d => (
               <TypeRow key={d.type} d={d} expanded={!!expanded[d.type]} onToggle={()=>toggle(d.type)}/>
             ))}
