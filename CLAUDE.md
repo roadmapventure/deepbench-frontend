@@ -19,6 +19,12 @@
    - Next session
    - Open blocking questions
 4. Ask: "What would you like to work on?"
+5. Save the kickoff doc to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+6. End the design session with a clearly bordered code block containing the exact build session start prompt:
+   ```
+   Read CLAUDE.md then read docs/kickoffs/[filename].md and execute it.
+   ```
+7. Commit and push to `dev`
 
 **If coding:** Read `CLAUDE.md` only and begin immediately.
 
