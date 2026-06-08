@@ -1,9 +1,10 @@
-// DeepBench v5.1.18 | AIActivityPanel.jsx | AI audit panel — renamed, By LLM + By Agent sections
+// DeepBench v5.1.19 | AIActivityPanel.jsx | AI audit panel — Supabase hydration on mount
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
+// FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { useAIActivity, AI_TYPES, MODEL_PROVIDER } from "../hooks/useAIActivity.js";
+import { useAIActivity, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase } from "../hooks/useAIActivity.js";
 
 const AGENT_NAMES = {
   chloe:   { name: "Chloe Okafor",      code: "JR-01" },
@@ -98,6 +99,11 @@ export default function AIActivityPanel({ onClose }) {
   const { byType, byLLM, byAgent, modelsInUse, totalCost, totalCalls } = useAIActivity();
   const [expanded, setExpanded] = useState({});
   const [tab, setTab]           = useState("activity"); // activity | checklist
+
+  // FEATURE: AI-10 — Hydrate lifetime totals from Supabase once on mount
+  useEffect(() => {
+    hydrateFromSupabase();
+  }, []);
 
   const toggle = (type) => setExpanded(e => ({ ...e, [type]: !e[type] }));
 

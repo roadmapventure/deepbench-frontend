@@ -1,9 +1,11 @@
-// DeepBench v5.1.18 | useAIActivity.js | AI call log — module-level store for AIActivityPanel
+// DeepBench v5.1.19 | useAIActivity.js | AI call log — module-level store + Supabase persistence
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
+// FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
 // AIActivityPanel reads the same store — no context provider needed.
 
 import { useState, useEffect } from "react";
+import { supabase } from '../lib/supabase.js';
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
 export const AI_TYPES = {
@@ -37,22 +39,76 @@ let _listeners = [];
 
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
-export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null }) {
+// FEATURE: AI-16 — logAICall Supabase persistence
+export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null }) {
+  const resolvedModel = model || AI_TYPES[type]?.model || "claude-haiku-4-5";
   const entry = {
     id:        Date.now() + Math.random(),
     type,
-    model:     model || AI_TYPES[type]?.model || "claude-haiku-4-5",
+    model:     resolvedModel,
     tokens,
     latencyMs,
     tier,
     location:  location || AI_TYPES[type]?.location || "—",
     agentId,
-    cost:      tokens > 0 ? (tokens / 1000) * (COST_PER_1K[model] || COST_PER_1K["claude-haiku-4-5"]) : null,
+    cost:      tokens > 0 ? (tokens / 1000) * (COST_PER_1K[resolvedModel] || COST_PER_1K["claude-haiku-4-5"]) : null,
     ts:        new Date().toISOString(),
   };
   _log = [entry, ..._log].slice(0, 500); // cap at 500
   notify();
+
+  // Fire-and-forget Supabase write — failure must never throw or slow the caller
+  supabase.from('ai_activity_log').insert({
+    tenant_id:      'global',
+    ai_type:        entry.type,
+    feature:        entry.location,
+    model:          entry.model,
+    agent_id:       entry.agentId || null,
+    task_id:        taskId || null,
+    input_tokens:   entry.tokens || null,
+    latency_ms:     entry.latencyMs || null,
+    knowledge_tier: entry.tier || null,
+    cost_usd:       entry.cost || null,
+  }).then(({ error }) => {
+    if (error) console.warn('[AI log] Supabase write failed:', error.message);
+  });
+
   return entry;
+}
+
+// FEATURE: AI-16 — Hydrate in-memory store from Supabase on panel mount
+export async function hydrateFromSupabase(tenantId = 'global') {
+  const { data, error } = await supabase
+    .from('ai_activity_log')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.warn('[AI log] Hydration failed:', error.message);
+    return;
+  }
+
+  const entries = (data || []).map(row => ({
+    id:        row.id,
+    type:      row.ai_type,
+    model:     row.model || 'claude-haiku-4-5',
+    tokens:    row.input_tokens || 0,
+    latencyMs: row.latency_ms || 0,
+    tier:      row.knowledge_tier || null,
+    location:  row.feature || '—',
+    agentId:   row.agent_id || null,
+    cost:      row.cost_usd ? parseFloat(row.cost_usd) : null,
+    ts:        row.created_at,
+    _fromDB:   true,
+  }));
+
+  // Seed store — deduplicate against any same-session entries already present
+  const existingIds = new Set(_log.filter(e => e._fromDB).map(e => e.id));
+  const newEntries = entries.filter(e => !existingIds.has(e.id));
+  _log = [..._log.filter(e => !e._fromDB), ...newEntries].slice(0, 500);
+  notify();
 }
 
 export function clearAILog() { _log = []; notify(); }
