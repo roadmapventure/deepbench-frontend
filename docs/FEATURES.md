@@ -236,11 +236,15 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 - Data: session-scoped in S16a. Lifetime persistence added in S16b.
 
 **AI-16 Notes (S16b spec — LOCKED):**
-- New Supabase table: `ai_call_log` — columns: id, tenant_id, type, model, agent_id, tokens, latency_ms, cost, ts
-- New backend endpoint: POST `/api/log-ai-call` in deepbench-backend/src/server.js
-- `logAICall()` fires a non-blocking POST to `/api/log-ai-call` after every call
-- On panel mount: reads `ai_call_log` from Supabase and seeds the in-memory store
+- Table already exists in Supabase: `ai_activity_log` (NOT `ai_call_log` — spec corrected 2026-06-07 via MCP)
+- Actual columns: id, tenant_id, ai_type, feature, model, agent_id, task_id, input_tokens, output_tokens, latency_ms, knowledge_tier, cost_usd, created_at
+- No migration needed — table created prior to S16b
+- No separate backend endpoint — `logAICall()` writes directly to Supabase client (fire-and-forget)
+- `logAICall()` extended with optional `taskId` param; non-blocking insert to `ai_activity_log`
+- New `hydrateFromSupabase()` function seeds in-memory store on panel mount
+- On panel mount: reads `ai_activity_log` from Supabase (limit 500, desc) and seeds the in-memory store
 - Result: metrics accumulate from S16b commit day, never reset
+- Kickoff doc: `docs/kickoffs/v5.1.19-AI16-ai-audit-persistence.md`
 
 ---
 
@@ -299,12 +303,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | S15c | UX Review — Task Instructions | ✅ DONE |
 
 
-| S16a | AI Audit UI — rename, restructure, By LLM + By Agent sections (AI-13, AI-14) | ← NEXT |
-| S16b | AI Audit persistence — Supabase ai_call_log, lifetime metrics (AI-16) | After S16a |
-| S-AI-01 Part A | AI Activity Panel full wiring (AI-10) | After S16b |
-| S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) | After Part A |
+| S16a | AI Audit UI — rename, restructure, By LLM + By Agent sections (AI-13, AI-14) | ✅ DONE |
+| S16b | AI Audit persistence + live panel wiring — Supabase ai_call_log, lifetime metrics, AI-10 full wiring (AI-16, AI-10) | ← NEXT |
 
-### Bench Side (begins after S-AI-01)
+### Bench Side (begins after S16b)
 | Session | Feature |
 |---------|---------|
 | S-BENCH-01 | Michelle Manning — Full Agent (AG-01 through AG-06) |
@@ -326,6 +328,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | S-DELIVER-01 | DL-01 — Step output type label |
 | S-DELIVER-02 | DL-02 — Deliverables Card (right panel) |
 | S-DELIVER-03 | DL-03 — Per-step deliverable access inline |
+| S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) |
 | S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
 
 ---
@@ -334,5 +337,4 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Question | Blocks |
 |----|----------|--------|
-| Q2 | "Project vs Tasks" naming — address during UX review sessions | S15a/b/c |
 | Q5 | Agent step output destination — A, B, or C (decision needed) | S11 |
