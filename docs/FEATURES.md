@@ -213,15 +213,34 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AI-10 | AI Activity Panel — header entry point, grouped by AI type | 🔶 Partial | S-AI-01 Part A |
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
-| AI-13 | AI Audit drawer — right-side overlay, persistent header button | 🔶 Partial (design done) | S16 |
-| AI-14 | AI Audit — lifetime metrics: 3 sections (Activity Type, LLM grouping, placeholder) | 🔶 Partial (design done) | S16 |
-| AI-15 | Architect Checklist tab in AI Audit | ❌ Missing | Q-S16 DECISION NEEDED |
+| AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | 🔶 Partial | S16a |
+| AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | 🔶 Partial | S16a |
+| AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
+| AI-16 | AI Audit persistence — write every AI call to Supabase ai_call_log; hydrate on mount for lifetime totals | ❌ Missing | S16b |
 
-**AI-10 Notes:** Accessible via "+ AI" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered (expandable). Builds with mock data in S-AI-01; live data wires after S11/AI-11.
+**AI-10 Notes:** Accessible via "AI Audit" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered (expandable). Session-scoped data in S16a; lifetime data wires in S16b.
 
 **AI-11 Notes:** Logs per step: step_id, agent_id, model, tokens_in, tokens_out, latency_ms, rag_hits, confidence_score, timestamp. Data source for AI-10 and AI-12.
 
 **AI-12 Notes:** Per-task, per-step breakdown: tokens in/out, model used, latency, RAG hits/misses, confidence, timestamp. Exportable report for IT/procurement governance. Distinct from AI-10 (Activity Panel = global view; AI-12 = deep dive per task). Builds with mock data in S-AI-01; live data after S11.
+
+**AI-13 Notes (S16a spec — LOCKED):**
+- Panel renamed: "AI Audit" (was "AI Activity Panel")
+- Header button in AppShell: "AI Audit" (was "AI")
+- Header strip: Total Calls · Total Cost · Active Types · Models in Use — Clear Log button removed
+- Section 1 — By Activity Type: 9 Phase 1 types (adding Knowledge Reinforcement — Brent self-learning write-back to Supabase), 4 Future Tracking planned rows. Columns: Total, Est. Cost, Avg Latency. 30D column removed.
+- Section 2 — By LLM: dynamic, grouped by model. Columns: Provider, Model, Total Calls, Est. Cost, Avg Latency
+- Section 3 — Future Tracking (planned, grayed): Agent Performance Score · Prompt Version Tracking · Cost Anomaly Detection · Human Review Rate
+- Section 4 — By Agent: dynamic, any agentId in log gets a row. Columns: Agent Name, Code, Total Calls, Est. Cost, Avg Latency. Unknown agentIds fall back to raw ID.
+- Architect Checklist tab: NO CHANGES — already complete (AI-15 ✅ Done)
+- Data: session-scoped in S16a. Lifetime persistence added in S16b.
+
+**AI-16 Notes (S16b spec — LOCKED):**
+- New Supabase table: `ai_call_log` — columns: id, tenant_id, type, model, agent_id, tokens, latency_ms, cost, ts
+- New backend endpoint: POST `/api/log-ai-call` in deepbench-backend/src/server.js
+- `logAICall()` fires a non-blocking POST to `/api/log-ai-call` after every call
+- On panel mount: reads `ai_call_log` from Supabase and seeds the in-memory store
+- Result: metrics accumulate from S16b commit day, never reset
 
 ---
 
@@ -280,9 +299,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | S15c | UX Review — Task Instructions | ✅ DONE |
 
 
-| S16 | AI Audit implementation (AI-13, AI-14, AI-15?) | ← NEXT |
-| S-AI-01 Part A | AI Activity Panel (AI-10) | After S16 |
-| S-AI-01 Part B | AI Audit Screen (AI-12) | After Part A |
+| S16a | AI Audit UI — rename, restructure, By LLM + By Agent sections (AI-13, AI-14) | ← NEXT |
+| S16b | AI Audit persistence — Supabase ai_call_log, lifetime metrics (AI-16) | After S16a |
+| S-AI-01 Part A | AI Activity Panel full wiring (AI-10) | After S16b |
+| S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) | After Part A |
 
 ### Bench Side (begins after S-AI-01)
 | Session | Feature |

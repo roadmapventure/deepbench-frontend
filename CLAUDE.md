@@ -213,12 +213,11 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.17 (commit 8b40037)
-**Next session:** S16 — AI Audit implementation
+**Next session:** S16a — AI Audit UI (kickoff doc: `docs/kickoffs/v5.1.18-AI13-ai-audit-ui.md`)
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**
 - Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
-- Q-S16: Architect Checklist tab in AI Audit — in scope for S16 or deferred?
 
 ---
 
