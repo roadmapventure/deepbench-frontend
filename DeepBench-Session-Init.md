@@ -188,11 +188,26 @@ When John says "generate kickoff doc for [session]":
 
 ## Step 10 — How to Close a Session
 
-When John reports QA results:
+**Follow this sequence in order. Do not skip steps. Do not close early.**
 
-- **All PASS** → give John this Claude Code prompt: "Close [FEATURE-ID] — mark complete in docs/FEATURES.md, session = [name]. Commit and push."
-- **Any FAIL** → generate a patch kickoff doc
-- **NEW REQUIREMENT** → give John this Claude Code prompt: "Add [requirement] to docs/FEATURES.md under [area] as ❌ Missing, session = S-future. Commit and push."
+### 10a — Wait for Claude Code to finish
+Claude Code reports Node.js tests pass and `npm run build` succeeds. Do not proceed until both are confirmed.
+
+### 10b — Present the Manual QA Checklist (mandatory — do not skip)
+When John pastes the Claude Code verification checklist showing all items checked, respond with the Manual QA Checklist from Section 10 of the kickoff doc. Present it as a numbered list and say:
+
+> "Before I close this out — please run these manual checks on the dev URL and report back PASS or FAIL for each item."
+
+**Do NOT update FEATURES.md or CLAUDE.md until John reports QA results. Do not assume PASS. Do not close early.**
+
+### 10c — Act on QA results
+
+- **All PASS** → Close out: mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE.md` Section 12 (bump version, set next session), commit and push both files to dev.
+- **Any FAIL** → Generate a patch kickoff doc targeting only the failing items. Do not mark anything Done. Do not close the session.
+- **NEW REQUIREMENT discovered during QA** → Add to `docs/FEATURES.md` under the correct area as ❌ Missing, session = S-future. Commit and push.
+
+### Why this order matters
+Node.js tests verify logic. Manual QA verifies the real browser. A session is not closed until John has confirmed both.
 
 ---
 
