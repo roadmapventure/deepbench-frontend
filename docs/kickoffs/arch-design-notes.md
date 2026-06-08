@@ -274,6 +274,42 @@ migration and architecture work. Session order becomes:
 
 ---
 
+## 12. Agent Persona Replication + MD File Training
+
+### MD Files in the RAG Pipeline
+MD files are a valid training document type — same pipeline as PDFs, skip the
+extraction step, go straight to chunking and embedding. Add MD as a supported
+upload type in the Teach screen. No new infrastructure needed.
+
+### "John as an Agent" — Two-Layer Training Model
+Replicating a human persona requires both layers:
+
+**Layer A — Behavioral (system prompt → `agent_configs`)**
+How the person thinks. Behavioral profile, working style, decision patterns.
+This is a system prompt, not a knowledge document. Loaded at every call.
+Example: John-Profile.md content becomes Michelle-equivalent system prompt for a John agent.
+
+**Layer B — Knowledge (RAG → pgvector)**
+What the person knows. Domain expertise, frameworks, past work, IP.
+Retrieved at query time to answer as that person would answer.
+Uploaded via Teach screen as MD files, PDFs, or any text document.
+
+### New Capability: Identity / Persona Replication
+Add to the Phase 1 capability list:
+- **Identity / Persona Replication** — trains an agent to think, respond, and reason
+  as a specific human, using behavioral prompts (agent_configs) + knowledge RAG (pgvector)
+
+Capability spectrum for this type:
+- Level 1 — Behavioral profile loaded (system prompt only, no RAG)
+- Level 2 — Trained on person's domain knowledge (RAG documents added)
+- Level 3 — Self-improving from ongoing work output
+- Level 4 — Proprietary IP — private, competitive advantage, chargeable
+
+This is the first capability that is explicitly person-specific rather than domain-specific.
+It is also the most personal form of IP on the platform.
+
+---
+
 ## 11. What S-ARCH-01 Writing Session Must Produce
 
 1. Full `docs/ARCHITECTURE.md` — replaces current version — covers all 10 sections above
