@@ -210,13 +210,13 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AI-07 | Summarization/synthesis in AI Activity Panel | 🔶 Partial | S-future |
 | AI-08 | Brent ReAct agent (Railway, Playwright) | ✅ Done | DONE |
 | AI-09 | RAG pipeline (ingest → pgvector → query) | ✅ Done | DONE |
-| AI-10 | AI Activity Panel — header entry point, grouped by AI type | 🔶 Partial | S-AI-01 Part A |
+| AI-10 | AI Activity Panel — header entry point, grouped by AI type | ✅ Done | S16b |
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
 | AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | ✅ Done | S16a |
 | AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | ✅ Done | S16a |
 | AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
-| AI-16 | AI Audit persistence — write every AI call to Supabase ai_call_log; hydrate on mount for lifetime totals | ❌ Missing | S16b |
+| AI-16 | AI Audit persistence — write every AI call to Supabase ai_activity_log; hydrate on mount for lifetime totals | ✅ Done | S16b |
 
 **AI-10 Notes:** Accessible via "AI Audit" button in header. Primary view grouped by AI type (not chronological). Per type: total calls, estimated cost, avg latency, locations triggered (expandable). Session-scoped data in S16a; lifetime data wires in S16b.
 
