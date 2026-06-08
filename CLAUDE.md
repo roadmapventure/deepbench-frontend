@@ -212,8 +212,8 @@ For any Supabase operation: verify column names against actual schema before wri
 > For the definitive session queue, see Google Drive Session Queue doc.
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-**Current version in dev:** v5.1.17 (commit 8b40037)
-**Next session:** S16a — AI Audit UI (kickoff doc: `docs/kickoffs/v5.1.18-AI13-ai-audit-ui.md`)
+**Current version in dev:** v5.1.18 (commit ec3481b)
+**Next session:** S16b — AI Audit persistence (Supabase ai_call_log, lifetime metrics)
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**

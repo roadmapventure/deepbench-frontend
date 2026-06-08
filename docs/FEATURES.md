@@ -213,8 +213,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AI-10 | AI Activity Panel — header entry point, grouped by AI type | 🔶 Partial | S-AI-01 Part A |
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
-| AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | 🔶 Partial | S16a |
-| AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | 🔶 Partial | S16a |
+| AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | ✅ Done | S16a |
+| AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | ✅ Done | S16a |
 | AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
 | AI-16 | AI Audit persistence — write every AI call to Supabase ai_call_log; hydrate on mount for lifetime totals | ❌ Missing | S16b |
 
