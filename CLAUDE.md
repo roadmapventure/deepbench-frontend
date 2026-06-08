@@ -213,11 +213,20 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.19 (commit ac5a791)
-**Next session:** S-BENCH-01 — Agent Bench side begins (first session after S16b)
+**Next session:** S-ARCH-01 — Write full ARCHITECTURE.md north star document
+**Kickoff doc:** `docs/kickoffs/arch-design-notes.md` — read this before writing ARCHITECTURE.md
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**
 - Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
+
+**Architecture decisions made 2026-06-08 (not yet in ARCHITECTURE.md — S-ARCH-01 will write it):**
+- Four-layer architecture locked: Shared Foundation / Product Modules / Agent Capability Services / Platform Services
+- Capability Spectrum Model adopted: capabilities are independent of agents, have measurable depth levels (1–4), are assignable to agents, and are the product nucleus
+- Per-agent LLM assignment + BYOK planned for S-INFRA-01
+- Service adapter layer required for all external vendor calls (vendor portability)
+- NIGP migration precedes S-BENCH-01 — new session S-MIGRATE-01 added
+- Full session order revised — see arch-design-notes.md Section 10
 
 ---
 

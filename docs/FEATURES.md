@@ -306,17 +306,28 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | S16a | AI Audit UI — rename, restructure, By LLM + By Agent sections (AI-13, AI-14) | ✅ DONE |
 | S16b | AI Audit persistence + live panel wiring — Supabase ai_call_log, lifetime metrics, AI-10 full wiring (AI-16, AI-10) | ← NEXT |
 
-### Bench Side (begins after S16b)
+### Architecture + Migration (inserted before Bench side — decided 2026-06-08)
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ← NEXT |
+| S-MIGRATE-01 | NIGP migration — port TeamBuilder + PersonnelScreen into DeepBench Layers 1/2/3 | — |
+
+### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
 |---------|---------|
-| S-BENCH-01 | Michelle Manning — Full Agent (AG-01 through AG-06) |
-| S-BENCH-02 | Personnel File audit |
+| S-BENCH-01 | Michelle Manning — Full Agent (AG-01 through AG-06), built capability-first |
+| S-BENCH-02 | Personnel File — post-migration audit + capability dashboard view |
 | S-BENCH-03 | Teach screen audit |
 | S-BENCH-04 | Test Team audit |
 | S-UX-BENCH-01 | UX Review — Roster / Bench screen |
 | S-UX-BENCH-02 | UX Review — Personnel File |
 | S-UX-BENCH-03 | UX Review — Teach screen |
 | S-UX-BENCH-04 | UX Review — Test Team |
+
+### Infrastructure (after Bench side is stable)
+| Session | Feature |
+|---------|---------|
+| S-INFRA-01 | Capability registry, per-agent LLM assignment, BYOK infrastructure, DB migration to capability model |
 
 ### Deferred (resume after Bench side complete)
 | Session | Feature |
