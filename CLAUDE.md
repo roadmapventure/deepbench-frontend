@@ -6,6 +6,24 @@
 
 ---
 
+## 0. Session Bootstrap
+
+**At the start of every new session, before doing anything else, ask:**
+> "Are we designing or coding?"
+
+**If designing:**
+1. Read `C:\Projects\deepbench-frontend\DeepBench-Session-Init.md` and `CLAUDE.md`
+2. Execute all steps in the init file
+3. Report back:
+   - Current version
+   - Next session
+   - Open blocking questions
+4. Ask: "What would you like to work on?"
+
+**If coding:** Read `CLAUDE.md` only and begin immediately.
+
+---
+
 ## 1. What This App Is
 
 **DeepBench v5.1** — AI workforce platform for government procurement intelligence.
