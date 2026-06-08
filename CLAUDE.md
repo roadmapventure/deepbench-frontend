@@ -198,6 +198,48 @@ For any Supabase operation: verify column names against actual schema before wri
 
 ---
 
+## 13. Key File URLs (for Claude.ai fetching)
+
+> Claude.ai fetches these directly via raw GitHub URL.
+> Claude Code updates this list whenever files are added, renamed, or deleted.
+> Base: https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/
+
+### Screens
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/AnalyzerScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/AssignWorkScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/BenchNewScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/DashboardScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/FetchScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/PersonnelScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/RosterScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/TaskInstructionsScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/TeachScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/TestTeamScreen.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/analyzer/AIReviewTab.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/analyzer/LocalSpendTab.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/analyzer/VendorDiversityTab.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/screens/personnel/ResumeTab.jsx
+
+### Components
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/AIActivityPanel.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/AIDiamond.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/DebugOverlay.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/MichelleAvatar.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/SharedUI.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/StepList.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/components/ui.jsx
+
+### Data & Config
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/data/agents.js
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/tokens.js
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/main.jsx
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/AppShell.jsx
+
+### API Routes
+*(no `src/api/` directory exists — backend routes live in `deepbench-backend/src/server.js`)*
+
+---
+
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
