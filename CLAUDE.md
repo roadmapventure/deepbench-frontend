@@ -197,6 +197,7 @@ navigate('/destination');
 - [ ] `?debug=features` on dev URL — confirm feature badge visible
 - [ ] `docs/FEATURES.md` updated — this session's feature IDs marked ✅ Done with commit hash, session order table row marked ✅ DONE
 - [ ] `docs/STYLE-GUIDE.md` updated — any new style rule or pattern locked this session added to the guide and change log
+- [ ] **`api/` dependency audit** — if any `api/` file was added or modified: verify every `import`/`require` in that file is listed in `package.json` `dependencies` (not `devDependencies`). `npm run build` does NOT catch missing serverless deps. See BUG-10.
 
 > ⛔ **HARD STOP — Manual QA gate:**
 > When a coding completion report is pasted, the ONLY valid next action is to present the Manual QA Checklist from Section 10 of the kickoff doc.

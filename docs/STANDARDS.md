@@ -278,6 +278,7 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md` and Google Drive Feature Inventory
 | BUG-7: Ephemeral `answers[q.id]` state lost on refresh | Answers stored in React state only | Persist answers on `step.questions[n].a` in Supabase | K answer persistence |
 | BUG-8: Archived steps lost after Update Plan | Save wrote active only | `saveStepsToSupabase` writes `[...active, ...archived]` | K supabase write |
 | BUG-9: `extractTextFromFile` 500 on PDF — `readAsDataURL` corrupts binary base64 | `readAsDataURL` is not binary-safe for PDFs; corrupted bytes reach `pdf-parse` and throw | Always use `readAsArrayBuffer` → `Uint8Array` → `btoa(binary)` (NIGP pattern). Never use `readAsDataURL` for file upload. | L binary round-trip |
+| BUG-10: `api/extract.js` 500 — "Cannot find package 'pdf-parse'" on Vercel | `pdf-parse` and `jszip` were missing from DeepBench `package.json`. `npm run build` and Node.js tests pass locally because Vite only bundles frontend and local node_modules are available. The gap only surfaces on Vercel at runtime. | Before any session that adds or modifies an `api/` function: audit all `import`/`require` statements in that file and verify every package is listed in `package.json` `dependencies` (not `devDependencies`). | Dependency audit (pre-commit) |
 
 ---
 
@@ -310,3 +311,4 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-06i | Category K added — component state initialization. Three-operation separation mandated. `saveStepsToSupabase` canonical function mandated. |
 | 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
 | 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |
+| 2026-06-09 | BUG-10 added — missing `pdf-parse` + `jszip` in package.json. Dependency audit rule added: every api/ import must exist in package.json dependencies before commit. |
