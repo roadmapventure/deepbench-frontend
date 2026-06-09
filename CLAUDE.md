@@ -235,7 +235,7 @@ For any Supabase operation: verify column names against actual schema before wri
 **Known gaps confirmed 2026-06-08 (post S-MIGRATE-01b manual test):**
 - Training tab: load/toggle/delete wiring + NIGP card layout → S-MIGRATE-02
 - Training tab: Add Courses inline sub-view → S-MIGRATE-03 (design done ✓)
-- Training tab: Edit Course inline sub-view → S-MIGRATE-04 (needs design session)
+- Training tab: Edit Course inline sub-view → S-MIGRATE-04 ✓ done (732bf3c)
 - Playbook tab: all buttons non-functional → S-MIGRATE-05 (needs design session)
 - Resume tab: confirmed working ✓
 - Future session needed: **S-BENCH-UX-01** — full Bench UI review (Roster + Personnel File polish punch list). Schedule after S-MIGRATE-02 when all tabs are live.
