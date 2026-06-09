@@ -185,7 +185,17 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ✅ Done | S-MIGRATE-03 (299f1c0) + patch (686007e) |
-| PE-11 | Training tab — Edit Course inline sub-view (edit title, field notes, triggers, priority — no re-vectorization) | ❌ Missing | S-MIGRATE-04 |
+| PE-11 | Training tab — Edit Course inline sub-view (edit title, category, jurisdiction, field notes, triggers, priority — no re-vectorization; EDIT+DELETE only for trainable+active entries) | 🔶 Partial | S-MIGRATE-04 |
+
+**PE-11 spec locked 2026-06-09 (S-MIGRATE-04 design session):**
+- Reuses AddCourseView with `existingEntry` prop — no separate EditCourseView component
+- Edit opens inline in Personnel File window (left nav + page header remain visible) — NOT a new screen
+- Exhibit A shows "Document on file" card — no file upload, no re-vectorization
+- Save button label: "▸ Save Course Detail" (not "Teach X this document")
+- EDIT + DELETE: only shown when `agent.trainable && entry.status === "active"` (NIGP parity)
+- PATCH endpoint extended: `api/knowledge-entry.js` accepts title, category, jurisdiction, teaching_note, triggers, priority
+- All form fields editable: title, category, jurisdiction, priority, triggers, teaching note (NIGP parity)
+- Kickoff doc: `docs/kickoffs/v5.1.26-PE11-edit-course.md`
 
 **PE design decisions locked 2026-06-08 (S-MIGRATE-UX):**
 - Left nav replaces horizontal tab bar. Nav groups: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section.
@@ -346,7 +356,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-01b | Personnel File left-sidebar nav + Profile tab 2-col layout (PE-07, PE-08, PE-09) | ✅ DONE (8660e42) |
 | S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
 | S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ✅ DONE (686007e) |
-| S-MIGRATE-04 | Training tab: Edit Course inline sub-view — title, notes, triggers, priority (PE-11) | ⏳ Needs design session |
+| S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ⏳ Ready to code |
 | S-MIGRATE-05 | Playbook tab: output_format CRUD — ResumeTab pattern (PE-04) | ⏳ Needs design session |
 | S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |
 
