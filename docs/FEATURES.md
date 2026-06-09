@@ -190,7 +190,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 **PE-04 spec locked 2026-06-09 (S-MIGRATE-05 design session):**
 - Output formats: full CRUD via `/api/agent-configs?type=output_format` — identical to ResumeTab `role_prompt` pattern
-- Guardrails: single-record load+save via `/api/agent-configs?type=guardrail` — PATCH if record exists, POST to create
+- Guardrails: two separate records — `name: "always"` and `name: "never"`, both `type: "guardrail"` — autosaved on blur; no canEdit gate (any agent editable)
 - Both sections loaded in single `Promise.all` on mount
 - `ConfigCard` and `AddConfigForm` promoted to shared scope (named exports from ResumeTab or inlined above ProfileTab)
 - `AddConfigForm` parameterized with `type` prop — not hardcoded `"role_prompt"`
