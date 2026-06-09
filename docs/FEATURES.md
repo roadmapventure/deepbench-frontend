@@ -166,7 +166,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
 | RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
 | RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
-| RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ⏳ Design done | S-BENCH-UX-01 |
+| RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
+| RO-08 | AiBadge on brass/gold backgrounds — current "✦ AI" text is not visually distinct against brass button; needs design solution (separate treatment or placement change) | ❌ Missing | S-BENCH-UX-02 |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
@@ -181,7 +182,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-02 | Resume tab | ✅ Done | DONE |
 | PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | ✅ Done | S-MIGRATE-02 (02ff560) |
 | PE-04 | Playbook tab live wiring (output_format CRUD + guardrails — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
-| PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ⏳ Design done | S-BENCH-UX-01 |
+| PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | PE-12 | Training tab — Test Agent console (inline sub-view: config selectors, scenario picker, live brief + RAG call, system prompt inspector, RAG chunks panel) | ❌ Missing | S-MIGRATE-06 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
@@ -402,7 +403,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ⏳ Design done — ready to code |
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
 | S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
-| S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ⏳ Design done — ready to code |
+| S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ✅ DONE (812ed59) |
+| S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge on brass background fix (RO-08) + Resume/Training/Playbook tab UX review | ⏳ Needs design session |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |

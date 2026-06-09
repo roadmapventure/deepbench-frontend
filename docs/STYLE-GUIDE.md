@@ -114,6 +114,9 @@ Or pass a color override if AiBadge supports it:
 <AiBadge style={{ color: T.navy }} />
 ```
 
+### Known limitation — AiBadge on brass backgrounds (RO-08)
+Placing `<AiBadge>` next to a brass-background button does not produce a visually distinct result — the "✦ AI" mark blends into the gold. Discovered in S-BENCH-UX-01 QA (Robyn's "+ Add Training" card). **Do not add new AiBadge placements adjacent to brass buttons until RO-08 is resolved in S-BENCH-UX-02.** Existing placements on navy and card backgrounds are unaffected.
+
 ### AI SUGGESTED chip (separate from AiBadge)
 For form field labels where AI pre-filled a value, use the purple chip:
 ```jsx
@@ -362,3 +365,4 @@ Used when a tab has an embedded form that swaps out the list view. Established i
 | 2026-06-08 | S-MIGRATE-01a | AgentAvatar, illustrated SVG avatars in SharedUI |
 | 2026-06-09 | S-MIGRATE-03 | Inline sub-view pattern (PE-10) |
 | 2026-06-09 | S-MIGRATE-03-patch | AiBadge color rule: match button label color. No badge on Cancel state. |
+| 2026-06-09 | S-BENCH-UX-01 | AiBadge known limitation: not visually distinct on brass backgrounds — blocked pending RO-08 design in S-BENCH-UX-02. |
