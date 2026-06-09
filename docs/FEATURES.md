@@ -177,7 +177,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 |----|---------|--------|---------|
 | PE-01 | Profile tab | ✅ Done | DONE |
 | PE-02 | Resume tab | ✅ Done | DONE |
-| PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | 🔶 Partial (mock only) | S-MIGRATE-02 |
+| PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | ✅ Done | S-MIGRATE-02 (02ff560) |
 | PE-04 | Playbook tab live wiring (output_format CRUD — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
@@ -334,7 +334,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-01-design | Design session: produce coding kickoff doc for S-MIGRATE-01 | ✅ DONE |
 | S-MIGRATE-01a | Illustrated SVG avatars + AgentAvatar in SharedUI + Roster visual port (RO-04) | ✅ DONE (621eb31) |
 | S-MIGRATE-01b | Personnel File left-sidebar nav + Profile tab 2-col layout (PE-07, PE-08, PE-09) | ✅ DONE (8660e42) |
-| S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ← NEXT (kickoff: v5.1.22-PE03-training-live-wiring.md) |
+| S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
 | S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ⏳ Needs design session |
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — title, notes, triggers, priority (PE-11) | ⏳ Needs design session |
 | S-MIGRATE-05 | Playbook tab: output_format CRUD — ResumeTab pattern (PE-04) | ⏳ Needs design session |

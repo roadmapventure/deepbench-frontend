@@ -215,8 +215,8 @@ For any Supabase operation: verify column names against actual schema before wri
 > For the definitive session queue, see Google Drive Session Queue doc.
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-**Current version in dev:** v5.1.21 (commit 8660e42)
-**Next session:** S-MIGRATE-02 — Training tab live wiring (PE-03). Read kickoff doc: `docs/kickoffs/v5.1.22-PE03-training-live-wiring.md`
+**Current version in dev:** v5.1.22 (commit 02ff560)
+**Next session:** S-MIGRATE-03 — Design session: Add Courses inline sub-view within Training tab (PE-10).
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
