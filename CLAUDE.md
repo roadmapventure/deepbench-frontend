@@ -28,6 +28,8 @@
 
 **If coding:** Read `CLAUDE.md` only and begin immediately.
 
+> **Rule: Every coding session must be preceded by a design session that produces a kickoff doc. No exceptions. Never skip straight to coding.**
+
 ---
 
 ## 1. What This App Is
@@ -191,6 +193,7 @@ navigate('/destination');
 - [ ] FeatureBadge added for this session's feature ID
 - [ ] Zero red errors in browser console after Vercel deploy
 - [ ] `?debug=features` on dev URL — confirm feature badge visible
+- [ ] `docs/FEATURES.md` updated — this session's feature IDs marked ✅ Done with commit hash, session order table row marked ✅ DONE
 
 ---
 
@@ -213,26 +216,34 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.21 (commit 8660e42)
-**Next session:** S-MIGRATE-02 — Coding session: Training tab live wiring + Playbook tab CRUD. Read kickoff doc when created.
+**Next session:** S-MIGRATE-02 — Training tab live wiring (PE-03). Read kickoff doc: `docs/kickoffs/v5.1.22-PE03-training-live-wiring.md`
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
 **Open blocking question:**
 - Q5 (BLOCKS S11): Agent step output destination — A, B, or C. (Decision needed before S11.)
 
+**Known gaps confirmed 2026-06-08 (post S-MIGRATE-01b manual test):**
+- Training tab: load/toggle/delete wiring + NIGP card layout → S-MIGRATE-02
+- Training tab: Add Courses inline sub-view → S-MIGRATE-03 (needs design session)
+- Training tab: Edit Course inline sub-view → S-MIGRATE-04 (needs design session)
+- Playbook tab: all buttons non-functional → S-MIGRATE-05 (needs design session)
+- Resume tab: confirmed working ✓
+- Future session needed: **S-BENCH-UX-01** — full Bench UI review (Roster + Personnel File polish punch list). Schedule after S-MIGRATE-02 when all tabs are live.
+
 **Migration decisions locked 2026-06-08 (S-MIGRATE-UX design session):**
 - NIGP and DeepBench share the same Supabase instance (confirmed via env vars)
 - Migration approach: design-first (Option B) — never import NIGP file structure; port only live API wiring logic
 - All existing API endpoints needed for migration already exist in DeepBench: `/api/load-entries`, `/api/agent-configs`, `/api/ingest`, `/api/extract`, `/api/brief`, `/api/rag-query`
-- Session chain: S-MIGRATE-UX (done) → S-MIGRATE-01-design (done) → S-MIGRATE-01a (done, 621eb31) → S-MIGRATE-01b (done, 8660e42) → S-MIGRATE-02 (next)
+- Session chain: S-MIGRATE-UX (done) → S-MIGRATE-01-design (done) → S-MIGRATE-01a (done, 621eb31) → S-MIGRATE-01b (done, 8660e42) → S-MIGRATE-02 (next) → S-MIGRATE-03 → S-MIGRATE-04 → S-MIGRATE-05 → S-BENCH-UX-01
 - ResumeTab pattern (ConfigCard + AddConfigForm + apiGetConfigs/apiPatchConfig/apiDeleteConfig) is the proven model — Playbook tab follows same pattern
 
 **UX decisions locked 2026-06-08 (S-MIGRATE-UX — full detail in docs/kickoffs/S-MIGRATE-UX-design-notes.md):**
-- Roster: adopt NIGP "Build your analyst team." design — illustrated SVG avatars, 5-stop labeled skill bar, NIGP headline. "Add a Player" moves to subtle `+` in stats strip. Vacancy card stays as primary /bench/new entry point. "Test My Team" removed → documented as WK-XX for future.
-- Personnel File: adopt NIGP left-sidebar nav layout. 2 nav groups only: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section. "Assignments" and "Completed Projects" become sections on Profile tab (mock data). "← Team Builder" button gone.
-- S-MIGRATE-01 scope: visual port only (RO-04, PE-07, PE-08, PE-09) — 3 files max: RosterScreen.jsx, PersonnelScreen.jsx, agents.js
-- S-MIGRATE-02 scope: data wiring (PE-03 Training live, PE-04 Playbook live CRUD)
-- Future (not in S-MIGRATE-01/02): Resume/Training/Playbook sub-page design from NIGP; Training inline Teach+Test deprecates TeachScreen + TestTeamScreen; Assignments/Completed live wiring
+- Roster: illustrated SVG avatars, 5-stop labeled skill bar, DeepBench headline preserved ("Your bench."). "Add a Player" moves to subtle `+` in stats strip. Vacancy card stays as primary /bench/new entry point. "Test My Team" removed → documented as WK-XX for future.
+- Personnel File: left-sidebar nav layout. 2 nav groups only: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section. "Assignments" and "Completed Projects" become sections on Profile tab (mock data).
+- S-MIGRATE-01 scope: visual port only (RO-04, PE-07, PE-08, PE-09) — done.
+- S-MIGRATE-02 scope: data wiring (PE-03 Training live add/edit/delete, PE-04 Playbook live CRUD)
+- Future (not in S-MIGRATE-01/02): Training inline Teach+Test sub-views deprecate TeachScreen + TestTeamScreen; Assignments/Completed live wiring; S-BENCH-UX-01 UI polish review
 
 **Architecture decisions made 2026-06-08 (not yet in ARCHITECTURE.md — S-ARCH-01 will write it):**
 - Four-layer architecture locked: Shared Foundation / Product Modules / Agent Capability Services / Platform Services

@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-08 | Session: S-MIGRATE-UX
+> Last updated: 2026-06-08 | Session: S-MIGRATE-01b
 
 ---
 
@@ -163,7 +163,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-01 | Roster screen — all 7 agents including Pat | ✅ Done | DONE |
 | RO-02 | Agent cards with workload indicators | ✅ Done | DONE |
 | RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
-| RO-04 | NIGP visual port — illustrated SVG avatars, 5-stop labeled skill bar, NIGP headline/subtitle, "Add a Player" subtle in stats strip | ❌ Missing | S-MIGRATE-01 |
+| RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
 | RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
@@ -177,13 +177,15 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 |----|---------|--------|---------|
 | PE-01 | Profile tab | ✅ Done | DONE |
 | PE-02 | Resume tab | ✅ Done | DONE |
-| PE-03 | Training tab live wiring (from Supabase /api/load-entries) | 🔶 Partial (mock only) | S-MIGRATE-02 |
-| PE-04 | Playbook tab live wiring (output_format CRUD — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-02 |
+| PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | 🔶 Partial (mock only) | S-MIGRATE-02 |
+| PE-04 | Playbook tab live wiring (output_format CRUD — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
-| PE-07 | NIGP left-sidebar nav layout (replaces horizontal tabs); 2 groups: OVERVIEW + CONFIGURE only | ❌ Missing | S-MIGRATE-01 |
-| PE-08 | Active Work Assignments section on Profile tab (mock data) | ❌ Missing | S-MIGRATE-01 |
-| PE-09 | Recently Completed section on Profile tab (mock data) | ❌ Missing | S-MIGRATE-01 |
+| PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ❌ Missing | S-MIGRATE-03 |
+| PE-11 | Training tab — Edit Course inline sub-view (edit title, field notes, triggers, priority — no re-vectorization) | ❌ Missing | S-MIGRATE-04 |
 
 **PE design decisions locked 2026-06-08 (S-MIGRATE-UX):**
 - Left nav replaces horizontal tab bar. Nav groups: OVERVIEW (Profile) + CONFIGURE (Resume, Training, Playbook). No OPERATE section.
@@ -329,9 +331,14 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 |---------|---------|--------|
 | S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ✅ DONE |
 | S-MIGRATE-UX | UX/UI design — Roster + Personnel screens walk-through, design decisions locked | ✅ DONE |
-| S-MIGRATE-01-design | Design session: produce coding kickoff doc for S-MIGRATE-01 | ← NEXT |
-| S-MIGRATE-01 | **Visual port**: Roster NIGP design (RO-04) + Personnel left-nav layout (PE-07, PE-08, PE-09) | ⏳ Pending kickoff doc |
-| S-MIGRATE-02 | **Data wiring**: Training tab live (PE-03) + Playbook tab live CRUD (PE-04) | ⏳ Pending |
+| S-MIGRATE-01-design | Design session: produce coding kickoff doc for S-MIGRATE-01 | ✅ DONE |
+| S-MIGRATE-01a | Illustrated SVG avatars + AgentAvatar in SharedUI + Roster visual port (RO-04) | ✅ DONE (621eb31) |
+| S-MIGRATE-01b | Personnel File left-sidebar nav + Profile tab 2-col layout (PE-07, PE-08, PE-09) | ✅ DONE (8660e42) |
+| S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ← NEXT (kickoff: v5.1.22-PE03-training-live-wiring.md) |
+| S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ⏳ Needs design session |
+| S-MIGRATE-04 | Training tab: Edit Course inline sub-view — title, notes, triggers, priority (PE-11) | ⏳ Needs design session |
+| S-MIGRATE-05 | Playbook tab: output_format CRUD — ResumeTab pattern (PE-04) | ⏳ Needs design session |
+| S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
