@@ -1,4 +1,4 @@
-// DeepBench v5.1.17 | StepList.jsx | S15c — rename Update Steps + move below textarea
+// DeepBench v5.1.27 | StepList.jsx | S15c — rename Update Steps + move below textarea
 // FEATURE: TI-UX-15c — Rename "Update Plan →" to "Update Steps →"; move below comment textarea
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
@@ -7,7 +7,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { FeatureBadge } from "./SharedUI.jsx";
+import { FeatureBadge, AgentAvatar } from "./SharedUI.jsx";
 import { AGENTS } from "../data/agents.js";
 
 // Type → visual theme
@@ -21,20 +21,6 @@ function getTheme(type) {
   return TYPE_THEME[type] || TYPE_THEME.agent;
 }
 
-function AgentInitials({ name = "?", size = 18 }) {
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: T.cardAlt, border: `1px solid ${T.lineSoft}`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: mono, fontSize: 7, fontWeight: 700, color: T.muted,
-      flexShrink: 0,
-    }}>
-      {initials}
-    </div>
-  );
-}
 
 // ── Threaded archive card — indented inline below its replacement step ────────
 function ThreadedArchiveCard({ oldStep, onArchive, onKeep }) {
@@ -142,12 +128,14 @@ function StepCard({
   // ── Agent attribution (TI-12) ─────────────────────────────────────────────
   const attribution = isHITL ? (
     <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, marginBottom: 5 }}>
-      <AgentInitials name="You" />
+      {/* FEATURE: RO-06 — AgentAvatar replaces AgentInitials */}
+      <AgentAvatar who={step.agentId} size={18} ring={false} />
       <span style={{ fontFamily: body, fontSize: 12, color: "#6b7280" }}>You · Action Required</span>
     </div>
   ) : (agentName || agentRecord) ? (
     <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, marginBottom: 5 }}>
-      <AgentInitials name={agentName || agentRecord?.name || "?"} />
+      {/* FEATURE: RO-06 — AgentAvatar replaces AgentInitials */}
+      <AgentAvatar who={step.agentId} size={18} ring={false} />
       <span style={{ fontFamily: body, fontSize: 12, color: "#6b7280" }}>
         {agentName || agentRecord?.name}
         {agentCode ? ` · ${agentCode}` : ""}

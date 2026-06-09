@@ -1,4 +1,4 @@
-// DeepBench v5.1.20 | agents.js | Add AVATAR_CFG for illustrated SVG portraits
+// DeepBench v5.1.27 | agents.js | Add AVATAR_CFG for illustrated SVG portraits
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -84,6 +84,8 @@ export const AVATAR_CFG = {
   robyn:  { skin:"#c48b62", hair:"#8a3418", collar:"#5a2f3d", extra:"bun",      border:T.brass  },
   brent:  { skin:"#d4a870", hair:"#2c3e2d", collar:"#1a2e1a", extra:"field",    border:T.moss   },
   pat:    { skin:"#e8c9a0", hair:"#8b4513", collar:"#c0c0c0", extra:"bob",      border:T.muted  },
+  // FEATURE: RO-06 — Add michelle to AVATAR_CFG
+  michelle: { skin:"#d4b896", hair:"#2a2a3a", collar:"#1e3a5a", extra:"glasses", border:T.brass },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// DeepBench v5.1.15 | DashboardScreen.jsx | Work Dashboard
+// DeepBench v5.1.27 | DashboardScreen.jsx | Work Dashboard
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -76,11 +76,11 @@ function TaskCard({ task, onClick }) {
     <div onClick={onClick} style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",marginBottom:10,position:"relative",cursor:"pointer",transition:"border-color .15s"}}
       onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
       onMouseLeave={e=>e.currentTarget.style.borderColor=T.line}>
+      <FeatureBadge id="RO-06" />
       <div style={{position:"absolute",top:5,left:5,width:8,height:8,borderTop:`1px solid ${T.brass}`,borderLeft:`1px solid ${T.brass}`,opacity:.4,pointerEvents:"none"}}/>
       <div style={{padding:"13px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
-        <div style={{width:36,height:36,borderRadius:"50%",border:`1.5px solid ${agent?.color||T.brass}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:14,fontWeight:700,color:agent?.color||T.brass,flexShrink:0,marginTop:1}}>
-          {task.agent[0]}
-        </div>
+        {/* FEATURE: RO-06 — AgentAvatar replaces hand-rolled circle */}
+        <AgentAvatar who={task.agentId} size={36} ring={true} />
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:4,lineHeight:1.2}}>{task.title}</div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
@@ -346,7 +346,8 @@ function ChatPanel() {
             <div key={i} style={{alignSelf:"flex-start",maxWidth:"90%"}}>
               {!msg.isIntro && (
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                  <div style={{width:18,height:18,borderRadius:"50%",border:`1px solid ${agent?.color||T.brass}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:agent?.color||T.brass}}>{agent?.name[0]}</div>
+                  {/* FEATURE: RO-06 — AgentAvatar replaces hand-rolled circle */}
+                  <AgentAvatar who={msg.agentId} size={18} ring={false} />
                   <span style={{fontFamily:display,fontSize:11,fontWeight:600,color:T.navy}}>{agent?.name}</span>
                   <span style={{fontFamily:mono,fontSize:8,padding:"1px 5px",background:tier.bg,color:tier.color,border:`1px solid ${tier.border}`}}>{tier.label}</span>
                   <AiBadge/>
@@ -354,7 +355,8 @@ function ChatPanel() {
               )}
               {msg.isIntro && (
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                  <div style={{width:18,height:18,borderRadius:"50%",border:`1px solid ${agent?.color||T.brass}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:agent?.color||T.brass}}>{agent?.name[0]}</div>
+                  {/* FEATURE: RO-06 — AgentAvatar replaces hand-rolled circle */}
+                  <AgentAvatar who={msg.agentId} size={18} ring={false} />
                   <span style={{fontFamily:display,fontSize:11,fontWeight:600,color:T.navy}}>{agent?.name}</span>
                   <span style={{fontFamily:mono,fontSize:8,color:T.moss}}>· Most Senior for this topic</span>
                   <span style={{fontFamily:mono,fontSize:8,color:T.moss,marginLeft:"auto"}}>● Online</span>
