@@ -2,7 +2,7 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.28
-**Next session:** S-MIGRATE-05 — Playbook tab CRUD (kickoff ready at docs/kickoffs/v5.1.26-PE-04-playbook-tab-crud.md)
+**Next session:** S-BENCH-UX-01 — Bench UI polish review (ready) | S-MIGRATE-06 — Test Agent console (needs design session)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
