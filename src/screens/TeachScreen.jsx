@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | TeachScreen.jsx | Teach an agent — upload doc, AI metadata, ingest to RAG
+// DeepBench v5.1.24 | TeachScreen.jsx | PE-10 patch — fix extractTextFromFile (FormData → base64 JSON)
 // FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
@@ -16,16 +16,29 @@ import { priorityInfo } from "../utils.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 
 // ── Extract text from uploaded file via /api/extract ─────────────────────────
+// FEATURE: PE-10 patch — API expects JSON { fileData, fileType, fileName }, not FormData
 async function extractTextFromFile(file) {
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/extract", { method: "POST", body: formData });
-    if (!res.ok) throw new Error(`Extract failed: ${res.status}`);
+    // Convert file to base64 via FileReader — API expects JSON { fileData, fileType, fileName }
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileData: base64, fileType: file.type, fileName: file.name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Extract failed: ${res.status}`);
+    }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const text = data.text || "";
-    return { text, wordCount: text.split(/\s+/).filter(Boolean).length, error: null };
+    return { text, wordCount: data.wordCount || text.split(/\s+/).filter(Boolean).length, error: null };
   } catch (e) {
     return { text: "", wordCount: 0, error: e.message };
   }

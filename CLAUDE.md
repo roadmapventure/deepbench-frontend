@@ -216,7 +216,7 @@ For any Supabase operation: verify column names against actual schema before wri
 > For the definitive session queue, see Google Drive Session Queue doc.
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
-**Current version in dev:** v5.1.23
+**Current version in dev:** v5.1.24
 **Next session:** S-MIGRATE-04 — Edit Course inline sub-view (needs design session first)
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.

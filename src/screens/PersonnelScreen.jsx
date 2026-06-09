@@ -1,7 +1,7 @@
-// DeepBench v5.1.23 | PersonnelScreen.jsx | Add Courses inline sub-view — PE-10
+// DeepBench v5.1.24 | PersonnelScreen.jsx | PE-10 patch — extract fix, AiBadge, tab routing
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
@@ -40,14 +40,26 @@ function str(v) { return typeof v === "string" ? v : ""; }
 
 async function extractTextFromFile(file) {
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/extract", { method: "POST", body: formData });
-    if (!res.ok) throw new Error(`Extract failed: ${res.status}`);
+    // Convert file to base64 via FileReader — API expects JSON { fileData, fileType, fileName }
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileData: base64, fileType: file.type, fileName: file.name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Extract failed: ${res.status}`);
+    }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const text = data.text || "";
-    return { text, wordCount: text.split(/\s+/).filter(Boolean).length, error: null };
+    return { text, wordCount: data.wordCount || text.split(/\s+/).filter(Boolean).length, error: null };
   } catch (e) {
     return { text: "", wordCount: 0, error: e.message };
   }
@@ -453,7 +465,7 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
               <div style={{ fontFamily: display, fontSize: 15, fontWeight: 600, color: T.navy, marginBottom: 4 }}>Drop a document here</div>
               <div style={{ fontFamily: body, fontSize: 12, color: T.muted, marginBottom: 14 }}>PDF, DOCX, TXT · Max 20MB</div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: T.brass, color: T.navy, padding: "8px 20px", fontFamily: body, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                <AiBadge /> ↑ Browse File
+                <AiBadge style={{ color: T.navy }} /> ↑ Browse File
               </div>
               <input ref={addFileRef} type="file" accept=".pdf,.txt,.docx" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
             </div>
@@ -770,26 +782,25 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
         ))}
         <div style={{flex:1}}/>
         {/* FEATURE: PE-10 — Add Courses inline sub-view */}
-        <button
-          onClick={() => showAddView ? resetAddView() : setShowAddView(true)}
-          style={{
-            background: showAddView ? "transparent" : T.brass,
-            border: `1px solid ${T.brass}`,
-            color: showAddView ? T.brassLight : T.navy,
-            padding: "6px 14px",
-            fontFamily: body,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            letterSpacing: .3,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <AiBadge />
-          {showAddView ? "✕ Cancel" : "+ Add Courses"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {!showAddView && <AiBadge style={{ color: T.navy }} />}
+          <button
+            onClick={() => showAddView ? resetAddView() : setShowAddView(true)}
+            style={{
+              background: showAddView ? "transparent" : T.brass,
+              border: `1px solid ${T.brass}`,
+              color: showAddView ? T.brassLight : T.navy,
+              padding: "6px 14px",
+              fontFamily: body,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: .3,
+            }}
+          >
+            {showAddView ? "✕ Cancel" : "+ Add Courses"}
+          </button>
+        </div>
       </div>
 
       {/* FEATURE: PE-10 — Inline add-course sub-view */}
@@ -1009,9 +1020,10 @@ function PlaybookTab({ agent }) {
 export default function PersonnelScreen() {
   const { agentId } = useParams();
   const navigate    = useNavigate();
+  const [searchParams] = useSearchParams();
   const agents      = useAgents();
   const agent       = agents.find(a => a.id === agentId) || agents[0];
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);

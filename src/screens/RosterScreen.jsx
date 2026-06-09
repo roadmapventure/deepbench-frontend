@@ -1,4 +1,4 @@
-// DeepBench v5.1.20 | RosterScreen.jsx | NIGP visual port — illustrated SVG avatars, stats strip + link
+// DeepBench v5.1.24 | RosterScreen.jsx | PE-10 patch — onAddTraining navigates to Training tab
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -197,7 +197,7 @@ export default function RosterScreen() {
           {agents.map(a=>(
             <AgentCard key={a.id} agent={a}
               onViewProfile={a=>navigate(`/bench/${a.id}`)}
-              onAddTraining={a=>navigate(`/bench/${a.id}/teach`)}
+              onAddTraining={a=>navigate(`/bench/${a.id}?tab=training`)}
             />
           ))}
 
