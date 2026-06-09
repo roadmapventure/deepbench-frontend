@@ -1,8 +1,8 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.27
-**Next session:** S-MIGRATE-05 — Playbook tab CRUD (kickoff ready) | S-AVATAR-01 — Avatar sweep (kickoff ready) | S-MIGRATE-06 — Test Agent console (needs design)
+**Version in dev:** v5.1.28
+**Next session:** S-MIGRATE-05 — Playbook tab CRUD (kickoff ready at docs/kickoffs/v5.1.26-PE-04-playbook-tab-crud.md)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -17,6 +17,7 @@
 - S-MIGRATE-03 — Training tab: Add Courses inline sub-view ✅ done (686007e)
 - S-MIGRATE-04 — Training tab: Edit Course inline sub-view ✅ done (732bf3c)
 - S-MIGRATE-05 — Playbook tab: output_format CRUD + guardrails ✅ done (1644366)
+- S-AVATAR-01 — Avatar consistency sweep ✅ done (d9d43c2)
 - S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 - S-BENCH-UX-01 — Bench UI review (schedule after S-MIGRATE-05)
 

@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-09 | Session: S-AVATAR-01 design (RO-06 added, Susan Smith TR-08 added, Michelle role corrected, backlog capture rule added)
+> Last updated: 2026-06-09 | Session: S-AVATAR-01 complete (RO-06 ✅, AG-04a superseded, Michelle + Susan added to roster)
 
 ---
 
@@ -165,7 +165,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
 | RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
 | RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
-| RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ❌ Missing | S-AVATAR-01 |
+| RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
@@ -322,7 +322,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AG-02 | Michelle system prompt in Supabase agent_configs | ❌ Missing | S-BENCH-01 LOCKED |
 | AG-03 | Michelle trainable via Teach + RAG | ❌ Missing | S-BENCH-01 LOCKED |
 | AG-04 | Michelle UI presence on planning screens | 🔶 Partial | S10b ✅ S10p ✅ S-BENCH-01 full |
-| AG-04a | Michelle avatar — silhouette placeholder | ✅ Done | S10p |
+| AG-04a | Michelle avatar — silhouette placeholder → replaced by AgentAvatar (RO-06) | ✅ Done | S10p → S-AVATAR-01 |
 | AG-04b | Update Plan thinking state — three-layer | ✅ Done | S10p |
 | AG-05 | api/plan.js reads Michelle prompt from Supabase | ❌ Missing | S-BENCH-01 LOCKED |
 | AG-06 | Michelle surgical replanning directive | ❌ Missing | S-BENCH-01 LOCKED |
@@ -399,7 +399,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ✅ DONE (732bf3c) |
 | S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ⏳ Design done — ready to code |
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
-| S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ⏳ Design done — ready to code |
+| S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
 | S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |
 
 ### Bench Side (begins after S-MIGRATE-01)
