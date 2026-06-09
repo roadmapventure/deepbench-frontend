@@ -206,7 +206,7 @@ When John pastes the Claude Code verification checklist showing all items checke
 ### 10c — Act on QA results
 
 - **All PASS** → Close out: mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE.md` Section 12 (bump version, set next session), commit and push both files to dev.
-- **Any FAIL** → Generate a patch kickoff doc targeting only the failing items. Do not mark anything Done. Do not close the session.
+- **Any FAIL** → Perform full root cause analysis before writing any patch: read the complete execution path (browser → call site → API handler → package.json → runtime), compare against the working NIGP reference line by line, identify the deepest cause — not the nearest symptom. A bug that fails QA once must not fail QA twice. Then generate a patch kickoff doc targeting the confirmed root cause.
 - **NEW REQUIREMENT discovered during QA** → Add to `docs/FEATURES.md` under the correct area as ❌ Missing, session = S-future. Commit and push.
 
 ### Why this order matters

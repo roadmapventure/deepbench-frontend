@@ -260,8 +260,21 @@ Rules:
 - Maximum 12 steps per session
 - Always end with: *"Report back PASS/FAIL/NEW REQUIREMENT for each item"*
 
-If FAIL: write a patch kickoff doc before moving on.
-If NEW REQUIREMENT: add to `docs/FEATURES.md` and Google Drive Feature Inventory.
+**If any QA item FAILS — mandatory root cause protocol (do not skip):**
+
+Before writing a patch kickoff doc, perform a full root cause analysis:
+1. Read the actual error message in full — not just the status code
+2. Read every file in the execution path (browser → frontend call site → API handler → package.json → runtime environment)
+3. Compare against the working reference implementation (NIGP or equivalent) line by line
+4. Identify the deepest root cause — not the closest symptom
+5. Confirm the fix addresses the root cause, not just the surface error
+
+Do not patch the call site before checking the server. Do not check the server before checking its dependencies. Do not assume the bug is in the last file you touched.
+
+A bug that fails QA once should not fail QA twice. If it does, the root cause analysis was not deep enough.
+
+If FAIL: write a patch kickoff doc targeting the confirmed root cause only.
+If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 
 ---
 
