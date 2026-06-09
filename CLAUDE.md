@@ -196,6 +196,11 @@ navigate('/destination');
 - [ ] `docs/FEATURES.md` updated — this session's feature IDs marked ✅ Done with commit hash, session order table row marked ✅ DONE
 - [ ] `docs/STYLE-GUIDE.md` updated — any new style rule or pattern locked this session added to the guide and change log
 
+> ⛔ **HARD STOP — Manual QA gate:**
+> When a coding completion report is pasted, the ONLY valid next action is to present the Manual QA Checklist from Section 10 of the kickoff doc.
+> Do NOT update FEATURES.md, do NOT bump the version, do NOT commit close-out docs, do NOT summarize the session as done.
+> Wait for John to report PASS/FAIL on every item. If any item FAILS, generate a patch kickoff doc. Close only after all items PASS.
+
 ---
 
 ## 11. Supabase Schema Reference

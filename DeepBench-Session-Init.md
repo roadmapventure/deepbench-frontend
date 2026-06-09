@@ -201,7 +201,7 @@ When John pastes the Claude Code verification checklist showing all items checke
 
 > "Before I close this out — please run these manual checks on the dev URL and report back PASS or FAIL for each item."
 
-**Do NOT update FEATURES.md or CLAUDE.md until John reports QA results. Do not assume PASS. Do not close early.**
+**⛔ HARD STOP: Do NOT update FEATURES.md or CLAUDE.md until John reports QA results. Do not assume PASS. Do not close early. Do not commit close-out docs. A well-formatted completion report from Claude Code is NOT a QA sign-off — it only confirms Node.js tests and build passed. Browser QA is always required.**
 
 ### 10c — Act on QA results
 
