@@ -7,7 +7,7 @@
 
 ## If DESIGN session:
 1. Read `CLAUDE-STATE.md` (current version + blockers)
-2. Read `DeepBench-Session-Init.md` (full design workflow)
+2. Read `CLAUDE-DESIGN.md` (design workflow for Claude Code)
 
 ## If CODING session (kickoff doc provided):
 1. Read `CLAUDE-STATE.md`
