@@ -73,6 +73,26 @@ export const AGENTS = [
     quip: `"I'm just here to learn... I think."`,
     color: T.muted, isWebAgent: true, isIntern: true, noMemory: true,
   },
+  {
+    id: "michelle", name: "Michelle Manning", role: "Project Manager",
+    code: "PP-01", hiredOn: "Mar 2025", trainer: "RMV", arch: "LLM Planning",
+    specialty: "Project Planning · Step Sequencing · Multi-Agent Coordination",
+    salary: 100000, value: 110000, hourly: 52, reportHrs: 2, reportCost: 104,
+    docs: 0, classes: 0, chunks: 0, skill: 65, situational: 30,
+    trainable: false, trainableBy: "RMV", revenueModel: "Included",
+    quip: '"I map the mission before anyone moves."', color: T.brass,
+    isPlanner: true,
+  },
+  {
+    id: "susan", name: "Susan Smith", role: "Trainer Agent",
+    code: "TR-08", hiredOn: "Jun 2026", trainer: "RMV", arch: "LLM Training",
+    specialty: "Agent Training · Knowledge Transfer · Capability Building",
+    salary: 85000, value: 95000, hourly: 44, reportHrs: 2, reportCost: 88,
+    docs: 0, classes: 0, chunks: 0, skill: 55, situational: 20,
+    trainable: false, trainableBy: "RMV", revenueModel: "Included",
+    quip: '"I turn knowledge into capability."', color: T.brass,
+    isTrainer: true,
+  },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -86,6 +106,7 @@ export const AVATAR_CFG = {
   pat:    { skin:"#e8c9a0", hair:"#8b4513", collar:"#c0c0c0", extra:"bob",      border:T.muted  },
   // FEATURE: RO-06 — Add michelle to AVATAR_CFG
   michelle: { skin:"#d4b896", hair:"#2a2a3a", collar:"#1e3a5a", extra:"glasses", border:T.brass },
+  susan:    { skin:"#e2c4a0", hair:"#5a3a1e", collar:"#3a5a3a", extra:"bun",     border:T.moss  },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
