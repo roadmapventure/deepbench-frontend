@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-09 | Session: S-MIGRATE-05 design (PE-04 spec locked, PE-12 added)
+> Last updated: 2026-06-09 | Session: S-AVATAR-01 design (RO-06 added, Susan Smith TR-08 added, Michelle role corrected, backlog capture rule added)
 
 ---
 
@@ -165,6 +165,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
 | RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
 | RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
+| RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ❌ Missing | S-AVATAR-01 |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
@@ -242,10 +243,11 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | TC-02 | Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log | ❌ Missing | S-future |
 
 **TC-02 Notes (added 2026-06-09):**
-- Concept: "Trainer" is a named agent role (not a user action) — another AI agent can be assigned to teach/configure peer agents
+- Named agent: **Susan Smith (TR-08)** — Trainer Agent role
+- Concept: Trainer is a named agent (not a user action) — another AI agent assigned to teach/configure peer agents
 - Visible in Training tab: each entry shows which agent (or user) added it
 - Multi-agent workflow: Trainer agent can be called into a task workflow to onboard or retrain a bench agent mid-project
-- Design session required before implementation
+- Design session required before implementation — full spec in S-BENCH-01b
 
 ---
 
@@ -325,8 +327,22 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AG-05 | api/plan.js reads Michelle prompt from Supabase | ❌ Missing | S-BENCH-01 LOCKED |
 | AG-06 | Michelle surgical replanning directive | ❌ Missing | S-BENCH-01 LOCKED |
 
+**S-BENCH-01b Susan Smith — Full Spec (needs design session):**
+- Code: `TR-08` | Role: Trainer Agent | `isTrainer: true`
+- Roster position: after Pat Smiley (IR-07)
+- Full spec requires dedicated design session before S-BENCH-01b
+
+| AG-07 | Susan Smith static identity in agents.js | ❌ Missing | S-BENCH-01b |
+| AG-08 | Susan Smith system prompt in Supabase agent_configs | ❌ Missing | S-BENCH-01b LOCKED |
+| AG-09 | Susan Smith trainable via Teach + RAG | ❌ Missing | S-BENCH-01b LOCKED |
+| AG-10 | Susan Smith UI presence as Trainer in Training tab | ❌ Missing | S-BENCH-01b |
+| AG-11 | api/train.js reads Susan Smith prompt from Supabase | ❌ Missing | S-BENCH-01b LOCKED |
+| AG-12 | Susan Smith can be assigned to train other bench agents | ❌ Missing | S-BENCH-01b LOCKED |
+
+---
+
 **S-BENCH-01 Michelle Manning — Full Spec:**
-- Code: `PP-01` | Role: Project Planner | `isPlanner: true`
+- Code: `PP-01` | Role: Project Manager | `isPlanner: true`
 - Roster position: between Mike Alvarez (SR-02) and Pat Smiley (IR-07)
 - Quip: *"I map the mission before anyone moves."*
 - Avatar: real photo (not silhouette) — replaces `MichelleAvatar.jsx` placeholder
@@ -383,12 +399,14 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ✅ DONE (732bf3c) |
 | S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ⏳ Design done — ready to code |
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
+| S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ⏳ Design done — ready to code |
 | S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
 |---------|---------|
 | S-BENCH-01 | Michelle Manning — Full Agent (AG-01 through AG-06), built capability-first |
+| S-BENCH-01b | Susan Smith — Full Trainer Agent (AG-07 through AG-12, needs design session) |
 | S-BENCH-02 | Personnel File — post-migration audit + capability dashboard view |
 | S-BENCH-03 | Teach screen audit |
 | S-BENCH-04 | Test Team audit |

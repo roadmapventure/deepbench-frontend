@@ -3,6 +3,14 @@
 
 ---
 
+## Standing Rule — Backlog Capture
+
+**Any feature, agent, or requirement named during a design session must be written to `docs/FEATURES.md` immediately — not deferred to session close-out.**
+
+This applies to items mentioned casually in conversation, not just items with a full spec. A one-line placeholder with ❌ Missing status is enough. Do not let the session end without the entry existing in FEATURES.md.
+
+---
+
 ## Step 1 — Orient (read these, in order, stop when you have enough)
 
 1. `CLAUDE-STATE.md` — current version, next session, open blockers
@@ -94,7 +102,8 @@ When John pastes the Claude Code completion report, respond with the Manual QA C
 | CN-03 | Robyn Castellanos | NIGP Consultant / Strategist |
 | DR-06 | Brent Matthews | Web Agent (Railway + Playwright) |
 | IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
-| PP-01 | Michelle Manning | Project Planner — stub until S-BENCH-01 |
+| PP-01 | Michelle Manning | Project Manager — stub until S-BENCH-01 |
+| TR-08 | Susan Smith | Trainer Agent — stub until S-BENCH-01b |
 
 ---
 

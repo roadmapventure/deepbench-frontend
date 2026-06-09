@@ -2,7 +2,7 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.27
-**Next session:** S-BENCH-UX-01 — Bench UI review (schedule after S-MIGRATE-05)
+**Next session:** S-MIGRATE-05 — Playbook tab CRUD (kickoff ready) | S-AVATAR-01 — Avatar sweep (kickoff ready) | S-MIGRATE-06 — Test Agent console (needs design)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
