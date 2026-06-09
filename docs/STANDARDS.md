@@ -127,6 +127,13 @@ Mandatory L tests for any `api/plan.js` change or call site change:
 - Log `PLAN API: PASS` or `PLAN API: FAIL` explicitly
 - If FAIL: do NOT commit — fix the payload first
 
+Mandatory L tests for any `api/extract.js` change or `extractTextFromFile` call site change:
+- Real call (or binary round-trip simulation) that verifies high-byte values survive base64 encoding intact
+- Confirm `readAsArrayBuffer` + `Uint8Array` → `btoa(binary)` pattern is used — NOT `readAsDataURL`
+- Confirm payload keys are `{ fileData, fileType, fileName }` JSON — NOT FormData
+- Confirm `fileData` decodes to valid binary (PDF magic bytes `%PDF-` survive round-trip)
+- Log `EXTRACT API: PASS` or `EXTRACT API: FAIL` explicitly
+
 Mandatory L tests for any `api/title.js` change:
 - Real call with representative goal and steps array
 - Confirm response has `taskTitle` (string, non-empty)
@@ -270,6 +277,7 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md` and Google Drive Feature Inventory
 | BUG-6: LLM intermittently returns no steps (no retry) | No retry on empty response | Retry once on empty steps response | L retry logic |
 | BUG-7: Ephemeral `answers[q.id]` state lost on refresh | Answers stored in React state only | Persist answers on `step.questions[n].a` in Supabase | K answer persistence |
 | BUG-8: Archived steps lost after Update Plan | Save wrote active only | `saveStepsToSupabase` writes `[...active, ...archived]` | K supabase write |
+| BUG-9: `extractTextFromFile` 500 on PDF — `readAsDataURL` corrupts binary base64 | `readAsDataURL` is not binary-safe for PDFs; corrupted bytes reach `pdf-parse` and throw | Always use `readAsArrayBuffer` → `Uint8Array` → `btoa(binary)` (NIGP pattern). Never use `readAsDataURL` for file upload. | L binary round-trip |
 
 ---
 
@@ -301,3 +309,4 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-06c | Drive scope rule |
 | 2026-06-06i | Category K added — component state initialization. Three-operation separation mandated. `saveStepsToSupabase` canonical function mandated. |
 | 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
+| 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |

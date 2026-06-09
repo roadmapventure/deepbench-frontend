@@ -180,6 +180,8 @@ navigate('/destination');
 
 **useEffect + useRef** — if component re-mounts, useRef is NOT safe for run-once guards. Use context state instead.
 
+**File upload base64 encoding** — always use `readAsArrayBuffer` → `Uint8Array` → `btoa(binary)`. Never use `readAsDataURL` for binary files (PDF, DOCX). `readAsDataURL` corrupts binary base64 silently. See BUG-9 in `docs/STANDARDS.md`.
+
 **Agent ID** — must resolve to full agent object before use in any UI.
 
 ---
