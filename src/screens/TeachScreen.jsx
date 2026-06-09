@@ -1,4 +1,4 @@
-// DeepBench v5.1.24 | TeachScreen.jsx | PE-10 patch — fix extractTextFromFile (FormData → base64 JSON)
+// DeepBench v5.1.25 | TeachScreen.jsx | PE-10 patch 2 — binary-safe base64 in extractTextFromFile
 // FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
@@ -16,32 +16,31 @@ import { priorityInfo } from "../utils.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 
 // ── Extract text from uploaded file via /api/extract ─────────────────────────
-// FEATURE: PE-10 patch — API expects JSON { fileData, fileType, fileName }, not FormData
+// FEATURE: PE-10 patch 2 — readAsArrayBuffer → Uint8Array → btoa (binary-safe, no readAsDataURL)
 async function extractTextFromFile(file) {
-  try {
-    // Convert file to base64 via FileReader — API expects JSON { fileData, fileType, fileName }
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const res = await fetch("/api/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileData: base64, fileType: file.type, fileName: file.name }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `Extract failed: ${res.status}`);
-    }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    const text = data.text || "";
-    return { text, wordCount: data.wordCount || text.split(/\s+/).filter(Boolean).length, error: null };
-  } catch (e) {
-    return { text: "", wordCount: 0, error: e.message };
-  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const bytes = new Uint8Array(e.target.result);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+        const res = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileData: base64, fileType: file.type, fileName: file.name }),
+        });
+        const data = await res.json();
+        if (!res.ok) { resolve({ text: "", wordCount: 0, error: data.error || "Extraction failed" }); return; }
+        resolve({ text: data.text, wordCount: data.wordCount, error: null });
+      } catch (err) {
+        resolve({ text: "", wordCount: 0, error: err.message });
+      }
+    };
+    reader.onerror = () => resolve({ text: "", wordCount: 0, error: "File read failed" });
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 // ── Generate metadata from extracted text via /api/brief ─────────────────────
