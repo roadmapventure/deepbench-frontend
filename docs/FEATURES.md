@@ -205,6 +205,13 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | TC-01 | Upload → extract → ingest → RAG | ✅ Done | DONE |
+| TC-02 | Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log | ❌ Missing | S-future |
+
+**TC-02 Notes (added 2026-06-09):**
+- Concept: "Trainer" is a named agent role (not a user action) — another AI agent can be assigned to teach/configure peer agents
+- Visible in Training tab: each entry shows which agent (or user) added it
+- Multi-agent workflow: Trainer agent can be called into a task workflow to onboard or retrain a bench agent mid-project
+- Design session required before implementation
 
 ---
 
