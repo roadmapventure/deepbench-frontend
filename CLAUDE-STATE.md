@@ -1,8 +1,8 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.29
-**Next session:** S-BENCH-UX-02 — Bench UI polish round 2 (kickoff doc ready)
+**Version in dev:** v5.1.30
+**Next session:** S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan (AI-18) — kickoff doc ready at docs/kickoffs/v5.1.30-AI18-capability-agent-attribution.md
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -20,6 +20,8 @@
 - S-AVATAR-01 — Avatar consistency sweep ✅ done (d9d43c2)
 - S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 - S-BENCH-UX-01 — Bench UI polish ✅ done (812ed59)
+- S-BENCH-UX-02 — Bench UI polish round 2 ✅ done (8717106)
+- S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan (AI-18) ⏳ kickoff ready
 
 Full session queue and feature backlog: `docs/FEATURES.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`

@@ -284,6 +284,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
 | AI-16 | AI Audit persistence — write every AI call to Supabase ai_activity_log; hydrate on mount for lifetime totals | ✅ Done | S16b |
 | AI-17 | Auto-Training service — extract synthesis+embed+write pattern from web-memory.js POST into standalone `/api/auto-train` endpoint, callable by any agent/capability | ❌ Missing | S-INFRA-02 |
+| AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ❌ Missing | S-AI-ATTR-01 |
 
 **AI-17 Notes:** `web-memory.js` POST currently hardcodes Brent's persona and "Portal Navigation" category. Extract into `/api/auto-train` accepting: `agent_id`, `source_type` (portal_run | document | conversation | test_result), and the raw artifact payload. `web-memory.js` POST becomes a thin caller. Enables any future capability to write training entries without duplicating the embed+write pattern. Design session required before coding — needs: input schema, per-agent persona selection, source_type → synthesis prompt mapping, category mapping.
 
@@ -405,6 +406,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
 | S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ✅ DONE (812ed59) |
 | S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge brass fix (RO-08), AddConfigForm labels, Resume structural fixes, Add Courses polish | ⏳ Design done — ready to code |
+| S-AI-ATTR-01 | Capability-agent attribution — Michelle (planning) + Susan (extraction, reinforcement) + type key bug fix (AI-18) | ⏳ Design done — ready to code |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
