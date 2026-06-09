@@ -1,4 +1,4 @@
-// DeepBench v5.1.26 | PersonnelScreen.jsx | PE-11 — Edit Course inline sub-view
+// DeepBench v5.1.29 | PersonnelScreen.jsx | S-BENCH-UX-01 — bench UI polish
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -1182,6 +1182,7 @@ function PlaybookTab({ agent, showToast }) {
         )}
       </div>
 
+      {/* FEATURE: PE-04 */}
       {/* Guardrails */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners color={T.flag} />
@@ -1202,7 +1203,7 @@ function PlaybookTab({ agent, showToast }) {
                   onBlur={() => saveGuardrail("always", alwaysText, alwaysId, setAlwaysId)}
                   rows={5}
                   placeholder={`Always cite the specific class code when referencing commodity risk…`}
-                  style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.moss}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                  style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.moss}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                 />
               </div>
               <div>
@@ -1215,7 +1216,7 @@ function PlaybookTab({ agent, showToast }) {
                   onBlur={() => saveGuardrail("never", neverText, neverId, setNeverId)}
                   rows={5}
                   placeholder={`Never name a vendor as fraudulent without documented evidence…`}
-                  style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.flag}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                  style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.flag}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                 />
               </div>
               <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, fontStyle: "italic", marginTop: 8 }}>
@@ -1285,19 +1286,26 @@ export default function PersonnelScreen() {
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
 
   return (
-    <AppShell toast={toast} headerProps={{ backLabel:"The Bench", onBack:()=>navigate("/bench") }}>
+    <AppShell toast={toast}>
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
         {/* ── Left sidebar nav ── */}
         <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
 
           {/* Agent identity strip */}
+          {/* FEATURE: PE-07 */}
           <div style={{ padding:"16px 14px 14px", borderBottom:`1px solid ${T.lineSoft}` }}>
             <div style={{ marginBottom:8 }}>
               <AgentAvatar who={agent.id} size={44} ring={true} />
             </div>
             <div style={{ fontFamily:display, fontSize:13, fontWeight:600, color:T.navy, lineHeight:1.2 }}>{agent.name}</div>
             <div style={{ fontFamily:mono, fontSize:8, color:T.muted, marginTop:2 }}>{agent.code}</div>
+            <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>
+              <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:"rgba(90,117,56,.1)", color:T.moss, border:`1px solid rgba(90,117,56,.3)`, fontWeight:700 }}>● ACTIVE</span>
+              {agent.trainable && (
+                <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:`${agent.color}18`, color:agent.color, border:`1px solid ${agent.color}40`, fontWeight:700 }}>YOUR TRAINEE</span>
+              )}
+            </div>
           </div>
 
           {/* Nav groups */}

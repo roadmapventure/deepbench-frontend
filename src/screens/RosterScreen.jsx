@@ -1,4 +1,4 @@
-// DeepBench v5.1.24 | RosterScreen.jsx | PE-10 patch — onAddTraining navigates to Training tab
+// DeepBench v5.1.29 | RosterScreen.jsx | S-BENCH-UX-01 — bench UI polish
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -7,12 +7,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, SkillBar, AgentAvatar } from "../components/SharedUI.jsx";
+import { Corners, SkillBar, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
-// FEATURE: RO-02 — Agent cards + workload
+// FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
 function AgentCard({ agent, onViewProfile, onAddTraining }) {
   const [open, setOpen] = useState(false);
   const borderColor = agent.trainable ? agent.color : T.line;
@@ -22,6 +22,7 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
     <div style={{background:T.card,border:`1px solid ${T.line}`,position:"relative",display:"flex",flexDirection:"column",boxShadow,overflow:"hidden",transition:"border-color .15s"}}
       onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
       onMouseLeave={e=>e.currentTarget.style.borderColor=agent.trainable?borderColor:T.line}>
+      <FeatureBadge id="RO-02" />
       <Corners color={agent.trainable ? agent.color : T.brass}/>
 
       {/* Badge header — click navigates to personnel */}
@@ -128,10 +129,13 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
           View Profile →
         </button>
         {agent.trainable
-          ? <button onClick={()=>onAddTraining(agent)}
-              style={{flex:1,padding:10,fontFamily:body,fontSize:11.5,fontWeight:700,background:agent.color===T.moss?T.moss:T.brass,color:agent.color===T.moss?"#fff":T.navy,border:"none",cursor:"pointer"}}>
-              + Add Training
-            </button>
+          ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:agent.color===T.moss?T.moss:T.brass}}>
+              <AiBadge style={{color:agent.color===T.moss?"#fff":T.navy}}/>
+              <button onClick={()=>onAddTraining(agent)}
+                style={{padding:10,fontFamily:body,fontSize:11.5,fontWeight:700,background:"transparent",color:agent.color===T.moss?"#fff":T.navy,border:"none",cursor:"pointer"}}>
+                + Add Training
+              </button>
+            </div>
           : <button disabled style={{flex:1,padding:10,fontFamily:body,fontSize:11.5,background:"transparent",border:"none",color:T.muted,cursor:"not-allowed"}}>
               🔒 {agent.trainableBy} Only
             </button>
@@ -170,7 +174,9 @@ export default function RosterScreen() {
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
         {/* Bench stats strip */}
-        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`}}>
+        {/* FEATURE: RO-02 */}
+        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,border:`1px solid rgba(182,135,58,.3)`,position:"relative"}}>
+          <Corners color={T.brass}/>
           {[
             ["Bench Size",        stats.size,                  T.card],
             ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
@@ -186,7 +192,7 @@ export default function RosterScreen() {
           <div style={{flex:1}}/>
           <button
             onClick={() => navigate("/bench/new")}
-            style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:"#8fa3bf", background:"transparent", border:"none", cursor:"pointer", letterSpacing:.5 }}>
+            style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:"5px 14px", cursor:"pointer", letterSpacing:.5 }}>
             + Add a Player
           </button>
           <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
