@@ -31,7 +31,7 @@ async function apiDeleteConfig(id) {
 }
 
 // ── ConfigCard ────────────────────────────────────────────────────────────────
-function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, onDelete, editingId, setEditingId, showToast }) {
+export function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, onDelete, editingId, setEditingId, showToast }) {
   const [editText, setEditText] = useState(config.text);
   const [editName, setEditName] = useState(config.name);
   const [saving,   setSaving]   = useState(false);
@@ -82,7 +82,7 @@ function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, onDelete
 }
 
 // ── Add Config Form ───────────────────────────────────────────────────────────
-function AddConfigForm({ agentId, onSaved, onCancel, showToast }) {
+export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel, showToast }) {
   const [name,        setName]        = useState("");
   const [text,        setText]        = useState("");
   const [isDefault,   setIsDefault]   = useState(false);
@@ -93,7 +93,7 @@ function AddConfigForm({ agentId, onSaved, onCancel, showToast }) {
     if (!name.trim() || !text.trim()) { showToast("Name and content required", "⚠"); return; }
     setSaving(true);
     try {
-      const config = await apiSaveConfig({ agent_id: agentId, type: "role_prompt", name: name.trim(), text: text.trim(), is_default: isDefault, is_user_selectable: isSelectable });
+      const config = await apiSaveConfig({ agent_id: agentId, type, name: name.trim(), text: text.trim(), is_default: isDefault, is_user_selectable: isSelectable });
       onSaved(config);
       showToast("Added ✦");
     } catch (e) { showToast("Save failed: " + e.message, "⚠"); }

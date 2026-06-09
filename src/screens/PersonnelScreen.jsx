@@ -9,7 +9,7 @@ import { Corners, SkillBar, Toast, AiBadge, FeatureBadge } from "../components/S
 import { useAgents } from "../hooks/useAgents.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab from "./personnel/ResumeTab.jsx";
+import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
 import { logAICall } from "../hooks/useAIActivity.js";
 
 // FEATURE: PE-03 — Training tab live wiring
@@ -44,6 +44,27 @@ async function apiUpdateEntry(id, fields) {
   });
   if (!res.ok) throw new Error("Failed to update entry");
   return (await res.json()).entry;
+}
+
+// FEATURE: PE-04 — agent-configs API helpers
+async function apiGetConfigs(agent_id, type) {
+  const res = await fetch(`/api/agent-configs?tenant_id=${TENANT_ID}&agent_id=${agent_id}&type=${type}`);
+  if (!res.ok) throw new Error("Failed to load configs");
+  return (await res.json()).configs || [];
+}
+async function apiSaveConfig(payload) {
+  const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, tenant_id: TENANT_ID }) });
+  if (!res.ok) throw new Error("Failed to save");
+  return (await res.json()).config;
+}
+async function apiPatchConfig(id, fields) {
+  const res = await fetch("/api/agent-configs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tenant_id: TENANT_ID, ...fields }) });
+  if (!res.ok) throw new Error("Failed to update");
+  return (await res.json()).config;
+}
+async function apiDeleteConfig(id) {
+  const res = await fetch("/api/agent-configs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tenant_id: TENANT_ID }) });
+  if (!res.ok) throw new Error("Failed to delete");
 }
 
 // FEATURE: PE-10 — Add Courses inline sub-view
@@ -1051,61 +1072,157 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
   );
 }
 
-// FEATURE: PE-04 — Playbook tab
+// FEATURE: PE-04 — Playbook tab live wiring
 // ── Tab: Playbook ─────────────────────────────────────────────────────────────
-function PlaybookTab({ agent }) {
-  const firstName  = agent.name.split(" ")[0];
-  const pronouns   = AGENT_PRONOUNS[agent.id] || { possessive:"their" };
-  const canEdit    = agent.trainable;
+function PlaybookTab({ agent, showToast }) {
+  const firstName = agent.name.split(" ")[0];
+  const pronouns  = AGENT_PRONOUNS[agent.id] || { possessive: "their" };
+  const canEdit   = agent.trainable;
 
-  const formats = [
-    { id:"f1", name:"Executive Briefing", isDefault:true, isSelectable:false, text:"Return a structured executive briefing with: 1. Executive Summary (3-4 sentences, board-ready tone) 2. Top Risk Findings (bulleted, dollar amounts cited) 3. Compliance Flags (cite statute where known) 4. Three Recommended Actions." },
-    { id:"f2", name:"Audit Report Format", isDefault:false, isSelectable:true,  text:"Return a formal audit-style report with: 1. Objective 2. Scope 3. Findings (Condition, Criteria, Cause, Effect, Recommendation) 4. Risk Rating Summary 5. Management Response." },
-  ];
+  const [formatConfigs, setFormatConfigs] = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [editingId,     setEditingId]     = useState(null);
+  const [showAdd,       setShowAdd]       = useState(false);
+  const [alwaysText,    setAlwaysText]    = useState("");
+  const [alwaysId,      setAlwaysId]      = useState(null);
+  const [neverText,     setNeverText]     = useState("");
+  const [neverId,       setNeverId]       = useState(null);
 
-  const guardrailText = canEdit
-    ? `NEVER:\n- Name a vendor as fraudulent without documented evidence\n- Provide legal conclusions — flag concerns and recommend legal review\n- Extrapolate beyond the data payload\n- Reference competitive bid thresholds from other jurisdictions\n\nALWAYS:\n- Cite the specific class code when referencing commodity risk\n- Use dollar amounts from the data payload directly\n- Qualify recommendations with "subject to legal review"\n- Flag items as concerns, not violations`
-    : `Contact ${agent.trainableBy} to configure guardrails.`;
+  useEffect(() => {
+    Promise.all([
+      apiGetConfigs(agent.id, "output_format"),
+      apiGetConfigs(agent.id, "guardrail"),
+    ]).then(([formats, guardrails]) => {
+      setFormatConfigs(formats);
+      const always = guardrails.find(r => r.name === "always");
+      const never  = guardrails.find(r => r.name === "never");
+      if (always) { setAlwaysText(always.text); setAlwaysId(always.id); }
+      if (never)  { setNeverText(never.text);   setNeverId(never.id); }
+    }).catch(() => showToast("Could not load playbook configs", "⚠"))
+      .finally(() => setLoading(false));
+  }, [agent.id]);
+
+  const handleSetDefault = async (id) => {
+    try {
+      await apiPatchConfig(id, { is_default: true });
+      const fresh = await apiGetConfigs(agent.id, "output_format");
+      setFormatConfigs(fresh);
+      showToast("Default updated ✦");
+    } catch { showToast("Failed", "⚠"); }
+  };
+
+  const handleToggleSelectable = async (id, val) => {
+    try {
+      await apiPatchConfig(id, { is_user_selectable: val });
+      setFormatConfigs(prev => prev.map(c => c.id === id ? { ...c, is_user_selectable: val } : c));
+      showToast(val ? "Now user-selectable ✦" : "Set to admin-only ✦");
+    } catch { showToast("Update failed", "⚠"); }
+  };
+
+  const handleEdit = (updated) => setFormatConfigs(prev => prev.map(c => c.id === updated.id ? updated : c));
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this output format permanently?")) return;
+    try {
+      await apiDeleteConfig(id);
+      setFormatConfigs(prev => prev.filter(c => c.id !== id));
+      showToast("Deleted ✦");
+    } catch { showToast("Delete failed", "⚠"); }
+  };
+
+  const handleFormatAdded = (config) => {
+    setFormatConfigs(prev => {
+      const updated = config.is_default ? prev.map(c => ({ ...c, is_default: false })) : prev;
+      return [config, ...updated];
+    });
+    setShowAdd(false);
+  };
+
+  const saveGuardrail = async (name, text, id, setId) => {
+    try {
+      if (id) {
+        await apiPatchConfig(id, { text });
+      } else {
+        const created = await apiSaveConfig({ agent_id: agent.id, type: "guardrail", name, text, is_default: false, is_user_selectable: false });
+        setId(created.id);
+      }
+      showToast("Saved ✦");
+    } catch { showToast("Save failed", "⚠"); }
+  };
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <FeatureBadge id="PE-04" />
+
       {/* Output formats */}
-      <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"15px 18px",position:"relative"}}>
-        <Corners/>
-        <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Layer 04 · Output Structure</div>
-        <div style={{fontFamily:display,fontSize:16,fontWeight:600,color:T.navy,marginBottom:6}}>How does {firstName} format {pronouns.possessive} responses?</div>
-        <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.5,marginBottom:13,padding:"9px 13px",background:T.cardAlt,borderLeft:`3px solid ${T.brassDeep}`}}>
+      <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
+        <Corners />
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 04 · Output Structure</div>
+        <div style={{ fontFamily: display, fontSize: 16, fontWeight: 600, color: T.navy, marginBottom: 6 }}>How does {firstName} format {pronouns.possessive} responses?</div>
+        <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 13, padding: "9px 13px", background: T.cardAlt, borderLeft: `3px solid ${T.brassDeep}` }}>
           Final block sent to the LLM. Set one as <strong>Default</strong> for automatic use. Toggle <strong>User Selectable</strong> to let users choose in the analysis UI.
         </div>
-        {formats.map(f=>(
-          <div key={f.id} style={{border:`1px solid ${f.isDefault?T.moss:T.lineSoft}`,marginBottom:9,background:f.isDefault?"rgba(90,117,56,.04)":"transparent"}}>
-            <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8,borderBottom:`1px solid ${f.isDefault?"rgba(90,117,56,.3)":T.lineSoft}`,flexWrap:"wrap"}}>
-              <div style={{fontFamily:body,fontSize:12,fontWeight:600,color:f.isDefault?T.moss:T.ink,flex:1}}>{f.name}</div>
-              {f.isDefault
-                ?<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 7px",background:"rgba(90,117,56,.15)",color:T.moss,border:`1px solid ${T.moss}`,fontWeight:700}}>● DEFAULT</span>
-                :<button style={{fontFamily:mono,fontSize:8.5,color:T.brass,background:"transparent",border:`1px solid ${T.brass}`,padding:"1px 8px",cursor:canEdit?"pointer":"not-allowed",fontWeight:700,opacity:canEdit?1:0.5}}>Set Default</button>}
-              <button style={{fontFamily:mono,fontSize:8.5,padding:"1px 8px",cursor:canEdit?"pointer":"not-allowed",border:`1px solid ${f.isSelectable?T.brass:T.lineSoft}`,background:f.isSelectable?"rgba(182,135,58,.15)":"transparent",color:f.isSelectable?T.brassDeep:T.muted,opacity:canEdit?1:0.5}}>
-                {f.isSelectable?"◎ User Selectable":"○ Admin Only"}
-              </button>
-              <button style={{fontFamily:mono,fontSize:8.5,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"1px 8px",cursor:canEdit?"pointer":"not-allowed",textTransform:"uppercase",letterSpacing:.5,opacity:canEdit?1:0.5}}>Edit</button>
-              {!f.isDefault&&<button style={{fontFamily:mono,fontSize:8.5,color:T.flag,background:"transparent",border:`1px solid rgba(168,51,25,.3)`,padding:"1px 8px",cursor:canEdit?"pointer":"not-allowed",textTransform:"uppercase",letterSpacing:.5,opacity:canEdit?1:0.5}}>Delete</button>}
-            </div>
-            <div style={{padding:"9px 12px",fontFamily:mono,fontSize:10.5,color:T.mutedDeep,lineHeight:1.6,maxHeight:50,overflow:"hidden",maskImage:"linear-gradient(to bottom,black 50%,transparent 100%)"}}>{f.text}</div>
-          </div>
+        {loading && <div style={{ fontFamily: body, fontSize: 12, color: T.muted, fontStyle: "italic", padding: "20px 0", textAlign: "center" }}>Loading…</div>}
+        {!loading && formatConfigs.map(config => (
+          <ConfigCard key={config.id} config={config}
+            onSetDefault={handleSetDefault}
+            onToggleSelectable={handleToggleSelectable}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            editingId={editingId}
+            setEditingId={setEditingId}
+            showToast={showToast}
+          />
         ))}
-        {canEdit&&<button style={{width:"100%",padding:"9px",background:"transparent",border:`1px dashed ${T.lineSoft}`,color:T.brassDeep,fontFamily:body,fontSize:12,cursor:"pointer",marginTop:2,fontWeight:500}}>+ Add New Format</button>}
+        {!loading && canEdit && !showAdd && (
+          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 }}>+ Add New Format</button>
+        )}
+        {showAdd && (
+          <AddConfigForm type="output_format" agentId={agent.id} onSaved={handleFormatAdded} onCancel={() => setShowAdd(false)} showToast={showToast} />
+        )}
       </div>
 
       {/* Guardrails */}
-      <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"15px 18px",position:"relative"}}>
-        <div style={{position:"absolute",top:4,left:4,width:9,height:9,borderTop:`1.5px solid ${T.flag}`,borderLeft:`1.5px solid ${T.flag}`}}/>
-        <div style={{position:"absolute",bottom:4,right:4,width:9,height:9,borderBottom:`1.5px solid ${T.flag}`,borderRight:`1.5px solid ${T.flag}`}}/>
-        <div style={{fontFamily:mono,fontSize:9,color:T.flag,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Layer 05 · Guardrails</div>
-        <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.5,marginBottom:18,padding:"9px 13px",background:"rgba(168,51,25,.07)",borderLeft:`3px solid ${T.flag}`}}>
+      <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
+        <Corners color={T.flag} />
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.flag, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 05 · Guardrails</div>
+        <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 18, padding: "9px 13px", background: `${T.flag}07`, borderLeft: `3px solid ${T.flag}` }}>
           Applied to every prompt regardless of which Role or Format is active. Protects against legal overreach and unsupported claims.
         </div>
-        <div style={{fontFamily:mono,fontSize:10.5,color:T.mutedDeep,lineHeight:1.7,background:T.cardAlt,padding:"12px 16px",borderLeft:`3px solid ${T.flag}44`,whiteSpace:"pre-wrap"}}>{guardrailText}</div>
-        {canEdit&&<button style={{marginTop:12,width:"100%",padding:"9px",background:"transparent",border:`1px dashed rgba(168,51,25,.3)`,color:T.flag,fontFamily:body,fontSize:12,cursor:"pointer",fontWeight:500}}>Edit Guardrails</button>}
+        {loading
+          ? <div style={{ fontFamily: body, fontSize: 12, color: T.muted, fontStyle: "italic", padding: "16px 0", textAlign: "center" }}>Loading…</div>
+          : <>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy, marginBottom: 6 }}>
+                  What must {firstName} always do?
+                </div>
+                <textarea
+                  value={alwaysText}
+                  onChange={e => setAlwaysText(e.target.value)}
+                  onBlur={() => saveGuardrail("always", alwaysText, alwaysId, setAlwaysId)}
+                  rows={5}
+                  placeholder={`Always cite the specific class code when referencing commodity risk…`}
+                  style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.moss}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <div>
+                <div style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy, marginBottom: 6 }}>
+                  What must {firstName} never do?
+                </div>
+                <textarea
+                  value={neverText}
+                  onChange={e => setNeverText(e.target.value)}
+                  onBlur={() => saveGuardrail("never", neverText, neverId, setNeverId)}
+                  rows={5}
+                  placeholder={`Never name a vendor as fraudulent without documented evidence…`}
+                  style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.flag}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, fontStyle: "italic", marginTop: 8 }}>
+                Autosaved on blur · applied to all prompts
+              </div>
+            </>
+        }
       </div>
     </div>
   );
@@ -1267,7 +1384,7 @@ export default function PersonnelScreen() {
                 navigate={navigate}
               />
             )}
-            {activeTab === "playbook" && <PlaybookTab agent={agent}/>}
+            {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
           </div>
 
         </div>
