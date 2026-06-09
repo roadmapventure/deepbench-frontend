@@ -114,8 +114,15 @@ Or pass a color override if AiBadge supports it:
 <AiBadge style={{ color: T.navy }} />
 ```
 
-### Known limitation — AiBadge on brass backgrounds (RO-08)
-Placing `<AiBadge>` next to a brass-background button does not produce a visually distinct result — the "✦ AI" mark blends into the gold. Discovered in S-BENCH-UX-01 QA (Robyn's "+ Add Training" card). **Do not add new AiBadge placements adjacent to brass buttons until RO-08 is resolved in S-BENCH-UX-02.** Existing placements on navy and card backgrounds are unaffected.
+### AiBadge on brass/moss backgrounds — chip override (Locked 2026-06-09, S-BENCH-UX-02)
+Badge stays **inside** the button. Pass style overrides to make the chip legible:
+
+| Button background | Style override |
+|-------------------|---------------|
+| Brass (`T.brass`) | `style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }}` |
+| Moss (`T.moss`) | `style={{ color: "#fff", background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)" }}` |
+
+Do NOT show AiBadge on file browse actions that do not call AI (e.g. "Browse File" in Add Courses drop zone).
 
 ### AI SUGGESTED chip (separate from AiBadge)
 For form field labels where AI pre-filled a value, use the purple chip:
@@ -366,3 +373,4 @@ Used when a tab has an embedded form that swaps out the list view. Established i
 | 2026-06-09 | S-MIGRATE-03 | Inline sub-view pattern (PE-10) |
 | 2026-06-09 | S-MIGRATE-03-patch | AiBadge color rule: match button label color. No badge on Cancel state. |
 | 2026-06-09 | S-BENCH-UX-01 | AiBadge known limitation: not visually distinct on brass backgrounds — blocked pending RO-08 design in S-BENCH-UX-02. |
+| 2026-06-09 | S-BENCH-UX-02 | RO-08 resolved: AiBadge on brass = navy chip override; on moss = white chip override. Badge stays inside button. No badge on non-AI actions (file browse). |

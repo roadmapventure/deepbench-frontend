@@ -1,8 +1,8 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.28
-**Next session:** S-BENCH-UX-01 — Bench UI polish (design done, kickoff: docs/kickoffs/v5.1.29-S-BENCH-UX-01-bench-ui-polish.md) | S-MIGRATE-05 — Playbook tab CRUD (design done) | S-MIGRATE-06 — Test Agent console (needs design session)
+**Version in dev:** v5.1.29
+**Next session:** S-BENCH-UX-02 — Bench UI polish round 2 (kickoff doc ready)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -19,7 +19,7 @@
 - S-MIGRATE-05 — Playbook tab: output_format CRUD + guardrails ✅ done (1644366)
 - S-AVATAR-01 — Avatar consistency sweep ✅ done (d9d43c2)
 - S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
-- S-BENCH-UX-01 — Bench UI review (schedule after S-MIGRATE-05)
+- S-BENCH-UX-01 — Bench UI polish ✅ done (812ed59)
 
 Full session queue and feature backlog: `docs/FEATURES.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`

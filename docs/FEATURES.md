@@ -167,7 +167,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
 | RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
 | RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
-| RO-08 | AiBadge on brass/gold backgrounds — current "✦ AI" text is not visually distinct against brass button; needs design solution (separate treatment or placement change) | ❌ Missing | S-BENCH-UX-02 |
+| RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ❌ Missing | S-BENCH-UX-02 |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
@@ -404,7 +404,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
 | S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
 | S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ✅ DONE (812ed59) |
-| S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge on brass background fix (RO-08) + Resume/Training/Playbook tab UX review | ⏳ Needs design session |
+| S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge brass fix (RO-08), AddConfigForm labels, Resume structural fixes, Add Courses polish | ⏳ Design done — ready to code |
 
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
