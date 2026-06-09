@@ -1,4 +1,4 @@
-// DeepBench v5.1.25 | PersonnelScreen.jsx | PE-10 patch 2 — binary-safe base64 in extractTextFromFile
+// DeepBench v5.1.26 | PersonnelScreen.jsx | PE-11 — Edit Course inline sub-view
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -33,6 +33,17 @@ async function apiDeleteEntry(id) {
     body: JSON.stringify({ id, tenant_id: TENANT_ID }),
   });
   if (!res.ok) throw new Error("Failed to delete");
+}
+
+// FEATURE: PE-11 — Edit Course inline sub-view
+async function apiUpdateEntry(id, fields) {
+  const res = await fetch("/api/knowledge-entry", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, tenant_id: TENANT_ID, ...fields }),
+  });
+  if (!res.ok) throw new Error("Failed to update entry");
+  return (await res.json()).entry;
 }
 
 // FEATURE: PE-10 — Add Courses inline sub-view
@@ -337,13 +348,13 @@ function ProfileTab({ agent, entries, layers }) {
 }
 
 // FEATURE: PE-10 — Add Courses inline sub-view
-function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgress,
+function AddCourseView({ agent, existingEntry = null, addState, setAddState, addProgress, setAddProgress,
   addFile, setAddFile, addExtracted, setAddExtracted, addWordCount, setAddWordCount,
   addExtractOpen, setAddExtractOpen, addForm, setAddForm, addFileRef,
   onCancel, onSaved, showToast }) {
 
   const agentId  = agent.id;
-  const locked   = addState !== "ready";
+  const locked   = existingEntry ? false : addState !== "ready";
   const isSaving = addState === "saving";
   const categories = agentId === "brent"
     ? [...STANDARD_CATEGORIES, ...BRENT_CATEGORIES]
@@ -397,38 +408,62 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
   };
 
   const handleSave = async () => {
-    if (!addForm.title || !addExtracted) { showToast("Title and document are required", "⚠"); return; }
+    if (!addForm.title) { showToast("Title is required", "⚠"); return; }
+    if (!existingEntry && !addExtracted) { showToast("Title and document are required", "⚠"); return; }
     setAddState("saving");
     try {
-      const res = await fetch("/api/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...addForm,
-          content: addExtracted,
-          tenant_id: TENANT_ID,
-          agent_id: agentId,
-          teaching_note: addForm.teaching_note || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) { showToast(data.error || "Save failed", "⚠"); setAddState("ready"); return; }
-      logAICall({ type: "knowledge-reinforcement", model: "text-embedding-3-small", location: "Training tab — Add Courses ingest" });
-      const newEntry = {
-        id:            Date.now(),
-        title:         addForm.title,
-        category:      addForm.category,
-        jurisdiction:  addForm.jurisdiction,
-        priority:      addForm.priority,
-        triggers:      addForm.triggers,
-        status:        addForm.status,
-        fieldNotes:    addForm.teaching_note || "",
-        learnedSummary: "",
-        createdAt:     new Date().toISOString(),
-        isDemo:        false,
-        chunks:        0,
-      };
-      onSaved(newEntry);
+      if (existingEntry) {
+        // FEATURE: PE-11 — Edit mode: PATCH metadata only, no re-vectorization
+        await apiUpdateEntry(existingEntry.id, {
+          title:          addForm.title,
+          category:       addForm.category,
+          jurisdiction:   addForm.jurisdiction,
+          teaching_note:  addForm.teaching_note || null,
+          triggers:       addForm.triggers,
+          priority:       addForm.priority,
+        });
+        const mergedEntry = {
+          ...existingEntry,
+          title:         addForm.title,
+          category:      addForm.category,
+          jurisdiction:  addForm.jurisdiction,
+          fieldNotes:    addForm.teaching_note || "",
+          triggers:      addForm.triggers,
+          priority:      addForm.priority,
+        };
+        onSaved(mergedEntry);
+      } else {
+        // Existing add flow — unchanged
+        const res = await fetch("/api/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...addForm,
+            content: addExtracted,
+            tenant_id: TENANT_ID,
+            agent_id: agentId,
+            teaching_note: addForm.teaching_note || null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || "Save failed", "⚠"); setAddState("ready"); return; }
+        logAICall({ type: "knowledge-reinforcement", model: "text-embedding-3-small", location: "Training tab — Add Courses ingest" });
+        const newEntry = {
+          id:            Date.now(),
+          title:         addForm.title,
+          category:      addForm.category,
+          jurisdiction:  addForm.jurisdiction,
+          priority:      addForm.priority,
+          triggers:      addForm.triggers,
+          status:        addForm.status,
+          fieldNotes:    addForm.teaching_note || "",
+          learnedSummary: "",
+          createdAt:     new Date().toISOString(),
+          isDemo:        false,
+          chunks:        0,
+        };
+        onSaved(newEntry);
+      }
     } catch (err) {
       showToast("Network error: " + err.message, "⚠");
       setAddState("ready");
@@ -441,6 +476,8 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
     <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18, alignItems: "start", marginBottom: 20 }}>
       {/* FEATURE: PE-10 — Add Courses inline sub-view */}
       <FeatureBadge id="PE-10" />
+      {/* FEATURE: PE-11 — Edit Course inline sub-view */}
+      <FeatureBadge id="PE-11" />
 
       {/* ── Left: Exhibit A + Exhibit B ── */}
       <div>
@@ -452,7 +489,19 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
             Exhibit A · Course Material
           </div>
 
-          {addState === "idle" && (
+          {existingEntry && (
+            <div style={{ border: `1px solid ${T.moss}50`, padding: "12px 14px", background: `${T.moss}05`, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 44, height: 52, background: T.navy, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ fontFamily: mono, fontSize: 9, color: T.card, fontWeight: 700 }}>DOC</div>
+                <div style={{ fontFamily: mono, fontSize: 8, color: `${T.card}80`, marginTop: 2 }}>on file</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: display, fontSize: 14, fontWeight: 600, color: T.navy }}>Previously indexed document</div>
+                <div style={{ fontFamily: body, fontSize: 11.5, color: T.moss, marginTop: 2 }}>✓ Vectorized and indexed in RAG</div>
+              </div>
+            </div>
+          )}
+          {!existingEntry && addState === "idle" && (
             <div
               onClick={() => addFileRef.current?.click()}
               onDragOver={e => e.preventDefault()}
@@ -471,7 +520,7 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
             </div>
           )}
 
-          {addState === "uploading" && (
+          {!existingEntry && addState === "uploading" && (
             <div style={{ border: `1px solid ${T.brass}40`, padding: "24px", textAlign: "center", background: T.cardAlt }}>
               <div style={{ fontFamily: display, fontSize: 15, fontWeight: 600, color: T.navy, marginBottom: 12 }}>Extracting document text…</div>
               <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, marginBottom: 10 }}>{addFile?.name}</div>
@@ -482,7 +531,7 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
             </div>
           )}
 
-          {(addState === "ready" || addState === "saving") && (
+          {!existingEntry && (addState === "ready" || addState === "saving") && (
             <div style={{ border: `1px solid ${T.moss}50`, padding: "12px 14px", background: `${T.moss}05`, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 44, height: 52, background: T.flag, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <div style={{ fontFamily: mono, fontSize: 9, color: T.card, fontWeight: 700 }}>DOC</div>
@@ -607,7 +656,7 @@ function AddCourseView({ agent, addState, setAddState, addProgress, setAddProgre
               disabled={!addForm.title || isSaving || locked}
               style={{ background: !addForm.title || locked ? T.line : `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", color: !addForm.title || locked ? T.muted : T.navy, padding: "10px 24px", fontFamily: display, fontSize: 14, fontWeight: 700, cursor: !addForm.title || locked ? "not-allowed" : "pointer", opacity: isSaving ? .7 : 1, display: "flex", alignItems: "center", gap: 8 }}
             >
-              {isSaving ? "⏳ Saving…" : `▸ Teach ${agent.name.split(" ")[0]} this document`}
+              {isSaving ? "⏳ Saving…" : existingEntry ? "▸ Save Course Detail" : `▸ Teach ${agent.name.split(" ")[0]} this document`}
             </button>
           </div>
         </div>
@@ -702,8 +751,30 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
   });
   const addFileRef = useRef(null);
 
+  // FEATURE: PE-11 — Edit Course inline sub-view state
+  const [editingEntry, setEditingEntry] = useState(null);
+
+  const handleEditClick = (entry) => {
+    setEditingEntry(entry);
+    setAddState("ready");
+    setAddForm({
+      title:        str(entry.title),
+      category:     str(entry.category) || "Standards",
+      jurisdiction: str(entry.jurisdiction) || "All",
+      priority:     typeof entry.priority === "number" ? entry.priority : 50,
+      triggers:     Array.isArray(entry.triggers) ? entry.triggers : [],
+      status:       entry.status || "active",
+      teaching_note: str(entry.fieldNotes),
+    });
+    setAddFile(null);
+    setAddExtracted("");
+    setAddWordCount(0);
+    setAddExtractOpen(false);
+  };
+
   const resetAddView = () => {
     setShowAddView(false);
+    setEditingEntry(null);
     setAddState("idle");
     setAddProgress(0);
     setAddFile(null);
@@ -781,15 +852,18 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
           </div>
         ))}
         <div style={{flex:1}}/>
-        {/* FEATURE: PE-10 — Add Courses inline sub-view */}
+        {/* Stats strip button — context-aware: Add / Cancel Add / Cancel Edit */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {!showAddView && <AiBadge style={{ color: T.navy }} />}
+          {!showAddView && !editingEntry && <AiBadge style={{ color: T.navy }} />}
           <button
-            onClick={() => showAddView ? resetAddView() : setShowAddView(true)}
+            onClick={() => {
+              if (showAddView || editingEntry) resetAddView();
+              else setShowAddView(true);
+            }}
             style={{
-              background: showAddView ? "transparent" : T.brass,
+              background: (showAddView || editingEntry) ? "transparent" : T.brass,
               border: `1px solid ${T.brass}`,
-              color: showAddView ? T.brassLight : T.navy,
+              color: (showAddView || editingEntry) ? T.brassLight : T.navy,
               padding: "6px 14px",
               fontFamily: body,
               fontSize: 12,
@@ -798,15 +872,16 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               letterSpacing: .3,
             }}
           >
-            {showAddView ? "✕ Cancel" : "+ Add Courses"}
+            {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
           </button>
         </div>
       </div>
 
-      {/* FEATURE: PE-10 — Inline add-course sub-view */}
-      {showAddView && (
+      {/* FEATURE: PE-10/PE-11 — Inline add-course / edit-course sub-view */}
+      {(showAddView || editingEntry) && (
         <AddCourseView
           agent={agent}
+          existingEntry={editingEntry}
           addState={addState}
           setAddState={setAddState}
           addProgress={addProgress}
@@ -823,16 +898,22 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
           setAddForm={setAddForm}
           addFileRef={addFileRef}
           onCancel={resetAddView}
-          onSaved={(newEntry) => {
-            setEntries(prev => [newEntry, ...prev]);
+          onSaved={(savedEntry) => {
+            if (editingEntry) {
+              // FEATURE: PE-11 — update entry in list
+              setEntries(prev => prev.map(e => e.id === savedEntry.id ? savedEntry : e));
+              showToast("Updated ✦");
+            } else {
+              setEntries(prev => [savedEntry, ...prev]);
+              showToast("Document indexed ✦");
+            }
             resetAddView();
-            showToast("Document indexed ✦");
           }}
           showToast={showToast}
         />
       )}
 
-      {!showAddView && (<>
+      {!showAddView && !editingEntry && (<>
 
       {/* How it works */}
       <div style={{background:T.cardAlt,border:`1px dashed ${T.lineSoft}`,padding:"9px 13px"}}>
@@ -895,15 +976,30 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
                 >
                   {e.status==="active" ? "● Active" : "○ Disabled"}
                 </button>
-                {/* S-MIGRATE-04 — Edit inline sub-view placeholder */}
-                <button disabled style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 7px",cursor:"not-allowed",letterSpacing:.5,textTransform:"uppercase",opacity:0.45}}>
-                  EDIT
-                </button>
-                {/* Delete — only if agent.trainable */}
-                {agent.trainable && (
-                  <button onClick={()=>deleteEntry(e.id)} style={{fontFamily:mono,fontSize:9,color:T.flag,background:"transparent",border:`1px solid ${T.flag}40`,padding:"2px 7px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase"}}>
-                    DELETE
-                  </button>
+                {/* FEATURE: PE-11 — EDIT + DELETE: trainable agents, active entries only (NIGP parity) */}
+                {agent.trainable && e.status === "active" && (
+                  <>
+                    <button
+                      onClick={() => handleEditClick(e)}
+                      style={{
+                        fontFamily: mono, fontSize: 9, color: T.muted,
+                        background: "transparent", border: `1px solid ${T.lineSoft}`,
+                        padding: "2px 7px", cursor: "pointer", letterSpacing: .5, textTransform: "uppercase",
+                      }}
+                    >
+                      EDIT
+                    </button>
+                    <button
+                      onClick={() => deleteEntry(e.id)}
+                      style={{
+                        fontFamily: mono, fontSize: 9, color: T.flag,
+                        background: "transparent", border: `1px solid ${T.flag}40`,
+                        padding: "2px 7px", cursor: "pointer", letterSpacing: .5, textTransform: "uppercase",
+                      }}
+                    >
+                      DELETE
+                    </button>
+                  </>
                 )}
               </div>
 

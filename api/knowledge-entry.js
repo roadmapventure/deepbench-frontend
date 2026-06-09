@@ -1,5 +1,6 @@
-// DeepBench v5.1.22 | knowledge-entry.js | PATCH + DELETE for knowledge_entries
+// DeepBench v5.1.26 | knowledge-entry.js | PE-11 — extend PATCH to accept metadata fields
 // FEATURE: PE-03 — Training tab live wiring
+// FEATURE: PE-11 — Edit Course inline sub-view
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -19,12 +20,27 @@ export default async function handler(req, res) {
   };
 
   try {
-    // ── PATCH — update status field only ─────────────────────────────────────
+    // ── PATCH — status OR metadata fields ────────────────────────────────────
     if (req.method === "PATCH") {
-      const { id, tenant_id = "global", status } = req.body;
+      const { id, tenant_id = "global", status, title, category, jurisdiction, teaching_note, triggers, priority } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      if (!["active", "disabled"].includes(status)) {
-        return res.status(400).json({ error: "status must be 'active' or 'disabled'" });
+
+      const patch = {};
+      if (status !== undefined) {
+        if (!["active", "disabled"].includes(status)) {
+          return res.status(400).json({ error: "status must be 'active' or 'disabled'" });
+        }
+        patch.status = status;
+      }
+      if (title !== undefined) patch.title = title;
+      if (category !== undefined) patch.category = category;
+      if (jurisdiction !== undefined) patch.jurisdiction = jurisdiction;
+      if (teaching_note !== undefined) patch.teaching_note = teaching_note;
+      if (triggers !== undefined) patch.triggers = triggers;
+      if (priority !== undefined) patch.priority = priority;
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: "No fields to update" });
       }
 
       const r = await fetch(
@@ -32,7 +48,7 @@ export default async function handler(req, res) {
         {
           method: "PATCH",
           headers: { ...headers, "Prefer": "return=representation" },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(patch),
         }
       );
       if (!r.ok) {
