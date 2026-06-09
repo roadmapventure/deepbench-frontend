@@ -56,7 +56,7 @@ Every kickoff doc must have these 10 sections in order:
 6. **SCOPE RULES** (what NOT to touch)
 7. **NODE.JS TEST** (full code written out — not described, not referenced)
 8. **CLAUDE CODE VERIFICATION CHECKLIST**
-9. **COMMIT instruction**
+9. **COMMIT instruction** — must include `git push origin dev` after the commit
 10. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
 Claude Code has no memory and no Drive access. Every kickoff doc must be fully self-contained — no "as discussed" or "refer to standards" references.

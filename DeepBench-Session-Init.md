@@ -168,7 +168,7 @@ When John says "generate kickoff doc for [session]":
 4. Fetch PRD.md + MOCK-NOTES.md — confirm spec and UI conventions
 5. Read relevant source files directly via filesystem MCP (preferred) or REPO-SNAPSHOT.md (fallback) — confirm what already exists
 6. If UI work: ask John for screenshot or describe mock for approval
-7. Write kickoff doc with all 10 required sections
+7. Write kickoff doc with all 10 required sections — Section 9 (COMMIT) must include `git push origin dev` after the commit
 8. Save kickoff doc to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 9. **Update `docs/FEATURES.md` (mandatory — do not skip):**
    - Mark newly designed features with correct status (🔶 Partial) and session ID
