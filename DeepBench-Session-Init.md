@@ -176,13 +176,14 @@ When John says "generate kickoff doc for [session]":
    - Add locked spec notes block for the feature (decisions made this session)
    - Update session order table if sessions were split or new sessions added
    - Remove any resolved blocking questions from Open Questions table
-10. **Update `CLAUDE.md` Section 12 (mandatory — do not skip):**
-    - Set "Next session" to the new session name + kickoff doc path
-    - Clear any blocking questions that were resolved this session
-11. Commit and push `docs/FEATURES.md`, `CLAUDE.md`, and the kickoff doc to `dev` in a single commit
+10. **Update `CLAUDE-STATE.md` (mandatory — do not skip):**
+    - Set "Version in dev" to the new version
+    - Set "Next session" to the new session name
+    - Remove any blocking questions that were resolved this session
+11. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev` in a single commit
 12. End with a clearly bordered code block containing the exact Claude Code start prompt:
     ```
-    Read CLAUDE.md then read docs/kickoffs/[filename].md and execute it.
+    Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
     ```
 
 **Why steps 9–11 are mandatory:** John opens the next design session by reading FEATURES.md to decide what to work on. If the backlog isn't updated at the end of this session, decisions made here are lost and will be redesigned from scratch.
@@ -205,7 +206,7 @@ When John pastes the Claude Code verification checklist showing all items checke
 
 ### 10c — Act on QA results
 
-- **All PASS** → Close out: mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE.md` Section 12 (bump version, set next session), commit and push both files to dev.
+- **All PASS** → Close out: mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE-STATE.md` (bump version, set next session), commit and push both files to dev.
 - **Any FAIL** → Perform full root cause analysis before writing any patch: read the complete execution path (browser → call site → API handler → package.json → runtime), compare against the working NIGP reference line by line, identify the deepest cause — not the nearest symptom. A bug that fails QA once must not fail QA twice. Then generate a patch kickoff doc targeting the confirmed root cause.
 - **NEW REQUIREMENT discovered during QA** → Add to `docs/FEATURES.md` under the correct area as ❌ Missing, session = S-future. Commit and push.
 
