@@ -184,7 +184,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
-| PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ❌ Missing | S-MIGRATE-03 |
+| PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | 🔶 Partial | S-MIGRATE-03 |
 | PE-11 | Training tab — Edit Course inline sub-view (edit title, field notes, triggers, priority — no re-vectorization) | ❌ Missing | S-MIGRATE-04 |
 
 **PE design decisions locked 2026-06-08 (S-MIGRATE-UX):**
@@ -335,7 +335,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-01a | Illustrated SVG avatars + AgentAvatar in SharedUI + Roster visual port (RO-04) | ✅ DONE (621eb31) |
 | S-MIGRATE-01b | Personnel File left-sidebar nav + Profile tab 2-col layout (PE-07, PE-08, PE-09) | ✅ DONE (8660e42) |
 | S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
-| S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ⏳ Needs design session |
+| S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | 🔶 Design done — kickoff: v5.1.23-PE10-add-courses-inline.md |
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — title, notes, triggers, priority (PE-11) | ⏳ Needs design session |
 | S-MIGRATE-05 | Playbook tab: output_format CRUD — ResumeTab pattern (PE-04) | ⏳ Needs design session |
 | S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |

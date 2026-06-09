@@ -216,7 +216,7 @@ For any Supabase operation: verify column names against actual schema before wri
 > Current Queue Doc ID: `1izzrv7pF7lLZSAlV-AAwWLVh_uGKGrNGioqva1YXSn4`
 
 **Current version in dev:** v5.1.22 (commit 02ff560)
-**Next session:** S-MIGRATE-03 — Design session: Add Courses inline sub-view within Training tab (PE-10).
+**Next session:** S-MIGRATE-03 — Coding session: Add Courses inline sub-view (PE-10). Kickoff doc: `docs/kickoffs/v5.1.23-PE10-add-courses-inline.md`
 **Architecture:** `docs/ARCHITECTURE.md` — north star document, written S-ARCH-01 — read before any structural work
 **Do NOT merge dev → main** — John has not confirmed.
 
@@ -225,7 +225,7 @@ For any Supabase operation: verify column names against actual schema before wri
 
 **Known gaps confirmed 2026-06-08 (post S-MIGRATE-01b manual test):**
 - Training tab: load/toggle/delete wiring + NIGP card layout → S-MIGRATE-02
-- Training tab: Add Courses inline sub-view → S-MIGRATE-03 (needs design session)
+- Training tab: Add Courses inline sub-view → S-MIGRATE-03 (design done ✓)
 - Training tab: Edit Course inline sub-view → S-MIGRATE-04 (needs design session)
 - Playbook tab: all buttons non-functional → S-MIGRATE-05 (needs design session)
 - Resume tab: confirmed working ✓
