@@ -194,6 +194,7 @@ navigate('/destination');
 - [ ] Zero red errors in browser console after Vercel deploy
 - [ ] `?debug=features` on dev URL — confirm feature badge visible
 - [ ] `docs/FEATURES.md` updated — this session's feature IDs marked ✅ Done with commit hash, session order table row marked ✅ DONE
+- [ ] `docs/STYLE-GUIDE.md` updated — any new style rule or pattern locked this session added to the guide and change log
 
 ---
 
@@ -300,3 +301,4 @@ https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/src/AppS
 *Full standards and testing detail: `/docs/STANDARDS.md`*
 *Full feature inventory: `/docs/FEATURES.md`*
 *Full architecture: `/docs/ARCHITECTURE.md`*
+*UI style guide (tokens, badges, patterns): `/docs/STYLE-GUIDE.md`*
