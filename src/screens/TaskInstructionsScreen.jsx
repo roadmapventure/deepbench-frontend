@@ -5,13 +5,12 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
+import { Corners, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { supabase } from "../lib/supabase.js";
 import { TENANT_ID } from "../config.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
 import StepList from "../components/StepList.jsx";
-import MichelleAvatar from "../components/MichelleAvatar.jsx";
 
 // FEATURE: TI-03 — Task loaded from Supabase
 // FEATURE: AW-13 — Clarifying questions as HITL step
@@ -845,7 +844,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
               <FeatureBadge id="AG-04a" />
               <FeatureBadge id="DB-17" />
-              <MichelleAvatar size="sm" />
+              <AgentAvatar who="michelle" size={28} ring={true} />
               {updatingPlan && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
               <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {updatingPlan ? "is updating your plan..." : "created this plan"}</span>
             </div>
@@ -854,7 +853,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
             {updatingPlan && (
               <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(221,213,190,0.4)",borderRadius:6,padding:12,marginBottom:10,position:"relative"}}>
                 <FeatureBadge id="AG-04b" />
-                <MichelleAvatar size="md" />
+                <AgentAvatar who="michelle" size={36} ring={true} />
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
                     <span style={{fontFamily:body,fontSize:14,color:T.navy}}>Michelle is thinking...</span>

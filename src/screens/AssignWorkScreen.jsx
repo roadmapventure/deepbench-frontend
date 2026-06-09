@@ -10,7 +10,6 @@ import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
-import MichelleAvatar from "../components/MichelleAvatar.jsx";
 
 const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
 
@@ -530,7 +529,7 @@ export default function AssignWorkScreen() {
           <div style={{marginBottom:16,position:"relative"}}>
             <FeatureBadge id="DB-17" />
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-              <MichelleAvatar size="sm" />
+              <AgentAvatar who="michelle" size={28} ring={true} />
               <span style={{fontFamily:body,fontSize:11,color:T.muted}}>
                 {titleData.titleEdited
                   ? "Task title (edited)"
@@ -615,7 +614,7 @@ export default function AssignWorkScreen() {
             {(generating || questions.length > 0) && (
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
                 <FeatureBadge id="AG-04a" />
-                <MichelleAvatar size="sm" />
+                <AgentAvatar who="michelle" size={28} ring={true} />
                 {generating && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
                 <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} is asking these questions</span>
               </div>
@@ -669,7 +668,7 @@ export default function AssignWorkScreen() {
             {(generating || planGenerated) && (
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative",fontFamily:body,fontSize:11,color:T.navy}}>
                 <FeatureBadge id="AG-04a" />
-                <MichelleAvatar size="sm" />
+                <AgentAvatar who="michelle" size={28} ring={true} />
                 {generating && <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>}
                 <span>{MICHELLE.initials} · {MICHELLE.name} · {MICHELLE.code} {generating ? "is building your instructions…" : "built this plan"}</span>
               </div>

@@ -117,7 +117,9 @@ export const AGENT_PRONOUNS = {
   christy: { subject:"she", object:"her", possessive:"her" },
   robyn:   { subject:"she", object:"her", possessive:"her" },
   brent:   { subject:"he",  object:"him", possessive:"his" },
-  pat:     { subject:"she", object:"her", possessive:"her" },
+  pat:      { subject:"she", object:"her", possessive:"her" },
+  michelle: { subject:"she", object:"her", possessive:"her" },
+  susan:    { subject:"she", object:"her", possessive:"her" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────

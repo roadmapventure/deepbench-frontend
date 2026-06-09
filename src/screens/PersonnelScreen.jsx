@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, SkillBar, Toast, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
+import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
@@ -186,8 +186,8 @@ function ProfileTab({ agent, entries, layers }) {
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
           <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
-          <div style={{width:92,height:92,borderRadius:"50%",border:`2px solid ${agent.color}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:36,fontWeight:700,color:agent.color,margin:"0 auto 12px"}}>
-            {agent.name[0]}
+          <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
+            <AgentAvatar who={agent.id} size={92} ring={true} />
           </div>
           <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
           <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>
@@ -321,7 +321,7 @@ function ProfileTab({ agent, entries, layers }) {
             onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
             onMouseLeave={e=>e.currentTarget.style.borderColor=T.line}>
             <div style={{padding:"13px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
-              <div style={{width:36,height:36,borderRadius:"50%",border:`1.5px solid ${agent.color}`,background:T.paperDeep,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontSize:14,fontWeight:700,color:agent.color,flexShrink:0,marginTop:1}}>{agent.name[0]}</div>
+              <AgentAvatar who={agent.id} size={36} ring={true} />
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:4,lineHeight:1.2}}>{t.title}</div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
@@ -1293,8 +1293,8 @@ export default function PersonnelScreen() {
 
           {/* Agent identity strip */}
           <div style={{ padding:"16px 14px 14px", borderBottom:`1px solid ${T.lineSoft}` }}>
-            <div style={{ width:44, height:44, borderRadius:"50%", border:`2px solid ${agent.color}`, background:T.paperDeep, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:display, fontSize:18, fontWeight:700, color:agent.color, marginBottom:8 }}>
-              {agent.name[0]}
+            <div style={{ marginBottom:8 }}>
+              <AgentAvatar who={agent.id} size={44} ring={true} />
             </div>
             <div style={{ fontFamily:display, fontSize:13, fontWeight:600, color:T.navy, lineHeight:1.2 }}>{agent.name}</div>
             <div style={{ fontFamily:mono, fontSize:8, color:T.muted, marginTop:2 }}>{agent.code}</div>
