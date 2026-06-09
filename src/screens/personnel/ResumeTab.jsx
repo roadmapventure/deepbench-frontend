@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | ResumeTab.jsx | Personnel Resume tab — role prompt CRUD, inline edit
+// DeepBench v5.1.30 | ResumeTab.jsx | S-BENCH-UX-02 — bench UI polish round 2
 // FEATURE: PE-02 — Resume tab
 // src/screens/personnel/ResumeTab.jsx — v5.0.0
 // DeepBench v5 — Resume tab: role_prompt CRUD
@@ -66,9 +66,9 @@ export function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, o
       </div>
       {isEditing ? (
         <div style={{ padding: "10px 12px" }}>
-          <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+          <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
           <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={6}
-            style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+            style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 7 }}>
             <button onClick={() => setEditingId(null)} style={{ fontFamily: mono, fontSize: 9, color: T.muted, background: "transparent", border: `1px solid ${T.lineSoft}`, padding: "4px 11px", cursor: "pointer", textTransform: "uppercase" }}>Cancel</button>
             <button onClick={handleSave} disabled={saving} style={{ fontFamily: mono, fontSize: 9, color: T.moss, background: "transparent", border: `1px solid ${T.moss}`, padding: "4px 11px", cursor: "pointer", fontWeight: 700, textTransform: "uppercase" }}>{saving ? "Saving…" : "Save"}</button>
@@ -89,6 +89,10 @@ export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel
   const [isSelectable,setIsSelectable]= useState(false);
   const [saving,      setSaving]      = useState(false);
 
+  // FEATURE: PE-02
+  const TYPE_LABELS = { role_prompt: "Role Prompt", output_format: "Output Format" };
+  const typeLabel = TYPE_LABELS[type] || "Config";
+
   const handleSave = async () => {
     if (!name.trim() || !text.trim()) { showToast("Name and content required", "⚠"); return; }
     setSaving(true);
@@ -102,17 +106,17 @@ export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel
 
   return (
     <div style={{ border: `1px solid ${T.brass}`, background: `${T.brass}05`, padding: "12px 14px", marginTop: 8 }}>
-      <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.3, fontWeight: 600, marginBottom: 10 }}>New Role Prompt</div>
+      <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.3, fontWeight: 600, marginBottom: 10 }}>{`New ${typeLabel}`}</div>
       <div style={{ marginBottom: 9 }}>
         <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Name</div>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Board Presentation Mode"
-          style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, padding: "7px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", boxSizing: "border-box" }} />
+          style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "7px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", boxSizing: "border-box" }} />
       </div>
       <div style={{ marginBottom: 9 }}>
         <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Prompt Text</div>
         <textarea value={text} onChange={e => setText(e.target.value)} rows={5}
           placeholder="You are [Name], a [role] with [X] years of experience in [specialty]..."
-          style={{ width: "100%", background: T.paper, border: `1px solid ${T.lineSoft}`, padding: "8px 10px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+          style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "8px 10px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
       </div>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: body, fontSize: 12, color: T.mutedDeep, cursor: "pointer" }}>
@@ -124,7 +128,7 @@ export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={onCancel} style={{ fontFamily: body, fontSize: 12, color: T.muted, background: "transparent", border: `1px solid ${T.line}`, padding: "6px 14px", cursor: "pointer" }}>Cancel</button>
-        <button onClick={handleSave} disabled={saving} style={{ fontFamily: body, fontSize: 12, color: T.navy, background: `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", padding: "6px 16px", cursor: "pointer", fontWeight: 700 }}>{saving ? "Saving…" : "Add Role Prompt"}</button>
+        <button onClick={handleSave} disabled={saving} style={{ fontFamily: body, fontSize: 12, color: T.navy, background: `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", padding: "6px 16px", cursor: "pointer", fontWeight: 700 }}>{saving ? "Saving…" : `Add ${typeLabel}`}</button>
       </div>
     </div>
   );
@@ -145,12 +149,14 @@ export default function ResumeTab({ agent, showToast }) {
       .finally(() => setLoading(false));
   }, [agent.id]);
 
+  // FEATURE: PE-02
   const handleSetDefault = async (id) => {
     try {
       await apiPatchConfig(id, { is_default: true });
-      setConfigs(prev => prev.map(c => ({ ...c, is_default: c.id === id })));
+      const fresh = await apiGetConfigs(agent.id, "role_prompt");
+      setConfigs(fresh);
       showToast("Default updated ✦");
-    } catch (e) { showToast("Failed to set default", "⚠"); }
+    } catch { showToast("Failed to set default", "⚠"); }
   };
 
   const handleToggleSelectable = async (id, value) => {
@@ -174,8 +180,14 @@ export default function ResumeTab({ agent, showToast }) {
     } catch (e) { showToast("Delete failed", "⚠"); }
   };
 
+  // FEATURE: PE-02
   const handleSaved = (config) => {
-    setConfigs(prev => [...prev, config]);
+    setConfigs(prev => {
+      const updated = config.is_default
+        ? prev.map(c => ({ ...c, is_default: false }))
+        : prev;
+      return [config, ...updated];
+    });
     setShowAdd(false);
   };
 
@@ -197,7 +209,9 @@ export default function ResumeTab({ agent, showToast }) {
             </div>
           ))}
         </div>
-        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px" }}>
+        {/* FEATURE: PE-02 */}
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px", position: "relative" }}>
+          <Corners />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Skill Ladder</div>
           {SKILL_LEVELS.map(([label, range]) => {
             const isActive = label === activeLevel;

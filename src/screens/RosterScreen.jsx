@@ -1,4 +1,4 @@
-// DeepBench v5.1.29 | RosterScreen.jsx | S-BENCH-UX-01 — bench UI polish
+// DeepBench v5.1.30 | RosterScreen.jsx | S-BENCH-UX-02 — bench UI polish round 2
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -130,7 +130,11 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
         </button>
         {agent.trainable
           ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:agent.color===T.moss?T.moss:T.brass}}>
-              <AiBadge style={{color:agent.color===T.moss?"#fff":T.navy}}/>
+              {/* FEATURE: RO-08 */}
+              <AiBadge style={agent.color===T.moss
+                ? {color:"#fff", background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.3)"}
+                : {color:T.navy, background:"rgba(18,36,60,0.12)", border:"1px solid rgba(18,36,60,0.2)"}
+              }/>
               <button onClick={()=>onAddTraining(agent)}
                 style={{padding:10,fontFamily:body,fontSize:11.5,fontWeight:700,background:"transparent",color:agent.color===T.moss?"#fff":T.navy,border:"none",cursor:"pointer"}}>
                 + Add Training

@@ -1,4 +1,4 @@
-// DeepBench v5.1.29 | PersonnelScreen.jsx | S-BENCH-UX-01 — bench UI polish
+// DeepBench v5.1.30 | PersonnelScreen.jsx | S-BENCH-UX-02 — bench UI polish round 2
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -534,8 +534,9 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
               <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
               <div style={{ fontFamily: display, fontSize: 15, fontWeight: 600, color: T.navy, marginBottom: 4 }}>Drop a document here</div>
               <div style={{ fontFamily: body, fontSize: 12, color: T.muted, marginBottom: 14 }}>PDF, DOCX, TXT · Max 20MB</div>
+              {/* FEATURE: PE-10 */}
               <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: T.brass, color: T.navy, padding: "8px 20px", fontFamily: body, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                <AiBadge style={{ color: T.navy }} /> ↑ Browse File
+                ↑ Browse File
               </div>
               <input ref={addFileRef} type="file" accept=".pdf,.txt,.docx" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
             </div>
@@ -564,7 +565,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
               </div>
               <button
                 onClick={() => { setAddState("idle"); setAddFile(null); setAddExtracted(""); setAddWordCount(0); }}
-                style={{ fontFamily: body, fontSize: 11.5, color: T.brassDeep, background: "transparent", border: `1px solid ${T.line}`, padding: "5px 12px", cursor: "pointer" }}
+                style={{ fontFamily: body, fontSize: 11.5, color: T.mutedDeep, background: "transparent", border: `1px solid ${T.line}`, padding: "5px 12px", cursor: "pointer" }}
               >✎ Replace</button>
             </div>
           )}
@@ -677,7 +678,13 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
               disabled={!addForm.title || isSaving || locked}
               style={{ background: !addForm.title || locked ? T.line : `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", color: !addForm.title || locked ? T.muted : T.navy, padding: "10px 24px", fontFamily: display, fontSize: 14, fontWeight: 700, cursor: !addForm.title || locked ? "not-allowed" : "pointer", opacity: isSaving ? .7 : 1, display: "flex", alignItems: "center", gap: 8 }}
             >
-              {isSaving ? "⏳ Saving…" : existingEntry ? "▸ Save Course Detail" : `▸ Teach ${agent.name.split(" ")[0]} this document`}
+              {/* FEATURE: PE-10 */}
+              {isSaving
+                ? "⏳ Saving…"
+                : existingEntry
+                  ? "▸ Save Course Detail"
+                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} /> ▸ Teach {agent.name.split(" ")[0]} this document</>
+              }
             </button>
           </div>
         </div>
@@ -704,7 +711,9 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
           <div style={{ fontFamily: body, fontSize: 11.5, color: T.mutedDeep, lineHeight: 1.5, fontStyle: "italic", padding: "8px 10px", background: `${T.moss}08`, border: `1px solid ${T.moss}30` }}>Mock projected impact. Live skill computation in v5.</div>
         </div>
 
-        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", marginBottom: 14 }}>
+        {/* FEATURE: PE-10 */}
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", marginBottom: 14, position: "relative" }}>
+          <Corners />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 10 }}>What Changes</div>
           {[
             ["Documents",         agent.docs,            agent.docs + 1,              true],
@@ -727,11 +736,13 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
           ))}
         </div>
 
-        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px" }}>
+        {/* FEATURE: PE-10 */}
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
+          <Corners />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 10 }}>Onboarding Checklist</div>
           {[
             ["File uploaded & extracted",  addState === "ready" || addState === "saving", "just now"],
-            ["Priority & flags assigned",  (addState === "ready" || addState === "saving") && addForm.title !== "", "just now"],
+            ["Priority & flags assigned",  addState === "ready" || addState === "saving", "just now"],
             ["Chunked into passages",      false, "starting…"],
             ["Indexed into RAG",           false, "queued"],
             ["Quality check",              false, "scheduled"],
@@ -874,8 +885,8 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
         ))}
         <div style={{flex:1}}/>
         {/* Stats strip button — context-aware: Add / Cancel Add / Cancel Edit */}
+        {/* FEATURE: PE-03 */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {!showAddView && !editingEntry && <AiBadge style={{ color: T.navy }} />}
           <button
             onClick={() => {
               if (showAddView || editingEntry) resetAddView();
@@ -891,8 +902,14 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               fontWeight: 600,
               cursor: "pointer",
               letterSpacing: .3,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
+            {!(showAddView || editingEntry) && (
+              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} />
+            )}
             {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
           </button>
         </div>
