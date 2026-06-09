@@ -1,29 +1,38 @@
-// DeepBench v5.1.21 | PersonnelScreen.jsx | NIGP visual port — left-sidebar nav, Profile tab 2-col layout
+// DeepBench v5.1.22 | PersonnelScreen.jsx | Training tab live wiring — PE-03
 
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Corners, SkillBar, Toast, AiBadge } from "../components/SharedUI.jsx";
+import { Corners, SkillBar, Toast, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab from "./personnel/ResumeTab.jsx";
 
-// ── Mock training entries (replace with Supabase in Phase 0) ─────────────────
-const MOCK_ENTRIES = {
-  bob: [
-    { id:"e-1", title:"FAR Part 13 — Small Purchase Thresholds", category:"Statute", priority:85, status:"active", triggers:["maverick","po-split"], jurisdiction:"Federal", fieldNotes:"Key threshold: $10,000 for micro-purchase, $250,000 for simplified acquisition.", createdAt:"20250415-143022", chunks:14, learnedSummary:"Bob learned the current FAR Part 13 thresholds and can cite them when flagging PO splitting and maverick spend.", isDemo:false },
-    { id:"e-2", title:"Texas Local Preference Ordinance Guidelines", category:"Jurisdiction", priority:72, status:"active", triggers:["maverick"], jurisdiction:"Texas", fieldNotes:"Texas cities may grant up to 5% preference to local vendors.", createdAt:"20250320-091500", chunks:8, learnedSummary:"Bob can apply Texas-specific local preference rules when reviewing vendor selection.", isDemo:false },
-  ],
-  robyn: [
-    { id:"e-3", title:"NIGP Best Practice — Cooperative Contracting", category:"Best Practice", priority:90, status:"active", triggers:["single-source","vendor-hhi"], jurisdiction:"All", fieldNotes:"NASPO ValuePoint and DIR contracts provide pre-competed pricing.", createdAt:"20250501-080000", chunks:22, learnedSummary:"Robyn knows cooperative contracting frameworks and can recommend NASPO/DIR alternatives to sole-source awards.", isDemo:false },
-  ],
-  brent: [
-    { id:"e-4", title:"Illinois Comptroller Portal — Navigation Pattern", category:"Portal Navigation", priority:95, status:"active", triggers:[], jurisdiction:"Illinois", fieldNotes:"Login not required. Filter: Agency > Expenditure Type > Date range > Export CSV.", createdAt:"20250410-120000", chunks:6, learnedSummary:"Brent learned the exact click sequence for the Illinois Comptroller statewide expenditures export.", isDemo:false },
-  ],
-};
+// FEATURE: PE-03 — Training tab live wiring
+async function apiGetEntries(agent_id) {
+  const res = await fetch(`/api/load-entries?tenant_id=${TENANT_ID}&agent_id=${encodeURIComponent(agent_id)}`);
+  if (!res.ok) throw new Error("Failed to load entries");
+  return (await res.json()).entries || [];
+}
+async function apiPatchEntry(id, status) {
+  const res = await fetch("/api/knowledge-entry", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, tenant_id: TENANT_ID, status }),
+  });
+  if (!res.ok) throw new Error("Failed to update");
+}
+async function apiDeleteEntry(id) {
+  const res = await fetch("/api/knowledge-entry", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, tenant_id: TENANT_ID }),
+  });
+  if (!res.ok) throw new Error("Failed to delete");
+}
 
 // ── 5-layer readiness calc ────────────────────────────────────────────────────
 function computeLayers(agent, entries) {
@@ -266,15 +275,12 @@ function ProfileTab({ agent, entries, layers }) {
   );
 }
 
-// FEATURE: PE-03 — Training tab
+// FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
-function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
+function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, navigate }) {
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
   const pronouns = AGENT_PRONOUNS[agent.id] || { subject:"they" };
-  const categories = agent.id==="brent"
-    ? [...STANDARD_CATEGORIES,...BRENT_CATEGORIES]
-    : STANDARD_CATEGORIES;
 
   const exportJSON = () => {
     const real = entries.filter(e=>!e.isDemo);
@@ -284,21 +290,58 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
     URL.revokeObjectURL(url);
   };
 
-  const toggleStatus = (id) => {
-    setEntries(prev=>prev.map(e=>e.id===id?{...e,status:e.status==="active"?"disabled":"active"}:e));
+  // FEATURE: PE-03 — live toggle via API
+  const toggleStatus = async (id, currentStatus) => {
+    const next = currentStatus === "active" ? "disabled" : "active";
+    try {
+      await apiPatchEntry(id, next);
+      setEntries(prev => prev.map(e => e.id === id ? { ...e, status: next } : e));
+      showToast(next === "active" ? "Enabled ✦" : "Disabled ✦");
+    } catch { showToast("Failed to update", "⚠"); }
   };
-  const deleteEntry = (id) => {
-    if(!window.confirm("Delete this training entry permanently?")) return;
-    setEntries(prev=>prev.filter(e=>e.id!==id));
-    showToast("Entry deleted","🗑");
+
+  // FEATURE: PE-03 — live delete via API
+  const deleteEntry = async (id) => {
+    if (!window.confirm("Delete this training entry permanently?")) return;
+    try {
+      await apiDeleteEntry(id);
+      setEntries(prev => prev.filter(e => e.id !== id));
+      showToast("Deleted ✦");
+    } catch { showToast("Delete failed", "⚠"); }
   };
+
+  // FEATURE: PE-03 — Run ID formatter
+  function formatRunId(createdAt) {
+    if (!createdAt) return "";
+    return createdAt.replace("T", " ").split(".")[0].replace(/-/g,"").replace(/:/g,"").replace(" ","-");
+  }
+
+  // FEATURE: PE-03 — Date column formatter
+  function formatDateCol(createdAt) {
+    if (!createdAt) return { month: "—", day: "" };
+    const d = new Date(createdAt);
+    return {
+      month: d.toLocaleDateString("en-US", { month: "short" }),
+      day:   d.getDate().toString(),
+    };
+  }
 
   const active   = entries.filter(e=>e.status==="active");
   const disabled = entries.filter(e=>e.status==="disabled");
 
+  // FEATURE: PE-03 — loading state while entries fetch
+  if (loadingEntries) return (
+    <div style={{ padding: "40px", textAlign: "center", color: T.muted, fontFamily: mono, fontSize: 11 }}>
+      Loading training entries…
+    </div>
+  );
+
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {/* Navy stats strip */}
+    <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
+      {/* FEATURE: PE-03 — FeatureBadge */}
+      <FeatureBadge id="PE-03" />
+
+      {/* Navy stats strip — FEATURE: PE-03 */}
       <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:22,alignItems:"center",border:`1px solid rgba(182,135,58,.3)`}}>
         {[["Documents",agent.docs,T.card],["Class Hrs",agent.classes,T.brassLight],["Chunks",agent.chunks,"#8fa3bf"],["~Tokens",agent.chunks>0?Math.round(agent.chunks*0.74/1000)+"K":"0","#8fa3bf"]].map(([k,v,c])=>(
           <div key={k}>
@@ -307,6 +350,21 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
           </div>
         ))}
         <div style={{flex:1}}/>
+        {/* S-MIGRATE-03 — Add Courses inline sub-view */}
+        <button disabled style={{
+          background:"transparent",
+          border:`1px solid ${T.brass}`,
+          color:T.brassLight,
+          padding:"6px 14px",
+          fontFamily:body,
+          fontSize:12,
+          fontWeight:600,
+          opacity:0.45,
+          cursor:"not-allowed",
+          letterSpacing:.3,
+        }}>
+          + Add Courses
+        </button>
       </div>
 
       {/* How it works */}
@@ -333,44 +391,94 @@ function TrainingTab({ agent, entries, setEntries, showToast, navigate }) {
         </div>
       )}
 
-      {entries.map((e,i)=>{
+      {/* FEATURE: PE-03 — NIGP card layout: left date/timeline col + right content */}
+      {entries.map((e) => {
         const pi = priorityInfo(e.priority);
         const isExpanded = expandedIds[e.id];
-        const runId = e.createdAt || "";
-        return(
-          <div key={e.id} style={{background:T.card,border:`1px solid ${T.line}`,marginBottom:10,overflow:"hidden"}}>
-            <div style={{padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
-                  <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:e.status==="active"?`${T.moss}15`:`${T.muted}10`,color:e.status==="active"?T.moss:T.muted,border:`1px solid ${e.status==="active"?T.moss:T.lineSoft}`,fontWeight:700}}>{e.status==="active"?"● Active":"○ Disabled"}</span>
-                  <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category}</span>
-                  {e.jurisdiction&&e.jurisdiction!=="All"&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
-                  {runId&&<span style={{fontFamily:mono,fontSize:8,color:T.muted,marginLeft:"auto"}}>Run ID: {runId}</span>}
-                  {agent.trainable&&(
-                    <span style={{display:"flex",gap:5,marginLeft:runId?"0":"auto"}}>
-                      <button onClick={()=>toggleStatus(e.id)} style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 7px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase"}}>Toggle</button>
-                      <button onClick={()=>deleteEntry(e.id)} style={{fontFamily:mono,fontSize:9,color:T.flag,background:"transparent",border:`1px solid ${T.flag}40`,padding:"2px 7px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase"}}>Delete</button>
-                    </span>
-                  )}
-                </div>
-                <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:4}}>{e.title}</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:3}}>
-                  {e.triggers?.length>0&&(e.triggers.includes("all")
-                    ?<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ ALL FLAGS</span>
-                    :e.triggers.map(t=><span key={t} style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ {t.toUpperCase().replace(/-/g," ")}</span>)
-                  )}
-                </div>
-                <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>Priority {e.priority}/100</div>
-                {e.fieldNotes&&<div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,marginTop:5,lineHeight:1.5,fontStyle:"italic",background:T.cardAlt,padding:"6px 10px",borderLeft:`3px solid ${T.brass}`}}>{e.fieldNotes}</div>}
-                <button onClick={()=>toggleEntry(e.id)} style={{marginTop:6,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
-                  {isExpanded?"▲":"▸"} What {agent.name.split(" ")[0]} Learned
+        const runId = formatRunId(e.createdAt);
+        const dateCol = formatDateCol(e.createdAt);
+        return (
+          <div key={e.id} style={{background:T.card,border:`1px solid ${T.line}`,marginBottom:10,overflow:"hidden",display:"flex"}}>
+
+            {/* Left date/timeline column */}
+            <div style={{width:56,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0 10px",borderRight:`1px solid ${T.lineSoft}`,background:T.cardAlt,gap:2}}>
+              <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:.8,fontWeight:600,lineHeight:1}}>{dateCol.month}</div>
+              {dateCol.day && <div style={{fontFamily:mono,fontSize:9,color:T.muted,lineHeight:1}}>{dateCol.day},</div>}
+              <div style={{marginTop:6,fontSize:14,color:T.moss,lineHeight:1}}>●</div>
+            </div>
+
+            {/* Right content */}
+            <div style={{flex:1,minWidth:0,padding:"12px 16px"}}>
+
+              {/* Header row: chips left, action buttons right */}
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
+                {e.jurisdiction&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
+                <div style={{flex:1}}/>
+                {/* Toggle button */}
+                <button
+                  onClick={() => toggleStatus(e.id, e.status)}
+                  style={{
+                    fontFamily:mono, fontSize:9, fontWeight:700,
+                    color: e.status==="active" ? T.moss : T.muted,
+                    background: e.status==="active" ? `${T.moss}12` : "transparent",
+                    border: `1px solid ${e.status==="active" ? T.moss : T.lineSoft}`,
+                    padding:"2px 8px", cursor:"pointer", letterSpacing:.3,
+                  }}
+                >
+                  {e.status==="active" ? "● Active" : "○ Disabled"}
                 </button>
-                {isExpanded&&e.learnedSummary&&(
-                  <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
-                    <AiBadge style={{marginBottom:5,display:"inline-block"}}/> {e.learnedSummary}
-                  </div>
+                {/* S-MIGRATE-04 — Edit inline sub-view placeholder */}
+                <button disabled style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 7px",cursor:"not-allowed",letterSpacing:.5,textTransform:"uppercase",opacity:0.45}}>
+                  EDIT
+                </button>
+                {/* Delete — only if agent.trainable */}
+                {agent.trainable && (
+                  <button onClick={()=>deleteEntry(e.id)} style={{fontFamily:mono,fontSize:9,color:T.flag,background:"transparent",border:`1px solid ${T.flag}40`,padding:"2px 7px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase"}}>
+                    DELETE
+                  </button>
                 )}
               </div>
+
+              {/* Run ID row */}
+              {runId && (
+                <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
+                  Run {runId}
+                </div>
+              )}
+
+              {/* Title */}
+              <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:5,lineHeight:1.25}}>{e.title}</div>
+
+              {/* Trigger chips */}
+              {e.triggers?.length > 0 && (
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                  {e.triggers.includes("all")
+                    ? <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ ALL FLAGS</span>
+                    : e.triggers.map(t=><span key={t} style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ {t.toUpperCase().replace(/-/g," ")}</span>)
+                  }
+                </div>
+              )}
+
+              {/* Priority */}
+              <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:5}}>Priority {e.priority}/100</div>
+
+              {/* Field notes */}
+              {e.fieldNotes && (
+                <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,marginBottom:5,lineHeight:1.5,fontStyle:"italic",background:T.cardAlt,padding:"6px 10px",borderLeft:`3px solid ${T.brass}`}}>
+                  {e.fieldNotes}
+                </div>
+              )}
+
+              {/* What X Learned expandable */}
+              <button onClick={()=>toggleEntry(e.id)} style={{marginTop:4,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
+                {isExpanded?"▲":"▸"} + What {agent.name.split(" ")[0]} Learned
+              </button>
+              {isExpanded && e.learnedSummary && (
+                <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
+                  <AiBadge style={{marginBottom:5,display:"inline-block"}}/> {e.learnedSummary}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -447,13 +555,36 @@ export default function PersonnelScreen() {
   const agents      = useAgents();
   const agent       = agents.find(a => a.id === agentId) || agents[0];
   const [activeTab, setActiveTab] = useState("profile");
-  const [entries, setEntries]     = useState(MOCK_ENTRIES[agentId] || []);
+  const [entries, setEntries]     = useState([]);
+  const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
 
   const showToast = (msg, icon="✓") => {
     setToast({msg,icon});
     setTimeout(()=>setToast(null),3000);
   };
+
+  // FEATURE: PE-03 — load live training entries from Supabase on mount
+  useEffect(() => {
+    setLoadingEntries(true);
+    setEntries([]);
+    apiGetEntries(agentId)
+      .then(raw => setEntries(raw.map(e => ({
+        id:            e.id,
+        title:         e.title,
+        category:      e.category,
+        jurisdiction:  e.jurisdiction,
+        priority:      e.priority,
+        triggers:      e.triggers || [],
+        status:        e.status,
+        fieldNotes:    e.teaching_note || "",
+        learnedSummary: e.content || "",
+        createdAt:     e.created_at || "",
+        isDemo:        false,
+      }))))
+      .catch(() => showToast("Could not load training entries", "⚠"))
+      .finally(() => setLoadingEntries(false));
+  }, [agentId]);
 
   const layers    = computeLayers(agent, entries);
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
@@ -560,7 +691,17 @@ export default function PersonnelScreen() {
             {/* FEATURE: PE-08 */}
             {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
-            {activeTab === "training" && <TrainingTab agent={agent} entries={entries} setEntries={setEntries} showToast={showToast} navigate={navigate}/>}
+            {/* FEATURE: PE-03 */}
+            {activeTab === "training" && (
+              <TrainingTab
+                agent={agent}
+                entries={entries}
+                setEntries={setEntries}
+                loadingEntries={loadingEntries}
+                showToast={showToast}
+                navigate={navigate}
+              />
+            )}
             {activeTab === "playbook" && <PlaybookTab agent={agent}/>}
           </div>
 
