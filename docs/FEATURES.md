@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-09 | Session: arch-inquiry (AI-17 added)
+> Last updated: 2026-06-09 | Session: S-MIGRATE-05 design (PE-04 spec locked, PE-12 added)
 
 ---
 
@@ -178,7 +178,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-01 | Profile tab | ✅ Done | DONE |
 | PE-02 | Resume tab | ✅ Done | DONE |
 | PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | ✅ Done | S-MIGRATE-02 (02ff560) |
-| PE-04 | Playbook tab live wiring (output_format CRUD — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
+| PE-04 | Playbook tab live wiring (output_format CRUD + guardrails — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
+| PE-12 | Training tab — Test Agent console (inline sub-view: config selectors, scenario picker, live brief + RAG call, system prompt inspector, RAG chunks panel) | ❌ Missing | S-MIGRATE-06 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab (stub) | ✅ Done | DONE |
 | PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
@@ -186,6 +187,29 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ✅ Done | S-MIGRATE-03 (299f1c0) + patch (686007e) |
 | PE-11 | Training tab — Edit Course inline sub-view (edit title, category, jurisdiction, field notes, triggers, priority — no re-vectorization; EDIT+DELETE only for trainable+active entries) | ✅ Done | S-MIGRATE-04 (732bf3c) |
+
+**PE-04 spec locked 2026-06-09 (S-MIGRATE-05 design session):**
+- Output formats: full CRUD via `/api/agent-configs?type=output_format` — identical to ResumeTab `role_prompt` pattern
+- Guardrails: single-record load+save via `/api/agent-configs?type=guardrail` — PATCH if record exists, POST to create
+- Both sections loaded in single `Promise.all` on mount
+- `ConfigCard` and `AddConfigForm` promoted to shared scope (named exports from ResumeTab or inlined above ProfileTab)
+- `AddConfigForm` parameterized with `type` prop — not hardcoded `"role_prompt"`
+- `canEdit = agent.trainable` gate: Add/Edit/Delete hidden for non-trainable agents; guardrail textarea read-only
+- Guardrails corner ornament: `<Corners color={T.flag} />` (already in static mock — preserve)
+- `handleSetDefault`: re-fetch full list after PATCH (not optimistic — server is source of truth)
+- `handleFormatAdded`: if new config `is_default`, zero out existing defaults before prepending
+- Kickoff doc: `docs/kickoffs/v5.1.26-PE-04-playbook-tab-crud.md`
+
+**PE-12 spec (S-MIGRATE-06 — needs design session):**
+- NIGP reference: `nigp-analyzer/src/PersonnelScreen.jsx` — TrainingTabWithSubViewSync, `subView === "test"` branch
+- Entry point: "🐝 Test Agent" button in Training tab stats strip (alongside existing "+ Add Courses")
+- Config selectors bar: Role Prompt dropdown + Output Format dropdown (loads from agent-configs on test mount)
+- Scenario picker: 5 pre-built procurement scenarios (adapt from NIGP's BEE_SCENARIOS — DeepBench scenarios TBD in design session)
+- Run Test: live `/api/brief` call with `role_prompt_id`, `output_format_id`, RAG context injected
+- Results panel: agent response + debug strip (Role, Format, Layers assembled, RAG retrieved)
+- System prompt inspector: expandable, color-coded by layer (L01 purple, L02 moss, L04 brass, L05 flag-red)
+- RAG chunks panel: expandable, shows retrieved docs + similarity scores
+- Design session required before coding — scenarios and UI layout need approval
 
 **PE-11 spec locked 2026-06-09 (S-MIGRATE-04 design session):**
 - Reuses AddCourseView with `existingEntry` prop — no separate EditCourseView component
@@ -357,7 +381,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
 | S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ✅ DONE (686007e) |
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ✅ DONE (732bf3c) |
-| S-MIGRATE-05 | Playbook tab: output_format CRUD — ResumeTab pattern (PE-04) | ⏳ Needs design session |
+| S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ⏳ Design done — ready to code |
+| S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
 | S-BENCH-UX-01 | Full Bench UI polish review — Roster + Personnel File | ⏳ After S-MIGRATE-05 |
 
 ### Bench Side (begins after S-MIGRATE-01)

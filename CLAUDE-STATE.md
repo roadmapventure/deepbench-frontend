@@ -2,7 +2,7 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.26
-**Next session:** S-MIGRATE-05 — Playbook tab CRUD (needs design session first)
+**Next session:** S-MIGRATE-05 — Playbook tab CRUD (design done ✓)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -13,11 +13,12 @@
 ---
 
 ## Session Queue (short view)
-- S-MIGRATE-02 — Training tab: load/toggle/delete wiring + NIGP card layout
-- S-MIGRATE-03 — Training tab: Add Courses inline sub-view (design done ✓)
+- S-MIGRATE-02 — Training tab: load/toggle/delete wiring + NIGP card layout ✅ done (02ff560)
+- S-MIGRATE-03 — Training tab: Add Courses inline sub-view ✅ done (686007e)
 - S-MIGRATE-04 — Training tab: Edit Course inline sub-view ✅ done (732bf3c)
-- S-MIGRATE-05 — Playbook tab: full CRUD (needs design session)
-- S-BENCH-UX-01 — Bench UI review (schedule after S-MIGRATE-02)
+- S-MIGRATE-05 — Playbook tab: output_format CRUD + guardrails (design done ✓)
+- S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+- S-BENCH-UX-01 — Bench UI review (schedule after S-MIGRATE-05)
 
 Full session queue and feature backlog: `docs/FEATURES.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`
