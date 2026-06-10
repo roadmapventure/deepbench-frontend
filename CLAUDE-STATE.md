@@ -1,9 +1,9 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.30
-**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
-**Last session:** S-AI-ATTR-01 — AI-18 capability-agent attribution ✅ done (4d568bd)
+**Version in dev:** v5.1.31
+**Next session:** S-INFRA-01 — Unified capability service model (prompt wiring at runtime)
+**Last session:** S-BENCH-01 — Michelle + Susan trainable flag + role_prompt seed ✅ done (ad31191)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
