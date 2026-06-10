@@ -1,4 +1,4 @@
-// DeepBench v5.1.19 | AIActivityPanel.jsx | AI audit panel — Supabase hydration on mount
+// DeepBench v5.1.30 | AIActivityPanel.jsx | AI-18 patch — add michelle + susan to AGENT_NAMES
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
@@ -6,14 +6,17 @@ import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { useAIActivity, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase } from "../hooks/useAIActivity.js";
 
+// FEATURE: AI-18 patch — add michelle + susan so By Agent renders full name + code
 const AGENT_NAMES = {
-  chloe:   { name: "Chloe Okafor",      code: "JR-01" },
-  mike:    { name: "Mike Alvarez",       code: "SR-02" },
-  bob:     { name: "Bob Whitfield",      code: "PR-04" },
-  christy: { name: "Christy Park",       code: "MK-05" },
-  robyn:   { name: "Robyn Castellanos",  code: "CN-03" },
-  brent:   { name: "Brent Matthews",     code: "DR-06" },
-  pat:     { name: "Pat Smiley",         code: "IR-07" },
+  chloe:    { name: "Chloe Okafor",      code: "JR-01" },
+  mike:     { name: "Mike Alvarez",       code: "SR-02" },
+  bob:      { name: "Bob Whitfield",      code: "PR-04" },
+  christy:  { name: "Christy Park",       code: "MK-05" },
+  robyn:    { name: "Robyn Castellanos",  code: "CN-03" },
+  brent:    { name: "Brent Matthews",     code: "DR-06" },
+  pat:      { name: "Pat Smiley",         code: "IR-07" },
+  michelle: { name: "Michelle Manning",   code: "PP-01" },
+  susan:    { name: "Susan Smith",        code: "TR-08" },
 };
 import { Corners } from "./SharedUI.jsx";
 
