@@ -1,4 +1,4 @@
-// DeepBench v5.1.27 | agents.js | Add AVATAR_CFG for illustrated SVG portraits
+// DeepBench v5.1.31 | agents.js | AG-03 AG-08 Michelle + Susan trainable
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -79,7 +79,8 @@ export const AGENTS = [
     specialty: "Project Planning · Step Sequencing · Multi-Agent Coordination",
     salary: 100000, value: 110000, hourly: 52, reportHrs: 2, reportCost: 104,
     docs: 0, classes: 0, chunks: 0, skill: 65, situational: 30,
-    trainable: false, trainableBy: "RMV", revenueModel: "Included",
+    // FEATURE: AG-03 — Michelle trainable via Personnel File
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I map the mission before anyone moves."', color: T.brass,
     isPlanner: true,
   },
@@ -89,7 +90,8 @@ export const AGENTS = [
     specialty: "Agent Training · Knowledge Transfer · Capability Building",
     salary: 85000, value: 95000, hourly: 44, reportHrs: 2, reportCost: 88,
     docs: 0, classes: 0, chunks: 0, skill: 55, situational: 20,
-    trainable: false, trainableBy: "RMV", revenueModel: "Included",
+    // FEATURE: AG-08 — Susan trainable via Personnel File
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I turn knowledge into capability."', color: T.brass,
     isTrainer: true,
   },
