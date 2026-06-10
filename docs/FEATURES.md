@@ -324,8 +324,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | AG-01 | Michelle static identity in agents.js | ❌ Missing | S-BENCH-01 |
-| AG-02 | Michelle system prompt in Supabase agent_configs | ❌ Missing | S-BENCH-01 LOCKED |
-| AG-03 | Michelle trainable via Teach + RAG | ❌ Missing | S-BENCH-01 LOCKED |
+| AG-02 | Michelle system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-03 | Michelle trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
 | AG-04 | Michelle UI presence on planning screens | 🔶 Partial | S10b ✅ S10p ✅ S-BENCH-01 full |
 | AG-04a | Michelle avatar — silhouette placeholder → replaced by AgentAvatar (RO-06) | ✅ Done | S10p → S-AVATAR-01 |
 | AG-04b | Update Plan thinking state — three-layer | ✅ Done | S10p |
@@ -337,9 +337,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 - Roster position: after Pat Smiley (IR-07)
 - Full spec requires dedicated design session before S-BENCH-01b
 
-| AG-07 | Susan Smith static identity in agents.js | ❌ Missing | S-BENCH-01b |
-| AG-08 | Susan Smith system prompt in Supabase agent_configs | ❌ Missing | S-BENCH-01b LOCKED |
-| AG-09 | Susan Smith trainable via Teach + RAG | ❌ Missing | S-BENCH-01b LOCKED |
+| AG-07 | Susan Smith static identity in agents.js | ✅ Done | DONE |
+| AG-08 | Susan Smith system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-09 | Susan Smith trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
 | AG-10 | Susan Smith UI presence as Trainer in Training tab | ❌ Missing | S-BENCH-01b |
 | AG-11 | api/train.js reads Susan Smith prompt from Supabase | ❌ Missing | S-BENCH-01b LOCKED |
 | AG-12 | Susan Smith can be assigned to train other bench agents | ❌ Missing | S-BENCH-01b LOCKED |
@@ -402,8 +402,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
 | S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ✅ DONE (686007e) |
 | S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ✅ DONE (732bf3c) |
-| S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ⏳ Design done — ready to code |
-| S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12) | ⏳ Needs design session |
+| S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ✅ DONE (1644366) |
 | S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
 | S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ✅ DONE (812ed59) |
 | S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge brass fix (RO-08), AddConfigForm labels, Resume structural fixes, Add Courses polish | ⏳ Design done — ready to code |
@@ -412,8 +411,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ### Bench Side (begins after S-MIGRATE-01)
 | Session | Feature |
 |---------|---------|
-| S-BENCH-01 | Michelle Manning — Full Agent (AG-01 through AG-06), built capability-first |
-| S-BENCH-01b | Susan Smith — Full Trainer Agent (AG-07 through AG-12, needs design session) |
+| S-BENCH-01 | Michelle + Susan: trainable flag + role_prompt seed (AG-02, AG-03, AG-08, AG-09) | ✅ DONE (ad31191) |
+| S-BENCH-01b | Michelle + Susan full API wiring — deferred to S-INFRA-01 (unified capability service) |
 | S-BENCH-02 | Personnel File — post-migration audit + capability dashboard view |
 | S-BENCH-03 | Teach screen audit |
 | S-BENCH-04 | Test Team audit |
@@ -440,6 +439,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-DELIVER-03 | DL-03 — Per-step deliverable access inline |
 | S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) |
 | S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
+| S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12, needs design session) |
 
 ---
 
