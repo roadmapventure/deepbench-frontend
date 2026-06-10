@@ -284,7 +284,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
 | AI-16 | AI Audit persistence — write every AI call to Supabase ai_activity_log; hydrate on mount for lifetime totals | ✅ Done | S16b |
 | AI-17 | Auto-Training service — extract synthesis+embed+write pattern from web-memory.js POST into standalone `/api/auto-train` endpoint, callable by any agent/capability | ❌ Missing | S-INFRA-02 |
-| AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ❌ Missing | S-AI-ATTR-01 |
+| AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ✅ Done | S-AI-ATTR-01 (4d568bd) |
+| AI-19 | Latency capture for extraction + reinforcement call sites — wrap fetch() with Date.now() timing so avg latency shows in AI Audit (currently "—" for Susan + OpenAI rows) | ❌ Missing | S-future |
 
 **AI-17 Notes:** `web-memory.js` POST currently hardcodes Brent's persona and "Portal Navigation" category. Extract into `/api/auto-train` accepting: `agent_id`, `source_type` (portal_run | document | conversation | test_result), and the raw artifact payload. `web-memory.js` POST becomes a thin caller. Enables any future capability to write training entries without duplicating the embed+write pattern. Design session required before coding — needs: input schema, per-agent persona selection, source_type → synthesis prompt mapping, category mapping.
 

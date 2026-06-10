@@ -3,6 +3,7 @@
 
 **Version in dev:** v5.1.30
 **Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+**Last session:** S-AI-ATTR-01 — AI-18 capability-agent attribution ✅ done (4d568bd)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -21,7 +22,7 @@
 - S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 - S-BENCH-UX-01 — Bench UI polish ✅ done (812ed59)
 - S-BENCH-UX-02 — Bench UI polish round 2 ✅ done (8717106)
-- S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+- S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan ✅ done (4d568bd)
 
 Full session queue and feature backlog: `docs/FEATURES.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`
