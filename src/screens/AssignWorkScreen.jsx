@@ -1,4 +1,4 @@
-// DeepBench v5.1.17 | AssignWorkScreen.jsx | S15b-B — Generating state, step labels, agent hover card
+// DeepBench v5.1.30 | AssignWorkScreen.jsx | AI-18 — michelle agentId on planning calls
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -105,13 +105,15 @@ Return a JSON object using the plan_task tool.`;
     const latency = Date.now()-t0;
     const toolBlock = data.content?.find(b=>b.type==="tool_use"&&b.name==="plan_task");
     if (toolBlock?.input) {
-      logAICall({type:"planning",model:"claude-haiku-4-5",latencyMs:latency,tokens:data.usage?.output_tokens||0,location:"Assign Work"});
+      // FEATURE: AI-18 — michelle owns task planning capability
+      logAICall({type:"planning",model:"claude-haiku-4-5",latencyMs:latency,tokens:data.usage?.output_tokens||0,location:"Assign Work",agentId:"michelle"});
       return { ok:true, plan:toolBlock.input };
     }
     const text = data.content?.find(b=>b.type==="text")?.text||"";
     const json = text.replace(/```json|```/g,"").trim();
     const plan = JSON.parse(json);
-    logAICall({type:"planning",model:"claude-haiku-4-5",latencyMs:latency,tokens:data.usage?.output_tokens||0,location:"Assign Work"});
+    // FEATURE: AI-18 — michelle owns task planning capability
+    logAICall({type:"planning",model:"claude-haiku-4-5",latencyMs:latency,tokens:data.usage?.output_tokens||0,location:"Assign Work",agentId:"michelle"});
     return { ok:true, plan };
   } catch(e) { return { ok:false, error:e.message }; }
 }

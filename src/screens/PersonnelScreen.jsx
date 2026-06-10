@@ -1,4 +1,4 @@
-// DeepBench v5.1.30 | PersonnelScreen.jsx | S-BENCH-UX-02 — bench UI polish round 2
+// DeepBench v5.1.30 | PersonnelScreen.jsx | AI-18 — susan agentId; fix reinforcement type key
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -120,7 +120,8 @@ Return ONLY the JSON. No explanation.`;
     const data = await res.json();
     const raw = data.content?.[0]?.text || "";
     const clean = raw.replace(/```json|```/g, "").trim();
-    logAICall({ type: "extraction", model: "claude-haiku-4-5", location: "Training tab — Add Courses" });
+    // FEATURE: AI-18 — susan owns document extraction capability
+    logAICall({ type: "extraction", model: "claude-haiku-4-5", location: "Training tab — Add Courses", agentId: "susan" });
     return JSON.parse(clean);
   } catch (e) {
     return null;
@@ -468,7 +469,8 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || "Save failed", "⚠"); setAddState("ready"); return; }
-        logAICall({ type: "knowledge-reinforcement", model: "text-embedding-3-small", location: "Training tab — Add Courses ingest" });
+        // FEATURE: AI-18 — fix type key (was "knowledge-reinforcement", must be "reinforcement"); susan owns this capability
+        logAICall({ type: "reinforcement", model: "text-embedding-3-small", location: "Training tab — Add Courses ingest", agentId: "susan" });
         const newEntry = {
           id:            Date.now(),
           title:         addForm.title,

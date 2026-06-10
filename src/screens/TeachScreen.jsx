@@ -1,4 +1,4 @@
-// DeepBench v5.1.25 | TeachScreen.jsx | PE-10 patch 2 — binary-safe base64 in extractTextFromFile
+// DeepBench v5.1.30 | TeachScreen.jsx | AI-18 — susan agentId on extraction call
 // FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
@@ -67,7 +67,8 @@ Return ONLY the JSON. No explanation.`;
     const data = await res.json();
     const raw = data.content?.[0]?.text || "";
     const clean = raw.replace(/```json|```/g, "").trim();
-    logAICall({type:"extraction",model:"claude-haiku-4-5",location:"Teach Agent screen"});
+    // FEATURE: AI-18 — susan owns document extraction capability
+    logAICall({type:"extraction",model:"claude-haiku-4-5",location:"Teach Agent screen",agentId:"susan"});
     return JSON.parse(clean);
   } catch (e) {
     return null;
