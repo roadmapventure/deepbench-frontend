@@ -2,7 +2,7 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.30
-**Next session:** S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan (AI-18) — kickoff doc ready at docs/kickoffs/v5.1.30-AI18-capability-agent-attribution.md
+**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
@@ -21,7 +21,7 @@
 - S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 - S-BENCH-UX-01 — Bench UI polish ✅ done (812ed59)
 - S-BENCH-UX-02 — Bench UI polish round 2 ✅ done (8717106)
-- S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan (AI-18) ⏳ kickoff ready
+- S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
 
 Full session queue and feature backlog: `docs/FEATURES.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`
