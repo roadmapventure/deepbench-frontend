@@ -1,4 +1,4 @@
-// DeepBench v5.1.32 | AppShell.jsx | App shell — header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel, about panel
+// DeepBench v5.1.33 | AppShell.jsx | AI Audit button tooltip
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, about panel
 
 import { useNavigate, useLocation } from "react-router-dom";
@@ -79,6 +79,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
   const location = useLocation();
   const { status, cleanup } = useAIStatus();
   const [aboutHovered, setAboutHovered] = useState(false);
+  const [auditTipShow, setAuditTipShow] = useState(false);
 
   useEffect(() => () => cleanup(), [cleanup]);
 
@@ -138,9 +139,47 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
 
       {/* AI Activity Panel trigger */}
       {showAIPanel && (
-        <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
-          <AIDiamond size="7px" color={T.brassLight}/> AI Audit
-        </button>
+        <span style={{position:"relative",display:"inline-flex",alignItems:"center"}}
+          onMouseEnter={() => setAuditTipShow(true)}
+          onMouseLeave={() => setAuditTipShow(false)}>
+          {/* FEATURE: AI-01 — AI Audit button tooltip */}
+          <button onClick={onAIPanel} style={{background:"rgba(182,135,58,.15)",border:`1px solid rgba(182,135,58,.4)`,color:T.brassLight,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:mono,letterSpacing:.5,display:"flex",alignItems:"center",gap:6}}>
+            <AIDiamond size="7px" color={T.brassLight}/> AI Audit
+          </button>
+          {auditTipShow && (
+            <>
+              <span style={{
+                position:"absolute",
+                bottom:"calc(100% + 6px)",
+                left:"50%",
+                transform:"translateX(-50%)",
+                whiteSpace:"nowrap",
+                fontFamily:mono,
+                fontSize:9,
+                letterSpacing:"0.4px",
+                textTransform:"uppercase",
+                color:T.brassLight,
+                background:T.navy,
+                border:`1px solid rgba(182,135,58,0.5)`,
+                padding:"3px 7px",
+                pointerEvents:"none",
+                zIndex:9999,
+              }}>AI Audit</span>
+              <span style={{
+                position:"absolute",
+                bottom:"calc(100% + 2px)",
+                left:"50%",
+                transform:"translateX(-50%)",
+                width:0,height:0,
+                borderLeft:"4px solid transparent",
+                borderRight:"4px solid transparent",
+                borderTop:`4px solid rgba(182,135,58,0.5)`,
+                pointerEvents:"none",
+                zIndex:9999,
+              }}/>
+            </>
+          )}
+        </span>
       )}
 
       {/* About button */}

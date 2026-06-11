@@ -1,4 +1,4 @@
-// DeepBench v5.1.20 | SharedUI.jsx | Add AgentAvatar illustrated SVG portrait component
+// DeepBench v5.1.33 | SharedUI.jsx | AiBadge tooltip label prop
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -72,11 +72,52 @@ export const FeatureBadge = ({ id }) => (
 );
 
 // ── AiBadge — AI heartbeat diamond badge for AI-touched elements ─────────────
-export const AiBadge = ({ style }) => (
-  <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
-    <AIDiamond size="6px" color={T.brass}/> AI
-  </span>
-);
+export const AiBadge = ({ style, label }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{position:"relative",display:"inline-flex",alignItems:"center"}}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}>
+      {/* FEATURE: AI-01 — AiBadge tooltip label */}
+      <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
+        <AIDiamond size="6px" color={T.brass}/> AI
+      </span>
+      {show && (
+        <>
+          <span style={{
+            position:"absolute",
+            bottom:"calc(100% + 6px)",
+            left:"50%",
+            transform:"translateX(-50%)",
+            whiteSpace:"nowrap",
+            fontFamily:mono,
+            fontSize:9,
+            letterSpacing:"0.4px",
+            textTransform:"uppercase",
+            color:T.brassLight,
+            background:T.navy,
+            border:`1px solid rgba(182,135,58,0.5)`,
+            padding:"3px 7px",
+            pointerEvents:"none",
+            zIndex:9999,
+          }}>{label || "AI"}</span>
+          <span style={{
+            position:"absolute",
+            bottom:"calc(100% + 2px)",
+            left:"50%",
+            transform:"translateX(-50%)",
+            width:0,height:0,
+            borderLeft:"4px solid transparent",
+            borderRight:"4px solid transparent",
+            borderTop:`4px solid rgba(182,135,58,0.5)`,
+            pointerEvents:"none",
+            zIndex:9999,
+          }}/>
+        </>
+      )}
+    </span>
+  );
+};
 
 // ── AISugg — "AI SUGGESTED" badge for form fields ────────────────────────────
 export const AISugg = () => (
@@ -159,7 +200,7 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${c}22`}}>
           {detail&&<div style={{fontSize:12.5,color:T.mutedDeep,lineHeight:1.6,marginBottom:10,fontFamily:body}}>{detail}</div>}
           {recommendation&&<div style={{background:`${T.moss}10`,border:`1px solid ${T.moss}40`,padding:"10px 14px"}}>
-            <div style={{fontSize:10,color:T.moss,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:mono}}>💡 Recommended Action <AiBadge/></div>
+            <div style={{fontSize:10,color:T.moss,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:mono}}>💡 Recommended Action <AiBadge label="AI Analysis"/></div>
             <div style={{fontSize:12.5,color:T.mutedDeep,lineHeight:1.5,fontFamily:body}}>{recommendation}</div>
           </div>}
         </div>

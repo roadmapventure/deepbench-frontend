@@ -1,4 +1,4 @@
-// DeepBench v5.1.30 | PersonnelScreen.jsx | AI-18 — susan agentId; fix reinforcement type key
+// DeepBench v5.1.33 | PersonnelScreen.jsx | AiBadge tooltip labels
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -685,7 +685,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
                 ? "⏳ Saving…"
                 : existingEntry
                   ? "▸ Save Course Detail"
-                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} /> ▸ Teach {agent.name.split(" ")[0]} this document</>
+                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="Knowledge Training"/> ▸ Teach {agent.name.split(" ")[0]} this document</>
               }
             </button>
           </div>
@@ -910,7 +910,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
             }}
           >
             {!(showAddView || editingEntry) && (
-              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} />
+              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="Knowledge Training"/>
             )}
             {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
           </button>
@@ -1079,7 +1079,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               </button>
               {isExpanded && e.learnedSummary && (
                 <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
-                  <AiBadge style={{marginBottom:5,display:"inline-block"}}/> {e.learnedSummary}
+                  <AiBadge style={{marginBottom:5,display:"inline-block"}} label="Learned Knowledge"/> {e.learnedSummary}
                 </div>
               )}
             </div>
