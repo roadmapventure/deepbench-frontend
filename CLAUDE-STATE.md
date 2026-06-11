@@ -1,9 +1,9 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.33
-**Next session:** S-AI01b-patch — AiBadge tooltip overflow fix + label corrections + Playbook badges
-**Last session:** S-AI01b — AiBadge tooltip labels across all AI-touched elements ✅ done (dfe4929)
+**Version in dev:** v5.1.34
+**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+**Last session:** S-AI01b-patch — AiBadge tooltip overflow fix + label corrections + Playbook badges ✅ done (50a6956)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
