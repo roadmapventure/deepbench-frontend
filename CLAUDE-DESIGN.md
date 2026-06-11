@@ -58,8 +58,9 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 4. For UI work: read `docs/PRD.md` + `docs/MOCK-NOTES.md` + `docs/STYLE-GUIDE.md`
 5. Read relevant source files in `src/` directly — confirm what already exists
 6. If UI work: describe mock for John's approval before writing the kickoff doc
-7. Write kickoff doc with all 10 required sections
-8. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+7. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
+8. Write kickoff doc with all 10 required sections
+9. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 
 **Mandatory close-out steps (do not skip):**
 9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs, update session order table

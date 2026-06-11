@@ -28,6 +28,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
+| SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express | ❌ Missing | S-future (do before v6.x) |
 
 ---
 
