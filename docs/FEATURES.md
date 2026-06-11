@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-11 | Session: S-AI01b-patch design complete — kickoff doc at docs/kickoffs/v5.1.33-AI01b-patch-aibadge-fixes.md
+> Last updated: 2026-06-11 | Session: S-AI01b-patch2 complete — AI-01 ✅ Done (e975715)
 
 ---
 
@@ -269,8 +269,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance (design done 2026-06-11) | 🔶 Partial (design done) | S-AI01b |
-| AI-01-patch | AiBadge tooltip fix: chat panel overflow clip + label corrections (RAG & Routing Training, RAG & Training, Prompt Build) + Playbook tab new badges | ❌ Missing | S-AI01b-patch |
+| AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance | ✅ Done | S-AI01b + patch + patch2 (e975715) |
 | AI-02 | Universal AI status dot | ✅ Done | DONE |
 | AI-03 | AI Activity Panel wiring (3 screens) | 🔶 Partial | S-AI-01 |
 | AI-04 | Intelligent agent routing | ✅ Done | DONE |
