@@ -170,6 +170,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
 | RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ✅ Done | S-BENCH-UX-02 (8717106) |
+| RO-09 | "Add Your Own Agent" UX — user-facing flow to create and configure a new custom agent from within the Bench | ❌ Missing | S-future |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
