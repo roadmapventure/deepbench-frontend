@@ -1,4 +1,4 @@
-// DeepBench v5.1.34 | ResumeTab.jsx | AiBadge on AddConfigForm submit
+// DeepBench v5.1.35 | ResumeTab.jsx | AiBadge on Add New Role Prompt trigger
 // FEATURE: PE-02 — Resume tab
 // src/screens/personnel/ResumeTab.jsx — v5.0.0
 // DeepBench v5 — Resume tab: role_prompt CRUD
@@ -258,7 +258,10 @@ export default function ResumeTab({ agent, showToast }) {
         ))}
 
         {canEdit && !showAdd && (
-          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 }}>+ Add New Role Prompt</button>
+          <>
+            {/* FEATURE: AI-01-patch — AiBadge on Add New Role Prompt trigger */}
+            <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>+ Add New Role Prompt <AiBadge label="Prompt Build"/></button>
+          </>
         )}
         {canEdit && showAdd && (
           <AddConfigForm agentId={agent.id} onSaved={handleSaved} onCancel={() => setShowAdd(false)} showToast={showToast} />

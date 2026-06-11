@@ -1,10 +1,10 @@
-// DeepBench v5.1.33 | SharedUI.jsx | AiBadge tooltip label prop
+// DeepBench v5.1.35 | SharedUI.jsx | AiBadge tooltip position:fixed fix
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
 // Used across all screens. Import from here, never re-define in screen files.
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
 import { AVATAR_CFG } from "../data/agents.js";
@@ -74,9 +74,21 @@ export const FeatureBadge = ({ id }) => (
 // ── AiBadge — AI heartbeat diamond badge for AI-touched elements ─────────────
 export const AiBadge = ({ style, label }) => {
   const [show, setShow] = useState(false);
+  const [tipPos, setTipPos] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      setTipPos({ top: r.top - 7, left: r.left + r.width / 2 });
+    }
+    setShow(true);
+  };
+
   return (
-    <span style={{position:"relative",display:"inline-flex",alignItems:"center"}}
-      onMouseEnter={() => setShow(true)}
+    <span ref={ref}
+      style={{position:"relative",display:"inline-flex",alignItems:"center"}}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShow(false)}>
       {/* FEATURE: AI-01 — AiBadge tooltip label */}
       <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
@@ -85,10 +97,10 @@ export const AiBadge = ({ style, label }) => {
       {show && (
         <>
           <span style={{
-            position:"absolute",
-            bottom:"calc(100% + 6px)",
-            left:"50%",
-            transform:"translateX(-50%)",
+            position:"fixed",
+            top: tipPos.top,
+            left: tipPos.left,
+            transform:"translate(-50%, -100%)",
             whiteSpace:"nowrap",
             fontFamily:mono,
             fontSize:9,
@@ -102,11 +114,12 @@ export const AiBadge = ({ style, label }) => {
             zIndex:9999,
           }}>{label || "AI"}</span>
           <span style={{
-            position:"absolute",
-            bottom:"calc(100% + 2px)",
-            left:"50%",
-            transform:"translateX(-50%)",
-            width:0,height:0,
+            position:"fixed",
+            top: tipPos.top,
+            left: tipPos.left,
+            transform:"translate(-50%, 0)",
+            width:0,
+            height:0,
             borderLeft:"4px solid transparent",
             borderRight:"4px solid transparent",
             borderTop:`4px solid rgba(182,135,58,0.5)`,
