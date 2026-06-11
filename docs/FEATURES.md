@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-09 | Session: S-AVATAR-01 complete (RO-06 ✅, AG-04a superseded, Michelle + Susan added to roster)
+> Last updated: 2026-06-11 | Session: S-ABOUT-01 design complete — kickoff doc at docs/kickoffs/v5.1.32-SH05-about-panel.md
 
 ---
 
@@ -23,6 +23,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-03 | useAgents() hook | ✅ Done | DONE |
 | SH-04 | React Router — all routes | ✅ Done | DONE |
 | SH-05 | App shell: header, Work/Bench tabs | ✅ Done | DONE |
+| SH-10 | About DeepBench panel — 7-tab portfolio + product info | 🔶 Partial (design done) | S-ABOUT-01 |
 | SH-06 | Supabase tasks table integration | ❌ Missing | S-future |
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |

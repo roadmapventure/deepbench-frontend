@@ -1,8 +1,9 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.31
-**Next session:** S-INFRA-01 — Unified capability service model (prompt wiring at runtime)
+**Version in dev:** v5.1.32
+**Next session:** S-ABOUT-01 — About panel — 7-tab portfolio panel (kickoff ready: docs/kickoffs/v5.1.32-SH05-about-panel.md)
+**After that:** S-INFRA-01 — Unified capability service model (prompt wiring at runtime)
 **Last session:** S-BENCH-01 — Michelle + Susan trainable flag + role_prompt seed ✅ done (ad31191)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
