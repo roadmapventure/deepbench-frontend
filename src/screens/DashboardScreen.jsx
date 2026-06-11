@@ -1,4 +1,4 @@
-// DeepBench v5.1.33 | DashboardScreen.jsx | AiBadge tooltip labels
+// DeepBench v5.1.34 | DashboardScreen.jsx | AiBadge tooltip overflow fix
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -288,7 +288,8 @@ function ChatPanel() {
   return (
     <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:600}}>
       {/* Header */}
-      <div style={{background:T.navy,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
+      {/* FEATURE: AI-01-patch — overflow fix so AiBadge tooltip escapes panel clip */}
+      <div style={{background:T.navy,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`2px solid ${T.brass}`,flexShrink:0,overflow:"visible"}}>
         <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}} label="AI Chat"/></div>
         <div style={{background:`rgba(182,135,58,.2)`,border:`1px solid rgba(182,135,58,.4)`,padding:"2px 8px",fontFamily:mono,fontSize:8,color:T.brassLight,fontWeight:700,letterSpacing:1}}>● Online</div>
       </div>

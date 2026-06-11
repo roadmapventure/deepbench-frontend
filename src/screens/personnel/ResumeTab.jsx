@@ -1,4 +1,4 @@
-// DeepBench v5.1.30 | ResumeTab.jsx | S-BENCH-UX-02 — bench UI polish round 2
+// DeepBench v5.1.34 | ResumeTab.jsx | AiBadge on AddConfigForm submit
 // FEATURE: PE-02 — Resume tab
 // src/screens/personnel/ResumeTab.jsx — v5.0.0
 // DeepBench v5 — Resume tab: role_prompt CRUD
@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../../tokens.js";
 import { TENANT_ID } from "../../config.js";
-import { Corners } from "../../components/SharedUI.jsx";
+import { Corners, AiBadge } from "../../components/SharedUI.jsx";
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function apiGetConfigs(agent_id, type) {
@@ -128,7 +128,8 @@ export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={onCancel} style={{ fontFamily: body, fontSize: 12, color: T.muted, background: "transparent", border: `1px solid ${T.line}`, padding: "6px 14px", cursor: "pointer" }}>Cancel</button>
-        <button onClick={handleSave} disabled={saving} style={{ fontFamily: body, fontSize: 12, color: T.navy, background: `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", padding: "6px 16px", cursor: "pointer", fontWeight: 700 }}>{saving ? "Saving…" : `Add ${typeLabel}`}</button>
+        {/* FEATURE: AI-01-patch — AiBadge on AddConfigForm submit */}
+        <button onClick={handleSave} disabled={saving} style={{ fontFamily: body, fontSize: 12, color: T.navy, background: `linear-gradient(135deg,${T.brass},${T.brassDeep})`, border: "none", padding: "6px 16px", cursor: "pointer", fontWeight: 700, display:"flex", alignItems:"center", gap:6 }}>{saving ? "Saving…" : `Add ${typeLabel}`}{!saving && <AiBadge label="Prompt Build" style={{color:T.navy, background:"rgba(18,36,60,0.15)", border:"1px solid rgba(18,36,60,0.25)"}}/>}</button>
       </div>
     </div>
   );
