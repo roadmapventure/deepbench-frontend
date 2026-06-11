@@ -19,7 +19,7 @@ async function apiGetEntries(agent_id) {
   return (await res.json()).entries || [];
 }
 async function apiPatchEntry(id, status) {
-  const res = await fetch("/api/knowledge-entry", {
+  const res = await fetch("/api/load-entries", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, tenant_id: TENANT_ID, status }),
@@ -27,7 +27,7 @@ async function apiPatchEntry(id, status) {
   if (!res.ok) throw new Error("Failed to update");
 }
 async function apiDeleteEntry(id) {
-  const res = await fetch("/api/knowledge-entry", {
+  const res = await fetch("/api/load-entries", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, tenant_id: TENANT_ID }),
@@ -37,7 +37,7 @@ async function apiDeleteEntry(id) {
 
 // FEATURE: PE-11 — Edit Course inline sub-view
 async function apiUpdateEntry(id, fields) {
-  const res = await fetch("/api/knowledge-entry", {
+  const res = await fetch("/api/load-entries", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, tenant_id: TENANT_ID, ...fields }),
