@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-11 | Session: S-ABOUT-01 design complete — kickoff doc at docs/kickoffs/v5.1.32-SH05-about-panel.md
+> Last updated: 2026-06-11 | Session: S-AI01b design complete — kickoff doc at docs/kickoffs/v5.1.32-AI01b-aibadge-tooltips.md
 
 ---
 
@@ -270,7 +270,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AI-01 | AiBadge on every AI-touched element app-wide | 🔶 Partial | S-future |
+| AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance (design done 2026-06-11) | 🔶 Partial (design done) | S-AI01b |
 | AI-02 | Universal AI status dot | ✅ Done | DONE |
 | AI-03 | AI Activity Panel wiring (3 screens) | 🔶 Partial | S-AI-01 |
 | AI-04 | Intelligent agent routing | ✅ Done | DONE |
