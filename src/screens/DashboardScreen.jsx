@@ -1,4 +1,4 @@
-// DeepBench v5.1.27 | DashboardScreen.jsx | Work Dashboard
+// DeepBench v5.1.35 | DashboardScreen.jsx | revert useless header overflow
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -289,7 +289,7 @@ function ChatPanel() {
     <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:600}}>
       {/* Header */}
       <div style={{background:T.navy,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
-        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}}/></div>
+        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}} label="AI Chat"/></div>
         <div style={{background:`rgba(182,135,58,.2)`,border:`1px solid rgba(182,135,58,.4)`,padding:"2px 8px",fontFamily:mono,fontSize:8,color:T.brassLight,fontWeight:700,letterSpacing:1}}>● Online</div>
       </div>
 
@@ -350,7 +350,7 @@ function ChatPanel() {
                   <AgentAvatar who={msg.agentId} size={18} ring={false} />
                   <span style={{fontFamily:display,fontSize:11,fontWeight:600,color:T.navy}}>{agent?.name}</span>
                   <span style={{fontFamily:mono,fontSize:8,padding:"1px 5px",background:tier.bg,color:tier.color,border:`1px solid ${tier.border}`}}>{tier.label}</span>
-                  <AiBadge/>
+                  <AiBadge label="Agent Response"/>
                 </div>
               )}
               {msg.isIntro && (
@@ -372,7 +372,7 @@ function ChatPanel() {
               {/* Routing suggestion card */}
               {msg.isRouting ? (
                 <div style={{background:`rgba(45,111,181,.06)`,border:`1.5px solid rgba(45,111,181,.3)`,padding:"10px 12px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}><AiBadge/><span style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:.5}}>Routing Suggestion</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}><AiBadge label="AI Routing"/><span style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:.5}}>Routing Suggestion</span></div>
                   <div style={{fontSize:12,color:T.mutedDeep,lineHeight:1.5,marginBottom:8}}>{msg.content}</div>
                   <div style={{display:"flex",gap:7}}>
                     <button onClick={()=>acceptRouting(msg)} style={{background:"#2d6fb5",color:"#fff",border:"none",padding:"5px 14px",fontFamily:display,fontSize:11,fontWeight:700,cursor:"pointer"}}>Route to {msg.suggestName?.split(" ")[0]} →</button>

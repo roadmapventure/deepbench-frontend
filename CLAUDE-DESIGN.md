@@ -3,6 +3,19 @@
 
 ---
 
+## Standing Rule — No Coding in Design Sessions
+
+**Design sessions produce documents only.** No code is written, no files in `src/` or `api/` are touched, no commits contain code changes. The session ends when the kickoff doc is committed to `dev`.
+
+Coding happens in a separate Claude Code session, started with:
+```
+Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
+```
+
+This separation is what enforces branch discipline. A coding session starts cold, reads the kickoff doc, and switches to `dev` as its first act. Blurring the boundary is how code ends up on `main` without a review gate.
+
+---
+
 ## Standing Rule — Backlog Capture
 
 **Any feature, agent, or requirement named during a design session must be written to `docs/FEATURES.md` immediately — not deferred to session close-out.**

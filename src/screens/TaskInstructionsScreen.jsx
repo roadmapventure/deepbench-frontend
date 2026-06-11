@@ -1,4 +1,4 @@
-// DeepBench v5.1.17 | TaskInstructionsScreen.jsx | S15c — Task Instructions UX polish
+// DeepBench v5.1.33 | TaskInstructionsScreen.jsx | AiBadge tooltip labels
 // FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
@@ -102,7 +102,7 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
     ? <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.3)`,fontWeight:700}}>● HUMAN REQUIRED</span>
     : isSubAgent
     ? <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:`1px solid rgba(45,111,181,.3)`,fontWeight:700}}>⇆ SUB-AGENT · {step.agentName||"Brent"}</span>
-    : <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 6px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent <AiBadge style={{marginLeft:3}}/></span>;
+    : <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 6px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent <AiBadge style={{marginLeft:3}} label="Agent Attribution"/></span>;
 
   return (
     <div style={{background:bgC,border:`1px solid ${bdC}`,padding:"14px 16px",borderLeft:`3px solid ${lbC}`,position:"relative"}}>
@@ -824,7 +824,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
                 <Corners color="#2d6fb5"/>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                   <span style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>This task started from a conversation</span>
-                  <AiBadge/>
+                  <AiBadge label="AI Chat"/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>

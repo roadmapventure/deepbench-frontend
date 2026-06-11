@@ -1,4 +1,4 @@
-// DeepBench v5.1.30 | PersonnelScreen.jsx | AI-18 — susan agentId; fix reinforcement type key
+// DeepBench v5.1.34 | PersonnelScreen.jsx | AiBadge label corrections + Playbook badge
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -685,7 +685,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
                 ? "⏳ Saving…"
                 : existingEntry
                   ? "▸ Save Course Detail"
-                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} /> ▸ Teach {agent.name.split(" ")[0]} this document</>
+                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="RAG & Routing Training"/> ▸ Teach {agent.name.split(" ")[0]} this document</>
               }
             </button>
           </div>
@@ -910,7 +910,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
             }}
           >
             {!(showAddView || editingEntry) && (
-              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} />
+              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="RAG & Routing Training"/>
             )}
             {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
           </button>
@@ -1079,7 +1079,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               </button>
               {isExpanded && e.learnedSummary && (
                 <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
-                  <AiBadge style={{marginBottom:5,display:"inline-block"}}/> {e.learnedSummary}
+                  <AiBadge style={{marginBottom:5,display:"inline-block"}} label="Learned Knowledge"/> {e.learnedSummary}
                 </div>
               )}
             </div>
@@ -1193,8 +1193,8 @@ function PlaybookTab({ agent, showToast }) {
             showToast={showToast}
           />
         ))}
-        {!loading && canEdit && !showAdd && (
-          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 }}>+ Add New Format</button>
+        {/* FEATURE: AI-01-patch — AiBadge on Playbook Add New Format */}
+        {!loading && canEdit && !showAdd && (          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 , display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>+ Add New Format <AiBadge label="Prompt Build"/></button>
         )}
         {showAdd && (
           <AddConfigForm type="output_format" agentId={agent.id} onSaved={handleFormatAdded} onCancel={() => setShowAdd(false)} showToast={showToast} />

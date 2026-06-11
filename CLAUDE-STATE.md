@@ -1,9 +1,9 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.32
-**Next session:** S-AI01b — AiBadge tooltip labels across all AI-touched elements
-**Last session:** S-ABOUT-01 — About panel — 7-tab portfolio panel replaces Help button ✅ done (eca9c9d)
+**Version in dev:** v5.1.35
+**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+**Last session:** S-AI01b-patch2 — AiBadge tooltip position:fixed fix + Role Prompt badge ✅ done (e975715)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---

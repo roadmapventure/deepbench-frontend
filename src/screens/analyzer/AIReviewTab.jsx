@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | AIReviewTab.jsx | Analyzer AI Review tab — agent picker, briefing generation
+// DeepBench v5.1.33 | AIReviewTab.jsx | AiBadge tooltip labels
 // FEATURE: AZ-15 — Tab: AI Review
 // src/screens/analyzer/AIReviewTab.jsx — v5.0.0
 // AI Review tab — 3-stage agent picker, briefing generation, results + Christy upsell
@@ -177,7 +177,7 @@ export default function AIReviewTab({ data, fileName, agents, mapping,
             <div style={{textAlign:"right"}}>
               {aiPickedAgents.length>0&&<div style={{fontFamily:mono,fontSize:10,color:T.muted,marginBottom:8}}>Total cost: <strong style={{color:T.brassDeep}}>{totalCost===0?"Free":"$"+totalCost}</strong> · ~60 seconds</div>}
               <button onClick={runAiReview} disabled={aiPickedAgents.length===0} style={{background:aiPickedAgents.length===0?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:aiPickedAgents.length===0?T.muted:T.navy,padding:"11px 24px",fontFamily:display,fontSize:14,fontWeight:700,cursor:aiPickedAgents.length===0?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:8}}>
-                <span>⚡</span> Generate Strategic Report <AiBadge style={{marginLeft:4}}/>
+                <span>⚡</span> Generate Strategic Report <AiBadge style={{marginLeft:4}} label="AI Analysis"/>
               </button>
             </div>
           </div>
