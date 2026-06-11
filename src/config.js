@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | config.js | Multi-tenancy stubs + environment config
+// DeepBench v5.1.32 | config.js | Multi-tenancy stubs + environment config
 // FEATURE: SH-02 — Environment config + tenant identity
 // src/config.js — v5.0.0
 // DeepBench v5 — Multi-tenancy stubs + environment config
@@ -12,6 +12,7 @@ export const CURRENT_USER = {
 };
 
 export const TENANT_ID = "global";
+export const APP_VERSION = "5.1.32";
 
 // ── URLs ──────────────────────────────────────────────────────────────────────
 // BASE_URL used for shareable task links
