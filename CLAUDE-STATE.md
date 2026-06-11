@@ -2,7 +2,7 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.34
-**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+**Next session:** S-AI01b-patch2 — AiBadge tooltip position:fixed fix + Add New Role Prompt badge
 **Last session:** S-AI01b-patch — AiBadge tooltip overflow fix + label corrections + Playbook badges ✅ done (50a6956)
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
