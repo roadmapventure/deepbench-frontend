@@ -2,8 +2,8 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.1.35
-**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
-**Last session:** S-AI01b-patch2 — AiBadge tooltip position:fixed fix + Role Prompt badge ✅ done (e975715)
+**Next session:** S-AGENT-ARCH-02 — Requirements check on Agent Architecture Model + write first kickoff doc (AA-01 through AA-04, Phase 1 foundation). Read docs/AGENT-ARCHITECTURE.md before starting.
+**Last session:** S-AGENT-ARCH-01 — Full agent architecture design session. Five-layer anatomy, Character Layer, AIS, Knowledge Hunger, Deliverables model, Revenue model, Release phases, JL-01 blueprint. Docs: AGENT-ARCHITECTURE.md created, FEATURES.md updated (AA-01 through AA-31, DL-04 through DL-07).
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
