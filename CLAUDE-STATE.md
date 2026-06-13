@@ -3,7 +3,7 @@
 
 **Version in dev:** v5.1.35
 **Next session:** S-AGENT-ARCH-02 — Requirements check on Agent Architecture Model + write first kickoff doc (AA-01 through AA-04, Phase 1 foundation). Read docs/AGENT-ARCHITECTURE.md before starting.
-**Last session:** S-AGENT-ARCH-01 — Full agent architecture design session. Five-layer anatomy, Character Layer, AIS, Knowledge Hunger, Deliverables model, Revenue model, Release phases, JL-01 blueprint. Docs: AGENT-ARCHITECTURE.md created, FEATURES.md updated (AA-01 through AA-31, DL-04 through DL-07).
+**Last session:** S-AGENT-ARCH-01 — Full agent architecture design session. Five-layer anatomy, Character Layer, AIS, Knowledge Hunger, Deliverables model, Revenue model, Release phases, JL-01 blueprint, Build Your Own Agent, Agent Builder Agent, video/URL training, auto-categorization, demo seeding. Docs: AGENT-ARCHITECTURE.md created + extended (sections 14–18), FEATURES.md updated (AA-01 through AA-41, DL-04 through DL-07).
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---

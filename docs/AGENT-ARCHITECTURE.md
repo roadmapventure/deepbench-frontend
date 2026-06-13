@@ -430,13 +430,102 @@ Reference implementation for the Identity/Persona Replication capability. Valida
 
 ---
 
-## 14. Items Left on the Table (Future Design Sessions Required)
+## 14. Training Input Extensions [LOCKED]
 
-1. Multi-agent workflow handoff design — how agents with different collaboration roles pass work
-2. Deliverables marketplace UI — discovery, preview, purchase flow
-3. Notification architecture — hunger alerts, streak reminders, competitive comparison
-4. Agent versioning — retrain creates a new version, rollback available
-5. Government audit trail — who trained what, when, with what material, what was produced
-6. "Create from Person" guided flow — setup wizard for persona replication
-7. Training provenance display — deliverables show which training material influenced the output
-8. Competitive comparison notifications — optional, shows how your agent ranks vs. category peers
+Beyond document uploads, three additional training input types are supported:
+
+### Auto-Categorization (AA-32)
+After every successful ingest, a Haiku call identifies topic areas covered by the document.
+- Updates the domain coverage map with newly covered areas
+- Posts expertise chips to the Training tab immediately
+- User sees: "Robyn now knows: Texas TAC §252, Sole-Source Justification, Emergency Procurement"
+- This is the feedback loop that makes training feel real — upload, see the agent change
+
+### Video File Upload (AA-33)
+Pipeline: video file → Whisper transcription → Haiku cleanup pass → existing chunking/embedding pipeline.
+- Cost shown to user before committing: "This 45-minute video will cost $0.27 to transcribe"
+- Same `training_type` tagging as any other document
+- Transcription quality cleanup prevents noise from degrading embeddings
+
+### URL Link Training (AA-34)
+Single capability route (`api/capabilities/url-ingest.js`) accepts any URL and detects type:
+- Web page → crawl + extract content (Brent's existing capability, extracted)
+- YouTube URL → YouTube transcript API (free for public videos) → existing pipeline
+- General video URL → download + Whisper transcription → existing pipeline
+
+---
+
+## 15. Build Your Own Agent (AA-41) [DESIGN REQUIRED]
+
+The "Add a Player" stub at `/bench/new` becomes a 5-step guided wizard.
+Without this, DeepBench is a fixed roster. With it, it is a true AI workforce builder.
+
+### The 5-Step Flow
+1. **Identity** — name, role, quip, avatar upload or selection
+2. **Character** — philosophy picker (visual, not dropdown), skeptic level slider, autonomy dial; advanced settings collapsed by default
+3. **Capabilities** — assignment menu, depth level per capability, LLM assignment (platform or BYOK)
+4. **Knowledge** — optional at setup; upload first doc, paste URL, or select a knowledge template; can skip and train later
+5. **Review** — AIS starting score displayed; plain-English character summary generated (not settings labels)
+
+### Plain-English Summary (Step 5)
+Not: "Philosophy: compliance-first, Skeptic: 8"
+Instead: "This agent approaches every problem by asking 'is this allowed?' first. They'll push back on your framing if something seems off. They work best on compliance-heavy tasks and escalate judgment calls rather than guessing."
+
+### Shortcuts
+- **Agent Templates (AA-35)** — pre-configured character + capability sets for common roles; user picks and customizes
+- **Quick-start from description (AA-36)** — paste a job description; Haiku auto-configures; user approves
+- **Copy from existing agent** — clone a full configuration as a starting point
+
+### Demo Seeding (AA-37)
+Existing roster agents (Chloe, Mike, Bob, Robyn, etc.) pre-seeded with character settings + meaningful AIS scores.
+A visitor to the demo URL sees a fully differentiated platform without any training work required.
+
+---
+
+## 16. Agent Builder Agent (AA-38) [DESIGN REQUIRED]
+
+An AI agent that designs and configures other agents. Different from Susan (who trains) — this agent builds.
+
+### How It Works
+- User describes the role they need in natural language
+- Agent Builder asks 4–5 clarifying questions
+- Returns proposed agent spec: name, character settings, capability assignments, suggested training material list, projected AIS at L1 and L3
+- User reviews and approves — agent is created
+- Susan (TR-08) can then be assigned to train it
+
+### Why This Matters
+An agent that can spec out another agent — and explain its choices — is the most powerful demo of the platform's intelligence. It proves the concept is recursive and self-improving.
+
+---
+
+## 17. JL-01 Build Tooling
+
+Two additional features required to actually build the John Leonard agent:
+
+### Transcript Annotation Assist (AA-39)
+Reasoning training material requires annotated transcripts — showing the decision arc, not just the conclusion.
+- Haiku does first-pass annotation: identifies decision points, reasoning arcs, what-was-ruled-out moments
+- John reviews and corrects (20-minute review vs. 4-hour manual annotation)
+- Corrected version ingested as `training_type = 'reasoning'`
+- Pattern reusable for any persona replication use case
+
+### JL-01 Demo Scenario (AA-40)
+A specific test scenario designed to prove the reasoning layer works:
+- Scenario chosen to elicit the same planning questions and architectural recommendation John would reach
+- Compared against John's documented decision patterns from ARCHITECTURE.md and session transcripts
+- Designed for employer/investor demos — the scenario proves the agent reasons like John, not just knows what John knows
+
+---
+
+## 18. Items Left on the Table (Future Design Sessions Required)
+
+1. Multi-agent workflow handoff design — how agents with different collaboration roles pass work (AA-24)
+2. Deliverables marketplace UI — discovery, preview, purchase flow (AA-25)
+3. Notification architecture — hunger alerts, streak reminders, competitive comparison (AA-26)
+4. Agent versioning + rollback — significant retrain creates new version (AA-27)
+5. Government audit trail — immutable log: who trained what, when, with what material, what produced (AA-28)
+6. Training provenance display — deliverables show which training material influenced the output (AA-30)
+7. Competitive comparison notifications — optional, user-controlled (AA-31)
+8. Agent Builder Agent — AI designs and configures other agents; design session required (AA-38)
+9. Build Your Own Agent full flow — 5-step wizard; UX mockup required before coding (AA-41)
+10. JL-01 demo scenario design — specific test proving reasoning layer matches John's arc (AA-40)
