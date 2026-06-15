@@ -10,6 +10,9 @@
 
 > "Your team, without the headcount or loss of domain knowledge."
 
+**Investor / CTO / Chief AI Architect pitch:**
+> "DeepBench is the only AI workforce platform where improving agent quality is a training operation, not a software release — because the routing, attribution, and feedback loop are already built into the data model. The same model that governs the product governs the product's own intelligence. It's self-optimizing, the platform scales through training, and work delivered to the customer, not deployment."
+
 **Two audiences simultaneously:**
 - **Buyers / agencies** — A production AI workforce platform they can deploy
 - **Employers / acquirers** — Live proof that John Leonard can architect and ship production agentic AI systems end-to-end as a non-coder product executive
