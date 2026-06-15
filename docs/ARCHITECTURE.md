@@ -241,17 +241,24 @@ Three training input types feed this Competency and develop corresponding Skills
 
 ---
 
-### Method Layer
-*Technical implementation only. How Capabilities and Deliverables execute. Never user-facing. Not named in the product model.*
+### AI Pattern Layer
+*Technical execution approach only. Industry-standard patterns that AI Services use to execute. Never user-facing as a concept. Not named in the product model at the agent level.*
 
-Methods are properties of Capabilities (each Skill has a primary Method) and candidate properties of Deliverable Capabilities (a Deliverable may require multiple Methods — defined in the Deliverables design session). Methods are accessed through the Service Adapter Layer (Section 5).
+> **Renamed 2026-06-15 (S-DELIVER-DESIGN):** This layer was previously called "Method Layer." What was listed here (RAG Query, LLM Call, Playwright, Embeddings, Document Extraction) were AI Patterns, not Methods. The full AI Services model is in `docs/AI-SERVICES.md`. The full AI Patterns catalog is in `docs/AI-SERVICES.md` Section 2.
 
-**Candidate Methods** *(grow as Capabilities are built)*
-- RAG Query — vector similarity search via pgvector
-- LLM Call — Anthropic or OpenAI model invocation
-- Playwright — browser automation via Railway
-- Embeddings — vector generation via OpenAI
-- Document Extraction — PDF/text parsing pipeline
+AI Patterns are the execution methodology of AI Services — each Service declares 0–N Patterns. Deterministic Services declare zero Patterns. Patterns are accessed through the Service Adapter Layer (Section 5). A Capability or Deliverable points to the AI Service(s) it uses — not directly to Patterns; the Service encapsulates Pattern selection.
+
+**Current AI Patterns** *(full catalog in `docs/AI-SERVICES.md` Section 2)*
+- RAG — Retrieval-Augmented Generation via pgvector + OpenAI embeddings
+- ReAct — Reasoning + Acting loop (Claude reasoning + Playwright execution)
+- Tool Use — structured function calling via Claude tool use / response_format
+- Prompt Chaining — sequential prompt assembly across multiple calls
+- Reflection — agent critiques and improves its own prior output
+- Embeddings — vector generation via OpenAI text-embedding-3-small
+- Browser Automation — Playwright browser control via Railway
+- Structured Output — constrained generation via response_format
+- Streaming — token-by-token output via SSE
+- HITL — Human-in-the-Loop gate
 
 ---
 
@@ -260,7 +267,7 @@ Methods are properties of Capabilities (each Skill has a primary Method) and can
 1. **Capabilities are shared resources.** Built once, assigned to many agents. Each Seniority carries its own Level and Properties.
 2. **Seniority is per-agent.** An agent's Competency profile is the set of Capabilities they hold Seniority in, each at its own Level.
 3. **Grade is the verb; Level is the noun.** Levels roll up to Competency Levels, which roll up to the Model Score.
-4. **Methods are not Capabilities.** RAG Query, LLM calls, and Playwright are how Capabilities execute — not what agents can do.
+4. **AI Patterns are not Capabilities.** RAG, LLM calls, and Playwright are AI Patterns — how AI Services execute. Capabilities and Deliverables point to AI Services, not Patterns directly. Full catalog: `docs/AI-SERVICES.md`.
 5. **Deliverables require a dedicated design session.** No Deliverable Capability is defined or built without one.
 6. **Knowledge feeds Skills.** Training inputs develop Skills Capabilities and raise their Levels. The Knowledge Competency is the corpus; Skills Competency is what grows from it.
 7. **Suggested Requirements are hints, not constraints.** They guide the Planning agent — they do not hard-block assignment.

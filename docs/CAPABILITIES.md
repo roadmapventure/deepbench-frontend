@@ -1,10 +1,11 @@
-# DeepBench — Capabilities, Methods & Deliverables Registry
-# Version: v5.2 | Created: 2026-06-15 | Session: S-DELIVER-DESIGN
+# DeepBench — AI Services, Capabilities & Deliverables Registry
+# Version: v5.2 | Created: 2026-06-15 | Updated: 2026-06-15 | Session: S-DELIVER-DESIGN
 
-> Canonical reference for all Methods, Capabilities, Deliverables, and System Artifacts in DeepBench.
+> Canonical reference for all AI Services, Deliverables, and System Artifacts in DeepBench from the deliverable composition perspective.
 > Every item here maps to at least one entry in FEATURES.md.
-> This document is the source of truth for: what each item is, how it is shared, whether it carries a feedback loop, and what depends on it.
+> This document is the source of truth for: sharing patterns, feedback loops, dependencies, and build order.
 >
+> **AI Services full catalog (14 services, 10 patterns, table schema, AI Audit sections):** `docs/AI-SERVICES.md`
 > Read alongside: ARCHITECTURE.md (layer definitions, session rules), FEATURES.md (backlog IDs and session queue).
 
 ---
@@ -12,9 +13,9 @@
 ## Definitions
 
 **Layer**
-- `Method` — technical implementation; how Capabilities and Deliverables execute; never user-facing as a concept; built once, shared across many callers
+- `AI Service` — DeepBench-owned named implementation; uses 0–N AI Patterns; built once, shared across many callers. Previously called "Method" — renamed 2026-06-15. Full catalog with Pattern assignments and properties: `docs/AI-SERVICES.md`.
 - `Capability` — what an agent is authorized to do; shareable and gradable per Agent Profile Model
-- `Deliverable` — typed output artifact the human sees, reviews, and acts on
+- `Deliverable` — typed output artifact the human sees, reviews, and acts on; a collection of AI Services
 - `System Artifact` — internal platform record; not a user-facing deliverable
 
 **AI Type**
@@ -44,12 +45,12 @@
 
 | # | Title | Layer | AI Type | User-Visible |
 |---|-------|-------|---------|-------------|
-| M-01 | Prompt Assembly | Method | Mixed | No |
-| M-02 | RAG Query | Method | Mixed | No |
-| M-03 | ReAct Loop | Method | Mixed | Yes |
-| M-04 | Self-Learning Write-back | Method | Mixed | No |
-| M-05 | REFLECT | Method | AI | Yes |
-| M-06 | Flag Computation | Method | Deterministic | No |
+| M-01 | Prompt Assembly | AI Service | Mixed | No |
+| M-02 | RAG Query | AI Service | Mixed | No |
+| M-03 | ReAct Loop | AI Service | Mixed | Yes |
+| M-04 | Self-Learning Write-back | AI Service | Mixed | No |
+| M-05 | REFLECT | AI Service | AI | Yes |
+| M-06 | Flag Computation | AI Service | Deterministic | No |
 | D-01 | AI Briefing | Deliverable | AI | Yes |
 | D-02 | Web Research Report | Deliverable | AI | Yes |
 | D-03 | Data Fetch / Dataset | Deliverable | Mixed | Yes |
@@ -66,12 +67,12 @@
 
 | ID | Title | Purpose | AI Type | Layer | Arch Layer | User-Visible | Sharing Pattern | Callers & Consumers |
 |----|-------|---------|---------|-------|-----------|-------------|----------------|---------------------|
-| M-01 | Prompt Assembly | Stacks role prompt + guardrails + output format + RAG chunks + REFLECT into one assembled system prompt at call time | Mixed | Method | 3 | No | Producer · Pipeline | **Callers:** AI Briefing, Portfolio AI Review, Task Planning (Michelle), Test Agent (PE-12), REFLECT pre-call. **Consumers:** every Deliverable that requires an assembled system prompt receives its output |
-| M-02 | RAG Query | Vector similarity search against `knowledge_entries` to retrieve relevant knowledge chunks for a given query text | Mixed | Method | 3 | No | Producer · Pipeline · Loop | **Callers:** Prompt Assembly (as a step), AI Briefing direct, Portfolio AI Review, REFLECT. **Consumers:** any Deliverable requiring knowledge-augmented response; output also flows back into knowledge layer when new entries are written post-retrieval |
+| M-01 | Prompt Assembly | Stacks role prompt + guardrails + output format + RAG chunks + REFLECT into one assembled system prompt at call time | Mixed | AI Service | 3 | No | Producer · Pipeline | **Callers:** AI Briefing, Portfolio AI Review, Task Planning (Michelle), Test Agent (PE-12), REFLECT pre-call. **Consumers:** every Deliverable that requires an assembled system prompt receives its output |
+| M-02 | RAG Query | Vector similarity search against `knowledge_entries` to retrieve relevant knowledge chunks for a given query text | Mixed | AI Service | 3 | No | Producer · Pipeline · Loop | **Callers:** Prompt Assembly (as a step), AI Briefing direct, Portfolio AI Review, REFLECT. **Consumers:** any Deliverable requiring knowledge-augmented response; output also flows back into knowledge layer when new entries are written post-retrieval |
 | M-03 | ReAct Loop | Browser automation reasoning loop — Claude reasons about a screenshot, Playwright executes the action, repeat until terminal state (DOWNLOAD, DONE, or STUCK) | Mixed | Method | 3 (Railway) | Yes — live step log streams to UI in real time | Producer · Pipeline · Loop | **Callers:** Web Research capability (Brent, Pat), Data Fetch capability (Brent, Pat) — same loop, terminal action determines output type. **Consumers:** Web Research Report (synthesis output), Data Fetch/Dataset (file output), Self-Learning Write-back (triggered post-run), REFLECT (reads prior run history pre-run) |
-| M-04 | Self-Learning Write-back | Post-run synthesis using Haiku + OpenAI embedding; writes structured knowledge entry to `knowledge_entries` autonomously after any ReAct run — success, failure, or interruption | Mixed | Method | 3 | No — result appears in Training tab as agent-sourced entry | Producer · Loop | **Callers:** ReAct Loop post-run (Web Research runs, Data Fetch runs). **Consumers:** RAG Query (future retrieval of written entries), Training tab (PE-03 display), Knowledge Reinforcement capability (AI-17) |
-| M-05 | REFLECT | Pre-run Claude (Haiku) call that reads agent memory via RAG and writes a step-by-step execution plan for the upcoming ReAct run — agent plans before it acts | AI | Method | 3 | Yes — execution plan shown to user in Fetch UI before run begins | Producer · Pipeline | **Callers:** any ReAct-based capability before run start (Web Research, Data Fetch). **Consumers:** ReAct Loop receives the plan as priming context; user sees the plan in the Fetch screen |
-| M-06 | Flag Computation | Deterministic rules engine — evaluates parsed spend data against procurement risk thresholds; produces structured risk flags with dollar amounts, transaction counts, and severity ratings | Deterministic | Method | 3 | No — output surfaces in Flags Report and Data Analysis Report | Producer · Pipeline | **Callers:** Flags Report, Data Analysis Report (Concerns tab). **Consumers:** both Deliverables above consume its output as their data source |
+| M-04 | Self-Learning Write-back | Post-run synthesis using Haiku + OpenAI embedding; writes structured knowledge entry to `knowledge_entries` autonomously after any ReAct run — success, failure, or interruption | Mixed | AI Service | 3 | No — result appears in Training tab as agent-sourced entry | Producer · Loop | **Callers:** ReAct Loop post-run (Web Research runs, Data Fetch runs). **Consumers:** RAG Query (future retrieval of written entries), Training tab (PE-03 display), Knowledge Reinforcement capability (AI-17) |
+| M-05 | REFLECT | Pre-run Claude (Haiku) call that reads agent memory via RAG and writes a step-by-step execution plan for the upcoming ReAct run — agent plans before it acts | AI | AI Service | 3 | Yes — execution plan shown to user in Fetch UI before run begins | Producer · Pipeline | **Callers:** any ReAct-based capability before run start (Web Research, Data Fetch). **Consumers:** ReAct Loop receives the plan as priming context; user sees the plan in the Fetch screen |
+| M-06 | Flag Computation | Deterministic rules engine — evaluates parsed spend data against procurement risk thresholds; produces structured risk flags with dollar amounts, transaction counts, and severity ratings | Deterministic | AI Service | 3 | No — output surfaces in Flags Report and Data Analysis Report | Producer · Pipeline | **Callers:** Flags Report, Data Analysis Report (Concerns tab). **Consumers:** both Deliverables above consume its output as their data source |
 | D-01 | AI Briefing | Agent-produced executive analysis document — structured HTML with findings, risk flags, compliance notes, and recommended actions; grounded in agent knowledge and uploaded data | AI | Deliverable | 2 | Yes | Producer · Pipeline | **Callers (production capability):** Step execution (S11), Test Agent (PE-12), Chat flow (DB-14), Portfolio AI Review. **Consumers of output:** Human (direct); in multi-agent workflows, Agent B receives Agent A's brief as context input; Deliverables Card (DL-02); change request flow (DL-05) |
 | D-02 | Web Research Report | Agent-produced synthesis of findings from a live web research run — what the agent found, what it tried, what it could not complete; formatted for human review and approval | AI | Deliverable | 2 | Yes | Producer · Pipeline · Loop | **Callers (production capability):** Brent (DR-06), Pat (IR-07, pending), any future ReAct-capable agent. **Consumers of output:** Human (direct); AI Briefing (findings as context in multi-agent handoff); Deliverables Card (DL-02); training layer via approval (DL-06) |
 | D-03 | Data Fetch / Dataset | Structured CSV file downloaded from a government portal by the ReAct agent — delivered to the user for download and optionally fed into the Analyzer as the next pipeline stage | Mixed | Deliverable | 2 | Yes — downloadable file; feeds Analyzer | Producer · Pipeline · Loop | **Callers (production capability):** Brent (DR-06), Pat (IR-07, pending). **Consumers of output:** Human (download); Data Analysis Report (Analyzer input — direct pipeline dependency); Deliverables Card (DL-02); change request triggers re-fetch |

@@ -3,9 +3,10 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN Part 2 — Full Capabilities, Methods & Deliverables registry designed and locked in `docs/CAPABILITIES.md`. 15 items mapped (6 Methods, 7 Deliverables, 2 System Artifacts). Three new DL IDs added: DL-10 (Web Research Report + Data Fetch as deliverables), DL-11 (Task/Step Plan as deliverable), DL-12 (Flags Report + Data Analysis Report as deliverables). Sharing Pattern and Feedback Loop design locked. S-INFRA-01 identified as highest-leverage session in queue. DL-04 identified as gate for six deliverables.
+> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN (continued) — AI Services Model locked in `docs/AI-SERVICES.md`. 14-service catalog (SVC-01–SVC-14: 11 AI/Mixed + 3 Deterministic). 10-pattern catalog (PAT-01–PAT-10). Unified Services table schema. Five redesigned AI Audit sections. MCP surfaces (MC-01–MC-07). New IDs: AI-25/26/27, MC section (7 items). AI-23 updated. ARCHITECTURE.md Method Layer → AI Pattern Layer. CAPABILITIES.md Methods → AI Services.
 >
-> **Capabilities registry:** All Methods, Capabilities, Deliverables, and System Artifacts with full sharing, feedback loop, dependency, and build-order documentation → `docs/CAPABILITIES.md`
+> **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
+> **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
 
 ---
 
@@ -294,9 +295,12 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-19 | Latency capture for extraction + reinforcement call sites — wrap fetch() with Date.now() timing so avg latency shows in AI Audit (currently "—" for Susan + OpenAI rows) | ❌ Missing | S-future |
 | AI-20 | AI Audit cost formatter — replace `<$0.01` floor with 4-decimal display so sub-penny costs show visible movement (e.g. `$0.0023`); one-liner change to `fmt$` in AIActivityPanel.jsx | ❌ Missing | S-future |
 | AI-21 | AI Audit output token tracking — extend `logAICall()` to accept `outputTokens` param; include output cost in formula; write to existing `output_tokens` column in ai_activity_log; all `logAICall()` call sites updated | ❌ Missing | S-future |
-| AI-22 | Full lineage columns on `ai_activity_log` — add `capability_slug`, `deliverable_id`, `step_id`, `level` so every AI call is traceable from Task → Step → Agent → Capability → Method → Deliverable → Cost. Do alongside S-INFRA-01. All `logAICall()` call sites updated. | ❌ Missing | S-INFRA-01 |
-| AI-23 | AI Audit rebuilt on Agent Profile Model taxonomy — By Competency / By Capability / By Level views replace and extend current By Activity Type. Existing 9 activity type categories remapped to Capability slugs once taxonomy table exists. Design session required. | ❌ Missing | S-future (after S-INFRA-01) |
+| AI-22 | Full lineage columns on `ai_activity_log` — add `service_slug`, `service_version`, `deliverable_id`, `step_id`, `level` so every AI call is traceable from Task → Step → Agent → Service → Pattern → Deliverable → Cost. Also adds `success` boolean and `error_type` for Service Health (AI-27). Do alongside S-INFRA-01. All `logAICall()` call sites updated. | ❌ Missing | S-INFRA-01 |
+| AI-23 | AI Audit rebuilt on AI Services model — five sections replace current "By Activity Type": (1) By Service — one row per AI/Mixed Service, columns: Service Name · Type · Calls · Est. Cost · Avg Latency; (2) By Pattern — one row per AI Pattern rolled up from Services declaring it; (3) Deterministic — execution count + latency for deterministic Services, no LLM cost; (4) By LLM — keep existing; (5) By Agent — keep existing. Existing ai_type strings remapped to service_slug values. Requires `ai_services` table (AI-25). Design session: S-AI-AUDIT-REDESIGN. | ❌ Missing | S-AI-AUDIT-REDESIGN |
 | AI-24 | Routing feedback loop — deliverable approval and change-request rates produce a per-agent-capability preference score; routing uses Capability match + Level + approval history as a third factor after Seniority. Design session required before building. | ❌ Missing | S-future (after S-DELIVER-04) |
+| AI-25 | `ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs), properties jsonb (llm_provider, llm_model, token_budget, execution_mode, rag_match_count, byok_eligible), in_nigp, in_deepbench, current_route, target_route, version, created_at. Seed with all 14 services (SVC-01 through SVC-14) on creation. | ❌ Missing | S-INFRA-01 |
+| AI-26 | `ai_patterns` table — Supabase catalog of 10 industry-standard AI Patterns: slug, name, description. Seed with PAT-01 through PAT-10 on creation. Referenced by `ai_services.patterns` jsonb array. | ❌ Missing | S-INFRA-01 |
+| AI-27 | Service Health tracking — `success` boolean + `error_type` text column on `ai_activity_log`; enables per-Service failure rate, uptime, and p50/p95 latency in AI Audit. Part of AI-22 lineage work or separate extension. | ❌ Missing | S-INFRA-01 |
 
 **AI-22 Notes:** `ai_activity_log` currently has `ai_type`, `feature`, `model`, `agent_id`, `task_id` — a pre-Agent-Profile-Model categorization. The four new columns are additive and nullable — no existing data affected. Once present, every AI call has a full lineage chain. The platform's own internal capabilities (Task Planning, Title Generation, Agent Routing) are themselves Deliverables produced by agents — they must also carry these columns, making the platform self-describing.
 
@@ -514,6 +518,22 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+## MCP PLATFORM EXPOSURE — MC
+> Full spec: `docs/AI-SERVICES.md` Section 7
+> All items Phase 4+. Design session required before any MCP surface is built: S-MCP-01 (not yet scheduled).
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| MC-01 | MCP Agent — expose a named agent as an MCP server; agent capabilities available as MCP tools to Claude Desktop and external AI clients | ❌ Missing | S-MCP-01 |
+| MC-02 | MCP Capability — expose a specific Capability without full agent persona; more granular than MC-01 | ❌ Missing | S-MCP-01 |
+| MC-03 | MCP Deliverable — expose deliverable production as an MCP tool; caller receives structured typed deliverable output | ❌ Missing | S-MCP-01 |
+| MC-04 | MCP Service — expose a single AI Service directly as an MCP tool; finest granularity; infrastructure licensing tier | ❌ Missing | S-MCP-01 |
+| MC-05 | MCP Workflow — expose full multi-step task pipeline as one MCP tool; caller receives completed task with all deliverables | ❌ Missing | S-MCP-01 |
+| MC-06 | MCP Training — allow external systems to push training material to an agent via MCP; enterprise DMS/CMS integration | ❌ Missing | S-MCP-01 |
+| MC-07 | MCP Feedback — allow external systems to send approval or change-request signals via MCP; closes feedback loop without DeepBench login | ❌ Missing | S-MCP-01 |
+
+---
+
 ## LANDING — LA
 
 | ID | Feature | Status | Session |
@@ -574,10 +594,12 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ### Apple Interview Sprint — 2 weeks starting 2026-06-16
 > Goal: agents produce visible, typed, reviewable, stored deliverables. Story: assign task → steps run → deliverable appears → user reviews → agent work tracked on profile.
+> Priority order: AI Audit redesign first (showcases architecture + correct terminology), then Deliverables model.
 
 | Session | Feature | Status |
 |---------|---------|--------|
-| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md created — full Methods/Deliverables/System Artifacts registry, sharing patterns, feedback loops, build order. Part 3: kickoff docs for S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 next |
+| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md + AI-SERVICES.md created — full Services/Deliverables registry, AI Patterns catalog (10), AI Services catalog (14), sharing patterns, feedback loops, MCP surfaces. Part 3: kickoff docs for S-AI-AUDIT-REDESIGN + S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 next |
+| S-AI-AUDIT-REDESIGN | **Design session first, then coding** — Rebuild AI Audit screen on AI Services model: (1) rename By Activity Type → By Service; (2) add By Pattern section; (3) add Deterministic section; (4–5) keep By LLM + By Agent. Remap existing ai_type strings to service_slug values. Seed `ai_services` + `ai_patterns` tables (AI-25, AI-26). Updates AI-23. Read `docs/AI-SERVICES.md` Sections 2, 3, 6 before starting. | — |
 | S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
 | S-DELIVER-04 | DL-04 + DL-05 + DL-07 + DL-10 + DL-11 + DL-12 — `deliverables` table, change request flow, agent Projects tab, Web Research/Fetch/Plan/Flags/Analysis write | — |
 | S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |

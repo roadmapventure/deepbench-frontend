@@ -2,14 +2,15 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.2.0
-**Next session:** S-DELIVER-DESIGN Part 3 — produce kickoff docs for S11 (Start button + per-step running state + first deliverable written to table: TI-14, TI-15, TI-16, AI-11) and S-DELIVER-04 (deliverables table migration + DL-04, DL-05, DL-07, DL-10, DL-11, DL-12 + Deliverables Card + change request flow + agent Projects tab). Read CAPABILITIES.md and ARCHITECTURE.md Section 2 before writing kickoff docs.
-**Last session:** S-DELIVER-DESIGN Part 2 — Full Capabilities, Methods & Deliverables registry designed and locked in `docs/CAPABILITIES.md`. 15 items mapped across 4 tables: 6 Methods (M-01 through M-06), 7 Deliverables (D-01 through D-07), 2 System Artifacts (SA-01, SA-02). Sharing Pattern (Producer / Pipeline / Loop) and Feedback Loop columns locked. Every item confirmed as a shared service. DL-04 identified as the gate for six deliverables. S-INFRA-01 confirmed as highest-leverage session in queue. Three new Feature IDs added: DL-10, DL-11, DL-12. FEATURES.md and CLAUDE-STATE.md updated.
+**Next session:** S-AI-AUDIT-REDESIGN — Design session: rebuild AI Audit screen on the AI Services model. Five new sections: By Service / By Pattern / Deterministic / By LLM / By Agent. Read `docs/AI-SERVICES.md` Sections 2, 3, and 6 before starting. Also read AI-23, AI-25, AI-26 in FEATURES.md. After this session: S-DELIVER-DESIGN Part 3 (kickoff docs for S11 + S-DELIVER-04).
+**Last session:** S-DELIVER-DESIGN Part 2 (continued) — AI Services Model designed and locked in `docs/AI-SERVICES.md`. Full 14-service catalog (SVC-01 through SVC-14: 11 AI/Mixed + 3 Deterministic). AI Patterns catalog (PAT-01 through PAT-10). Unified Services table schema. Five redesigned AI Audit sections. MCP exposure surfaces (MC-01 through MC-07). Service Versioning and Service Health design. ARCHITECTURE.md Section 2 Method Layer renamed to AI Pattern Layer. CAPABILITIES.md Methods renamed to AI Services throughout. FEATURES.md: AI-23 updated, AI-25/26/27 added, MC section added (7 items), S-AI-AUDIT-REDESIGN added to session queue.
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
 
 ## Open Blockers
-- None. Q5 resolved 2026-06-13. CAPABILITIES.md design complete.
+- None. Q5 resolved 2026-06-13. CAPABILITIES.md + AI-SERVICES.md design complete.
+- **Note:** S-INFRA-01 scope may need splitting into 01a (AI Services catalog + 6 extraction jobs) and 01b (capability registry, BYOK, two-speed routing). Decide before S-INFRA-01 design session.
 
 ---
 
