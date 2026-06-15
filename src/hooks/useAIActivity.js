@@ -1,4 +1,4 @@
-// DeepBench v5.2.1 | useAIActivity.js | AI-23 — rebuild on AI Services model: catalogs, remap table, new aggregations
+// DeepBench v5.2.2 | useAIActivity.js | AI-23 patch — sorted service/pattern/agent arrays for dynamic UI
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -231,11 +231,29 @@ export function useAIActivity() {
   const servicesActive      = Object.values(byService).filter(s => s.total > 0).length;
   const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length; // static: 8 of 10
 
+  // FEATURE: AI-23 patch — sorted arrays for dynamic section rendering
+  // Services: primary sort = type order (ai→hybrid→logic), secondary = calls desc
+  const SERVICE_TYPE_ORDER = { ai: 0, hybrid: 1, logic: 2 };
+  const servicesSorted = Object.values(byService).sort((a, b) => {
+    const tDiff = SERVICE_TYPE_ORDER[a.serviceType] - SERVICE_TYPE_ORDER[b.serviceType];
+    if (tDiff !== 0) return tDiff;
+    return b.total - a.total;
+  });
+
+  // Patterns: sorted by calls desc; inactive patterns always at bottom
+  const patternsSorted = Object.values(byPattern).sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return b.total - a.total;
+  });
+
+  // Agents: sorted by calls desc
+  const agentsSorted = Object.values(byAgent).sort((a, b) => b.calls - a.calls);
+
   const modelsInUse = Object.values(byLLM).filter(d => d.calls > 0).length;
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, modelsInUse, totalCost, totalCalls };
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
 }
 
 export { MODEL_PROVIDER };
