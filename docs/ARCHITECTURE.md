@@ -541,6 +541,8 @@ These rules apply to every future session. No exceptions without explicit produc
 9. Multi-tenancy stubs stay in place on every table and constant — never remove them
 10. Per-agent LLM assignment and BYOK must not be blocked by any code written before S-INFRA-01
 11. **Never delete Supabase data or agent configuration data without explicit confirmation from John**
+12. Every `logAICall()` invocation must include `capability_slug`, `step_id`, `deliverable_id`, and `level` once S-INFRA-01 ships — no AI call is logged without its full lineage. Until then, pass whatever subset is available and leave the rest null. Never remove an existing logging call.
+13. The platform's internal capabilities (Task Planning, Title Generation, Agent Routing) are Deliverables produced by agents — treat them as first-class entries in `ai_activity_log` with the same lineage fields, not as special system events.
 
 ---
 
