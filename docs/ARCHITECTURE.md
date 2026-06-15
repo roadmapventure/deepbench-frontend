@@ -1,5 +1,5 @@
 # DeepBench — Architecture North Star
-# Version: v5.1.x | Last updated: 2026-06-08 | Session: S-ARCH-01
+# Version: v5.2 | Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
 > This document supersedes all prior architecture notes.
@@ -102,62 +102,214 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 
 ---
 
-## 2. The Capability Spectrum Model [LOCKED — North Star]
+## 2. Agent Profile Model [LOCKED — Vocabulary + Structure]
 
-This is the most important architectural concept. It is NOT fully implemented yet.
-Every session between now and S-INFRA-01 builds toward it.
+> The Agent Profile Model is the core data model of DeepBench. Every product feature on the Bench side wraps around this model. All vocabulary defined here is canonical — use it in code comments, UI labels, kickoff docs, and design sessions.
+>
+> **Important:** Capabilities within each Competency are listed as candidates only. They are suggestive — not locked. Each Competency requires a dedicated design and modeling session before any Capability inside it is built. We can build a single Capability with a single Property in one sprint without touching anything else in the model.
 
-### Core Concept
-A capability has a measurable depth spectrum:
+---
 
-| Level | Name | Description |
-|-------|------|-------------|
-| 1 | General | Baseline LLM or deterministic logic, no training, lowest cost |
-| 2 | Trained | RAG docs added, knows a specific domain |
-| 3 | Expert | Deeply trained, specialized, self-improving |
-| 4 | Proprietary | User's own IP — private, chargeable to others |
+### Vocabulary
 
-An **agent** is a named persona authorized to use a set of capabilities at specific depth levels.
-The persona (name, voice, avatar, behavioral prompt) makes it human-facing.
-The capability depth is what makes it valuable and measurable.
+| Term | Definition |
+|------|-----------|
+| **Agent** | Named persona. Has a voice, avatar, role, quip. The human-facing identity. |
+| **Competency** | One of four parent categories that define an agent. Every agent has all four. |
+| **Capability** | An individual named element within a Competency. The shareable, gradable unit of agent value. |
+| **Grade** | Verb — the act of assessing and assigning a Level to a Capability. |
+| **Level** | Noun — the result of grading. L1–L4. Determines quality, pricing, and routing. |
+| **Seniority** | Authorizing an agent to use a Capability at a specific Level. |
+| **Qualities & Properties** | Universal configuration dials that apply to every Capability regardless of Competency. |
+| **Method** | Technical implementation layer. How a Capability or Deliverable executes. Never user-facing. |
+| **Model Score** | Rolled-up score across all Competency Levels. The agent's overall grade. |
 
-### Capability Access Tags
-Each capability assignment carries access metadata:
-- **Exclusivity** — exclusive (only one agent) or shared (multiple agents)
-- **Visibility** — public (discoverable by others) or private (tenant-only)
+> **Reserved term:** "Assignment" means work assigned to an agent — a task or step. Never use it to describe Seniority or Capability authorization.
 
-These tags determine how capabilities are surfaced in the marketplace and resold.
+---
 
-### What This Means for Agents
-- Training an agent = deepening a specific capability, not training the agent generically
-- A trained capability can be assigned to multiple agents simultaneously (unless tagged exclusive)
-- Two agents with the same capability at different depths produce comparable but measurably, statistically, and explicably different outputs — depth difference is a core product proof point
-- Two agents with the same capability and depth but different assigned LLMs will produce outputs that are measurably different; the gap (or lack thereof) is unknown until tested
-- The Personnel File is not just a profile — it is an agent's **capability dashboard**
+### The Four Competencies
 
-### Agent Personality Layer
-An agent's behavioral prompt defines its personality — how it communicates, its tone, its reasoning style, its domain voice. This is stored in Supabase `agent_configs`, not in code. Two agents with identical capability assignments can have entirely different personalities (e.g. one pessimistic/risk-focused, one optimistic/opportunity-focused). This behavioral layer is what makes each agent unique and valuable beyond its capability list.
+```
+AGENT PROFILE MODEL
+│
+│  Model Score = rollup of Competency Levels
+│  Competency Level = rollup of Capability Levels within it
+│  Capability Level = result of grading its Qualities & Properties
+│
+├── COMPETENCY: Identity       — Who the agent is
+├── COMPETENCY: Skills         — What the agent can do
+├── COMPETENCY: Knowledge      — What the agent knows
+└── COMPETENCY: Deliverables   — What the agent produces
+```
 
-### What This Means for Routing
-Routing is capability matching, not agent matching:
-1. What capability does this task require?
-2. Which agent has the deepest assignment of that capability?
-3. Route to that agent
+**Baseline behavior:** An agent with no defined Competencies or Capabilities still produces output — operating at L1 (General) across the board using generic LLM. The Agent Profile Model enriches quality and routing precision but never blocks execution. Agents grow into their profiles one sprint at a time.
 
-**Two routing modes:**
-- **Efficiency mode** — fastest path, lowest cost, lightest capable depth
-- **Deep knowledge mode** — highest quality, deepest capability, may be slower and costlier
+---
 
-The routing service accepts `mode` as a parameter.
+### Competency: Identity
+*Who the agent is — mindset, philosophy, personality, ethics.*
+Capabilities are agent-scoped. Identity does not share across agents.
+Design session required before building any Capability here.
 
-### What This Means for the Business Model
-- Charge by capability depth — deeper = more valuable, higher price
-- Charge by agent — the ability to build up an agent's skill set without starting over; the most capable agents are resellable assets; access and outputs can be sold multiple times
-- Pre-built agents: capability depth pre-assigned, user pays for the configuration
-- Build-your-own: user selects capabilities from a menu, assigns depth, sets persona and behavioral prompt
-- Users can publish their trained capability spectrum as a service (their IP, their revenue)
-- Users keep capability spectrum private — the output is their competitive advantage
-- Test Team screen: compare outputs across capability depths and LLM assignments within one capability
+**Candidate Capabilities** *(suggestive — not locked)*
+- Character
+- Ethics
+- Behavioral Style
+- Philosophy
+- Autonomy
+- Skeptic Level
+- Temporal Stance
+- Epistemology
+- Collaboration Role
+- Learning Stance
+- Peter Principle
+
+---
+
+### Competency: Skills
+*What the agent can do — named abilities, each with a Level.*
+Skills are **shared resources**. The same Skill can be assigned to multiple agents at different Levels. Training a Skill benefits all agents assigned to it.
+Design session required before building any Capability here.
+
+**Candidate Capabilities** *(suggestive — not locked)*
+- Domain Expertise
+- Behavioral Application
+- Reasoning
+
+> **Note:** RAG Query, LLM calls, and Playwright are **Methods** — the technical means by which Skills execute. They are not Skills themselves. See Method layer below.
+
+---
+
+### Competency: Knowledge
+*What the agent knows — the training corpus that raises Skill Levels.*
+Design session required before building any Capability here.
+
+Three training input types feed this Competency and develop corresponding Skills:
+
+| Training Input | What it captures | Develops → Skill Capability |
+|---------------|-----------------|---------------------------|
+| Knowledge | Domain facts, reference material | Domain Expertise |
+| Behavioral | How agent thinks, communicates | Behavioral Application |
+| Reasoning Pattern | Decision arcs, annotated thinking | Reasoning |
+
+**Candidate Capabilities** *(suggestive — not locked)*
+- Training Volume
+- Knowledge Freshness
+- Domain Coverage
+- Training Streak / Engagement
+
+---
+
+### Competency: Deliverables
+*What the agent produces — typed output artifacts.*
+
+> ⚠️ **Full design and modeling session required before any Capability in this Competency is defined or built.** Naming convention for Deliverable Capabilities is TBD in that session.
+
+**Suggested Requirements** — each Deliverable Capability carries a lightweight list of which Skills and Methods are typically needed to produce it. Used by the Planning agent as routing hints, not hard constraints. A Deliverable may require multiple Skills and multiple Methods (1-to-many). A Deliverable can also be produced by multiple agents, which is the entry point for multi-agent routing (see AA-24 — design session required).
+
+**Generic LLM baseline:** A Deliverable can be produced even when no Skills or Methods are formally declared for it. In that case, the Planning agent uses generic LLM judgment to assign and execute. This is L1. Declaring Suggested Requirements raises routing quality and output Level over time.
+
+**Candidate Capabilities** *(suggestive — naming convention TBD in design session)*
+- AI Briefing
+- Research Report
+- Data Analysis Report
+- Project Plan
+- Presentation
+- Document Review
+
+---
+
+### Qualities & Properties
+*Universal — same dials on every Capability regardless of Competency.*
+
+| Property | Description | Values |
+|----------|-------------|--------|
+| **Level** | Result of grading — depth and quality | L1 General · L2 Trained · L3 Expert · L4 Proprietary |
+| **Availability** | Who can access this Capability | Public · Private |
+| **Exclusivity** | How many agents share this Capability | Shared · Exclusive |
+| **Pricing** | Cost to access or use | Free · Priced ($/use) |
+| **Trainability** | Can this Capability be improved | Trainable · Supervised · Locked |
+| **Confidence** | Calibration level of the Capability's output | *(scale TBD in design session)* |
+| **LLM Provider** | Which AI provider executes this Capability | Anthropic · OpenAI · *(future: others)* |
+| **LLM Model** | Specific model assigned | Haiku · Sonnet · GPT-4o · *(future: others)* |
+| **API Key Source** | Who provides the API key | Platform · BYOK |
+| **Type** | Execution type — determines badge and cost model | AI · Deterministic |
+
+---
+
+### Method Layer
+*Technical implementation only. How Capabilities and Deliverables execute. Never user-facing. Not named in the product model.*
+
+Methods are properties of Capabilities (each Skill has a primary Method) and candidate properties of Deliverable Capabilities (a Deliverable may require multiple Methods — defined in the Deliverables design session). Methods are accessed through the Service Adapter Layer (Section 5).
+
+**Candidate Methods** *(grow as Capabilities are built)*
+- RAG Query — vector similarity search via pgvector
+- LLM Call — Anthropic or OpenAI model invocation
+- Playwright — browser automation via Railway
+- Embeddings — vector generation via OpenAI
+- Document Extraction — PDF/text parsing pipeline
+
+---
+
+### Key Rules [LOCKED]
+
+1. **Capabilities are shared resources.** Built once, assigned to many agents. Each Seniority carries its own Level and Properties.
+2. **Seniority is per-agent.** An agent's Competency profile is the set of Capabilities they hold Seniority in, each at its own Level.
+3. **Grade is the verb; Level is the noun.** Levels roll up to Competency Levels, which roll up to the Model Score.
+4. **Methods are not Capabilities.** RAG Query, LLM calls, and Playwright are how Capabilities execute — not what agents can do.
+5. **Deliverables require a dedicated design session.** No Deliverable Capability is defined or built without one.
+6. **Knowledge feeds Skills.** Training inputs develop Skills Capabilities and raise their Levels. The Knowledge Competency is the corpus; Skills Competency is what grows from it.
+7. **Suggested Requirements are hints, not constraints.** They guide the Planning agent — they do not hard-block assignment.
+8. **Model Score is always derived.** Never hardcoded. Always rolled up from actual assigned Capability Levels.
+9. **"Assignment" means work.** Never use it for Seniority or Capability authorization. Assignment = task or step assigned to an agent.
+
+---
+
+### DB Architecture — Target State
+*(Do not build before S-INFRA-01. Design all sessions to not contradict this structure.)*
+
+**Layer 1 — Taxonomy** *(the catalog — rarely changes)*
+```sql
+competencies (id, slug, name, display_order)
+
+capabilities (
+  id, competency_slug, slug, name,
+  default_trainable, default_type,
+  display_order
+)
+
+deliverable_capability_requirements (
+  id, deliverable_capability_slug,
+  skill_capability_slug,
+  primary_method,
+  minimum_level, is_required
+)
+```
+
+**Layer 2 — Seniority** *(per-agent — 1-to-many)*
+```sql
+agent_capability_assignments (
+  id, tenant_id, agent_id, capability_slug,
+  level (1-4),
+  availability, exclusivity, pricing,
+  trainability, confidence,
+  llm_provider, llm_model, api_key_ref,
+  type, created_at
+)
+```
+
+**Layer 3 — Instances** *(runtime output — what agents actually produce)*
+```sql
+deliverables (
+  id, tenant_id, task_id, step_id, agent_id,
+  capability_slug, type, title,
+  content jsonb, format, status,
+  level, is_final, version_of,
+  is_public, share_token, price_usd,
+  created_at
+)
+```
 
 ---
 
@@ -184,13 +336,13 @@ MD files are valid training documents — same pipeline as PDFs, skip extraction
 
 ### Three Training Material Types
 
-Not all training material is the same. The Teach screen distinguishes three types:
+Not all training material is the same. These types are the inputs that feed the Knowledge Competency and develop corresponding Skills Capabilities (see Section 2):
 
-| Type | What it captures | Where it goes | Example |
-|------|-----------------|---------------|---------|
-| **Knowledge** | Facts, domain expertise, reference material | RAG → pgvector | NIGP standards doc, procurement regulations |
-| **Behavioral** | How the agent thinks, communicates, prioritizes | System prompt → `agent_configs` | John-Profile.md, persona description |
-| **Reasoning Pattern** | How decisions were reached — the arc of thinking, not just the conclusion | RAG → pgvector, tagged `training_type = 'reasoning'` | Session transcripts, decision logs, annotated case studies |
+| Type | What it captures | Where it goes | Develops → |
+|------|-----------------|---------------|-----------|
+| **Knowledge** | Facts, domain expertise, reference material | RAG → pgvector | Domain Expertise Skill |
+| **Behavioral** | How the agent thinks, communicates, prioritizes | System prompt → `agent_configs` | Behavioral Application Skill |
+| **Reasoning Pattern** | How decisions were reached — the arc of thinking, not just the conclusion | RAG → pgvector, tagged `training_type = 'reasoning'` | Reasoning Skill |
 
 Reasoning Pattern material is the most valuable and the hardest to replicate. It teaches an agent to run the same diagnostic process on a new problem — not just recall past answers. A session transcript where a human works from a vague problem to a named architecture is more valuable training than a document stating the architecture conclusion alone.
 
@@ -311,18 +463,9 @@ All tables have `tenant_id`.
 
 ### Target state — S-INFRA-01 (do not build yet, design toward)
 
+See Section 2 DB Architecture for the full three-layer target state (Taxonomy / Seniority / Instances).
+
 ```sql
--- Capability registry
-capabilities (id, name, slug, description, phase, default_model, created_at)
-
--- Per-agent capability assignments with access tags
-agent_capability_assignments (
-  id, tenant_id, agent_id, capability_slug, depth_level (1-4),
-  llm_provider, llm_model, api_key_ref,
-  is_exclusive, is_public,
-  cost_per_use, created_at
-)
-
 -- Tenant-owned API keys
 tenant_api_keys (id, tenant_id, provider, key_encrypted, created_at)
 ```
@@ -407,12 +550,14 @@ All agents share the same configuration options. No agent has unique hard-coded 
 
 **Every agent may have:**
 - A behavioral prompt (personality, tone, reasoning style) stored in Supabase `agent_configs`
-- A set of capability assignments at specific depth levels
+- Seniority in a set of Capabilities at specific Levels (see Section 2 Agent Profile Model)
 - An assigned LLM provider and model per capability (default: platform keys; BYOK: tenant keys)
 - A RAG knowledge base in `knowledge_entries` scoped to their assigned capabilities
 - Access tags on their capabilities: exclusive/shared, public/private
-- `isIntern: true` flag — disables RAG, disables self-learning, reduces cost tier
-- `isPlanner: true` flag — surfaces in task planning flows
+
+**Current code flags** *(do not remove before S-INFRA-01 — future design session will map these to Agent Profile Model Competencies)*
+- `isIntern: true` — disables RAG, disables self-learning, reduces cost tier. Will map to Identity + Knowledge Competency constraints.
+- `isPlanner: true` — surfaces in task planning flows. Will map to Skills Competency: Task Planning Seniority. May become a Seniority Level designation.
 
 These configuration options are available to any agent. Individual agents (Michelle, Pat, Brent, etc.) are instances of this model — not special cases.
 
@@ -484,3 +629,45 @@ Check: `nigp-analyzer-agent-api` env vars or server.js `SUPABASE_URL`.
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.
 Tagged on GitHub: `v4.0-production` (frontend), `v4.3.1-backend` (backend).
 The NIGP analyzer is not replaced — it is a destination inside DeepBench via `/work/[taskId]/analyze`.
+
+---
+
+## 18. Archived — Capability Spectrum Model (superseded by Section 2)
+
+> Archived 2026-06-15. Superseded by the Agent Profile Model (Section 2). Preserved for historical reference.
+
+The original Capability Spectrum Model established L1–L4 depth levels and the principle that capabilities are independent of agents. These concepts survive in the Agent Profile Model under the vocabulary of Competencies, Capabilities, Levels, and Seniority.
+
+### Original Core Concept
+A capability had a measurable depth spectrum:
+
+| Level | Name | Description |
+|-------|------|-------------|
+| 1 | General | Baseline LLM or deterministic logic, no training, lowest cost |
+| 2 | Trained | RAG docs added, knows a specific domain |
+| 3 | Expert | Deeply trained, specialized, self-improving |
+| 4 | Proprietary | User's own IP — private, chargeable to others |
+
+### Original Capability Access Tags
+- **Exclusivity** — exclusive (only one agent) or shared (multiple agents)
+- **Visibility** — public (discoverable by others) or private (tenant-only)
+
+### Original Business Model Notes
+- Charge by capability depth — deeper = more valuable, higher price
+- Pre-built agents: capability depth pre-assigned, user pays for the configuration
+- Build-your-own: user selects capabilities from a menu, assigns depth, sets persona and behavioral prompt
+- Users can publish their trained capability spectrum as a service (their IP, their revenue)
+- Test Team screen: compare outputs across capability depths and LLM assignments within one capability
+
+### Original Agent Personality Layer
+An agent's behavioral prompt defines its personality — how it communicates, its tone, its reasoning style, its domain voice. Stored in Supabase `agent_configs`, not in code. Two agents with identical capability assignments can have entirely different personalities. This behavioral layer is what makes each agent unique and valuable beyond its capability list.
+
+### Original Routing Model
+Routing is capability matching, not agent matching:
+1. What capability does this task require?
+2. Which agent has the deepest assignment of that capability?
+3. Route to that agent
+
+Two routing modes:
+- **Efficiency mode** — fastest path, lowest cost, lightest capable depth
+- **Deep knowledge mode** — highest quality, deepest capability, may be slower and costlier

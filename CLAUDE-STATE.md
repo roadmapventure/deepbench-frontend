@@ -1,9 +1,9 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.35
-**Next session:** S-AGENT-ARCH-02 — Requirements check on Agent Architecture Model + write first kickoff doc (AA-01 through AA-04, Phase 1 foundation). Read docs/AGENT-ARCHITECTURE.md before starting.
-**Last session:** S-AGENT-ARCH-01 — Full agent architecture design session. Five-layer anatomy, Character Layer, AIS, Knowledge Hunger, Deliverables model, Revenue model, Release phases, JL-01 blueprint, Build Your Own Agent, Agent Builder Agent, video/URL training, auto-categorization, demo seeding. Docs: AGENT-ARCHITECTURE.md created + extended (sections 14–18), FEATURES.md updated (AA-01 through AA-41, DL-04 through DL-07).
+**Version in dev:** v5.2.0
+**Next session:** S-DELIVER-DESIGN (continued) — Agent Profile Model locked. Now: produce kickoff docs for S11 (Start button + step execution + first deliverable written to table) and S-DELIVER-04 (deliverables table migration + Deliverables Card + change request flow). Read ARCHITECTURE.md Section 2 before starting kickoff docs.
+**Last session:** S-DELIVER-DESIGN Part 1 — Agent Profile Model designed and locked. Vocabulary defined: Competency, Capability, Grade/Level, Seniority, Qualities & Properties, Method. Four Competencies: Identity, Skills, Knowledge, Deliverables. ARCHITECTURE.md updated to v5.2, old Capability Spectrum section archived. Version bumped to v5.2.
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---

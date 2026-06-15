@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-13 | Session: S-AGENT-ARCH-01 cont. — AA-32 through AA-41 added (auto-categorization, video/URL training, templates, BYOA, Agent Builder Agent, JL-01 tooling)
+> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN Part 1 — Agent Profile Model locked in ARCHITECTURE.md Section 2. Vocabulary: Competency / Capability / Grade / Level / Seniority / Qualities & Properties / Method. Four Competencies: Identity, Skills, Knowledge, Deliverables. Version bumped to v5.2. AA section below now maps to this model — individual Capabilities require dedicated design sessions before building.
 
 ---
 
@@ -189,7 +189,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | PE-12 | Training tab — Test Agent console (inline sub-view: config selectors, scenario picker, live brief + RAG call, system prompt inspector, RAG chunks panel) | ❌ Missing | S-MIGRATE-06 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
-| PE-06 | Projects tab (stub) | ✅ Done | DONE |
+| PE-06 | Projects tab — live wiring to `deliverables` table; shows agent's completed deliverables: count, type, task name, date; stub until DL-04 ships | 🔶 Partial (stub) | S-DELIVER-04 |
 | PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
@@ -367,15 +367,19 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## DELIVERABLES — DL
 
+> **Q5 RESOLVED 2026-06-13:** Step outputs and task deliverables are two tiers of the same first-class object. Step deliverables (`step_id` set) are intermediate; task deliverables (`is_final: true`, no `step_id`) are the assembled final output. Both live in the `deliverables` table. User can inspect any step deliverable and approve or request a change. Change requests go back to the assigned agent and update the final task deliverable when resolved. Every deliverable links to `agent_id` → surfaces on the agent's Projects tab (PE-06) and feeds the adaptive learning loop (change requests = training signal).
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| DL-01 | Step output type label (Michelle assigns at plan time) | ❌ Missing | S-DELIVER-01 |
-| DL-02 | Deliverables Card — right panel, full task view | ❌ Missing | S-DELIVER-02 |
-| DL-03 | Per-step deliverable access inline | ❌ Missing | S-DELIVER-03 |
-| DL-04 | Dedicated `deliverables` table — first-class objects (id, tenant_id, task_id, agent_id, step_id, type, title, content jsonb, format, is_shared, share_token, price_usd, created_at) | ❌ Missing | S-DELIVER-04 |
-| DL-05 | Supervised training feedback loop — agent flags deliverables for training, user approves before ingestion | ❌ Missing | S-DELIVER-04 |
-| DL-06 | Deliverable sharing — signed URL, public preview (partial) vs. paid full access tiers | ❌ Missing | S-DELIVER-05 |
-| DL-07 | Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure) | ❌ Missing | S-future (Phase 4) |
+| DL-01 | Step output type label (Michelle assigns at plan time — Research / Analysis / Report / Review / etc.) | ❌ Missing | S-DELIVER-01 |
+| DL-02 | Deliverables Card — right panel on task view; shows final task deliverable + link to each step's output | ❌ Missing | S-DELIVER-02 |
+| DL-03 | Per-step deliverable access inline — click step → open its deliverable; approve or request change | ❌ Missing | S-DELIVER-03 |
+| DL-04 | `deliverables` table — two-tier model: step deliverables (step_id set) + task final (is_final: true); columns: id, tenant_id, task_id, step_id, agent_id, type, title, content jsonb, format, status (draft/approved/change_requested), is_final, is_shared, share_token, price_usd, created_at | ❌ Missing | S-DELIVER-04 |
+| DL-05 | Change request flow — user requests revision on a step deliverable; status → change_requested; agent is notified; resolution updates final task deliverable; change request is a training signal fed to adaptive learning | ❌ Missing | S-DELIVER-04 |
+| DL-06 | Supervised training feedback loop — approved deliverables can be flagged for ingestion; change request resolutions auto-flagged; user confirms before vectorization | ❌ Missing | S-DELIVER-05 |
+| DL-07 | Agent work history on Projects tab (PE-06) — wired to `deliverables` table; shows deliverable count, types, task names, dates per agent; categorizes what kind of work each agent is capable of | ❌ Missing | S-DELIVER-04 |
+| DL-08 | Deliverable sharing — signed URL, public preview (partial) vs. paid full access tiers | ❌ Missing | S-DELIVER-06 |
+| DL-09 | Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure) | ❌ Missing | S-future (Phase 4) |
 
 ---
 
@@ -528,16 +532,25 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-INFRA-01 | Capability registry, per-agent LLM assignment, BYOK infrastructure, DB migration to capability model |
 | S-INFRA-02 | Auto-Training service — extract `/api/auto-train` from web-memory.js; reusable by any capability (AI-17) |
 
-### Deferred (resume after Bench side complete)
+### Apple Interview Sprint — 2 weeks starting 2026-06-16
+> Goal: agents produce visible, typed, reviewable, stored deliverables. Story: assign task → steps run → deliverable appears → user reviews → agent work tracked on profile.
+
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-DELIVER-DESIGN | **Design session** — S11 + DL-04 combined: step execution model + deliverables table schema + change request flow + agent profile wiring. Read FEATURES.md DL section + ARCHITECTURE.md before starting. Q5 resolved — see DL section above. | ⬅ START HERE |
+| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
+| S-DELIVER-04 | DL-04 + DL-05 + DL-07 — `deliverables` table, change request flow, agent Projects tab wired | — |
+| S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |
+| S-DELIVER-01 | DL-01 — Michelle labels step output types at plan time | — |
+| S-POLISH-01 | Demo path audit — golden path: assign → approve → run → deliverable → review | — |
+
+### Deferred (resume after sprint)
 | Session | Feature |
 |---------|---------|
-| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Execution loop (Q5 needed first) |
 | S11b | TI-17 + FT-06 — Pat execution + fetch agent |
 | S12 | AW-17 — Michelle assigns steps to multiple agents |
 | S13 | DB-18 — Auto-select best agent |
-| S-DELIVER-01 | DL-01 — Step output type label |
-| S-DELIVER-02 | DL-02 — Deliverables Card (right panel) |
-| S-DELIVER-03 | DL-03 — Per-step deliverable access inline |
+| S-DELIVER-06 | DL-08 — Deliverable sharing (signed URL, tiers) |
 | S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) |
 | S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12, needs design session) |
@@ -548,4 +561,4 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Question | Blocks |
 |----|----------|--------|
-| Q5 | Agent step output destination — A, B, or C (decision needed) | S11 |
+| Q5 | Agent step output destination — **RESOLVED 2026-06-13.** Two-tier deliverables model. See DL section above. | ~~S11~~ unblocked |
