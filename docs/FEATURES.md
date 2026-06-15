@@ -1,9 +1,11 @@
-# DeepBench v5.1 — Feature Inventory
+# DeepBench v5.2 — Feature Inventory
 
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN Part 1 — Agent Profile Model locked in ARCHITECTURE.md Section 2. Vocabulary: Competency / Capability / Grade / Level / Seniority / Qualities & Properties / Method. Four Competencies: Identity, Skills, Knowledge, Deliverables. Version bumped to v5.2. AA section below now maps to this model — individual Capabilities require dedicated design sessions before building.
+> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN Part 2 — Full Capabilities, Methods & Deliverables registry designed and locked in `docs/CAPABILITIES.md`. 15 items mapped (6 Methods, 7 Deliverables, 2 System Artifacts). Three new DL IDs added: DL-10 (Web Research Report + Data Fetch as deliverables), DL-11 (Task/Step Plan as deliverable), DL-12 (Flags Report + Data Analysis Report as deliverables). Sharing Pattern and Feedback Loop design locked. S-INFRA-01 identified as highest-leverage session in queue. DL-04 identified as gate for six deliverables.
+>
+> **Capabilities registry:** All Methods, Capabilities, Deliverables, and System Artifacts with full sharing, feedback loop, dependency, and build-order documentation → `docs/CAPABILITIES.md`
 
 ---
 
@@ -389,6 +391,35 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | DL-07 | Agent work history on Projects tab (PE-06) — wired to `deliverables` table; shows deliverable count, types, task names, dates per agent; categorizes what kind of work each agent is capable of | ❌ Missing | S-DELIVER-04 |
 | DL-08 | Deliverable sharing — signed URL, public preview (partial) vs. paid full access tiers | ❌ Missing | S-DELIVER-06 |
 | DL-09 | Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure) | ❌ Missing | S-future (Phase 4) |
+| DL-10 | Web Research Report + Data Fetch as `deliverables` table entries — on ReAct run completion (DONE or DOWNLOAD terminal state), write deliverable record to `deliverables` table. Covers Web Research Report (synthesis content) and Data Fetch/Dataset (file reference + metadata). Enables DL-02, DL-05, DL-07 for Brent and Pat runs. | ❌ Missing | S-DELIVER-04 |
+| DL-11 | Task / Step Plan as `deliverables` table entry — on "Approve Steps & Launch", write approved plan as type: "plan", is_final: false; becomes parent record of all step-level deliverables produced during execution; enables plan history, plan-level change requests, Michelle attribution on Projects tab | ❌ Missing | S-DELIVER-04 |
+| DL-12 | Flags Report + Data Analysis Report as `deliverables` table entries — when user views Flags Report or exports analysis from Analyzer, write deliverable record; type: "flags_report" and "analysis_report" respectively; no ✦ AI badge on Flags Report (deterministic); enables DL-02 and DL-07 for Analyzer outputs | ❌ Missing | S-DELIVER-04 |
+
+**DL-10 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Same `deliverables` table as all other deliverable types — no new table
+- Web Research Report: `type: "web_research_report"`, `agent_id: "brent"` (or "pat"), `content: jsonb` with synthesis text + run metadata
+- Data Fetch/Dataset: `type: "dataset"`, `agent_id: "brent"` (or "pat"), `content: jsonb` with file reference + row count + column summary
+- Both written on terminal state (DONE or DOWNLOAD) in the Railway ReAct loop → Vercel write via Supabase client
+- Both go through approve/change-request flow (DL-05) when surfaced in Deliverables Card (DL-02)
+- Self-Learning Write-back (M-04 in CAPABILITIES.md) continues to write to `knowledge_entries` independently — two separate write targets from one run
+- Depends on: DL-04 (`deliverables` table), M-03 ReAct Loop terminal state detection
+
+**DL-11 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Written at "Approve Steps & Launch" — same moment `task.status` moves to "active"
+- `type: "plan"`, `is_final: false` — not the terminal deliverable, but the parent record
+- `content: jsonb` — stores the full approved step array (same structure as `task.steps` JSONB)
+- `step_id: null`, `agent_id: "michelle"` (PP-01)
+- Step deliverables produced during execution reference this record as their parent via `task_id`
+- Enables Michelle's work to appear on her Projects tab (PE-06 / DL-07) — she is the planner of record
+- Depends on: DL-04 (`deliverables` table), AW-11 (Approve Steps & Launch)
+
+**DL-12 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Flags Report: `type: "flags_report"`, no `agent_id` (deterministic, no agent authorization), `content: jsonb` with flag array + dollar amounts
+- Data Analysis Report: `type: "analysis_report"`, no `agent_id`, `content: jsonb` with summary stats + tab-level outputs
+- Written when user views or exports — not on CSV upload (analysis runs client-side; write triggered by user action)
+- No ✦ AI badge on Flags Report — deterministic capability per ARCHITECTURE.md badge rule
+- Data Analysis Report carries Mixed type — Concerns tab (deterministic) + AI Review tab (AI) — badge applies to AI Review tab only
+- Depends on: DL-04 (`deliverables` table), AZ-01 (CSV upload), M-06 Flag Computation
 
 ---
 
@@ -546,9 +577,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | Session | Feature | Status |
 |---------|---------|--------|
-| S-DELIVER-DESIGN | **Design session** — S11 + DL-04 combined: step execution model + deliverables table schema + change request flow + agent profile wiring. Read FEATURES.md DL section + ARCHITECTURE.md before starting. Q5 resolved — see DL section above. | ⬅ START HERE |
+| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md created — full Methods/Deliverables/System Artifacts registry, sharing patterns, feedback loops, build order. Part 3: kickoff docs for S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 next |
 | S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
-| S-DELIVER-04 | DL-04 + DL-05 + DL-07 — `deliverables` table, change request flow, agent Projects tab wired | — |
+| S-DELIVER-04 | DL-04 + DL-05 + DL-07 + DL-10 + DL-11 + DL-12 — `deliverables` table, change request flow, agent Projects tab, Web Research/Fetch/Plan/Flags/Analysis write | — |
 | S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |
 | S-DELIVER-01 | DL-01 — Michelle labels step output types at plan time | — |
 | S-POLISH-01 | Demo path audit — golden path: assign → approve → run → deliverable → review | — |

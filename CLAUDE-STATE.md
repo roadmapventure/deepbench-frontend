@@ -2,14 +2,14 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.2.0
-**Next session:** S-DELIVER-DESIGN (continued) — Agent Profile Model locked. Now: produce kickoff docs for S11 (Start button + step execution + first deliverable written to table) and S-DELIVER-04 (deliverables table migration + Deliverables Card + change request flow). Read ARCHITECTURE.md Section 2 before starting kickoff docs.
-**Last session:** S-DELIVER-DESIGN Part 1 — Agent Profile Model designed and locked. Vocabulary defined: Competency, Capability, Grade/Level, Seniority, Qualities & Properties, Method. Four Competencies: Identity, Skills, Knowledge, Deliverables. ARCHITECTURE.md updated to v5.2, old Capability Spectrum section archived. Version bumped to v5.2.
+**Next session:** S-DELIVER-DESIGN Part 3 — produce kickoff docs for S11 (Start button + per-step running state + first deliverable written to table: TI-14, TI-15, TI-16, AI-11) and S-DELIVER-04 (deliverables table migration + DL-04, DL-05, DL-07, DL-10, DL-11, DL-12 + Deliverables Card + change request flow + agent Projects tab). Read CAPABILITIES.md and ARCHITECTURE.md Section 2 before writing kickoff docs.
+**Last session:** S-DELIVER-DESIGN Part 2 — Full Capabilities, Methods & Deliverables registry designed and locked in `docs/CAPABILITIES.md`. 15 items mapped across 4 tables: 6 Methods (M-01 through M-06), 7 Deliverables (D-01 through D-07), 2 System Artifacts (SA-01, SA-02). Sharing Pattern (Producer / Pipeline / Loop) and Feedback Loop columns locked. Every item confirmed as a shared service. DL-04 identified as the gate for six deliverables. S-INFRA-01 confirmed as highest-leverage session in queue. Three new Feature IDs added: DL-10, DL-11, DL-12. FEATURES.md and CLAUDE-STATE.md updated.
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
 
 ## Open Blockers
-- **Q5 (blocks S11):** Agent step output destination — A, B, or C. Decision needed before S11.
+- None. Q5 resolved 2026-06-13. CAPABILITIES.md design complete.
 
 ---
 
