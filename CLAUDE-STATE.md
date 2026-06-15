@@ -2,8 +2,8 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.2.0
-**Next session:** S-AI-AUDIT-REDESIGN — Design session: rebuild AI Audit screen on the AI Services model. Five new sections: By Service / By Pattern / Deterministic / By LLM / By Agent. Read `docs/AI-SERVICES.md` Sections 2, 3, and 6 before starting. Also read AI-23, AI-25, AI-26 in FEATURES.md. After this session: S-DELIVER-DESIGN Part 3 (kickoff docs for S11 + S-DELIVER-04).
-**Last session:** S-DELIVER-DESIGN Part 2 (continued) — AI Services Model designed and locked in `docs/AI-SERVICES.md`. Full 14-service catalog (SVC-01 through SVC-14: 11 AI/Mixed + 3 Deterministic). AI Patterns catalog (PAT-01 through PAT-10). Unified Services table schema. Five redesigned AI Audit sections. MCP exposure surfaces (MC-01 through MC-07). Service Versioning and Service Health design. ARCHITECTURE.md Section 2 Method Layer renamed to AI Pattern Layer. CAPABILITIES.md Methods renamed to AI Services throughout. FEATURES.md: AI-23 updated, AI-25/26/27 added, MC section added (7 items), S-AI-AUDIT-REDESIGN added to session queue.
+**Next session:** S-AI-AUDIT-REDESIGN coding — kickoff doc at `docs/kickoffs/v5.2.1-AI23-ai-audit-redesign.md`. Read it and CLAUDE-STATE.md then execute. After coding session closes: S-DELIVER-DESIGN Part 3 (kickoff docs for S11 + S-DELIVER-04).
+**Last session:** S-AI-AUDIT-REDESIGN design — Full layout locked. By Service (14 services, type badge AI/Hybrid/Logic, patterns inline, calls/cost/latency), By Pattern (10 industry patterns catalog, inactive greyed), By LLM + By Agent unchanged, Roadmap collapsed (Services Now/Next/Later + Patterns Now/Next/Later). New MCP Roadmap tab (7 surfaces, tier badges, bidirectional callout). Header strip expanded to 5 stats (Services Active X/14 + Patterns Active 8/10). Old ai_type strings remapped client-side via AI_TYPE_TO_SERVICE — no DB migration needed. ai_services + ai_patterns tables deferred to S-INFRA-01. AI-23 marked Designed. Kickoff doc: v5.2.1-AI23-ai-audit-redesign.md.
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
