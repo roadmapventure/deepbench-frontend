@@ -1,9 +1,12 @@
-# DeepBench v5.1 — Feature Inventory
+# DeepBench v5.2 — Feature Inventory
 
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-11 | Session: S-AI01b-patch2 complete — AI-01 ✅ Done (e975715)
+> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN (continued) — AI Services Model locked in `docs/AI-SERVICES.md`. 14-service catalog (SVC-01–SVC-14: 11 AI/Mixed + 3 Deterministic). 10-pattern catalog (PAT-01–PAT-10). Unified Services table schema. Five redesigned AI Audit sections. MCP surfaces (MC-01–MC-07). New IDs: AI-25/26/27, MC section (7 items). AI-23 updated. ARCHITECTURE.md Method Layer → AI Pattern Layer. CAPABILITIES.md Methods → AI Services.
+>
+> **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
+> **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
 
 ---
 
@@ -29,6 +32,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
 | SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express | ❌ Missing | S-future (do before v6.x) |
+| SH-12 | About DeepBench panel — display correct current version number (pulled from CLAUDE-STATE.md or package.json, not hardcoded) | ❌ Missing | S-future |
 
 ---
 
@@ -57,6 +61,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | DB-19 | Module naming — Work/Bench dashboards | ✅ Done | S15a |
 | DB-20 | Nav tab styling — brass borders, active states | ✅ Done | S15a |
 | DB-21 | AIDiamond.jsx — animated heartbeat AI indicator | ✅ Done | S15a |
+| DB-22 | "Create a New Task" button on Work dashboard — add AiBadge with tooltip "Planning & Routing" (AI pulse indicator, consistent with AI-01 sweep) | ❌ Missing | S-future |
 
 **DB-17 Notes:** Michelle generates concise title + step names on first draft. `title_edited` flag — user owns title after first edit, never overwritten. `api/title.js`: direct Claude Haiku call; Supabase agent_configs wired in S-BENCH-01.
 
@@ -187,7 +192,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | PE-12 | Training tab — Test Agent console (inline sub-view: config selectors, scenario picker, live brief + RAG call, system prompt inspector, RAG chunks panel) | ❌ Missing | S-MIGRATE-06 |
 | PE-05 | Workflow tab (stub) | ✅ Done | DONE |
-| PE-06 | Projects tab (stub) | ✅ Done | DONE |
+| PE-06 | Projects tab — live wiring to `deliverables` table; shows agent's completed deliverables: count, type, task name, date; stub until DL-04 ships | 🔶 Partial (stub) | S-DELIVER-04 |
 | PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
 | PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
@@ -288,6 +293,20 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-17 | Auto-Training service — extract synthesis+embed+write pattern from web-memory.js POST into standalone `/api/auto-train` endpoint, callable by any agent/capability | ❌ Missing | S-INFRA-02 |
 | AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ✅ Done | S-AI-ATTR-01 (4d568bd) |
 | AI-19 | Latency capture for extraction + reinforcement call sites — wrap fetch() with Date.now() timing so avg latency shows in AI Audit (currently "—" for Susan + OpenAI rows) | ❌ Missing | S-future |
+| AI-20 | AI Audit cost formatter — replace `<$0.01` floor with 4-decimal display so sub-penny costs show visible movement (e.g. `$0.0023`); one-liner change to `fmt$` in AIActivityPanel.jsx | ❌ Missing | S-future |
+| AI-21 | AI Audit output token tracking — extend `logAICall()` to accept `outputTokens` param; include output cost in formula; write to existing `output_tokens` column in ai_activity_log; all `logAICall()` call sites updated | ❌ Missing | S-future |
+| AI-22 | Full lineage columns on `ai_activity_log` — add `service_slug`, `service_version`, `deliverable_id`, `step_id`, `level` so every AI call is traceable from Task → Step → Agent → Service → Pattern → Deliverable → Cost. Also adds `success` boolean and `error_type` for Service Health (AI-27). Do alongside S-INFRA-01. All `logAICall()` call sites updated. | ❌ Missing | S-INFRA-01 |
+| AI-23 | AI Audit rebuilt on AI Services model — five sections replace current "By Activity Type": (1) By Service — one row per AI/Mixed Service, columns: Service Name · Type · Calls · Est. Cost · Avg Latency; (2) By Pattern — one row per AI Pattern rolled up from Services declaring it; (3) Deterministic — execution count + latency for deterministic Services, no LLM cost; (4) By LLM — keep existing; (5) By Agent — keep existing. Existing ai_type strings remapped to service_slug values. Requires `ai_services` table (AI-25). Design session: S-AI-AUDIT-REDESIGN. | ✅ Done | S-AI-AUDIT-REDESIGN (da40458 + f0ecd09) |
+| AI-24 | Routing feedback loop — deliverable approval and change-request rates produce a per-agent-capability preference score; routing uses Capability match + Level + approval history as a third factor after Seniority. Design session required before building. | ❌ Missing | S-future (after S-DELIVER-04) |
+| AI-25 | `ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs), properties jsonb (llm_provider, llm_model, token_budget, execution_mode, rag_match_count, byok_eligible), in_nigp, in_deepbench, current_route, target_route, version, created_at. Seed with all 14 services (SVC-01 through SVC-14) on creation. | ❌ Missing | S-INFRA-01 |
+| AI-26 | `ai_patterns` table — Supabase catalog of 10 industry-standard AI Patterns: slug, name, description. Seed with PAT-01 through PAT-10 on creation. Referenced by `ai_services.patterns` jsonb array. | ❌ Missing | S-INFRA-01 |
+| AI-27 | Service Health tracking — `success` boolean + `error_type` text column on `ai_activity_log`; enables per-Service failure rate, uptime, and p50/p95 latency in AI Audit. Part of AI-22 lineage work or separate extension. | ❌ Missing | S-INFRA-01 |
+
+**AI-22 Notes:** `ai_activity_log` currently has `ai_type`, `feature`, `model`, `agent_id`, `task_id` — a pre-Agent-Profile-Model categorization. The four new columns are additive and nullable — no existing data affected. Once present, every AI call has a full lineage chain. The platform's own internal capabilities (Task Planning, Title Generation, Agent Routing) are themselves Deliverables produced by agents — they must also carry these columns, making the platform self-describing.
+
+**AI-23 Notes:** The existing "By Activity Type" 9 categories are a temporary categorization that predates the Agent Profile Model. Once the `competencies` and `capabilities` taxonomy tables exist (S-INFRA-01), the AI Audit views rebuild on top of them. Old activity type rows are remapped to `capability_slug` values via a one-time backfill. New views: By Competency (Identity/Skills/Knowledge/Deliverables spend), By Capability (which capabilities cost the most), By Level (what quality level is the platform operating at).
+
+**AI-24 Notes:** The feedback loop requires DL-04 (`deliverables` table with `status: approved / change_requested`) to be live first. Score formula TBD in design session — likely: approval_rate × recency_weight × level_factor. Score stored per `(agent_id, capability_slug)` pair. Used as a tiebreaker when multiple agents have matching Capability + Level.
 
 **AI-17 Notes:** `web-memory.js` POST currently hardcodes Brent's persona and "Portal Navigation" category. Extract into `/api/auto-train` accepting: `agent_id`, `source_type` (portal_run | document | conversation | test_result), and the raw artifact payload. `web-memory.js` POST becomes a thin caller. Enables any future capability to write training entries without duplicating the embed+write pattern. Design session required before coding — needs: input schema, per-agent persona selection, source_type → synthesis prompt mapping, category mapping.
 
@@ -361,13 +380,157 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
-## DELIVERABLES — DL (deferred — after Bench work)
+## DELIVERABLES — DL
+
+> **Q5 RESOLVED 2026-06-13:** Step outputs and task deliverables are two tiers of the same first-class object. Step deliverables (`step_id` set) are intermediate; task deliverables (`is_final: true`, no `step_id`) are the assembled final output. Both live in the `deliverables` table. User can inspect any step deliverable and approve or request a change. Change requests go back to the assigned agent and update the final task deliverable when resolved. Every deliverable links to `agent_id` → surfaces on the agent's Projects tab (PE-06) and feeds the adaptive learning loop (change requests = training signal).
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| DL-01 | Step output type label (Michelle assigns at plan time) | ❌ Missing | S-DELIVER-01 |
-| DL-02 | Deliverables Card — right panel, full task view | ❌ Missing | S-DELIVER-02 |
-| DL-03 | Per-step deliverable access inline | ❌ Missing | S-DELIVER-03 |
+| DL-01 | Step output type label (Michelle assigns at plan time — Research / Analysis / Report / Review / etc.) | ❌ Missing | S-DELIVER-01 |
+| DL-02 | Deliverables Card — right panel on task view; shows final task deliverable + link to each step's output | ❌ Missing | S-DELIVER-02 |
+| DL-03 | Per-step deliverable access inline — click step → open its deliverable; approve or request change | ❌ Missing | S-DELIVER-03 |
+| DL-04 | `deliverables` table — two-tier model: step deliverables (step_id set) + task final (is_final: true); columns: id, tenant_id, task_id, step_id, agent_id, type, title, content jsonb, format, status (draft/approved/change_requested), is_final, is_shared, share_token, price_usd, created_at | ❌ Missing | S-DELIVER-04 |
+| DL-05 | Change request flow — user requests revision on a step deliverable; status → change_requested; agent is notified; resolution updates final task deliverable; change request is a training signal fed to adaptive learning | ❌ Missing | S-DELIVER-04 |
+| DL-06 | Supervised training feedback loop — approved deliverables can be flagged for ingestion; change request resolutions auto-flagged; user confirms before vectorization | ❌ Missing | S-DELIVER-05 |
+| DL-07 | Agent work history on Projects tab (PE-06) — wired to `deliverables` table; shows deliverable count, types, task names, dates per agent; categorizes what kind of work each agent is capable of | ❌ Missing | S-DELIVER-04 |
+| DL-08 | Deliverable sharing — signed URL, public preview (partial) vs. paid full access tiers | ❌ Missing | S-DELIVER-06 |
+| DL-09 | Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure) | ❌ Missing | S-future (Phase 4) |
+| DL-10 | Web Research Report + Data Fetch as `deliverables` table entries — on ReAct run completion (DONE or DOWNLOAD terminal state), write deliverable record to `deliverables` table. Covers Web Research Report (synthesis content) and Data Fetch/Dataset (file reference + metadata). Enables DL-02, DL-05, DL-07 for Brent and Pat runs. | ❌ Missing | S-DELIVER-04 |
+| DL-11 | Task / Step Plan as `deliverables` table entry — on "Approve Steps & Launch", write approved plan as type: "plan", is_final: false; becomes parent record of all step-level deliverables produced during execution; enables plan history, plan-level change requests, Michelle attribution on Projects tab | ❌ Missing | S-DELIVER-04 |
+| DL-12 | Flags Report + Data Analysis Report as `deliverables` table entries — when user views Flags Report or exports analysis from Analyzer, write deliverable record; type: "flags_report" and "analysis_report" respectively; no ✦ AI badge on Flags Report (deterministic); enables DL-02 and DL-07 for Analyzer outputs | ❌ Missing | S-DELIVER-04 |
+
+**DL-10 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Same `deliverables` table as all other deliverable types — no new table
+- Web Research Report: `type: "web_research_report"`, `agent_id: "brent"` (or "pat"), `content: jsonb` with synthesis text + run metadata
+- Data Fetch/Dataset: `type: "dataset"`, `agent_id: "brent"` (or "pat"), `content: jsonb` with file reference + row count + column summary
+- Both written on terminal state (DONE or DOWNLOAD) in the Railway ReAct loop → Vercel write via Supabase client
+- Both go through approve/change-request flow (DL-05) when surfaced in Deliverables Card (DL-02)
+- Self-Learning Write-back (M-04 in CAPABILITIES.md) continues to write to `knowledge_entries` independently — two separate write targets from one run
+- Depends on: DL-04 (`deliverables` table), M-03 ReAct Loop terminal state detection
+
+**DL-11 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Written at "Approve Steps & Launch" — same moment `task.status` moves to "active"
+- `type: "plan"`, `is_final: false` — not the terminal deliverable, but the parent record
+- `content: jsonb` — stores the full approved step array (same structure as `task.steps` JSONB)
+- `step_id: null`, `agent_id: "michelle"` (PP-01)
+- Step deliverables produced during execution reference this record as their parent via `task_id`
+- Enables Michelle's work to appear on her Projects tab (PE-06 / DL-07) — she is the planner of record
+- Depends on: DL-04 (`deliverables` table), AW-11 (Approve Steps & Launch)
+
+**DL-12 Notes (locked 2026-06-15, S-DELIVER-DESIGN Part 2):**
+- Flags Report: `type: "flags_report"`, no `agent_id` (deterministic, no agent authorization), `content: jsonb` with flag array + dollar amounts
+- Data Analysis Report: `type: "analysis_report"`, no `agent_id`, `content: jsonb` with summary stats + tab-level outputs
+- Written when user views or exports — not on CSV upload (analysis runs client-side; write triggered by user action)
+- No ✦ AI badge on Flags Report — deterministic capability per ARCHITECTURE.md badge rule
+- Data Analysis Report carries Mixed type — Concerns tab (deterministic) + AI Review tab (AI) — badge applies to AI Review tab only
+- Depends on: DL-04 (`deliverables` table), AZ-01 (CSV upload), M-06 Flag Computation
+
+---
+
+## AGENT ARCHITECTURE — AA
+> Full spec: docs/AGENT-ARCHITECTURE.md (created S-AGENT-ARCH-01)
+
+### Phase 1 — Foundation
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-01 | `agent_character` table — character settings per agent (philosophy, skeptic_level, autonomy_level, temporal_stance, epistemology, confidence_calibration, peter_principle, collaboration_role, ethical_constraints, learning_stance, lock states per field) | ❌ Missing | S-INFRA-01 |
+| AA-02 | `training_type` column on `knowledge_entries` — tags: knowledge / behavioral / reasoning / character | ❌ Missing | S-INFRA-01 |
+| AA-03 | `api/capabilities/prompt-assembly.js` — assembles system prompt from all layers at call time; token cap per block | ❌ Missing | S-INFRA-01 |
+| AA-04 | Two-speed routing — fast path (chat, DB only, Haiku, top 3 RAG) vs. deep path (tasks, full assembly, Sonnet, top 10+ RAG); agent depth level sets default, task complexity can override upward | ❌ Missing | S-INFRA-01 |
+
+### Phase 2 — Intelligence Visibility
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-05 | Character Layer L1 settings panel — Personnel File new tab: philosophy dropdown, skeptic level slider, autonomy dial, lock/adaptive/supervised toggle per setting | ❌ Missing | S-CHAR-01 |
+| AA-06 | Agent Intelligence Score (AIS) — 100 pts: Identity 10, Character 15, Behavioral 15, Reasoning 20, Knowledge 40 (Volume 10 + Freshness 10 + Coverage 10 + Activity 10). Displayed on Personnel File header + Roster cards | ❌ Missing | S-AIS-01 |
+| AA-07 | Capability Score (CS) — separate 0–100: breadth (capabilities assigned / available) × depth (avg depth level). Displayed alongside AIS | ❌ Missing | S-AIS-01 |
+| AA-08 | Knowledge hunger mechanic — freshness decay curve (100% day 0–30, 85% day 31–60, 70% day 61–90, 50% day 91–180, 30% day 181+, stale flag); hunger states: Fed / Peckish / Hungry / Starving | ❌ Missing | S-HUNGER-01 |
+| AA-09 | Domain coverage map — visual grid of topic areas, named gaps, specific upgrade prompts per gap | ❌ Missing | S-HUNGER-01 |
+| AA-10 | Training streak — weekly cadence, bonus AIS points (4wk +2, 12wk +5, 52wk +10 + badge) | ❌ Missing | S-HUNGER-01 |
+| AA-11 | Character Layer L2–L4 training — behavioral-tagged, character-tagged RAG retrieval; character deepens through training material uploads | ❌ Missing | S-CHAR-02 |
+
+### Phase 3 — Revenue
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-12 | Free tier — L1 unlimited (monthly cap), 3 one-time L2 trials (never resets) | ❌ Missing | S-REV-01 |
+| AA-13 | Pay-per-use pricing — no subscription required, ~2x subscription per-use rate, scales by depth level | ❌ Missing | S-REV-01 |
+| AA-14 | Depth Delta Panel — after every task output, shows specifically what next depth level would have added; L3 preview = first 30% of real output, rest gated | ❌ Missing | S-REV-01 |
+| AA-15 | BYOK discount display — shown at moment of payment, real number dynamically calculated from actual API cost differential | ❌ Missing | S-REV-01 |
+| AA-16 | Subscription tiers — base fee + usage allowance + overage billing, tiered by depth level | ❌ Missing | S-REV-02 |
+
+### Phase 4 — Marketplace
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-17 | Lock/Adaptive/Supervised controls — UI toggle per dimension and character setting | ❌ Missing | S-MARKET-01 |
+| AA-18 | Access tags — exclusive/shared and public/private per capability assignment; exclusivity = 2x rate | ❌ Missing | S-MARKET-01 |
+| AA-19 | Margin sharing engine — 30% platform / 60% IP owner / 10% infrastructure; $0.10 minimum L4 price | ❌ Missing | S-MARKET-01 |
+| AA-20 | BYOK economics — 40% markup when platform provides keys; BYOK pays subscription only | ❌ Missing | S-REV-01 |
+
+### Phase 5 — Scale and Enterprise
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-21 | John Leonard agent (JL-01) — persona replication reference implementation; Philosophy + Ethical Constraints locked; all other character settings supervised adaptive; training priority: annotated session transcripts → ARCHITECTURE.md → behavioral docs → domain docs | ❌ Missing | S-JL-01 (design session required) |
+| AA-22 | Test Agent console — full dimension testing (extends PE-12); one scenario per dimension; Test Scorecard per run (Output Quality, Character Alignment, Confidence Calibration, RAG chunks, Reasoning depth, Depth delta, Verdict + suggested training) | ❌ Missing | S-MIGRATE-06 (spec updated) |
+| AA-23 | Test Team cross-agent depth comparison (extends existing Test Team screen — NIGP "Bee" pattern); same task run at L1/L2/L3, scorecard per depth | ❌ Missing | S-TEST-01 |
+
+### Future Backlog (design session required before scheduling)
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-24 | Multi-agent workflow handoff design — collaboration roles (Lead/Execute/Challenge/Synthesize) and how agents pass work in a task workflow | ❌ Missing | S-future |
+| AA-25 | Deliverables marketplace UI — discovery, preview, purchase flow for other tenants' published capabilities and deliverables | ❌ Missing | S-future |
+| AA-26 | Notification architecture — hunger alerts, training streak reminders, competitive comparison notifications (optional, user-controlled) | ❌ Missing | S-future |
+| AA-27 | Agent versioning + rollback — significant retrain creates new version; user can roll back to prior version | ❌ Missing | S-future |
+| AA-28 | Government audit trail — immutable log of who trained what, when, with what material, and what the agent produced; enterprise compliance requirement | ❌ Missing | S-future |
+| AA-29 | "Create from Person" guided flow — setup wizard for persona replication: walks through all 5 dimensions + character settings for a real human | ❌ Missing | S-future |
+| AA-30 | Training provenance display — deliverables and outputs show which training material and reasoning patterns influenced the result | ❌ Missing | S-future |
+| AA-31 | Competitive comparison notifications — optional: shows how your agent ranks vs. category peers by AIS and CS; user can disable | ❌ Missing | S-future |
+
+### Phase 2 Additions (from S-AGENT-ARCH-01 cont.)
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-32 | Auto-categorization after training upload — Haiku reads ingested doc, identifies topic areas, posts expertise chips to Training tab, updates domain coverage map in real time; user sees immediately what the agent just learned | ❌ Missing | S-HUNGER-01 |
+| AA-35 | Agent templates — pre-configured character settings + capability assignments for common roles (Compliance Analyst, Project Manager, Domain Expert, Marketing Strategist); user picks template and customizes from L1 baseline | ❌ Missing | S-BYOA-01 (design required) |
+| AA-36 | Quick-start from description — user pastes job description or role description; Haiku auto-configures character settings and suggests capability assignments; user reviews and approves before agent is created | ❌ Missing | S-BYOA-01 (design required) |
+| AA-37 | Demo seeding — pre-seed existing roster agents (Chloe, Mike, Bob, Robyn, etc.) with character settings + meaningful AIS scores so platform demos as differentiated without any training required by the visitor | ❌ Missing | S-CHAR-01 |
+| AA-41 | Build Your Own Agent — 5-step guided wizard: (1) Identity — name, role, quip, avatar; (2) Character — philosophy picker, skeptic slider, autonomy dial, advanced settings collapsed; (3) Capabilities — assignment menu + depth + LLM; (4) Knowledge — optional first upload/URL/template; (5) Review — AIS starting score + plain-English character summary (not settings labels). Design session + UX mockup required before coding. | ❌ Missing | S-BYOA-01 (design required) |
+
+### Phase 3 Additions (from S-AGENT-ARCH-01 cont.)
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-33 | Video file upload for training — upload .mp4/.mov/etc. → Whisper transcription (OpenAI, ~$0.006/min) → cleanup pass (Haiku) → existing extraction/chunking/embedding pipeline; transcription cost shown to user before committing | ❌ Missing | S-TRAIN-EXT-01 |
+| AA-34 | URL link training — paste web page URL, YouTube link, or general video URL; single capability route (`api/capabilities/url-ingest.js`) detects type and routes: web page → crawl + extract, YouTube → transcript API (free), video URL → download + Whisper; result enters existing chunking/embedding pipeline | ❌ Missing | S-TRAIN-EXT-01 |
+| AA-39 | Transcript annotation assist — Haiku first-pass annotates reasoning transcripts (identifies decision points, reasoning arcs, what-was-ruled-out moments); John reviews and corrects; corrected version ingested as reasoning-tagged training material for JL-01 and future persona replication use cases | ❌ Missing | S-JL-01 |
+
+### Phase 5 Additions (from S-AGENT-ARCH-01 cont.)
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-38 | Agent Builder Agent — AI agent that designs and configures a new agent from a description; user describes the role needed; agent proposes full spec (name, character settings, capability assignments, suggested training material list, projected AIS at L1 and L3); human approves before creation; Susan (TR-08) assigned to train after creation. Design session required. | ❌ Missing | S-future |
+| AA-40 | JL-01 demo scenario — specific test scenario that demonstrates JL-01's reasoning layer matches John's actual reasoning arc; designed to show to employers/investors; scenario chosen to elicit planning questions + architectural recommendation that mirrors John's documented decision patterns | ❌ Missing | S-JL-01 |
+
+---
+
+## MCP PLATFORM EXPOSURE — MC
+> Full spec: `docs/AI-SERVICES.md` Section 7
+> All items Phase 4+. Design session required before any MCP surface is built: S-MCP-01 (not yet scheduled).
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| MC-01 | MCP Agent — expose a named agent as an MCP server; agent capabilities available as MCP tools to Claude Desktop and external AI clients | ❌ Missing | S-MCP-01 |
+| MC-02 | MCP Capability — expose a specific Capability without full agent persona; more granular than MC-01 | ❌ Missing | S-MCP-01 |
+| MC-03 | MCP Deliverable — expose deliverable production as an MCP tool; caller receives structured typed deliverable output | ❌ Missing | S-MCP-01 |
+| MC-04 | MCP Service — expose a single AI Service directly as an MCP tool; finest granularity; infrastructure licensing tier | ❌ Missing | S-MCP-01 |
+| MC-05 | MCP Workflow — expose full multi-step task pipeline as one MCP tool; caller receives completed task with all deliverables | ❌ Missing | S-MCP-01 |
+| MC-06 | MCP Training — allow external systems to push training material to an agent via MCP; enterprise DMS/CMS integration | ❌ Missing | S-MCP-01 |
+| MC-07 | MCP Feedback — allow external systems to send approval or change-request signals via MCP; closes feedback loop without DeepBench login | ❌ Missing | S-MCP-01 |
 
 ---
 
@@ -429,16 +592,27 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-INFRA-01 | Capability registry, per-agent LLM assignment, BYOK infrastructure, DB migration to capability model |
 | S-INFRA-02 | Auto-Training service — extract `/api/auto-train` from web-memory.js; reusable by any capability (AI-17) |
 
-### Deferred (resume after Bench side complete)
+### Apple Interview Sprint — 2 weeks starting 2026-06-16
+> Goal: agents produce visible, typed, reviewable, stored deliverables. Story: assign task → steps run → deliverable appears → user reviews → agent work tracked on profile.
+> Priority order: AI Audit redesign first (showcases architecture + correct terminology), then Deliverables model.
+
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md + AI-SERVICES.md created — full Services/Deliverables registry, AI Patterns catalog (10), AI Services catalog (14), sharing patterns, feedback loops, MCP surfaces. Part 3: kickoff docs for S-AI-AUDIT-REDESIGN + S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 next |
+| S-AI-AUDIT-REDESIGN | **Design session first, then coding** — Rebuild AI Audit screen on AI Services model: (1) rename By Activity Type → By Service; (2) add By Pattern section; (3) add Deterministic section; (4–5) keep By LLM + By Agent. Remap existing ai_type strings to service_slug values. Seed `ai_services` + `ai_patterns` tables (AI-25, AI-26). Updates AI-23. Read `docs/AI-SERVICES.md` Sections 2, 3, 6 before starting. | — |
+| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
+| S-DELIVER-04 | DL-04 + DL-05 + DL-07 + DL-10 + DL-11 + DL-12 — `deliverables` table, change request flow, agent Projects tab, Web Research/Fetch/Plan/Flags/Analysis write | — |
+| S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |
+| S-DELIVER-01 | DL-01 — Michelle labels step output types at plan time | — |
+| S-POLISH-01 | Demo path audit — golden path: assign → approve → run → deliverable → review | — |
+
+### Deferred (resume after sprint)
 | Session | Feature |
 |---------|---------|
-| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Execution loop (Q5 needed first) |
 | S11b | TI-17 + FT-06 — Pat execution + fetch agent |
 | S12 | AW-17 — Michelle assigns steps to multiple agents |
 | S13 | DB-18 — Auto-select best agent |
-| S-DELIVER-01 | DL-01 — Step output type label |
-| S-DELIVER-02 | DL-02 — Deliverables Card (right panel) |
-| S-DELIVER-03 | DL-03 — Per-step deliverable access inline |
+| S-DELIVER-06 | DL-08 — Deliverable sharing (signed URL, tiers) |
 | S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) |
 | S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
 | S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12, needs design session) |
@@ -449,4 +623,4 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Question | Blocks |
 |----|----------|--------|
-| Q5 | Agent step output destination — A, B, or C (decision needed) | S11 |
+| Q5 | Agent step output destination — **RESOLVED 2026-06-13.** Two-tier deliverables model. See DL section above. | ~~S11~~ unblocked |

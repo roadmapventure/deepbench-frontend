@@ -1,10 +1,10 @@
-// DeepBench v5.1.30 | AIActivityPanel.jsx | AI-18 patch — add michelle + susan to AGENT_NAMES
+// DeepBench v5.2.2 | AIActivityPanel.jsx | AI-23 patch — 650px, collapsible sections, sorted lists, text expand
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { useAIActivity, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase } from "../hooks/useAIActivity.js";
+import { useAIActivity, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
 
 // FEATURE: AI-18 patch — add michelle + susan so By Agent renders full name + code
 const AGENT_NAMES = {
@@ -34,28 +34,68 @@ const CHECKLIST = [
 const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(3)}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
 
-function TypeRow({ d, expanded, onToggle }) {
-  const isPhase2 = d.phase === 2;
-  const ringColor = d.total > 0 ? T.moss : isPhase2 ? T.muted : T.lineSoft;
+// FEATURE: AI-23 — Service row: type badge + name + patterns + stats (no expand)
+function ServiceRow({ d }) {
+  const hasData = d.total > 0;
+  const TYPE_BADGE = {
+    ai:     { label:'AI',     bg:`rgba(90,117,56,.12)`,  color:T.moss,     border:`rgba(90,117,56,.3)`  },
+    hybrid: { label:'Hybrid', bg:`rgba(182,135,58,.12)`, color:T.brassDeep,border:`rgba(182,135,58,.3)` },
+    logic:  { label:'Logic',  bg:`rgba(120,109,82,.12)`, color:T.muted,    border:`rgba(120,109,82,.3)` },
+  };
+  const badge = TYPE_BADGE[d.serviceType] || TYPE_BADGE.ai;
 
   return (
-    <div style={{border:`1px solid ${d.total>0?T.line:T.lineSoft}`,marginBottom:6,opacity:isPhase2?.55:1}}>
-      <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:"pointer",background:expanded?T.cardAlt:"transparent"}}>
-        {/* Status dot */}
-        <div style={{width:8,height:8,borderRadius:"50%",background:ringColor,flexShrink:0}}/>
-        {/* Type name */}
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:d.total>0?T.navy:T.muted,display:"flex",alignItems:"center",gap:6}}>
-            {d.label}
-            {isPhase2 && <span style={{fontFamily:mono,fontSize:7.5,color:T.muted,border:`1px solid ${T.lineSoft}`,padding:"0 4px"}}>v5.x</span>}
-            {d.total > 0 && <span style={{fontFamily:mono,fontSize:8,color:"#fff",background:T.moss,padding:"1px 5px",marginLeft:4}}>{d.total}</span>}
-          </div>
-          <div style={{fontFamily:body,fontSize:10,color:T.muted,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.desc}</div>
+    <div style={{border:`1px solid ${hasData?T.line:T.lineSoft}`,marginBottom:5,padding:"8px 12px",display:"flex",alignItems:"center",gap:10,opacity:hasData?1:.55}}>
+      <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,padding:"2px 6px",background:badge.bg,color:badge.color,border:`1px solid ${badge.border}`,flexShrink:0}}>{badge.label}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:hasData?T.navy:T.muted,marginBottom:1}}>{d.name}</div>
+        {d.patterns.length > 0 && (
+          <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{d.patterns.join(' · ')}</div>
+        )}
+      </div>
+      {hasData ? (
+        <div style={{display:"flex",gap:12,flexShrink:0}}>
+          {[["Calls",d.total],[d.serviceType==='logic'?null:"Cost",d.serviceType!=='logic'?fmt$(d.cost):null],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].filter(x=>x[0]).map(([k,v])=>(
+            <div key={k} style={{textAlign:"right"}}>
+              <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+              <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+            </div>
+          ))}
         </div>
-        {/* Stats */}
-        {d.total > 0 ? (
-          <div style={{display:"flex",gap:14,flexShrink:0}}>
-            {[["Total",d.total],[`Cost`,fmt$(d.cost)],[`Avg`,d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+      ) : (
+        <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>No calls yet</div>
+      )}
+    </div>
+  );
+}
+
+// FEATURE: AI-23 patch — PatternRow with "more" text expand
+function PatternRow({ d }) {
+  const [showFull, setShowFull] = useState(false);
+  const hasData = d.total > 0;
+  const isLong  = d.desc && d.desc.length > 72;
+
+  return (
+    <div style={{border:`1px solid ${d.active?T.line:T.lineSoft}`,marginBottom:5,padding:"8px 12px",display:"flex",alignItems:"flex-start",gap:10,opacity:d.active?1:.45}}>
+      <div style={{width:8,height:8,borderRadius:"50%",background:hasData?T.moss:d.active?T.line:T.lineSoft,flexShrink:0,marginTop:3}}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:d.active?T.navy:T.muted,marginBottom:2}}>{d.name}</div>
+        <div style={{fontFamily:body,fontSize:10,color:T.muted,lineHeight:1.45}}>
+          {showFull || !isLong ? d.desc : d.desc.slice(0, 72) + "…"}
+          {isLong && (
+            <span
+              onClick={()=>setShowFull(v=>!v)}
+              style={{fontFamily:mono,fontSize:9,color:T.brass,cursor:"pointer",marginLeft:4,flexShrink:0}}
+            >
+              {showFull ? "less" : "more"}
+            </span>
+          )}
+        </div>
+      </div>
+      {d.active ? (
+        hasData ? (
+          <div style={{display:"flex",gap:12,flexShrink:0}}>
+            {[["Calls",d.total],["Cost",fmt$(d.cost)]].map(([k,v])=>(
               <div key={k} style={{textAlign:"right"}}>
                 <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
                 <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
@@ -63,59 +103,79 @@ function TypeRow({ d, expanded, onToggle }) {
             ))}
           </div>
         ) : (
-          <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>{isPhase2?"Planned":"No calls yet"}</div>
-        )}
-        <div style={{fontFamily:mono,fontSize:10,color:T.muted,marginLeft:6}}>{expanded?"▴":"▾"}</div>
-      </div>
-
-      {expanded && (
-        <div style={{borderTop:`1px solid ${T.lineSoft}`,padding:"10px 12px",background:T.paper}}>
-          <div style={{display:"flex",gap:20,marginBottom:8,flexWrap:"wrap"}}>
-            <div><span style={{fontFamily:mono,fontSize:9,color:T.muted}}>Model: </span><span style={{fontFamily:mono,fontSize:9,color:T.navy,fontWeight:600}}>{d.model}</span></div>
-            <div><span style={{fontFamily:mono,fontSize:9,color:T.muted}}>Location: </span><span style={{fontFamily:mono,fontSize:9,color:T.navy}}>{d.location}</span></div>
-            <div><span style={{fontFamily:mono,fontSize:9,color:T.muted}}>Phase: </span><span style={{fontFamily:mono,fontSize:9,color:T.navy}}>{d.phase}</span></div>
-          </div>
-          {d.entries.length > 0 ? (
-            <div style={{maxHeight:120,overflowY:"auto"}}>
-              {d.entries.slice(0,10).map(e=>(
-                <div key={e.id} style={{display:"flex",gap:10,padding:"3px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:10}}>
-                  <span style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>{new Date(e.ts).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})}</span>
-                  {e.agentId && <span style={{fontFamily:mono,fontSize:9,color:T.brassDeep,flexShrink:0}}>{e.agentId}</span>}
-                  {e.tier && <span style={{fontFamily:mono,fontSize:8,padding:"0 4px",background:e.tier==="trained"?`${T.brass}15`:e.tier==="informed"?`${T.navy}10`:`${T.muted}10`,color:e.tier==="trained"?T.brassDeep:T.mutedDeep}}>{e.tier}</span>}
-                  {e.tokens>0 && <span style={{color:T.muted}}>{e.tokens.toLocaleString()} tokens</span>}
-                  {e.latencyMs>0 && <span style={{color:T.muted}}>{fmtMs(e.latencyMs)}</span>}
-                  {e.cost && <span style={{color:T.brassDeep,marginLeft:"auto",flexShrink:0}}>{fmt$(e.cost)}</span>}
-                </div>
-              ))}
-              {d.entries.length > 10 && <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginTop:4}}>+{d.entries.length-10} more</div>}
-            </div>
-          ) : (
-            <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{isPhase2?"Planned for v5.x — not yet implemented.":"No calls logged in this session."}</div>
-          )}
-        </div>
+          <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>No calls yet</div>
+        )
+      ) : (
+        <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0,border:`1px solid ${T.lineSoft}`,padding:"1px 5px"}}>Not yet active</div>
       )}
     </div>
   );
 }
 
+// FEATURE: AI-23 patch — MCP card with expandable description
+function McpCard({ item }) {
+  const [showFull, setShowFull] = useState(false);
+  const isLong = item.desc && item.desc.length > 80;
+  return (
+    <div style={{border:`1px solid ${T.line}`,marginBottom:8,padding:"10px 12px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+        <span style={{fontFamily:mono,fontSize:8,fontWeight:700,padding:"2px 6px",background:item.tierBg,color:item.tierColor,border:`1px solid ${item.tierBorder}`,flexShrink:0}}>
+          {item.tier}
+        </span>
+        <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{item.name}</div>
+        <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginLeft:"auto",flexShrink:0}}>Phase 4+</div>
+      </div>
+      <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,marginBottom:4}}>
+        {showFull || !isLong ? item.desc : item.desc.slice(0, 80) + "…"}
+        {isLong && (
+          <span onClick={()=>setShowFull(v=>!v)} style={{fontFamily:mono,fontSize:9,color:T.brass,cursor:"pointer",marginLeft:4}}>
+            {showFull ? "less" : "more"}
+          </span>
+        )}
+      </div>
+      <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>Caller: {item.caller}</div>
+    </div>
+  );
+}
+
+// FEATURE: AI-23 patch — reusable collapsible section header
+function SectionHeader({ label, open, onToggle }) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 2px",cursor:"pointer",borderTop:`1px solid ${T.lineSoft}`,marginTop:18,userSelect:"none"}}
+    >
+      <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>{label}</div>
+      <div style={{fontFamily:mono,fontSize:16,color:T.brassDeep,lineHeight:1,marginRight:2}}>{open ? "▲" : "▼"}</div>
+    </div>
+  );
+}
+
+const MCP_SURFACES = [
+  { tier:"Free / Basic",  tierColor:T.muted,    tierBg:`rgba(120,109,82,.1)`,  tierBorder:`rgba(120,109,82,.3)`,  name:"MCP Agent",       desc:"Expose a named agent as an MCP server — any MCP-compatible client can ask Chloe, Mike, or Robyn a question directly.",                                                                    caller:"Claude Desktop · External AI clients" },
+  { tier:"Paid",          tierColor:T.brassDeep, tierBg:`rgba(182,135,58,.1)`, tierBorder:`rgba(182,135,58,.3)`,  name:"MCP Capability",  desc:"Expose a specific capability without the full agent persona — call NIGP Risk Assessment directly without routing through an agent.",                                                       caller:"Specialized integrations" },
+  { tier:"Paid",          tierColor:T.brassDeep, tierBg:`rgba(182,135,58,.1)`, tierBorder:`rgba(182,135,58,.3)`,  name:"MCP Deliverable", desc:"Expose the deliverable production pipeline — caller submits a goal and receives a structured typed deliverable output.",                                                             caller:"External systems · Other AI agents" },
+  { tier:"Enterprise",    tierColor:"#fff",      tierBg:T.navy,                tierBorder:T.navy,                 name:"MCP Service",     desc:"Expose a single AI Service directly at the finest granularity — enables infrastructure-level licensing of individual services.",                                                     caller:"Infrastructure consumers" },
+  { tier:"Enterprise",    tierColor:"#fff",      tierBg:T.navy,                tierBorder:T.navy,                 name:"MCP Workflow",    desc:"Expose a full multi-step task pipeline — caller submits a goal and receives a completed task with all step deliverables.",                                                           caller:"Enterprise clients" },
+  { tier:"Enterprise",    tierColor:"#fff",      tierBg:T.navy,                tierBorder:T.navy,                 name:"MCP Training",    desc:"Allow external systems to push training material to a named agent via MCP — enterprise DMS and CMS integrations feed agents automatically. ⇐ Bidirectional.",                     caller:"Enterprise DMS · CMS systems" },
+  { tier:"Enterprise",    tierColor:"#fff",      tierBg:T.navy,                tierBorder:T.navy,                 name:"MCP Feedback",    desc:"Allow external systems to send approval or change-request signals via MCP — closes the feedback loop without requiring a DeepBench login. ⇐ Bidirectional.",                       caller:"External workflow systems" },
+];
+
 export default function AIActivityPanel({ onClose }) {
-  const { byType, byLLM, byAgent, modelsInUse, totalCost, totalCalls } = useAIActivity();
-  const [expanded, setExpanded] = useState({});
-  const [tab, setTab]           = useState("activity"); // activity | checklist
+  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, patternsActiveCount, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  const [tab, setTab] = useState("activity");
+  // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
+  const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
+  const [zeroClosed, setZeroClosed] = useState(true);
+  const toggle = (key) => setSections(s => ({ ...s, [key]: !s[key] }));
 
   // FEATURE: AI-10 — Hydrate lifetime totals from Supabase once on mount
   useEffect(() => {
     hydrateFromSupabase();
   }, []);
 
-  const toggle = (type) => setExpanded(e => ({ ...e, [type]: !e[type] }));
-
-  const phase1Types = Object.values(byType).filter(d => d.phase === 1);
-  const phase2Types = Object.values(byType).filter(d => d.phase === 2);
-  const activeTypes = phase1Types.filter(d => d.total > 0);
-
   return (
-    <div style={{position:"fixed",top:0,right:0,bottom:0,width:520,background:T.card,borderLeft:`2px solid ${T.brass}`,zIndex:1000,display:"flex",flexDirection:"column",boxShadow:"-8px 0 32px rgba(0,0,0,.18)"}}>
+    <div style={{position:"fixed",top:0,right:0,bottom:0,width:650,background:T.card,borderLeft:`2px solid ${T.brass}`,zIndex:1000,display:"flex",flexDirection:"column",boxShadow:"-8px 0 32px rgba(0,0,0,.18)"}}>
       {/* Header */}
       <div style={{background:`linear-gradient(135deg,${T.navy},${T.navyMid})`,padding:"14px 20px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -127,10 +187,16 @@ export default function AIActivityPanel({ onClose }) {
         </div>
         {/* Total strip */}
         <div style={{display:"flex",gap:16,marginTop:10}}>
-          {[["Total Calls",totalCalls],["Total Cost",fmt$(totalCost)],["Active Types",activeTypes.length+"/"+phase1Types.length],["Models in Use",modelsInUse]].map(([k,v])=>(
+          {[
+            ["Total Calls",    totalCalls],
+            ["Total Cost",     fmt$(totalCost)],
+            ["Services Active",`${servicesActive}/14`],
+            ["Patterns Active",`${patternsActiveCount}/10`],
+            ["Models in Use",  modelsInUse],
+          ].map(([k,v])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1}}>{k}</div>
-              <div style={{fontFamily:display,fontSize:16,fontWeight:600,color:T.brassLight}}>{v}</div>
+              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:T.brassLight}}>{v}</div>
             </div>
           ))}
         </div>
@@ -138,7 +204,7 @@ export default function AIActivityPanel({ onClose }) {
 
       {/* Tabs */}
       <div style={{display:"flex",borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
-        {[["activity","Activity Log"],["checklist","Architect Checklist"]].map(([id,label])=>(
+        {[["activity","Activity Log"],["mcp","MCP Roadmap"],["checklist","Architect Checklist"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             style={{flex:1,padding:"9px",fontFamily:mono,fontSize:9,textTransform:"uppercase",letterSpacing:1,border:"none",background:"transparent",cursor:"pointer",color:tab===id?T.navy:T.muted,fontWeight:tab===id?700:400,borderBottom:`2px solid ${tab===id?T.brass:"transparent"}`,marginBottom:-1}}>
             {label}
@@ -150,44 +216,70 @@ export default function AIActivityPanel({ onClose }) {
       <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
         {tab === "activity" && (
           <>
-            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Phase 1 · Production AI Types</div>
-            {phase1Types.map(d => (
-              <TypeRow key={d.type} d={d} expanded={!!expanded[d.type]} onToggle={()=>toggle(d.type)}/>
-            ))}
+            {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
+            <SectionHeader label="By Pattern · Industry Catalog" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
+            {sections.pattern && (
+              patternsSorted.length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
+                : patternsSorted.map(pat => <PatternRow key={pat.slug} d={pat}/>)
+            )}
 
-            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>By LLM</div>
-            {Object.values(byLLM).length === 0
-              ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",marginBottom:8}}>No LLM calls logged yet.</div>
-              : Object.values(byLLM).map(d => (
-                <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:d.calls>0?T.moss:T.lineSoft,flexShrink:0}}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.model}</div>
-                    <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
-                  </div>
-                  <div style={{display:"flex",gap:14,flexShrink:0}}>
-                    {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
-                      <div key={k} style={{textAlign:"right"}}>
-                        <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-                        <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+            {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
+            <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
+            {sections.service && (() => {
+              const withCalls = servicesSorted.filter(s => s.total > 0);
+              const zeroCalls = servicesSorted.filter(s => s.total === 0);
+              const aiSvcs     = withCalls.filter(s => s.serviceType === 'ai');
+              const hybridSvcs = withCalls.filter(s => s.serviceType === 'hybrid');
+              const logicSvcs  = withCalls.filter(s => s.serviceType === 'logic');
+
+              return (
+                <>
+                  {aiSvcs.length > 0 && (
+                    <>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4}}>AI Services</div>
+                      {aiSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
+                    </>
+                  )}
+                  {hybridSvcs.length > 0 && (
+                    <>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Hybrid Services</div>
+                      {hybridSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
+                    </>
+                  )}
+                  {logicSvcs.length > 0 && (
+                    <>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Logic Services</div>
+                      {logicSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
+                    </>
+                  )}
+                  {zeroCalls.length > 0 && (
+                    <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
+                      <div
+                        onClick={()=>setZeroClosed(o=>!o)}
+                        style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
+                      >
+                        <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Not yet called · {zeroCalls.length} services</div>
+                        <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{zeroClosed?"▼":"▲"}</div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            }
+                      {!zeroClosed && zeroCalls.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
-            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>By Agent</div>
-            {Object.values(byAgent).length === 0
-              ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",marginBottom:8}}>No agent calls logged yet.</div>
-              : Object.values(byAgent).map(d => {
-                const info = AGENT_NAMES[d.agentId] || { name: d.agentId, code: "—" };
-                return (
-                  <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
+            {/* By LLM — collapsible, unchanged data */}
+            <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')}/>
+            {sections.llm && (
+              Object.values(byLLM).length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No LLM calls logged yet.</div>
+                : Object.values(byLLM).map(d => (
+                  <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:d.calls>0?T.moss:T.lineSoft,flexShrink:0}}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
-                      <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.code}</div>
+                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.model}</div>
+                      <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
                     </div>
                     <div style={{display:"flex",gap:14,flexShrink:0}}>
                       {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
@@ -198,15 +290,88 @@ export default function AIActivityPanel({ onClose }) {
                       ))}
                     </div>
                   </div>
-                );
-              })
-            }
+                ))
+            )}
 
-            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8,marginTop:20}}>Future Tracking · Planned</div>
-            {phase2Types.map(d => (
-              <TypeRow key={d.type} d={d} expanded={!!expanded[d.type]} onToggle={()=>toggle(d.type)}/>
-            ))}
+            {/* By Agent — collapsible, sorted by calls desc */}
+            <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
+            {sections.agent && (
+              agentsSorted.length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
+                : agentsSorted.map(d => {
+                  const info = AGENT_NAMES[d.agentId] || { name: d.agentId, code: "—" };
+                  return (
+                    <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
+                        <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.code}</div>
+                      </div>
+                      <div style={{display:"flex",gap:14,flexShrink:0}}>
+                        {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                          <div key={k} style={{textAlign:"right"}}>
+                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+
+            {/* FEATURE: AI-23 patch — Roadmap collapsible; Patterns Now tier removed */}
+            <SectionHeader label="Platform Roadmap" open={sections.roadmap} onToggle={()=>toggle('roadmap')}/>
+            {sections.roadmap && (
+              <div style={{paddingBottom:12}}>
+                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Services</div>
+                {[
+                  { tier:"Now",  color:T.moss,  items:["Knowledge Retrieval","Autonomous Research","Task Planning","Title Generation","Agent Routing","Chat / Consultative","Document Extraction","Procurement Flags","Vendor Concentration","Column Detection"] },
+                  { tier:"Next", color:T.brass, items:["Prompt Assembly — extracts from inline code (S-INFRA-01)","Knowledge Reinforcement — generalizes beyond Brent (S-INFRA-02)","Pre-Run Planning — formalizes as discrete step (S-INFRA-01)"] },
+                  { tier:"Later",color:T.muted, items:["Persona Replication — full design required (S-JL-01)"] },
+                ].map(({ tier, color, items }) => (
+                  <div key={tier} style={{marginBottom:10}}>
+                    <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>{tier}</div>
+                    {items.map(item=>(
+                      <div key={item} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:10,paddingBottom:2,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:3}}>{item}</div>
+                    ))}
+                  </div>
+                ))}
+
+                {/* FEATURE: AI-23 patch — Patterns roadmap: Now tier removed; only Next + Later, driven from PATTERN_CATALOG */}
+                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6,marginTop:12}}>AI Patterns</div>
+                {PATTERN_CATALOG.filter(p => !p.active).map(pat => (
+                  <div key={pat.slug} style={{marginBottom:10}}>
+                    <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:pat.roadmap==='next'?T.brass:T.muted,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>{pat.roadmap === 'next' ? 'Next' : 'Later'}</div>
+                    <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:10,borderLeft:`2px solid ${pat.roadmap==='next'?T.brass:T.muted}30`,marginLeft:2,marginBottom:3}}>
+                      {pat.name} — {pat.roadmapNote}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
+        )}
+
+        {tab === "mcp" && (
+          // FEATURE: AI-23 — MCP Roadmap tab (static, Phase 4+; design session S-MCP-01 required before coding)
+          <div>
+            <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.6,marginBottom:14,padding:"9px 12px",background:`${T.brass}06`,border:`1px solid ${T.brass}20`}}>
+              DeepBench can be called by any MCP-compatible client — Claude Desktop, external AI agents, enterprise systems — at any level of the platform stack.
+            </div>
+
+            {/* Bidirectional callout */}
+            <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.6,marginBottom:16,padding:"8px 12px",background:`${T.navy}06`,border:`1px solid ${T.lineSoft}`}}>
+              <strong style={{color:T.navy}}>Bidirectional integration:</strong> MCP Training and MCP Feedback are the only surfaces where the data flow reverses — external systems push material IN and push approvals OUT. Every other surface is DeepBench responding to a caller. These two make DeepBench an active participant in an external system's workflow, not just a responder.
+            </div>
+
+            {/* MCP surface table */}
+            {MCP_SURFACES.map(item => <McpCard key={item.name} item={item}/>)}
+
+            <div style={{marginTop:12,padding:"9px 12px",background:`${T.flag}06`,border:`1px solid ${T.flag}20`,fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5}}>
+              <strong style={{color:T.navy}}>S-MCP-01 design session required before any MCP surface is built.</strong> Auth model, rate limiting, pricing integration, and which surface ships first are all unresolved — they're design decisions, not implementation details.
+            </div>
+          </div>
         )}
 
         {tab === "checklist" && (

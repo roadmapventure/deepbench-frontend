@@ -1,4 +1,4 @@
-// DeepBench v5.1.30 | useAIActivity.js | AI-18 — agent-neutral capability descriptions
+// DeepBench v5.2.2 | useAIActivity.js | AI-23 patch — sorted service/pattern/agent arrays for dynamic UI
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -6,6 +6,51 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
+
+// FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
+export const SERVICE_CATALOG = [
+  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','Reflection','RAG'],                         roadmap: 'next' },
+  { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
+  { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
+  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Reflection','Embeddings','Structured Output'],                roadmap: 'next' },
+  { slug: 'pre-run-planning',        name: 'Pre-Run Planning',          serviceType: 'ai',     patterns: ['RAG','Reflection'],                                           roadmap: 'next' },
+  { slug: 'task-planning',           name: 'Task Planning',             serviceType: 'ai',     patterns: ['Tool Use','Structured Output','Streaming'],                   roadmap: 'now'  },
+  { slug: 'title-generation',        name: 'Title Generation',          serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
+  { slug: 'agent-routing',           name: 'Agent Routing',             serviceType: 'ai',     patterns: ['RAG','Structured Output'],                                    roadmap: 'now'  },
+  { slug: 'chat-response',           name: 'Chat / Consultative',       serviceType: 'ai',     patterns: ['RAG','Prompt Chaining','Streaming'],                          roadmap: 'now'  },
+  { slug: 'document-extraction',     name: 'Document Extraction',       serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
+  { slug: 'persona-replication',     name: 'Persona Replication',       serviceType: 'ai',     patterns: ['RAG','Prompt Chaining','Reflection'],                         roadmap: 'later'},
+  { slug: 'procurement-flags',       name: 'Procurement Flags',         serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+  { slug: 'vendor-concentration',    name: 'Vendor Concentration',      serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+  { slug: 'column-detection',        name: 'Column Detection',          serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+];
+
+// FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
+export const PATTERN_CATALOG = [
+  { slug: 'rag',                name: 'RAG',                desc: 'Retrieval-Augmented Generation — embed query, search vector store, inject retrieved chunks into context before LLM call',             active: true  },
+  { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true  },
+  { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true  },
+  { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true  },
+  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: false, roadmap: 'next',  roadmapNote: 'Formalizes when Prompt Assembly + Knowledge Reinforcement are extracted as discrete services (S-INFRA-01)' },
+  { slug: 'streaming',          name: 'Streaming',          desc: 'Token-by-token output delivery via SSE — response arrives progressively where UX latency matters',                                    active: true  },
+  { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true  },
+  { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true  },
+  { slug: 'browser-automation', name: 'Browser Automation', desc: 'Playwright-controlled browser execution — agent drives a real browser instance on Railway infrastructure',                            active: true  },
+  { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
+];
+
+// FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
+const AI_TYPE_TO_SERVICE = {
+  rag_briefing:   'prompt-assembly',
+  planning:       'task-planning',
+  routing:        'agent-routing',
+  chat:           'chat-response',
+  similarity:     'knowledge-retrieval',
+  summarization:  'knowledge-reinforcement',
+  react_loop:     'autonomous-research',
+  extraction:     'document-extraction',
+  reinforcement:  'knowledge-reinforcement',
+};
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
 export const AI_TYPES = {
@@ -160,11 +205,55 @@ export function useAIActivity() {
     d.avgLatency = d.latencies.length ? Math.round(d.latencies.reduce((a,b)=>a+b,0)/d.latencies.length) : null;
   });
 
+  // FEATURE: AI-23 — Aggregate by Service (remaps old ai_type to service_slug)
+  const byService = {};
+  for (const svc of SERVICE_CATALOG) {
+    const entries = log.filter(e => (AI_TYPE_TO_SERVICE[e.type] || e.type) === svc.slug);
+    const cost    = entries.reduce((s,e) => s + (e.cost||0), 0);
+    const latencies = entries.filter(e=>e.latencyMs).map(e=>e.latencyMs);
+    byService[svc.slug] = {
+      ...svc,
+      total:      entries.length,
+      cost,
+      avgLatency: latencies.length ? Math.round(latencies.reduce((a,b)=>a+b,0)/latencies.length) : null,
+    };
+  }
+
+  // FEATURE: AI-23 — Aggregate by Pattern (roll up from services that declare the pattern)
+  const byPattern = {};
+  for (const pat of PATTERN_CATALOG) {
+    const svcsUsingPattern = new Set(SERVICE_CATALOG.filter(s => s.patterns.includes(pat.name)).map(s => s.slug));
+    const entries = log.filter(e => svcsUsingPattern.has(AI_TYPE_TO_SERVICE[e.type] || e.type));
+    const cost    = entries.reduce((s,e) => s + (e.cost||0), 0);
+    byPattern[pat.slug] = { ...pat, total: entries.length, cost };
+  }
+
+  const servicesActive      = Object.values(byService).filter(s => s.total > 0).length;
+  const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length; // static: 8 of 10
+
+  // FEATURE: AI-23 patch — sorted arrays for dynamic section rendering
+  // Services: primary sort = type order (ai→hybrid→logic), secondary = calls desc
+  const SERVICE_TYPE_ORDER = { ai: 0, hybrid: 1, logic: 2 };
+  const servicesSorted = Object.values(byService).sort((a, b) => {
+    const tDiff = SERVICE_TYPE_ORDER[a.serviceType] - SERVICE_TYPE_ORDER[b.serviceType];
+    if (tDiff !== 0) return tDiff;
+    return b.total - a.total;
+  });
+
+  // Patterns: sorted by calls desc; inactive patterns always at bottom
+  const patternsSorted = Object.values(byPattern).sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return b.total - a.total;
+  });
+
+  // Agents: sorted by calls desc
+  const agentsSorted = Object.values(byAgent).sort((a, b) => b.calls - a.calls);
+
   const modelsInUse = Object.values(byLLM).filter(d => d.calls > 0).length;
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, modelsInUse, totalCost, totalCalls };
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
 }
 
 export { MODEL_PROVIDER };

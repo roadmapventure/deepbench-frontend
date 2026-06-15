@@ -1,15 +1,16 @@
 # DeepBench — Current State
 > Updated at the close of every session.
 
-**Version in dev:** v5.1.35
-**Next session:** S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
-**Last session:** S-AI01b-patch2 — AiBadge tooltip position:fixed fix + Role Prompt badge ✅ done (e975715)
+**Version in dev:** v5.2.2
+**Next session:** S-DELIVER-DESIGN Part 3 — kickoff docs for S11 + S-DELIVER-04. Design session.
+**Last session:** S-AI-AUDIT-REDESIGN complete (da40458 + f0ecd09) — AI Audit rebuilt on AI Services model. AI-23 ✅ Done. 650px panel, By Pattern + By Service + By LLM + By Agent + Roadmap sections (all collapsible), MCP Roadmap tab (7 surfaces), Architect Checklist tab unchanged. Service catalog (14), Pattern catalog (10), client-side remap table, sorted dynamic lists. All 12 QA items PASS across both commits. By Service (14 services, type badge AI/Hybrid/Logic, patterns inline, calls/cost/latency), By Pattern (10 industry patterns catalog, inactive greyed), By LLM + By Agent unchanged, Roadmap collapsed (Services Now/Next/Later + Patterns Now/Next/Later). New MCP Roadmap tab (7 surfaces, tier badges, bidirectional callout). Header strip expanded to 5 stats (Services Active X/14 + Patterns Active 8/10). Old ai_type strings remapped client-side via AI_TYPE_TO_SERVICE — no DB migration needed. ai_services + ai_patterns tables deferred to S-INFRA-01. AI-23 marked Designed. Kickoff doc: v5.2.1-AI23-ai-audit-redesign.md.
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
 ---
 
 ## Open Blockers
-- **Q5 (blocks S11):** Agent step output destination — A, B, or C. Decision needed before S11.
+- None. Q5 resolved 2026-06-13. CAPABILITIES.md + AI-SERVICES.md design complete.
+- **Note:** S-INFRA-01 scope may need splitting into 01a (AI Services catalog + 6 extraction jobs) and 01b (capability registry, BYOK, two-speed routing). Decide before S-INFRA-01 design session.
 
 ---
 
