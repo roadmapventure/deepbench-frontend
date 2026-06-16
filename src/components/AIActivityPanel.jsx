@@ -1,4 +1,4 @@
-// DeepBench v5.2.2 | AIActivityPanel.jsx | AI-23 patch — 650px, collapsible sections, sorted lists, text expand
+// DeepBench v5.2.6 | AIActivityPanel.jsx | AI-30 — pattern catalog expanded to 20; HITL + Parallelization special rows
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
@@ -70,6 +70,7 @@ function ServiceRow({ d }) {
 }
 
 // FEATURE: AI-23 patch — PatternRow with "more" text expand
+// FEATURE: AI-30 — PatternRow HITL special columns + Parallelization partial badge
 function PatternRow({ d }) {
   const [showFull, setShowFull] = useState(false);
   const hasData = d.total > 0;
@@ -92,7 +93,19 @@ function PatternRow({ d }) {
           )}
         </div>
       </div>
-      {d.active ? (
+      {d.hitlSpecial ? (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+          <div style={{display:"flex",gap:12}}>
+            {[["Gates Triggered","—"],["Avg Response Time","—"]].map(([k,v])=>(
+              <div key={k} style={{textAlign:"right"}}>
+                <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8,whiteSpace:"nowrap"}}>{k}</div>
+                <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.ink}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontFamily:mono,fontSize:8,color:T.brass,border:`1px solid ${T.brass}40`,padding:"1px 5px",marginTop:1}}>🔶 Partial · TI-18 required</div>
+        </div>
+      ) : d.active ? (
         hasData ? (
           <div style={{display:"flex",gap:12,flexShrink:0}}>
             {[["Calls",d.total],["Cost",fmt$(d.cost)]].map(([k,v])=>(
@@ -105,6 +118,8 @@ function PatternRow({ d }) {
         ) : (
           <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>No calls yet</div>
         )
+      ) : d.partial ? (
+        <div style={{fontFamily:mono,fontSize:8,color:T.brass,flexShrink:0,border:`1px solid ${T.brass}40`,padding:"1px 5px"}}>🔶 Partial · TT-01/02</div>
       ) : (
         <div style={{fontFamily:mono,fontSize:8,color:T.muted,flexShrink:0,border:`1px solid ${T.lineSoft}`,padding:"1px 5px"}}>Not yet active</div>
       )}
@@ -162,7 +177,7 @@ const MCP_SURFACES = [
 ];
 
 export default function AIActivityPanel({ onClose }) {
-  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, patternsActiveCount, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, patternsActiveCount, patternsCatalogTotal, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
@@ -191,7 +206,7 @@ export default function AIActivityPanel({ onClose }) {
             ["Total Calls",    totalCalls],
             ["Total Cost",     fmt$(totalCost)],
             ["Services Active",`${servicesActive}/14`],
-            ["Patterns Active",`${patternsActiveCount}/10`],
+            ["Patterns Active",`${patternsActiveCount}/${patternsCatalogTotal}`],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(
             <div key={k}>
