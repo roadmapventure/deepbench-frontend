@@ -126,6 +126,7 @@ Mandatory M tests:
 - Every pattern slug referenced in `AGENT_PATTERNS` or any AiBadge label exists in `PATTERN_CATALOG`
 - Every pattern slug in `PATTERN_CATALOG` with `active: true` is NOT listed in the Platform Roadmap (roadmap only shows `active: false`)
 - Every pattern slug in `PATTERN_CATALOG` with `active: false` is NOT listed as a live badge on any currently-executing feature
+- Every pattern name in `SERVICE_CATALOG[*].patterns` arrays is `active: true` in `PATTERN_CATALOG` — roadmap-only patterns must not appear in any service's patterns list (root cause of AI-36p: Reflection was removed from AI_PAT labels but remained in SERVICE_CATALOG.patterns for 4 services)
 - Every service slug in `SERVICE_CATALOG` with `roadmap: 'now'` has a corresponding live implementation (verified by checking that the relevant `api/` route or inline logic exists)
 - No slug, constant, or status value appears with conflicting definitions across the files that reference it
 - Any new constant introduced this session is defined in exactly one place and imported everywhere else — never redefined
