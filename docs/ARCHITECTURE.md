@@ -110,6 +110,8 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 > The Agent Profile Model is the core data model of DeepBench. Every product feature on the Bench side wraps around this model. All vocabulary defined here is canonical — use it in code comments, UI labels, kickoff docs, and design sessions.
 >
 > **Important:** Capabilities within each Competency are listed as candidates only. They are suggestive — not locked. Each Competency requires a dedicated design and modeling session before any Capability inside it is built. We can build a single Capability with a single Property in one sprint without touching anything else in the model.
+>
+> **Updated 2026-06-16 (S-DELIVER-DESIGN Part 3):** The Deliverables Competency has been removed. See note below under "Competency: Deliverables." Intent and Format are now independent first-class entities — see `docs/INTENT-MODEL.md` and `docs/FORMAT-MODEL.md`.
 
 ---
 
@@ -131,7 +133,9 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 
 ---
 
-### The Four Competencies
+### The Three Competencies
+
+> **Updated 2026-06-16:** Reduced from four to three Competencies. The Deliverables Competency has been removed — see note below.
 
 ```
 AGENT PROFILE MODEL
@@ -142,8 +146,11 @@ AGENT PROFILE MODEL
 │
 ├── COMPETENCY: Identity       — Who the agent is
 ├── COMPETENCY: Skills         — What the agent can do
-├── COMPETENCY: Knowledge      — What the agent knows
-└── COMPETENCY: Deliverables   — What the agent produces
+└── COMPETENCY: Knowledge      — What the agent knows
+
++ Intent Assignments  (standalone — what types of work the agent performs)
++ Format Assignments  (standalone — what output structures the agent produces)
++ Deliverable History (portfolio view — what the agent has produced; Projects tab PE-06)
 ```
 
 **Baseline behavior:** An agent with no defined Competencies or Capabilities still produces output — operating at L1 (General) across the board using generic LLM. The Agent Profile Model enriches quality and routing precision but never blocks execution. Agents grow into their profiles one sprint at a time.
@@ -204,22 +211,29 @@ Three training input types feed this Competency and develop corresponding Skills
 
 ---
 
-### Competency: Deliverables
-*What the agent produces — typed output artifacts.*
+### ~~Competency: Deliverables~~ [REMOVED — 2026-06-16]
 
-> ⚠️ **Full design and modeling session required before any Capability in this Competency is defined or built.** Naming convention for Deliverable Capabilities is TBD in that session.
-
-**Suggested Requirements** — each Deliverable Capability carries a lightweight list of which Skills and Methods are typically needed to produce it. Used by the Planning agent as routing hints, not hard constraints. A Deliverable may require multiple Skills and multiple Methods (1-to-many). A Deliverable can also be produced by multiple agents, which is the entry point for multi-agent routing (see AA-24 — design session required).
-
-**Generic LLM baseline:** A Deliverable can be produced even when no Skills or Methods are formally declared for it. In that case, the Planning agent uses generic LLM judgment to assign and execute. This is L1. Declaring Suggested Requirements raises routing quality and output Level over time.
-
-**Candidate Capabilities** *(suggestive — naming convention TBD in design session)*
-- AI Briefing
-- Research Report
-- Data Analysis Report
-- Project Plan
-- Presentation
-- Document Review
+> **Removed in S-DELIVER-DESIGN Part 3.** The Deliverables Competency was designed to capture "what the agent produces." During the full deliverable model design session, it was found to be redundant — the concept it captured is now covered by two independent standalone entities:
+>
+> - **Intent Assignments** — what type of cognitive work the agent is authorized to perform (Research, Analysis, Review, etc.). Equivalent to the former Deliverable Capability "what can this agent do." Lives outside Competencies as a standalone assignment table.
+> - **Format Assignments** — what output structures the agent is authorized to produce (NIGP Dashboard, Executive Brief, etc.). Lives outside Competencies as a standalone assignment table with its own capability dependencies, availability, and pricing.
+>
+> The lock on this Competency ("design session required before building") worked as intended — we designed it properly and found that Intent + Format replace it completely.
+>
+> **What happened to the candidate capabilities:**
+>
+> | Former Deliverable Capability | Now |
+> |------------------------------|-----|
+> | AI Briefing | Intent: `analysis-report` + Format: `executive-brief` |
+> | Research Report | Intent: `research-findings` + Format: `research-summary` |
+> | Data Analysis Report | Intent: `analysis-report` + Format: `nigp-dashboard` or `structured-report` |
+> | Project Plan | Intent: `draft-document` + Format: `executive-brief` |
+> | Presentation | Intent: `draft-document` + Format: `powerpoint-deck` |
+> | Document Review | Intent: `review-feedback` + Format: `structured-report` |
+>
+> **Deliverable History** (what the agent has produced) is still tracked — it surfaces on the agent's Projects tab (PE-06) as a portfolio view. It is not a Competency.
+>
+> **Full models:** `docs/INTENT-MODEL.md`, `docs/FORMAT-MODEL.md`, `docs/DELIVERABLE-MODEL.md`, `docs/PLATFORM-ENTITIES.md`
 
 ---
 

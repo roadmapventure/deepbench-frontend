@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN (continued) — AI Services Model locked in `docs/AI-SERVICES.md`. 14-service catalog (SVC-01–SVC-14: 11 AI/Mixed + 3 Deterministic). 10-pattern catalog (PAT-01–PAT-10). Unified Services table schema. Five redesigned AI Audit sections. MCP surfaces (MC-01–MC-07). New IDs: AI-25/26/27, MC section (7 items). AI-23 updated. ARCHITECTURE.md Method Layer → AI Pattern Layer. CAPABILITIES.md Methods → AI Services.
+> Last updated: 2026-06-16 | Session: S-DELIVER-DESIGN Part 3 — Full Platform Entity Model designed. Work Order replaces Task (S-RENAME-01 required before WO coding). Deliverable Model, Intent Model, Format Model, Platform Entities Registry documented. Deliverables Competency removed from Agent Profile Model — replaced by Intent Assignments + Format Assignments (standalone). 9 Intents named (MCP service categories). 3 Format tiers defined (Universal/Standard/Proprietary). New area codes: WO, IN, FM, SV. New sessions: S-RENAME-01, S-WO-01, S-INTENT-01, S-FORMAT-01, S-SERVICE-01, S-CAP-01, S-METHOD-01, S-MONITOR-01.
 >
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
@@ -13,7 +13,7 @@
 ## Feature ID Format
 
 `[AREA]-[NUMBER]`
-Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables
+Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables, `WO`=Work Order, `IN`=Intent, `FM`=Format, `SV`=Service
 
 ---
 
@@ -200,6 +200,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | PE-11 | Training tab — Edit Course inline sub-view (edit title, category, jurisdiction, field notes, triggers, priority — no re-vectorization; EDIT+DELETE only for trainable+active entries) | ✅ Done | S-MIGRATE-04 (732bf3c) |
 | PE-14 | Training tab — "What X Learned" panel UX fix: (1) move AiBadge outside the expandable so it is visible immediately before and after expansion; (2) replace clickable expansion trigger with inline "more..." text after "What X Learned" label | ❌ Missing | S-future |
 | PE-15 | Training tab — Add Courses loading state: (1) spinner + status text during Exhibit B pre-fill lag so user knows system is working and cannot click "Teach X this document" yet; (2) AiBadge + AI pulse icon on Exhibit B section showing the pattern being used (KNOWLEDGE_TRAINING) | ❌ Missing | S-future |
+| PE-16 | Playbook tab — guardrails section AI Pulse + hover label: add `<AIDiamond>` to the guardrails card header (always/never section) with a hover label identifying PAT-13 Guardrails / Output Filtering as the pattern these constraints feed into. AIDiamond should render in inactive/roadmap state (PAT-13 is `active: false` in PATTERN_CATALOG) — visually distinct from a live-pattern pulse. Exact inactive AIDiamond treatment must be specced in the AI-34/AI-31 design session before this can be coded. Depends on: PE-04 ✅ Done, AI-34 design (AIDiamond pattern label spec). File: PersonnelScreen.jsx (Playbook tab). | ❌ Missing | S-future (depends on AI-34 design session) |
 
 **PE-04 spec locked 2026-06-09 (S-MIGRATE-05 design session):**
 - Output formats: full CRUD via `/api/agent-configs?type=output_format` — identical to ResumeTab `role_prompt` pattern
@@ -311,6 +312,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-29 | Step card conditional pattern badge — derive execution patterns from assigned agent code (Approach A: agent→AGENT_PATTERNS map) with step-name keyword fallback (Approach B); HITL steps = no badge; greyed dashed badge for unbuilt patterns (Pat IR-07, Susan TR-08, multi-agent PAT-11); no badge on deterministic steps. | ✅ Done | S-AI-BADGE-02 (b03d04e) |
 | AI-31 | Task Instructions AI pulse buttons — "Re-run All" and "Update Steps →" buttons each get AI activity signal + pattern label. Byline badge fix in AssignWorkScreen also shipped. Functionally complete (195aeda + 8bd3f23) but VISUAL TREATMENT WRONG: currently uses raw `<span>` dot + AiBadge chip, which is not in the style guide. Must be replaced with `<AIDiamond>` + pattern tooltip pattern (spec TBD in S-AI-AUDIT-UX-01). Files: TaskInstructionsScreen.jsx, StepList.jsx, AssignWorkScreen.jsx. | 🔶 Partial (visual redesign needed — see AI-31 notes) | S-AI-BADGE-05/05p ✅ functional · S-AI-AUDIT-UX-01 visual redesign |
 | AI-34 | Step card AI pattern display — each step card in Task Instructions and Assign Work shows which AI patterns are used for that step, plus an `<AIDiamond>` AI pulse icon. Source: AGENT_PATTERNS map (same as AI-29). Visual treatment: AIDiamond + pattern label, exact placement TBD in design session. Do not use AiBadge chip for this. File: StepList.jsx. | ❌ Missing | S-AI-AUDIT-UX-01 (design session required) |
+| AI-35 | Unified AI Pattern Registry — single source of truth for all pattern tracking across the platform. Replaces the current split between `PATTERN_CATALOG` (useAIActivity.js), `AI_PAT` constants + `AGENT_PATTERNS` map (aiPatterns.js), and scattered AiBadge label strings. The registry owns: (1) **Active status** — which patterns are actually firing in DeepBench code today vs roadmap-only, so AiBadge labels and the Platform Roadmap never contradict each other; (2) **Label/feature associations** — which UI elements (buttons, cards, step types) declare each pattern, so AiBadge labels derive from the registry instead of being hardcoded per component; (3) **AI Audit display** — By Pattern row status (active/partial/roadmap) and roadmap tier driven from one source; (4) **Metric logging** — pattern-level calls, cost, and latency logged directly to `ai_activity_log` via pattern slug, not only rolled up from service calls; (5) **Full graph** — each pattern knows which Services declare it, which Deliverables those Services produce, and which Capabilities invoke those Deliverables. Resolves the AI-28/PATTERN_CATALOG contradiction discovered 2026-06-15: AiBadge labels were set from SVC design intent (Reflection listed on Playbook badge) but PATTERN_CATALOG correctly marks Reflection inactive — a split source caused the inconsistency. Design session required before coding — needs: registry schema, migration path from aiPatterns.js + PATTERN_CATALOG, AiBadge label derivation mechanism, metric log schema. | ❌ Missing | S-PAT-REGISTRY-01 (design required) |
+| AI-36 | Pattern type classification — every pattern in the registry carries a `patternType` field: `structural` (scaffolding around Claude — changes what Claude sees or when it is called, not how it reasons: RAG, Streaming, Structured Output, Embeddings, Browser Automation) or `reasoning` (changes how Claude thinks — same prompt produces meaningfully different output: ReAct, Tool Use, Prompt Chaining, Reflection, Multi-Agent Debate, Chain-of-Verification). Design requirement: (1) AI Audit By Pattern section visually distinguishes the two types — separate groupings or a type badge per row; (2) counts, cost, and availability (active/partial/roadmap) tracked and displayed per type group; (3) AiBadge labels and tooltips app-wide identify pattern type so users can see whether an element is using structural or reasoning architecture; (4) Platform Roadmap section groups roadmap patterns by type. Registry field: `patternType: 'structural' | 'reasoning'`. All 20 patterns in PATTERN_CATALOG must be classified before S-PAT-REGISTRY-01 coding begins. Depends on AI-35. Classification locked 2026-06-16: Structural (9) = RAG, Streaming, Structured Output, Embeddings, Browser Automation, Guardrails, Parallelization, HyDE, Adaptive RAG. Reasoning (11) = ReAct, Tool Use, Prompt Chaining, Reflection, HITL, Agent Orchestration, Few-Shot Prompting, LLM-as-Judge, Multi-Agent Debate, Chain-of-Verification, Episodic Memory. | ✅ Done | S-AI-PATTERN-TYPE-01 (22c9d2e) + patch (26ff072) |
 
 **AI-22 Notes:** `ai_activity_log` currently has `ai_type`, `feature`, `model`, `agent_id`, `task_id` — a pre-Agent-Profile-Model categorization. The four new columns are additive and nullable — no existing data affected. Once present, every AI call has a full lineage chain. The platform's own internal capabilities (Task Planning, Title Generation, Agent Routing) are themselves Deliverables produced by agents — they must also carry these columns, making the platform self-describing.
 
@@ -545,6 +548,67 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+## WORK ORDER — WO
+> Replaces "Task" app-wide. Full model: `docs/WORK-ORDER-MODEL.md`
+> S-RENAME-01 is a pre-requisite before any WO coding session.
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| WO-01 | Work Order DB table + rename — migrate `tasks` → `work_orders`; rename all task_id refs; update routes, UI labels, API contracts | ❌ Missing | S-RENAME-01 |
+| WO-02 | Work Order creation flow — replace current Assign Work screen with Work Order creation: Intent picker (9 intents), Format picker (filtered by Intent), goal/purpose/audience/scope fields, Deliverable specs array with per-spec constraints | ❌ Missing | S-WO-01 |
+| WO-03 | Work Order `deliverables[]` — structured Deliverable spec array inside Work Order jsonb; minimum 1 spec; each spec carries intent, format, action, constraints (must/must-not), template ref | ❌ Missing | S-WO-01 |
+| WO-04 | Work Order lifecycle states — draft → submitted → planning → awaiting_approval → in_progress → paused → change_requested → complete / failed / gap_flagged | ❌ Missing | S-WO-01 |
+| WO-05 | `parent_work_order_id` stub — nullable FK on work_orders table; no UI yet; enables future Work Order decomposition | ❌ Missing | S-WO-01 |
+| WO-06 | `depends_on` on step — nullable jsonb field listing step IDs that must complete before this step runs; stub only; enables future parallel execution | ❌ Missing | S-WO-01 |
+
+---
+
+## INTENT — IN
+> Full model: `docs/INTENT-MODEL.md`
+> Design session (S-INTENT-01) required before any coding.
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| IN-01 | Intent catalog — 9 named Intents with slug, name, description, execution_pattern, mcp_path, gap_flag, default_format | ❌ Missing | S-INTENT-01 |
+| IN-02 | Intent picker in Work Order creation — replaces current task type tiles; user selects from 9 Intents; scales without code changes as new Intents added | ❌ Missing | S-WO-01 |
+| IN-03 | Intent canned configurations — pre-built Work Order starting points per Intent; sharable; public or tenant-private | ❌ Missing | S-INTENT-01 |
+| IN-04 | Intent agent assignments — optional; which agents are authorized to perform each Intent; absence → generic LLM + gap flag | ❌ Missing | S-INTENT-01 |
+| IN-05 | Intent capability assignments — optional; which Capabilities serve each Intent well; absence → generic LLM | ❌ Missing | S-INTENT-01 |
+| IN-06 | Intent profile view — admin-facing profile page per Intent (Profile, Capabilities, Training, Playbook, History tabs) | ❌ Missing | S-INTENT-01 |
+| IN-07 | Gap flagging — when Michelle finds no Agent or Capability for an Intent, set gap_flag, use generic LLM, surface signal to product intelligence | ❌ Missing | S-INTENT-01 |
+| IN-08 | Monitor & Alert intent — recurring/trigger-based execution pattern; separate architecture from one-shot Intents; scheduler + notification layer | ❌ Missing | S-MONITOR-01 |
+
+---
+
+## FORMAT — FM
+> Full model: `docs/FORMAT-MODEL.md`
+> Design session (S-FORMAT-01) required before any coding.
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| FM-01 | Format catalog — registry of all Formats; each entry: slug, name, tier, intent, output_file_type, data_variables, sections, charts, badge, mcp_tool, preview_url | ❌ Missing | S-FORMAT-01 |
+| FM-02 | NIGP Dashboard registered as proprietary Format — `nigp-dashboard` / `analysis-report` intent / locked sections / Mixed badge / priced | ❌ Missing | S-FORMAT-01 |
+| FM-03 | Format picker in Work Order creation — filtered by selected Intent; shows tier badge; preview thumbnail | ❌ Missing | S-WO-01 |
+| FM-04 | Format agent assignments — optional; which agents are authorized to produce each Format; absence → generic LLM + gap flag | ❌ Missing | S-FORMAT-01 |
+| FM-05 | Format capability assignments — optional; which Capabilities are needed to produce each Format | ❌ Missing | S-FORMAT-01 |
+| FM-06 | Format profile view — admin-facing profile page per Format (Profile, Schema, Capabilities, Templates, History tabs) | ❌ Missing | S-FORMAT-01 |
+| FM-07 | Standard Format catalog — register DeepBench Standard formats: structured-report, executive-brief, research-summary, observation-log, summary-card | ❌ Missing | S-FORMAT-01 |
+
+---
+
+## SERVICE — SV
+> A Service is a packaged Intent + Format combination — named, priced, MCP-exposed.
+> Design session (S-SERVICE-01) required before any coding.
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SV-01 | Service catalog — registry of named Services; each entry: slug, name, intent_slug, format_slug, mcp_tool, availability, exclusivity, pricing, level | ❌ Missing | S-SERVICE-01 |
+| SV-02 | Service profile view — name, description, Intent + Format components, agent roster, pricing, performance metrics, history | ❌ Missing | S-SERVICE-01 |
+| SV-03 | MCP service exposure — each Service exposed as an MCP tool at `deepbench/{intent}/{format}` path; resources for discovery | ❌ Missing | S-MCP-01 |
+| SV-04 | Service marketplace listing — browse, preview, purchase access to proprietary Services | ❌ Missing | S-future (Phase 4) |
+
+---
+
 ## LANDING — LA
 
 | ID | Feature | Status | Session |
@@ -621,6 +685,21 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |
 | S-DELIVER-01 | DL-01 — Michelle labels step output types at plan time | — |
 | S-POLISH-01 | Demo path audit — golden path: assign → approve → run → deliverable → review | — |
+
+### Platform Entity Sessions (new — from S-DELIVER-DESIGN Part 3, 2026-06-16)
+> Pre-requisite: S-RENAME-01 must run before any WO coding session.
+> Design sessions (S-INTENT-01, S-FORMAT-01, S-WO-01) precede coding sessions.
+
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-RENAME-01 | Terminology rename cascade — Tasks → Work Orders app-wide; task_id → work_order_id; tasks table → work_orders table; Assign Work → New Work Order; Task Instructions → Execution Plan; update all routes, UI labels, API contracts. See PLATFORM-ENTITIES.md rename table. | ❌ Not started |
+| S-WO-01 | Work Order entity — DB migration, creation flow (Intent picker → Format picker → goal/purpose/audience/scope), deliverables[] spec array, lifecycle states, parent_work_order_id stub, Michelle Execution Plan routing | ❌ Not started |
+| S-INTENT-01 | Intent entity — intents catalog table, admin UI, canned configuration management, gap flagging storage (product_gaps table), agent assignment table, capability assignment table | ❌ Not started |
+| S-FORMAT-01 | Format entity — formats catalog table, section schema editor, data variable schema editor, tier management, agent assignment table, capability assignment table, Format picker component | ❌ Not started |
+| S-SERVICE-01 | Service entity — services catalog table, packaging UI (Intent + Format → Service), pricing model, MCP endpoint registration, marketplace listing | ❌ Not started |
+| S-CAP-01 | Capability entity full design — capability profile UI, assignment tables (to Intent, Format, Agent), Level grading, gap flag, Universal Profile Structure applied to Capability | ❌ Not started |
+| S-METHOD-01 | Method definition + adapter layer formalization — methods table, capability↔method mapping, adapter layer contracts | ❌ Not started |
+| S-MONITOR-01 | Monitor & Alert intent — recurring/trigger-based execution pattern, scheduler, trigger model, notification layer (separate architecture from one-shot Intents) | ❌ Not started |
 
 ### Deferred (resume after sprint)
 | Session | Feature |

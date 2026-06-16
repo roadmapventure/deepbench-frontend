@@ -70,11 +70,19 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 3. Read `docs/SESSIONS.md` — confirm current version and next session
 4. For UI work: read `docs/PRD.md` + `docs/MOCK-NOTES.md` + `docs/STYLE-GUIDE.md`
 5. Read relevant source files in `src/` directly — confirm what already exists
-6. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, explicitly mark N/A in the kickoff doc. Do not skip this step.
-7. If UI work: describe mock for John's approval before writing the kickoff doc
-8. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
-9. Write kickoff doc with all 11 required sections
-9. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+6. **Architect Review** — mandatory before writing any task spec. Check all four:
+   - **Duplicate functionality:** grep for any function, component, hook, or constant the session plans to create. If it already exists anywhere in the codebase, reuse it — do not build a parallel implementation.
+   - **Cross-reference integrity:** for every catalog, constant, status flag, or label the session touches, verify every file that references it agrees on the current value and state. A contradiction between files (e.g. a pattern marked active on a badge but inactive in the catalog) must be resolved in this design session — never deferred to coding.
+   - **Layer violations:** confirm every new piece of logic lands in the correct architecture layer. Capability logic belongs in Layer 3 (`api/capabilities/`), not inline in React components (Layer 2). Flag violations before speccing the task.
+   - **Schema alignment:** for any DB column read or written, verify the column name and type against the actual Supabase schema or existing code before speccing the task. Never assume a column exists because a design doc mentions it.
+
+   If any check reveals a contradiction, duplication, or violation — resolve it now. Do not write a kickoff doc that contains a known inconsistency.
+
+7. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, explicitly mark N/A in the kickoff doc. Do not skip this step.
+8. If UI work: describe mock for John's approval before writing the kickoff doc
+9. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
+10. Write kickoff doc with all 11 required sections
+11. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 
 **Mandatory close-out steps (do not skip):**
 9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs, update session order table
