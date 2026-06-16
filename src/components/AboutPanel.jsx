@@ -1,4 +1,4 @@
-// DeepBench v5.1.32 | AboutPanel.jsx | About panel — 7-tab portfolio + product info panel
+// DeepBench v5.2.10 | AboutPanel.jsx | S-RENAME-01 UI label rename
 // FEATURE: SH-05 — About panel replacing Help modal
 
 import { useState } from "react";
@@ -227,7 +227,8 @@ function QuickStartTab() {
       <StepItem n={6}>Training tab → <strong style={{ fontWeight: 500 }}>Test Agent</strong> → run live scenarios, inspect assembled system prompt + RAG chunks + response</StepItem>
 
       <Divider />
-      <SH>How to Run a Task</SH>
+      {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+      <SH>How to Run a Work Order</SH>
       <p style={{ fontSize: 11, color: T.muted, lineHeight: 1.5, margin: "0 0 10px" }}>
         Assign work to your bench — your planning agent breaks it into steps, assigns the right agent, and tracks execution.
       </p>

@@ -1,4 +1,4 @@
-// DeepBench v5.1.0 | BenchNewScreen.jsx | Add a Player — agent creation wizard stub
+// DeepBench v5.2.10 | BenchNewScreen.jsx | S-RENAME-01 UI label rename
 // src/screens/BenchNewScreen.jsx — v5.0.0
 // DeepBench v5 — Add a Player (/bench/new)
 // 2-step wizard UI stubbed with Coming Soon
@@ -59,7 +59,8 @@ export default function BenchNewScreen() {
             </p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={()=>navigate("/bench")} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"10px 24px",cursor:"pointer",fontFamily:display,fontSize:14,fontWeight:700}}>← Back to the Bench</button>
-              <button onClick={()=>navigate("/")} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontFamily:body,fontSize:13}}>Assign Work Instead</button>
+              {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+              <button onClick={()=>navigate("/")} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontFamily:body,fontSize:13}}>New Work Order Instead</button>
             </div>
           </div>
         </div>
