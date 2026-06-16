@@ -1,4 +1,4 @@
-// DeepBench v5.1.33 | AssignWorkScreen.jsx | AiBadge tooltip labels
+// DeepBench v5.2.4 | AssignWorkScreen.jsx | AI-28 pattern badge labels + AI-29 step card pattern logic
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
+import { AI_PAT, AGENT_PATTERNS } from "../aiPatterns.js";
 
 const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" };
 
@@ -181,6 +182,8 @@ function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveSt
   const [hovered, setHovered] = useState(false);
   const [labelValue, setLabelValue] = useState(step.label);
   useEffect(() => { setLabelValue(step.label); }, [step.label]);
+  // FEATURE: AI-29 — derive patterns from AGENT_PATTERNS map by step.agentId
+  const agentEntry = step.agentId ? (AGENT_PATTERNS[step.agentId] ?? null) : null;
 
   const isHITL = step.type==="hitl", isSub = step.type==="subagent";
   const bl = isHITL?T.flag:isSub?"#2d6fb5":T.brassDeep;
@@ -216,8 +219,9 @@ function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveSt
             )}
             <div style={{flexShrink:0,display:"flex",gap:4,alignItems:"center"}}>
               {isHITL && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.3)`,fontWeight:700}}>● HUMAN</span>}
-              {isSub  && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:`1px solid rgba(45,111,181,.3)`,fontWeight:700}}>⇆ SUB-AGENT</span>}
-              {!isHITL&&!isSub && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent <AiBadge label="Agent Attribution"/></span>}
+              {isSub  && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:`1px solid rgba(45,111,181,.3)`,fontWeight:700}}>⇆ SUB-AGENT {agentEntry && <AiBadge label={agentEntry.patterns} built={agentEntry.built}/>}</span>}
+              {/* FEATURE: AI-29 — conditional pattern badge from AGENT_PATTERNS map */}
+              {!isHITL&&!isSub && <span style={{fontFamily:mono,fontSize:7.5,padding:"1px 5px",background:`rgba(182,135,58,.1)`,color:T.brassDeep,border:`1px solid rgba(182,135,58,.25)`}}>Agent {agentEntry && <AiBadge label={agentEntry.patterns} built={agentEntry.built}/>}</span>}
             </div>
           </div>
           {/* FEATURE: AW-UX-10 — Agent name badge is hover target → shows AgentHoverCard */}
@@ -230,7 +234,7 @@ function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveSt
               >
                 <AgentAvatar who={agent.id} size={14} ring={false}/>
                 <span style={{fontFamily:mono,fontSize:9,color:T.brassDeep}}>{agent.name} · {agent.code}</span>
-                <AiBadge label="Agent Attribution"/>
+                {agentEntry && <AiBadge label={agentEntry.patterns} built={agentEntry.built}/>}
                 {hovered && <AgentHoverCard agent={agent}/>}
               </span>
             </div>
@@ -607,7 +611,8 @@ export default function AssignWorkScreen() {
                 <FeatureBadge id="AW-04" />
                 <button onClick={generatePlan} disabled={!canGenerate||generating}
                   style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <AiBadge label="Plan Generation & AI Routing"/> {generating ? "Planning agent is building your task…" : "Generate Plan"}
+                  {/* FEATURE: AI-28 */}
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your task…" : "Generate Plan"}
                 </button>
               </div>
             )}
@@ -630,7 +635,8 @@ export default function AssignWorkScreen() {
                 <Corners/>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
                   <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Clarifying Questions</div>
-                  <AiBadge label="Plan Generation"/>
+                  {/* FEATURE: AI-28 */}
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/>
                   <span style={{fontFamily:mono,fontSize:8,color:T.muted,marginLeft:"auto"}}>{pendingQs.length} pending</span>
                 </div>
                 {questions.map(q=>(
@@ -655,7 +661,8 @@ export default function AssignWorkScreen() {
                 <FeatureBadge id="AW-UX-08" />
                 <button onClick={generatePlan} disabled={!canGenerate||generating}
                   style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <AiBadge label="Plan Generation & AI Routing"/> {generating ? "Planning agent is building your task…" : "Re-generate Plan"}
+                  {/* FEATURE: AI-28 */}
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your task…" : "Re-generate Plan"}
                 </button>
               </div>
             )}
@@ -664,7 +671,8 @@ export default function AssignWorkScreen() {
           {/* RIGHT: Instructions */}
           <div>
             {/* FEATURE: AW-UX-02 — Step 3 renamed to INSTRUCTIONS + AI badge */}
-            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 3 — INSTRUCTIONS <AiBadge label="Plan Generation"/></div>
+            {/* FEATURE: AI-28 */}
+            <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 3 — INSTRUCTIONS <AiBadge label={AI_PAT.TASK_PLANNING}/></div>
 
             {/* FEATURE: AG-04a — Michelle byline (generating + post-generation) */}
             {(generating || planGenerated) && (
@@ -698,7 +706,8 @@ export default function AssignWorkScreen() {
                 {/* Plan summary */}
                 {planSummary && (
                   <div style={{background:`${T.brass}06`,border:`1px solid ${T.brass}20`,padding:"7px 12px",fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10,display:"flex",gap:6,alignItems:"flex-start"}}>
-                    <AiBadge label="Plan Generation"/><span>{planSummary}</span>
+                    {/* FEATURE: AI-28 */}
+                    <AiBadge label={AI_PAT.TASK_PLANNING}/><span>{planSummary}</span>
                   </div>
                 )}
 
