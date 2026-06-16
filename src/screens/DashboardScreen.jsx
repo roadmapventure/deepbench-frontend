@@ -1,4 +1,4 @@
-// DeepBench v5.2.3 | DashboardScreen.jsx | AI-28 pattern badge labels + DB-22 Create New Task badge
+// DeepBench v5.2.10 | DashboardScreen.jsx | S-RENAME-01 UI label rename
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -539,7 +539,8 @@ export default function DashboardScreen() {
           {/* FEATURE: DB-22 — AiBadge on Create New Task button */}
           <span style={{position:"relative",display:"inline-flex",alignItems:"center"}}>
             <button onClick={()=>navigate("/work/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
-              <span style={{fontSize:14}}>+</span> Create a new Task
+              {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+              <span style={{fontSize:14}}>+</span> New Work Order
               <AiBadge label={AI_PAT.CREATE_TASK_FULL} style={{color:T.brassLight,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(210,183,130,0.3)"}}/>
             </button>
             <FeatureBadge id="AI-28"/>
@@ -551,7 +552,8 @@ export default function DashboardScreen() {
         {/* Stats strip */}
         <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,borderBottom:`3px solid ${T.brass}`,position:"relative"}}>
           <FeatureBadge id="SH-06" />
-          {[["Active Tasks",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
+          {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+          {[["Active Work Orders",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
               <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
@@ -566,11 +568,13 @@ export default function DashboardScreen() {
 
           {/* Left: task list */}
           <div>
-            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
+            {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Orders</div>
 
             {loading && (
               <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
-                <div style={{fontFamily:mono,fontSize:13,color:T.brass,fontStyle:"italic"}}>Loading tasks…</div>
+                {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                <div style={{fontFamily:mono,fontSize:13,color:T.brass,fontStyle:"italic"}}>Loading work orders…</div>
               </div>
             )}
 
@@ -587,7 +591,8 @@ export default function DashboardScreen() {
             {/* FEATURE: DB-03 — Show more drawer */}
             {hiddenCount > 0 && (
               <div onClick={()=>setDrawerOpen(d=>!d)} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:1.5,textTransform:"uppercase"}}>{drawerOpen?"▴ Show fewer":"▾ Show more tasks"}</span>
+                {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:1.5,textTransform:"uppercase"}}>{drawerOpen?"▴ Show fewer":"▾ Show more work orders"}</span>
                 {!drawerOpen && <span style={{fontFamily:mono,fontSize:8,color:T.muted,fontWeight:600}}>{hiddenCount} more</span>}
               </div>
             )}

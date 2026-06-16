@@ -1,4 +1,4 @@
-// DeepBench v5.2.7 | TaskInstructionsScreen.jsx | AI-31 AI pulse buttons on Re-run All + Update Steps
+// DeepBench v5.2.10 | TaskInstructionsScreen.jsx | S-RENAME-01 UI label rename
 // FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
@@ -305,7 +305,7 @@ export default function TaskInstructionsScreen() {
         .eq('tenant_id', TENANT_ID)
         .single();
       if (error || !data) {
-        setTaskError("Task not found");
+        setTaskError("Work Order not found");
         setLoading(false);
         return;
       }
@@ -355,7 +355,8 @@ export default function TaskInstructionsScreen() {
       <div style={{ flex:1, display:"flex", alignItems:"center",
         justifyContent:"center", color:T.brass,
         fontFamily:mono, fontSize:13 }}>
-        Loading task...
+        {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+        Loading work order...
       </div>
     </AppShell>
   );
@@ -365,7 +366,8 @@ export default function TaskInstructionsScreen() {
       <div style={{ flex:1, display:"flex", alignItems:"center",
         justifyContent:"center", color:T.flag,
         fontFamily:mono, fontSize:13 }}>
-        {taskError || "Task not found"}
+        {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+        {taskError || "Work Order not found"}
       </div>
     </AppShell>
   );
@@ -748,7 +750,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
         {/* Breadcrumb */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,fontFamily:mono,fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase"}}>
           <button onClick={()=>navigate("/")} style={{background:"transparent",border:"none",color:T.brass,cursor:"pointer",fontFamily:mono,fontSize:9,letterSpacing:1,textTransform:"uppercase",padding:0}}>Work Dashboard</button>
-          <span>›</span><span style={{color:T.ink}}>Task Instructions</span>
+          {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+          <span>›</span><span style={{color:T.ink}}>Work Order Instructions</span>
         </div>
 
         {/* FEATURE: TI-09 — Read-only completed banner */}
@@ -756,7 +759,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
           <div style={{position:"relative",background:"rgba(90,117,56,.08)",border:"1px solid rgba(90,117,56,.2)",padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10,fontFamily:mono,fontSize:11,color:"#5a7538"}}>
             <FeatureBadge id="TI-09" />
             <span>✓</span>
-            <span>This task was completed on {completedDateStr}</span>
+            {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+            <span>This Work Order was completed on {completedDateStr}</span>
           </div>
         )}
 
@@ -832,7 +836,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
               <div style={{background:`rgba(45,111,181,.05)`,border:`1px solid rgba(45,111,181,.2)`,padding:"12px 16px",marginBottom:14,position:"relative"}}>
                 <Corners color="#2d6fb5"/>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                  <span style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>This task started from a conversation</span>
+                  {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                  <span style={{fontFamily:mono,fontSize:8.5,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>This Work Order started from a conversation</span>
                   <AiBadge label="AI Chat"/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -904,7 +909,8 @@ where needed. Use the plan_task tool to return a structured plan.`;
             {/* Task summary */}
             <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden"}}>
               <div style={{background:T.navy,padding:"10px 16px",borderBottom:`2px solid ${T.brass}`}}>
-                <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Task Summary</div>
+                {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Work Order Summary</div>
               </div>
               <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:8}}>
                 {[["Agent",task.agent],["Type",task.type],["Steps",`${steps.length} total`],["Human steps",`${steps.filter(s=>s.type==="hitl").length} required`],["Status",task.status],["Created",task.created]].map(([k,v])=>(

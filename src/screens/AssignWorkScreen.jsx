@@ -1,4 +1,4 @@
-// DeepBench v5.2.7 | AssignWorkScreen.jsx | AI-31 byline badge fix — AiBadge outside hover-target
+// DeepBench v5.2.10 | AssignWorkScreen.jsx | S-RENAME-01 UI label rename
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -447,7 +447,7 @@ export default function AssignWorkScreen() {
     const qas = questions.map(q => ({ q: q.q, a: answers[q.id] || "" }));
     const { error } = await supabase.from("tasks").insert({
       tenant_id:    TENANT_ID,
-      title:        titleData.taskTitle || goal.trim() || "Untitled Task",
+      title:        titleData.taskTitle || goal.trim() || "Untitled Work Order",
       title_edited: titleData.titleEdited,
       agent_id:     selectedAgent?.id || selectedAgent,
       type:         taskTypeLabel,
@@ -494,7 +494,8 @@ export default function AssignWorkScreen() {
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4,position:"relative"}}>
           <FeatureBadge id="AW-UX-01" />
           <div>
-            <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:3}}>Work Dashboard · Assign New Work</div>
+            {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:3}}>Work Dashboard · New Work Order</div>
             <div style={{fontFamily:display,fontSize:28,fontWeight:500,color:T.navy,letterSpacing:"-.5px"}}>What do you need done?</div>
           </div>
           {/* FEATURE: AW-10 — Persistent save state indicator */}
@@ -507,7 +508,8 @@ export default function AssignWorkScreen() {
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
         {/* Task type tiles */}
-        <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 1 — Select Task Type</div>
+        {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+        <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Step 1 — Select Work Order Type</div>
         {/* FEATURE: AW-14 — Task type tile pre-populates goal textarea */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:20,position:"relative"}}>
           <FeatureBadge id="AW-14" />
@@ -537,9 +539,10 @@ export default function AssignWorkScreen() {
             <FeatureBadge id="DB-17" />
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
               <AgentAvatar who="michelle" size={28} ring={true} />
+              {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
               <span style={{fontFamily:body,fontSize:11,color:T.muted}}>
                 {titleData.titleEdited
-                  ? "Task title (edited)"
+                  ? "Work Order title (edited)"
                   : `${MICHELLE.initials} · ${MICHELLE.name} · ${MICHELLE.code} suggested this title`}
               </span>
             </div>
@@ -613,7 +616,8 @@ export default function AssignWorkScreen() {
                 <button onClick={generatePlan} disabled={!canGenerate||generating}
                   style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   {/* FEATURE: AI-28 */}
-                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your task…" : "Generate Plan"}
+                  {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your work order…" : "Generate Plan"}
                 </button>
               </div>
             )}
@@ -663,7 +667,8 @@ export default function AssignWorkScreen() {
                 <button onClick={generatePlan} disabled={!canGenerate||generating}
                   style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   {/* FEATURE: AI-28 */}
-                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your task…" : "Re-generate Plan"}
+                  {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your work order…" : "Re-generate Plan"}
                 </button>
               </div>
             )}
@@ -781,12 +786,12 @@ export default function AssignWorkScreen() {
                         <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,letterSpacing:.5}}>PRE-SELECTED FROM CONVERSATION</div>
                       </div>
                     </div>
-                    <div style={{fontFamily:display,fontSize:13,color:T.muted}}>Select a task type and describe your goal — the planning agent will build your step-by-step plan.</div>
+                    <div style={{fontFamily:display,fontSize:13,color:T.muted}}>Select a work order type and describe your goal — the planning agent will build your step-by-step plan.</div>
                   </>
                 ) : (
                   <>
                     <div style={{fontSize:24,marginBottom:10}}>📋</div>
-                    <div style={{fontFamily:display,fontSize:14,color:T.muted}}>Select a task type and describe your goal — the planning agent will build your step-by-step plan.</div>
+                    <div style={{fontFamily:display,fontSize:14,color:T.muted}}>Select a work order type and describe your goal — the planning agent will build your step-by-step plan.</div>
                   </>
                 )}
               </div>
