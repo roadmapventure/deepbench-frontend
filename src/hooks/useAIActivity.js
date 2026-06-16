@@ -1,4 +1,4 @@
-// DeepBench v5.2.2 | useAIActivity.js | AI-23 patch — sorted service/pattern/agent arrays for dynamic UI
+// DeepBench v5.2.6 | useAIActivity.js | AI-30 — pattern catalog expanded to 20 patterns (PAT-11–20)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -26,6 +26,7 @@ export const SERVICE_CATALOG = [
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
+// FEATURE: AI-30 — PATTERN_CATALOG expanded to 20 entries (PAT-11–20); hitlSpecial + partial flags added
 export const PATTERN_CATALOG = [
   { slug: 'rag',                name: 'RAG',                desc: 'Retrieval-Augmented Generation — embed query, search vector store, inject retrieved chunks into context before LLM call',             active: true  },
   { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true  },
@@ -36,7 +37,17 @@ export const PATTERN_CATALOG = [
   { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true  },
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true  },
   { slug: 'browser-automation', name: 'Browser Automation', desc: 'Playwright-controlled browser execution — agent drives a real browser instance on Railway infrastructure',                            active: true  },
-  { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
+  { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, hitlSpecial: true, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
+  { slug: 'agent-orchestration',      name: 'Agent Orchestration',          desc: 'One agent delegates work to a peer agent mid-execution; subagent output feeds back into the orchestrating task. Distinct from agent routing (pre-call selection): orchestration happens inside a running execution loop.', active: false, roadmap: 'next',  roadmapNote: 'Becomes live in S11 (step execution) + AW-17 (multi-agent step assignment)' },
+  { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
+  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: false, roadmap: 'next',  roadmapNote: 'Playbook tab has always/never guardrail records; runtime enforcement not yet wired' },
+  { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
+  { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: false, roadmap: 'later', roadmapNote: 'Natural fit for PE-12 Test Agent scoring and AI-24 routing feedback loop' },
+  { slug: 'multi-agent-debate',       name: 'Multi-Agent Debate',           desc: 'Two agents take opposing positions and argue against each other\'s output; a synthesis agent reads both arguments and produces a reconciled final answer. Agents are adversarially aware — each sees the other\'s response.', active: false, roadmap: 'later', roadmapNote: 'Extends Test Team (TT-01/02); adds critique pass + synthesis agent. TT-03 design session required.' },
+  { slug: 'chain-of-verification',    name: 'Chain-of-Verification (CoVe)', desc: 'After generating an answer, the model generates a checklist of verification questions about its own factual claims, answers each independently, then revises the original answer. Targets factual accuracy claim by claim.', active: false, roadmap: 'later', roadmapNote: 'High compliance relevance for government procurement deliverables. No implementation planned yet.' },
+  { slug: 'episodic-memory',          name: 'Episodic Memory',              desc: 'Agents recall the context of prior interactions with a specific user, task, or organization — separate from factual knowledge in RAG. RAG retrieves facts; episodic memory retrieves experience.', active: false, roadmap: 'later', roadmapNote: 'Differentiates AI workforce (colleagues with history) from AI tools (stateless responders). Phase 3+.' },
+  { slug: 'hyde',                     name: 'HyDE',                         desc: 'Before retrieving from the knowledge base, generate a hypothetical ideal answer to the query, embed that hypothetical, and use the resulting vector for retrieval — significantly improves RAG quality for domain-specific terminology.', active: false, roadmap: 'next',  roadmapNote: 'One-model change inside SVC-02 Knowledge Retrieval — no schema changes required' },
+  { slug: 'adaptive-rag',             name: 'Adaptive RAG',                 desc: 'Dynamically adjusts retrieval depth and strategy based on query complexity. Simple queries: shallow retrieval (3 chunks). Complex analysis: deep retrieval (20+ chunks) with keyword fallback. Prevents over-retrieval cost waste.', active: false, roadmap: 'next',  roadmapNote: 'Complexity classifier inside SVC-02 Knowledge Retrieval — no schema changes required' },
 ];
 
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
@@ -229,7 +240,7 @@ export function useAIActivity() {
   }
 
   const servicesActive      = Object.values(byService).filter(s => s.total > 0).length;
-  const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length; // static: 8 of 10
+  const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length;
 
   // FEATURE: AI-23 patch — sorted arrays for dynamic section rendering
   // Services: primary sort = type order (ai→hybrid→logic), secondary = calls desc
@@ -253,7 +264,7 @@ export function useAIActivity() {
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, patternsCatalogTotal: PATTERN_CATALOG.length, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
 }
 
 export { MODEL_PROVIDER };

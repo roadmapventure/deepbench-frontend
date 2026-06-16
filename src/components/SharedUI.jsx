@@ -1,4 +1,4 @@
-// DeepBench v5.1.35 | SharedUI.jsx | AiBadge tooltip position:fixed fix
+// DeepBench v5.2.3 | SharedUI.jsx | AiBadge built prop for greyed/dashed unbuilt pattern state
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -72,7 +72,7 @@ export const FeatureBadge = ({ id }) => (
 );
 
 // ── AiBadge — AI heartbeat diamond badge for AI-touched elements ─────────────
-export const AiBadge = ({ style, label }) => {
+export const AiBadge = ({ style, label, built = true }) => {
   const [show, setShow] = useState(false);
   const [tipPos, setTipPos] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
@@ -91,8 +91,12 @@ export const AiBadge = ({ style, label }) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShow(false)}>
       {/* FEATURE: AI-01 — AiBadge tooltip label */}
-      <span style={{fontFamily:mono,fontSize:8,background:`rgba(182,135,58,0.15)`,border:`1px solid rgba(182,135,58,0.4)`,padding:"1px 5px",color:T.brass,letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
-        <AIDiamond size="6px" color={T.brass}/> AI
+      <span style={{fontFamily:mono,fontSize:8,
+        background: built ? `rgba(182,135,58,0.15)` : `rgba(120,109,82,0.12)`,
+        border: built ? `1px solid rgba(182,135,58,0.4)` : `1px dashed rgba(120,109,82,0.35)`,
+        padding:"1px 5px",color: built ? T.brass : T.muted,
+        letterSpacing:0.3,flexShrink:0,display:"inline-flex",alignItems:"center",gap:3,...style}}>
+        <AIDiamond size="6px" color={built ? T.brass : T.muted}/> AI
       </span>
       {show && (
         <>
@@ -184,6 +188,7 @@ export function AgentAvatar({ who, size = 68, ring = true }) {
   );
 }
 
+// FEATURE: AI-28
 // ── FlagCard — collapsible procurement flag card ──────────────────────────────
 export const FlagCard = ({ severity, title, summary, detail, amount, count, recommendation, totalSpend }) => {
   const [open, setOpen] = useState(false);
@@ -213,7 +218,7 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${c}22`}}>
           {detail&&<div style={{fontSize:12.5,color:T.mutedDeep,lineHeight:1.6,marginBottom:10,fontFamily:body}}>{detail}</div>}
           {recommendation&&<div style={{background:`${T.moss}10`,border:`1px solid ${T.moss}40`,padding:"10px 14px"}}>
-            <div style={{fontSize:10,color:T.moss,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:mono}}>💡 Recommended Action <AiBadge label="AI Analysis"/></div>
+            <div style={{fontSize:10,color:T.moss,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:mono}}>💡 Recommended Action</div>
             <div style={{fontSize:12.5,color:T.mutedDeep,lineHeight:1.5,fontFamily:body}}>{recommendation}</div>
           </div>}
         </div>

@@ -1,4 +1,4 @@
-// DeepBench v5.1.27 | StepList.jsx | S15c — rename Update Steps + move below textarea
+// DeepBench v5.2.7 | StepList.jsx | AI-31p — Update Steps button: pulse dot + AiBadge
 // FEATURE: TI-UX-15c — Rename "Update Plan →" to "Update Steps →"; move below comment textarea
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
@@ -7,8 +7,9 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { FeatureBadge, AgentAvatar } from "./SharedUI.jsx";
+import { FeatureBadge, AgentAvatar, AiBadge } from "./SharedUI.jsx";
 import { AGENTS } from "../data/agents.js";
+import { AI_PAT } from "../aiPatterns.js";
 
 // Type → visual theme
 const TYPE_THEME = {
@@ -288,6 +289,7 @@ function StepCard({
 
           {/* FEATURE: TI-UX-15c — Update Steps button moved below comment textarea (AW-UX-08 pattern) */}
           {/* FEATURE: AW-16 — Update Steps button regenerates steps */}
+          {/* FEATURE: AI-31 — Update Steps: pulsing dot + AiBadge */}
           {step.questions && step.questions.length > 0 && onUpdatePlan && !updatingPlan && !isCompleted && (
             <div style={{ position: "relative", marginTop: 10 }}>
               <FeatureBadge id="AW-16" />
@@ -296,9 +298,12 @@ function StepCard({
                 style={{
                   background: T.brass, color: T.navy, border: "none",
                   padding: "7px 18px", fontFamily: display, fontSize: 12,
-                  fontWeight: 700, cursor: "pointer",
+                  fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                 }}>
+                <span style={{ display:"inline-block", width:4, height:4, borderRadius:"50%",
+                  background:T.navyDeep, animation:"pdot 1.4s ease-in-out infinite", flexShrink:0 }}/>
                 Update Steps →
+                <AiBadge label={AI_PAT.TASK_PLANNING}/>
               </button>
             </div>
           )}

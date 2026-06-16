@@ -1,4 +1,4 @@
-// DeepBench v5.1.34 | RosterScreen.jsx | AiBadge label correction
+// DeepBench v5.2.5 | RosterScreen.jsx | AI-28 badge label sweep — KNOWLEDGE_TRAINING
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
@@ -10,6 +10,7 @@ import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
+import { AI_PAT } from "../aiPatterns.js";
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
@@ -131,10 +132,11 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
         {agent.trainable
           ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:agent.color===T.moss?T.moss:T.brass}}>
               {/* FEATURE: RO-08 */}
+              {/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
               <AiBadge style={agent.color===T.moss
                 ? {color:"#fff", background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.3)"}
                 : {color:T.navy, background:"rgba(18,36,60,0.12)", border:"1px solid rgba(18,36,60,0.2)"}
-              } label="RAG & Training"/>
+              } label={AI_PAT.KNOWLEDGE_TRAINING}/>
               <button onClick={()=>onAddTraining(agent)}
                 style={{padding:10,fontFamily:body,fontSize:11.5,fontWeight:700,background:"transparent",color:agent.color===T.moss?"#fff":T.navy,border:"none",cursor:"pointer"}}>
                 + Add Training

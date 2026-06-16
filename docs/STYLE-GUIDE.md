@@ -134,13 +134,30 @@ For form field labels where AI pre-filled a value, use the purple chip:
 
 ---
 
-## 5. Pulsing AI Status Dot
+## 5. AI Pulse Icon — AIDiamond (Updated 2026-06-15)
 
+The canonical AI activity indicator is `<AIDiamond />` from `src/components/AIDiamond.jsx`. It renders a small brass animated diamond (square rotated 45°, `aiDiamondBeat` animation).
+
+**Do NOT use a raw `<span>` with `pdot` animation as a substitute — that is not the AI pulse icon.**
+
+### Props
+```jsx
+<AIDiamond size="7px" color={T.brass} animationDuration="2.4s" />
+```
+
+### When to use AIDiamond
+- On any button or UI element that invokes an AI call, to signal AI activity at a glance
+- On step cards to mark AI-powered steps (alongside pattern label — design TBD in S-AI-AUDIT-UX-01)
+- In the app header during active AI calls (existing usage — do not change)
+
+### Pattern label display on AIDiamond (design required)
+The pattern tooltip ("Tool Use · Structured Output · Streaming") should be carried by or adjacent to AIDiamond — not by a separate AiBadge chip. Exact treatment (title attribute, wrapper tooltip, hover label) to be decided in S-AI-AUDIT-UX-01 design session. **Do not ship AiBadge chips next to AIDiamond on buttons until this is specced.**
+
+### Current exceptions (shipped, pending redesign)
+- "Re-run All" and "Update Steps →" buttons currently use a raw `<span>` dot + AiBadge chip (AI-31, S-AI-BADGE-05/05p). These need to be replaced with AIDiamond + pattern tooltip in a future session — tracked as AI-31 revision.
+
+### Header usage (existing — do not change)
 A pulsing brass dot `●` appears in the header when any AI call is active. Implemented via `AIDiamond.jsx`. Do not refactor without a dedicated session.
-
-- Color: `T.brass` (`#b6873a`)
-- Size: 4×4px, `rounded-full`
-- Animation: `animate-pulse`
 - Shown: during active AI call
 - Hidden (removed, not just opacity 0): when call resolves
 

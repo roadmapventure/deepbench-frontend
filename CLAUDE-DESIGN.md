@@ -70,9 +70,10 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 3. Read `docs/SESSIONS.md` — confirm current version and next session
 4. For UI work: read `docs/PRD.md` + `docs/MOCK-NOTES.md` + `docs/STYLE-GUIDE.md`
 5. Read relevant source files in `src/` directly — confirm what already exists
-6. If UI work: describe mock for John's approval before writing the kickoff doc
-7. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
-8. Write kickoff doc with all 10 required sections
+6. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, explicitly mark N/A in the kickoff doc. Do not skip this step.
+7. If UI work: describe mock for John's approval before writing the kickoff doc
+8. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
+9. Write kickoff doc with all 11 required sections
 9. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 
 **Mandatory close-out steps (do not skip):**
