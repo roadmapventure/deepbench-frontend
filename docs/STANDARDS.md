@@ -46,23 +46,25 @@ Branch: commit directly to `dev`. No feature branches.
 
 ## Section 3: Mandatory Kickoff Doc Structure
 
-Every kickoff doc must have these 10 sections in order:
+Every kickoff doc must have these 11 sections in order:
 
 1. **SESSION** header (name, version, branch, files to read first)
 2. **CONTEXT** (what the feature does, why it exists)
-3. **STUB definitions** if any (e.g. `const MICHELLE = {...}`)
-4. **TASKS** (max 4, each with exact code spec)
-5. **DESIGN RULES** (tokens, fonts, styling — required for UI sessions)
-6. **SCOPE RULES** (what NOT to touch)
-7. **NODE.JS TEST** (full code written out — not described, not referenced)
-8. **CLAUDE CODE VERIFICATION CHECKLIST**
-9. **COMMIT instruction** — must include `git push origin dev` after the commit
-10. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
+3. **AI PATTERN CHECK** — does this feature have an opportunity to use an AI pattern not yet wired in? Name the pattern + service, or mark N/A. Never skip.
+4. **STUB definitions** if any (e.g. `const MICHELLE = {...}`)
+5. **TASKS** (max 4, each with exact code spec)
+6. **DESIGN RULES** (tokens, fonts, styling — required for UI sessions)
+7. **SCOPE RULES** (what NOT to touch)
+8. **NODE.JS TEST** (full code written out — not described, not referenced)
+9. **CLAUDE CODE VERIFICATION CHECKLIST**
+10. **COMMIT instruction** — must include `git push origin dev` after the commit
+11. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
 Claude Code has no memory and no Drive access. Every kickoff doc must be fully self-contained — no "as discussed" or "refer to standards" references.
 
 **Kickoff doc compliance check before issuing:**
-- [ ] All 10 sections present
+- [ ] All 11 sections present
+- [ ] AI Pattern Check section present — names pattern + service, or explicitly marks N/A
 - [ ] Node.js test is full code (not described)
 - [ ] Category K tests if touching mergedSteps or Supabase JSONB
 - [ ] Category L live API test if touching any api/ endpoint
@@ -319,6 +321,7 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 
 | Date | Change |
 |------|--------|
+| 2026-06-15 | AI Pattern Check added as mandatory Section 3 in kickoff doc (11 sections total). Design sessions must check PATTERN_CATALOG + SERVICE_CATALOG before choosing implementation approach. |
 | 2026-06-06b | Sub-session versioning, category J |
 | 2026-06-06c | Drive scope rule |
 | 2026-06-06i | Category K added — component state initialization. Three-operation separation mandated. `saveStepsToSupabase` canonical function mandated. |
