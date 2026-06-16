@@ -1,4 +1,4 @@
-// DeepBench v5.1.35 | DashboardScreen.jsx | revert useless header overflow
+// DeepBench v5.2.3 | DashboardScreen.jsx | AI-28 pattern badge labels + DB-22 Create New Task badge
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { FETCH_API_BASE } from "../config.js";
 import { supabase } from "../lib/supabase.js";
+import { AI_PAT } from "../aiPatterns.js";
 
 // ── Status + Priority styles ──────────────────────────────────────────────────
 const STATUS_STYLES = {
@@ -289,7 +290,7 @@ function ChatPanel() {
     <div style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:600}}>
       {/* Header */}
       <div style={{background:T.navy,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
-        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}} label="AI Chat"/></div>
+        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:"rgba(184,197,216,.8)",textTransform:"uppercase"}}>Chat With Agent <AiBadge style={{marginLeft:6}} label={AI_PAT.CHAT_RESPONSE}/></div>
         <div style={{background:`rgba(182,135,58,.2)`,border:`1px solid rgba(182,135,58,.4)`,padding:"2px 8px",fontFamily:mono,fontSize:8,color:T.brassLight,fontWeight:700,letterSpacing:1}}>● Online</div>
       </div>
 
@@ -350,7 +351,7 @@ function ChatPanel() {
                   <AgentAvatar who={msg.agentId} size={18} ring={false} />
                   <span style={{fontFamily:display,fontSize:11,fontWeight:600,color:T.navy}}>{agent?.name}</span>
                   <span style={{fontFamily:mono,fontSize:8,padding:"1px 5px",background:tier.bg,color:tier.color,border:`1px solid ${tier.border}`}}>{tier.label}</span>
-                  <AiBadge label="Agent Response"/>
+                  <AiBadge label={AI_PAT.CHAT_RESPONSE}/>
                 </div>
               )}
               {msg.isIntro && (
@@ -372,7 +373,7 @@ function ChatPanel() {
               {/* Routing suggestion card */}
               {msg.isRouting ? (
                 <div style={{background:`rgba(45,111,181,.06)`,border:`1.5px solid rgba(45,111,181,.3)`,padding:"10px 12px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}><AiBadge label="AI Routing"/><span style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:.5}}>Routing Suggestion</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}><AiBadge label={AI_PAT.AGENT_ROUTING}/><span style={{fontFamily:mono,fontSize:8,color:"#2d6fb5",textTransform:"uppercase",letterSpacing:.5}}>Routing Suggestion</span></div>
                   <div style={{fontSize:12,color:T.mutedDeep,lineHeight:1.5,marginBottom:8}}>{msg.content}</div>
                   <div style={{display:"flex",gap:7}}>
                     <button onClick={()=>acceptRouting(msg)} style={{background:"#2d6fb5",color:"#fff",border:"none",padding:"5px 14px",fontFamily:display,fontSize:11,fontWeight:700,cursor:"pointer"}}>Route to {msg.suggestName?.split(" ")[0]} →</button>
@@ -535,9 +536,14 @@ export default function DashboardScreen() {
             <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,lineHeight:1.5}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
           </div>
           {/* FEATURE: DB-06 — Assign New Work button */}
-          <button onClick={()=>navigate("/work/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
-            <span style={{fontSize:14}}>+</span> Create a new Task
-          </button>
+          {/* FEATURE: DB-22 — AiBadge on Create New Task button */}
+          <span style={{position:"relative",display:"inline-flex",alignItems:"center"}}>
+            <button onClick={()=>navigate("/work/new")} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,whiteSpace:"nowrap"}}>
+              <span style={{fontSize:14}}>+</span> Create a new Task
+              <AiBadge label={AI_PAT.CREATE_TASK_FULL} style={{color:T.brassLight,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(210,183,130,0.3)"}}/>
+            </button>
+            <FeatureBadge id="AI-28"/>
+          </span>
         </div>
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
