@@ -1,4 +1,4 @@
-// DeepBench v5.2.4 | AssignWorkScreen.jsx | AI-28 pattern badge labels + AI-29 step card pattern logic
+// DeepBench v5.2.7 | AssignWorkScreen.jsx | AI-31 byline badge fix — AiBadge outside hover-target
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -225,8 +225,9 @@ function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveSt
             </div>
           </div>
           {/* FEATURE: AW-UX-10 — Agent name badge is hover target → shows AgentHoverCard */}
+          {/* FEATURE: AI-31 — AiBadge moved outside hover-target so tooltip is independently hoverable */}
           {agent && !isHITL && !isSub && (
-            <div style={{marginBottom:4}}>
+            <div style={{marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
               <span
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
@@ -234,9 +235,9 @@ function StepCard({ step, agent, onRemove, index, onStepLabelChange, onArchiveSt
               >
                 <AgentAvatar who={agent.id} size={14} ring={false}/>
                 <span style={{fontFamily:mono,fontSize:9,color:T.brassDeep}}>{agent.name} · {agent.code}</span>
-                {agentEntry && <AiBadge label={agentEntry.patterns} built={agentEntry.built}/>}
                 {hovered && <AgentHoverCard agent={agent}/>}
               </span>
+              {agentEntry && <AiBadge label={agentEntry.patterns} built={agentEntry.built}/>}
             </div>
           )}
           {isHITL && (

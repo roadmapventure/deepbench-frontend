@@ -1,4 +1,4 @@
-// DeepBench v5.1.33 | TaskInstructionsScreen.jsx | AiBadge tooltip labels
+// DeepBench v5.2.7 | TaskInstructionsScreen.jsx | AI-31 AI pulse buttons on Re-run All + Update Steps
 // FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabase.js";
 import { TENANT_ID } from "../config.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
 import StepList from "../components/StepList.jsx";
+import { AI_PAT } from "../aiPatterns.js";
 
 // FEATURE: TI-03 — Task loaded from Supabase
 // FEATURE: AW-13 — Clarifying questions as HITL step
@@ -181,12 +182,15 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
                   {!isCompleted && (
                     <div style={{position:"relative",marginTop:10}}>
                       <FeatureBadge id="AW-16" />
+                      {/* FEATURE: AI-31 — Update Steps: pulsing dot + AiBadge */}
                       <button
                         onClick={() => onUpdatePlan && onUpdatePlan(step.questions)}
                         style={{background:T.brass,color:T.navy,
                           border:"none",padding:"7px 18px",fontFamily:display,
-                          fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                          fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.navyDeep,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
                         Update Steps →
+                        <AiBadge label={AI_PAT.TASK_PLANNING}/>
                       </button>
                     </div>
                   )}
@@ -797,7 +801,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
             {/* FEATURE: TI-06 — Mark Complete button */}
             {!isCompleted && (
               <div style={{display:"flex",gap:8,flexShrink:0}}>
-                <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5}}>Re-run All</button>
+                {/* FEATURE: AI-31 — Re-run All: pulsing dot + AiBadge */}
+                <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
+                  Re-run All
+                  <AiBadge label={AI_PAT.TASK_PLANNING}/>
+                </button>
                 <button onClick={handleMarkComplete} style={{fontFamily:mono,fontSize:9,color:T.moss,background:"rgba(90,117,56,.1)",border:`1px solid rgba(90,117,56,.3)`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>Mark Complete ✓</button>
               </div>
             )}
