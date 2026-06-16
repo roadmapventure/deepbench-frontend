@@ -1,4 +1,4 @@
-// DeepBench v5.2.6 | AIActivityPanel.jsx | AI-30 — pattern catalog expanded to 20; HITL + Parallelization special rows
+// DeepBench v5.2.7 | AIActivityPanel.jsx | AI-32 pattern collapse card + AI-33 roadmap 2-column redesign
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
@@ -182,6 +182,7 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
   const [zeroClosed, setZeroClosed] = useState(true);
+  const [inactivePtnClosed, setInactivePtnClosed] = useState(true);
   const toggle = (key) => setSections(s => ({ ...s, [key]: !s[key] }));
 
   // FEATURE: AI-10 — Hydrate lifetime totals from Supabase once on mount
@@ -232,11 +233,32 @@ export default function AIActivityPanel({ onClose }) {
         {tab === "activity" && (
           <>
             {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
+            {/* FEATURE: AI-32 — By Pattern inactive collapse card */}
             <SectionHeader label="By Pattern · Industry Catalog" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
             {sections.pattern && (
               patternsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
-                : patternsSorted.map(pat => <PatternRow key={pat.slug} d={pat}/>)
+                : (() => {
+                    const activeAndSpecial = patternsSorted.filter(p => p.active || p.hitlSpecial || p.partial);
+                    const inactive = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
+                    return (
+                      <>
+                        {activeAndSpecial.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                        {inactive.length > 0 && (
+                          <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
+                            <div
+                              onClick={()=>setInactivePtnClosed(o=>!o)}
+                              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
+                            >
+                              <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Not yet active · {inactive.length} patterns</div>
+                              <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{inactivePtnClosed?"▼":"▲"}</div>
+                            </div>
+                            {!inactivePtnClosed && inactive.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
             )}
 
             {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
@@ -337,32 +359,35 @@ export default function AIActivityPanel({ onClose }) {
 
             {/* FEATURE: AI-23 patch — Roadmap collapsible; Patterns Now tier removed */}
             <SectionHeader label="Platform Roadmap" open={sections.roadmap} onToggle={()=>toggle('roadmap')}/>
+            {/* FEATURE: AI-33 — Platform Roadmap: Next + Later only, 2-column AI Patterns × DeepBench Services */}
             {sections.roadmap && (
               <div style={{paddingBottom:12}}>
-                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Services</div>
                 {[
-                  { tier:"Now",  color:T.moss,  items:["Knowledge Retrieval","Autonomous Research","Task Planning","Title Generation","Agent Routing","Chat / Consultative","Document Extraction","Procurement Flags","Vendor Concentration","Column Detection"] },
-                  { tier:"Next", color:T.brass, items:["Prompt Assembly — extracts from inline code (S-INFRA-01)","Knowledge Reinforcement — generalizes beyond Brent (S-INFRA-02)","Pre-Run Planning — formalizes as discrete step (S-INFRA-01)"] },
-                  { tier:"Later",color:T.muted, items:["Persona Replication — full design required (S-JL-01)"] },
-                ].map(({ tier, color, items }) => (
-                  <div key={tier} style={{marginBottom:10}}>
-                    <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>{tier}</div>
-                    {items.map(item=>(
-                      <div key={item} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:10,paddingBottom:2,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:3}}>{item}</div>
-                    ))}
-                  </div>
-                ))}
-
-                {/* FEATURE: AI-23 patch — Patterns roadmap: Now tier removed; only Next + Later, driven from PATTERN_CATALOG */}
-                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6,marginTop:12}}>AI Patterns</div>
-                {PATTERN_CATALOG.filter(p => !p.active).map(pat => (
-                  <div key={pat.slug} style={{marginBottom:10}}>
-                    <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:pat.roadmap==='next'?T.brass:T.muted,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>{pat.roadmap === 'next' ? 'Next' : 'Later'}</div>
-                    <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:10,borderLeft:`2px solid ${pat.roadmap==='next'?T.brass:T.muted}30`,marginLeft:2,marginBottom:3}}>
-                      {pat.name} — {pat.roadmapNote}
+                  { key:'next',  label:'Next',  color:T.brass },
+                  { key:'later', label:'Later',  color:T.muted },
+                ].map(({ key, label, color }) => {
+                  const tierPats = PATTERN_CATALOG.filter(p => !p.active && p.roadmap === key);
+                  const tierSvcs = SERVICE_CATALOG.filter(s => s.roadmap === key);
+                  return (
+                    <div key={key} style={{marginBottom:16}}>
+                      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color,textTransform:"uppercase",letterSpacing:1.2,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${T.lineSoft}`}}>{label}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                        <div>
+                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:5}}>AI Patterns</div>
+                          {tierPats.map(p => (
+                            <div key={p.slug} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:8,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:4}}>{p.name}</div>
+                          ))}
+                        </div>
+                        <div>
+                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:5}}>DeepBench Services</div>
+                          {tierSvcs.map(s => (
+                            <div key={s.slug} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:8,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:4}}>{s.name}</div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
