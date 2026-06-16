@@ -1,4 +1,4 @@
-// DeepBench v5.1.34 | PersonnelScreen.jsx | AiBadge label corrections + Playbook badge
+// DeepBench v5.2.5 | PersonnelScreen.jsx | AI-28 badge label sweep — KNOWLEDGE_TRAINING + PROMPT_ASSEMBLY
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -11,6 +11,7 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
 import { logAICall } from "../hooks/useAIActivity.js";
+import { AI_PAT } from "../aiPatterns.js";
 
 // FEATURE: PE-03 — Training tab live wiring
 async function apiGetEntries(agent_id) {
@@ -685,7 +686,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
                 ? "⏳ Saving…"
                 : existingEntry
                   ? "▸ Save Course Detail"
-                  : <><AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="RAG & Routing Training"/> ▸ Teach {agent.name.split(" ")[0]} this document</>
+                  : <>{/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}<AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label={AI_PAT.KNOWLEDGE_TRAINING}/> ▸ Teach {agent.name.split(" ")[0]} this document</>
               }
             </button>
           </div>
@@ -910,7 +911,8 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
             }}
           >
             {!(showAddView || editingEntry) && (
-              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label="RAG & Routing Training"/>
+              <>{/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
+              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label={AI_PAT.KNOWLEDGE_TRAINING}/></>
             )}
             {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
           </button>
@@ -1079,7 +1081,8 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               </button>
               {isExpanded && e.learnedSummary && (
                 <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
-                  <AiBadge style={{marginBottom:5,display:"inline-block"}} label="Learned Knowledge"/> {e.learnedSummary}
+                  {/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
+                  <AiBadge style={{marginBottom:5,display:"inline-block"}} label={AI_PAT.KNOWLEDGE_TRAINING}/> {e.learnedSummary}
                 </div>
               )}
             </div>
@@ -1194,7 +1197,7 @@ function PlaybookTab({ agent, showToast }) {
           />
         ))}
         {/* FEATURE: AI-01-patch — AiBadge on Playbook Add New Format */}
-        {!loading && canEdit && !showAdd && (          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 , display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>+ Add New Format <AiBadge label="Prompt Build"/></button>
+        {!loading && canEdit && !showAdd && (          <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: "9px", background: "transparent", border: `1px dashed ${T.lineSoft}`, color: T.brassDeep, fontFamily: body, fontSize: 12, cursor: "pointer", marginTop: 2, fontWeight: 500 , display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>{/* FEATURE: AI-28 — PROMPT_ASSEMBLY pattern label */}+ Add New Format <AiBadge label={AI_PAT.PROMPT_ASSEMBLY}/></button>
         )}
         {showAdd && (
           <AddConfigForm type="output_format" agentId={agent.id} onSaved={handleFormatAdded} onCancel={() => setShowAdd(false)} showToast={showToast} />
