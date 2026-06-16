@@ -554,7 +554,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| WO-01 | Work Order DB table + rename — migrate `tasks` → `work_orders`; rename all task_id refs; update routes, UI labels, API contracts | ❌ Missing | S-RENAME-01 |
+| WO-01 | Work Order UI label rename — all user-visible "Task" → "Work Order" labels across DashboardScreen, AssignWorkScreen, TaskInstructionsScreen, BenchNewScreen, AboutPanel. Backend rename (DB table, routes, variables) deferred to future session. | 🔶 Partial (design done) | S-RENAME-01 |
 | WO-02 | Work Order creation flow — replace current Assign Work screen with Work Order creation: Intent picker (9 intents), Format picker (filtered by Intent), goal/purpose/audience/scope fields, Deliverable specs array with per-spec constraints | ❌ Missing | S-WO-01 |
 | WO-03 | Work Order `deliverables[]` — structured Deliverable spec array inside Work Order jsonb; minimum 1 spec; each spec carries intent, format, action, constraints (must/must-not), template ref | ❌ Missing | S-WO-01 |
 | WO-04 | Work Order lifecycle states — draft → submitted → planning → awaiting_approval → in_progress → paused → change_requested → complete / failed / gap_flagged | ❌ Missing | S-WO-01 |
