@@ -1,18 +1,19 @@
-// DeepBench v5.2.3 | aiPatterns.js | AI Pattern label constants + agent→pattern map
+// DeepBench v5.2.8 | aiPatterns.js | AI-36 — Reflection removed from labels where active: false
 // FEATURE: AI-28 — AiBadge label sweep: shared constants for all three badge sessions
 
+// FEATURE: AI-36 — Reflection removed; active: false in PATTERN_CATALOG
 // Pattern label strings — match AI Audit By Pattern section terminology exactly
 export const AI_PAT = {
   TASK_PLANNING:           "Tool Use · Structured Output · Streaming",
   AGENT_ROUTING:           "RAG · Structured Output",
   CHAT_RESPONSE:           "RAG · Prompt Chaining · Streaming",
-  PROMPT_ASSEMBLY:         "Prompt Chaining · Reflection · RAG",
+  PROMPT_ASSEMBLY:         "Prompt Chaining · RAG",
   KNOWLEDGE_TRAINING:      "RAG · Embeddings",
-  KNOWLEDGE_REINFORCEMENT: "Reflection · Embeddings · Structured Output",
+  KNOWLEDGE_REINFORCEMENT: "Embeddings · Structured Output",
   AUTONOMOUS_RESEARCH:     "ReAct · Browser Automation · Streaming",
-  AI_REVIEW:               "RAG · Prompt Chaining · Reflection",
+  AI_REVIEW:               "RAG · Prompt Chaining",
   // DB-22 — full pattern set across the entire Create New Task → Assign Work flow
-  CREATE_TASK_FULL: "RAG · Embeddings · Tool Use · Structured Output · Streaming · Prompt Chaining · Reflection",
+  CREATE_TASK_FULL: "RAG · Embeddings · Tool Use · Structured Output · Streaming · Prompt Chaining",
 };
 
 // Agent code → execution patterns for step card badges (AI-29 — used in S-AI-BADGE-02)

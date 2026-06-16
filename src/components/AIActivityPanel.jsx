@@ -1,4 +1,4 @@
-// DeepBench v5.2.7 | AIActivityPanel.jsx | AI-32 pattern collapse card + AI-33 roadmap 2-column redesign
+// DeepBench v5.2.8 | AIActivityPanel.jsx | AI-36 — By Pattern split into Structural / Reasoning subsections
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
@@ -234,16 +234,34 @@ export default function AIActivityPanel({ onClose }) {
           <>
             {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
             {/* FEATURE: AI-32 — By Pattern inactive collapse card */}
+            {/* FEATURE: AI-36 — By Pattern section split into Structural and Reasoning subsections */}
             <SectionHeader label="By Pattern · Industry Catalog" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
             {sections.pattern && (
               patternsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
                 : (() => {
-                    const activeAndSpecial = patternsSorted.filter(p => p.active || p.hitlSpecial || p.partial);
-                    const inactive = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
+                    const structural = patternsSorted.filter(p => (p.active || p.partial) && p.patternType === 'structural');
+                    const reasoning  = patternsSorted.filter(p => (p.active || p.hitlSpecial || p.partial) && p.patternType === 'reasoning');
+                    const inactive   = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
                     return (
                       <>
-                        {activeAndSpecial.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                        {/* FEATURE: AI-36 — Structural subsection */}
+                        {structural.length > 0 && (
+                          <>
+                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4}}>Structural</div>
+                            {structural.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                          </>
+                        )}
+
+                        {/* FEATURE: AI-36 — Reasoning subsection */}
+                        {reasoning.length > 0 && (
+                          <>
+                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Reasoning</div>
+                            {reasoning.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                          </>
+                        )}
+
+                        {/* Inactive collapse card — unchanged */}
                         {inactive.length > 0 && (
                           <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
                             <div
