@@ -61,7 +61,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | DB-19 | Module naming — Work/Bench dashboards | ✅ Done | S15a |
 | DB-20 | Nav tab styling — brass borders, active states | ✅ Done | S15a |
 | DB-21 | AIDiamond.jsx — animated heartbeat AI indicator | ✅ Done | S15a |
-| DB-22 | "Create a New Task" button on Work dashboard — add AiBadge with tooltip "Planning & Routing" (AI pulse indicator, consistent with AI-01 sweep) | ❌ Missing | S-future |
+| DB-22 | "Create a New Task" button on Work dashboard — add AiBadge showing all patterns used across the full Create New Task flow: RAG · Embeddings · Tool Use · Structured Output · Streaming · Prompt Chaining · Reflection | ❌ Missing | S-AI-BADGE-01 |
 
 **DB-17 Notes:** Michelle generates concise title + step names on first draft. `title_edited` flag — user owns title after first edit, never overwritten. `api/title.js`: direct Claude Haiku call; Supabase agent_configs wired in S-BENCH-01.
 
@@ -301,6 +301,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AI-25 | `ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs), properties jsonb (llm_provider, llm_model, token_budget, execution_mode, rag_match_count, byok_eligible), in_nigp, in_deepbench, current_route, target_route, version, created_at. Seed with all 14 services (SVC-01 through SVC-14) on creation. | ❌ Missing | S-INFRA-01 |
 | AI-26 | `ai_patterns` table — Supabase catalog of 10 industry-standard AI Patterns: slug, name, description. Seed with PAT-01 through PAT-10 on creation. Referenced by `ai_services.patterns` jsonb array. | ❌ Missing | S-INFRA-01 |
 | AI-27 | Service Health tracking — `success` boolean + `error_type` text column on `ai_activity_log`; enables per-Service failure rate, uptime, and p50/p95 latency in AI Audit. Part of AI-22 lineage work or separate extension. | ❌ Missing | S-INFRA-01 |
+| AI-28 | AiBadge label sweep — update all 21 existing AiBadge tooltip labels app-wide to AI Pattern names (full pattern list per responsible service); remove FlagCard deterministic badge (SharedUI); add `built` prop to AiBadge for greyed/dashed visual when pattern not yet implemented. Constants centralized in `src/aiPatterns.js`. Three coding sessions: S-AI-BADGE-01/02/03. | ❌ Missing | S-AI-BADGE-01/02/03 |
+| AI-29 | Step card conditional pattern badge — derive execution patterns from assigned agent code (Approach A: agent→AGENT_PATTERNS map) with step-name keyword fallback (Approach B); HITL steps = no badge; greyed dashed badge for unbuilt patterns (Pat IR-07, Susan TR-08, multi-agent PAT-11); no badge on deterministic steps. | ❌ Missing | S-AI-BADGE-02 |
 
 **AI-22 Notes:** `ai_activity_log` currently has `ai_type`, `feature`, `model`, `agent_id`, `task_id` — a pre-Agent-Profile-Model categorization. The four new columns are additive and nullable — no existing data affected. Once present, every AI call has a full lineage chain. The platform's own internal capabilities (Task Planning, Title Generation, Agent Routing) are themselves Deliverables produced by agents — they must also carry these columns, making the platform self-describing.
 
@@ -500,6 +502,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AA-36 | Quick-start from description — user pastes job description or role description; Haiku auto-configures character settings and suggests capability assignments; user reviews and approves before agent is created | ❌ Missing | S-BYOA-01 (design required) |
 | AA-37 | Demo seeding — pre-seed existing roster agents (Chloe, Mike, Bob, Robyn, etc.) with character settings + meaningful AIS scores so platform demos as differentiated without any training required by the visitor | ❌ Missing | S-CHAR-01 |
 | AA-41 | Build Your Own Agent — 5-step guided wizard: (1) Identity — name, role, quip, avatar; (2) Character — philosophy picker, skeptic slider, autonomy dial, advanced settings collapsed; (3) Capabilities — assignment menu + depth + LLM; (4) Knowledge — optional first upload/URL/template; (5) Review — AIS starting score + plain-English character summary (not settings labels). Design session + UX mockup required before coding. | ❌ Missing | S-BYOA-01 (design required) |
+| AA-42 | Michelle pattern advisory — at plan time, Michelle identifies when a step's requirements call for a pattern the assigned agent doesn't currently provide; shows greyed advisory chip on the step card alongside the normal pattern badge indicating what pattern would be needed. Design session required before coding. | ❌ Missing | S-future (design required) |
 
 ### Phase 3 Additions (from S-AGENT-ARCH-01 cont.)
 
@@ -598,7 +601,10 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | Session | Feature | Status |
 |---------|---------|--------|
-| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md + AI-SERVICES.md created — full Services/Deliverables registry, AI Patterns catalog (10), AI Services catalog (14), sharing patterns, feedback loops, MCP surfaces. Part 3: kickoff docs for S-AI-AUDIT-REDESIGN + S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 next |
+| S-AI-BADGE-01 | AiBadge foundation — `src/aiPatterns.js` constants + AGENT_PATTERNS map, AiBadge greyed/dashed state for unbuilt patterns, DashboardScreen badge label updates (3), DB-22 Create New Task badge (AI-28 partial, DB-22) | ⬅ NEXT |
+| S-AI-BADGE-02 | AiBadge sweep — AssignWorkScreen label updates (7 badges), step card conditional pattern badge logic, AIReviewTab label update (AI-28 partial, AI-29) | — |
+| S-AI-BADGE-03 | AiBadge sweep — PersonnelScreen (4 badges), ResumeTab (3 badges), RosterScreen (1 badge) label updates (AI-28 complete) | — |
+| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md + AI-SERVICES.md created — full Services/Deliverables registry, AI Patterns catalog (10), AI Services catalog (14), sharing patterns, feedback loops, MCP surfaces. Part 3: kickoff docs for S-AI-AUDIT-REDESIGN + S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 after badge sessions |
 | S-AI-AUDIT-REDESIGN | **Design session first, then coding** — Rebuild AI Audit screen on AI Services model: (1) rename By Activity Type → By Service; (2) add By Pattern section; (3) add Deterministic section; (4–5) keep By LLM + By Agent. Remap existing ai_type strings to service_slug values. Seed `ai_services` + `ai_patterns` tables (AI-25, AI-26). Updates AI-23. Read `docs/AI-SERVICES.md` Sections 2, 3, 6 before starting. | — |
 | S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
 | S-DELIVER-04 | DL-04 + DL-05 + DL-07 + DL-10 + DL-11 + DL-12 — `deliverables` table, change request flow, agent Projects tab, Web Research/Fetch/Plan/Flags/Analysis write | — |

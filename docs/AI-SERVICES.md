@@ -51,6 +51,7 @@ Industry-standard architectural approaches. DeepBench does not own these — it 
 | PAT-08 | Embeddings | Vector generation — text converted to dense vector for similarity search or storage | OpenAI text-embedding-3-small |
 | PAT-09 | Browser Automation | Playwright-controlled browser execution — agent drives a real browser instance on Railway | Microsoft Playwright |
 | PAT-10 | HITL | Human-in-the-Loop — agent pauses at a defined gate and waits for human input before continuing | DeepBench step gate architecture |
+| PAT-11 | Agent Orchestration | One agent (the orchestrator) delegates work to a peer agent mid-execution; the subagent's output feeds back into the orchestrating task. Distinct from agent routing (pre-call system selection via SVC-08): orchestration happens inside a running agent's execution loop. Not yet implemented — becomes live in S11 (step execution) and fully realized in AW-17 (multi-agent step assignment). | Anthropic multi-agent architecture docs; emerging industry standard |
 
 ---
 
