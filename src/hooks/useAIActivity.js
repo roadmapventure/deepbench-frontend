@@ -1,4 +1,4 @@
-// DeepBench v5.2.8 | useAIActivity.js | AI-36 — patternType field added to PATTERN_CATALOG
+// DeepBench v5.2.9 | useAIActivity.js | AI-36p — Reflection removed from SERVICE_CATALOG patterns
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -9,17 +9,17 @@ import { supabase } from '../lib/supabase.js';
 
 // FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
 export const SERVICE_CATALOG = [
-  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','Reflection','RAG'],                         roadmap: 'next' },
+  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
-  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Reflection','Embeddings','Structured Output'],                roadmap: 'next' },
-  { slug: 'pre-run-planning',        name: 'Pre-Run Planning',          serviceType: 'ai',     patterns: ['RAG','Reflection'],                                           roadmap: 'next' },
+  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
+  { slug: 'pre-run-planning',        name: 'Pre-Run Planning',          serviceType: 'ai',     patterns: ['RAG'],                                                        roadmap: 'next' },
   { slug: 'task-planning',           name: 'Task Planning',             serviceType: 'ai',     patterns: ['Tool Use','Structured Output','Streaming'],                   roadmap: 'now'  },
   { slug: 'title-generation',        name: 'Title Generation',          serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
   { slug: 'agent-routing',           name: 'Agent Routing',             serviceType: 'ai',     patterns: ['RAG','Structured Output'],                                    roadmap: 'now'  },
   { slug: 'chat-response',           name: 'Chat / Consultative',       serviceType: 'ai',     patterns: ['RAG','Prompt Chaining','Streaming'],                          roadmap: 'now'  },
   { slug: 'document-extraction',     name: 'Document Extraction',       serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
-  { slug: 'persona-replication',     name: 'Persona Replication',       serviceType: 'ai',     patterns: ['RAG','Prompt Chaining','Reflection'],                         roadmap: 'later'},
+  { slug: 'persona-replication',     name: 'Persona Replication',       serviceType: 'ai',     patterns: ['RAG','Prompt Chaining'],                                     roadmap: 'later'},
   { slug: 'procurement-flags',       name: 'Procurement Flags',         serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'vendor-concentration',    name: 'Vendor Concentration',      serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'column-detection',        name: 'Column Detection',          serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
