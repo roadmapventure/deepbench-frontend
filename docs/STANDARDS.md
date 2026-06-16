@@ -64,10 +64,15 @@ Claude Code has no memory and no Drive access. Every kickoff doc must be fully s
 
 **Kickoff doc compliance check before issuing:**
 - [ ] All 11 sections present
+- [ ] Architect Review complete: no duplicate functionality introduced — grepped for existing implementations
+- [ ] Architect Review complete: all cross-references verified consistent across every file that shares them
+- [ ] Architect Review complete: DB columns verified against actual schema before speccing any read/write
+- [ ] Architect Review complete: no layer violations in task specs
 - [ ] AI Pattern Check section present — names pattern + service, or explicitly marks N/A
 - [ ] Node.js test is full code (not described)
 - [ ] Category K tests if touching mergedSteps or Supabase JSONB
 - [ ] Category L live API test if touching any api/ endpoint
+- [ ] Category M consistency test if touching any cross-referenced data (see Section 4)
 - [ ] Manual QA is session-specific
 - [ ] No external references
 - [ ] Design tokens present if UI work
@@ -114,6 +119,16 @@ Mandatory K tests:
 - Unanswered HITL detection uses `q.a` (persisted) not ephemeral state
 - Label-based dedup (not ID-based) for LLM-generated steps
 - Answers snapshot overlaid before unanswered detection fires
+
+**M. Cross-Reference Consistency Tests** — REQUIRED for any session that touches data shared across more than one file: `PATTERN_CATALOG`, `aiPatterns.js` (`AI_PAT` constants, `AGENT_PATTERNS` map), AiBadge label strings, `SERVICE_CATALOG`, `AGENT_NAMES`, `AVATAR_CFG`, `agent_configs` schema, or any shared constant map. Also required for any session that introduces a new constant, slug, or status flag that will be referenced in more than one file.
+
+Mandatory M tests:
+- Every pattern slug referenced in `AGENT_PATTERNS` or any AiBadge label exists in `PATTERN_CATALOG`
+- Every pattern slug in `PATTERN_CATALOG` with `active: true` is NOT listed in the Platform Roadmap (roadmap only shows `active: false`)
+- Every pattern slug in `PATTERN_CATALOG` with `active: false` is NOT listed as a live badge on any currently-executing feature
+- Every service slug in `SERVICE_CATALOG` with `roadmap: 'now'` has a corresponding live implementation (verified by checking that the relevant `api/` route or inline logic exists)
+- No slug, constant, or status value appears with conflicting definitions across the files that reference it
+- Any new constant introduced this session is defined in exactly one place and imported everywhere else — never redefined
 
 **L. Live API Integration Tests** — REQUIRED for any session that modifies an `api/` endpoint, modifies code that calls an `api/` endpoint, adds retry logic, or changes any payload sent to an API endpoint. Added after S14p4b — a change to `handleUpdatePlan` caused the planning agent to intermittently return no steps. Pure logic tests cannot catch LLM response shape issues. A live call test catches these before the code ships.
 
@@ -224,6 +239,13 @@ Complete every item before committing.
 - [ ] Label-based dedup (not ID-based)
 - [ ] Active/archived split on load by `mergeStatus`
 
+### Category M — Cross-Reference Consistency
+- [ ] Every pattern slug in AiBadge labels / AGENT_PATTERNS exists in PATTERN_CATALOG
+- [ ] No active-false pattern appears as a live badge on a currently-executing feature
+- [ ] No now-tier service slug is absent from the codebase (route or inline logic exists)
+- [ ] No slug or constant is defined in more than one place with conflicting values
+- [ ] Any new constant introduced is defined once and imported — not redefined inline
+
 ### Category L — Live API Integration
 - [ ] Live API test file written and run before commit
 - [ ] `test-[session]-api.mjs` deleted before commit
@@ -321,6 +343,7 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 
 | Date | Change |
 |------|--------|
+| 2026-06-15 | Architect Review added as mandatory Step 6 in CLAUDE-DESIGN.md kickoff doc generation: duplicate functionality check, cross-reference integrity check, layer violation check, schema alignment check. Category M added — cross-reference consistency tests required for any session touching shared constants, slugs, or status flags across multiple files. Kickoff doc compliance checklist updated with Architect Review gate and Category M requirement. Root cause: AiBadge labels set from SVC design intent without verifying PATTERN_CATALOG active status — Reflection listed on Playbook badge while marked inactive in catalog. |
 | 2026-06-15 | AI Pattern Check added as mandatory Section 3 in kickoff doc (11 sections total). Design sessions must check PATTERN_CATALOG + SERVICE_CATALOG before choosing implementation approach. |
 | 2026-06-06b | Sub-session versioning, category J |
 | 2026-06-06c | Drive scope rule |
