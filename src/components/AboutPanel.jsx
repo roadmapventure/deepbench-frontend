@@ -159,16 +159,33 @@ function PurposeTab() {
 function ArchitectureTab() {
   return (
     <>
-      <SH mt={0}>For the Product Manager</SH>
+      <SH mt={0}>The DEEP / BENCH Model</SH>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <div style={{ background: "#1a2e4a", padding: "11px 13px", borderTop: `3px solid ${T.brass}` }}>
+          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.brassLight, letterSpacing: 1.5, marginBottom: 8 }}>DEEP</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>① Services</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>② Skills</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf" }}>③ Capabilities</div>
+          <div style={{ fontSize: 9, color: T.muted, marginTop: 8, lineHeight: 1.4 }}>The engine — builds and trains expertise</div>
+        </div>
+        <div style={{ background: "#1a2e4a", padding: "11px 13px", borderTop: `3px solid ${T.moss}` }}>
+          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: "#7ec8a0", letterSpacing: 1.5, marginBottom: 8 }}>BENCH</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>④ Agents</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf" }}>⑤ Deliverables</div>
+          <div style={{ fontSize: 9, color: T.muted, marginTop: 8, lineHeight: 1.4 }}>The workforce — deployed and producing</div>
+        </div>
+      </div>
+      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: "0 0 12px" }}>
+        <strong style={{ fontWeight: 500 }}>Skills are the atomic unit.</strong> Skill Profiles — configured instances of a Skill — are independent of agents. An agent is authorized to use a Skill Profile at a specific depth; it does not own it. The same Skill Profile can be shared, upgraded, and priced independently of any individual agent.
+      </p>
+
+      <SH>For the Product Manager</SH>
       <div style={{ background: "#1a2e4a", padding: "11px 13px", fontFamily: mono, fontSize: 9, lineHeight: 1.7, marginBottom: 10, borderRadius: 2 }}>
         <div style={{ color: T.brassLight }}>Layer 4 — Platform Services &nbsp;&nbsp;&nbsp;Auth · Multi-tenancy · Security</div>
         <div style={{ color: "#8fa3bf" }}>Layer 2 — Product Modules &nbsp;&nbsp;&nbsp;&nbsp;Work Dashboard · Bench Dashboard</div>
         <div style={{ color: "#8fa3bf" }}>Layer 3 — Capability Services &nbsp;Planning · RAG · Chat · Analysis · Web…</div>
         <div style={{ color: "#8fa3bf" }}>Layer 1 — Shared Foundation &nbsp;&nbsp;&nbsp;Tokens · Agents · Supabase · Config</div>
       </div>
-      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: 0 }}>
-        <strong style={{ fontWeight: 500 }}>Skills are the atomic unit.</strong> Skill Profiles — configured instances of a Skill — are independent of agents. An agent is authorized to use a Skill Profile at a specific depth; it does not own it. The same Skill Profile can be shared, upgraded, and priced independently of any individual agent.
-      </p>
 
       <Divider />
       <SH>For the Engineer</SH>

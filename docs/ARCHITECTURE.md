@@ -22,6 +22,37 @@ Design decisions must work for both. When in doubt ask:
 
 ---
 
+## 0b. The DEEP / BENCH Model [LOCKED]
+
+DeepBench's name is its architecture. The product has two sides — each with named components that map directly to the product experience.
+
+```
+DEEP                            BENCH
+────────────────────────        ──────────────────────
+Services                        Agents
+Skills                          Deliverables
+Capabilities
+```
+
+**DEEP — 3 components** — the engine that builds and trains expertise
+- **Services** (Technical Services) — the AI Pattern and Deterministic execution engine; how Skills run
+- **Skills** — the atomic unit; five types (Identity, Behavior, Knowledge, Intent, Format) configured into Skill Profiles
+- **Capabilities** — grouped Skill Profiles packaged into reusable, priceable, MCP-accessible expertise
+
+**BENCH — 2 components** — the workforce you deploy and the work they produce
+- **Agents** — Competencies with a persona (name, avatar, role); the named workforce members
+- **Deliverables** — the typed, governed, auditable output produced at every level of execution
+
+**The pitch sentence:**
+> *"DeepBench has two sides: DEEP — Technical Services, Skills, and Capabilities — the engine that builds and trains expertise; and BENCH — Agents and Deliverables — the workforce you deploy and the work they produce."*
+
+**Why the name works architecturally:**
+- DEEP = depth of training, depth of knowledge, depth levels (L1–L4) — the compounding asset
+- BENCH = the workforce bench — the agents ready to deploy, the deliverables they produce
+- The deeper the DEEP, the more valuable the BENCH
+
+---
+
 ## 1. The Four-Layer Architecture [LOCKED]
 
 DeepBench is organized into four layers. Each layer has one responsibility.
