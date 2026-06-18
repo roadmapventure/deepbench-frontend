@@ -167,7 +167,7 @@ function ArchitectureTab() {
         <div style={{ color: "#8fa3bf" }}>Layer 1 — Shared Foundation &nbsp;&nbsp;&nbsp;Tokens · Agents · Supabase · Config</div>
       </div>
       <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: 0 }}>
-        <strong style={{ fontWeight: 500 }}>Capabilities are independent of agents.</strong> An agent is authorized to use a capability at a specific depth — it does not own it. The same capability can be shared, upgraded, and priced independently of any individual agent.
+        <strong style={{ fontWeight: 500 }}>Skills are the atomic unit.</strong> Skill Profiles — configured instances of a Skill — are independent of agents. An agent is authorized to use a Skill Profile at a specific depth; it does not own it. The same Skill Profile can be shared, upgraded, and priced independently of any individual agent.
       </p>
 
       <Divider />
@@ -202,7 +202,7 @@ function ArchitectureTab() {
 
       <Divider />
       <SH>My Product Architectural Decisions</SH>
-      <DecisionItem title="Capabilities are independent of agents"   desc="The single most important call. Not hardwired to agents — enables the marketplace, depth pricing, and agent swaps without a rebuild." />
+      <DecisionItem title="Skills are the atomic unit — independent of agents"   desc="The single most important call. Skill Profiles are not hardwired to agents — they are configurable instances that can be shared, priced, and exposed via MCP independently of any individual agent." />
       <DecisionItem title="No AI logic inside React components"      desc="Every AI call lives in a serverless route named for the capability. Prevents agent-specific tangle; enables independent pricing and reuse." />
       <DecisionItem title="Supabase as behavioral prompt storage"    desc="Agent prompts live in a database, not code. Versioned, auditable, tenant-scoped. No deployment needed to change agent behavior." />
       <DecisionItem title="tenant_id on every table from day one"    desc="Multi-tenancy stubs in place with one tenant today. Adding Clerk in v6 is a wrapping layer — not a schema rewrite." />
@@ -246,7 +246,7 @@ function RevenueTab() {
   return (
     <>
       <p style={{ fontSize: 12, color: T.navy, lineHeight: 1.6, margin: "0 0 12px" }}>
-        The monetization model is baked into the architecture — not an afterthought. The unit of value is <strong style={{ fontWeight: 500 }}>capability depth</strong> — not the model, not the seat count. Depth is measurable, transferable, and priceable.
+        The monetization model is baked into the architecture — not an afterthought. The unit of value is <strong style={{ fontWeight: 500 }}>Skill Profile depth</strong> — not the model, not the seat count. A deeply trained Skill Profile is proprietary IP — owned by the tenant, chargeable to others. Depth is measurable, transferable, and priceable.
       </p>
       <SH mt={0}>Revenue Streams</SH>
       <RevenueCard title="Capability Depth Pricing"    desc="Level 1 (general knowledge) costs less than Level 4 (proprietary, deeply trained). Every call priced against a depth tier. Deeper capability = more value delivered = higher price." />
@@ -287,9 +287,9 @@ function RoadmapTab() {
         ))}
       </div>
 
-      <SH>Capability Registry — The Heartbeat</SH>
+      <SH>Skills — The Heart of the Platform</SH>
       <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: "0 0 8px" }}>
-        The capability registry is the nucleus of DeepBench. Capabilities are independent, discrete, deployable services — not hardwired to agents. Agents are assigned capabilities at specific depth levels (1–4). This is what makes the marketplace, depth pricing, and measurable output quality possible.
+        Skills are the atomic unit of DeepBench. Five types — Identity, Behavior, Knowledge, Intent, Format — are configured into Skill Profiles: proprietary, measurable, deployable instances that agents hold Seniority in at specific depth levels (1–4). Skills combine into Capabilities, which assemble into Agents. Every level is independently configurable, priceable, and MCP-accessible. This is what makes the marketplace, depth pricing, and measurable output quality possible.
       </p>
       <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.5, padding: "8px 10px", border: `1px solid ${T.lineSoft}`, background: T.cardAlt }}>
         Phase 1: Task Planning · Title Generation · Agent Routing · RAG Query · Chat Response · Data Analysis · Document Extraction · Web Research (ReAct) · Knowledge Reinforcement · Capability Audit · Procurement Flags · Vendor Concentration · Column Detection / NIGP Lookup · Identity / Persona Replication
