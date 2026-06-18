@@ -1,5 +1,5 @@
 # DeepBench — Architecture North Star
-# Version: v5.2 | Last updated: 2026-06-15 | Session: S-DELIVER-DESIGN
+# Version: v5.2 | Last updated: 2026-06-18 | Session: Architecture Model Redesign
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
 > This document supersedes all prior architecture notes.
@@ -56,8 +56,8 @@ Files: `src/tokens.js`, `src/data/agents.js`, `src/lib/supabase.js`, `src/config
 
 ### Layer 2 — Product Modules
 The two user-facing dashboards:
-- **Work** — task assignment, step execution, HITL management, capability audit
-- **Bench** — team roster, personnel files, capability assignments, training
+- **Work** — work order assignment, step execution, HITL management, capability audit
+- **Bench** — team roster, personnel files, skill profile assignments, training
 
 New modules can be added without changing Layers 1 or 3.
 A module can be removed without affecting agent capabilities.
@@ -67,7 +67,7 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 
 **Critical rules [LOCKED]:**
 - Capabilities are independent of any specific agent
-- An agent does not OWN a capability — it is AUTHORIZED to USE one at a certain depth
+- An agent does not OWN a capability — it holds Seniority to USE one at a certain Level
 - Capability routes are named for the capability, never for the agent
   - ❌ Wrong: `api/michelle-plan.js`
   - ✅ Right: `api/capabilities/task-planning.js`
@@ -105,13 +105,13 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 
 ---
 
-## 2. Agent Profile Model [LOCKED — Vocabulary + Structure]
+## 2. The Platform Model [LOCKED — Vocabulary + Structure]
 
-> The Agent Profile Model is the core data model of DeepBench. Every product feature on the Bench side wraps around this model. All vocabulary defined here is canonical — use it in code comments, UI labels, kickoff docs, and design sessions.
+> The Platform Model is the core conceptual and data model of DeepBench. Every product feature wraps around this model. All vocabulary defined here is canonical — use it in code comments, UI labels, kickoff docs, and design sessions.
 >
-> **Important:** Capabilities within each Competency are listed as candidates only. They are suggestive — not locked. Each Competency requires a dedicated design and modeling session before any Capability inside it is built. We can build a single Capability with a single Property in one sprint without touching anything else in the model.
+> **Updated 2026-06-18 (Architecture Model Redesign):** Supersedes the prior Agent Profile Model (three Competencies). Skills are now the atomic unit of the platform. The hierarchy runs: Technical Services → Skills → Skill Profiles → Capabilities → Competencies → Agents → Deliverables. Intent and Format are now Skill types (no longer standalone entities). AI Patterns and Deterministic logic are now Technical Services — the platform-facing execution engine, not user-facing Skills.
 >
-> **Updated 2026-06-16 (S-DELIVER-DESIGN Part 3):** The Deliverables Competency has been removed. See note below under "Competency: Deliverables." Intent and Format are now independent first-class entities — see `docs/INTENT-MODEL.md` and `docs/FORMAT-MODEL.md`.
+> **Important:** Skill Profiles within each Skill type are listed as examples only. Each Skill type requires a dedicated design and modeling session before any Skill Profile inside it is built. We can build a single Skill Profile in one sprint without touching anything else in the model.
 
 ---
 
@@ -119,217 +119,225 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 
 | Term | Definition |
 |------|-----------|
-| **Agent** | Named persona. Has a voice, avatar, role, quip. The human-facing identity. |
-| **Competency** | One of four parent categories that define an agent. Every agent has all four. |
-| **Capability** | An individual named element within a Competency. The shareable, gradable unit of agent value. |
-| **Grade** | Verb — the act of assessing and assigning a Level to a Capability. |
-| **Level** | Noun — the result of grading. L1–L4. Determines quality, pricing, and routing. |
-| **Seniority** | Authorizing an agent to use a Capability at a specific Level. |
-| **Qualities & Properties** | Universal configuration dials that apply to every Capability regardless of Competency. |
-| **Method** | Technical implementation layer. How a Capability or Deliverable executes. Never user-facing. |
-| **Model Score** | Rolled-up score across all Competency Levels. The agent's overall grade. |
+| **Technical Service** | An AI Pattern or Deterministic engine that executes a Skill. Platform-facing — never user-facing as a concept. |
+| **Skill** | A type of ability the platform supports. Five types: Identity, Behavior, Knowledge, Intent, Format. |
+| **Skill Profile** | A configured instance of a Skill type. Where proprietary IP and novel value live. Created by users or platform admins. |
+| **Capability** | A grouped set of Skill Profiles with its own Profile. Novel and configurable. |
+| **Competency** | An assembled set of Skill Profiles and/or Capabilities. Can be packaged and exposed with or without a persona. |
+| **Agent** | A Competency with a persona — name, avatar, role, quip. The human-facing workforce member. |
+| **Work Order** | The unit of work assigned to a Competency. Contains Steps. |
+| **Step** | A discrete unit of execution within a Work Order. May consume prior Deliverables as input context. |
+| **Deliverable** | An output object produced when a Skill, Capability, Step, or Work Order completes execution. First-class entity. |
+| **Deliverable Handoff** | A Step property declaring which prior Deliverable(s) it consumes as input context. |
+| **Profile** | The configured state of any entity — Skill, Capability, Competency, or Agent. |
+| **Level** | Depth and quality grade of a Skill Profile. L1–L4. Determines quality, pricing, and routing. |
+| **Grade** | The act of assessing and assigning a Level to a Skill Profile. |
+| **Seniority** | Authorizing an Agent to use a Skill Profile or Capability at a specific Level. |
+| **Model Score** | Rolled-up score across all Skill Profile Levels held by a Competency. |
 
-> **Reserved term:** "Assignment" means work assigned to an agent — a task or step. Never use it to describe Seniority or Capability authorization.
+> **Reserved term:** "Assignment" means work assigned to a Competency — a Work Order or Step. Never use it to describe Seniority or Skill Profile authorization.
 
 ---
 
-### The Three Competencies
-
-> **Updated 2026-06-16:** Reduced from four to three Competencies. The Deliverables Competency has been removed — see note below.
+### The Hierarchy
 
 ```
-AGENT PROFILE MODEL
-│
-│  Model Score = rollup of Competency Levels
-│  Competency Level = rollup of Capability Levels within it
-│  Capability Level = result of grading its Qualities & Properties
-│
-├── COMPETENCY: Identity       — Who the agent is
-├── COMPETENCY: Skills         — What the agent can do
-└── COMPETENCY: Knowledge      — What the agent knows
-
-+ Intent Assignments  (standalone — what types of work the agent performs)
-+ Format Assignments  (standalone — what output structures the agent produces)
-+ Deliverable History (portfolio view — what the agent has produced; Projects tab PE-06)
+Technical Services  — AI Patterns + Deterministic (platform-facing execution engine)
+  ↓ execute
+Skills              — 5 types: Identity, Behavior, Knowledge, Intent, Format
+  ↓ configured into
+Skill Profiles      — novel, proprietary instances of a Skill (where IP lives)
+  ↓ combine into
+Capabilities        — grouped Skill Profiles with their own Profile
+  ↓ assemble into
+Competencies        — packaged Capability sets (with or without a persona)
+  ↓ persona-bearing Competency =
+Agents              — named, avatared workforce members
+  ↓ execute against
+Work Orders         — with Steps that may consume prior Deliverables as input
+  ↓ produce
+Deliverables        — output objects attributed to the producing Competency
 ```
 
-**Baseline behavior:** An agent with no defined Competencies or Capabilities still produces output — operating at L1 (General) across the board using generic LLM. The Agent Profile Model enriches quality and routing precision but never blocks execution. Agents grow into their profiles one sprint at a time.
+**Baseline behavior:** A Competency with no defined Skill Profiles still produces output — operating at L1 (General) using generic LLM. The platform model enriches quality and routing precision but never blocks execution. Competencies grow into their profiles one sprint at a time.
 
 ---
 
-### Competency: Identity
-*Who the agent is — mindset, philosophy, personality, ethics.*
-Capabilities are agent-scoped. Identity does not share across agents.
-Design session required before building any Capability here.
+### The Three Visions
 
-**Candidate Capabilities** *(suggestive — not locked)*
-- Character
-- Ethics
-- Behavioral Style
-- Philosophy
-- Autonomy
-- Skeptic Level
-- Temporal Stance
-- Epistemology
-- Collaboration Role
-- Learning Stance
-- Peter Principle
+| Audience | Vision |
+|----------|--------|
+| **Human** | Load your Skills, configure your Profiles, and be recreated as a Competency — your knowledge, behavior, and identity preserved and operational. |
+| **Machine** | An LLM assembles Skills, Capabilities, and Competencies at runtime to execute any Work Order or Step without human configuration at call time. |
+| **Technical** | Every Skill Profile, Capability, and Agent is configurable, measurable, sharable, revenue-generating, and MCP-accessible at every level of the hierarchy. |
 
 ---
 
-### Competency: Skills
-*What the agent can do — named abilities, each with a Level.*
-Skills are **shared resources**. The same Skill can be assigned to multiple agents at different Levels. Training a Skill benefits all agents assigned to it.
-Design session required before building any Capability here.
+### Five Skill Types
 
-**Candidate Capabilities** *(suggestive — not locked)*
-- Domain Expertise
-- Behavioral Application
-- Reasoning
+Skills are the atomic unit of the platform. Five types are defined. New Skill types can always be added without changing existing ones.
 
-> **Note:** RAG Query, LLM calls, and Playwright are **Methods** — the technical means by which Skills execute. They are not Skills themselves. See Method layer below.
+| Skill Type | What it captures | Example Skill Profiles |
+|-----------|-----------------|----------------------|
+| **Identity** | Who the agent is — mindset, philosophy, personality, ethics | Philosophy, Autonomy, Skeptic Level, Temporal Stance, Epistemology |
+| **Behavior** | How the agent thinks and communicates — style, reasoning, tone | Behavioral Style, Collaboration Role, Learning Stance, Peter Principle |
+| **Knowledge** | What the agent knows — domain facts, training corpus, IP | NIGP Domain Knowledge, Legal Procurement Expertise, Austin FY2025 Data |
+| **Intent** | What type of cognitive work the agent performs | Analysis Report, Research Findings, Review Feedback, Draft Document, Monitor & Alert |
+| **Format** | What output structures the agent produces | HTML Strategy Brief, Executive Brief, NIGP Dashboard, Structured Report |
 
----
-
-### Competency: Knowledge
-*What the agent knows — the training corpus that raises Skill Levels.*
-Design session required before building any Capability here.
-
-Three training input types feed this Competency and develop corresponding Skills:
-
-| Training Input | What it captures | Develops → Skill Capability |
-|---------------|-----------------|---------------------------|
-| Knowledge | Domain facts, reference material | Domain Expertise |
-| Behavioral | How agent thinks, communicates | Behavioral Application |
-| Reasoning Pattern | Decision arcs, annotated thinking | Reasoning |
-
-**Candidate Capabilities** *(suggestive — not locked)*
-- Training Volume
-- Knowledge Freshness
-- Domain Coverage
-- Training Streak / Engagement
+Each Skill type can have unlimited Skill Profile instances — created by users or platform admins. A Skill Profile is where novel, proprietary value lives.
 
 ---
 
-### ~~Competency: Deliverables~~ [REMOVED — 2026-06-16]
+### Technical Services
 
-> **Removed in S-DELIVER-DESIGN Part 3.** The Deliverables Competency was designed to capture "what the agent produces." During the full deliverable model design session, it was found to be redundant — the concept it captured is now covered by two independent standalone entities:
->
-> - **Intent Assignments** — what type of cognitive work the agent is authorized to perform (Research, Analysis, Review, etc.). Equivalent to the former Deliverable Capability "what can this agent do." Lives outside Competencies as a standalone assignment table.
-> - **Format Assignments** — what output structures the agent is authorized to produce (NIGP Dashboard, Executive Brief, etc.). Lives outside Competencies as a standalone assignment table with its own capability dependencies, availability, and pricing.
->
-> The lock on this Competency ("design session required before building") worked as intended — we designed it properly and found that Intent + Format replace it completely.
->
-> **What happened to the candidate capabilities:**
->
-> | Former Deliverable Capability | Now |
-> |------------------------------|-----|
-> | AI Briefing | Intent: `analysis-report` + Format: `executive-brief` |
-> | Research Report | Intent: `research-findings` + Format: `research-summary` |
-> | Data Analysis Report | Intent: `analysis-report` + Format: `nigp-dashboard` or `structured-report` |
-> | Project Plan | Intent: `draft-document` + Format: `executive-brief` |
-> | Presentation | Intent: `draft-document` + Format: `powerpoint-deck` |
-> | Document Review | Intent: `review-feedback` + Format: `structured-report` |
->
-> **Deliverable History** (what the agent has produced) is still tracked — it surfaces on the agent's Projects tab (PE-06) as a portfolio view. It is not a Competency.
->
-> **Full models:** `docs/INTENT-MODEL.md`, `docs/FORMAT-MODEL.md`, `docs/DELIVERABLE-MODEL.md`, `docs/PLATFORM-ENTITIES.md`
+Technical Services are the platform-facing execution engine. They are never user-facing as a concept — users configure Skill Profiles, not Technical Services directly. However, Technical Services are visible in the AI Audit screen for cost tracking, governance, and transparency.
+
+**Two categories:**
+
+| Category | Examples | Badge |
+|----------|---------|-------|
+| **AI Pattern Services** | RAG, Tool Use, Streaming, Structured Output, ReAct, Embeddings, Prompt Chaining, Reflection, Browser Automation, HITL | ✦ AI |
+| **Deterministic Services** | Flag Computation, HHI / Vendor Concentration, Column Detection, NIGP Lookup | No badge |
+
+A Skill Profile declares which Technical Service(s) execute it. A Knowledge Skill Profile may use RAG + Embeddings. A Format Skill Profile may use Structured Output. A Deterministic Skill Profile uses a Deterministic Service with no LLM cost.
+
+The `✦ AI` badge appears on every UI element where an AI Pattern Service executes. Deterministic Services do not receive the badge — this distinction is intentional product positioning.
+
+Full Technical Services catalog: `docs/AI-SERVICES.md`
 
 ---
 
-### Qualities & Properties
-*Universal — same dials on every Capability regardless of Competency.*
+### Skill Profiles
+
+A Skill Profile is a configured instance of a Skill type. It is the unit where proprietary value and IP are created and stored.
+
+**Universal properties — apply to every Skill Profile regardless of type:**
 
 | Property | Description | Values |
 |----------|-------------|--------|
-| **Level** | Result of grading — depth and quality | L1 General · L2 Trained · L3 Expert · L4 Proprietary |
-| **Availability** | Who can access this Capability | Public · Private |
-| **Exclusivity** | How many agents share this Capability | Shared · Exclusive |
+| **Level** | Depth and quality grade | L1 General · L2 Trained · L3 Expert · L4 Proprietary |
+| **Availability** | Who can access this Skill Profile | Public · Private |
+| **Exclusivity** | How many Competencies share this Skill Profile | Shared · Exclusive |
 | **Pricing** | Cost to access or use | Free · Priced ($/use) |
-| **Trainability** | Can this Capability be improved | Trainable · Supervised · Locked |
-| **Confidence** | Calibration level of the Capability's output | *(scale TBD in design session)* |
-| **LLM Provider** | Which AI provider executes this Capability | Anthropic · OpenAI · *(future: others)* |
+| **Trainability** | Can this Skill Profile be improved | Trainable · Supervised · Locked |
+| **Confidence** | Calibration level of output | *(scale TBD in design session)* |
+| **LLM Provider** | Which AI provider executes this Skill Profile | Anthropic · OpenAI · *(future: others)* |
 | **LLM Model** | Specific model assigned | Haiku · Sonnet · GPT-4o · *(future: others)* |
 | **API Key Source** | Who provides the API key | Platform · BYOK |
-| **Type** | Execution type — determines badge and cost model | AI · Deterministic |
+| **Execution Type** | Technical Service category | AI (+ which pattern) · Deterministic |
 
 ---
 
-### AI Pattern Layer
-*Technical execution approach only. Industry-standard patterns that AI Services use to execute. Never user-facing as a concept. Not named in the product model at the agent level.*
+### Capabilities
 
-> **Renamed 2026-06-15 (S-DELIVER-DESIGN):** This layer was previously called "Method Layer." What was listed here (RAG Query, LLM Call, Playwright, Embeddings, Document Extraction) were AI Patterns, not Methods. The full AI Services model is in `docs/AI-SERVICES.md`. The full AI Patterns catalog is in `docs/AI-SERVICES.md` Section 2.
+A Capability is a grouped set of Skill Profiles with its own Profile. Capabilities are novel and configurable — created by users or platform admins.
 
-AI Patterns are the execution methodology of AI Services — each Service declares 0–N Patterns. Deterministic Services declare zero Patterns. Patterns are accessed through the Service Adapter Layer (Section 5). A Capability or Deliverable points to the AI Service(s) it uses — not directly to Patterns; the Service encapsulates Pattern selection.
+**Rules [LOCKED]:**
+- A Capability is independent of any specific Agent
+- An Agent does not OWN a Capability — it holds Seniority to USE one at a specific Level
+- A Capability can be packaged and sold via MCP without being wrapped in an Agent
+- New Capabilities are additive — never modify an existing Capability to serve a new purpose
+- Capability routes are named for the capability, never for the agent
 
-**Current AI Patterns** *(full catalog in `docs/AI-SERVICES.md` Section 2)*
-- RAG — Retrieval-Augmented Generation via pgvector + OpenAI embeddings
-- ReAct — Reasoning + Acting loop (Claude reasoning + Playwright execution)
-- Tool Use — structured function calling via Claude tool use / response_format
-- Prompt Chaining — sequential prompt assembly across multiple calls
-- Reflection — agent critiques and improves its own prior output
-- Embeddings — vector generation via OpenAI text-embedding-3-small
-- Browser Automation — Playwright browser control via Railway
-- Structured Output — constrained generation via response_format
-- Streaming — token-by-token output via SSE
-- HITL — Human-in-the-Loop gate
+---
+
+### Competencies and Agents
+
+A Competency is an assembled set of Skill Profiles and/or Capabilities. It can be packaged and exposed with or without a persona.
+
+**Agent = a Competency with a persona.**
+
+| Type | Has persona | Example |
+|------|-------------|---------|
+| **Agent** | Yes — name, avatar, role, quip | Chloe Okafor (JR-01), Mike Alvarez (SR-02) |
+| **Standalone Competency** | No | NIGP Analysis Capability exposed via MCP directly |
+
+An Agent does not own its Skill Profiles or Capabilities — it holds Seniority in them at specific Levels. Two Agents can hold Seniority in the same Skill Profile at different Levels.
+
+---
+
+### Deliverables
+
+A Deliverable is an output object produced when any level of the hierarchy executes. Deliverables are first-class entities — stored, reviewable, approvable, shareable, and sellable independently.
+
+**Four Deliverable types:**
+
+| Type | When produced | Example |
+|------|---------------|---------|
+| **Skill Deliverable** | A single Skill Profile executes | RAG retrieval result, extracted document summary |
+| **Capability Deliverable** | A Capability completes | NIGP Analysis output |
+| **Step Deliverable** | A Work Order Step completes | Vendor concentration report (intermediate) |
+| **Work Order Deliverable** | The full Work Order completes | Assembled executive brief (final) |
+
+**Deliverable Handoff:** A Step may declare which prior Deliverable(s) it consumes as input context via a `consumes: [deliverable_id]` property. This enables multi-agent workflows where one Competency's output becomes another's input.
+
+**Attribution:** Every Deliverable is attributed to the Competency that produced it — which may be an Agent (Competency with persona) or a standalone Capability (Competency without persona). Attribution field: `competency_id`.
+
+**Status lifecycle:** draft → approved → change_requested → resolved
 
 ---
 
 ### Key Rules [LOCKED]
 
-1. **Capabilities are shared resources.** Built once, assigned to many agents. Each Seniority carries its own Level and Properties.
-2. **Seniority is per-agent.** An agent's Competency profile is the set of Capabilities they hold Seniority in, each at its own Level.
-3. **Grade is the verb; Level is the noun.** Levels roll up to Competency Levels, which roll up to the Model Score.
-4. **AI Patterns are not Capabilities.** RAG, LLM calls, and Playwright are AI Patterns — how AI Services execute. Capabilities and Deliverables point to AI Services, not Patterns directly. Full catalog: `docs/AI-SERVICES.md`.
-5. **Deliverables require a dedicated design session.** No Deliverable Capability is defined or built without one.
-6. **Knowledge feeds Skills.** Training inputs develop Skills Capabilities and raise their Levels. The Knowledge Competency is the corpus; Skills Competency is what grows from it.
-7. **Suggested Requirements are hints, not constraints.** They guide the Planning agent — they do not hard-block assignment.
-8. **Model Score is always derived.** Never hardcoded. Always rolled up from actual assigned Capability Levels.
-9. **"Assignment" means work.** Never use it for Seniority or Capability authorization. Assignment = task or step assigned to an agent.
+1. **Skills are the atomic unit.** Everything else is composition — Capabilities group Skill Profiles, Competencies assemble Capabilities.
+2. **Skill Profiles are where IP lives.** The Skill type is generic. The Skill Profile is proprietary, configurable, and revenue-generating.
+3. **Technical Services are platform-facing.** Users configure Skill Profiles, not Technical Services. Technical Services are visible only in the AI Audit screen for transparency and governance.
+4. **Capabilities are shared resources.** Built once, assigned to many Agents at different Levels via Seniority.
+5. **Agents hold Seniority, not ownership.** An Agent does not own a Skill Profile or Capability — it is authorized to use one at a specific Level.
+6. **Agent = Competency with persona.** A Competency without a persona is a valid, sellable, MCP-accessible product.
+7. **Every level can produce a Deliverable.** A Skill, Capability, Step, or Work Order can produce a Deliverable. No level is output-less by definition.
+8. **Deliverables are attributed to Competencies.** Not specifically to Agents. An Agent is a Competency.
+9. **Baseline is always L1.** A Competency with no Skill Profiles still executes using generic LLM. The model enriches; it never blocks.
+10. **Grade is the verb; Level is the noun.** Levels roll up to Capability Levels, which roll up to the Competency Model Score.
+11. **"Assignment" means work.** Never use it for Seniority or Skill Profile authorization. Assignment = Work Order or Step assigned to a Competency.
+12. **Model Score is always derived.** Never hardcoded. Always rolled up from actual assigned Skill Profile Levels.
 
 ---
 
 ### DB Architecture — Target State
 *(Do not build before S-INFRA-01. Design all sessions to not contradict this structure.)*
 
+> **Vocabulary note:** "capability" in prior DB schema language maps to "Skill Profile" in the updated model. Table names will be updated in S-INFRA-01 to reflect current vocabulary.
+
 **Layer 1 — Taxonomy** *(the catalog — rarely changes)*
 ```sql
-competencies (id, slug, name, display_order)
+skill_types (id, slug, name, display_order)
 
-capabilities (
-  id, competency_slug, slug, name,
-  default_trainable, default_type,
+skill_profiles (
+  id, skill_type_slug, slug, name,
+  default_trainable, default_execution_type,
   display_order
 )
 
-deliverable_capability_requirements (
-  id, deliverable_capability_slug,
-  skill_capability_slug,
-  primary_method,
+capability_skill_requirements (
+  id, capability_slug,
+  skill_profile_slug,
+  primary_technical_service,
   minimum_level, is_required
 )
 ```
 
-**Layer 2 — Seniority** *(per-agent — 1-to-many)*
+**Layer 2 — Seniority** *(per-Agent — 1-to-many)*
 ```sql
-agent_capability_assignments (
-  id, tenant_id, agent_id, capability_slug,
+agent_skill_assignments (
+  id, tenant_id, agent_id, skill_profile_slug,
   level (1-4),
   availability, exclusivity, pricing,
   trainability, confidence,
   llm_provider, llm_model, api_key_ref,
-  type, created_at
+  execution_type, created_at
 )
 ```
 
-**Layer 3 — Instances** *(runtime output — what agents actually produce)*
+**Layer 3 — Instances** *(runtime output — what Competencies actually produce)*
 ```sql
 deliverables (
-  id, tenant_id, task_id, step_id, agent_id,
-  capability_slug, type, title,
+  id, tenant_id, work_order_id, step_id, competency_id,
+  skill_profile_slug, type, title,
   content jsonb, format, status,
   level, is_final, version_of,
+  consumes jsonb,
   is_public, share_token, price_usd,
   created_at
 )
@@ -342,17 +350,17 @@ deliverables (
 Replicating a human persona requires two layers. These same two layers apply to all agents — persona replication makes them explicit.
 
 **Layer A — Behavioral (system prompt → Supabase `agent_configs`)**
-How the agent thinks. Behavioral profile, working style, decision patterns, tone.
+How the agent thinks. Behavioral Skill Profile — working style, decision patterns, tone.
 Stored in Supabase, loaded at every call. Not stored in code or config files.
-This is private to the agent and makes it unique — it is not shared or exposed.
+This is private to the Agent and makes it unique — it is not shared or exposed.
 
 **Layer B — Knowledge (RAG → pgvector → `knowledge_entries`)**
-What the agent knows. Domain expertise, frameworks, past work, IP.
+What the agent knows. Knowledge Skill Profile — domain expertise, frameworks, past work, IP.
 Retrieved at query time. Deepens with every uploaded document.
 
-**Capability depth for Persona Replication:**
-- Level 1 — Behavioral profile loaded (system prompt only, no RAG)
-- Level 2 — Trained on person's domain knowledge (RAG documents added)
+**Skill Profile depth for Persona Replication:**
+- Level 1 — Behavioral Skill Profile loaded (system prompt only, no RAG)
+- Level 2 — Trained on person's domain knowledge (Knowledge Skill Profile via RAG documents)
 - Level 3 — Self-improving from ongoing work output
 - Level 4 — Proprietary IP — private, competitive advantage, chargeable
 
@@ -360,13 +368,13 @@ MD files are valid training documents — same pipeline as PDFs, skip extraction
 
 ### Three Training Material Types
 
-Not all training material is the same. These types are the inputs that feed the Knowledge Competency and develop corresponding Skills Capabilities (see Section 2):
+Not all training material is the same. These types are the inputs that feed Knowledge and Behavior Skill Profiles:
 
 | Type | What it captures | Where it goes | Develops → |
 |------|-----------------|---------------|-----------|
-| **Knowledge** | Facts, domain expertise, reference material | RAG → pgvector | Domain Expertise Skill |
-| **Behavioral** | How the agent thinks, communicates, prioritizes | System prompt → `agent_configs` | Behavioral Application Skill |
-| **Reasoning Pattern** | How decisions were reached — the arc of thinking, not just the conclusion | RAG → pgvector, tagged `training_type = 'reasoning'` | Reasoning Skill |
+| **Knowledge** | Facts, domain expertise, reference material | RAG → pgvector | Knowledge Skill Profile |
+| **Behavioral** | How the agent thinks, communicates, prioritizes | System prompt → `agent_configs` | Behavior Skill Profile |
+| **Reasoning Pattern** | How decisions were reached — the arc of thinking, not just the conclusion | RAG → pgvector, tagged `training_type = 'reasoning'` | Knowledge Skill Profile (reasoning-tagged) |
 
 Reasoning Pattern material is the most valuable and the hardest to replicate. It teaches an agent to run the same diagnostic process on a new problem — not just recall past answers. A session transcript where a human works from a vague problem to a named architecture is more valuable training than a document stating the architecture conclusion alone.
 
@@ -376,15 +384,15 @@ The Teach screen will support tagging uploaded documents by training type. Reaso
 
 ## 4. Per-Agent LLM Assignment + BYOK [LOCKED — Design Target]
 
-Each agent can be assigned a different LLM provider (Anthropic, OpenAI, etc.) at the capability level.
-Users bring their own API keys ("BYOK") for any agent or capability.
-Two agents with the same capability but different LLMs produce results whose differences are measurable — the gap is unknown until tested.
+Each Agent can be assigned a different LLM provider (Anthropic, OpenAI, etc.) at the Skill Profile level.
+Users bring their own API keys ("BYOK") for any Agent or Skill Profile.
+Two Agents with the same Skill Profile but different LLMs produce results whose differences are measurable — the gap is unknown until tested.
 
 **If the user does not bring their own key:** Roadmap Venture provides API access at a margin — a direct revenue line on top of capability pricing.
 
 **Future superadmin + user-facing config:**
-- Superadmin backend: configurable LLM model selection per capability type
-- User-facing: when building an agent with BYOK, user selects their LLM and model
+- Superadmin backend: configurable LLM model selection per Skill Profile type
+- User-facing: when building an Agent with BYOK, user selects their LLM and model
 
 **Implementation: S-INFRA-01** — do not build before that session.
 Design all sessions between now and S-INFRA-01 to not contradict this.
@@ -454,9 +462,9 @@ No feature branches during active development.
 |-----|--------|
 | `/` | Work dashboard |
 | `/work/new` | Assign new work |
-| `/work/[taskId]` | Task instructions / step detail |
-| `/work/[taskId]/analyze` | NIGP Analyzer scoped to a task |
-| `/work/[taskId]/audit` | Capability Audit per-task (S-AI-01) |
+| `/work/[workOrderId]` | Work Order execution / step detail |
+| `/work/[workOrderId]/analyze` | NIGP Analyzer scoped to a Work Order |
+| `/work/[workOrderId]/audit` | Capability Audit per-Work Order (S-AI-01) |
 | `/bench` | Team roster |
 | `/bench/[agentId]` | Personnel file |
 
@@ -466,7 +474,7 @@ No feature branches during active development.
 
 ### Current tables
 
-**`tasks`**
+**`tasks`** *(will be renamed `work_orders` in a future session)*
 ```sql
 id, tenant_id, title, agent_id, type, status, priority, due, preview,
 csv_path, mapping (jsonb), ai_result (jsonb), has_hitl, steps (jsonb),
@@ -475,10 +483,10 @@ created_at, updated_at
 
 **`agent_configs`**
 `id, agent_id, tenant_id, type, name, text, is_default, is_user_selectable, created_at, updated_at`
-Stores behavioral prompts (personality layer), output format rules, and guardrails per agent.
-This table evolves — in S-INFRA-01 it gains `capability_slug` scoping.
+Stores Behavioral Skill Profile data (personality layer), output format rules, and guardrails per agent.
+This table evolves — in S-INFRA-01 it gains `skill_profile_slug` scoping.
 
-**`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Not changing in S-INFRA-01.
+**`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data. Not changing in S-INFRA-01.
 **`agent_run_log`** — Brent fetch run history.
 **`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries.
 All tables have `tenant_id`.
@@ -494,8 +502,8 @@ See Section 2 DB Architecture for the full three-layer target state (Taxonomy / 
 tenant_api_keys (id, tenant_id, provider, key_encrypted, created_at)
 ```
 
-`agent_configs` gains a `capability_slug` column — training content scoped by capability, not just by agent.
-`knowledge_entries` gains a `capability_slug` column — RAG knowledge scoped by capability.
+`agent_configs` gains a `skill_profile_slug` column — training content scoped by Skill Profile, not just by agent.
+`knowledge_entries` gains a `skill_profile_slug` column — RAG knowledge scoped by Skill Profile.
 No data is deleted. All existing records remain. New columns are additive.
 
 **Do not migrate before S-INFRA-01.** Design all sessions to not contradict this structure.
@@ -521,12 +529,12 @@ Never remove them.
 |---------|---------|---------|
 | Anthropic Claude Haiku | Classification, routing, short answers | `ANTHROPIC_API_KEY` |
 | Anthropic Claude Sonnet | Briefings, reasoning, planning, long-form | `ANTHROPIC_API_KEY` |
-| Supabase | Tasks, RAG, agent configs, run logs, capability audit log, CSV storage | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
+| Supabase | Work Orders, RAG, agent configs, run logs, capability audit log, CSV storage | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
 | OpenAI `text-embedding-3-small` | RAG vector embeddings | `OPENAI_API_KEY` |
 | Railway | Persistent Node.js + Playwright backend (browser automation) | `PORT`, `ALLOWED_ORIGINS`, `VERCEL_API_BASE` |
 | Vercel | Frontend + serverless capability routes | auto-configured |
 
-**Future (S-INFRA-01):** Model selection per capability becomes configurable via superadmin backend, not hardcoded. Users with BYOK select their own LLM provider and model when building an agent or capability.
+**Future (S-INFRA-01):** Model selection per Skill Profile becomes configurable via superadmin backend, not hardcoded. Users with BYOK select their own LLM provider and model when building an Agent or Skill Profile.
 
 ---
 
@@ -534,9 +542,9 @@ Never remove them.
 
 | Rule | Detail |
 |------|--------|
-| Model selection | Haiku: classification, routing, short answers. Sonnet: complex reasoning, ReAct loops, long briefings. Never Sonnet where Haiku suffices (~20x cost). Future: configurable per capability via superadmin. |
+| Model selection | Haiku: classification, routing, short answers. Sonnet: complex reasoning, ReAct loops, long briefings. Never Sonnet where Haiku suffices (~20x cost). Future: configurable per Skill Profile via superadmin. |
 | Structured output | Use Claude tool use / `response_format`. Never parse free-text JSON. |
-| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Future: configurable per capability via superadmin. |
+| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Future: configurable per Skill Profile via superadmin. |
 | Streaming | Only where UX benefit justifies overhead. Yes: task planning, AI Review. No: routing, classification. |
 | Prompt caching | System prompts that don't change use Anthropic prompt caching. |
 | RAG retrieval | Cap `match_count` on vector searches. Never uncap. Future: configurable cap via superadmin. |
@@ -544,7 +552,7 @@ Never remove them.
 
 ### Capability Badge Rule [LOCKED]
 `✦ AI` badge on every AI-touched UI element.
-Deterministic logic (`computeFlags`, HHI, column detection, NIGP lookup) does **NOT** get the badge.
+Deterministic Technical Services (`computeFlags`, HHI, column detection, NIGP lookup) do **NOT** get the badge.
 This distinction is intentional product positioning — it communicates what is AI and what is rule-based.
 Both types are productized capabilities with a usage/cost model and are tracked in the capability audit.
 
@@ -560,32 +568,32 @@ These rules apply to every future session. No exceptions without explicit produc
 4. Capability routes are named for the capability, never for the agent
 5. Each capability is one independent route — new capabilities are new routes, never bolted onto existing ones
 6. All external service calls go through the adapter layer — no direct vendor API calls in routes
-7. Agent profiles define voice and persona only — capabilities are never written into an agent's profile
+7. Agent profiles define voice and persona only — Skill Profiles are never written into an Agent's persona definition
 8. Railway is for browser automation only — all AI and Supabase calls go through Vercel serverless
 9. Multi-tenancy stubs stay in place on every table and constant — never remove them
-10. Per-agent LLM assignment and BYOK must not be blocked by any code written before S-INFRA-01
+10. Per-Agent LLM assignment and BYOK must not be blocked by any code written before S-INFRA-01
 11. **Never delete Supabase data or agent configuration data without explicit confirmation from John**
-12. Every `logAICall()` invocation must include `capability_slug`, `step_id`, `deliverable_id`, and `level` once S-INFRA-01 ships — no AI call is logged without its full lineage. Until then, pass whatever subset is available and leave the rest null. Never remove an existing logging call.
-13. The platform's internal capabilities (Task Planning, Title Generation, Agent Routing) are Deliverables produced by agents — treat them as first-class entries in `ai_activity_log` with the same lineage fields, not as special system events.
+12. Every `logAICall()` invocation must include `skill_profile_slug`, `step_id`, `deliverable_id`, and `level` once S-INFRA-01 ships — no AI call is logged without its full lineage. Until then, pass whatever subset is available and leave the rest null. Never remove an existing logging call.
+13. The platform's internal capabilities (Task Planning, Title Generation, Agent Routing) are Deliverables produced by Competencies — treat them as first-class entries in `ai_activity_log` with the same lineage fields, not as special system events.
 
 ---
 
 ## 14. Agent Configuration Model [LOCKED]
 
-All agents share the same configuration options. No agent has unique hard-coded behavior in the codebase.
+All Agents share the same configuration options. No Agent has unique hard-coded behavior in the codebase.
 
-**Every agent may have:**
-- A behavioral prompt (personality, tone, reasoning style) stored in Supabase `agent_configs`
-- Seniority in a set of Capabilities at specific Levels (see Section 2 Agent Profile Model)
-- An assigned LLM provider and model per capability (default: platform keys; BYOK: tenant keys)
-- A RAG knowledge base in `knowledge_entries` scoped to their assigned capabilities
-- Access tags on their capabilities: exclusive/shared, public/private
+**Every Agent may have:**
+- A Behavior Skill Profile (personality, tone, reasoning style) stored in Supabase `agent_configs`
+- Seniority in a set of Skill Profiles at specific Levels (see Section 2 Platform Model)
+- An assigned LLM provider and model per Skill Profile (default: platform keys; BYOK: tenant keys)
+- A Knowledge Skill Profile in `knowledge_entries` scoped to their assigned Skill Profiles
+- Access tags on their Skill Profiles: exclusive/shared, public/private
 
-**Current code flags** *(do not remove before S-INFRA-01 — future design session will map these to Agent Profile Model Competencies)*
-- `isIntern: true` — disables RAG, disables self-learning, reduces cost tier. Will map to Identity + Knowledge Competency constraints.
-- `isPlanner: true` — surfaces in task planning flows. Will map to Skills Competency: Task Planning Seniority. May become a Seniority Level designation.
+**Current code flags** *(do not remove before S-INFRA-01 — future design session will map these to Platform Model Skill types)*
+- `isIntern: true` — disables RAG, disables self-learning, reduces cost tier. Will map to Identity + Knowledge Skill Profile constraints.
+- `isPlanner: true` — surfaces in work order planning flows. Will map to Seniority in Task Planning Skill Profile.
 
-These configuration options are available to any agent. Individual agents (Michelle, Pat, Brent, etc.) are instances of this model — not special cases.
+These configuration options are available to any Agent. Individual Agents (Michelle, Pat, Brent, etc.) are instances of this model — not special cases.
 
 ---
 
@@ -639,7 +647,7 @@ No future development happens in NIGP repos.
 6. Remove duplicate **code** copies of tokens, agent data from NIGP — Supabase data is never deleted
 
 **Data continuity rule:**
-All Supabase data (agent configs, knowledge entries, run logs, capability assignments) persists through migration.
+All Supabase data (agent configs, knowledge entries, run logs, Skill Profile assignments) persists through migration.
 During dev and testing, DeepBench reads the same Supabase instance as NIGP — agents appear identical in both.
 Divergence begins only when DeepBench goes live and new training/config work happens exclusively in DeepBench.
 **Never delete Supabase data or agent configuration data without explicit confirmation from John.**
@@ -654,18 +662,21 @@ Check: `nigp-analyzer-agent-api` env vars or server.js `SUPABASE_URL`.
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.
 Tagged on GitHub: `v4.0-production` (frontend), `v4.3.1-backend` (backend).
-The NIGP analyzer is not replaced — it is a destination inside DeepBench via `/work/[taskId]/analyze`.
+The NIGP analyzer is not replaced — it is a destination inside DeepBench via `/work/[workOrderId]/analyze`.
 
 ---
 
-## 18. Archived — Capability Spectrum Model (superseded by Section 2)
+## 18. Archived — Prior Models (superseded by Section 2)
 
-> Archived 2026-06-15. Superseded by the Agent Profile Model (Section 2). Preserved for historical reference.
+### 18a — Agent Profile Model / Three Competencies (superseded 2026-06-18)
 
-The original Capability Spectrum Model established L1–L4 depth levels and the principle that capabilities are independent of agents. These concepts survive in the Agent Profile Model under the vocabulary of Competencies, Capabilities, Levels, and Seniority.
+> Archived 2026-06-18. Superseded by the Platform Model (Section 2). The three-Competency model (Identity / Skills / Knowledge) established the vocabulary of Levels, Seniority, and Grading — all of which survive in the updated model. What changed: Skills are now the atomic unit (not Capabilities within a Competency), Intent and Format are now Skill types, AI Patterns and Deterministic logic are now Technical Services, and Competency is now the assembled entity (not a category container). The core principle — capabilities are independent of agents, agents hold Seniority, the model enriches but never blocks — is unchanged.
 
-### Original Core Concept
-A capability had a measurable depth spectrum:
+### 18b — Capability Spectrum Model (superseded 2026-06-15)
+
+> Archived 2026-06-15. Superseded by the Agent Profile Model, then further by the Platform Model (Section 2). The original Capability Spectrum established L1–L4 depth levels and the principle that capabilities are independent of agents. These concepts survive fully in the current Platform Model under the vocabulary of Skill Profiles, Levels, and Seniority.
+
+#### Original L1–L4 Definition (preserved for reference)
 
 | Level | Name | Description |
 |-------|------|-------------|
@@ -673,27 +684,3 @@ A capability had a measurable depth spectrum:
 | 2 | Trained | RAG docs added, knows a specific domain |
 | 3 | Expert | Deeply trained, specialized, self-improving |
 | 4 | Proprietary | User's own IP — private, chargeable to others |
-
-### Original Capability Access Tags
-- **Exclusivity** — exclusive (only one agent) or shared (multiple agents)
-- **Visibility** — public (discoverable by others) or private (tenant-only)
-
-### Original Business Model Notes
-- Charge by capability depth — deeper = more valuable, higher price
-- Pre-built agents: capability depth pre-assigned, user pays for the configuration
-- Build-your-own: user selects capabilities from a menu, assigns depth, sets persona and behavioral prompt
-- Users can publish their trained capability spectrum as a service (their IP, their revenue)
-- Test Team screen: compare outputs across capability depths and LLM assignments within one capability
-
-### Original Agent Personality Layer
-An agent's behavioral prompt defines its personality — how it communicates, its tone, its reasoning style, its domain voice. Stored in Supabase `agent_configs`, not in code. Two agents with identical capability assignments can have entirely different personalities. This behavioral layer is what makes each agent unique and valuable beyond its capability list.
-
-### Original Routing Model
-Routing is capability matching, not agent matching:
-1. What capability does this task require?
-2. Which agent has the deepest assignment of that capability?
-3. Route to that agent
-
-Two routing modes:
-- **Efficiency mode** — fastest path, lowest cost, lightest capable depth
-- **Deep knowledge mode** — highest quality, deepest capability, may be slower and costlier
