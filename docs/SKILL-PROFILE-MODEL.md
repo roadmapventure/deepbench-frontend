@@ -330,6 +330,42 @@ agent_capability_assignments (
 
 ## 8. Currently Defined Capabilities
 
+### CAP-PM-01 — Project Manager
+
+```json
+{
+  "slug": "project-manager",
+  "name": "Project Manager",
+  "description": "Receives a Work Order, decomposes it into executable steps, matches steps to available capabilities, assigns agents, flags gaps, and produces an Execution Plan for user approval.",
+  "execution_type": "ai",
+  "tenant_id": null
+}
+```
+
+**Skill Profile assignments:**
+
+| Skill Profile | Level | Required |
+|--------------|-------|---------|
+| `work-order-decomposition` (intent) | L2 | Yes |
+| `capability-assignment` (intent) | L2 | Yes |
+| `execution-plan` (format) | L1 | Yes |
+| `planning-behavior` (behavior) | L2 | Yes |
+| `capability-registry-knowledge` (knowledge) | L2 | Yes |
+
+**Agent assignments:**
+
+| Agent | Notes |
+|-------|-------|
+| Michelle Manning (PP-01) | Primary orchestrator — replaces hardcoded isPlanner:true |
+
+**Future additions to this Capability:**
+- `work-order-clarification` Intent Skill → covers the multi-turn clarifying questions flow (required before Michelle hardcode can be fully removed)
+- `episodic-memory` Knowledge Skill → past Work Orders embedded as training corpus (Orchestrator gets smarter over time)
+
+**Full spec:** `docs/EXECUTION-DELIVERY-MODEL.md` Sections 5–6
+
+---
+
 ### CAP-01 — Data Analyst
 
 ```json
@@ -453,12 +489,14 @@ When the Work Side execution is built, the Skill Profile data drives the capabil
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SK-01 | `skill_types` table + 5 type seeds | ❌ Missing | S-SK-01 |
-| SK-02 | `skill_profiles` table + SP-01 (Data Analysis) + SP-02 (Analysis Report) seeds | ❌ Missing | S-SK-01 |
-| SK-03 | `capabilities` table + CAP-01 (Data Analyst) seed | ❌ Missing | S-SK-01 |
-| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 | ❌ Missing | S-SK-01 |
-| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ❌ Missing | S-SK-01 |
-| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card) | ❌ Missing | S-SK-01 |
+| SK-01 | `skill_types` table + 5 type seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-02 | `skill_profiles` table + SP-01 (Data Analysis) + SP-02 (Analysis Report) seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-03 | `capabilities` table + CAP-01 (Data Analyst) seed | ✅ Done | S-SK-01 (a447e49) |
+| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card) | ✅ Done | S-SK-01 (a447e49) |
+| SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes. | ❌ Missing | S-PM-01 |
+| SK-13 | JD → Capability Auto-Generation — upload job description, extract competencies by Skill type, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval, create records. Extends PE-10 pipeline with new output target. Design session required. | ❌ Missing | S-future (design required) |
 
 ---
 

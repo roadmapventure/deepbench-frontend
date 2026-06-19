@@ -514,6 +514,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | AA-37 | Demo seeding — pre-seed existing roster agents (Chloe, Mike, Bob, Robyn, etc.) with character settings + meaningful AIS scores so platform demos as differentiated without any training required by the visitor | ❌ Missing | S-CHAR-01 |
 | AA-41 | Build Your Own Agent — 5-step guided wizard: (1) Identity — name, role, quip, avatar; (2) Character — philosophy picker, skeptic slider, autonomy dial, advanced settings collapsed; (3) Capabilities — assignment menu + depth + LLM; (4) Knowledge — optional first upload/URL/template; (5) Review — AIS starting score + plain-English character summary (not settings labels). Design session + UX mockup required before coding. | ❌ Missing | S-BYOA-01 (design required) |
 | AA-42 | Michelle pattern advisory — at plan time, Michelle identifies when a step's requirements call for a pattern the assigned agent doesn't currently provide; shows greyed advisory chip on the step card alongside the normal pattern badge indicating what pattern would be needed. Design session required before coding. | ❌ Missing | S-future (design required) |
+| AA-43 | PM-initiated capability/agent creation from gap detection — during the Capability Assignment pass, the Orchestrator detects steps it cannot assign and proposes what needs to be built: draft Skill Profiles, a new Capability spec, optionally a new Agent identity. HITL: user approves before any record is created. On approval, new capability is created and embedded into RAG — closing the gap for future Work Orders. Extends AA-38 (Agent Builder Agent) with a new trigger: internal gap detection vs. user request. Design session required. | ❌ Missing | S-future (design required) |
 
 ### Phase 3 Additions (from S-AGENT-ARCH-01 cont.)
 
@@ -613,6 +614,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | SK-09 | Capability builder UI — assemble Skill Profiles into a new Capability, set Level per Skill | ❌ Missing | S-future (design required) |
 | SK-10 | Agent Capability assignment UI — assign/unassign Capabilities on Personnel File | ❌ Missing | S-future (design required) |
 | SK-11 | Capability hover card on Personnel File — hovering the capability name/title shows a summary popup of all the Capability's traits (name, description, Skill count, execution type). Mirrors SkillHoverCard pattern. Design session required before coding. | ❌ Missing | S-future (design required) |
+| SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles links + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes required. | ❌ Missing | S-PM-01 |
+| SK-13 | JD → Capability Auto-Generation — upload a job description, extract competencies mapped to Skill types, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval before creation. Extends PE-10 upload pipeline with capability records as output target instead of knowledge_entries. Design session required. | ❌ Missing | S-future (design required) |
 
 ---
 
@@ -685,7 +688,15 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | Session | Feature | Status |
 |---------|---------|--------|
 | S-SK-01-design | Skill/Capability data model design session — locked 2026-06-18 | ✅ DONE |
-| S-SK-01 | SK-01 through SK-06 — 5 tables + seeds + Personnel File Capabilities section | ❌ Missing |
+| S-SK-01 | SK-01 through SK-06 — 5 tables + seeds + Personnel File Capabilities section | ✅ DONE (a447e49) |
+
+### Project Manager Capability & Execution Delivery Model
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-EXEC-DESIGN | Execution & Delivery Model design session — locked 2026-06-18. Full pipeline spec, Project Manager Capability defined (5 Skill Profiles), 6 deliverable types, AI pattern map, DB impact, Michelle transition path. Produced: EXECUTION-DELIVERY-MODEL.md, updated SKILL-PROFILE-MODEL.md + FEATURES.md | ✅ DONE |
+| S-PM-01 | Seed Project Manager Capability in DB — SK-12. Supabase only, no src/ changes. Michelle's Personnel File immediately shows CAP-PM-01 via existing SK-06 UI. Kickoff doc required. | ❌ Not started |
+| S-PM-02 | Build prompt-assembly.js (AA-03) — reads Skill Profiles for a given capability slug, assembles layered system prompt from Traits. Layer 3 service. Required before plan.js can be refactored. Design session required. | ❌ Not started |
+| S-PM-03 | Refactor api/plan.js — use prompt-assembly.js instead of hardcoded prompt; expand step schema to full Execution Plan contract (capability_slug, assignment_status, expected_output_type, rationale, depends_on[]); write approved plan to deliverables table (depends on DL-04). | ❌ Not started |
 
 ### Infrastructure (after Bench side is stable)
 | Session | Feature |
