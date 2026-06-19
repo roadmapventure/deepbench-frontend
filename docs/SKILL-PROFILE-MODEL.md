@@ -358,8 +358,14 @@ agent_capability_assignments (
 |-------|-------|
 | Michelle Manning (PP-01) | Primary orchestrator — replaces hardcoded isPlanner:true |
 
+**Design decisions locked 2026-06-19:**
+- Clarifying questions: conditional behavior trait on SP-PM-04, not a separate Skill. `clarification_policy: "conditional"` — LLM decides, max 3 questions, only when requirements are genuinely ambiguous. SP-PM-00 (Work Order Clarification) is not needed.
+- HITL: LLM-decided per step via PAT-10 during SP-PM-02 (Capability Assignment) pass. Not a hard rule. Intended `technical_services` for SP-PM-02: PAT-11 Agent Orchestration, PAT-07 Chain-of-Verification, PAT-10 HITL.
+- planSummary: required output field on SP-PM-03 (Execution Plan). Pre-populates HITL review card in UI. One sentence. LLM-generated from Work Order goal + assembled steps.
+- Step icons: UI-derived from `step.type`, not LLM output. Not in SP-PM-03 schema.
+- Agent assignment: fully registry-driven via SP-PM-02 — no hardcoded routing. Gap steps are created and preserved in the Execution Plan, never dropped.
+
 **Future additions to this Capability:**
-- `work-order-clarification` Intent Skill → covers the multi-turn clarifying questions flow (required before Michelle hardcode can be fully removed)
 - `episodic-memory` Knowledge Skill → past Work Orders embedded as training corpus (Orchestrator gets smarter over time)
 
 **Full spec:** `docs/EXECUTION-DELIVERY-MODEL.md` Sections 5–6

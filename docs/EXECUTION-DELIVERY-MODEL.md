@@ -308,32 +308,41 @@ produces an Execution Plan for user approval.
   "slug": "capability-assignment",
   "skill_type_slug": "intent",
   "name": "Capability Assignment",
-  "description": "Takes the decomposed step list and matches each step to the capability registry. Assigns the best authorized agent or flags the step as a gap.",
-  "objective": "For every step in the Ideal Plan, find the closest matching capability in the DeepBench registry. Assign the highest-level authorized agent. For unmatched steps, assign generic LLM and log the gap.",
-  "method": "Semantic match from step's free-text capability name to registry slugs. For matched capabilities, select the highest-level authorized agent. For unmatched, assign generic and log. Verify every assignment before finalizing.",
-  "output_desc": "Same step list with capability_slug, agent_id, and assignment_status added to each step.",
+  "description": "Takes the decomposed step list and matches each step to the capability registry. Assigns the best authorized agent or flags the step as a gap. Determines which steps warrant human review via the HITL pattern.",
+  "objective": "For every step in the Ideal Plan, find the closest matching capability in the DeepBench registry. Assign the highest-level authorized agent. For unmatched steps, create the step with assignment_status: gap and log it. Determine per step whether human review is warranted before execution proceeds.",
+  "method": "Semantic match from step's free-text capability name to registry slugs. For matched capabilities, select the highest-level authorized agent. For unmatched, set gap status and preserve the step — do not drop it. Verify every assignment before finalizing. Flag steps for HITL when the deliverable requirements are ambiguous, stakes are high, or a gap step requires human judgment before the next step can proceed.",
+  "output_desc": "Same step list with capability_slug, agent_id, assignment_status, and hitl_required added to each step.",
   "tone": "technical",
   "confidence": "assertive",
   "traits": {
     "sections": ["assignment-pass", "gap-log", "verification"],
-    "analysis_instructions": "Take each step from the Ideal Plan. Search the capability registry semantically. Match or flag. Never leave a step unresolved — every step gets one of: assigned, generic, or gap. After assignment, verify each assigned step: does the named agent actually hold the named capability?",
+    "analysis_instructions": "Take each step from the Ideal Plan. Search the capability registry semantically. Match or flag. Never leave a step unresolved — every step gets one of: assigned, generic, or gap. After assignment, verify each assigned step: does the named agent actually hold the named capability? For each step, independently assess whether human review is warranted before execution continues.",
     "reporting_depth": "structured"
   },
   "guardrails": {
     "must": [
       "Every step must have an assignment_status",
       "Verify every assignment against agent_capability_assignments before finalizing",
-      "Log every unmatched step to the capability gap log"
+      "Log every unmatched step to the capability gap log",
+      "Gap steps must still appear in the Execution Plan — never drop an unassigned step",
+      "Assess HITL need per step independently based on ambiguity, stakes, and gap status"
     ],
     "must_not": [
       "Never assign a capability to an agent who does not hold it",
       "Never leave a step unresolved",
-      "Never infer a capability exists — only match against confirmed registry entries"
+      "Never infer a capability exists — only match against confirmed registry entries",
+      "Never hardcode which agent receives which step type — assignment must flow from the capability registry"
     ]
   },
   "technical_services": [],
   "execution_type": "ai"
 }
+```
+
+> **Intended `technical_services` when wired (S-PM-02/S-PM-03):**
+> - `agent-orchestration` (PAT-11) — Orchestrator coordinates which executor agent receives each step
+> - `chain-of-verification` (PAT-07) — verifies every assignment against live registry before HITL
+> - `hitl` (PAT-10) — fires per step when LLM determines human review is warranted; LLM decides, not a hard rule
 ```
 
 ---
@@ -345,31 +354,37 @@ produces an Execution Plan for user approval.
   "slug": "execution-plan",
   "skill_type_slug": "format",
   "name": "Execution Plan",
-  "description": "Structured JSON output schema for a Work Order execution plan — both Ideal and Assigned passes.",
-  "objective": "Produce a machine-readable, human-reviewable execution plan that drives Work Order execution.",
-  "method": "Structured JSON conforming to the Execution Plan step schema.",
-  "output_desc": "JSON object with plan-level fields and a steps array. Each step carries the full step contract.",
+  "description": "Structured JSON output schema for a Work Order execution plan — both Ideal and Assigned passes. Includes a plain-English plan summary for the HITL review surface.",
+  "objective": "Produce a machine-readable, human-reviewable execution plan that drives Work Order execution. The plan summary pre-populates the HITL review card so the user understands what they are approving.",
+  "method": "Structured JSON conforming to the Execution Plan step schema. planSummary is generated from the Work Order goal and the assembled step list — one sentence describing what the plan accomplishes.",
+  "output_desc": "JSON object with plan-level fields (including planSummary), a steps array, and assignment counts. planSummary surfaces in the UI at the HITL review point.",
   "tone": "technical",
   "confidence": "assertive",
   "traits": {
     "output_type": "json",
     "file_format": "json",
-    "section_structure": "step-array"
+    "section_structure": "step-array",
+    "output_fields": ["planSummary", "steps", "assigned_count", "generic_count", "gap_count", "status"]
   },
   "guardrails": {
     "must": [
       "Output must be valid JSON",
       "Every step must include all required fields",
-      "assignment_status must be one of: assigned | generic | gap"
+      "assignment_status must be one of: assigned | generic | gap",
+      "planSummary must be present — one plain-English sentence describing what the plan accomplishes"
     ],
     "must_not": [
-      "No free-text plan descriptions — structure only",
-      "No missing step fields"
+      "No free-text plan descriptions outside of planSummary — structure only",
+      "No missing step fields",
+      "planSummary must not exceed one sentence"
     ]
   },
   "technical_services": [],
   "execution_type": "ai"
 }
+```
+
+> **UI surface:** `planSummary` pre-populates the HITL review card headline — the one-sentence description the user reads before approving the Execution Plan. It is a plan-level field, not a step field. The UI derives step icons from `step.type` (agent / hitl / subagent) — icon is not an LLM output field.
 ```
 
 ---
@@ -381,25 +396,30 @@ produces an Execution Plan for user approval.
   "slug": "planning-behavior",
   "skill_type_slug": "behavior",
   "name": "Planning Stance",
-  "description": "How the Project Manager reasons through Work Order decomposition and assignment.",
-  "objective": "Produce plans that are honest, complete, and sequenced correctly.",
-  "method": "Risk-first ordering. Steps that block other steps run first. Research before analysis. Analysis before synthesis. Synthesis before reporting.",
-  "output_desc": "A correctly sequenced plan that surfaces gaps honestly.",
+  "description": "How the Project Manager reasons through Work Order decomposition and assignment — including when to ask clarifying questions before proceeding.",
+  "objective": "Produce plans that are honest, complete, and sequenced correctly. Ask clarifying questions only when they would materially improve the plan.",
+  "method": "Risk-first ordering. Steps that block other steps run first. Research before analysis. Analysis before synthesis. Synthesis before reporting. Before decomposing, assess whether requirements are clear enough to produce a quality plan — if not, ask targeted questions first.",
+  "output_desc": "A correctly sequenced plan that surfaces gaps honestly. Optionally preceded by up to 3 clarifying questions if requirements are genuinely ambiguous.",
   "tone": "professional",
   "confidence": "measured",
   "traits": {
     "reasoning_style": "risk-first",
     "writing_style": "precise",
-    "autonomy_level": "supervised"
+    "autonomy_level": "supervised",
+    "clarification_policy": "conditional"
   },
   "guardrails": {
     "must": [
       "Surface gaps honestly — do not hide what DeepBench cannot do",
-      "Sequence steps by dependency, not by arbitrary order"
+      "Sequence steps by dependency, not by arbitrary order",
+      "Ask clarifying questions only when requirements are genuinely ambiguous or when clarification would materially improve step quality",
+      "Maximum 3 clarifying questions — never ask if intent is already clear"
     ],
     "must_not": [
       "Never reorder steps to hide gaps",
-      "Never present an incomplete plan as complete"
+      "Never present an incomplete plan as complete",
+      "Never ask clarifying questions as a default — proceed directly when requirements are sufficient",
+      "Never ask questions that could be answered by reading the Work Order again"
     ]
   },
   "technical_services": [],
@@ -510,8 +530,9 @@ The Project Manager Capability is the model replacement for Michelle's current h
 
 **What blocks the removal of hardcoded code:**
 1. `prompt-assembly.js` (AA-03) must be built — reads Skill Profiles, builds prompt. Deferred to S-INFRA-01 or earlier sprint.
-2. The clarifying questions flow is not yet covered by any Skill Profile. Needs a sixth Skill Profile: SP-PM-00 Work Order Clarification (type: intent). Requires its own design treatment.
-3. `api/title.js` is separate — title generation is a smaller independent capability, not part of Project Manager scope.
+2. `api/title.js` is separate — title generation is a smaller independent capability, not part of Project Manager scope.
+
+**Clarifying questions — resolved (2026-06-19):** Previously identified as a blocker requiring SP-PM-00 (Work Order Clarification). Decision: conditional clarification is a behavioral trait, not a separate Intent Skill. SP-PM-04 (Planning Stance) now carries `clarification_policy: "conditional"` and the guardrail rules. The LLM decides whether to ask (max 3 questions) before decomposing. SP-PM-00 is not needed.
 
 **Removal sequence:**
 ```
