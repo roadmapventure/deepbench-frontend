@@ -598,20 +598,21 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## SKILLS & CAPABILITIES — SK
 > Full model: `docs/SKILL-PROFILE-MODEL.md` — Traits, Capability assembly, Technical Services invocation, domain-agnostic principle, sprint template.
-> S-SK-01 design complete (2026-06-18). Coding session is next.
+> S-SK-01 complete (a447e49, 2026-06-18). All 12 Manual QA items PASS.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SK-01 | `skill_types` table + 5 type seeds (identity, behavior, knowledge, intent, format) | ❌ Missing | S-SK-01 |
-| SK-02 | `skill_profiles` table + SP-01 Data Analysis (type: intent) + SP-02 Analysis Report (type: format) seeds | ❌ Missing | S-SK-01 |
-| SK-03 | `capabilities` table + CAP-01 Data Analyst seed | ❌ Missing | S-SK-01 |
-| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 at L2/L1 | ❌ Missing | S-SK-01 |
-| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ❌ Missing | S-SK-01 |
-| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card); empty state for unassigned agents; all agents show container | ❌ Missing | S-SK-01 |
+| SK-01 | `skill_types` table + 5 type seeds (identity, behavior, knowledge, intent, format) | ✅ Done | S-SK-01 (a447e49) |
+| SK-02 | `skill_profiles` table + SP-01 Data Analysis (type: intent) + SP-02 Analysis Report (type: format) seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-03 | `capabilities` table + CAP-01 Data Analyst seed | ✅ Done | S-SK-01 (a447e49) |
+| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 at L2/L1 | ✅ Done | S-SK-01 (a447e49) |
+| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card); SkillHoverCard on each Skill row shows all Traits, type-specific jsonb fields, and guardrails; empty state for unassigned agents; all agents show container | ✅ Done | S-SK-01 (a447e49) |
 | SK-07 | AiBadge on Capabilities card — shows all technical_services patterns per Skill when Work Side is wired | ❌ Missing | S-future (Work Side execution sprint) |
 | SK-08 | CRUD UI for Skill Profile creation and editing | ❌ Missing | S-future (design required) |
 | SK-09 | Capability builder UI — assemble Skill Profiles into a new Capability, set Level per Skill | ❌ Missing | S-future (design required) |
 | SK-10 | Agent Capability assignment UI — assign/unassign Capabilities on Personnel File | ❌ Missing | S-future (design required) |
+| SK-11 | Capability hover card on Personnel File — hovering the capability name/title shows a summary popup of all the Capability's traits (name, description, Skill count, execution type). Mirrors SkillHoverCard pattern. Design session required before coding. | ❌ Missing | S-future (design required) |
 
 ---
 
