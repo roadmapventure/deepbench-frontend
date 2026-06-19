@@ -453,6 +453,9 @@ as a hard constraint inside the synthesis prompt — Haiku is responsible for ho
 
 ### Builder Output
 
+The Builder output carries a `format_contract` field extracted from the Format Skill traits.
+This gives the Sender everything it needs without going back to the Specification or the DB.
+
 ```json
 {
   "system_prompt": "You are Michelle Manning... [full optimized prompt string]",
@@ -464,6 +467,20 @@ as a hard constraint inside the synthesis prompt — Haiku is responsible for ho
     "intent": "Decompose the Work Order into discrete executable steps...",
     "format": "Return a JSON object with the following fields: ...",
     "guardrails": "Never assign a step to an agent who lacks the required capability..."
+  },
+  "format_contract": {
+    "output_type": "json",
+    "skill_profile_slug": "execution-plan",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "planSummary": { "type": "string" },
+        "agentId": { "type": "string" },
+        "agentReason": { "type": "string" },
+        "steps": { "type": "array" },
+        "questions": { "type": "array" }
+      }
+    }
   },
   "llm": {
     "provider": "anthropic",
@@ -497,42 +514,190 @@ They do not need to call the Sender. The assembled prompt is a self-contained ar
 
 ---
 
-## 7. API 3 — Prompt Sender (Execute + Parse + Deliver)
+## 7. API 3 — Prompt Sender (Send + Parse + Deliver)
 
 **Route:** `api/prompt/sender.js`
-**Job:** Send the assembled prompt to the LLM. Parse the response. Write the Deliverable.
-Log. Route back to caller.
+**Job:** Take the assembled prompt from the Builder. Call the LLM. Parse the response
+against the Format Skill output contract. Write the Deliverable. Log. Route back to caller.
+**Does NOT:** read Skill Profiles, agent_configs, or the Specification directly.
+**Makes AI calls:** Yes — one main LLM call. One retry call if parse fails.
 
-### Three sub-steps:
+### Input
 
-**Step 1 — Send**
-Calls the LLM using the `llm` config from the Builder output.
-- Passes `system_prompt` as the system message
-- Passes `messages` array from the caller (conversation history or single user turn)
-- Passes `tools` if the Capability's Skill Profiles declare Tool Use as a Technical Service
-- Handles streaming when the Capability declares PAT-03 (Streaming) in `technical_services`
+```json
+{
+  "builder_output":   { ... },       // full Builder output object
+  "messages":         [ ... ],       // conversation history or single user turn from caller
+  "step_id":          "uuid",        // optional — null for MCP callers
+  "work_order_id":    "uuid",        // optional — null for MCP callers
+  "stream":           true           // default true; auto-overridden by Sender when needed
+}
+```
 
-**Step 2 — Parse**
-Reads the Format Skill's output contract from the Specification.
-- If `output_type: "json"` or `"structured"` → validates response against expected schema
-- If response does not conform → single retry with explicit schema reminder appended
-- If retry fails → returns raw response with `parse_error: true` flag (caller decides)
-- If `output_type: "html"` → passes through — no structural validation
+---
 
-**Step 3 — Deliver**
-- Writes Deliverable record to `deliverables` table with full lineage:
-  `agent_id`, `capability_slug`, `skill_profile_slug`, `level`, `step_id`, `work_order_id`
-- Logs to `ai_activity_log` via `logAICall()` — no exceptions
-- Returns parsed response to the requesting agent or service
+### Three steps — run in this order
 
-### Output
+---
+
+#### Step 1 — Send
+
+The Sender calls the LLM using the `llm` config from the Builder output.
+
+**Streaming behavior — default true, auto-overridden:**
+
+| `format_contract.output_type` | Streaming |
+|-------------------------------|-----------|
+| `html` | `true` — text streams token by token to the UI |
+| `docx` / `pdf` | `true` — prose streams, then packaged after completion |
+| `json` / `dashboard` | `false` — tool_choice returns a complete block; streaming adds no value |
+| MCP caller (`stream: false` passed) | `false` — batch JSON returned |
+
+The Sender overrides the caller's `stream` flag automatically when `output_type` is
+`json` or `dashboard`. The caller does not need to know about this — it always passes
+`stream: true` as the default and the Sender does the right thing.
+
+**Structured output (json / dashboard):**
+When `format_contract.output_type` is `json` or `dashboard`, the Sender:
+- Passes the `format_contract.schema` to the LLM as a tool definition
+- Sets `tool_choice: { type: "any" }` to force the LLM to use it
+- This is the same pattern as `plan.js` today — tool_choice for the PM Execution Plan
+
+**Tool use (capability-declared):**
+If a Skill Profile in the Capability declares `technical_services: ["tool-use"]`,
+the Sender passes additional tool definitions from the Specification alongside the
+format schema. Format tool and capability tools are separate — both are passed.
+
+**What the Sender passes to the LLM adapter:**
+```
+system:      builder_output.system_prompt
+messages:    caller's messages array
+tools:       [format_contract.schema as tool def] + [any capability-declared tools]
+tool_choice: { type: "any" }   ← only when output_type is json/dashboard
+max_tokens:  builder_output.llm.max_tokens
+model:       builder_output.llm.model
+stream:      resolved streaming flag (after auto-override)
+```
+
+All LLM calls go through `api/adapters/anthropic.js` (or the appropriate vendor adapter).
+No direct vendor API calls inside the Sender.
+
+---
+
+#### Step 2 — Parse
+
+The Sender reads `format_contract.output_type` and handles the response accordingly:
+
+**`output_type: "json"` or `"dashboard"`**
+- Extracts the tool_use block from the LLM response
+- Validates the `input` object against `format_contract.schema`
+- If valid → pass to Step 3
+- If invalid → single retry: append a message to the messages array and call again:
+  ```
+  { role: "user", content: "Your previous response did not match the required format.
+    Return the response again conforming exactly to this schema: [schema as JSON string]" }
+  ```
+- If retry also fails → return raw response with `parse_error: true`. Caller decides.
+
+**`output_type: "html"`**
+- Extracts text content from the LLM response
+- No structural validation — passes through as-is
+- No retry logic for HTML — free text has no contract to validate against
+
+**`output_type: "docx"` / `"pdf"`**
+- Extracts prose text from the LLM response
+- Passes to a document generation service (outside the Sender's scope)
+- Sender returns the prose text and a `requires_packaging: true` flag
+- Document packaging is a separate capability route — not the Sender's job
+
+**Streaming responses:**
+When streaming is active, parsing happens on the completed stream — the Sender buffers
+the full response before validating. The UI sees tokens arriving progressively; the
+Sender validates the complete result before writing the Deliverable.
+
+---
+
+#### Step 3 — Deliver
+
+After successful parse, the Sender writes and logs.
+
+**Write Deliverable:**
+```sql
+INSERT INTO deliverables (
+  id, tenant_id, work_order_id, step_id, competency_id,
+  skill_profile_slug, type, title,
+  content, format, status,
+  level, is_final,
+  created_at
+)
+```
+
+| Field | Value |
+|-------|-------|
+| `work_order_id` | from caller input (null if MCP) |
+| `step_id` | from caller input (null if MCP) |
+| `competency_id` | `agent_id` from Builder output |
+| `skill_profile_slug` | `format_contract.skill_profile_slug` |
+| `type` | derived from `format_contract.output_type` |
+| `content` | parsed response |
+| `format` | `format_contract.output_type` |
+| `status` | `draft` (default — HITL or Orchestrator promotes to approved) |
+
+**Log to ai_activity_log:**
+```js
+logAICall({
+  capability_slug:     builder_output.capability_slug,
+  skill_profile_slug:  format_contract.skill_profile_slug,
+  agent_id:            builder_output.agent_id,
+  step_id:             step_id || null,
+  work_order_id:       work_order_id || null,
+  deliverable_id:      new deliverable uuid,
+  model:               builder_output.llm.model,
+  provider:            builder_output.llm.provider,
+  tokens_in:           from LLM response usage object,
+  tokens_out:          from LLM response usage object,
+  cost_usd:            calculated from tokens + model pricing,
+  latency_ms:          time from Send to parse complete,
+  streamed:            resolved streaming flag,
+  parse_error:         false / true,
+  reflect_tokens:      builder_output.debug.reflect_tokens_used || 0,
+  synthesis_tokens:    builder_output.debug.synthesis_tokens_used || 0
+})
+```
+
+Note: `reflect_tokens` and `synthesis_tokens` are logged here alongside the main call
+so the full cost of one Sender execution (including Builder's Haiku calls) is visible
+in a single `ai_activity_log` row. Builder Haiku calls are not logged separately —
+they are overhead of the Sender execution, not standalone capability calls.
+
+---
+
+### Sender Output
+
 ```json
 {
   "deliverable_id": "uuid",
-  "content": { ... },
+  "content": {
+    "planSummary": "...",
+    "agentId": "pp-01",
+    "agentReason": "...",
+    "steps": [ ... ],
+    "questions": []
+  },
+  "format": "json",
+  "status": "draft",
   "raw_response": { ... },
   "parse_error": false,
-  "log_id": "uuid"
+  "streamed": false,
+  "log_id": "uuid",
+  "debug": {
+    "model": "claude-sonnet-4-6",
+    "tokens_in": 1820,
+    "tokens_out": 640,
+    "cost_usd": 0.0031,
+    "latency_ms": 2140,
+    "retry_used": false
+  }
 }
 ```
 
@@ -574,19 +739,26 @@ These are explicitly excluded — they belong elsewhere:
 
 ---
 
-## 10. Open Design Decisions (Builder + Sender sessions)
+## 10. Open Design Decisions (future sessions)
 
-The following are confirmed in principle but require their own design sessions before
-kickoff docs are written:
+Resolved decisions are marked ✅. Remaining open items require their own design sessions
+before kickoff docs are written.
 
 | Decision | Status |
 |----------|--------|
-| Builder token optimization — exact compression algorithm | Design session required |
-| REFLECT — always-on vs capability-declared vs caller flag | Design session required |
-| Sender retry logic — max retries, backoff, partial parse handling | Design session required |
-| Sender streaming — when SSE is used vs batch return | Design session required |
+| REFLECT — declared on Skill Profile via `technical_services: ["reflect"]` | ✅ Locked |
+| Intelligent synthesis — declared on Intent Skill Profile via `technical_services: ["intelligent-synthesis"]` — Haiku rewrite, runs last | ✅ Locked |
+| Builder: Container feeds all stored content directly — Builder never reads DB | ✅ Locked |
+| Sender streaming — default true; auto-overridden to false for json/dashboard; MCP callers pass false explicitly | ✅ Locked |
+| Sender structured output — driven by `format_contract.output_type`; json/dashboard use tool_choice + schema | ✅ Locked |
+| Sender retry — single append retry on parse failure; raw response + parse_error flag if retry also fails | ✅ Locked |
+| Sender lineage — step_id + work_order_id from caller; null for MCP callers | ✅ Locked |
+| Builder Haiku call costs (REFLECT + synthesis) logged as overhead on Sender's ai_activity_log row | ✅ Locked |
+| docx/pdf packaging — Sender returns prose + requires_packaging flag; document service is separate | ✅ Locked |
 | Container caching — Spec caching strategy (same capability + agent = cache hit) | Design session required |
-| `max_tokens` addition to `skill_profiles` DB schema | Schema update required (S-INFRA-01 or earlier) |
+| `max_tokens` / `llm_model` / `llm_provider` columns added to `skill_profiles` table in Supabase | Schema migration required (S-INFRA-01 or earlier) |
+| Two-speed routing — fast path (Haiku, top 3 RAG) vs deep path (Sonnet, top 10 RAG) declared at Capability level | Design session required (AA-04) |
+| Builder fetch: multiple Knowledge Skill Profiles — merge strategy for multiple RAG result sets | Design session required |
 
 ---
 
