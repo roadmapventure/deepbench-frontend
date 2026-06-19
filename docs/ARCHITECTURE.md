@@ -122,6 +122,9 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 | Self-Learning / Knowledge Reinforcement | AI | `api/web-memory.js` | `api/capabilities/knowledge-reinforcement.js` |
 | Capability Audit & Cost Tracking | System | `src/hooks/useAIActivity.js` | stays in hooks (client-side aggregation) |
 | Identity / Persona Replication | AI | ❌ Not yet built | `api/capabilities/persona-replication.js` |
+| Prompt Container | System | `api/agent-run.js` (partial) | `api/prompt/container.js` |
+| Prompt Builder | AI + System | `api/agent-run.js` (partial) | `api/prompt/builder.js` |
+| Prompt Sender | AI | `api/agent-run.js` (partial) | `api/prompt/sender.js` |
 | Procurement Flags | Deterministic | `computeFlags()` inline | `api/capabilities/procurement-flags.js` |
 | Vendor Concentration / HHI | Deterministic | `computeVendorConc()` inline | `api/capabilities/vendor-concentration.js` |
 | Column Detection / NIGP Lookup | Deterministic | inline in AnalyzerScreen | `api/capabilities/column-detection.js` |
@@ -255,6 +258,7 @@ A Skill Profile is a configured instance of a Skill type. It is the unit where p
 | **Confidence** | Calibration level of output | *(scale TBD in design session)* |
 | **LLM Provider** | Which AI provider executes this Skill Profile | Anthropic · OpenAI · *(future: others)* |
 | **LLM Model** | Specific model assigned | Haiku · Sonnet · GPT-4o · *(future: others)* |
+| **Max Tokens** | Token budget ceiling for this Skill's LLM call | Integer — e.g. 1200 · 4000 · 8000 |
 | **API Key Source** | Who provides the API key | Platform · BYOK |
 | **Execution Type** | Technical Service category | AI (+ which pattern) · Deterministic |
 
@@ -347,6 +351,10 @@ skill_profiles (
   guardrails jsonb,
   notes,
   technical_services jsonb,   -- AI Patterns — seeded [] until Work Side wired
+  llm_provider,               -- 'anthropic' | 'openai' | future: others (default: 'anthropic')
+  llm_model,                  -- e.g. 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
+  max_tokens int,             -- token budget ceiling for this Skill's LLM call
+  api_key_source,             -- 'platform' | 'byok'
   execution_type,
   tenant_id,
   created_at
