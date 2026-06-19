@@ -1,4 +1,4 @@
-// DeepBench v5.2.5 | PersonnelScreen.jsx | AI-28 badge label sweep — KNOWLEDGE_TRAINING + PROMPT_ASSEMBLY
+// DeepBench v5.2.11 | PersonnelScreen.jsx | SK-01–SK-06 Skills & Capabilities schema + Capabilities card + SkillHoverCard
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -12,6 +12,7 @@ import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
+import { supabase } from "../lib/supabase.js";
 
 // FEATURE: PE-03 — Training tab live wiring
 async function apiGetEntries(agent_id) {
@@ -66,6 +67,45 @@ async function apiPatchConfig(id, fields) {
 async function apiDeleteConfig(id) {
   const res = await fetch("/api/agent-configs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tenant_id: TENANT_ID }) });
   if (!res.ok) throw new Error("Failed to delete");
+}
+
+// FEATURE: SK-01–SK-05 — fetch capabilities for agent from Supabase
+async function fetchCapabilities(agentId) {
+  const { data: assignments } = await supabase
+    .from("agent_capability_assignments")
+    .select("capability_slug")
+    .eq("agent_id", agentId)
+    .eq("tenant_id", TENANT_ID);
+
+  if (!assignments || assignments.length === 0) return [];
+
+  const result = [];
+  for (const a of assignments) {
+    const { data: cap } = await supabase
+      .from("capabilities")
+      .select("*")
+      .eq("slug", a.capability_slug)
+      .single();
+    if (!cap) continue;
+
+    const { data: cspRows } = await supabase
+      .from("capability_skill_profiles")
+      .select("*")
+      .eq("capability_slug", cap.slug)
+      .order("display_order", { ascending: true });
+
+    const skillProfiles = [];
+    for (const csp of (cspRows || [])) {
+      const { data: sp } = await supabase
+        .from("skill_profiles")
+        .select("*")
+        .eq("slug", csp.skill_profile_slug)
+        .single();
+      if (sp) skillProfiles.push({ ...sp, level: csp.level });
+    }
+    result.push({ ...cap, skillProfiles });
+  }
+  return result;
 }
 
 // FEATURE: PE-10 — Add Courses inline sub-view
@@ -153,10 +193,134 @@ const AGENT_COMPLETED = {
   brent:[{id:11,title:"Oregon OregonBuys PO Export",type:"Web Fetch",completedOn:"May 22"}],
 };
 
+// FEATURE: SK-06 — hover card showing all Traits for a Skill Profile
+function SkillHoverCard({ skill }) {
+  if (!skill) return null;
+
+  const TYPE_COLOR = {
+    intent:   { bg: "rgba(182,135,58,.15)", color: T.brassDeep,  border: "rgba(182,135,58,.35)", label: "INTENT"   },
+    format:   { bg: "rgba(90,117,56,.12)",  color: T.moss,       border: "rgba(90,117,56,.3)",   label: "FORMAT"   },
+    knowledge:{ bg: "rgba(18,36,60,.1)",    color: T.navy,       border: T.line,                 label: "KNOWLEDGE"},
+    behavior: { bg: "rgba(120,109,82,.12)", color: T.mutedDeep,  border: T.line,                 label: "BEHAVIOR" },
+    identity: { bg: "rgba(168,51,25,.08)",  color: T.flag,       border: "rgba(168,51,25,.25)",  label: "IDENTITY" },
+  };
+  const tc = TYPE_COLOR[skill.skill_type_slug] || TYPE_COLOR.intent;
+
+  const standardRows = [
+    ["Objective",  skill.objective],
+    ["Method",     skill.method],
+    ["Output",     skill.output_desc],
+    ["Tone",       skill.tone],
+    ["Confidence", skill.confidence],
+  ].filter(([, v]) => v);
+
+  const must    = skill.guardrails?.must    || [];
+  const mustNot = skill.guardrails?.must_not || [];
+  const typeTraits = skill.traits ? Object.entries(skill.traits) : [];
+
+  return (
+    <div style={{
+      position: "absolute",
+      bottom: "calc(100% + 6px)",
+      left: 0,
+      zIndex: 100,
+      background: T.navy,
+      border: `1px solid rgba(182,135,58,0.3)`,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+      padding: "12px 14px",
+      minWidth: 260,
+      maxWidth: 300,
+      pointerEvents: "none",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
+        <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: "#fff", lineHeight: 1.3 }}>{skill.name}</div>
+        <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", padding: "2px 6px", background: tc.bg, color: tc.color, border: `1px solid ${tc.border}`, flexShrink: 0 }}>
+          {tc.label}
+        </span>
+      </div>
+      {skill.description && (
+        <div style={{ fontFamily: body, fontSize: 10, color: "rgba(255,255,255,0.5)", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4 }}>
+          {skill.description}
+        </div>
+      )}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: 8 }} />
+      {standardRows.map(([label, value]) => (
+        <div key={label} style={{ display: "flex", gap: 8, marginBottom: 5 }}>
+          <div style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(182,135,58,0.7)", width: 68, flexShrink: 0, paddingTop: 1 }}>{label}</div>
+          <div style={{ fontFamily: body, fontSize: 10, color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>{value}</div>
+        </div>
+      ))}
+      {typeTraits.length > 0 && (
+        <>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", margin: "8px 0" }} />
+          {typeTraits.map(([key, val]) => (
+            <div key={key} style={{ display: "flex", gap: 8, marginBottom: 5 }}>
+              <div style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(182,135,58,0.5)", width: 68, flexShrink: 0, paddingTop: 1 }}>
+                {key.replace(/_/g, " ")}
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 9, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
+                {Array.isArray(val) ? val.join(" · ") : String(val)}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      {(must.length > 0 || mustNot.length > 0) && (
+        <>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", margin: "8px 0" }} />
+          {must.length > 0 && (
+            <div style={{ marginBottom: 5 }}>
+              <div style={{ fontFamily: mono, fontSize: 8, color: T.moss, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 700, marginBottom: 4 }}>MUST</div>
+              {must.map((r, i) => (
+                <div key={i} style={{ fontFamily: body, fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2, paddingLeft: 8 }}>· {r}</div>
+              ))}
+            </div>
+          )}
+          {mustNot.length > 0 && (
+            <div>
+              <div style={{ fontFamily: mono, fontSize: 8, color: T.flag, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 700, marginBottom: 4 }}>MUST NOT</div>
+              {mustNot.map((r, i) => (
+                <div key={i} style={{ fontFamily: body, fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2, paddingLeft: 8 }}>· {r}</div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {skill.notes && (
+        <>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", margin: "8px 0" }} />
+          <div style={{ fontFamily: body, fontSize: 10, color: "rgba(255,255,255,0.45)", fontStyle: "italic", lineHeight: 1.4 }}>{skill.notes}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// FEATURE: SK-06 — skill row with hover card trigger
+function SkillRow({ sp, chip }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}`, position: "relative", cursor: "default" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{ fontFamily: body, fontSize: 11, color: T.mutedDeep, flex: 1 }}>{sp.name}</div>
+      <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", padding: "1px 5px", background: chip.bg, color: chip.color, border: `1px solid ${chip.border}`, flexShrink: 0 }}>
+        {chip.label}
+      </span>
+      <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassDeep, background: "rgba(182,135,58,.1)", border: `1px solid rgba(182,135,58,.25)`, padding: "1px 5px", flexShrink: 0 }}>
+        L{sp.level}
+      </span>
+      {hovered && <SkillHoverCard skill={sp} />}
+    </div>
+  );
+}
+
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers }) {
+function ProfileTab({ agent, entries, layers, capabilities }) {
   const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   const rc            = readinessColor;
   const fmt           = fmt$;
@@ -201,6 +365,40 @@ function ProfileTab({ agent, entries, layers }) {
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{agent.quip}"
           </div>
+        </div>
+
+        {/* FEATURE: SK-06 — Capabilities card */}
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
+          <Corners />
+          <FeatureBadge id="SK-06" />
+          <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
+          {capabilities.length === 0 ? (
+            <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
+              <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>No capabilities assigned.</div>
+            </div>
+          ) : (
+            capabilities.map(cap => {
+              const TYPE_CHIP = {
+                intent:   { bg: "rgba(182,135,58,.1)",  color: T.brassDeep, border: "rgba(182,135,58,.3)", label: "INTENT"   },
+                format:   { bg: "rgba(90,117,56,.08)",  color: T.moss,      border: "rgba(90,117,56,.25)", label: "FORMAT"   },
+                knowledge:{ bg: "rgba(18,36,60,.07)",   color: T.mutedDeep, border: T.lineSoft,            label: "KNOWLEDGE"},
+                behavior: { bg: "rgba(120,109,82,.08)", color: T.mutedDeep, border: T.lineSoft,            label: "BEHAVIOR" },
+                identity: { bg: "rgba(168,51,25,.06)",  color: T.flag,      border: "rgba(168,51,25,.2)",  label: "IDENTITY" },
+              };
+              return (
+                <div key={cap.slug} style={{ marginBottom: 12 }}>
+                  <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
+                  {cap.description && (
+                    <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
+                  )}
+                  {cap.skillProfiles.map(sp => {
+                    const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
+                    return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
+                  })}
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Compensation card */}
@@ -1263,11 +1461,20 @@ export default function PersonnelScreen() {
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
+  const [capabilities, setCapabilities] = useState([]);
 
   const showToast = (msg, icon="✓") => {
     setToast({msg,icon});
     setTimeout(()=>setToast(null),3000);
   };
+
+  // FEATURE: SK-01–SK-05 — load capabilities for agent from Supabase
+  useEffect(() => {
+    if (!agent) return;
+    fetchCapabilities(agent.id)
+      .then(setCapabilities)
+      .catch(err => console.error("Failed to load capabilities", err));
+  }, [agent?.id]);
 
   // FEATURE: PE-03 — load live training entries from Supabase on mount
   useEffect(() => {
@@ -1401,7 +1608,7 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
