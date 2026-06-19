@@ -616,6 +616,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | SK-11 | Capability hover card on Personnel File — hovering the capability name/title shows a summary popup of all the Capability's traits (name, description, Skill count, execution type). Mirrors SkillHoverCard pattern. Design session required before coding. | ❌ Missing | S-future (design required) |
 | SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles links + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes required. | ✅ Done | S-PM-01 (9255c22) |
 | SK-13 | JD → Capability Auto-Generation — upload a job description, extract competencies mapped to Skill types, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval before creation. Extends PE-10 upload pipeline with capability records as output target instead of knowledge_entries. Design session required. | ❌ Missing | S-future (design required) |
+| SK-14 | SkillHoverCard z-index fix — hover popup renders behind sibling controls on Personnel File Profile tab. CSS z-index elevation required on the hover card container. Small patch — can go into any upcoming coding session. | ❌ Missing | S-next-patch |
+| SK-15 | Identity Skill for Project Manager (SP-PM-06) — orchestrator philosophy, autonomy dial, skeptic level. Deferred pending prompt-assembly design session where Personnel File Trait usage will be assessed in full context. | ❌ Missing | S-future (design required) |
 
 ---
 
@@ -694,8 +696,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | Session | Feature | Status |
 |---------|---------|--------|
 | S-EXEC-DESIGN | Execution & Delivery Model design session — locked 2026-06-18. Full pipeline spec, Project Manager Capability defined (5 Skill Profiles), 6 deliverable types, AI pattern map, DB impact, Michelle transition path. Produced: EXECUTION-DELIVERY-MODEL.md, updated SKILL-PROFILE-MODEL.md + FEATURES.md | ✅ DONE |
-| S-PM-01 | Seed Project Manager Capability in DB — SK-12. Supabase only, no src/ changes. Michelle's Personnel File immediately shows CAP-PM-01 via existing SK-06 UI. Kickoff doc required. | ❌ Not started |
-| S-PM-02 | Build prompt-assembly.js (AA-03) — reads Skill Profiles for a given capability slug, assembles layered system prompt from Traits. Layer 3 service. Required before plan.js can be refactored. Design session required. | ❌ Not started |
+| S-PM-01 | Seed Project Manager Capability in DB — SK-12. Supabase only, no src/ changes. Michelle's Personnel File immediately shows CAP-PM-01 via existing SK-06 UI. Kickoff doc required. | ✅ DONE (9255c22) |
+| S-PM-01b-design | PM Format Skill alignment design session (2026-06-19) — SP-PM-03 output_fields updated: added agentId, agentReason, questions[]. Orchestrator/Executor field distinction locked. S-PM-02 scope confirmed: prompt-assembly only, no deliverables table (Option A). Execution Plan storage deferred to S-DELIVER-04. SK-14 (z-index bug) + SK-15 (Identity Skill) added. | ✅ DONE |
+| S-PM-02 | Build prompt-assembly.js (AA-03) — reads Skill Profiles for a given capability slug, assembles layered system prompt from Traits. Layer 3 service. Required before plan.js can be refactored. Design session required. Scope: prompt assembly only. No deliverables table. Identity Skill (SP-PM-06) to be reviewed during this design session. | ❌ Not started |
 | S-PM-03 | Refactor api/plan.js — use prompt-assembly.js instead of hardcoded prompt; expand step schema to full Execution Plan contract (capability_slug, assignment_status, expected_output_type, rationale, depends_on[]); write approved plan to deliverables table (depends on DL-04). | ❌ Not started |
 
 ### Infrastructure (after Bench side is stable)

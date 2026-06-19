@@ -352,6 +352,12 @@ agent_capability_assignments (
 | `planning-behavior` (behavior) | L2 | Yes |
 | `capability-registry-knowledge` (knowledge) | L2 | Yes |
 
+> **Format Skill role [LOCKED]:** SP-PM-03 is the output contract between Claude and the existing hardcoded AssignWorkScreen. It declares the exact JSON shape Claude must produce. The screen stays deterministic — the Format Skill governs what the LLM outputs so it fits the screen's expectations. No screen changes are needed until S-PM-03 (step schema expansion).
+
+> **output_fields updated (2026-06-19):** Added `agentId`, `agentReason`, `questions` to align with the existing screen's tool schema. Plan-level `agentId` = Orchestrating PM only (never an executor). `questions[]` = empty array when SP-PM-04 clarification policy does not trigger.
+
+> **Identity Skill:** CAP-PM-01 currently has 4 of 5 Skill types (no Identity). Identity Skill (SP-PM-06) deferred — to be reviewed during the prompt-assembly design session, where Personnel File Trait usage will be assessed in full context.
+
 **Agent assignments:**
 
 | Agent | Notes |

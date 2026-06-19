@@ -354,29 +354,32 @@ produces an Execution Plan for user approval.
   "slug": "execution-plan",
   "skill_type_slug": "format",
   "name": "Execution Plan",
-  "description": "Structured JSON output schema for a Work Order execution plan — both Ideal and Assigned passes. Includes a plain-English plan summary for the HITL review surface.",
-  "objective": "Produce a machine-readable, human-reviewable execution plan that drives Work Order execution. The plan summary pre-populates the HITL review card so the user understands what they are approving.",
-  "method": "Structured JSON conforming to the Execution Plan step schema. planSummary is generated from the Work Order goal and the assembled step list — one sentence describing what the plan accomplishes.",
-  "output_desc": "JSON object with plan-level fields (including planSummary), a steps array, and assignment counts. planSummary surfaces in the UI at the HITL review point.",
+  "description": "Structured JSON output schema for a Work Order execution plan — both Ideal and Assigned passes. Includes a plain-English plan summary and clarifying questions for the HITL review surface.",
+  "objective": "Produce a machine-readable, human-reviewable execution plan that drives Work Order execution. The plan summary pre-populates the HITL review card so the user understands what they are approving. Clarifying questions, when present, are surfaced before decomposition proceeds.",
+  "method": "Structured JSON conforming to the Execution Plan step schema. planSummary is generated from the Work Order goal and the assembled step list — one sentence describing what the plan accomplishes. agentId always identifies the Orchestrating PM (not an executor). questions[] is populated only when SP-PM-04 clarification_policy triggers.",
+  "output_desc": "JSON object with plan-level fields (including planSummary, agentId, agentReason, questions), a steps array, and assignment counts. planSummary surfaces in the UI at the HITL review point.",
   "tone": "technical",
   "confidence": "assertive",
   "traits": {
     "output_type": "json",
     "file_format": "json",
     "section_structure": "step-array",
-    "output_fields": ["planSummary", "steps", "assigned_count", "generic_count", "gap_count", "status"]
+    "output_fields": ["planSummary", "agentId", "agentReason", "questions", "steps", "assigned_count", "generic_count", "gap_count", "status"]
   },
   "guardrails": {
     "must": [
       "Output must be valid JSON",
       "Every step must include all required fields",
       "assignment_status must be one of: assigned | generic | gap",
-      "planSummary must be present — one plain-English sentence describing what the plan accomplishes"
+      "planSummary must be present — one plain-English sentence describing what the plan accomplishes",
+      "agentId must reference the Orchestrating PM agent — never an executor agent",
+      "questions[] must be an empty array when no clarification is needed"
     ],
     "must_not": [
       "No free-text plan descriptions outside of planSummary — structure only",
       "No missing step fields",
-      "planSummary must not exceed one sentence"
+      "planSummary must not exceed one sentence",
+      "agentId must never reference an executor agent — plan-level agent is always the Orchestrator"
     ]
   },
   "technical_services": [],
@@ -384,8 +387,11 @@ produces an Execution Plan for user approval.
 }
 ```
 
-> **UI surface:** `planSummary` pre-populates the HITL review card headline — the one-sentence description the user reads before approving the Execution Plan. It is a plan-level field, not a step field. The UI derives step icons from `step.type` (agent / hitl / subagent) — icon is not an LLM output field.
-```
+> **UI surface:** `planSummary` pre-populates the HITL review card headline. `agentId` drives the primary agent chip at the top of the plan (always the PM — Michelle today, domain-specific PMs in future). `questions[]` surfaces the clarifying questions panel when populated (driven by SP-PM-04 `clarification_policy: "conditional"`). The UI derives step icons from `step.type` (agent / hitl / subagent) — icon is not an LLM output field.
+
+> **Orchestrator / Executor distinction [LOCKED]:** Plan-level `agentId` = the Orchestrating PM responsible for the full Work Order. Step-level `agent_id` = the Executor assigned to that individual step. These are never the same field. In future, when multiple PM-type agents exist (e.g. Procurement PM, IT PM), `agentId` becomes the PM selector — the user picks which PM runs the Work Order.
+
+> **Storage:** The Execution Plan is held in React state during the Assign Work flow. Steps are persisted to the tasks table (Supabase JSONB) on Work Order save. The Execution Plan is not stored as a first-class deliverable record until S-DELIVER-04 builds the `deliverables` table.
 
 ---
 
