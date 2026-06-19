@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-18 | Session: S-SK-01-design — Skill Profile Model designed. New area code SK (Skills & Capabilities). Features SK-01–SK-10 added. S-SK-01 added to session queue. ARCHITECTURE.md DB section fixed (capabilities table added; renamed capability_skill_requirements → capability_skill_profiles and agent_skill_assignments → agent_capability_assignments). New canonical reference: docs/SKILL-PROFILE-MODEL.md.
+> Last updated: 2026-06-18 | Session: S-SK-01-design cont. — Kickoff doc written for S-SK-01. SkillHoverCard added to SK-06 scope: hover over a Skill row in the Capabilities card shows all Traits, type-specific jsonb fields, and guardrails in a popup. Kickoff doc: docs/kickoffs/v5.2.11-SK-01-skills-capabilities-schema.md.
 >
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
