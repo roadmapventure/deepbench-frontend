@@ -186,8 +186,22 @@ prompt to any LLM they choose. The Builder always returns both.
 ## 5. API 1 — Prompt Container (Specification)
 
 **Route:** `api/prompt/container.js`
-**Job:** Read the capability and agent. Produce a Prompt Specification.
+**Job:** Read the capability and agent. Load all stored content. Produce a fully-loaded
+Prompt Specification that the Builder can execute without touching the DB again.
 **Does NOT:** fetch RAG, call Claude, write anything to the DB.
+
+### What the Container loads
+
+The Container is responsible for ALL stored data reads. It passes content directly in
+the Specification so the Builder is fully decoupled from the data model. The Builder
+never reads Supabase directly — it only executes runtime operations declared in the Spec.
+
+| Source type | What Container does | What Builder does |
+|-------------|--------------------|--------------------|
+| `stored` | Reads and embeds content in Spec | Renders section from embedded content |
+| `rag` | Passes fetch instruction only (needs task_context at runtime) | Executes RAG query, receives chunks |
+| `reflect` | Passes instruction (declared via `technical_services`) | Runs Haiku call, inserts section |
+| `intelligent-synthesis` | Passes instruction (declared via `technical_services`) | Runs Haiku rewrite of full prompt |
 
 ### Input
 ```json
@@ -199,6 +213,10 @@ prompt to any LLM they choose. The Builder always returns both.
 ```
 
 ### Output — Prompt Specification
+
+The Specification carries either embedded content (`content` field populated) or a fetch
+instruction (`fetch_instruction` field populated). Never both. Never neither.
+
 ```json
 {
   "sections": [
@@ -206,7 +224,8 @@ prompt to any LLM they choose. The Builder always returns both.
       "slug": "identity",
       "label": "ROLE & IDENTITY",
       "skill_profile_slug": "pm-identity",
-      "source": "credentials",
+      "type": "stored",
+      "content": "You are Michelle Manning, Project Manager...",
       "required": true,
       "order": 1
     },
@@ -214,7 +233,8 @@ prompt to any LLM they choose. The Builder always returns both.
       "slug": "behavior",
       "label": "BEHAVIOR & APPROACH",
       "skill_profile_slug": "planning-behavior",
-      "source": "credentials",
+      "type": "stored",
+      "content": "Approach every Work Order by first decomposing...",
       "required": true,
       "order": 2
     },
@@ -222,35 +242,66 @@ prompt to any LLM they choose. The Builder always returns both.
       "slug": "knowledge",
       "label": "BACKGROUND KNOWLEDGE",
       "skill_profile_slug": "capability-registry-knowledge",
-      "source": "rag",
+      "type": "rag",
+      "fetch_instruction": {
+        "method": "rag",
+        "agent_id": "pp-01",
+        "query_from": "task_context",
+        "match_count": 5,
+        "scope": "agent"
+      },
       "required": false,
       "order": 3
+    },
+    {
+      "slug": "execution-plan",
+      "label": "EXECUTION PLAN",
+      "skill_profile_slug": "planning-behavior",
+      "type": "reflect",
+      "fetch_instruction": {
+        "method": "reflect",
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 1024,
+        "inserts_after": "knowledge",
+        "declared_by": "planning-behavior"
+      },
+      "required": false,
+      "order": 4
     },
     {
       "slug": "intent",
       "label": "TASK INSTRUCTION",
       "skill_profile_slug": "work-order-decomposition",
-      "source": "skill_profile_traits",
+      "type": "stored",
+      "content": "Decompose the Work Order into discrete executable steps...",
       "required": true,
-      "order": 4
+      "order": 5
     },
     {
       "slug": "format",
       "label": "OUTPUT FORMAT",
       "skill_profile_slug": "execution-plan",
-      "source": "skill_profile_traits",
+      "type": "stored",
+      "content": "Return a JSON object with the following fields: ...",
       "required": true,
-      "order": 5
+      "order": 6
     },
     {
       "slug": "guardrails",
       "label": "CONSTRAINTS & GUARDRAILS",
       "skill_profile_slug": "planning-behavior",
-      "source": "skill_profile_guardrails",
+      "type": "stored",
+      "content": "Never assign a step to an agent who lacks the required capability...",
       "required": true,
-      "order": 6
+      "order": 7
     }
   ],
+  "synthesis": {
+    "enabled": true,
+    "model": "claude-haiku-4-5-20251001",
+    "max_tokens": 2048,
+    "declared_by": "work-order-decomposition"
+  },
   "llm": {
     "provider": "anthropic",
     "model": "claude-sonnet-4-6",
@@ -263,92 +314,186 @@ prompt to any LLM they choose. The Builder always returns both.
 }
 ```
 
-The Specification is the sole input to the Builder. Nothing in the Builder hardcodes
-section order, section names, or section inclusion — those all come from the Specification.
+**Key rule:** The Specification is the sole input to the Builder. Nothing in the Builder
+hardcodes section order, section names, section inclusion, or fetch behavior. Everything
+is declared in the Specification.
 
 ---
 
-## 6. API 2 — Prompt Builder (Assembly + Optimization)
+## 6. API 2 — Prompt Builder (Fetch + Render + REFLECT + Synthesis)
 
 **Route:** `api/prompt/builder.js`
-**Job:** Take the Specification. Fetch what needs fetching. Render. Optimize.
-**Does NOT:** call Claude for the main task. Does NOT write to the DB.
+**Job:** Execute the Prompt Specification. Fetch runtime data. Render all sections.
+Run REFLECT if declared. Run intelligent synthesis if declared. Return the optimized prompt.
+**Does NOT:** read Skill Profiles or agent_configs directly. Does NOT write to the DB.
+**Makes AI calls:** Yes — REFLECT (Haiku) and intelligent synthesis (Haiku) when declared.
 
-### Three sub-steps (run in this order):
+### Four steps — run in this order
 
-**Step 1 — Fetch**
-For each section in the Specification, the Builder reads the `source` field and fetches:
-- `source: "credentials"` → reads from `agent_configs` or `skill_profiles` named columns
-- `source: "rag"` → runs vector search against `knowledge_entries` scoped to `agent_id`
-- `source: "skill_profile_traits"` → reads `skill_profiles.traits` jsonb
-- `source: "skill_profile_guardrails"` → reads `skill_profiles.guardrails` jsonb
+---
 
-Fetch calls run in parallel where sections have no dependency on each other.
+#### Step 1 — Fetch
 
-**Step 2 — Render**
-Each fetched section is rendered into text with a section header:
+The Builder iterates the Specification's `sections` array. For each section:
+
+- `type: "stored"` → content is already in the Spec. No fetch needed. Pass to render.
+- `type: "rag"` → execute the `fetch_instruction`: run vector search against
+  `knowledge_entries` using `task_context` as the query string. Returns ranked chunks.
+  Scope: `agent_id` scoped by default. `match_count` from the fetch instruction.
+- `type: "reflect"` → skip for now. Handled in Step 3 after render.
+- `type: "intelligent-synthesis"` → skip. Handled in Step 4.
+
+RAG fetches run in parallel if multiple Knowledge sections exist in one Specification.
+All other fetches are parallel by default. Sections with no inter-dependency never wait.
+
+**Fetch failure behavior:**
+- Required section fetch fails → log error, use empty string, mark `fetch_error: true`
+- Optional section fetch fails → omit section silently, log warning
+- Never block prompt assembly on a fetch failure
+
+---
+
+#### Step 2 — Render
+
+Each section with resolved content is rendered into a text block:
+
 ```
 === ROLE & IDENTITY ===
-[content]
+You are Michelle Manning, Project Manager...
 
 ---
 
 === BACKGROUND KNOWLEDGE ===
-[content]
+[RAG chunks joined by newline]
+
+---
+
+=== TASK INSTRUCTION ===
+Decompose the Work Order into discrete executable steps...
 
 ---
 ```
-Sections with empty content (e.g. RAG returns nothing, or a Skill has no traits set) are
-omitted from the rendered output. A required section with empty content logs a warning
-but does not block assembly.
 
-**Step 3 — Optimize**
-The rendered prompt is reviewed against the token budget from the Specification.
+**Render rules:**
+- Section header format: `=== LABEL ===` (all caps, matched to `section.label`)
+- Section separator: `\n\n---\n\n`
+- Sections with empty content after fetch are omitted — required or not
+- Section order follows `section.order` from the Specification — never hardcoded in Builder
 
-- If assembled prompt is within budget → pass through unchanged
-- If assembled prompt exceeds budget → compress in priority order:
-  1. Truncate Knowledge (RAG) section first — least precise content
-  2. Summarize Behavior section if still over budget
-  3. Never truncate Intent, Format, or Guardrails sections — these are the output contract
+---
 
-The REFLECT pattern (Haiku pre-run synthesis) is an optional optimization step:
-when `reflect: true` is passed, the Builder runs a Haiku call after render to produce
-an Execution Plan section from the assembled context. This becomes an additional section
-inserted between Knowledge and Intent.
+#### Step 3 — REFLECT
 
-### Output
+Runs only if one or more sections in the Specification have `type: "reflect"`.
+
+**What REFLECT does:**
+Takes the rendered prompt so far (all `stored` and `rag` sections assembled), plus
+`task_context`, and runs a Haiku call:
+
+```
+Prompt to Haiku:
+  "You are [agent identity]. Review your background knowledge and the task below.
+   Write a numbered execution plan that reflects your role, incorporates relevant
+   knowledge, and addresses this specific task concretely."
+
+  [rendered identity + behavior + knowledge sections]
+  [task_context]
+```
+
+Haiku returns a numbered execution plan. This becomes the content of the `execution-plan`
+section, inserted at the `order` position declared in the Specification.
+
+**REFLECT is declared on a Skill Profile** via `technical_services: ["reflect"]`.
+The Container reads this and adds the reflect section to the Specification.
+Builder checks `type: "reflect"` — if present, runs the Haiku call. If not present,
+skips entirely. REFLECT never runs automatically.
+
+After REFLECT, the rendered prompt is updated with the execution plan section inserted
+at the correct position.
+
+---
+
+#### Step 4 — Intelligent Synthesis
+
+Runs only if `synthesis.enabled: true` in the Specification.
+
+**What synthesis does:**
+Takes the full rendered prompt (all sections including REFLECT output if present) and
+runs a Haiku rewrite call against the token budget:
+
+```
+Prompt to Haiku:
+  "You are a prompt optimization engine. The prompt below will be sent to an AI agent
+   to complete a task. Rewrite it to be maximally clear, coherent, and efficient.
+   Remove redundancy. Tighten language. Preserve all factual content, all constraints,
+   and all output format instructions exactly.
+   The rewritten prompt must be under [max_tokens] tokens.
+   Do not add new instructions. Do not remove guardrails or format requirements."
+
+  [full rendered prompt]
+```
+
+Haiku returns a rewritten system prompt string. This replaces the rendered prompt
+as the Builder's output. The section-by-section debug object is preserved from the
+pre-synthesis render — it reflects what went in, not what came out.
+
+**Synthesis is declared on a Skill Profile** via `technical_services: ["intelligent-synthesis"]`.
+The Intent Skill Profile is the natural home for this declaration — it represents the
+cognitive operation the agent is performing and is best positioned to declare that the
+full assembled prompt should be synthesized before execution.
+
+**Synthesis runs last** — it sees the complete prompt including REFLECT output.
+It never runs before REFLECT.
+
+**Synthesis is a rewrite, not a filter.** It does not score-and-select sections.
+It rewrites the whole assembled prompt as a coherent unit. The token budget is passed
+as a hard constraint inside the synthesis prompt — Haiku is responsible for honoring it.
+
+---
+
+### Builder Output
+
 ```json
 {
-  "system_prompt": "=== ROLE & IDENTITY ===\n...\n\n---\n\n=== BACKGROUND KNOWLEDGE ===\n...",
+  "system_prompt": "You are Michelle Manning... [full optimized prompt string]",
   "sections": {
-    "identity": "...",
-    "behavior": "...",
-    "knowledge": "...",
-    "intent": "...",
-    "format": "...",
-    "guardrails": "..."
+    "identity": "You are Michelle Manning, Project Manager...",
+    "behavior": "Approach every Work Order by first decomposing...",
+    "knowledge": "[RAG chunks]",
+    "execution-plan": "1. Review the Work Order goal...\n2. Identify required capabilities...",
+    "intent": "Decompose the Work Order into discrete executable steps...",
+    "format": "Return a JSON object with the following fields: ...",
+    "guardrails": "Never assign a step to an agent who lacks the required capability..."
   },
   "llm": {
     "provider": "anthropic",
     "model": "claude-sonnet-4-6",
-    "max_tokens": 4000
+    "max_tokens": 4000,
+    "api_key_source": "platform"
   },
   "debug": {
-    "sections_assembled": 6,
+    "sections_assembled": 7,
     "sections_omitted": [],
-    "token_estimate": 1840,
-    "token_budget": 4000,
-    "budget_used_pct": 46,
-    "reflect_used": false,
+    "fetch_errors": [],
     "rag_retrieved": true,
-    "rag_chunks": 5
+    "rag_chunks": 5,
+    "reflect_ran": true,
+    "reflect_model": "claude-haiku-4-5-20251001",
+    "reflect_tokens_used": 312,
+    "synthesis_ran": true,
+    "synthesis_model": "claude-haiku-4-5-20251001",
+    "synthesis_tokens_used": 480,
+    "token_estimate_pre_synthesis": 2940,
+    "token_estimate_post_synthesis": 1820,
+    "token_budget": 4000,
+    "budget_used_pct": 46
   }
 }
 ```
 
 **MCP stop point:** An external MCP caller receives this output and sends `system_prompt`
 to their own LLM with their own messages array. They use `llm` as a recommendation only.
-They do not call the Sender.
+They do not need to call the Sender. The assembled prompt is a self-contained artifact.
 
 ---
 

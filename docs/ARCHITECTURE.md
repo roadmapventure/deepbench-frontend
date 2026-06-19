@@ -603,11 +603,13 @@ Never remove them.
 |------|--------|
 | Model selection | Haiku: classification, routing, short answers. Sonnet: complex reasoning, ReAct loops, long briefings. Never Sonnet where Haiku suffices (~20x cost). Future: configurable per Skill Profile via superadmin. |
 | Structured output | Use Claude tool use / `response_format`. Never parse free-text JSON. |
-| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Future: configurable per Skill Profile via superadmin. |
+| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Configurable per Skill Profile via `skill_profiles.max_tokens`. |
 | Streaming | Only where UX benefit justifies overhead. Yes: task planning, AI Review. No: routing, classification. |
 | Prompt caching | System prompts that don't change use Anthropic prompt caching. |
-| RAG retrieval | Cap `match_count` on vector searches. Never uncap. Future: configurable cap via superadmin. |
+| RAG retrieval | Cap `match_count` on vector searches. Never uncap. Configurable per Skill Profile via fetch_instruction in Prompt Specification. |
 | Logging | Every Layer 3 capability route logs to `ai_activity_log` via `logAICall()`. No exceptions — AI and deterministic alike. |
+| REFLECT | Haiku pre-run synthesis. Declared on a Skill Profile via `technical_services: ["reflect"]`. Runs inside Prompt Builder after Fetch + Render. Inserts an Execution Plan section into the assembled prompt. Never runs automatically — must be declared. |
+| Intelligent Synthesis | Haiku full-prompt rewrite. Declared on a Skill Profile via `technical_services: ["intelligent-synthesis"]`. Runs inside Prompt Builder last — after REFLECT. Rewrites the complete assembled prompt against the token budget. A rewrite, not a filter. Never runs automatically — must be declared. |
 
 ### Capability Badge Rule [LOCKED]
 `✦ AI` badge on every AI-touched UI element.
