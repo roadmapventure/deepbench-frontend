@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-16 | Session: S-DELIVER-DESIGN Part 3 — Full Platform Entity Model designed. Work Order replaces Task (S-RENAME-01 required before WO coding). Deliverable Model, Intent Model, Format Model, Platform Entities Registry documented. Deliverables Competency removed from Agent Profile Model — replaced by Intent Assignments + Format Assignments (standalone). 9 Intents named (MCP service categories). 3 Format tiers defined (Universal/Standard/Proprietary). New area codes: WO, IN, FM, SV. New sessions: S-RENAME-01, S-WO-01, S-INTENT-01, S-FORMAT-01, S-SERVICE-01, S-CAP-01, S-METHOD-01, S-MONITOR-01.
+> Last updated: 2026-06-18 | Session: S-SK-01-design — Skill Profile Model designed. New area code SK (Skills & Capabilities). Features SK-01–SK-10 added. S-SK-01 added to session queue. ARCHITECTURE.md DB section fixed (capabilities table added; renamed capability_skill_requirements → capability_skill_profiles and agent_skill_assignments → agent_capability_assignments). New canonical reference: docs/SKILL-PROFILE-MODEL.md.
 >
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
@@ -13,7 +13,7 @@
 ## Feature ID Format
 
 `[AREA]-[NUMBER]`
-Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables, `WO`=Work Order, `IN`=Intent, `FM`=Format, `SV`=Service
+Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables, `WO`=Work Order, `IN`=Intent, `FM`=Format, `SV`=Service, `SK`=Skills & Capabilities
 
 ---
 
@@ -596,6 +596,25 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+## SKILLS & CAPABILITIES — SK
+> Full model: `docs/SKILL-PROFILE-MODEL.md` — Traits, Capability assembly, Technical Services invocation, domain-agnostic principle, sprint template.
+> S-SK-01 design complete (2026-06-18). Coding session is next.
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SK-01 | `skill_types` table + 5 type seeds (identity, behavior, knowledge, intent, format) | ❌ Missing | S-SK-01 |
+| SK-02 | `skill_profiles` table + SP-01 Data Analysis (type: intent) + SP-02 Analysis Report (type: format) seeds | ❌ Missing | S-SK-01 |
+| SK-03 | `capabilities` table + CAP-01 Data Analyst seed | ❌ Missing | S-SK-01 |
+| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 at L2/L1 | ❌ Missing | S-SK-01 |
+| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ❌ Missing | S-SK-01 |
+| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card); empty state for unassigned agents; all agents show container | ❌ Missing | S-SK-01 |
+| SK-07 | AiBadge on Capabilities card — shows all technical_services patterns per Skill when Work Side is wired | ❌ Missing | S-future (Work Side execution sprint) |
+| SK-08 | CRUD UI for Skill Profile creation and editing | ❌ Missing | S-future (design required) |
+| SK-09 | Capability builder UI — assemble Skill Profiles into a new Capability, set Level per Skill | ❌ Missing | S-future (design required) |
+| SK-10 | Agent Capability assignment UI — assign/unassign Capabilities on Personnel File | ❌ Missing | S-future (design required) |
+
+---
+
 ## SERVICE — SV
 > A Service is a packaged Intent + Format combination — named, priced, MCP-exposed.
 > Design session (S-SERVICE-01) required before any coding.
@@ -660,6 +679,12 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | S-UX-BENCH-02 | UX Review — Personnel File |
 | S-UX-BENCH-03 | UX Review — Teach screen |
 | S-UX-BENCH-04 | UX Review — Test Team |
+
+### Skills & Capabilities (Bench side — before Work Side wiring)
+| Session | Feature | Status |
+|---------|---------|--------|
+| S-SK-01-design | Skill/Capability data model design session — locked 2026-06-18 | ✅ DONE |
+| S-SK-01 | SK-01 through SK-06 — 5 tables + seeds + Personnel File Capabilities section | ❌ Missing |
 
 ### Infrastructure (after Bench side is stable)
 | Session | Feature |

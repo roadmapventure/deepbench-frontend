@@ -329,35 +329,55 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 ### DB Architecture — Target State
 *(Do not build before S-INFRA-01. Design all sessions to not contradict this structure.)*
 
-> **Vocabulary note:** "capability" in prior DB schema language maps to "Skill Profile" in the updated model. Table names will be updated in S-INFRA-01 to reflect current vocabulary.
+> For the full Skill Profile design guide — Traits, Capabilities assembly, Technical Services invocation,
+> domain-agnostic principle, sprint template — see **docs/SKILL-PROFILE-MODEL.md**.
 
 **Layer 1 — Taxonomy** *(the catalog — rarely changes)*
 ```sql
-skill_types (id, slug, name, display_order)
+-- Global; no tenant scope
+skill_types (id, slug, name, description, display_order)
 
+-- tenant_id null = platform-wide; non-null = tenant-private
 skill_profiles (
-  id, skill_type_slug, slug, name,
-  default_trainable, default_execution_type,
-  display_order
+  id, slug, name, description,
+  skill_type_slug,
+  objective, method, output_desc,
+  tone, confidence,
+  traits jsonb,
+  guardrails jsonb,
+  notes,
+  technical_services jsonb,   -- AI Patterns — seeded [] until Work Side wired
+  execution_type,
+  tenant_id,
+  created_at
 )
 
-capability_skill_requirements (
-  id, capability_slug,
-  skill_profile_slug,
-  primary_technical_service,
-  minimum_level, is_required
+-- tenant_id null = platform-wide; non-null = tenant-private
+capabilities (
+  id, slug, name, description,
+  execution_type,
+  tenant_id,
+  created_at
+)
+
+-- Level lives here (Skill's quality level within a Capability) — NOT on the agent
+capability_skill_profiles (
+  id, capability_slug, skill_profile_slug,
+  level,              -- L1–L4: this Skill's quality level within this Capability
+  is_required,
+  display_order,
+  created_at
 )
 ```
 
 **Layer 2 — Seniority** *(per-Agent — 1-to-many)*
 ```sql
-agent_skill_assignments (
-  id, tenant_id, agent_id, skill_profile_slug,
-  level (1-4),
-  availability, exclusivity, pricing,
-  trainability, confidence,
-  llm_provider, llm_model, api_key_ref,
-  execution_type, created_at
+-- Agents are assigned to Capabilities — not to individual Skill Profiles
+-- Agents inherit level from capability_skill_profiles.level (no per-agent ceiling yet)
+agent_capability_assignments (
+  id, tenant_id, agent_id,
+  capability_slug,    -- FK → capabilities.slug
+  created_at
 )
 ```
 
