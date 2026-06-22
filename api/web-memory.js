@@ -6,7 +6,7 @@
 //   GET  ?url=<encoded_url>&goal=<encoded_goal>  — retrieve memory + execution plan before a run
 //   POST                                          — save what the agent learned after a run
 
-import { assembleContext } from "./agent-run.js";
+import { assembleContext } from "./lib/agent-run.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 

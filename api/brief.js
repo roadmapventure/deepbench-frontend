@@ -3,7 +3,7 @@
 // v4.2.0: thin wrapper — delegates context assembly and Claude call to agent-run.js
 // Uses raw fetch only — no @anthropic-ai/sdk, no @supabase/supabase-js
 
-import { assembleContext, callClaude } from "./agent-run.js";
+import { assembleContext, callClaude } from "./lib/agent-run.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
