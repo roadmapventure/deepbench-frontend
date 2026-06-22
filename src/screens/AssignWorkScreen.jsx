@@ -61,11 +61,13 @@ Return a JSON object using the plan_task tool.`;
     description: "Generate a structured task plan with steps and clarifying questions",
     input_schema: {
       type: "object",
-      required: ["steps","questions","agentId","planSummary"],
+      required: ["steps","questions","agentId","planSummary","taskTitle"],
       properties: {
         planSummary: { type:"string", description:"One sentence describing the plan" },
         agentId:     { type:"string", description:"Primary agent ID for this task" },
         agentReason: { type:"string", description:"Why this agent was chosen" },
+        // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+        taskTitle:   { type:"string", description:"Concise work order title, max 8 words, action-oriented. Not the raw goal text." },
         steps: {
           type:"array",
           items: {
@@ -122,10 +124,10 @@ Return a JSON object using the plan_task tool.`;
 // FEATURE: DB-17 — Michelle Manning title generation
 async function callTitleAgent(goal, steps) {
   try {
-    const res = await fetch("/api/title", {
+    const res = await fetch("/api/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goal, steps }),
+      body: JSON.stringify({ action: "title", goal, steps }),
     });
     if (!res.ok) return { taskTitle: null, stepTitles: [] };
     const data = await res.json();

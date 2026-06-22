@@ -456,10 +456,10 @@ export default function TaskInstructionsScreen() {
   // FEATURE: DB-17 — Michelle title generation helper
   const callTitleAgent = async (goal, steps) => {
     try {
-      const res = await fetch("/api/title", {
+      const res = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal, steps }),
+        body: JSON.stringify({ action: "title", goal, steps }),
       });
       if (!res.ok) return { taskTitle: null, stepTitles: [] };
       const data = await res.json();
@@ -543,10 +543,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
             description: "Generate a structured task plan",
             input_schema: {
               type: "object",
-              required: ["steps", "questions", "agentId", "planSummary"],
+              required: ["steps", "questions", "agentId", "planSummary", "taskTitle"],
               properties: {
                 planSummary: { type: "string" },
                 agentId: { type: "string" },
+                // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+                taskTitle: { type: "string", description: "Concise work order title, max 8 words, action-oriented. Not the raw goal text." },
                 steps: {
                   type: "array",
                   items: {
@@ -589,10 +591,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
               description: "Generate a structured task plan",
               input_schema: {
                 type: "object",
-                required: ["steps", "questions", "agentId", "planSummary"],
+                required: ["steps", "questions", "agentId", "planSummary", "taskTitle"],
                 properties: {
                   planSummary: { type: "string" },
                   agentId: { type: "string" },
+                  // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+                  taskTitle: { type: "string", description: "Concise work order title, max 8 words, action-oriented. Not the raw goal text." },
                   steps: {
                     type: "array",
                     items: {

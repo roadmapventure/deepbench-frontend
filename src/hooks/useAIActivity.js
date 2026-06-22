@@ -1,4 +1,4 @@
-// DeepBench v5.2.14 | useAIActivity.js | S-PM-03b — ai-enrichment SERVICE_CATALOG entry + AA-53 AI_TYPE_TO_SERVICE
+// DeepBench v5.2.15 | useAIActivity.js | request-receivable SERVICE_CATALOG + PAT-13 active + logAICall patterns_used
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -12,6 +12,8 @@ export const SERVICE_CATALOG = [
   { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
   // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
   { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining'],                                          roadmap: 'next' },
+  // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
+  { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'next' },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
   { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
@@ -43,7 +45,8 @@ export const PATTERN_CATALOG = [
   { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, patternType: 'reasoning',  hitlSpecial: true, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
   { slug: 'agent-orchestration',      name: 'Agent Orchestration',          desc: 'One agent delegates work to a peer agent mid-execution; subagent output feeds back into the orchestrating task. Distinct from agent routing (pre-call selection): orchestration happens inside a running execution loop.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Becomes live in S11 (step execution) + AW-17 (multi-agent step assignment)' },
   { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
-  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'Playbook tab has always/never guardrail records; runtime enforcement not yet wired' },
+  // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
+  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
   { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, patternType: 'structural', partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
   { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Natural fit for PE-12 Test Agent scoring and AI-24 routing feedback loop' },
   { slug: 'multi-agent-debate',       name: 'Multi-Agent Debate',           desc: 'Two agents take opposing positions and argue against each other\'s output; a synthesis agent reads both arguments and produces a reconciled final answer. Agents are adversarially aware — each sees the other\'s response.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Extends Test Team (TT-01/02); adds critique pass + synthesis agent. TT-03 design session required.' },
@@ -64,7 +67,8 @@ const AI_TYPE_TO_SERVICE = {
   react_loop:     'autonomous-research',
   extraction:     'document-extraction',
   reinforcement:  'knowledge-reinforcement',
-  ai_enrichment:  'ai-enrichment',
+  ai_enrichment:        'ai-enrichment',
+  request_receivable:   'request-receivable',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
@@ -101,7 +105,8 @@ let _listeners = [];
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
 // FEATURE: AI-16 — logAICall Supabase persistence
-export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null }) {
+// FEATURE: AA-44 — logAICall gains optional patterns_used param
+export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null, patterns_used = [] }) {
   const resolvedModel = model || AI_TYPES[type]?.model || "claude-haiku-4-5";
   const entry = {
     id:        Date.now() + Math.random(),
@@ -130,6 +135,7 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
     latency_ms:     entry.latencyMs || null,
     knowledge_tier: entry.tier || null,
     cost_usd:       entry.cost || null,
+    patterns_used:  patterns_used.length > 0 ? patterns_used : null,
   }).then(({ error }) => {
     if (error) console.warn('[AI log] Supabase write failed:', error.message);
   });

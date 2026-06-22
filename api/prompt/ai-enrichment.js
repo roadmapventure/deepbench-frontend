@@ -1,4 +1,4 @@
-// DeepBench v5.2.13 | api/prompt/ai-enrichment.js | Prompt Service — AI Enrichment
+// DeepBench v5.2.15 | api/prompt/ai-enrichment.js | Format section render gains title instruction
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -51,9 +51,14 @@ async function fetchSection(section, taskContext, tenantId) {
   return { ...section };
 }
 
+// FEATURE: AA-44 — Format section gains title instruction for deliverable title generation
 function renderSection(section) {
   if (!section.content) return null;
-  return `=== ${section.label} ===\n${section.content}`;
+  let content = section.content;
+  if (section.slug === 'format') {
+    content = content + '\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.';
+  }
+  return `=== ${section.label} ===\n${content}`;
 }
 
 function assemblePrompt(renderedBlocks) {

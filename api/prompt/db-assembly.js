@@ -1,4 +1,4 @@
-// DeepBench v5.2.13 | api/prompt/db-assembly.js | Prompt Service — DB Assembly
+// DeepBench v5.2.15 | api/prompt/db-assembly.js | format_contract gains handler + guardrails
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -6,7 +6,14 @@ export const config = { maxDuration: 30, runtime: "nodejs" };
 const SKILL_ORDER = { format: 1, intent: 2, identity: 3, behavior: 4, knowledge: 5, guardrails: 6 };
 
 const DEFAULT_LLM = { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" };
-const DEFAULT_FORMAT_CONTRACT = { output_type: "html", skill_profile_slug: null, schema: null };
+// FEATURE: AA-44 — format_contract gains handler + guardrails for request-receivable
+const DEFAULT_FORMAT_CONTRACT = {
+  output_type: "html",
+  skill_profile_slug: null,
+  schema: null,
+  handler: "store",
+  guardrails: { must: [], must_not: [] }
+};
 const DEFAULT_SYNTHESIS = { enabled: false };
 
 function getSupabaseHeaders(key) {
@@ -79,10 +86,13 @@ function buildSections(skillProfiles, agentId, agentConfigs) {
       if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
       content = formatParts.join("\n");
 
+      // FEATURE: AA-44 — format_contract gains handler + guardrails for request-receivable
       formatContract = {
         output_type: outputType,
         skill_profile_slug: sp.slug,
         schema: traits.schema || null,
+        handler: traits.handler || 'store',
+        guardrails: sp.guardrails || { must: [], must_not: [] },
       };
 
       // LLM config from Format skill (SK-17 columns)
