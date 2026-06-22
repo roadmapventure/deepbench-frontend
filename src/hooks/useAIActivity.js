@@ -1,4 +1,4 @@
-// DeepBench v5.2.9 | useAIActivity.js | AI-36p — Reflection removed from SERVICE_CATALOG patterns
+// DeepBench v5.2.14 | useAIActivity.js | S-PM-03b — ai-enrichment SERVICE_CATALOG entry + AA-53 AI_TYPE_TO_SERVICE
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase.js';
 // FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
 export const SERVICE_CATALOG = [
   { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
+  // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
+  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining'],                                          roadmap: 'next' },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
   { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
@@ -62,6 +64,7 @@ const AI_TYPE_TO_SERVICE = {
   react_loop:     'autonomous-research',
   extraction:     'document-extraction',
   reinforcement:  'knowledge-reinforcement',
+  ai_enrichment:  'ai-enrichment',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
