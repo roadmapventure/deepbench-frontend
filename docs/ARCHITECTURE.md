@@ -561,8 +561,34 @@ This table evolves — in S-INFRA-01 it gains `skill_profile_slug` scoping.
 
 **`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data. Not changing in S-INFRA-01.
 **`agent_run_log`** — Brent fetch run history.
-**`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries.
+**`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries. `patterns_used jsonb` column added S-PM-04a — records which AI patterns actually fired on each call (e.g. `["structured-output","tool-use"]`). Frontend routes log via `logAICall()`; `api/prompt/request-receivable.js` logs server-side directly (first server-side logger — required because it has no guaranteed frontend caller).
 All tables have `tenant_id`.
+
+**`deliverables`** *(created S-PM-04a)*
+```sql
+id uuid primary key,
+tenant_id text not null,
+task_id uuid,                    -- FK → tasks.id (null for MCP callers)
+step_id uuid,                    -- FK → tasks.steps jsonb (null until S-DELIVER-04)
+agent_id text,                   -- agent who produced this deliverable
+skill_profile_slug text,         -- Format Skill Profile that governed output
+type text,                       -- 'plan' | 'report' | 'brief' | 'analysis' | 'action' | etc.
+title text,                      -- LLM-generated title from response content (max 8 words)
+content jsonb,                   -- parsed response: structured object, html string, prose, or action payload
+format text,                     -- output_type from format_contract: 'json' | 'html' | 'docx' | 'pdf' | 'action'
+status text default 'draft',     -- 'draft' | 'approved' | 'change_requested'
+handler text,                    -- handler slug used: 'store' | 'dispatch' | 'package' | 'mcp'
+level int,                       -- Skill Profile level at time of production (null until S-DELIVER-04)
+is_final boolean default false,  -- true when promoted to task-level final deliverable
+version_of uuid,                 -- FK → deliverables.id for revision history (null for originals)
+consumes jsonb,                  -- upstream deliverable IDs this one consumed as input
+is_public boolean default false,
+is_shared boolean default false,
+share_token text,
+price_usd numeric,
+created_at timestamptz default now()
+```
+S-PM-04a only populates: `id, tenant_id, task_id, agent_id, skill_profile_slug, type, title, content, format, status, handler, created_at`. All other columns nullable until S-DELIVER-04.
 
 **Storage bucket:** `task-data` (private, signed URLs) — path: `{tenant_id}/{task_id}/{filename}.csv`
 

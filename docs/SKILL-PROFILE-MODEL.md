@@ -98,7 +98,7 @@ when patterns solidify across multiple Skill Profiles of that type.
 
 | Skill Type | Type-specific Traits (in `traits` jsonb) |
 |-----------|------------------------------------------|
-| **Format** | `output_type` (html/pdf/docx/json/dashboard), `file_format`, `section_structure` |
+| **Format** | `output_type` (html/pdf/docx/json/dashboard/action), `file_format`, `section_structure`, `handler` (store/dispatch/package/mcp — which handler module processes the LLM response) |
 | **Intent** | `sections[]` (ordered section slugs), `analysis_instructions`, `reporting_depth` |
 | **Knowledge** | `domain`, `jurisdiction`, `source_types`, `source_priority` |
 | **Behavior** | `reasoning_style`, `writing_style`, `autonomy_level` |
@@ -355,6 +355,7 @@ agent_capability_assignments (
 > **Format Skill role [LOCKED]:** SP-PM-03 is the output contract between Claude and the existing hardcoded AssignWorkScreen. It declares the exact JSON shape Claude must produce. The screen stays deterministic — the Format Skill governs what the LLM outputs so it fits the screen's expectations. No screen changes are needed until S-PM-03 (step schema expansion).
 
 > **output_fields updated (2026-06-19):** Added `agentId`, `agentReason`, `questions` to align with the existing screen's tool schema. Plan-level `agentId` = Orchestrating PM only (never an executor). `questions[]` = empty array when SP-PM-04 clarification policy does not trigger.
+> **output_fields updated (2026-06-22, S-PM-04-design):** Added `title` (LLM-generated deliverable title, max 8 words, required on every format contract — generated as part of the main LLM call, not a separate request) and `taskTitle` (human-readable work order title, max 8 words). Both required fields in the tool schema. `handler: "store"` added to traits — declares which handler module in `api/lib/handlers/` processes the response. DB Assembly extracts `handler` and `guardrails` into `format_contract` (patched S-PM-04a). AI Enrichment appends title instruction to Format section render (patched S-PM-04a).
 
 > **Identity Skill:** CAP-PM-01 currently has 4 of 5 Skill types (no Identity). Identity Skill (SP-PM-06) deferred — to be reviewed during the prompt-assembly design session, where Personnel File Trait usage will be assessed in full context.
 

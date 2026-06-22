@@ -369,12 +369,17 @@ top-level field on the Prompt Request:
 {
   "output_type": "json",
   "skill_profile_slug": "<format skill slug>",
-  "schema": "<traits.schema if present, null otherwise>"
+  "schema": "<traits.schema if present, null otherwise>",
+  "handler": "<traits.handler — e.g. 'store' | 'dispatch' | 'package' | 'mcp'>",
+  "guardrails": { "must": [], "must_not": [] }
 }
 ```
+`handler` defaults to `"store"` if not declared on the Skill Profile.
+`guardrails` is pulled directly from `skill_profiles.guardrails` jsonb — the same data injected into the prompt as text is also available here for runtime enforcement by the Guardrails pattern.
+
 If no Format Skill Profile exists for the Capability, `format_contract` defaults to:
 ```json
-{ "output_type": "html", "skill_profile_slug": null, "schema": null }
+{ "output_type": "html", "skill_profile_slug": null, "schema": null, "handler": "store", "guardrails": { "must": [], "must_not": [] } }
 ```
 
 **synthesis** — DB Assembly adds top-level `synthesis` object if any Skill Profile declares
@@ -457,6 +462,7 @@ Decompose the Work Order into discrete executable steps...
 - Section separator: `\n\n---\n\n`
 - Sections with empty content after fetch are omitted — required or not
 - Section order follows `section.order` from the Specification — never hardcoded in Builder
+- **Format section title instruction (locked S-PM-04-design):** When rendering a `format` type section, AI Enrichment appends the following line to the rendered content before assembly: `"Also return a 'title' field (max 8 words) that describes the actual content you produced."` This ensures every LLM response includes a title as part of the main call — no separate title request needed. The title is generated from what was actually produced, not from the task goal.
 
 ---
 
@@ -658,35 +664,73 @@ Reflection, Prompt Chaining) and `AI_TYPE_TO_SERVICE` mapping.
 
 ---
 
-## 7. Service 3 — Request & Receivable (Send + Parse + Deliver)
+## 7. Service 3 — Request & Receivable (Send + Parse + Guardrails + Deliver)
 
 **Route:** `api/prompt/request-receivable.js`
-**Job:** Take the assembled prompt from AI Enrichment. Call the LLM. Parse the response
-against the Format Skill output contract. Write the Deliverable. Log. Route back to caller.
+**Job:** Take the assembled prompt from AI Enrichment. Call the LLM. Parse the response.
+Run Guardrails check. Delegate to handler. Write the Deliverable. Log server-side. Return package to caller.
 **Does NOT:** read Skill Profiles, agent_configs, or the Prompt Request directly.
-**Makes AI calls:** Yes — one main LLM call. One retry call if parse fails.
+**Makes AI calls:** Yes — one main LLM call. One retry call if parse fails. One Haiku call for Guardrails (skipped if no guardrails declared).
+**Logs:** Server-side directly to `ai_activity_log` via Supabase service key — not via frontend `logAICall()`. Required because callers are not guaranteed to be the frontend (MCP callers, other API routes).
+
+### AI Patterns (locked S-PM-04-design)
+
+| Pattern | When it runs |
+|---------|-------------|
+| Prompt Chaining (PAT-04) | Always — Step 3 of DB Assembly → AI Enrichment → Request & Receivable chain |
+| Structured Output (PAT-07) | When `format_contract.output_type` is `json` or `dashboard` |
+| Tool Use (PAT-03) | Same call as Structured Output — schema passed as tool definition with `tool_choice` |
+| Streaming (PAT-06) | When `format_contract.output_type` is `html` or `docx`/`pdf` |
+| Guardrails (PAT-13) | When `format_contract.guardrails.must` or `must_not` are non-empty |
+
+`patterns_used` is built at runtime per call and written to `ai_activity_log`.
+
+### Handler Registry (locked S-PM-04-design)
+
+The Sender reads `format_contract.handler` and delegates to a handler module in `api/lib/handlers/`.
+New formats and action types are new handler files — zero changes to the Sender itself.
+
+```
+api/lib/handlers/
+  store.js      ← write content to deliverables table (ships S-PM-04b)
+  dispatch.js   ← route to another agent or capability (AA-54, future)
+  package.js    ← prose → docx/pdf packaging (future)
+  mcp.js        ← call MCP server with result (future)
+```
+
+**Two deliverable categories (locked S-PM-04-design):**
+- **Content** — LLM produced something a human reads: report, plan, brief. `handler: "store"`. Written to `deliverables` table.
+- **Action** — LLM produced an instruction: call this agent, invoke MCP, trigger webhook. `handler: "dispatch"` or `"mcp"`. Audit record written to `deliverables` with `format: "action"`.
+- **Hybrid** — Both. Example: Michelle produces an execution plan (store) AND dispatches it to Bob (dispatch). Both handlers run sequentially.
+
+### Title Generation (locked S-PM-04-design)
+
+Every LLM call includes `title` as a required field in the Format Skill's output schema.
+AI Enrichment appends the instruction to the Format section render: `"Also return a 'title' field (max 8 words) that describes the actual content you produced."`
+Title is generated as part of the main LLM call — not a separate request.
+Describes what was actually produced. Written to `deliverables.title`.
 
 ### Input
 
 ```json
 {
-  "builder_output":   { ... },       // full Builder output object
-  "messages":         [ ... ],       // conversation history or single user turn from caller
-  "step_id":          "uuid",        // optional — null for MCP callers
-  "work_order_id":    "uuid",        // optional — null for MCP callers
-  "stream":           true           // default true; auto-overridden by Sender when needed
+  "builder_output":   { ... },    // full AI Enrichment output object
+  "messages":         [ ... ],    // conversation history or single user turn from caller
+  "task_id":          "uuid",     // optional — null for MCP callers
+  "step_id":          "uuid",     // optional — null for MCP callers
+  "stream":           true        // default true; auto-overridden by Sender when needed
 }
 ```
 
 ---
 
-### Three steps — run in this order
+### Four steps — run in this order
 
 ---
 
 #### Step 1 — Send
 
-The Sender calls the LLM using the `llm` config from the Builder output.
+Direct fetch to Anthropic API — same pattern as `plan.js` and `ai-enrichment.js`. No adapter layer.
 
 **Streaming behavior — default true, auto-overridden:**
 
@@ -697,122 +741,104 @@ The Sender calls the LLM using the `llm` config from the Builder output.
 | `json` / `dashboard` | `false` — tool_choice returns a complete block; streaming adds no value |
 | MCP caller (`stream: false` passed) | `false` — batch JSON returned |
 
-The Sender overrides the caller's `stream` flag automatically when `output_type` is
-`json` or `dashboard`. The caller does not need to know about this — it always passes
-`stream: true` as the default and the Sender does the right thing.
-
 **Structured output (json / dashboard):**
-When `format_contract.output_type` is `json` or `dashboard`, the Sender:
-- Passes the `format_contract.schema` to the LLM as a tool definition
-- Sets `tool_choice: { type: "any" }` to force the LLM to use it
-- This is the same pattern as `plan.js` today — tool_choice for the PM Execution Plan
+- Passes `format_contract.schema` as a tool definition (schema always includes `title` field)
+- Sets `tool_choice: { type: "any" }` to force tool use
 
-**Tool use (capability-declared):**
-If a Skill Profile in the Capability declares `technical_services: ["tool-use"]`,
-the Sender passes additional tool definitions from the Specification alongside the
-format schema. Format tool and capability tools are separate — both are passed.
-
-**What the Sender passes to the LLM adapter:**
+**What the Sender passes to the Anthropic API:**
 ```
 system:      builder_output.system_prompt
 messages:    caller's messages array
-tools:       [format_contract.schema as tool def] + [any capability-declared tools]
+tools:       [format_contract.schema as tool def]
 tool_choice: { type: "any" }   ← only when output_type is json/dashboard
 max_tokens:  builder_output.llm.max_tokens
 model:       builder_output.llm.model
 stream:      resolved streaming flag (after auto-override)
 ```
 
-All LLM calls go through `api/adapters/anthropic.js` (or the appropriate vendor adapter).
-No direct vendor API calls inside the Sender.
-
 ---
 
 #### Step 2 — Parse
 
-The Sender reads `format_contract.output_type` and handles the response accordingly:
-
 **`output_type: "json"` or `"dashboard"`**
-- Extracts the tool_use block from the LLM response
-- Validates the `input` object against `format_contract.schema`
-- If valid → pass to Step 3
-- If invalid → single retry: append a message to the messages array and call again:
-  ```
-  { role: "user", content: "Your previous response did not match the required format.
-    Return the response again conforming exactly to this schema: [schema as JSON string]" }
-  ```
-- If retry also fails → return raw response with `parse_error: true`. Caller decides.
+- Extracts tool_use block from LLM response
+- Extracts `title` from `input.title` — required field on every schema
+- Validates `input` against `format_contract.schema`
+- If invalid → single retry with schema reminder appended to messages
+- If retry also fails → return raw response with `parse_error: true`
 
 **`output_type: "html"`**
-- Extracts text content from the LLM response
-- No structural validation — passes through as-is
-- No retry logic for HTML — free text has no contract to validate against
+- Extracts text content and `title` — no structural validation
 
 **`output_type: "docx"` / `"pdf"`**
-- Extracts prose text from the LLM response
-- Passes to a document generation service (outside the Sender's scope)
-- Sender returns the prose text and a `requires_packaging: true` flag
-- Document packaging is a separate capability route — not the Sender's job
+- Extracts prose text and `title`
+- Returns with `requires_packaging: true` — document packaging handled by `package` handler (future)
 
-**Streaming responses:**
-When streaming is active, parsing happens on the completed stream — the Sender buffers
-the full response before validating. The UI sees tokens arriving progressively; the
-Sender validates the complete result before writing the Deliverable.
+**Streaming:** parsing happens on completed stream — Sender buffers full response before validating.
 
 ---
 
-#### Step 3 — Deliver
+#### Step 3 — Guardrails (PAT-13)
 
-After successful parse, the Sender writes and logs.
+Runs after Parse. Reads `format_contract.guardrails.must` and `guardrails.must_not`.
 
-**Write Deliverable:**
-```sql
-INSERT INTO deliverables (
-  id, tenant_id, work_order_id, step_id, competency_id,
-  skill_profile_slug, type, title,
-  content, format, status,
-  level, is_final,
-  created_at
-)
+**If guardrails are declared (non-empty arrays):**
+Fast Haiku call against the parsed response:
+```
+"Review the following AI response against these rules.
+ For each MUST rule: confirm satisfied. For each MUST NOT rule: confirm not violated.
+ Return JSON: { passed: boolean, violations: string[] }"
+[parsed content] [must rules] [must_not rules]
 ```
 
-| Field | Value |
-|-------|-------|
-| `work_order_id` | from caller input (null if MCP) |
+**If violations found:** Deliverable is still written as `draft`. Caller receives `guardrails_passed: false` and `violations[]` in debug. Future: automatic retry or HITL gate on violation.
+
+**If no guardrails declared:** Step is a no-op — no Haiku call, `guardrails_passed: true`.
+
+**Logged separately** as its own `ai_activity_log` row: `ai_type: 'guardrails-check'`, `patterns_used: ['guardrails']`.
+
+---
+
+#### Step 4 — Deliver
+
+Delegate to handler, then log.
+
+**Handler delegation:**
+```js
+const handler = await import(`./handlers/${format_contract.handler}.js`);
+const result = await handler.run({ parsedContent, title, formatContract, builderOutput, taskId, stepId, tenantId });
+```
+
+**`store` handler** writes to `deliverables`:
+
+| Column | Value |
+|--------|-------|
+| `tenant_id` | from request |
+| `task_id` | from caller input (null if MCP) |
 | `step_id` | from caller input (null if MCP) |
-| `competency_id` | `agent_id` from Builder output |
+| `agent_id` | `builder_output.agent_id` |
 | `skill_profile_slug` | `format_contract.skill_profile_slug` |
 | `type` | derived from `format_contract.output_type` |
-| `content` | parsed response |
+| `title` | extracted from parsed LLM response |
+| `content` | parsed response object |
 | `format` | `format_contract.output_type` |
-| `status` | `draft` (default — HITL or Orchestrator promotes to approved) |
+| `status` | `draft` |
+| `handler` | `format_contract.handler` |
 
-**Log to ai_activity_log:**
+**Server-side logging:**
 ```js
-logAICall({
-  capability_slug:     builder_output.capability_slug,
-  skill_profile_slug:  format_contract.skill_profile_slug,
-  agent_id:            builder_output.agent_id,
-  step_id:             step_id || null,
-  work_order_id:       work_order_id || null,
-  deliverable_id:      new deliverable uuid,
-  model:               builder_output.llm.model,
-  provider:            builder_output.llm.provider,
-  tokens_in:           from LLM response usage object,
-  tokens_out:          from LLM response usage object,
-  cost_usd:            calculated from tokens + model pricing,
-  latency_ms:          time from Send to parse complete,
-  streamed:            resolved streaming flag,
-  parse_error:         false / true,
-  reflect_tokens:      builder_output.debug.reflect_tokens_used || 0,
-  synthesis_tokens:    builder_output.debug.synthesis_tokens_used || 0
-})
+await supabase.from('ai_activity_log').insert({
+  tenant_id,
+  ai_type:      'request-receivable',
+  model:        builder_output.llm.model,
+  agent_id:     builder_output.agent_id || null,
+  task_id:      task_id || null,
+  input_tokens: usage.input_tokens,
+  latency_ms:   latencyMs,
+  cost_usd:     calculatedCost,
+  patterns_used: patternsUsed,  // built at runtime from what actually fired
+});
 ```
-
-Note: `reflect_tokens` and `synthesis_tokens` are logged here alongside the main call
-so the full cost of one Sender execution (including Builder's Haiku calls) is visible
-in a single `ai_activity_log` row. Builder Haiku calls are not logged separately —
-they are overhead of the Sender execution, not standalone capability calls.
 
 ---
 
@@ -821,7 +847,9 @@ they are overhead of the Sender execution, not standalone capability calls.
 ```json
 {
   "deliverable_id": "uuid",
+  "title": "Michelle's Vendor Risk Execution Plan",
   "content": {
+    "title": "Michelle's Vendor Risk Execution Plan",
     "planSummary": "...",
     "agentId": "pp-01",
     "agentReason": "...",
@@ -829,18 +857,22 @@ they are overhead of the Sender execution, not standalone capability calls.
     "questions": []
   },
   "format": "json",
+  "handler": "store",
   "status": "draft",
-  "raw_response": { ... },
   "parse_error": false,
   "streamed": false,
-  "log_id": "uuid",
+  "guardrails_passed": true,
+  "violations": [],
   "debug": {
     "model": "claude-sonnet-4-6",
     "tokens_in": 1820,
     "tokens_out": 640,
     "cost_usd": 0.0031,
     "latency_ms": 2140,
-    "retry_used": false
+    "retry_used": false,
+    "patterns_used": ["prompt-chaining", "structured-output", "tool-use", "guardrails"],
+    "reflect_tokens_used": 312,
+    "synthesis_tokens_used": 480
   }
 }
 ```
@@ -896,9 +928,16 @@ before kickoff docs are written.
 | Sender streaming — default true; auto-overridden to false for json/dashboard; MCP callers pass false explicitly | ✅ Locked |
 | Sender structured output — driven by `format_contract.output_type`; json/dashboard use tool_choice + schema | ✅ Locked |
 | Sender retry — single append retry on parse failure; raw response + parse_error flag if retry also fails | ✅ Locked |
-| Sender lineage — step_id + work_order_id from caller; null for MCP callers | ✅ Locked |
-| Builder Haiku call costs (REFLECT + synthesis) logged as overhead on Sender's ai_activity_log row | ✅ Locked |
-| docx/pdf packaging — Sender returns prose + requires_packaging flag; document service is separate | ✅ Locked |
+| Sender lineage — task_id + step_id from caller; null for MCP callers (`work_order_id` renamed `task_id` to match live DB FK) | ✅ Locked |
+| Sender logging — server-side direct Supabase insert, not frontend logAICall(). Required because caller is not always the frontend. `patterns_used jsonb` column added to ai_activity_log (S-PM-04a). | ✅ Locked |
+| docx/pdf packaging — Sender returns prose + requires_packaging flag; document service is separate (`package` handler, future) | ✅ Locked |
+| Handler registry — `format_contract.handler` slug delegates to `api/lib/handlers/[handler].js`. New formats/actions = new handler files only. `store.js` ships S-PM-04b. `dispatch`, `package`, `mcp` are future (AA-54). | ✅ Locked |
+| Two deliverable categories — content (store) and action (dispatch/mcp). Hybrid runs both handlers. Audit record written for all categories. | ✅ Locked |
+| Title generation — required `title` field on every Format Skill schema. Generated by main LLM call, not a separate request. AI Enrichment appends title instruction to Format section render. Written to `deliverables.title`. | ✅ Locked |
+| Guardrails pattern (PAT-13) — post-generation Haiku check against `format_contract.guardrails`. No-op when guardrails empty. Violation does not block deliverable write — status stays draft, caller receives violation list. Logged as separate ai_activity_log row. | ✅ Locked |
+| format_contract gains `handler` and `guardrails` fields — extracted by DB Assembly from Format Skill Profile traits (patched S-PM-04a). | ✅ Locked |
+| No adapter layer — direct fetch to Anthropic API, same as plan.js and ai-enrichment.js. Adapter deferred until multi-provider support required. | ✅ Locked |
+| Builder Haiku call costs (REFLECT + synthesis) passed through in debug object — not logged separately. Visible in Sender response debug for caller inspection. | ✅ Locked |
 | DB Assembly is a faithful collector — no adjudication, no AI, no writes. Organized by source: agent_configs / capabilities / skill_profiles / task_context | ✅ Locked |
 | DB Assembly section priority order: Format → Intent → Identity → Behavior → Knowledge → Guardrails | ✅ Locked |
 | DB Assembly inputs: tenant_id (required, always explicit), task_context (required), agent_id (optional), capability_slug (optional) | ✅ Locked |
