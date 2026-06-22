@@ -478,7 +478,21 @@ api/adapters/
   openai.js        — wraps OpenAI API calls (embeddings today, LLM future)
   supabase.js      — wraps Supabase client (references src/lib/supabase.js)
   railway.js       — wraps Railway SSE calls from frontend to backend
+
+api/lib/
+  rag.js           — shared RAG service (embed via OpenAI → vector search via Supabase match_knowledge RPC)
+                     Single source of truth for all RAG retrieval across the platform.
+                     Not a Vercel handler — no default export. Imported directly by:
+                       api/rag-query.js (handler wrapper)
+                       api/agent-run.js (replacing internal HTTP call)
+                       api/prompt/ai-enrichment.js
+                     Interface: queryRAG({ queryText, agentId, tenantId, matchCount, scope })
+                       → { context: string, chunks: Array, matchCount: number }
 ```
+
+**Rule [LOCKED — S-PM-03-design 2026-06-22]:** No capability route calls `/api/rag-query`
+via internal HTTP. All RAG retrieval imports `queryRAG` from `api/lib/rag.js` directly.
+`api/rag-query.js` remains as a thin public handler for external/frontend callers only.
 
 Capability routes import from adapters. Never call vendor APIs directly.
 

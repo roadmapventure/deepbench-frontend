@@ -320,6 +320,77 @@ is declared in the Prompt Request.
 
 ---
 
+### DB Assembly — Section Assembly Spec (locked S-PM-03-design, 2026-06-22)
+
+DB Assembly must produce fully assembled sections — not raw DB rows. The current implementation
+(S-PM-02) returns raw `agent_configs`, `capabilities`, and `skill_profiles` rows. S-PM-03a
+patches this to produce the assembled Prompt Request with typed sections.
+
+**Section type mapping — how skill_type_slug determines section type:**
+
+| skill_type_slug | Section type | Content source |
+|----------------|--------------|----------------|
+| `identity` | `stored` | agent_configs (type: role_prompt, is_default: true) → falls back to skill_profiles traits if no agent_config |
+| `behavior` | `stored` | agent_configs (type: role_prompt) combined with skill_profiles traits (reasoning_style, writing_style) |
+| `knowledge` | `rag` | No content — `fetch_instruction` only (see RAG fetch_instruction spec below) |
+| `intent` | `stored` | Built from skill_profiles.traits (analysis_instructions + sections[]) |
+| `format` | `stored` | Built from skill_profiles.traits (output_type instruction string) |
+| `guardrails` | `stored` | agent_configs (type: guardrail) + skill_profiles.guardrails jsonb |
+
+**Section order** follows the locked priority: Format(1) → Intent(2) → Identity(3) → Behavior(4) → Knowledge(5) → Guardrails(6).
+Within each type, `capability_skill_profiles.display_order` determines ordering.
+
+**RAG fetch_instruction spec** (produced by DB Assembly for Knowledge sections):
+```json
+{
+  "method": "rag",
+  "agent_id": "<agent_id from input>",
+  "query_from": "task_context",
+  "match_count": 5,
+  "scope": "agent"
+}
+```
+`scope` is always `"agent"` when agent_id is present, `"platform"` when no agent_id provided.
+
+**REFLECT fetch_instruction spec** (produced when Skill Profile declares `technical_services: ["reflect"]`):
+```json
+{
+  "method": "reflect",
+  "model": "claude-haiku-4-5-20251001",
+  "max_tokens": 1024,
+  "inserts_after": "knowledge",
+  "declared_by": "<skill_profile_slug>"
+}
+```
+
+**format_contract** — DB Assembly extracts from the Format Skill Profile's traits and adds as a
+top-level field on the Prompt Request:
+```json
+{
+  "output_type": "json",
+  "skill_profile_slug": "<format skill slug>",
+  "schema": "<traits.schema if present, null otherwise>"
+}
+```
+If no Format Skill Profile exists for the Capability, `format_contract` defaults to:
+```json
+{ "output_type": "html", "skill_profile_slug": null, "schema": null }
+```
+
+**synthesis** — DB Assembly adds top-level `synthesis` object if any Skill Profile declares
+`technical_services: ["intelligent-synthesis"]`:
+```json
+{
+  "enabled": true,
+  "model": "claude-haiku-4-5-20251001",
+  "max_tokens": 2048,
+  "declared_by": "<skill_profile_slug>"
+}
+```
+If no Skill Profile declares synthesis: `{ "enabled": false }`.
+
+---
+
 ## 6. Service 2 — AI Enrichment (Fetch + Render + REFLECT + Synthesis)
 
 **Route:** `api/prompt/ai-enrichment.js`
@@ -346,12 +417,17 @@ The Builder iterates the Specification's `sections` array. For each section:
 - `type: "intelligent-synthesis"` → skip. Handled in Step 4.
 
 RAG fetches run in parallel if multiple Knowledge sections exist in one Specification.
-All other fetches are parallel by default. Sections with no inter-dependency never wait.
+`Promise.all()` waits for ALL parallel fetches to complete before proceeding to Render.
+No section is rendered until all fetches resolve or time out.
+
+**Per-fetch timeout: 10 seconds.** If a RAG fetch exceeds 10 seconds, treat as
+optional-section-miss and continue. Never let one slow fetch hang the pipeline.
 
 **Fetch failure behavior:**
-- Required section fetch fails → log error, use empty string, mark `fetch_error: true`
-- Optional section fetch fails → omit section silently, log warning
-- Never block prompt assembly on a fetch failure
+- Required section fetch fails or times out → omit section, log to `ai_activity_log` only, continue pipeline. Never block. No user exposure.
+- Optional section fetch fails or times out → omit section silently, log warning
+- Empty sections array (no sections in Prompt Request) → return valid output with `system_prompt: ""` and `debug.warn: "no_sections_assembled"`. Never block the Sender.
+- Required RAG section returns zero chunks → omit section, log to `ai_activity_log` only. No user exposure at this time.
 
 ---
 
@@ -410,6 +486,15 @@ The Container reads this and adds the reflect section to the Specification.
 Builder checks `type: "reflect"` — if present, runs the Haiku call. If not present,
 skips entirely. REFLECT never runs automatically.
 
+**REFLECT identity source:** The Haiku prompt uses the rendered `identity` section content
+as the agent persona — not a separate DB lookup. If no identity section exists, REFLECT
+runs on task_context only, producing a thin generic plan. No failure, no user notification.
+This degradation is expected and acceptable.
+
+**`inserts_after` fallback:** If the section named in `inserts_after` was omitted (e.g. RAG
+returned nothing and knowledge section was dropped), insert REFLECT output at the end of
+all currently rendered sections. Future: smarter positioning logic.
+
 After REFLECT, the rendered prompt is updated with the execution plan section inserted
 at the correct position.
 
@@ -450,6 +535,13 @@ It never runs before REFLECT.
 **Synthesis is a rewrite, not a filter.** It does not score-and-select sections.
 It rewrites the whole assembled prompt as a coherent unit. The token budget is passed
 as a hard constraint inside the synthesis prompt — Haiku is responsible for honoring it.
+
+**Synthesis token budget enforcement:** AI Enrichment trusts Haiku's output as-is.
+No post-synthesis token count check. If output exceeds budget, that is the Sender's
+problem to handle (future feature). No rollback or quality gate at this time.
+
+**Synthesis quality:** No LLM-as-Judge pass on synthesis output. Used as-is.
+Future: quality gate via PAT-15 LLM-as-Judge after pipeline is proven.
 
 ---
 
@@ -513,6 +605,56 @@ This gives the Sender everything it needs without going back to the Specificatio
 **MCP stop point:** An external MCP caller receives this output and sends `system_prompt`
 to their own LLM with their own messages array. They use `llm` as a recommendation only.
 They do not need to call the Sender. The assembled prompt is a self-contained artifact.
+
+---
+
+### RAG Scoping — Locked S-PM-03-design (2026-06-22)
+
+The `fetch_instruction.scope` field controls which knowledge entries are searched.
+The existing `match_knowledge` RPC supports `p_agent_id` filtering only.
+
+| scope value | Behavior | p_agent_id passed |
+|-------------|----------|------------------|
+| `"agent"` | Scoped to this agent's knowledge entries | agent_id from fetch_instruction |
+| `"capability"` | Falls back to platform-wide — no capability_slug column on knowledge_entries yet | null |
+| `"platform"` | Full platform knowledge base, no agent filter | null |
+
+`capability` scope degradation is expected behavior until S-INFRA-01 adds `capability_slug`
+to `knowledge_entries`. Logged in debug as `rag_scope_requested` vs `rag_scope_effective`.
+
+### Shared RAG Service — Locked S-PM-03-design (2026-06-22)
+
+RAG logic (OpenAI embed → Supabase `match_knowledge` RPC) is extracted from `api/rag-query.js`
+and `api/agent-run.js` into a single shared module: **`api/lib/rag.js`**.
+
+```js
+// api/lib/rag.js — exported interface
+export async function queryRAG({ queryText, agentId, tenantId, matchCount, scope })
+  → { context: string, chunks: Array, matchCount: number }
+```
+
+- `api/rag-query.js` becomes a thin handler that calls `queryRAG()` directly — no behavior change
+- `api/agent-run.js` replaces internal HTTP call to `/api/rag-query` with direct `queryRAG()` import
+- `api/prompt/ai-enrichment.js` imports `queryRAG()` directly
+- No other file calls `/api/rag-query` via internal HTTP after this change
+
+`api/lib/rag.js` has no default export — it is a module, not a Vercel handler. Does not count
+toward the Vercel Hobby 12-function limit.
+
+### AI Audit Logging — Locked S-PM-03-design (2026-06-22)
+
+AI Enrichment makes multiple AI calls. Each is logged individually to `ai_activity_log`.
+**S-PM-03b** (separate coding session) wires all logging.
+
+| Operation | Log entry | Model |
+|-----------|-----------|-------|
+| RAG embedding (per section) | One entry per Knowledge section | OpenAI text-embedding-3-small |
+| REFLECT Haiku call | One entry | claude-haiku-4-5-20251001 |
+| Synthesis Haiku call | One entry | claude-haiku-4-5-20251001 |
+
+All entries roll up to the AI Audit summary. No aggregate entry — individual entries only.
+S-PM-03b also adds: `SERVICE_CATALOG` entry for AI Enrichment (patterns: RAG, Embeddings,
+Reflection, Prompt Chaining) and `AI_TYPE_TO_SERVICE` mapping.
 
 ---
 
@@ -764,14 +906,20 @@ before kickoff docs are written.
 | DB Assembly: duplicative/conflicting content (e.g. guardrails in multiple sources) passed through intact — AI Enrichment resolves | ✅ Locked |
 | AI Enrichment always runs — even with no DB content. All platform patterns run; RAG always runs scoped to agent/capability/platform-wide | ✅ Locked |
 | Service terminology: Container → DB Assembly, Builder → AI Enrichment, Sender → Request & Receivable, Specification → Prompt Request | ✅ Locked |
-| DB Assembly caching — same capability + agent = cache hit | Design session required |
-| `max_tokens` / `llm_model` / `llm_provider` columns added to `skill_profiles` table in Supabase | Schema migration required (SK-17, S-PM-02) |
+| DB Assembly caching — same capability + agent = cache hit | Semantic Caching (AA-50) — design session required |
+| `max_tokens` / `llm_model` / `llm_provider` columns added to `skill_profiles` table in Supabase | ✅ Done (SK-17, S-PM-02) |
 | Two-speed routing — fast path (Haiku, top 3 RAG) vs deep path (Sonnet, top 10 RAG) declared at Capability level | Design session required (AA-04) |
-| AI Enrichment: multiple Knowledge Skill Profiles — merge strategy for multiple RAG result sets | Design session required |
+| AI Enrichment: multiple Knowledge Skill Profiles — merge strategy | ✅ Locked — run in parallel, render as separate labeled sections, no dedup. Synthesis resolves redundancy. |
 | Multi-LLM conflict resolution — when multiple Skill Profiles declare different LLM configs | Future feature (platform defaults handle for now) |
 | User-declared priority in task_context — formal parsing of priority signals embedded in the task string | Future feature (AI Enrichment surfaces naturally for now) |
 | DB Assembly relevance flagging — lightweight AI annotation on package sections to guide AI Enrichment prioritization | Future feature (after pipeline is proven) |
-| RAG query expansion — using AI to expand task_context into a richer search query before hitting the knowledge store | Future feature (design session required) |
+| RAG query expansion — using AI to expand task_context into a richer search query before hitting the knowledge store | Future feature (AA-48, design session required) |
+| HyDE — generate hypothetical ideal answer before RAG embed for better retrieval quality | Future feature (AA-48 extension or separate — deferred) |
+| Synthesis token budget enforcement — verify output fits within budget post-synthesis | Future feature — Sender's problem for now |
+| Synthesis quality gate — LLM-as-Judge on synthesis output before returning | Future feature (AA-52) |
+| format_contract validation skill — pre-flight capability check before DB Assembly runs, catches missing Format Skill Profiles | Future feature (AA-51) |
+| Capability-scoped RAG — scope: "capability" currently falls back to platform-wide; needs capability_slug on knowledge_entries | Future (S-INFRA-01) |
+| REFLECT inserts_after smart positioning — currently falls back to end of sections if named section was omitted | Future feature |
 
 ---
 
