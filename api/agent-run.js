@@ -1,5 +1,6 @@
-// api/agent-run.js
-// Shared agent pipeline service — v4.2.0
+// DeepBench v5.2.13 | api/agent-run.js | Shared agent pipeline service
+// FEATURE: AA-43 — RAG now imported directly from api/lib/rag.js (no internal HTTP)
+import { queryRAG } from "./lib/rag.js";
 //
 // Exports:
 //   assembleContext(agent_id, tenant_id, queryText, taskDescription, options)
@@ -56,27 +57,10 @@ async function fetchConfig(agent_id, type, overrideId, tenant_id) {
 }
 
 async function callRagQuery(queryText, agent_id, tenant_id, matchCount) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  if (!supabaseUrl || !queryText) return "";
+  // FEATURE: AA-43 — direct import from shared RAG service (no more internal HTTP)
   try {
-    const host = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
-    const ragRes = await fetch(`${host}/api/rag-query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        queryText,
-        jurisdiction: "All",
-        matchCount: matchCount || 5,
-        tenant_id: tenant_id || "global",
-        agent_id,
-        triggers: [],
-      }),
-    });
-    if (!ragRes.ok) return "";
-    const ragJson = await ragRes.json();
-    return ragJson.context || "";
+    const result = await queryRAG({ queryText, agentId: agent_id, tenantId: tenant_id, matchCount, scope: "agent" });
+    return result.context || "";
   } catch (e) {
     console.warn("[agent-run] RAG query failed:", e.message);
     return "";

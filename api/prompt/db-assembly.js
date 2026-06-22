@@ -1,7 +1,13 @@
-// DeepBench v5.2.12 | db-assembly.js | Prompt Service — DB Assembly
-// FEATURE: AA-03 — Reads agent competency data from Supabase, returns Prompt Request
+// DeepBench v5.2.13 | api/prompt/db-assembly.js | Prompt Service — DB Assembly
+// FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
+
+const SKILL_ORDER = { format: 1, intent: 2, identity: 3, behavior: 4, knowledge: 5, guardrails: 6 };
+
+const DEFAULT_LLM = { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" };
+const DEFAULT_FORMAT_CONTRACT = { output_type: "html", skill_profile_slug: null, schema: null };
+const DEFAULT_SYNTHESIS = { enabled: false };
 
 function getSupabaseHeaders(key) {
   return {
@@ -9,6 +15,161 @@ function getSupabaseHeaders(key) {
     "apikey": key,
     "Authorization": `Bearer ${key}`,
   };
+}
+
+function buildSections(skillProfiles, agentId, agentConfigs) {
+  const sections = [];
+  let reflectSection = null;
+  let synthesisEnabled = false;
+  let synthesisDeclaringSlug = null;
+  let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
+  let llm = { ...DEFAULT_LLM };
+
+  for (const sp of skillProfiles) {
+    const typeSlug = sp.skill_type_slug;
+    const order = SKILL_ORDER[typeSlug] ?? 99;
+    const traits = sp.traits || {};
+
+    let sectionType = "stored";
+    let content = null;
+    let fetchInstruction = null;
+
+    if (typeSlug === "knowledge") {
+      sectionType = "rag";
+      fetchInstruction = {
+        method: "rag",
+        agent_id: agentId || null,
+        query_from: "task_context",
+        match_count: 5,
+        scope: agentId ? "agent" : "platform",
+      };
+
+    } else if (typeSlug === "identity") {
+      const defaultConfig = (agentConfigs || []).find(c => c.type === "role_prompt" && c.is_default);
+      if (defaultConfig?.text) {
+        content = defaultConfig.text;
+      } else {
+        const parts = [];
+        if (sp.objective) parts.push(sp.objective);
+        if (sp.method) parts.push(sp.method);
+        content = parts.join("\n") || null;
+      }
+
+    } else if (typeSlug === "behavior") {
+      const roleParts = (agentConfigs || [])
+        .filter(c => c.type === "role_prompt")
+        .map(c => c.text)
+        .filter(Boolean);
+      const traitParts = [];
+      if (traits.reasoning_style) traitParts.push(`Reasoning style: ${traits.reasoning_style}`);
+      if (traits.writing_style) traitParts.push(`Writing style: ${traits.writing_style}`);
+      const allParts = [...roleParts, ...traitParts];
+      content = allParts.length ? allParts.join("\n") : null;
+
+    } else if (typeSlug === "intent") {
+      const intentParts = [];
+      if (sp.objective) intentParts.push(sp.objective);
+      if (sp.method) intentParts.push(sp.method);
+      if (traits.analysis_instructions) intentParts.push(traits.analysis_instructions);
+      content = intentParts.length ? intentParts.join("\n") : null;
+
+    } else if (typeSlug === "format") {
+      const outputType = traits.output_type || "html";
+      const formatParts = [`Output type: ${outputType}`];
+      if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
+      content = formatParts.join("\n");
+
+      formatContract = {
+        output_type: outputType,
+        skill_profile_slug: sp.slug,
+        schema: traits.schema || null,
+      };
+
+      // LLM config from Format skill (SK-17 columns)
+      if (sp.llm_provider || sp.llm_model) {
+        llm = {
+          provider: sp.llm_provider || DEFAULT_LLM.provider,
+          model: sp.llm_model || DEFAULT_LLM.model,
+          max_tokens: sp.max_tokens || DEFAULT_LLM.max_tokens,
+          api_key_source: sp.api_key_source || DEFAULT_LLM.api_key_source,
+        };
+      }
+
+    } else if (typeSlug === "guardrails") {
+      const guardParts = (agentConfigs || [])
+        .filter(c => c.type === "guardrail")
+        .map(c => c.text)
+        .filter(Boolean);
+      if (sp.guardrails) {
+        const g = sp.guardrails;
+        if (Array.isArray(g)) guardParts.push(...g);
+        else if (typeof g === "string") guardParts.push(g);
+        else if (typeof g === "object") guardParts.push(JSON.stringify(g));
+      }
+      content = guardParts.length ? guardParts.join("\n") : null;
+    }
+
+    const section = {
+      slug: typeSlug === "knowledge" ? `knowledge-${sp.slug}` : typeSlug,
+      label: buildLabel(typeSlug, sp.name),
+      skill_profile_slug: sp.slug,
+      type: sectionType,
+      content,
+      fetch_instruction: fetchInstruction,
+      required: sp.is_required ?? false,
+      order,
+    };
+    sections.push(section);
+
+    // reflect detection
+    const techServices = Array.isArray(sp.technical_services) ? sp.technical_services : [];
+    if (techServices.includes("reflect") && !reflectSection) {
+      reflectSection = {
+        slug: "reflect",
+        label: "EXECUTION PLAN",
+        skill_profile_slug: sp.slug,
+        type: "reflect",
+        content: null,
+        fetch_instruction: {
+          method: "reflect",
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1024,
+          inserts_after: "behavior",
+          declared_by: sp.slug,
+        },
+        required: false,
+        order: 4.5,
+      };
+    }
+
+    // synthesis detection
+    if (techServices.includes("intelligent-synthesis") && !synthesisEnabled) {
+      synthesisEnabled = true;
+      synthesisDeclaringSlug = sp.slug;
+    }
+  }
+
+  if (reflectSection) sections.push(reflectSection);
+
+  sections.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const synthesis = synthesisEnabled
+    ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug }
+    : { enabled: false };
+
+  return { sections, formatContract, synthesis, llm };
+}
+
+function buildLabel(typeSlug, name) {
+  const labels = {
+    identity: "ROLE & IDENTITY",
+    behavior: "BEHAVIOR",
+    knowledge: "BACKGROUND KNOWLEDGE",
+    intent: "INTENT",
+    format: "OUTPUT FORMAT",
+    guardrails: "CONSTRAINTS & GUARDRAILS",
+  };
+  return labels[typeSlug] || (name || typeSlug).toUpperCase();
 }
 
 export default async function handler(req, res) {
@@ -29,18 +190,25 @@ export default async function handler(req, res) {
   if (!tenant_id) return res.status(400).json({ error: "tenant_id required" });
   if (!task_context) return res.status(400).json({ error: "task_context required" });
 
+  // Graceful degradation: no capability_slug and no agent_id → empty Prompt Request
+  if (!capability_slug && !agent_id) {
+    return res.status(200).json({
+      tenant_id,
+      task_context,
+      agent_id: null,
+      capability_slug: null,
+      sections: [],
+      format_contract: DEFAULT_FORMAT_CONTRACT,
+      synthesis: DEFAULT_SYNTHESIS,
+      llm: DEFAULT_LLM,
+    });
+  }
+
   const headers = getSupabaseHeaders(supabaseKey);
 
   try {
-    const promptRequest = {
-      tenant_id,
-      task_context,
-      agent_id: agent_id || null,
-      capability_slug: capability_slug || null,
-      agent_configs: null,
-      capabilities: null,
-      skill_profiles: null,
-    };
+    let agentConfigs = [];
+    let skillProfiles = [];
 
     // 1. Load agent_configs if agent_id provided
     if (agent_id) {
@@ -48,80 +216,64 @@ export default async function handler(req, res) {
         `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=id,type,name,text,is_default`,
         { headers }
       );
-      if (r.ok) promptRequest.agent_configs = await r.json();
+      if (r.ok) agentConfigs = await r.json() || [];
     }
 
-    // 2. Load capability + skill_profiles if capability_slug provided
+    // 2. Load skill_profiles for the given capability_slug
     if (capability_slug) {
-      // Load capability record
-      const capR = await fetch(
-        `${supabaseUrl}/rest/v1/capabilities?or=(tenant_id.eq.${encodeURIComponent(tenant_id)},tenant_id.is.null)&slug=eq.${encodeURIComponent(capability_slug)}&select=*&limit=1`,
-        { headers }
-      );
-      if (capR.ok) {
-        const caps = await capR.json();
-        promptRequest.capabilities = caps?.[0] || null;
-      }
-
-      // Load skill_profiles for this capability, ordered by display_order
       const spR = await fetch(
         `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
         { headers }
       );
       if (spR.ok) {
-        const rows = await spR.json();
-        promptRequest.skill_profiles = (rows || []).map(row => ({
+        const rows = await spR.json() || [];
+        skillProfiles = rows.map(row => ({
           ...row.skill_profiles,
           level: row.level,
           is_required: row.is_required,
           display_order: row.display_order,
         }));
       }
-    }
 
-    // 3. If agent_id but no capability_slug — load all capabilities assigned to agent
-    if (agent_id && !capability_slug) {
+    } else if (agent_id) {
+      // No capability_slug — load all capabilities assigned to agent, then their skill_profiles
       const assignR = await fetch(
         `${supabaseUrl}/rest/v1/agent_capability_assignments?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=capability_slug`,
         { headers }
       );
       if (assignR.ok) {
-        const assignments = await assignR.json();
-        if (assignments?.length) {
-          const slugs = assignments.map(a => a.capability_slug);
-
-          // Load capability records
-          const slugFilter = slugs.map(s => `"${s}"`).join(",");
-          const capsR = await fetch(
-            `${supabaseUrl}/rest/v1/capabilities?or=(tenant_id.eq.${encodeURIComponent(tenant_id)},tenant_id.is.null)&slug=in.(${slugFilter})&select=*`,
+        const assignments = await assignR.json() || [];
+        for (const a of assignments) {
+          const spR = await fetch(
+            `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(a.capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
             { headers }
           );
-          if (capsR.ok) promptRequest.capabilities = await capsR.json();
-
-          // Load skill_profiles for each capability
-          const allSPs = [];
-          for (const slug of slugs) {
-            const spR = await fetch(
-              `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
-              { headers }
-            );
-            if (spR.ok) {
-              const rows = await spR.json();
-              allSPs.push(...(rows || []).map(row => ({
-                ...row.skill_profiles,
-                source_capability_slug: slug,
-                level: row.level,
-                is_required: row.is_required,
-                display_order: row.display_order,
-              })));
-            }
+          if (spR.ok) {
+            const rows = await spR.json() || [];
+            skillProfiles.push(...rows.map(row => ({
+              ...row.skill_profiles,
+              source_capability_slug: a.capability_slug,
+              level: row.level,
+              is_required: row.is_required,
+              display_order: row.display_order,
+            })));
           }
-          promptRequest.skill_profiles = allSPs;
         }
       }
     }
 
-    return res.status(200).json(promptRequest);
+    const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs);
+
+    return res.status(200).json({
+      tenant_id,
+      task_context,
+      agent_id: agent_id || null,
+      capability_slug: capability_slug || null,
+      sections,
+      format_contract: formatContract,
+      synthesis,
+      llm,
+    });
 
   } catch (err) {
     console.error("[db-assembly]", err);
