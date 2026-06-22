@@ -30,36 +30,36 @@ They are designed to run in sequence but are independently callable.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  API 1 — PROMPT CONTAINER                               │
-│  api/prompt/container.js                                │
+│  Service 1 — DB ASSEMBLY                                │
+│  api/prompt/db-assembly.js                              │
 │                                                         │
 │  Reads the capability and resolves what goes into       │
-│  the prompt. Produces a Prompt Specification —          │
+│  the prompt. Produces a Prompt Request —          │
 │  a blueprint of which sections are included,            │
 │  in what order, with which Skill Profiles,              │
 │  which LLM, and what token budget.                      │
 │                                                         │
 │  Input  → capability_slug, agent_id, task_context       │
-│  Output → Prompt Specification (structured object)      │
+│  Output → Prompt Request (structured object)      │
 └─────────────────────────┬───────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  API 2 — PROMPT BUILDER                                 │
-│  api/prompt/builder.js                                  │
+│  Service 2 — AI ENRICHMENT                              │
+│  api/prompt/ai-enrichment.js                            │
 │                                                         │
 │  Takes the Specification. Fetches data for each         │
 │  section that requires it (RAG, agent_configs,          │
 │  skill_profiles). Renders sections into text.           │
 │  Optimizes against the token budget.                    │
 │                                                         │
-│  Input  → Prompt Specification + task_context           │
+│  Input  → Prompt Request + task_context           │
 │  Output → Assembled, optimized system prompt string     │
 │           + section-by-section debug object             │
 └─────────────────────────┬───────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  API 3 — PROMPT SENDER                                  │
-│  api/prompt/sender.js                                   │
+│  Service 3 — REQUEST & RECEIVABLE                       │
+│  api/prompt/request-receivable.js                       │
 │                                                         │
 │  Takes the assembled prompt. Sends to the LLM.          │
 │  Parses the response against the Format Skill's         │
@@ -183,11 +183,11 @@ prompt to any LLM they choose. The Builder always returns both.
 
 ---
 
-## 5. API 1 — Prompt Container (Specification)
+## 5. Service 1 — DB Assembly
 
-**Route:** `api/prompt/container.js`
+**Route:** `api/prompt/db-assembly.js`
 **Job:** Read the capability and agent. Load all stored content. Produce a fully-loaded
-Prompt Specification that the Builder can execute without touching the DB again.
+Prompt Request that AI Enrichment can execute without touching the DB again.
 **Does NOT:** fetch RAG, call Claude, write anything to the DB.
 
 ### What the Container loads
@@ -198,7 +198,7 @@ never reads Supabase directly — it only executes runtime operations declared i
 
 | Source type | What Container does | What Builder does |
 |-------------|--------------------|--------------------|
-| `stored` | Reads and embeds content in Spec | Renders section from embedded content |
+| `stored` | Reads and embeds content in Prompt Request | Renders section from embedded content |
 | `rag` | Passes fetch instruction only (needs task_context at runtime) | Executes RAG query, receives chunks |
 | `reflect` | Passes instruction (declared via `technical_services`) | Runs Haiku call, inserts section |
 | `intelligent-synthesis` | Passes instruction (declared via `technical_services`) | Runs Haiku rewrite of full prompt |
@@ -212,7 +212,7 @@ never reads Supabase directly — it only executes runtime operations declared i
 }
 ```
 
-### Output — Prompt Specification
+### Output — Prompt Request
 
 The Specification carries either embedded content (`content` field populated) or a fetch
 instruction (`fetch_instruction` field populated). Never both. Never neither.
@@ -314,19 +314,21 @@ instruction (`fetch_instruction` field populated). Never both. Never neither.
 }
 ```
 
-**Key rule:** The Specification is the sole input to the Builder. Nothing in the Builder
+**Key rule:** The Prompt Request is the sole input to AI Enrichment. Nothing in AI Enrichment
 hardcodes section order, section names, section inclusion, or fetch behavior. Everything
-is declared in the Specification.
+is declared in the Prompt Request.
 
 ---
 
-## 6. API 2 — Prompt Builder (Fetch + Render + REFLECT + Synthesis)
+## 6. Service 2 — AI Enrichment (Fetch + Render + REFLECT + Synthesis)
 
-**Route:** `api/prompt/builder.js`
-**Job:** Execute the Prompt Specification. Fetch runtime data. Render all sections.
+**Route:** `api/prompt/ai-enrichment.js`
+**Job:** Execute the Prompt Request. Fetch runtime data. Render all sections.
 Run REFLECT if declared. Run intelligent synthesis if declared. Return the optimized prompt.
 **Does NOT:** read Skill Profiles or agent_configs directly. Does NOT write to the DB.
 **Makes AI calls:** Yes — REFLECT (Haiku) and intelligent synthesis (Haiku) when declared.
+**Note:** All platform AI patterns always run regardless of whether DB content was provided.
+RAG always runs — scoped to agent if available, capability if available, platform-wide if neither.
 
 ### Four steps — run in this order
 
@@ -514,12 +516,12 @@ They do not need to call the Sender. The assembled prompt is a self-contained ar
 
 ---
 
-## 7. API 3 — Prompt Sender (Send + Parse + Deliver)
+## 7. Service 3 — Request & Receivable (Send + Parse + Deliver)
 
-**Route:** `api/prompt/sender.js`
-**Job:** Take the assembled prompt from the Builder. Call the LLM. Parse the response
+**Route:** `api/prompt/request-receivable.js`
+**Job:** Take the assembled prompt from AI Enrichment. Call the LLM. Parse the response
 against the Format Skill output contract. Write the Deliverable. Log. Route back to caller.
-**Does NOT:** read Skill Profiles, agent_configs, or the Specification directly.
+**Does NOT:** read Skill Profiles, agent_configs, or the Prompt Request directly.
 **Makes AI calls:** Yes — one main LLM call. One retry call if parse fails.
 
 ### Input
@@ -710,9 +712,9 @@ an MCP tool:
 
 | MCP Tool | Wraps | Use case |
 |----------|-------|----------|
-| `deepbench.prompt.specify` | Container | "What would a project-manager prompt look like?" |
-| `deepbench.prompt.build` | Builder | "Build me the assembled prompt for this capability" |
-| `deepbench.prompt.send` | Sender | "Build and execute — give me the Deliverable" |
+| `deepbench.prompt.db-assembly` | DB Assembly | "What would a project-manager prompt look like?" |
+| `deepbench.prompt.ai-enrichment` | AI Enrichment | "Build me the assembled prompt for this capability" |
+| `deepbench.prompt.request-receivable` | Request & Receivable | "Build and execute — give me the Deliverable" |
 
 An external agent (outside DeepBench) can call `deepbench.prompt.build` with a
 `capability_slug`, receive an assembled prompt, and send it to its own LLM. It receives
@@ -755,10 +757,21 @@ before kickoff docs are written.
 | Sender lineage — step_id + work_order_id from caller; null for MCP callers | ✅ Locked |
 | Builder Haiku call costs (REFLECT + synthesis) logged as overhead on Sender's ai_activity_log row | ✅ Locked |
 | docx/pdf packaging — Sender returns prose + requires_packaging flag; document service is separate | ✅ Locked |
-| Container caching — Spec caching strategy (same capability + agent = cache hit) | Design session required |
-| `max_tokens` / `llm_model` / `llm_provider` columns added to `skill_profiles` table in Supabase | Schema migration required (S-INFRA-01 or earlier) |
+| DB Assembly is a faithful collector — no adjudication, no AI, no writes. Organized by source: agent_configs / capabilities / skill_profiles / task_context | ✅ Locked |
+| DB Assembly section priority order: Format → Intent → Identity → Behavior → Knowledge → Guardrails | ✅ Locked |
+| DB Assembly inputs: tenant_id (required, always explicit), task_context (required), agent_id (optional), capability_slug (optional) | ✅ Locked |
+| DB Assembly degradation: works with whatever data is available — no blocking errors on missing Skills, agent, or capability | ✅ Locked |
+| DB Assembly: duplicative/conflicting content (e.g. guardrails in multiple sources) passed through intact — AI Enrichment resolves | ✅ Locked |
+| AI Enrichment always runs — even with no DB content. All platform patterns run; RAG always runs scoped to agent/capability/platform-wide | ✅ Locked |
+| Service terminology: Container → DB Assembly, Builder → AI Enrichment, Sender → Request & Receivable, Specification → Prompt Request | ✅ Locked |
+| DB Assembly caching — same capability + agent = cache hit | Design session required |
+| `max_tokens` / `llm_model` / `llm_provider` columns added to `skill_profiles` table in Supabase | Schema migration required (SK-17, S-PM-02) |
 | Two-speed routing — fast path (Haiku, top 3 RAG) vs deep path (Sonnet, top 10 RAG) declared at Capability level | Design session required (AA-04) |
-| Builder fetch: multiple Knowledge Skill Profiles — merge strategy for multiple RAG result sets | Design session required |
+| AI Enrichment: multiple Knowledge Skill Profiles — merge strategy for multiple RAG result sets | Design session required |
+| Multi-LLM conflict resolution — when multiple Skill Profiles declare different LLM configs | Future feature (platform defaults handle for now) |
+| User-declared priority in task_context — formal parsing of priority signals embedded in the task string | Future feature (AI Enrichment surfaces naturally for now) |
+| DB Assembly relevance flagging — lightweight AI annotation on package sections to guide AI Enrichment prioritization | Future feature (after pipeline is proven) |
+| RAG query expansion — using AI to expand task_context into a richer search query before hitting the knowledge store | Future feature (design session required) |
 
 ---
 
@@ -766,6 +779,6 @@ before kickoff docs are written.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AA-03 | Prompt Container API (`api/prompt/container.js`) — reads capability + agent, resolves Prompt Specification (sections, LLM config, token budget). No fetching, no LLM calls. | ❌ Missing | S-PM-02 |
-| AA-43 | Prompt Builder API (`api/prompt/builder.js`) — takes Prompt Specification, fetches content per section source type (credentials / RAG / skill_profile_traits), renders sections, optimizes against token budget. Returns assembled system prompt + debug object. | ❌ Missing | S-PM-03 |
-| AA-44 | Prompt Sender API (`api/prompt/sender.js`) — takes assembled prompt, calls LLM via adapter, parses response against Format Skill output contract, writes Deliverable, logs to ai_activity_log, routes response to caller. | ❌ Missing | S-PM-04 |
+| AA-03 | DB Assembly (`api/prompt/db-assembly.js`) — reads capability_slug + agent_id, queries agent_configs / capabilities / skill_profiles, returns Prompt Request organized by source. No AI calls, no writes. Degrades gracefully on missing data. | ❌ Missing | S-PM-02 |
+| AA-43 | AI Enrichment (`api/prompt/ai-enrichment.js`) — takes Prompt Request, executes platform patterns: RAG (agent/capability/platform-wide scope), REFLECT, intelligent synthesis. Resolves conflicts and duplication. Returns assembled system prompt + debug object. | ❌ Missing | S-PM-03 |
+| AA-44 | Request & Receivable (`api/prompt/request-receivable.js`) — takes assembled prompt, calls LLM via adapter, parses response against Format Skill output contract, writes Deliverable, logs to ai_activity_log, routes response to caller. | ❌ Missing | S-PM-04 |

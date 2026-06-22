@@ -122,9 +122,9 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 | Self-Learning / Knowledge Reinforcement | AI | `api/web-memory.js` | `api/capabilities/knowledge-reinforcement.js` |
 | Capability Audit & Cost Tracking | System | `src/hooks/useAIActivity.js` | stays in hooks (client-side aggregation) |
 | Identity / Persona Replication | AI | ❌ Not yet built | `api/capabilities/persona-replication.js` |
-| Prompt Container | System | `api/agent-run.js` (partial) | `api/prompt/container.js` |
-| Prompt Builder | AI + System | `api/agent-run.js` (partial) | `api/prompt/builder.js` |
-| Prompt Sender | AI | `api/agent-run.js` (partial) | `api/prompt/sender.js` |
+| DB Assembly | System | `api/agent-run.js` (partial) | `api/prompt/db-assembly.js` |
+| AI Enrichment | AI + System | `api/agent-run.js` (partial) | `api/prompt/ai-enrichment.js` |
+| Request & Receivable | AI | `api/agent-run.js` (partial) | `api/prompt/request-receivable.js` |
 | Procurement Flags | Deterministic | `computeFlags()` inline | `api/capabilities/procurement-flags.js` |
 | Vendor Concentration / HHI | Deterministic | `computeVendorConc()` inline | `api/capabilities/vendor-concentration.js` |
 | Column Detection / NIGP Lookup | Deterministic | inline in AnalyzerScreen | `api/capabilities/column-detection.js` |
