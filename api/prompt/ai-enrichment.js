@@ -1,7 +1,7 @@
 // DeepBench v5.2.13 | api/prompt/ai-enrichment.js | Prompt Service — AI Enrichment
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
-import { queryRAG } from "../lib/rag.js";
+import { queryRAG } from "../../lib/rag.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 

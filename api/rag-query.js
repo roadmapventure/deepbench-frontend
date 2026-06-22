@@ -1,6 +1,6 @@
 // DeepBench v5.2.13 | api/rag-query.js | RAG query handler — thin wrapper over api/lib/rag.js
 // FEATURE: AA-43 — delegates to shared queryRAG module. External/frontend callers use this endpoint.
-import { queryRAG } from "./lib/rag.js";
+import { queryRAG } from "../lib/rag.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
