@@ -119,7 +119,7 @@
 ## NIGP Analyzer Standalone App (`nigp-analyzer/src/`)
 
 Separate standalone React + Vite app. Routes: `/` → NIGPAnalyzer, `/admin` → TeamBuilder.
-Deployed independently; shares the Treasury design system and calls the same Vercel API routes (`/api/brief`, `/api/agent-configs`, `/api/web-memory-patch`).
+Deployed independently; shares the Treasury design system and calls the same Vercel API routes (`/api/brief`, `/api/agent-configs`, `/api/web-memory`).
 
 | File | Description | Key Exports |
 |------|-------------|-------------|
