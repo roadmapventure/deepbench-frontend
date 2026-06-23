@@ -1,7 +1,7 @@
 // DeepBench v5.2.16 | api/prompt/request-receivable.js | Send + Parse + Guardrails + Handler + Log
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
-import { handle as storeHandle } from '../lib/handlers/store.js';
+import { handle as storeHandle } from '../_lib/handlers/store.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
