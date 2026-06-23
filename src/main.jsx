@@ -8,7 +8,7 @@ import { FetchProvider }    from "./contexts/FetchContext.jsx";
 import { AnalyzerProvider } from "./contexts/AnalyzerContext.jsx";
 
 import DashboardScreen        from "./screens/DashboardScreen.jsx";
-import AssignWorkScreen       from "./screens/AssignWorkScreen.jsx";
+import CreateWorkOrderScreen  from "./screens/CreateWorkOrderScreen.jsx";
 import TaskInstructionsScreen from "./screens/TaskInstructionsScreen.jsx";
 import AnalyzerScreen         from "./screens/AnalyzerScreen.jsx";
 import FetchScreen            from "./screens/FetchScreen.jsx";
@@ -25,7 +25,7 @@ createRoot(document.getElementById("root")).render(
         <AnalyzerProvider>
           <Routes>
             <Route path="/"                          element={<DashboardScreen />} />
-            <Route path="/work/new"                  element={<AssignWorkScreen />} />
+            <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
             <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
             <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />
             <Route path="/work/:taskId/fetch"        element={<FetchScreen />} />

@@ -1,6 +1,11 @@
-// DeepBench v5.2.15 | api/plan.js | Planning agent + title generation (merged from title.js)
+// DeepBench v5.2.18 | api/plan.js | suggest-goal (AW-27) + prompt-service (SK-20) actions
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+
+import { assemblePrompt } from './prompt/db-assembly.js';
+import { enrichPrompt } from './prompt/ai-enrichment.js';
+import { sendRequest } from './prompt/request-receivable.js';
+import { queryRAG } from '../lib/rag.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -16,6 +21,128 @@ export default async function handler(req, res) {
   if (!anthropicKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
   const action = req.body.action || 'plan';
+
+  // FEATURE: AW-27 — AI goal suggestion: streaming Haiku call with RAG context
+  if (action === 'suggest-goal') {
+    try {
+      const { agent_id, capability_slug, deliverable_label, deliverable_description, tenant_id = 'global' } = req.body;
+
+      if (!deliverable_label) return res.status(400).json({ error: 'deliverable_label required' });
+
+      // RAG: fetch relevant context from Michelle's knowledge entries
+      let ragContext = '';
+      try {
+        const ragResults = await queryRAG({
+          queryText: `${deliverable_label}: ${deliverable_description || ''}`,
+          agentId: agent_id || 'michelle',
+          tenantId: tenant_id,
+          matchCount: 3,
+          scope: 'agent',
+        });
+        if (ragResults?.context) {
+          ragContext = ragResults.context;
+        }
+      } catch (ragErr) {
+        console.warn('[suggest-goal] RAG fetch failed — proceeding without context:', ragErr.message);
+      }
+
+      const systemPrompt = `You are Michelle Manning (PP-01), a Project Manager. Generate a concise, specific work order goal (2–3 sentences) for the deliverable type requested. Be practical and action-oriented. Do not include preamble — output the goal text only.${ragContext ? `\n\nRelevant context from your knowledge base:\n${ragContext}` : ''}`;
+      const userMsg = `Deliverable type: ${deliverable_label}\n${deliverable_description ? `Description: ${deliverable_description}\n` : ''}Write a suggested goal for this work order.`;
+
+      // SSE streaming response
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 200,
+          stream: true,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMsg }],
+        }),
+      });
+
+      if (!anthropicRes.ok) {
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
+
+      const reader = anthropicRes.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+              }
+            } catch {}
+          }
+        }
+      }
+
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    } catch (e) {
+      console.error('[suggest-goal] error:', e);
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+  }
+
+  // FEATURE: SK-20 — Prompt Service pipeline orchestration for Create Work Order
+  if (action === 'prompt-service') {
+    try {
+      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context } = req.body;
+
+      if (!goal) return res.status(400).json({ error: 'goal required' });
+
+      // Step 1: DB Assembly
+      const promptRequest = await assemblePrompt({
+        capability_slug: capability_slug || 'cap-pm-01',
+        agent_id: agent_id || 'michelle',
+        tenant_id,
+        task_context: { goal, deliverable_type },
+        runtime_context: runtime_context || null,
+      });
+
+      // Step 2: AI Enrichment
+      const enriched = await enrichPrompt({
+        prompt_request: promptRequest,
+        agent_id: agent_id || 'michelle',
+        capability_slug: capability_slug || 'cap-pm-01',
+      });
+
+      // Step 3: Request & Receivable
+      const result = await sendRequest({
+        prompt_request: enriched,
+        agent_id: agent_id || 'michelle',
+        capability_slug: capability_slug || 'cap-pm-01',
+        tenant_id,
+      });
+
+      return res.status(200).json(result);
+    } catch (e) {
+      console.error('[prompt-service] error:', e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   // ── Title action (merged from title.js) ─────────────────────────────────────
   if (action === 'title') {

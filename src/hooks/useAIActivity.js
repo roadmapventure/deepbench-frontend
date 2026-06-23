@@ -1,4 +1,4 @@
-// DeepBench v5.2.15 | useAIActivity.js | request-receivable SERVICE_CATALOG + PAT-13 active + logAICall patterns_used
+// DeepBench v5.2.18 | useAIActivity.js | goal-suggestion SERVICE_CATALOG + AI_TYPE_TO_SERVICE (AW-27)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -14,6 +14,8 @@ export const SERVICE_CATALOG = [
   { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining'],                                          roadmap: 'next' },
   // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
   { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'next' },
+  // FEATURE: AW-27 — goal suggestion: streaming Haiku + RAG
+  { slug: 'goal-suggestion',         name: 'Goal Suggestion',          serviceType: 'ai',     patterns: ['Streaming', 'RAG'],                                                                           roadmap: 'now'  },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
   { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
@@ -69,6 +71,7 @@ const AI_TYPE_TO_SERVICE = {
   reinforcement:  'knowledge-reinforcement',
   ai_enrichment:        'ai-enrichment',
   request_receivable:   'request-receivable',
+  goal_suggestion:      'goal-suggestion',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
