@@ -1,4 +1,4 @@
-// DeepBench v5.2.17 | api/prompt/db-assembly.js | assemblePrompt named export + runtime_context (AA-56)
+// DeepBench v5.2.22 | api/prompt/db-assembly.js | assemblePrompt named export + runtime_context (AA-56)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -263,6 +263,25 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   }
 
   const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs);
+
+  // FEATURE: AA-57 — inject goal as WORK ORDER section so LLM receives the actual task
+  const goalText = typeof task_context === 'object' && task_context !== null
+    ? (task_context.goal || null)
+    : (typeof task_context === 'string' ? task_context : null);
+
+  if (goalText && goalText.trim()) {
+    sections.push({
+      slug: 'work-order',
+      label: 'WORK ORDER',
+      skill_profile_slug: null,
+      type: 'stored',
+      content: goalText.trim(),
+      fetch_instruction: null,
+      required: true,
+      order: 2.5,
+    });
+    sections.sort((a, b) => (a.order || 0) - (b.order || 0));
+  }
 
   // FEATURE: AA-56 — runtime_context injected as Additional Context section when present
   if (runtime_context && typeof runtime_context === 'string' && runtime_context.trim()) {

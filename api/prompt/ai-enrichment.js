@@ -1,4 +1,4 @@
-// DeepBench v5.2.17 | api/prompt/ai-enrichment.js | enrichPrompt named export
+// DeepBench v5.2.22 | api/prompt/ai-enrichment.js | enrichPrompt named export
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -72,6 +72,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   }
 
   const { sections = [], task_context = "", tenant_id = "global", format_contract, synthesis, llm, agent_id: pr_agent_id, capability_slug: pr_capability_slug } = promptRequest;
+  // FEATURE: AA-57 — task_context may be an object {goal, deliverable_type}; extract string for RAG + Reflect
+  const taskContextStr = typeof task_context === 'object' && task_context !== null
+    ? (task_context.goal || JSON.stringify(task_context))
+    : (task_context || "");
   const effectiveAgentId = agent_id || pr_agent_id || null;
   const effectiveCapabilitySlug = capability_slug || pr_capability_slug || null;
 
@@ -99,7 +103,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   // STEP 1 — FETCH: run stored pass-through + RAG fetches in parallel
   const nonReflectSections = sections.filter(s => s.type !== "reflect");
   const fetchedSections = await Promise.all(
-    nonReflectSections.map(s => fetchSection(s, task_context, tenant_id))
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id))
   );
 
   // STEP 2 — RENDER: assemble text blocks in section order
@@ -140,7 +144,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
 
 ${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n` : ""}
 ## SPECIFIC TASK
-${task_context}
+${taskContextStr}
 
 Write a numbered execution plan. Be concrete — reference specific knowledge where it applies.`;
 
