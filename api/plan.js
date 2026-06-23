@@ -318,7 +318,7 @@ Return JSON only, no markdown fences, no explanation.`;
         system:      systemPrompt,
         messages,
         tools,
-        tool_choice: { type: "auto" },
+        tool_choice: { type: "any" },
       }),
     });
 
