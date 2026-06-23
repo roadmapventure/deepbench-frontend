@@ -1,4 +1,4 @@
-// DeepBench v5.2.18 | api/plan.js | suggest-goal (AW-27) + prompt-service (SK-20) actions
+// DeepBench v5.2.23 | api/plan.js | suggest-goal (AW-27) + preview-prompt (AW-28) + prompt-service (SK-20) actions
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
 
@@ -103,6 +103,94 @@ export default async function handler(req, res) {
       console.error('[suggest-goal] error:', e);
       res.write('data: [DONE]\n\n');
       return res.end();
+    }
+  }
+
+  // FEATURE: AW-28 — preview-prompt: Prompt Service returns 4-stage breakdown for Prompt Evolution Modal
+  if (action === 'preview-prompt') {
+    try {
+      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context } = req.body;
+      if (!goal) return res.status(400).json({ error: 'goal required' });
+
+      // Stage 1: raw goal only
+      const stage1Text = goal.trim();
+
+      // DB Assembly
+      const promptRequest = await assemblePrompt({
+        capability_slug: capability_slug || 'project-manager',
+        agent_id: agent_id || 'michelle',
+        tenant_id,
+        task_context: { goal, deliverable_type },
+        runtime_context: runtime_context || null,
+      });
+
+      // Stage 2: stored sections only (DB Assembly output, no RAG, no Reflect)
+      const storedSections = (promptRequest.sections || [])
+        .filter(s => s.type === 'stored' && s.content)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      const stage2Text = storedSections
+        .map(s => `=== ${s.label} ===\n${s.content}`)
+        .join('\n\n---\n\n');
+
+      // AI Enrichment — single call, all stages derived from result
+      const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug });
+      const enrichedMap = enriched.sections || {};
+      const debug = enriched.debug || {};
+
+      // Helper: build ordered section list from enriched map
+      const orderedSections = [...(promptRequest.sections || [])]
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      function buildStage(excludeReflect) {
+        const pairs = [];
+        for (const s of orderedSections) {
+          if (excludeReflect && s.type === 'reflect') continue;
+          const content = enrichedMap[s.slug];
+          if (!content) continue;
+          const source = s.slug.startsWith('knowledge') ? 'RAG' : s.type === 'reflect' ? 'REFLECT' : 'DB';
+          pairs.push({ slug: s.slug, label: s.label, content, source });
+        }
+        return pairs;
+      }
+
+      // Stage 3: stored + RAG (no Reflect)
+      const stage3Pairs = buildStage(true);
+      const stage3Text = stage3Pairs
+        .map(p => `=== ${p.label} ===\n${p.content}`)
+        .join('\n\n---\n\n');
+
+      // Stage 4: full enriched prompt (stored + RAG + Reflect)
+      const stage4Pairs = buildStage(false);
+      const stage4Text = enriched.system_prompt || stage4Pairs
+        .map(p => `=== ${p.label} ===\n${p.content}`)
+        .join('\n\n---\n\n');
+
+      const patterns = {
+        rag: debug.rag_retrieved || false,
+        rag_chunks: debug.rag_chunks_by_section
+          ? Object.values(debug.rag_chunks_by_section).reduce((a, b) => a + b, 0)
+          : 0,
+        rag_scope: debug.rag_scope_effective || null,
+        reflect: debug.reflect_ran || false,
+        synthesis: debug.synthesis_ran || false,
+        synthesis_tokens_saved: debug.synthesis_ran
+          ? (debug.token_estimate_pre_synthesis || 0) - (debug.token_estimate_post_synthesis || 0)
+          : 0,
+        model: enriched.llm?.model || 'claude-sonnet-4-6',
+        skill_profile: enriched.format_contract?.skill_profile_slug || null,
+      };
+
+      return res.status(200).json({
+        stage1: { text: stage1Text, tokens: Math.ceil(stage1Text.length / 4) },
+        stage2: { text: stage2Text, tokens: Math.ceil(stage2Text.length / 4), sections: storedSections.map(s => ({ slug: s.slug, label: s.label, source: 'DB' })) },
+        stage3: { text: stage3Text, tokens: Math.ceil(stage3Text.length / 4), sections: stage3Pairs },
+        stage4: { text: stage4Text, tokens: Math.ceil(stage4Text.length / 4), sections: stage4Pairs },
+        patterns,
+      });
+    } catch (e) {
+      console.error('[preview-prompt] error:', e);
+      return res.status(500).json({ error: e.message });
     }
   }
 

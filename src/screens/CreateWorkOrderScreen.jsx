@@ -1,4 +1,4 @@
-// DeepBench v5.2.20 | CreateWorkOrderScreen.jsx | BUG-01 fix: capability_slug cap-pm-01 → project-manager
+// DeepBench v5.2.23 | CreateWorkOrderScreen.jsx | AW-28: Prompt Evolution Modal wired as first consumer
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -10,6 +10,7 @@ import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, AgentAvatar, AiBadge, Toast, FeatureBadge } from "../components/SharedUI.jsx";
+import PromptEvolutionModal from "../components/PromptEvolutionModal.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
@@ -224,6 +225,12 @@ export default function CreateWorkOrderScreen() {
   const [titleData,       setTitleData]        = useState({ taskTitle: "", michelleTitle: "", stepTitles: [], titleEdited: false });
   const goalRef         = useRef(null);
 
+  // FEATURE: AW-28 — Prompt Evolution Modal state
+  const [promptPreview, setPromptPreview] = useState(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const planResultRef = useRef(null);
+  const planReadyRef = useRef(false);
+
   const [chatContext, setChatContext] = useState(null);
 
   useEffect(() => {
@@ -344,11 +351,8 @@ export default function CreateWorkOrderScreen() {
     });
   };
 
-  const generatePlan = async () => {
-    if (!canGenerate) return;
-    setGenerating(true); setPlanGenerated(false);
-    const qas = questions.map(q=>({q:q.q, a:answers[q.id]||""}));
-    const result = await callPlanningAgent(goal, agents, selectedPMAgent, selectedDeliverable, qas);
+  // FEATURE: AW-28 — extracted so Continue handler can invoke after modal closes
+  const applyPlanResult = (result) => {
     if (result.ok) {
       const p = result.plan; // { steps, questions, title, planSummary, agentId, agentReason }
       if (steps.length > 0) {
@@ -378,6 +382,53 @@ export default function CreateWorkOrderScreen() {
       showToast("Planning agent failed: "+result.error,"⚠");
     }
     setGenerating(false);
+  };
+
+  // FEATURE: AW-28 — parallel preview-prompt + prompt-service
+  const generatePlan = async () => {
+    if (!canGenerate) return;
+    setGenerating(true);
+    setPlanGenerated(false);
+    planResultRef.current = null;
+    planReadyRef.current = false;
+
+    const qas = questions.map(q => ({ q: q.q, a: answers[q.id] || '' }));
+    const runtimeContext = qas.filter(qa => qa.a).map(qa => `Q: ${qa.q}\nA: ${qa.a}`).join('\n\n') || null;
+
+    const previewPayload = {
+      action: 'preview-prompt',
+      agent_id: selectedPMAgent?.id || 'michelle',
+      capability_slug: 'project-manager',
+      tenant_id: TENANT_ID,
+      goal,
+      deliverable_type: selectedDeliverable?.id || 'execution-plan',
+      runtime_context: runtimeContext,
+    };
+
+    // preview-prompt: non-blocking — show modal when ready
+    fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(previewPayload),
+    })
+      .then(r => r.json())
+      .then(data => { if (!data.error) { setPromptPreview(data); setShowPromptModal(true); } })
+      .catch(() => {});
+
+    // prompt-service: awaited — store result for Continue handler
+    const result = await callPlanningAgent(goal, agents, selectedPMAgent, selectedDeliverable, qas);
+    planResultRef.current = result;
+    planReadyRef.current = true;
+
+    if (!showPromptModal) applyPlanResult(result);
+  };
+
+  const handlePromptModalContinue = () => {
+    setShowPromptModal(false);
+    setPromptPreview(null);
+    if (planReadyRef.current && planResultRef.current) {
+      applyPlanResult(planResultRef.current);
+    }
   };
 
   const removeStep = (id) => {
@@ -594,6 +645,7 @@ export default function CreateWorkOrderScreen() {
             {!planGenerated && selectedDeliverable && (
               <div style={{position:"relative",marginBottom:14}}>
                 <FeatureBadge id="AW-04" />
+                <FeatureBadge id="AW-28" />
                 <button onClick={generatePlan} disabled={!canGenerate||generating}
                   style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your work order…" : "Generate Plan"}
@@ -749,6 +801,13 @@ export default function CreateWorkOrderScreen() {
           </div>
         </div>
       </div>
+      {showPromptModal && promptPreview && (
+        <PromptEvolutionModal
+          preview={promptPreview}
+          planReady={planReadyRef.current}
+          onContinue={handlePromptModalContinue}
+        />
+      )}
     </AppShell>
   );
 }
