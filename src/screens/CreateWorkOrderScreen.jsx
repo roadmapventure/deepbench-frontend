@@ -1,4 +1,4 @@
-// DeepBench v5.2.19 | CreateWorkOrderScreen.jsx | Create Work Order redesign (AW-24/25/26/27) + right column minWidth fix
+// DeepBench v5.2.20 | CreateWorkOrderScreen.jsx | BUG-01 fix: capability_slug cap-pm-01 → project-manager
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -39,7 +39,7 @@ async function callPlanningAgent(goal, agents, selectedPMAgent, selectedDelivera
       body: JSON.stringify({
         action: 'prompt-service',
         agent_id: selectedPMAgent?.id || 'michelle',
-        capability_slug: 'cap-pm-01',
+        capability_slug: 'project-manager', // BUG-01 fix: cap-pm-01 does not exist in DB — correct slug is project-manager
         tenant_id: TENANT_ID,
         goal,
         deliverable_type: selectedDeliverable?.id || null,
@@ -57,7 +57,7 @@ async function callPlanningAgent(goal, agents, selectedPMAgent, selectedDelivera
         body: JSON.stringify({
           action: 'prompt-service',
           agent_id: selectedPMAgent?.id || 'michelle',
-          capability_slug: 'cap-pm-01',
+          capability_slug: 'project-manager', // BUG-01 fix: cap-pm-01 does not exist in DB — correct slug is project-manager
           tenant_id: TENANT_ID,
           goal,
           deliverable_type: selectedDeliverable?.id || null,
@@ -302,7 +302,7 @@ export default function CreateWorkOrderScreen() {
       body: JSON.stringify({
         action: 'suggest-goal',
         agent_id: selectedPMAgent?.id || 'michelle',
-        capability_slug: 'cap-pm-01',
+        capability_slug: 'project-manager', // BUG-01 fix: cap-pm-01 does not exist in DB — correct slug is project-manager
         deliverable_label: deliverable.label,
         deliverable_description: deliverable.description,
         tenant_id: TENANT_ID,
