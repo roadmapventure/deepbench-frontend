@@ -1,4 +1,4 @@
-// DeepBench v5.2.15 | api/prompt/db-assembly.js | format_contract gains handler + guardrails
+// DeepBench v5.2.17 | api/prompt/db-assembly.js | assemblePrompt named export + runtime_context (AA-56)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -182,27 +182,18 @@ function buildLabel(typeSlug, name) {
   return labels[typeSlug] || (name || typeSlug).toUpperCase();
 }
 
-export default async function handler(req, res) {
-  const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
+export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl) return res.status(500).json({ error: "SUPABASE_URL not configured" });
-  if (!supabaseKey) return res.status(500).json({ error: "SUPABASE_SERVICE_KEY not configured" });
+  if (!supabaseUrl) throw new Error("SUPABASE_URL not configured");
+  if (!supabaseKey) throw new Error("SUPABASE_SERVICE_KEY not configured");
 
-  const { tenant_id, task_context, agent_id, capability_slug } = req.body || {};
-
-  if (!tenant_id) return res.status(400).json({ error: "tenant_id required" });
-  if (!task_context) return res.status(400).json({ error: "task_context required" });
+  if (!tenant_id) throw new Error("tenant_id required");
+  if (!task_context) throw new Error("task_context required");
 
   // Graceful degradation: no capability_slug and no agent_id → empty Prompt Request
   if (!capability_slug && !agent_id) {
-    return res.status(200).json({
+    return {
       tenant_id,
       task_context,
       agent_id: null,
@@ -211,82 +202,102 @@ export default async function handler(req, res) {
       format_contract: DEFAULT_FORMAT_CONTRACT,
       synthesis: DEFAULT_SYNTHESIS,
       llm: DEFAULT_LLM,
-    });
+    };
   }
 
   const headers = getSupabaseHeaders(supabaseKey);
 
-  try {
-    let agentConfigs = [];
-    let skillProfiles = [];
+  let agentConfigs = [];
+  let skillProfiles = [];
 
-    // 1. Load agent_configs if agent_id provided
-    if (agent_id) {
-      const r = await fetch(
-        `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=id,type,name,text,is_default`,
-        { headers }
-      );
-      if (r.ok) agentConfigs = await r.json() || [];
+  // 1. Load agent_configs if agent_id provided
+  if (agent_id) {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=id,type,name,text,is_default`,
+      { headers }
+    );
+    if (r.ok) agentConfigs = await r.json() || [];
+  }
+
+  // 2. Load skill_profiles for the given capability_slug
+  if (capability_slug) {
+    const spR = await fetch(
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+      { headers }
+    );
+    if (spR.ok) {
+      const rows = await spR.json() || [];
+      skillProfiles = rows.map(row => ({
+        ...row.skill_profiles,
+        level: row.level,
+        is_required: row.is_required,
+        display_order: row.display_order,
+      }));
     }
 
-    // 2. Load skill_profiles for the given capability_slug
-    if (capability_slug) {
-      const spR = await fetch(
-        `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
-        { headers }
-      );
-      if (spR.ok) {
-        const rows = await spR.json() || [];
-        skillProfiles = rows.map(row => ({
-          ...row.skill_profiles,
-          level: row.level,
-          is_required: row.is_required,
-          display_order: row.display_order,
-        }));
-      }
-
-    } else if (agent_id) {
-      // No capability_slug — load all capabilities assigned to agent, then their skill_profiles
-      const assignR = await fetch(
-        `${supabaseUrl}/rest/v1/agent_capability_assignments?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=capability_slug`,
-        { headers }
-      );
-      if (assignR.ok) {
-        const assignments = await assignR.json() || [];
-        for (const a of assignments) {
-          const spR = await fetch(
-            `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(a.capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
-            { headers }
-          );
-          if (spR.ok) {
-            const rows = await spR.json() || [];
-            skillProfiles.push(...rows.map(row => ({
-              ...row.skill_profiles,
-              source_capability_slug: a.capability_slug,
-              level: row.level,
-              is_required: row.is_required,
-              display_order: row.display_order,
-            })));
-          }
+  } else if (agent_id) {
+    // No capability_slug — load all capabilities assigned to agent, then their skill_profiles
+    const assignR = await fetch(
+      `${supabaseUrl}/rest/v1/agent_capability_assignments?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=capability_slug`,
+      { headers }
+    );
+    if (assignR.ok) {
+      const assignments = await assignR.json() || [];
+      for (const a of assignments) {
+        const spR = await fetch(
+          `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(a.capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+          { headers }
+        );
+        if (spR.ok) {
+          const rows = await spR.json() || [];
+          skillProfiles.push(...rows.map(row => ({
+            ...row.skill_profiles,
+            source_capability_slug: a.capability_slug,
+            level: row.level,
+            is_required: row.is_required,
+            display_order: row.display_order,
+          })));
         }
       }
     }
+  }
 
-    const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs);
+  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs);
 
-    return res.status(200).json({
-      tenant_id,
-      task_context,
-      agent_id: agent_id || null,
-      capability_slug: capability_slug || null,
-      sections,
-      format_contract: formatContract,
-      synthesis,
-      llm,
+  // FEATURE: AA-56 — runtime_context injected as Additional Context section when present
+  if (runtime_context && typeof runtime_context === 'string' && runtime_context.trim()) {
+    sections.push({
+      source: 'task_context',
+      type: 'Additional Context',
+      content: runtime_context.trim(),
     });
+  }
 
-  } catch (err) {
-    console.error("[db-assembly]", err);
-    return res.status(500).json({ error: err.message });
+  return {
+    tenant_id,
+    task_context,
+    agent_id: agent_id || null,
+    capability_slug: capability_slug || null,
+    sections,
+    format_contract: formatContract,
+    synthesis,
+    llm,
+  };
+}
+
+export default async function handler(req, res) {
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  try {
+    const result = await assemblePrompt(req.body || {});
+    return res.status(200).json(result);
+  } catch (e) {
+    console.error('[db-assembly] error:', e);
+    return res.status(500).json({ error: e.message });
   }
 }
