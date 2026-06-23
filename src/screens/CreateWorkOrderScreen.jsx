@@ -1,4 +1,4 @@
-// DeepBench v5.2.18 | CreateWorkOrderScreen.jsx | Create Work Order redesign (AW-24/25/26/27)
+// DeepBench v5.2.19 | CreateWorkOrderScreen.jsx | Create Work Order redesign (AW-24/25/26/27) + right column minWidth fix
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -649,7 +649,7 @@ export default function CreateWorkOrderScreen() {
           <div style={{ width: 1, background: T.line, margin: '0 16px', alignSelf: 'stretch' }} />
 
           {/* RIGHT: Instructions */}
-          <div>
+          <div style={{minWidth:0}}>
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 4 — INSTRUCTIONS <AiBadge label={AI_PAT.TASK_PLANNING}/></div>
 
             {(generating || planGenerated) && (

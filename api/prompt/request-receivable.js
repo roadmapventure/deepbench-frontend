@@ -1,4 +1,4 @@
-// DeepBench v5.2.17 | api/prompt/request-receivable.js | sendRequest named export + content in response
+// DeepBench v5.2.19 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
@@ -72,11 +72,9 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     'anthropic-version': '2023-06-01',
   };
 
-  const { task_id, sections, format_contract, llm } = prompt_request || {};
+  // Accept both raw db-assembly output (sections array) and enriched ai-enrichment output (system_prompt string)
+  const { task_id, sections, system_prompt, format_contract, llm } = prompt_request || {};
 
-  if (!sections || !Array.isArray(sections)) {
-    throw new Error('sections array required');
-  }
   if (!format_contract) {
     throw new Error('format_contract required');
   }
@@ -92,7 +90,15 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   const max_tokens = llm?.max_tokens || 2048;
   const isJson = format_contract.output_type === 'json';
 
-  const systemPrompt = sections.map(s => `=== ${s.label} ===\n${s.content}`).join('\n\n');
+  // Use pre-assembled system_prompt from ai-enrichment if present; otherwise build from sections array
+  let systemPrompt;
+  if (system_prompt) {
+    systemPrompt = system_prompt;
+  } else if (Array.isArray(sections) && sections.length > 0) {
+    systemPrompt = sections.map(s => `=== ${s.label} ===\n${s.content}`).join('\n\n');
+  } else {
+    throw new Error('either system_prompt or sections array required');
+  }
 
   // ── STEP 1: Send to LLM ─────────────────────────────────────────────────────
   let parsedResponse;
