@@ -2,8 +2,9 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.2.39
-**Next session:** S-ABOUT-ARCH-01 — Architecture tab refresh (AIStackDiagram, glossary, updated counts, relabeled sections) — kickoff doc: docs/kickoffs/v5.2.40-SH10-about-architecture-tab-refresh.md
-**Session after next:** S-AI-AUDIT-FIX-01 — AI Audit panel data integrity (BUG-20/21/22) — kickoff doc: docs/kickoffs/v5.2.37-AI-AUDIT-FIX-01-ai-audit-panel-data-integrity.md
+**Next session:** S-SPLASH-01 — Welcome splash modal (SH-14) — kickoff doc: docs/kickoffs/v5.2.41-SPLASH-01-welcome-splash-modal.md
+**Session after next:** S-ABOUT-ARCH-01 — Architecture tab refresh (AIStackDiagram, glossary, updated counts, relabeled sections) — kickoff doc: docs/kickoffs/v5.2.40-SH10-about-architecture-tab-refresh.md
+**Prior design session:** S-SPLASH-01-design (2026-06-24) — SH-14 welcome splash modal designed. WelcomeSplash.jsx (new) + main.jsx (wire). sessionStorage key `db_splash_dismissed`. Modal: 80vw/max 960px/88vh, brass border, navy overlay+blur, × dismiss + CTA dismiss (stays on `/`). Animated counters. Kickoff: docs/kickoffs/v5.2.41-SPLASH-01-welcome-splash-modal.md.
 **Last session:** S-TI-20p (2026-06-24, 8ce2947) — TI-20 patch complete. StepList.jsx: Update Steps → button — added `disabled`, `opacity:0.45`, `cursor:"not-allowed"`, removed `onClick`. This was the live button; the one patched in S-TI-20 was dead code in TaskInstructionsScreen.jsx. 6/6 Node.js tests PASS. Build zero errors.
 **Prior last session:** S-TI-20 (2026-06-24, 5bef296) — TI-20 complete. TaskInstructionsScreen.jsx: Re-run All button — added `disabled`, `opacity:0.45`, `cursor:"not-allowed"`; Update Steps → button — added `disabled`, `opacity:0.45`, `cursor:"not-allowed"`, removed `onClick`. Both buttons remain visible. Pulsing dot retained on both. Mark Complete and per-step Re-run buttons untouched. 11/11 Node.js tests PASS. Build zero errors.
 **Prior last session:** S-RO-09 (2026-06-24, 4c4bdb2) — RO-09 complete. useAgents.js: new `useAgentUsageCounts` export queries ai_activity_log for agent_id counts (tenant_id='global', null excluded), returns {agent_id: count} map. RosterScreen.jsx: imports useAgentUsageCounts + useMemo; derives sortedAgents (usageCount DESC, first-name alpha tie-break); grid renders sortedAgents. 9/9 Node.js tests PASS. Build zero errors.
