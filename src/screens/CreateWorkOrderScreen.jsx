@@ -1,4 +1,4 @@
-// DeepBench v5.2.30 | src/screens/CreateWorkOrderScreen.jsx | AW-29 Victoria solution catalog
+// DeepBench v5.2.32 | src/screens/CreateWorkOrderScreen.jsx | BUG-16 goal suggestion timeout
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -204,6 +204,7 @@ export default function CreateWorkOrderScreen() {
   const [selectedDeliverable, setSelectedDeliverable] = useState(null);
   // FEATURE: AW-27 — streaming goal suggestion
   const [goalStreaming,       setGoalStreaming]        = useState(false);
+  const [goalSuggestFailed,  setGoalSuggestFailed]    = useState(false);
   const abortControllerRef = useRef(null);
 
   const [goal,            setGoal]            = useState(prefillGoal);
@@ -301,11 +302,14 @@ export default function CreateWorkOrderScreen() {
   const handleDeliverableSelect = (deliverable) => {
     setSelectedDeliverable(deliverable);
     setGoal('');
+    setGoalSuggestFailed(false);
     setPlanGenerated(false);
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
+
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     setGoalStreaming(true);
     let accumulated = '';
@@ -329,7 +333,9 @@ export default function CreateWorkOrderScreen() {
 
       const read = () => reader.read().then(({ done, value }) => {
         if (done) {
+          clearTimeout(timeoutId);
           setGoalStreaming(false);
+          if (!accumulated) setGoalSuggestFailed(true);
           logAICall({ type: 'goal_suggestion', model: 'claude-haiku-4-5-20251001', latencyMs: Date.now() - streamStart, tokens: 0, location: 'Create Work Order', agentId: selectedPMAgent?.id || 'michelle' });
           return;
         }
@@ -337,7 +343,9 @@ export default function CreateWorkOrderScreen() {
         const lines = chunk.split('\n').filter(l => l.trim());
         for (const line of lines) {
           if (line === 'data: [DONE]') {
+            clearTimeout(timeoutId);
             setGoalStreaming(false);
+            if (!accumulated) setGoalSuggestFailed(true);
             logAICall({ type: 'goal_suggestion', model: 'claude-haiku-4-5-20251001', latencyMs: Date.now() - streamStart, tokens: 0, location: 'Create Work Order', agentId: selectedPMAgent?.id || 'michelle' });
             return;
           }
@@ -349,12 +357,14 @@ export default function CreateWorkOrderScreen() {
           }
         }
         read();
-      }).catch(() => setGoalStreaming(false));
+      }).catch(() => { clearTimeout(timeoutId); setGoalStreaming(false); if (!accumulated) setGoalSuggestFailed(true); });
 
       read();
     }).catch(e => {
+      clearTimeout(timeoutId);
       if (e.name !== 'AbortError') console.error('[suggest-goal] stream error:', e);
       setGoalStreaming(false);
+      if (!accumulated) setGoalSuggestFailed(true);
     });
   };
 
@@ -704,10 +714,16 @@ export default function CreateWorkOrderScreen() {
                   onChange={e => {
                     if (abortControllerRef.current) { abortControllerRef.current.abort(); abortControllerRef.current = null; }
                     setGoalStreaming(false);
+                    setGoalSuggestFailed(false);
                     setGoal(e.target.value);
                   }}
                   placeholder="Describe what you need in plain English…"
                   style={{ width: '100%', minHeight: 90, padding: '10px 12px', fontFamily: body, fontSize: 13, color: T.ink, background: T.card, border: `1px solid ${goal.length > 8 ? T.brass : T.line}`, resize: 'vertical', outline: 'none', lineHeight: 1.6, boxSizing: 'border-box' }} />
+                {goalSuggestFailed && !goalStreaming && !goal && (
+                  <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, marginTop: 6, letterSpacing: 0.3 }}>
+                    Suggestion unavailable — describe your goal above.
+                  </div>
+                )}
               </div>
             )}
 
