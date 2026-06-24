@@ -1,4 +1,4 @@
-// DeepBench v5.2.10 | TaskInstructionsScreen.jsx | S-RENAME-01 UI label rename
+// DeepBench v5.2.38 | TaskInstructionsScreen.jsx | TI-20 disable Re-run All + Update Steps
 // FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
@@ -184,10 +184,10 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
                       <FeatureBadge id="AW-16" />
                       {/* FEATURE: AI-31 — Update Steps: pulsing dot + AiBadge */}
                       <button
-                        onClick={() => onUpdatePlan && onUpdatePlan(step.questions)}
+                        disabled
                         style={{background:T.brass,color:T.navy,
                           border:"none",padding:"7px 18px",fontFamily:display,
-                          fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                          fontSize:12,fontWeight:700,cursor:"not-allowed",display:"flex",alignItems:"center",gap:6,opacity:0.45}}>
                         <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.navyDeep,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
                         Update Steps →
                         <AiBadge label={AI_PAT.TASK_PLANNING}/>
@@ -810,7 +810,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
             {!isCompleted && (
               <div style={{display:"flex",gap:8,flexShrink:0}}>
                 {/* FEATURE: AI-31 — Re-run All: pulsing dot + AiBadge */}
-                <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,display:"flex",alignItems:"center",gap:5}}>
+                <button disabled style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"not-allowed",textTransform:"uppercase",letterSpacing:.5,display:"flex",alignItems:"center",gap:5,opacity:0.45}}>
                   <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
                   Re-run All
                   <AiBadge label={AI_PAT.TASK_PLANNING}/>
