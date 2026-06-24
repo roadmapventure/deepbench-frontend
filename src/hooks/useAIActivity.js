@@ -1,4 +1,4 @@
-// DeepBench v5.2.23 | useAIActivity.js | preview-prompt SERVICE_CATALOG + AI_TYPE_TO_SERVICE (AW-28)
+// DeepBench v5.2.26 | useAIActivity.js | AG-13 db-assembly SERVICE_CATALOG entry (AA-59 partial)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -31,6 +31,8 @@ export const SERVICE_CATALOG = [
   { slug: 'procurement-flags',       name: 'Procurement Flags',         serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'vendor-concentration',    name: 'Vendor Concentration',      serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'column-detection',        name: 'Column Detection',          serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+  // FEATURE: AG-13 — DB Assembly service catalog entry (Dan's deterministic capability, AA-59)
+  { slug: 'db-assembly',             name: 'DB Assembly',               serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -75,6 +77,7 @@ const AI_TYPE_TO_SERVICE = {
   request_receivable:   'request-receivable',
   goal_suggestion:      'goal-suggestion',
   preview_prompt:       'preview-prompt',
+  db_assembly:          'db-assembly',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────

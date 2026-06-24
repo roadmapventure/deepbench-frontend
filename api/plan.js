@@ -1,4 +1,4 @@
-// DeepBench v5.2.23 | api/plan.js | suggest-goal (AW-27) + preview-prompt (AW-28) + prompt-service (SK-20) actions
+// DeepBench v5.2.26 | plan.js | AA-65 agent_card added to preview-prompt response
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
 
@@ -187,6 +187,8 @@ export default async function handler(req, res) {
         stage3: { text: stage3Text, tokens: Math.ceil(stage3Text.length / 4), sections: stage3Pairs },
         stage4: { text: stage4Text, tokens: Math.ceil(stage4Text.length / 4), sections: stage4Pairs },
         patterns,
+        // FEATURE: AA-65 — primary agent card for collaboration indicator in PromptEvolutionModal
+        agent_card: promptRequest.agent_card,
       });
     } catch (e) {
       console.error('[preview-prompt] error:', e);

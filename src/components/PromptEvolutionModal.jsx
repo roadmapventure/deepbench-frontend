@@ -1,4 +1,4 @@
-// DeepBench v5.2.23 | src/components/PromptEvolutionModal.jsx | AW-28 Prompt Evolution Modal
+// DeepBench v5.2.26 | PromptEvolutionModal.jsx | AA-65 Dan Bingham collaboration indicator in footer
 // FEATURE: AW-28 — Platform-level Prompt Service visibility modal. Import from any screen that calls prompt-service.
 
 import { T, display, body, mono } from '../tokens.js';
@@ -10,6 +10,7 @@ import { T, display, body, mono } from '../tokens.js';
 
 export default function PromptEvolutionModal({ preview, planReady, onContinue }) {
   if (!preview) return null;
+  const agentCard = preview.agent_card; // populated by plan.js preview-prompt (AA-65)
 
   const { stage1, stage2, stage3, stage4, patterns } = preview;
 
@@ -148,19 +149,43 @@ export default function PromptEvolutionModal({ preview, planReady, onContinue })
           padding: '10px 16px', borderTop: `1px solid ${T.lineSoft}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {!planReady ? (
-              <>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: T.brass, display: 'inline-block',
-                  animation: 'pulse 1.5s infinite',
-                }} />
-                Running plan generation...
-              </>
-            ) : (
-              <span style={{ color: T.moss }}>✓ Plan ready</span>
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Status line — unchanged */}
+            <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {!planReady ? (
+                <>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: T.brass, display: 'inline-block',
+                    animation: 'pulse 1.5s infinite',
+                  }} />
+                  Running plan generation...
+                </>
+              ) : (
+                <span style={{ color: T.moss }}>✓ Plan ready</span>
+              )}
+            </div>
+            {/* FEATURE: AA-65 — Dan Bingham collaboration indicator */}
+            <div style={{ fontFamily: mono, fontSize: 9, display: 'flex', alignItems: 'center', gap: 5 }}>
+              {agentCard && (
+                <>
+                  <span style={{
+                    background: T.brass, color: T.navy, fontWeight: 700,
+                    padding: '1px 5px', borderRadius: 2,
+                  }}>
+                    {agentCard.name} {agentCard.code}
+                  </span>
+                  <span style={{ color: T.muted }}>+</span>
+                </>
+              )}
+              <span style={{
+                background: T.moss, color: '#fff', fontWeight: 700,
+                padding: '1px 5px', borderRadius: 2,
+              }}>
+                Dan Bingham PS-01
+              </span>
+              <span style={{ color: T.muted }}>· AI Prompt Strategist</span>
+            </div>
           </div>
           <button
             onClick={onContinue}

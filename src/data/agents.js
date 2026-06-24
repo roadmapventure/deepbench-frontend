@@ -1,4 +1,4 @@
-// DeepBench v5.1.31 | agents.js | AG-03 AG-08 Michelle + Susan trainable
+// DeepBench v5.2.26 | agents.js | AG-13 Dan Bingham (PS-01) added to roster
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -95,6 +95,18 @@ export const AGENTS = [
     quip: '"I turn knowledge into capability."', color: T.brass,
     isTrainer: true,
   },
+  // FEATURE: AG-13 — Dan Bingham (PS-01) AI Prompt Strategist
+  {
+    id: "dan", name: "Dan Bingham", role: "AI Prompt Strategist",
+    code: "PS-01", hiredOn: "Jun 2026", trainer: "RMV", arch: "Prompt Engineering",
+    specialty: "Prompt Engineering · Context Assembly · Intelligence Architecture",
+    salary: 105000, value: 125000, hourly: 55, reportHrs: 0, reportCost: 0,
+    docs: 0, classes: 0, chunks: 0, skill: 80, situational: 40,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"The right prompt doesn't ask for the answer — it makes the answer inevitable."`,
+    color: T.moss,
+    isPromptArchitect: true,
+  },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -109,6 +121,8 @@ export const AVATAR_CFG = {
   // FEATURE: RO-06 — Add michelle to AVATAR_CFG
   michelle: { skin:"#d4b896", hair:"#2a2a3a", collar:"#1e3a5a", extra:"glasses", border:T.brass },
   susan:    { skin:"#e2c4a0", hair:"#5a3a1e", collar:"#3a5a3a", extra:"bun",     border:T.moss  },
+  // FEATURE: AG-13 — Dan avatar
+  dan: { skin:"#c8a882", hair:"#2a2a2a", collar:"#1a3a4a", extra:"glasses", border:T.moss },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -122,6 +136,8 @@ export const AGENT_PRONOUNS = {
   pat:      { subject:"she", object:"her", possessive:"her" },
   michelle: { subject:"she", object:"her", possessive:"her" },
   susan:    { subject:"she", object:"her", possessive:"her" },
+  // FEATURE: AG-13 — Dan pronouns
+  dan: { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
