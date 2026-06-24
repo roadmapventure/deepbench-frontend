@@ -1,4 +1,4 @@
-// DeepBench v5.2.34 | api/prompt/ai-enrichment.js | BUG-12p tenant_id fix for reflect + synthesis logs
+// DeepBench v5.2.36 | api/prompt/ai-enrichment.js | BUG-18 fix location→feature in reflect + synthesis ai_activity_log inserts
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -261,7 +261,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
           model: reflectModel,
           input_tokens: reflectTokensUsed,
           output_tokens: 0,
-          location: 'ai-enrichment',
+          feature: 'ai-enrichment',      // FEATURE: BUG-18 — was 'location' (column does not exist); correct column is 'feature'
           patterns_used: ['reflection'],
           created_at: nowIso,
         }),
@@ -278,7 +278,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
           model: synthesisModel,
           input_tokens: synthesisTokensUsed,
           output_tokens: 0,
-          location: 'ai-enrichment',
+          feature: 'ai-enrichment',      // FEATURE: BUG-18 — was 'location' (column does not exist); correct column is 'feature'
           patterns_used: ['prompt-chaining'],
           created_at: nowIso,
         }),
