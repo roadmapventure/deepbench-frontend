@@ -1,4 +1,4 @@
-// DeepBench v5.2.23 | CreateWorkOrderScreen.jsx | AW-28: Prompt Evolution Modal wired as first consumer
+// DeepBench v5.2.30 | src/screens/CreateWorkOrderScreen.jsx | AW-29 Victoria solution catalog
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -44,6 +44,8 @@ async function callPlanningAgent(goal, agents, selectedPMAgent, selectedDelivera
         tenant_id: TENANT_ID,
         goal,
         deliverable_type: selectedDeliverable?.id || null,
+        format_skill_profile_slug: selectedDeliverable?.format_skill_profile_slug || null,
+        display_agent_id: selectedDeliverable?.display_agent_id || null,
         runtime_context,
       }),
     });
@@ -62,6 +64,8 @@ async function callPlanningAgent(goal, agents, selectedPMAgent, selectedDelivera
           tenant_id: TENANT_ID,
           goal,
           deliverable_type: selectedDeliverable?.id || null,
+          format_skill_profile_slug: selectedDeliverable?.format_skill_profile_slug || null,
+          display_agent_id: selectedDeliverable?.display_agent_id || null,
           runtime_context,
         }),
       });
@@ -195,6 +199,8 @@ export default function CreateWorkOrderScreen() {
   const [selectedPMAgent,     setSelectedPMAgent]     = useState(null);
   // FEATURE: AW-26 — DB-driven deliverable tiles
   const [deliverables,        setDeliverables]        = useState([]);
+  const [roadmapDeliverables, setRoadmapDeliverables] = useState([]);
+  const [victoriaCard,        setVictoriaCard]        = useState(null);
   const [selectedDeliverable, setSelectedDeliverable] = useState(null);
   // FEATURE: AW-27 — streaming goal suggestion
   const [goalStreaming,       setGoalStreaming]        = useState(false);
@@ -256,35 +262,36 @@ export default function CreateWorkOrderScreen() {
                   : saveState==="saved" ? "Saved ✓"
                   : "";
 
-  // FEATURE: AW-26 — load deliverables from selected agent's Format Skill
+  // FEATURE: AW-29 — load solutions from Victoria Chen's solution-catalog skill profile
+  // Filtered by pm_agent_id matching the selected PM agent.
+  // Three states: active:true = live | active:false+coming_soon:true = roadmap | active:false+coming_soon:false = hidden
   const loadDeliverables = async (agent) => {
     try {
-      const { data: capData } = await supabase
-        .from('agent_capability_assignments')
-        .select('capability_slug')
-        .eq('agent_id', agent.id)
-        .eq('tenant_id', TENANT_ID)
-        .limit(1)
-        .single();
-      if (!capData?.capability_slug) return;
-
-      const { data: skillData } = await supabase
-        .from('capability_skill_profiles')
-        .select('skill_profile_slug')
-        .eq('capability_slug', capData.capability_slug)
-        .limit(10);
-      if (!skillData?.length) return;
-
-      const slugs = skillData.map(r => r.skill_profile_slug);
-      const { data: profiles } = await supabase
+      const { data, error } = await supabase
         .from('skill_profiles')
-        .select('slug, traits')
-        .in('slug', slugs);
+        .select('traits')
+        .eq('slug', 'solution-catalog')
+        .single();
 
-      const formatSkill = profiles?.find(p => p.traits?.output_type && p.traits?.deliverables);
-      if (formatSkill?.traits?.deliverables) {
-        setDeliverables(formatSkill.traits.deliverables);
-      }
+      if (error || !data?.traits?.solutions) return;
+
+      const agentSolutions = data.traits.solutions.filter(
+        s => s.pm_agent_id === agent.id
+      );
+
+      const live = agentSolutions.filter(s => s.active === true);
+      const roadmap = agentSolutions.filter(s => s.active === false && s.coming_soon === true);
+
+      setDeliverables(live);
+      setRoadmapDeliverables(roadmap);
+
+      // Fetch Victoria's agent card for UI chip
+      const { data: vc } = await supabase
+        .from('agents')
+        .select('name, role, code')
+        .eq('id', 'victoria')
+        .single();
+      if (vc) setVictoriaCard(vc);
     } catch (e) {
       console.error('[loadDeliverables] error:', e);
     }
@@ -402,6 +409,8 @@ export default function CreateWorkOrderScreen() {
       tenant_id: TENANT_ID,
       goal,
       deliverable_type: selectedDeliverable?.id || 'execution-plan',
+      format_skill_profile_slug: selectedDeliverable?.format_skill_profile_slug || null,
+      display_agent_id: selectedDeliverable?.display_agent_id || null,
       runtime_context: runtimeContext,
     };
 
@@ -582,20 +591,101 @@ export default function CreateWorkOrderScreen() {
 
           {/* LEFT */}
           <div>
-            {/* FEATURE: AW-26 — DB-driven deliverable tiles */}
+            {/* FEATURE: AW-29 — Step 2: Victoria Chen solution catalog */}
             {selectedPMAgent && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>Step 2 — Select a deliverable</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6 }}>
-                  {deliverables.map(d => (
-                    <div key={d.id} onClick={() => handleDeliverableSelect(d)}
-                      style={{ background: selectedDeliverable?.id === d.id ? `${T.brass}10` : T.card, border: `1.5px solid ${selectedDeliverable?.id === d.id ? T.brass : T.line}`, padding: '8px 7px', textAlign: 'center', cursor: 'pointer', borderRadius: 2 }}>
-                      <div style={{ fontSize: 13, marginBottom: 3 }}>{d.icon}</div>
-                      <div style={{ fontFamily: display, fontSize: 10, fontWeight: 600, color: T.navy, marginBottom: 1 }}>{d.label}</div>
-                      <div style={{ fontFamily: body, fontSize: 9, color: T.muted, lineHeight: 1.3 }}>{d.description}</div>
+              <div style={{ marginTop: 24 }}>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600,
+                  letterSpacing: '0.08em', textTransform: 'uppercase', color: T.muted, marginBottom: 16 }}>
+                  STEP 2 — SELECT A SOLUTION
+                </p>
+
+                {/* Victoria consultation chip */}
+                {victoriaCard && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      border: `2px solid ${T.navy}`,
+                      background: T.navyMid,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 700, color: T.brassLight,
+                      flexShrink: 0,
+                    }}>VC</div>
+                    <div>
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: T.navy }}>
+                        {victoriaCard.name}
+                      </span>
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: T.muted, marginLeft: 6 }}>
+                        {victoriaCard.code} · {victoriaCard.role}
+                      </span>
                     </div>
+                  </div>
+                )}
+
+                {/* Live solutions */}
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: T.ink, marginBottom: 12 }}>
+                  Here's what we can help you with right now:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
+                  {deliverables.map(sol => (
+                    <button
+                      key={sol.id}
+                      onClick={() => handleDeliverableSelect(sol)}
+                      style={{
+                        textAlign: 'left', padding: '12px 14px', borderRadius: 6, cursor: 'pointer',
+                        border: selectedDeliverable?.id === sol.id
+                          ? `2px solid ${T.brass}`
+                          : `1px solid ${T.line}`,
+                        background: selectedDeliverable?.id === sol.id ? T.card : T.paper,
+                        transition: 'border-color 0.15s',
+                      }}
+                    >
+                      <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 600, color: T.ink, marginBottom: 3 }}>
+                        {sol.label}
+                      </div>
+                      <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T.muted, lineHeight: 1.4 }}>
+                        {sol.description}
+                      </div>
+                    </button>
                   ))}
                 </div>
+
+                {/* Roadmap solutions */}
+                {roadmapDeliverables.length > 0 && (
+                  <>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: T.muted, marginBottom: 12 }}>
+                      Available in our next roadmap:
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {roadmapDeliverables.map(sol => (
+                        <div
+                          key={sol.id}
+                          style={{
+                            textAlign: 'left', padding: '12px 14px', borderRadius: 6,
+                            border: `1px solid ${T.lineSoft}`,
+                            background: T.paper,
+                            opacity: 0.55,
+                            cursor: 'not-allowed',
+                            position: 'relative',
+                          }}
+                        >
+                          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 600, color: T.muted, marginBottom: 3 }}>
+                            {sol.label}
+                          </div>
+                          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T.muted, lineHeight: 1.4 }}>
+                            {sol.description}
+                          </div>
+                          <span style={{
+                            position: 'absolute', top: 8, right: 8,
+                            fontFamily: 'Inter, sans-serif', fontSize: 9, fontWeight: 700,
+                            color: T.muted, letterSpacing: '0.06em', textTransform: 'uppercase',
+                          }}>
+                            Coming Soon
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

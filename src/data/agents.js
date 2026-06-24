@@ -1,4 +1,4 @@
-// DeepBench v5.2.28 | agents.js | AG-14/15/16 three editor agents added
+// DeepBench v5.2.30 | src/data/agents.js | AG-17 Victoria Chen SP-01
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -140,6 +140,14 @@ export const AGENTS = [
     quip: '"Every document is a first impression. I make sure it\'s the right one."',
     color: T.brass,
   },
+  // FEATURE: AG-17 — Victoria Chen (SP-01) Head of Product Strategy
+  {
+    id: "victoria", name: "Victoria Chen", role: "Head of Product Strategy",
+    code: "SP-01", hiredOn: "Jun 2026", trainer: "RMV", arch: "Catalog",
+    specialty: "Solution Design · Service Line Strategy · Product Catalog Management",
+    salary: 120000, value: 140000, hourly: 62, reportHrs: 1, reportCost: 62,
+    isProductStrategist: true,
+  },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -160,6 +168,8 @@ export const AVATAR_CFG = {
   alex:  { skin:"#e0c9a8", hair:"#4a3a2a", collar:"#2a3a52", extra:"glasses", border:T.brass },
   riley: { skin:"#c8916e", hair:"#1a1a1a", collar:"#3a2a4a", extra:"bob",     border:T.brass },
   claire:{ skin:"#e8d5b5", hair:"#6a4a2a", collar:"#1e2e3a", extra:"bun",     border:T.brass },
+  // FEATURE: AG-17 — Victoria Chen avatar
+  victoria: { skin:"#e8d4b8", hair:"#1a1a2a", collar:"#2a1a3a", extra:"", border:T.navy },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -179,6 +189,8 @@ export const AGENT_PRONOUNS = {
   alex:  { subject:"they", object:"them", possessive:"their" },
   riley: { subject:"she",  object:"her",  possessive:"her"   },
   claire:{ subject:"she",  object:"her",  possessive:"her"   },
+  // FEATURE: AG-17 — Victoria Chen pronouns
+  victoria: { subject:"she", object:"her", possessive:"her" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
