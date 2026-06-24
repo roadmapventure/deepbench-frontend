@@ -1,7 +1,7 @@
 # DeepBench v5.1 — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Last updated: 2026-06-07a | Category K + L added | Bug library added
+> Last updated: 2026-06-24 | Section 11 added — agent build completeness standard
 
 ---
 
@@ -352,3 +352,48 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
 | 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |
 | 2026-06-09 | BUG-10 added — missing `pdf-parse` + `jszip` in package.json. Dependency audit rule added: every api/ import must exist in package.json dependencies before commit. |
+| 2026-06-24 | Section 11 added — agent build completeness standard. Every agent must ship all 23 required fields + AVATAR_CFG + AGENT_PRONOUNS + Supabase row in one session. No partial entries. Root cause: Victoria Chen shipped without standard fields; RosterScreen crashed on `trainableBy.toUpperCase()`. |
+
+---
+
+## Section 11: Agent Build Completeness Standard
+
+Every agent added to `src/data/agents.js` MUST include ALL of the following fields in a single session. No partial entries permitted — a missing field crashes any component that iterates AGENTS.
+
+**Required fields for every agent:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Unique slug — matches agents table PK in Supabase |
+| `name` | string | Full name |
+| `role` | string | Job title |
+| `code` | string | Agent code (XX-00) |
+| `hiredOn` | string | "Mon YYYY" |
+| `trainer` | string | Who trained this agent |
+| `arch` | string | Architecture label (e.g. "LLM Planning", "RAG", "Catalog") |
+| `specialty` | string | 3 dot-separated specialties |
+| `salary` | number | Annual salary |
+| `value` | number | Billed value |
+| `hourly` | number | Hourly rate |
+| `reportHrs` | number | Avg hours per report |
+| `reportCost` | number | hourly × reportHrs |
+| `docs` | number | Training docs count |
+| `classes` | number | Training classes count |
+| `chunks` | number | RAG chunks count |
+| `skill` | number | Skill score 0–100 |
+| `situational` | number | Situational score 0–100 |
+| `trainable` | boolean | Whether user can train this agent |
+| `trainableBy` | string | Who manages training ("RMV", "NIGP", "None", etc.) |
+| `revenueModel` | string | Revenue model label |
+| `quip` | string | One-line character quip in double quotes |
+| `color` | token | T.brass / T.moss / T.navy / T.muted |
+
+**Also required in the same session:**
+- `AVATAR_CFG` entry (skin, hair, collar, extra, border)
+- `AGENT_PRONOUNS` entry (subject, object, possessive)
+- Supabase `agents` table row (id, name, code, role, specialty, bio, tenant_id)
+
+**Verification before commit:**
+- [ ] Navigate to Bench tab — agent card renders without console errors
+- [ ] Click agent card — Personnel File opens
+- [ ] Zero red errors in DevTools Console

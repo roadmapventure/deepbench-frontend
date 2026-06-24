@@ -1,4 +1,4 @@
-// DeepBench v5.2.30 | src/data/agents.js | AG-17 Victoria Chen SP-01
+// DeepBench v5.2.31 | src/data/agents.js | AG-17p Victoria complete entry
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -146,6 +146,10 @@ export const AGENTS = [
     code: "SP-01", hiredOn: "Jun 2026", trainer: "RMV", arch: "Catalog",
     specialty: "Solution Design · Service Line Strategy · Product Catalog Management",
     salary: 120000, value: 140000, hourly: 62, reportHrs: 1, reportCost: 62,
+    docs: 0, classes: 0, chunks: 0, skill: 85, situational: 45,
+    trainable: false, trainableBy: "RMV", revenueModel: "Platform",
+    quip: '"The catalog is the strategy. Everything else is execution."',
+    color: T.navy,
     isProductStrategist: true,
   },
 ];
