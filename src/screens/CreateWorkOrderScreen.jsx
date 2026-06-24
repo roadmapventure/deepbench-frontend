@@ -232,6 +232,14 @@ export default function CreateWorkOrderScreen() {
   const [titleData,       setTitleData]        = useState({ taskTitle: "", michelleTitle: "", stepTitles: [], titleEdited: false });
   const goalRef         = useRef(null);
 
+  const autoResizeGoal = () => {
+    if (goalRef.current) {
+      goalRef.current.style.height = 'auto';
+      goalRef.current.style.height = goalRef.current.scrollHeight + 'px';
+    }
+  };
+  useEffect(() => { autoResizeGoal(); }, [goal]);
+
   // FEATURE: AW-28 — Prompt Evolution Modal state
   const [promptPreview, setPromptPreview] = useState(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
@@ -239,6 +247,7 @@ export default function CreateWorkOrderScreen() {
   const planReadyRef = useRef(false);
   // FEATURE: AA-70 — Alex Reeves display agent attribution
   const [alexAgentCard, setAlexAgentCard] = useState(null);
+  const [roadmapOpen,   setRoadmapOpen]   = useState(false);
 
   const [chatContext, setChatContext] = useState(null);
 
@@ -299,6 +308,14 @@ export default function CreateWorkOrderScreen() {
       console.error('[loadDeliverables] error:', e);
     }
   };
+
+  // Auto-select first PM agent and load solutions on mount
+  useEffect(() => {
+    if (agents.length > 0 && !selectedPMAgent) {
+      const pmAgent = agents.find(a => a.role?.toLowerCase().includes('project manager'));
+      if (pmAgent) { setSelectedPMAgent(pmAgent); loadDeliverables(pmAgent); }
+    }
+  }, [agents.length]);
 
   // FEATURE: AW-27 — auto-fire streaming goal suggestion on deliverable selection
   const handleDeliverableSelect = (deliverable) => {
@@ -564,30 +581,6 @@ export default function CreateWorkOrderScreen() {
         </div>
         <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
-        {/* FEATURE: AW-25 — PM agent picker */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
-            Step 1 — Select a project manager
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {agents.filter(a => a.role?.toLowerCase().includes('project manager')).map(agent => (
-              <div key={agent.id}
-                onClick={() => { setSelectedPMAgent(agent); loadDeliverables(agent); setSelectedDeliverable(null); setGoal(''); setPlanGenerated(false); }}
-                style={{ background: selectedPMAgent?.id === agent.id ? `${T.brass}10` : T.card, border: `1.5px solid ${selectedPMAgent?.id === agent.id ? T.brass : T.line}`, padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 2, minWidth: 200, position: 'relative' }}>
-                {selectedPMAgent?.id === agent.id && <Corners />}
-                <AgentAvatar who={agent.id} size={28} ring={true} />
-                <div>
-                  <div style={{ fontFamily: display, fontSize: 12, fontWeight: 600, color: T.navy }}>{agent.name}</div>
-                  <div style={{ fontFamily: mono, fontSize: 8, color: T.brassDeep }}>{agent.code} · {agent.role}</div>
-                </div>
-                {selectedPMAgent?.id === agent.id && (
-                  <div style={{ marginLeft: 'auto', width: 7, height: 7, borderRadius: '50%', background: T.moss }} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Title display (post-generation) */}
         {planGenerated && !generating && (
           <div style={{marginBottom:16,position:"relative"}}>
@@ -609,131 +602,108 @@ export default function CreateWorkOrderScreen() {
           </div>
         )}
 
-        {/* Two-column: left (deliverable + goal + questions), divider, right (instructions) */}
-        <div style={{display:"grid",gridTemplateColumns:"42% 1px 1fr",alignItems:"start"}}>
+        {/* Two-column: left (solution + pm + goal + questions), right (instructions) */}
+        <div style={{display:"grid",gridTemplateColumns:"42% 1fr",alignItems:"start"}}>
 
           {/* LEFT */}
-          <div>
-            {/* FEATURE: AW-29 — Step 2: Victoria Chen solution catalog */}
-            {selectedPMAgent && (
-              <div style={{ marginTop: 24 }}>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600,
-                  letterSpacing: '0.08em', textTransform: 'uppercase', color: T.muted, marginBottom: 16 }}>
-                  STEP 2 — SELECT A SOLUTION
-                </p>
+          <div style={{paddingRight:24,borderRight:`1px solid ${T.line}`}}>
 
-                {/* Victoria consultation chip */}
+            {/* FEATURE: AW-29 — Step 1: Victoria Chen solution catalog */}
+            {deliverables.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600,marginBottom:12}}>
+                  Step 1 — Select a Solution
+                </div>
+
                 {victoriaCard && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      border: `2px solid ${T.navy}`,
-                      background: T.navyMid,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 700, color: T.brassLight,
-                      flexShrink: 0,
-                    }}>VC</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                    <AgentAvatar who="victoria" size={28} ring={true} />
                     <div>
-                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: T.navy }}>
-                        {victoriaCard.name}
-                      </span>
-                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: T.muted, marginLeft: 6 }}>
-                        {victoriaCard.code} · {victoriaCard.role}
-                      </span>
+                      <span style={{fontFamily:body,fontSize:11,fontWeight:600,color:T.navy}}>{victoriaCard.name}</span>
+                      <span style={{fontFamily:mono,fontSize:9,color:T.muted,marginLeft:6}}>{victoriaCard.code} · {victoriaCard.role}</span>
                     </div>
                   </div>
                 )}
 
-                {/* Live solutions */}
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: T.ink, marginBottom: 12 }}>
-                  Here's what we can help you with right now:
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
+                <p style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:12}}>Here's what we can help you with right now:</p>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:roadmapDeliverables.length>0?14:0}}>
                   {deliverables.map(sol => (
-                    <button
-                      key={sol.id}
-                      onClick={() => handleDeliverableSelect(sol)}
-                      style={{
-                        textAlign: 'left', padding: '12px 14px', borderRadius: 6, cursor: 'pointer',
-                        border: selectedDeliverable?.id === sol.id
-                          ? `2px solid ${T.brass}`
-                          : `1px solid ${T.line}`,
-                        background: selectedDeliverable?.id === sol.id ? T.card : T.paper,
-                        transition: 'border-color 0.15s',
-                      }}
-                    >
-                      <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 600, color: T.ink, marginBottom: 3 }}>
-                        {sol.label}
-                      </div>
-                      <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T.muted, lineHeight: 1.4 }}>
-                        {sol.description}
-                      </div>
+                    <button key={sol.id} onClick={()=>handleDeliverableSelect(sol)}
+                      style={{textAlign:'left',padding:'12px 14px',borderRadius:6,cursor:'pointer',
+                        border:selectedDeliverable?.id===sol.id?`2px solid ${T.brass}`:`1px solid ${T.line}`,
+                        background:selectedDeliverable?.id===sol.id?T.card:T.paper,transition:'border-color 0.15s'}}>
+                      <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink,marginBottom:3}}>{sol.label}</div>
+                      <div style={{fontFamily:body,fontSize:11,color:T.muted,lineHeight:1.4}}>{sol.description}</div>
                     </button>
                   ))}
                 </div>
 
-                {/* Roadmap solutions */}
                 {roadmapDeliverables.length > 0 && (
                   <>
-                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: T.muted, marginBottom: 12 }}>
-                      Available in our next roadmap:
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {roadmapDeliverables.map(sol => (
-                        <div
-                          key={sol.id}
-                          style={{
-                            textAlign: 'left', padding: '12px 14px', borderRadius: 6,
-                            border: `1px solid ${T.lineSoft}`,
-                            background: T.paper,
-                            opacity: 0.55,
-                            cursor: 'not-allowed',
-                            position: 'relative',
-                          }}
-                        >
-                          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 600, color: T.muted, marginBottom: 3 }}>
-                            {sol.label}
+                    <button onClick={()=>setRoadmapOpen(o=>!o)}
+                      style={{width:'100%',padding:'7px 12px',background:'transparent',border:`1px solid ${T.lineSoft}`,color:T.muted,fontFamily:mono,fontSize:9,cursor:'pointer',textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span>Available in our next roadmap ({roadmapDeliverables.length})</span>
+                      <span>{roadmapOpen?'▴':'▾'}</span>
+                    </button>
+                    {roadmapOpen && (
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10}}>
+                        {roadmapDeliverables.map(sol => (
+                          <div key={sol.id}
+                            style={{textAlign:'left',padding:'12px 14px',borderRadius:6,border:`1px solid ${T.lineSoft}`,background:T.paper,opacity:0.55,cursor:'not-allowed',position:'relative'}}>
+                            <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.muted,marginBottom:3}}>{sol.label}</div>
+                            <div style={{fontFamily:body,fontSize:11,color:T.muted,lineHeight:1.4}}>{sol.description}</div>
+                            <span style={{position:'absolute',top:8,right:8,fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:'0.06em',textTransform:'uppercase'}}>Coming Soon</span>
                           </div>
-                          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T.muted, lineHeight: 1.4 }}>
-                            {sol.description}
-                          </div>
-                          <span style={{
-                            position: 'absolute', top: 8, right: 8,
-                            fontFamily: 'Inter, sans-serif', fontSize: 9, fontWeight: 700,
-                            color: T.muted, letterSpacing: '0.06em', textTransform: 'uppercase',
-                          }}>
-                            Coming Soon
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
             )}
 
-            {/* FEATURE: AW-27 — Goal textarea with streaming suggestion */}
+            {/* FEATURE: AW-25 — Step 2: PM agent picker */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600,marginBottom:8}}>
+                Step 2 — Select a Project Manager
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {agents.filter(a=>a.role?.toLowerCase().includes('project manager')).map(agent=>(
+                  <div key={agent.id}
+                    onClick={()=>{setSelectedPMAgent(agent);loadDeliverables(agent);setSelectedDeliverable(null);setGoal('');setPlanGenerated(false);}}
+                    style={{background:selectedPMAgent?.id===agent.id?`${T.brass}10`:T.card,border:`1.5px solid ${selectedPMAgent?.id===agent.id?T.brass:T.line}`,padding:'9px 12px',display:'flex',alignItems:'center',gap:8,cursor:'pointer',borderRadius:2,minWidth:200,position:'relative'}}>
+                    {selectedPMAgent?.id===agent.id&&<Corners/>}
+                    <AgentAvatar who={agent.id} size={28} ring={true}/>
+                    <div>
+                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{agent.name}</div>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep}}>{agent.code} · {agent.role}</div>
+                    </div>
+                    {selectedPMAgent?.id===agent.id&&<div style={{marginLeft:'auto',width:7,height:7,borderRadius:'50%',background:T.moss}}/>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* FEATURE: AW-27 — Step 3: Goal textarea with streaming suggestion */}
             {selectedDeliverable && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>Step 3 — Describe your goal</div>
-                {(goalStreaming || goal) && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: mono, fontSize: 7.5, color: T.brass, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
-                    <span style={{ display: 'inline-block', width: 5, height: 5, background: T.brass, borderRadius: 1, transform: 'rotate(45deg)' }} />
+              <div style={{marginBottom:14}}>
+                <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Step 3 — Describe your goal</div>
+                {(goalStreaming||goal) && (
+                  <div style={{display:'flex',alignItems:'center',gap:4,fontFamily:mono,fontSize:7.5,color:T.brass,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8,marginBottom:4}}>
+                    <span style={{display:'inline-block',width:5,height:5,background:T.brass,borderRadius:1,transform:'rotate(45deg)'}}/>
                     MM · PP-01 suggested a starting point — edit freely
-                    {goalStreaming && <span style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: T.brass, animation: 'pdot 1.4s ease-in-out infinite', marginLeft: 4 }} />}
+                    {goalStreaming&&<span style={{display:'inline-block',width:4,height:4,borderRadius:'50%',background:T.brass,animation:'pdot 1.4s ease-in-out infinite',marginLeft:4}}/>}
                   </div>
                 )}
                 <textarea value={goal} ref={goalRef}
-                  onChange={e => {
-                    if (abortControllerRef.current) { abortControllerRef.current.abort(); abortControllerRef.current = null; }
-                    setGoalStreaming(false);
-                    setGoalSuggestFailed(false);
-                    setGoal(e.target.value);
+                  onChange={e=>{
+                    if(abortControllerRef.current){abortControllerRef.current.abort();abortControllerRef.current=null;}
+                    setGoalStreaming(false);setGoalSuggestFailed(false);setGoal(e.target.value);autoResizeGoal();
                   }}
                   placeholder="Describe what you need in plain English…"
-                  style={{ width: '100%', minHeight: 90, padding: '10px 12px', fontFamily: body, fontSize: 13, color: T.ink, background: T.card, border: `1px solid ${goal.length > 8 ? T.brass : T.line}`, resize: 'vertical', outline: 'none', lineHeight: 1.6, boxSizing: 'border-box' }} />
-                {goalSuggestFailed && !goalStreaming && !goal && (
-                  <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, marginTop: 6, letterSpacing: 0.3 }}>
+                  style={{width:'100%',minHeight:60,padding:'10px 12px',fontFamily:body,fontSize:13,color:T.ink,background:T.card,border:`1px solid ${goal.length>8?T.brass:T.line}`,resize:'none',overflow:'hidden',outline:'none',lineHeight:1.6,boxSizing:'border-box'}}/>
+                {goalSuggestFailed&&!goalStreaming&&!goal&&(
+                  <div style={{fontFamily:mono,fontSize:10,color:T.muted,marginTop:6,letterSpacing:0.3}}>
                     Suggestion unavailable — describe your goal above.
                   </div>
                 )}
@@ -816,11 +786,8 @@ export default function CreateWorkOrderScreen() {
             )}
           </div>
 
-          {/* Divider */}
-          <div style={{ width: 1, background: T.line, margin: '0 16px', alignSelf: 'stretch' }} />
-
           {/* RIGHT: Instructions */}
-          <div style={{minWidth:0}}>
+          <div style={{minWidth:0,paddingLeft:24}}>
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 4 — INSTRUCTIONS <AiBadge label={AI_PAT.TASK_PLANNING}/></div>
 
             {(generating || planGenerated) && (
