@@ -81,7 +81,7 @@ function DecisionItem({ title, desc }) {
 
 function AIStackDiagram() {
   return (
-    <svg viewBox="0 0 520 292" style={{ width: "100%", maxWidth: 480, display: "block", margin: "10px 0 14px" }} role="img">
+    <svg viewBox="0 0 520 292" style={{ width: "100%", maxWidth: 600, display: "block", margin: "10px 0 14px" }} role="img">
       {/* Layer 6 — Governance */}
       <rect x={8} y={8} width={440} height={42} fill="#1e3556"/>
       <rect x={8} y={8} width={440} height={2} fill="#b6873a"/>
@@ -263,7 +263,7 @@ function ArchitectureTab() {
       <Divider />
       <SH>By the Numbers</SH>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-        {[["40","Source files"],["~19,000","Lines of code"],["12","API routes"],["11","DB tables"],["23","Arch docs"],["61","Session specs"],["20","AI Patterns"],["19","AI Services"],["13","Bench agents"]].map(([n, l]) => (
+        {[["40","Source files"],["~19,000","Lines of code"],["12","API routes"],["11","DB tables (154 cols)"],["23","Arch docs"],["61","Session specs"],["20","AI Patterns"],["19","AI Services"],["13","Bench agents"]].map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
             <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{l}</div>
