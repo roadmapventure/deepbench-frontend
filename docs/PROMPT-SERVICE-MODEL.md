@@ -518,13 +518,23 @@ runs a Haiku rewrite call against the token budget:
 Prompt to Haiku:
   "You are a prompt optimization engine. The prompt below will be sent to an AI agent
    to complete a task. Rewrite it to be maximally clear, coherent, and efficient.
-   Remove redundancy. Tighten language. Preserve all factual content, all constraints,
+   Preserve the agent's professional identity, reasoning style, and behavioral character
+   as equally important as format and intent instructions — do not compress persona content
+   in favor of structural instructions.
+   Remove redundancy and resolve any conflicts between sections.
+   Tighten language. Preserve all factual content, all constraints,
    and all output format instructions exactly.
    The rewritten prompt must be under [max_tokens] tokens.
    Do not add new instructions. Do not remove guardrails or format requirements."
 
   [full rendered prompt]
 ```
+
+> **Implementation note:** The Synthesis prompt above reflects quality guidance locked in
+> S-PM-08-design (2026-06-23). The current ai-enrichment.js implementation uses an older
+> shorter string. When AA-61 ships (S-PROMPT-ARCH-01), Synthesis will read its prompt from
+> `traits.synthesis_prompt` on the declaring skill profile — not from a hardcoded string.
+> The guidance above is the required content for that trait value.
 
 Haiku returns a rewritten system prompt string. This replaces the rendered prompt
 as the Builder's output. The section-by-section debug object is preserved from the
@@ -922,6 +932,13 @@ before kickoff docs are written.
 
 | Decision | Status |
 |----------|--------|
+| **[S-PM-08-design 2026-06-23] Dan Bingham (PS-01) owns DB Assembly + AI Enrichment** — named team member, not platform utility. agent_id ps-01 accompanies every Prompt Service call in ai_activity_log. Skill profiles carry traits.reflect_prompt and traits.synthesis_prompt. UI collaboration indicator shown alongside primary agent. | ✅ Locked |
+| **[S-PM-08-design 2026-06-23] Prompt Service founding principle preserved** — assembler is dumb/agnostic. No conditionals based on content type, agent type, or deliverable type. All intelligence in skill profile traits. Any improvement to Prompt Service output is accomplished by adding or updating traits — never by adding assembler logic. | ✅ Locked |
+| **[S-PM-08-design 2026-06-23] REFLECT prompt → traits.reflect_prompt** — the REFLECT reasoning prompt moves from hardcoded string in ai-enrichment.js to traits.reflect_prompt on the declaring skill profile. AI Enrichment reads from fetch_instruction.reflect_prompt (populated by DB Assembly). Makes each agent's REFLECT unique and trainable. | ❌ Missing — S-PROMPT-ARCH-01 |
+| **[S-PM-08-design 2026-06-23] Synthesis prompt → traits.synthesis_prompt** — moves from hardcoded string to traits.synthesis_prompt on declaring skill profile. Quality guidance: preserve persona equally to format/intent; remove redundancy and conflicts. See Synthesis prompt spec in Section 6 Step 4. | ❌ Missing — S-PROMPT-ARCH-01 |
+| **[S-PM-08-design 2026-06-23] task_context as always-present separate context block** — task_context (goal, deliverable_type, future fields) is a separate top-level context block, never injected as a hardcoded section inside the assembler. Static sections from skill profiles = who the agent is. task_context = what needs to happen right now. Always present, always separate. The current WORK ORDER section hardcode (AA-57) is a temporary measure until S-PROMPT-ARCH-01. | ❌ Missing — S-PROMPT-ARCH-01 |
+| **[S-PM-08-design 2026-06-23] Identity section additive assembly** — Identity combines ALL non-blank sources: agents table (name, role, specialty), all role_prompt entries in agent_configs (not just is_default), skill profile objective + method. No OR logic. Depends on agents table (AA-58). | ❌ Missing — S-PROMPT-ARCH-01 |
+| **[S-PM-08-design 2026-06-23] Display agent routing** — content specialist output routes to display agent (Screen Controls / HTML Display / PDF Assembly) based on user's requested output format. Display agents own the Format Skill. No formatting logic in content specialist prompts. | ❌ Missing — S-EDITOR-01 (design required) |
 | REFLECT — declared on Skill Profile via `technical_services: ["reflect"]` | ✅ Locked |
 | Intelligent synthesis — declared on Intent Skill Profile via `technical_services: ["intelligent-synthesis"]` — Haiku rewrite, runs last | ✅ Locked |
 | Builder: Container feeds all stored content directly — Builder never reads DB | ✅ Locked |

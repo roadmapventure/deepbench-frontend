@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push origin dev)",
+      "Bash(git push origin dev *)",
+      "Bash(npm run build *)",
+      "Bash(cd * && git add *)",
+      "Bash(cd * && git commit *)",
+      "Bash(cd * && git push origin dev*)",
+      "Bash(cd * && npm run build *)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push origin dev)",
+      "PowerShell(npm run build *)",
+      "PowerShell(cd C:\\Projects\\deepbench-frontend; git add *)",
+      "PowerShell(cd C:\\Projects\\deepbench-frontend; git commit *)",
+      "PowerShell(cd C:\\Projects\\deepbench-frontend; git push origin dev)",
+      "PowerShell(cd C:\\Projects\\deepbench-frontend; npm run build *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(Get-ChildItem *)",
+      "PowerShell(git -C * status)",
+      "PowerShell(git -C * log *)",
+      "PowerShell(git -C * diff *)"
+    ]
+  }
+}

@@ -676,6 +676,9 @@ These rules apply to every future session. No exceptions without explicit produc
 11. **Never delete Supabase data or agent configuration data without explicit confirmation from John**
 12. Every `logAICall()` invocation must include `skill_profile_slug`, `step_id`, `deliverable_id`, and `level` once S-INFRA-01 ships — no AI call is logged without its full lineage. Until then, pass whatever subset is available and leave the rest null. Never remove an existing logging call.
 13. The platform's internal capabilities (Task Planning, Title Generation, Agent Routing) are Deliverables produced by Competencies — treat them as first-class entries in `ai_activity_log` with the same lineage fields, not as special system events.
+14. **Content specialists (planners, researchers, analysts) never own Format Skills.** Format Skill ownership belongs exclusively to display/editor agents (Screen Controls, HTML Display, PDF Assembly). This enforces the content vs. display separation principle locked in S-PM-08-design (2026-06-23). See Section 19.
+15. **Display agents are the single source of truth for all presentation output.** Never hardcode formatting in content specialist skill profiles or request-receivable.js. One trait update to a display agent propagates to all consumers platform-wide with no code changes.
+16. **Dan Bingham's agent_id (ps-01) must accompany every Prompt Service call** in ai_activity_log. Dan is a named team member, not a platform utility. His contribution is logged separately from the requesting agent so his value is visible in the AI Audit. See Section 19.
 
 ---
 
@@ -756,6 +759,86 @@ Divergence begins only when DeepBench goes live and new training/config work hap
 **Pre-migration question (answer at S-MIGRATE-01 start):**
 Do NIGP and DeepBench share the same Supabase instance?
 Check: `nigp-analyzer-agent-api` env vars or server.js `SUPABASE_URL`.
+
+---
+
+## 19. Agent Collaboration Model — Prompt Architect + Display Specialists [LOCKED S-PM-08-design 2026-06-23]
+
+### The Founding Principle of the Prompt Service (NEVER VIOLATE)
+
+The Prompt Service is a dumb, agnostic assembler and enricher. It has no conditionals based on content type, agent type, or deliverable type. All intelligence lives in skill profile traits. If you find yourself writing an `if (agentId === 'x')` or `if (deliverable_type === 'pdf')` inside db-assembly.js, ai-enrichment.js, or request-receivable.js — stop. The fix is a trait, not a conditional. The value of DeepBench's Prompt Service is that it showcases a higher standard than the industry default (hardcoded prompts, hardcoded logic). That positioning must never be compromised.
+
+---
+
+### Dan Bingham — AI Prompt Strategist (PS-01)
+
+Dan Bingham is a named member of the Bench — not a platform utility. He owns the DB Assembly and AI Enrichment capabilities as his professional expertise. When any agent fires the Prompt Service, Dan is working alongside them as a team member.
+
+| Property | Value |
+|----------|-------|
+| Code | PS-01 |
+| Name | Dan Bingham |
+| Role | AI Prompt Strategist |
+| Specialty | Prompt Engineering · Context Assembly · Intelligence Architecture |
+| Quip | "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
+| Capabilities | DB Assembly, AI Enrichment |
+| Personnel File | Full: Resume, Playbook, Training, Projects |
+| Bench Roster | Yes — visible on Bench alongside all other agents |
+
+**Dan's calling structure:**
+- Dan's agent_id (ps-01) is passed alongside the requesting agent in every Prompt Service call
+- Dan logs to ai_activity_log separately from the requesting agent (his own service entry in SERVICE_CATALOG)
+- The UI shows a small collaboration indicator: "[Primary Agent] + Dan Bingham" wherever the Prompt Service fires
+- Dan does NOT appear as a separate step in the work order — his contribution is a background team collaboration
+
+**Dan's skill profiles declare REFLECT and Synthesis configuration via traits:**
+- `traits.reflect_prompt` — the REFLECT reasoning prompt, read by AI Enrichment instead of a hardcoded string
+- `traits.synthesis_prompt` — the Synthesis quality guidance prompt, read by AI Enrichment instead of a hardcoded string
+- Synthesis quality guidance (locked): preserve agent persona and behavioral character as equally important as format and intent; remove redundancy and conflicts between sections; produce one coherent authoritative prompt
+
+---
+
+### Content Specialists vs. Display Specialists
+
+Content specialists focus on domain expertise. Display specialists focus on presentation. These are two separate concerns and must never be mixed in the same agent.
+
+**Content specialists** (Michelle Manning, future Research & Analysis, Data Insights, Document & Compliance agents):
+- Own: Identity, Behavior, Knowledge, Intent skills
+- **Never own Format Skills** — they are domain experts, not presentation experts
+- Their output is the authoritative subject matter content, independent of how it will be displayed
+- Adding a new content specialist requires no changes to display logic
+
+**Display/Editor agents** (three agents, named in S-EDITOR-01 design session):
+- **Screen Controls Editor** — maps content to defined UI fields and structured screen components
+- **HTML Display Editor** — formats content as polished web HTML with proper visual hierarchy
+- **PDF Assembly Editor** — renders content as a professional PDF document
+- Own the Format Skill for the platform — their traits define presentation for all consumers
+- **Updating one display agent's traits propagates everywhere with no code changes**
+- Full Personnel Files on the Bench (persona, resume, playbook, training, projects)
+
+**Calling structure:**
+1. Work order fires → content specialist agent handles (Michelle for plans, etc.)
+2. Content specialist produces subject matter output via DB Assembly + AI Enrichment (Dan's capabilities)
+3. Output routes to appropriate display agent based on user's requested output format
+4. Display agent applies Format Skill → final Deliverable produced
+
+---
+
+### agents Table in Supabase
+
+A new `agents` table holds professional card data for all agents. Required because DB Assembly needs agent identity data server-side — agents.js is client-only.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| agent_id | text PK | matches agents.js code (e.g. 'pp-01', 'ps-01') |
+| name | text | full display name |
+| role | text | job title |
+| specialty | text | one-line expertise summary |
+| bio | text | longer professional bio |
+| tenant_id | uuid | multi-tenancy stub |
+
+Seeded with all 9 existing agents + Dan Bingham + 3 editor agents (names TBD in S-EDITOR-01).
+Full agents.js migration (salary, stats, avatar, flags) is a separate future session (S-BENCH-FULL-MIGRATE).
 
 ---
 

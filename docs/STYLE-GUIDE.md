@@ -381,6 +381,88 @@ Used when a tab has an embedded form that swaps out the list view. Established i
 
 ---
 
+## 15. Create Work Order Screen — Two-Column Layout (Locked 2026-06-23, S-PM-05-design)
+
+The Create Work Order screen uses a strict two-column layout: all user entry controls on the left, all plan output (step cards) on the right.
+
+- **Left column:** 42% width, fixed. Contains: PM agent picker (Step 01), deliverable tiles (Step 02), goal textarea (Step 03), Generate Plan button — top to bottom in sequence.
+- **Right column:** `flex: 1`. Contains: title suggestion, plan summary, step cards, clarifying questions, Approve & Launch — rendered only after plan is generated.
+- **Divider:** 1px vertical line (`background: T.line`) between columns with `margin: 0 16px`.
+- **Empty right state:** Show a dashed placeholder card until the first plan is generated.
+
+### Agent Picker Cards (Step 01)
+- Each card: `background: T.card`, `border: 1.5px solid T.line`, `border-radius: 2px`, `padding: 9px 12px`
+- Selected state: `border-color: T.brass`, `background: rgba(182,135,58,0.07)`
+- Layout: `display: flex; align-items: center; gap: 8px` — avatar left, name + code right, active dot far right
+- Active dot: 7px circle, `background: T.moss`
+- Unavailable agents: `opacity: 0.38`
+- Filtered to agents whose `role` contains "Project Manager" (case-insensitive)
+
+### Deliverable Tiles (Step 02)
+- Grid: `repeat(2, 1fr)` within the left column (narrower than full-width 5-tile grid)
+- Tile: same pattern as task type tiles — `T.card` background, 1.5px border, centered icon + label + short description
+- Selected state: `border-color: T.brass`, `background: rgba(182,135,58,0.07)`
+- Description text: `font-size: 9px`, `color: T.muted`, `line-height: 1.3`
+- Tiles are DB-driven from SP-PM-03 Format Skill `traits.deliverables` — never hardcoded
+
+### AI Goal Suggestion Bar (Step 03)
+- Displayed above the goal textarea when a deliverable is selected
+- Label: JetBrains Mono 7.5px, brass, uppercase — format: `MM · PP-01 suggested a starting point`
+- Prefixed with a 5×5px brass rotated square (the AI dot pattern)
+- Goal textarea border: `T.brass` when pre-populated (signals AI involvement)
+- Do NOT show the suggestion bar if no deliverable is selected
+
+---
+
+---
+
+## Section 16 — Prompt Visibility Modal (Locked 2026-06-23 · S-PM-07-design)
+
+Triggered when user clicks Generate Plan on the Create Work Order screen. Fires in parallel with the full pipeline — does not block plan generation. Dismisses on Continue or when plan renders.
+
+### Modal Container
+- Full-screen overlay: `background: rgba(18,36,60,0.72)` (navy at 72% opacity)
+- Modal card: `background: T.paperDeep`, `border: 1px solid T.line`, max-width 880px, centered, `padding: 28px 32px`
+- Treasury corners component on the modal card
+- Title: Fraunces 18px, `T.navy`, `"What DeepBench sent to the AI"`
+- Subtitle: Inter 12px, `T.muted`, `"Compare what you typed to what the platform assembled"`
+
+### Three-Panel Layout
+- Side-by-side columns: `display: grid`, `gridTemplateColumns: 1fr 1fr 1fr`, `gap: 12px`
+- Each panel: `background: T.card`, `border: 1px solid T.line`, `padding: 14px`, `borderRadius: 2`
+- Panel header: JetBrains Mono 8px, uppercase, `letterSpacing: 1.5`, `T.muted`
+- Panel number chip: brass background, navy text, Mono 7px
+- Token count badge: bottom of each panel — Mono 8px, `T.muted` — format: `"42 words"` / `"847 tokens"` / `"2,341 tokens"`
+
+| Panel | Header | Content |
+|-------|--------|---------|
+| 1 | `01 · WHAT YOU TYPED` | Goal text only. No decoration. |
+| 2 | `02 · DB ASSEMBLY` | Goal + each section block labeled with source slug (e.g. `planning-behavior · behavior`, `RAG · 3 chunks`). Collapsed by default — expand on click. |
+| 3 | `03 · ENRICHED PROMPT` | Full system prompt after Reflect + Synthesis. Pattern badges (RAG, Reflect, Prompt Chaining, Guardrails) as chips above the text. |
+
+### Section Source Labels (Panel 2 + 3)
+- Label format: `{skill_profile_slug} · {skill_type_slug}` — Mono 7px, `T.brassDeep`
+- RAG sections: `"knowledge · RAG · {n} chunks"` — moss colored
+- Reflect output: `"reflect · pre-plan · Haiku"` — brass colored
+- runtime_context (if present): `"additional context · Q&A answers"` — navy colored
+
+### Pattern Badges (Panel 3 only)
+- Same chip style as AiBadge — Mono 7.5px, active color
+- Only show patterns that actually fired (RAG only if chunks > 0, Reflect only if ran, etc.)
+- Displayed as a horizontal wrap row above the prompt text
+
+### Summary Line
+- Between panel 3 and Continue button
+- Inter 11px, `T.muted`, centered
+- Format: `"Assembled from {n} skill profiles, {n} knowledge chunks, and Michelle's agent configuration"`
+
+### Continue Button
+- Full-width, brass gradient, Fraunces 14px navy — same style as Generate Plan button
+- Label: `"Continue — view your plan ▸"`
+- Dismisses modal. If plan is already back, renders immediately. If still processing, spinner continues behind modal.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |

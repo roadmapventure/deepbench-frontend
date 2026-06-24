@@ -134,6 +134,10 @@ When John pastes the Claude Code completion report, respond with the Manual QA C
 | IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
 | PP-01 | Michelle Manning | Project Manager — stub until S-BENCH-01 |
 | TR-08 | Susan Smith | Trainer Agent — stub until S-BENCH-01b |
+| PS-01 | Dan Bingham | AI Prompt Strategist — owns DB Assembly + AI Enrichment. Full persona in S-DAN-01. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
+| TBD | Screen Controls Editor | Display agent — maps content to defined UI screen fields (persona + name in S-EDITOR-01) |
+| TBD | HTML Display Editor | Display agent — web HTML formatting and visual hierarchy (persona + name in S-EDITOR-01) |
+| TBD | PDF Assembly Editor | Display agent — professional PDF document layout (persona + name in S-EDITOR-01) |
 
 ---
 
