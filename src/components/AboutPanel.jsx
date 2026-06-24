@@ -81,7 +81,7 @@ function DecisionItem({ title, desc }) {
 
 function AIStackDiagram() {
   return (
-    <svg viewBox="0 0 520 292" style={{ width: "100%", display: "block", margin: "10px 0 14px" }} role="img">
+    <svg viewBox="0 0 520 292" style={{ width: "100%", maxWidth: 480, display: "block", margin: "10px 0 14px" }} role="img">
       {/* Layer 6 — Governance */}
       <rect x={8} y={8} width={440} height={42} fill="#1e3556"/>
       <rect x={8} y={8} width={440} height={2} fill="#b6873a"/>
@@ -272,7 +272,7 @@ function ArchitectureTab() {
       </div>
       <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Frontend:</strong> React 18 + Vite · React Router 6 · Recharts · PapaParse · PDF-parse</div>
       <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>API:</strong> 12 Vercel serverless routes — task planning, RAG query, doc extraction + ingestion, agent configs, self-learning write-back, Prompt Service (DB Assembly · AI Enrichment · Request &amp; Receivable) · Railway (Node.js + Playwright) for browser automation only</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Database:</strong> Supabase Postgres + pgvector · 11 tables · tenant_id on every table · Storage bucket for CSV · tasks (16 cols) · skill_profiles (21) · deliverables (21) · ai_activity_log (13) · agent_configs (10) · agents (8) · capabilities (7) · capability_skill_profiles (7) · agent_capability_assignments (5) · knowledge_entries · agent_run_log</div>
+      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Database:</strong> Supabase Postgres + pgvector · 11 tables · 154 total columns · tenant_id on every table · Storage bucket for CSV</div>
       <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5 }}><strong style={{ fontWeight: 500 }}>AI:</strong> Anthropic claude-haiku-4-5-20251001 (routing, classification, reflection, guardrails) · claude-sonnet-4-6 (planning, enrichment, ReAct loops) · OpenAI text-embedding-3-small (RAG embeddings)</div>
 
       <Divider />
