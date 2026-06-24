@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> Last updated: 2026-06-24 | Session: S-SPLASH-01-design — Welcome splash modal designed. SH-14 added. Kickoff doc: docs/kickoffs/v5.2.41-SPLASH-01-welcome-splash-modal.md.
+> Last updated: 2026-06-24 | Session: S-SPLASH-01 — SH-14 complete. 12/12 Manual QA PASS.
 >
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
@@ -32,7 +32,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-06 | Supabase tasks table integration | ❌ Missing | S-future |
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
-| SH-14 | Welcome splash modal — marketing/orientation overlay on initial load, session-dismissed | ⏳ Coding ready | docs/kickoffs/v5.2.41-SPLASH-01-welcome-splash-modal.md |
+| SH-14 | Welcome splash modal — marketing/orientation overlay on initial load, session-dismissed | ✅ Done | S-SPLASH-01 |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
 | SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express | ❌ Missing | S-future (do before v6.x) |
 | SH-12 | About DeepBench panel — display correct current version number (pulled from CLAUDE-STATE.md or package.json, not hardcoded) | ❌ Missing | S-future |
