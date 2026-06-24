@@ -26,7 +26,9 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-03 | useAgents() hook | ✅ Done | DONE |
 | SH-04 | React Router — all routes | ✅ Done | DONE |
 | SH-05 | App shell: header, Work/Bench tabs | ✅ Done | DONE |
-| SH-10 | About DeepBench panel — 7-tab portfolio + product info | 🔶 Partial (design done) | S-ABOUT-01 |
+| SH-10 | About DeepBench panel — 7-tab portfolio + product info | 🔶 Partial | S-ABOUT-ARCH-01 (Architecture tab — kickoff ready v5.2.40) |
+| SH-12 | About panel: Architecture tab — AI stack diagram, glossary, updated stats, relabeled sections | ⏳ Coding ready | docs/kickoffs/v5.2.40-SH10-about-architecture-tab-refresh.md |
+| SH-13 | About panel: GitHub Action auto-update stats.json on push to dev | ❌ Missing | S-ABOUT-STATS-01 (future, separate session) |
 | SH-06 | Supabase tasks table integration | ❌ Missing | S-future |
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
