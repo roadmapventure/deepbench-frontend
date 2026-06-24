@@ -1,4 +1,4 @@
-// DeepBench v5.2.32 | src/screens/CreateWorkOrderScreen.jsx | BUG-16 goal suggestion timeout
+// DeepBench v5.2.33 | src/screens/CreateWorkOrderScreen.jsx | AA-70 Alex attribution + BUG-14 double-count fix
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
@@ -71,12 +71,12 @@ async function callPlanningAgent(goal, agents, selectedPMAgent, selectedDelivera
       });
       const retryData = await retry.json();
       if (!retryData.content?.steps?.length) return { ok: false, error: 'No steps returned after retry' };
-      logAICall({ type: 'planning', model: 'prompt-service', latencyMs: Date.now() - t0, tokens: 0, location: 'Create Work Order', agentId: 'michelle' });
-      return { ok: true, plan: retryData.content };
+      // FEATURE: BUG-14 — logAICall({type:'planning'}) removed; real log fires server-side in request-receivable.js
+      return { ok: true, plan: retryData.content, display_agent_card: retryData.display_agent_card || null };
     }
 
-    logAICall({ type: 'planning', model: 'prompt-service', latencyMs: latency, tokens: 0, location: 'Create Work Order', agentId: 'michelle' });
-    return { ok: true, plan: data.content };
+    // FEATURE: BUG-14 — logAICall({type:'planning'}) removed; real log fires server-side in request-receivable.js
+    return { ok: true, plan: data.content, display_agent_card: data.display_agent_card || null };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -237,6 +237,8 @@ export default function CreateWorkOrderScreen() {
   const [showPromptModal, setShowPromptModal] = useState(false);
   const planResultRef = useRef(null);
   const planReadyRef = useRef(false);
+  // FEATURE: AA-70 — Alex Reeves display agent attribution
+  const [alexAgentCard, setAlexAgentCard] = useState(null);
 
   const [chatContext, setChatContext] = useState(null);
 
@@ -370,6 +372,10 @@ export default function CreateWorkOrderScreen() {
 
   // FEATURE: AW-28 — extracted so Continue handler can invoke after modal closes
   const applyPlanResult = (result) => {
+    // FEATURE: AA-70 — read display agent from plan response
+    if (result.display_agent_card) {
+      setAlexAgentCard(result.display_agent_card);
+    }
     if (result.ok) {
       const p = result.plan; // { steps, questions, title, planSummary, agentId, agentReason }
       if (steps.length > 0) {
@@ -431,7 +437,14 @@ export default function CreateWorkOrderScreen() {
       body: JSON.stringify(previewPayload),
     })
       .then(r => r.json())
-      .then(data => { if (!data.error) { setPromptPreview(data); setShowPromptModal(true); } })
+      .then(data => {
+        if (!data.error) {
+          setPromptPreview(data);
+          setShowPromptModal(true);
+          // FEATURE: AA-70 — set Alex card from preview so modal chip is ready at modal open time
+          if (data.display_agent_card) setAlexAgentCard(data.display_agent_card);
+        }
+      })
       .catch(() => {});
 
     // prompt-service: awaited — store result for Continue handler
@@ -840,6 +853,21 @@ export default function CreateWorkOrderScreen() {
                   </div>
                 )}
 
+                {/* FEATURE: AA-70 — Alex Reeves display agent attribution */}
+                {alexAgentCard && mergedSteps.active.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingLeft: 2 }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>
+                      Screen formatted by
+                    </span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>
+                      {alexAgentCard.name || 'Alex Reeves'}
+                    </span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: '#777' }}>
+                      {alexAgentCard.role || 'Screen Controls Editor'}
+                    </span>
+                  </div>
+                )}
+
                 <div style={{marginBottom:10,position:"relative"}}>
                   <FeatureBadge id="AW-UX-10" />
                   {mergedSteps.active.map((step, i) => {
@@ -912,6 +940,7 @@ export default function CreateWorkOrderScreen() {
           preview={promptPreview}
           planReady={planReadyRef.current}
           onContinue={handlePromptModalContinue}
+          displayAgentCard={alexAgentCard}
         />
       )}
     </AppShell>

@@ -1,4 +1,4 @@
-// DeepBench v5.2.26 | PromptEvolutionModal.jsx | AA-65 Dan Bingham collaboration indicator in footer
+// DeepBench v5.2.33 | PromptEvolutionModal.jsx | AA-70 Alex chip
 // FEATURE: AW-28 — Platform-level Prompt Service visibility modal. Import from any screen that calls prompt-service.
 
 import { T, display, body, mono } from '../tokens.js';
@@ -8,7 +8,7 @@ import { T, display, body, mono } from '../tokens.js';
 // planReady = boolean — true when prompt-service has resolved
 // onContinue = callback — close modal and process plan result
 
-export default function PromptEvolutionModal({ preview, planReady, onContinue }) {
+export default function PromptEvolutionModal({ preview, planReady, onContinue, displayAgentCard }) {
   if (!preview) return null;
   const agentCard = preview.agent_card; // populated by plan.js preview-prompt (AA-65)
 
@@ -124,8 +124,8 @@ export default function PromptEvolutionModal({ preview, planReady, onContinue })
           </Column>
 
           <Column
-            number="4" title="+ Reflect"
-            label="Haiku pre-thinks an execution plan before the main model runs"
+            number="4" title="+ Reflect (+ Format)"
+            label="Haiku pre-thinks an execution plan; format section appended last by Alex Reeves"
             stageData={stage4}
             deltaLabel={delta4 > 0 ? `+${delta4} tokens` : '(reflect did not fire)'}
             isLast={true}
@@ -166,6 +166,7 @@ export default function PromptEvolutionModal({ preview, planReady, onContinue })
               )}
             </div>
             {/* FEATURE: AA-65 — Dan Bingham collaboration indicator */}
+            {/* FEATURE: AA-70 — Alex Reeves format chip */}
             <div style={{ fontFamily: mono, fontSize: 9, display: 'flex', alignItems: 'center', gap: 5 }}>
               {agentCard && (
                 <>
@@ -185,6 +186,21 @@ export default function PromptEvolutionModal({ preview, planReady, onContinue })
                 Dan Bingham PS-01
               </span>
               <span style={{ color: T.muted }}>· AI Prompt Strategist</span>
+              {displayAgentCard && (
+                <>
+                  <span style={{ color: T.muted }}>+</span>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 4,
+                    border: '1px solid #b6873a',
+                    fontFamily: 'Inter, sans-serif',
+                  }}>
+                    <span style={{ fontSize: 10, color: '#b6873a', fontWeight: 700 }}>ED-01</span>
+                    <span style={{ fontSize: 10, color: '#ccc' }}>{displayAgentCard.name || 'Alex Reeves'}</span>
+                    <span style={{ fontSize: 9, color: '#888' }}>Format</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <button

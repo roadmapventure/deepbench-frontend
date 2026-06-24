@@ -1,4 +1,4 @@
-// DeepBench v5.2.26 | useAIActivity.js | AG-13 db-assembly SERVICE_CATALOG entry (AA-59 partial)
+// DeepBench v5.2.33 | useAIActivity.js | BUG-13 COST_PER_1K + BUG-15 reflection active + BUG-12 mappings
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -43,7 +43,8 @@ export const PATTERN_CATALOG = [
   { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true,  patternType: 'reasoning'  },
   { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true,  patternType: 'reasoning'  },
   { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
-  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formalizes when Prompt Assembly + Knowledge Reinforcement are extracted as discrete services (S-INFRA-01)' },
+  // FEATURE: BUG-15 — reflection is live since S-PROMPT-ARCH-01; flip active: false → true
+  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
   { slug: 'streaming',          name: 'Streaming',          desc: 'Token-by-token output delivery via SSE — response arrives progressively where UX latency matters',                                    active: true,  patternType: 'structural' },
   { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true,  patternType: 'structural' },
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
@@ -78,6 +79,9 @@ const AI_TYPE_TO_SERVICE = {
   goal_suggestion:      'goal-suggestion',
   preview_prompt:       'preview-prompt',
   db_assembly:          'db-assembly',
+  // FEATURE: BUG-12 — reflect and synthesis attributed to ai-enrichment service
+  reflect:              'ai-enrichment',
+  synthesis:            'ai-enrichment',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
@@ -99,7 +103,14 @@ export const AI_TYPES = {
 };
 
 // Cost estimates per 1K tokens
-const COST_PER_1K = { "claude-haiku-4-5":0.00025, "claude-sonnet-4-5":0.003, "text-embedding-3-small":0.00002 };
+// FEATURE: BUG-13 — correct model IDs for cost lookup (old short-form keys kept for safety)
+const COST_PER_1K = {
+  "claude-haiku-4-5": 0.00025,
+  "claude-haiku-4-5-20251001": 0.00025,
+  "claude-sonnet-4-5": 0.003,
+  "claude-sonnet-4-6": 0.003,
+  "text-embedding-3-small": 0.00002,
+};
 
 const MODEL_PROVIDER = {
   "claude-haiku-4-5":       "Anthropic",
