@@ -1,4 +1,4 @@
-// DeepBench v5.2.22 | api/prompt/db-assembly.js | assemblePrompt named export + runtime_context (AA-56)
+// DeepBench v5.2.25 | api/prompt/db-assembly.js | AA-58 agents table fetch + AA-66 Identity additive assembly
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -24,7 +24,7 @@ function getSupabaseHeaders(key) {
   };
 }
 
-function buildSections(skillProfiles, agentId, agentConfigs) {
+function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
   const sections = [];
   let reflectSection = null;
   let synthesisEnabled = false;
@@ -52,15 +52,26 @@ function buildSections(skillProfiles, agentId, agentConfigs) {
       };
 
     } else if (typeSlug === "identity") {
-      const defaultConfig = (agentConfigs || []).find(c => c.type === "role_prompt" && c.is_default);
-      if (defaultConfig?.text) {
-        content = defaultConfig.text;
-      } else {
-        const parts = [];
-        if (sp.objective) parts.push(sp.objective);
-        if (sp.method) parts.push(sp.method);
-        content = parts.join("\n") || null;
+      // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile
+      const parts = [];
+
+      // Source 1: agents table — name, role, specialty
+      if (agentRow) {
+        const cardParts = [agentRow.name, agentRow.role, agentRow.specialty].filter(Boolean);
+        if (cardParts.length) parts.push(cardParts.join(' · '));
       }
+
+      // Source 2: all role_prompt entries from agent_configs (not just is_default)
+      const rolePrompts = (agentConfigs || [])
+        .filter(c => c.type === "role_prompt" && c.text)
+        .map(c => c.text);
+      parts.push(...rolePrompts);
+
+      // Source 3: skill profile objective + method
+      if (sp.objective) parts.push(sp.objective);
+      if (sp.method) parts.push(sp.method);
+
+      content = parts.filter(Boolean).join("\n") || null;
 
     } else if (typeSlug === "behavior") {
       const roleParts = (agentConfigs || [])
@@ -262,7 +273,20 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs);
+  // FEATURE: AA-58 — fetch agent professional card from agents table
+  let agentRow = null;
+  if (agent_id) {
+    const agR = await fetch(
+      `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(agent_id)}&select=name,role,specialty,bio&limit=1`,
+      { headers }
+    );
+    if (agR.ok) {
+      const agRows = await agR.json() || [];
+      agentRow = agRows[0] || null;
+    }
+  }
+
+  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow);
 
   // FEATURE: AA-57 — inject goal as WORK ORDER section so LLM receives the actual task
   const goalText = typeof task_context === 'object' && task_context !== null
@@ -297,6 +321,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     task_context,
     agent_id: agent_id || null,
     capability_slug: capability_slug || null,
+    agent_card: agentRow,   // FEATURE: AA-58 — exposes fetched agent row for audit/debug
     sections,
     format_contract: formatContract,
     synthesis,
