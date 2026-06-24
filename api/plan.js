@@ -1,4 +1,4 @@
-// DeepBench v5.2.29 | api/plan.js | AA-69 format-last pattern + BUG-12 enrichment logging
+// DeepBench v5.2.35 | api/plan.js | BUG-17 wire dan-ai-enrichment into prompt-service + preview-prompt
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
 
@@ -125,12 +125,14 @@ export default async function handler(req, res) {
       const stage1Text = goal.trim();
 
       // DB Assembly
+      // FEATURE: BUG-17 — wire Dan's enrichment capability alongside PM capability
       const promptRequest = await assemblePrompt({
         capability_slug: capability_slug || 'project-manager',
         agent_id: agent_id || 'michelle',
         tenant_id,
         task_context: { goal, deliverable_type },
         runtime_context: runtime_context || null,
+        enrichment_capability_slug: 'dan-ai-enrichment',
       });
 
       // Stage 2: stored sections only (DB Assembly output, no RAG, no Reflect)
@@ -256,12 +258,14 @@ export default async function handler(req, res) {
       if (!goal) return res.status(400).json({ error: 'goal required' });
 
       // Step 1: DB Assembly
+      // FEATURE: BUG-17 — wire Dan's enrichment capability alongside PM capability
       const promptRequest = await assemblePrompt({
         capability_slug: capability_slug || 'project-manager',
         agent_id: agent_id || 'michelle',
         tenant_id,
         task_context: { goal, deliverable_type },
         runtime_context: runtime_context || null,
+        enrichment_capability_slug: 'dan-ai-enrichment',
       });
 
       // Step 2: AI Enrichment

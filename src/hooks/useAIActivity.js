@@ -1,4 +1,4 @@
-// DeepBench v5.2.33 | useAIActivity.js | BUG-13 COST_PER_1K + BUG-15 reflection active + BUG-12 mappings
+// DeepBench v5.2.35 | useAIActivity.js | BUG-17 add Reflection to ai-enrichment SERVICE_CATALOG
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -11,7 +11,8 @@ import { supabase } from '../lib/supabase.js';
 export const SERVICE_CATALOG = [
   { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
   // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
-  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining'],                                          roadmap: 'next' },
+  // FEATURE: BUG-17 — Reflection is live (BUG-15 active:true); surface it in AI Audit By Service view
+  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection'],                                roadmap: 'next' },
   // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
   { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'next' },
   // FEATURE: AW-27 — goal suggestion: streaming Haiku + RAG

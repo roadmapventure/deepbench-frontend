@@ -1,4 +1,4 @@
-// DeepBench v5.2.27 | api/prompt/db-assembly.js | AA-60 reflect_prompt + AA-61 synthesis_prompt + AA-67 deliverable_type in WORK ORDER
+// DeepBench v5.2.35 | api/prompt/db-assembly.js | BUG-17 enrichment_capability_slug — loads Dan's dan-ai-enrichment capability alongside primary
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -196,7 +196,7 @@ function buildLabel(typeSlug, name) {
   return labels[typeSlug] || (name || typeSlug).toUpperCase();
 }
 
-export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null }) {
+export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl) throw new Error("SUPABASE_URL not configured");
@@ -274,6 +274,26 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
           })));
         }
       }
+    }
+  }
+
+  // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)
+  // These profiles contribute technical_services triggers (reflect, synthesis) with Dan's authored prompts.
+  // They produce null section content by design and do not add visible text to the assembled prompt.
+  if (enrichment_capability_slug) {
+    const enrichR = await fetch(
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(enrichment_capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+      { headers }
+    );
+    if (enrichR.ok) {
+      const enrichRows = await enrichR.json() || [];
+      skillProfiles.push(...enrichRows.map(row => ({
+        ...row.skill_profiles,
+        source_capability_slug: enrichment_capability_slug,
+        level: row.level,
+        is_required: row.is_required,
+        display_order: row.display_order,
+      })));
     }
   }
 
