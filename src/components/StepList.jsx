@@ -1,4 +1,4 @@
-// DeepBench v5.2.7 | StepList.jsx | AI-31p — Update Steps button: pulse dot + AiBadge
+// DeepBench v5.2.39 | StepList.jsx | TI-20p — disable Update Steps button
 // FEATURE: TI-UX-15c — Rename "Update Plan →" to "Update Steps →"; move below comment textarea
 // FEATURE: TI-10 — Richer color treatment on new/changed steps
 // FEATURE: TI-11 — Threaded archive approval
@@ -294,11 +294,12 @@ function StepCard({
             <div style={{ position: "relative", marginTop: 10 }}>
               <FeatureBadge id="AW-16" />
               <button
-                onClick={() => onUpdatePlan(step.questions)}
+                disabled
                 style={{
                   background: T.brass, color: T.navy, border: "none",
                   padding: "7px 18px", fontFamily: display, fontSize: 12,
-                  fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  fontWeight: 700, cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+                  opacity: 0.45,
                 }}>
                 <span style={{ display:"inline-block", width:4, height:4, borderRadius:"50%",
                   background:T.navyDeep, animation:"pdot 1.4s ease-in-out infinite", flexShrink:0 }}/>
