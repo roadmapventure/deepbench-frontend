@@ -1,4 +1,4 @@
-// DeepBench v5.2.26 | plan.js | AA-65 agent_card added to preview-prompt response
+// DeepBench v5.2.29 | api/plan.js | AA-69 format-last pattern + BUG-12 enrichment logging
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
 
@@ -8,6 +8,15 @@ import { sendRequest } from './prompt/request-receivable.js';
 import { queryRAG } from '../lib/rag.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
+
+// FEATURE: AA-69 — Supabase header builder for format routing lookups
+function getSupabaseHeaders(key) {
+  return {
+    "Content-Type": "application/json",
+    "apikey": key,
+    "Authorization": `Bearer ${key}`,
+  };
+}
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -109,7 +118,7 @@ export default async function handler(req, res) {
   // FEATURE: AW-28 — preview-prompt: Prompt Service returns 4-stage breakdown for Prompt Evolution Modal
   if (action === 'preview-prompt') {
     try {
-      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context } = req.body;
+      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context, format_skill_profile_slug, display_agent_id } = req.body;
       if (!goal) return res.status(400).json({ error: 'goal required' });
 
       // Stage 1: raw goal only
@@ -181,14 +190,57 @@ export default async function handler(req, res) {
         skill_profile: enriched.format_contract?.skill_profile_slug || null,
       };
 
+      // FEATURE: AA-69 — Append Alex's format section to Column 4 (format-last pattern)
+      let displayAgentCard = null;
+      let stage4WithFormat = stage4Text;
+      if (format_skill_profile_slug) {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        if (supabaseUrl && supabaseKey) {
+          const headers = getSupabaseHeaders(supabaseKey);
+          try {
+            const fspRes = await fetch(
+              `${supabaseUrl}/rest/v1/skill_profiles?slug=eq.${encodeURIComponent(format_skill_profile_slug)}&select=*&limit=1`,
+              { headers }
+            );
+            if (fspRes.ok) {
+              const [fsp] = await fspRes.json();
+              if (fsp) {
+                const traits = fsp.traits || {};
+                const outputType = traits.output_type || 'json';
+                const formatParts = [`Output type: ${outputType}`];
+                if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
+                formatParts.push('\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.');
+                const formatSection = `=== OUTPUT FORMAT ===\n${formatParts.join('\n')}`;
+                stage4WithFormat = (stage4Text || '') + '\n\n---\n\n' + formatSection;
+              }
+            }
+            if (display_agent_id) {
+              const agRes = await fetch(
+                `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(display_agent_id)}&select=name,role,specialty,bio&limit=1`,
+                { headers }
+              );
+              if (agRes.ok) {
+                const [agRow] = await agRes.json();
+                displayAgentCard = agRow || null;
+              }
+            }
+          } catch (e) {
+            console.warn('[preview-prompt] format append failed:', e.message);
+          }
+        }
+      }
+
       return res.status(200).json({
         stage1: { text: stage1Text, tokens: Math.ceil(stage1Text.length / 4) },
         stage2: { text: stage2Text, tokens: Math.ceil(stage2Text.length / 4), sections: storedSections.map(s => ({ slug: s.slug, label: s.label, source: 'DB' })) },
         stage3: { text: stage3Text, tokens: Math.ceil(stage3Text.length / 4), sections: stage3Pairs },
-        stage4: { text: stage4Text, tokens: Math.ceil(stage4Text.length / 4), sections: stage4Pairs },
+        stage4: { text: stage4WithFormat, tokens: Math.ceil(stage4WithFormat.length / 4), sections: stage4Pairs },
         patterns,
         // FEATURE: AA-65 — primary agent card for collaboration indicator in PromptEvolutionModal
         agent_card: promptRequest.agent_card,
+        display_agent_card: displayAgentCard,
+        display_agent_id: display_agent_id || null,
       });
     } catch (e) {
       console.error('[preview-prompt] error:', e);
@@ -199,13 +251,13 @@ export default async function handler(req, res) {
   // FEATURE: SK-20 — Prompt Service pipeline orchestration for Create Work Order
   if (action === 'prompt-service') {
     try {
-      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context } = req.body;
+      const { agent_id, capability_slug, tenant_id = 'global', goal, deliverable_type, runtime_context, format_skill_profile_slug, display_agent_id } = req.body;
 
       if (!goal) return res.status(400).json({ error: 'goal required' });
 
       // Step 1: DB Assembly
       const promptRequest = await assemblePrompt({
-        capability_slug: capability_slug || 'cap-pm-01',
+        capability_slug: capability_slug || 'project-manager',
         agent_id: agent_id || 'michelle',
         tenant_id,
         task_context: { goal, deliverable_type },
@@ -216,18 +268,67 @@ export default async function handler(req, res) {
       const enriched = await enrichPrompt({
         prompt_request: promptRequest,
         agent_id: agent_id || 'michelle',
-        capability_slug: capability_slug || 'cap-pm-01',
+        capability_slug: capability_slug || 'project-manager',
       });
+
+      // FEATURE: AA-69 — Step 2b: Format append (format-last pattern)
+      // After enrichment, fetch display agent's Format Skill and append as final system_prompt section.
+      // format_skill_profile_slug and display_agent_id come from the deliverable tile's routing config.
+      let displayAgentCard = null;
+      if (format_skill_profile_slug) {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        if (supabaseUrl && supabaseKey) {
+          const headers = getSupabaseHeaders(supabaseKey);
+          try {
+            const fspRes = await fetch(
+              `${supabaseUrl}/rest/v1/skill_profiles?slug=eq.${encodeURIComponent(format_skill_profile_slug)}&select=*&limit=1`,
+              { headers }
+            );
+            if (fspRes.ok) {
+              const [fsp] = await fspRes.json();
+              if (fsp) {
+                const traits = fsp.traits || {};
+                const outputType = traits.output_type || 'json';
+                const formatParts = [`Output type: ${outputType}`];
+                if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
+                formatParts.push('\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.');
+                const formatSection = `=== OUTPUT FORMAT ===\n${formatParts.join('\n')}`;
+                enriched.system_prompt = (enriched.system_prompt || '') + '\n\n---\n\n' + formatSection;
+                enriched.format_contract = {
+                  output_type: outputType,
+                  skill_profile_slug: fsp.slug,
+                  schema: traits.schema || null,
+                  handler: traits.handler || 'store',
+                  guardrails: fsp.guardrails || { must: [], must_not: [] },
+                };
+              }
+            }
+            if (display_agent_id) {
+              const agRes = await fetch(
+                `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(display_agent_id)}&select=name,role,specialty,bio&limit=1`,
+                { headers }
+              );
+              if (agRes.ok) {
+                const [agRow] = await agRes.json();
+                displayAgentCard = agRow || null;
+              }
+            }
+          } catch (e) {
+            console.warn('[prompt-service] format append failed — using default format_contract:', e.message);
+          }
+        }
+      }
 
       // Step 3: Request & Receivable
       const result = await sendRequest({
         prompt_request: enriched,
         agent_id: agent_id || 'michelle',
-        capability_slug: capability_slug || 'cap-pm-01',
+        capability_slug: capability_slug || 'project-manager',
         tenant_id,
       });
 
-      return res.status(200).json(result);
+      return res.status(200).json({ ...result, display_agent_card: displayAgentCard, display_agent_id: display_agent_id || null });
     } catch (e) {
       console.error('[prompt-service] error:', e);
       return res.status(500).json({ error: e.message });

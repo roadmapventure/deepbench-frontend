@@ -1,4 +1,4 @@
-// DeepBench v5.2.27 | api/prompt/ai-enrichment.js | AA-60 reflect_prompt from traits + AA-61 synthesis_prompt from traits
+// DeepBench v5.2.29 | api/prompt/ai-enrichment.js | BUG-12 enrichment log writes
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -70,6 +70,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   if (!promptRequest || typeof promptRequest !== "object") {
     throw new Error("Prompt Request body required");
   }
+
+  // FEATURE: BUG-12 — server-side ai_activity_log writes for enrichment LLM calls
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
   const { sections = [], task_context = "", tenant_id = "global", format_contract, synthesis, llm, agent_id: pr_agent_id, capability_slug: pr_capability_slug } = promptRequest;
   // FEATURE: AA-57 — task_context may be an object {goal, deliverable_type}; extract string for RAG + Reflect
@@ -234,6 +238,49 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
       } catch (e) {
         console.warn("[ai-enrichment] Synthesis failed:", e.message);
       }
+    }
+  }
+
+  // FEATURE: BUG-12 — log REFLECT and Synthesis to ai_activity_log (fire-and-forget)
+  if (supabaseUrl && supabaseKey) {
+    const sbHeaders = {
+      "Content-Type": "application/json",
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${supabaseKey}`,
+      "Prefer": "return=minimal",
+    };
+    const nowIso = new Date().toISOString();
+    if (reflectRan && reflectTokensUsed > 0) {
+      fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
+        method: "POST",
+        headers: sbHeaders,
+        body: JSON.stringify({
+          agent_id: 'dan',
+          ai_type: 'reflect',
+          model: reflectModel,
+          input_tokens: reflectTokensUsed,
+          output_tokens: 0,
+          location: 'ai-enrichment',
+          patterns_used: ['reflection'],
+          created_at: nowIso,
+        }),
+      }).catch(e => console.warn('[ai-enrichment] reflect log failed:', e.message));
+    }
+    if (synthesisRan && synthesisTokensUsed > 0) {
+      fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
+        method: "POST",
+        headers: sbHeaders,
+        body: JSON.stringify({
+          agent_id: 'dan',
+          ai_type: 'synthesis',
+          model: synthesisModel,
+          input_tokens: synthesisTokensUsed,
+          output_tokens: 0,
+          location: 'ai-enrichment',
+          patterns_used: ['prompt-chaining'],
+          created_at: nowIso,
+        }),
+      }).catch(e => console.warn('[ai-enrichment] synthesis log failed:', e.message));
     }
   }
 
