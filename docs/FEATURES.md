@@ -127,7 +127,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | TI-17 | Pat execution via Railway | ❌ Missing | S11b (deferred) |
 | TI-18 | HITL step gate — full runtime execution contract: (1) execution pauses when a HITL step is reached, (2) signal emitted to notify human (UI state change + future notification), (3) human provides input via the step's comment/approval interface, (4) input injected into the next agent step's context, (5) execution resumes. Activates PAT-10 HITL in AI Audit By Pattern — triggers "Gates Triggered" counter + records human response time. Design session required before coding — needs: pause signal architecture, notification mechanism, resume-with-context handoff spec. | ❌ Missing | S-future (design required) |
 | TI-19 | Header renamed to "Steps" | ✅ Done | S15c |
-| TI-20 | Disable Re-run All + Update Steps buttons — roadmap-gated until tested | ❌ Missing | S-TI-20 |
+| TI-20 | Disable Re-run All + Update Steps buttons — roadmap-gated until tested | ✅ Done | S-TI-20 + S-TI-20p (8ce2947) |
 | TI-20 | Nav buttons removed from Task Instructions | ✅ Done | S15c |
 | TI-21 | CTA renamed "Update Steps →" | ✅ Done | S15c |
 | TI-22 | Update Steps button repositioned below HITL comment textarea | ✅ Done | S15c |
