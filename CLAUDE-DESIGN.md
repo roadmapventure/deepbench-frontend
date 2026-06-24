@@ -84,6 +84,13 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 10. Write kickoff doc with all 11 required sections
 11. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 
+**Mandatory kickoff doc compliance check — AI Audit wiring (never skip):**
+Every kickoff doc for any `api/` route must explicitly spec:
+- [ ] `logAICall()` call site at every AI operation in the route
+- [ ] `SERVICE_CATALOG` entry in `useAIActivity.js` declaring which patterns the service uses
+- [ ] `AI_TYPE_TO_SERVICE` mapping entry for the new service slug
+If wiring these would push the session over 4 tasks or 3 files — split into `a` (build) and `b` (audit wiring). Never defer audit wiring to an unscheduled future session. Applies to deterministic routes too (`ai_type: 'deterministic'`).
+
 **Mandatory close-out steps (do not skip):**
 9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs, update session order table
 10. Update `CLAUDE-STATE.md` — set next session, clear resolved blockers
@@ -127,6 +134,10 @@ When John pastes the Claude Code completion report, respond with the Manual QA C
 | IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
 | PP-01 | Michelle Manning | Project Manager — stub until S-BENCH-01 |
 | TR-08 | Susan Smith | Trainer Agent — stub until S-BENCH-01b |
+| PS-01 | Dan Bingham | AI Prompt Strategist — owns DB Assembly + AI Enrichment. Full persona in S-DAN-01. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
+| TBD | Screen Controls Editor | Display agent — maps content to defined UI screen fields (persona + name in S-EDITOR-01) |
+| TBD | HTML Display Editor | Display agent — web HTML formatting and visual hierarchy (persona + name in S-EDITOR-01) |
+| TBD | PDF Assembly Editor | Display agent — professional PDF document layout (persona + name in S-EDITOR-01) |
 
 ---
 

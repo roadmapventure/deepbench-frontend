@@ -98,7 +98,7 @@ when patterns solidify across multiple Skill Profiles of that type.
 
 | Skill Type | Type-specific Traits (in `traits` jsonb) |
 |-----------|------------------------------------------|
-| **Format** | `output_type` (html/pdf/docx/json/dashboard), `file_format`, `section_structure` |
+| **Format** | `output_type` (html/pdf/docx/json/dashboard/action), `file_format`, `section_structure`, `handler` (store/dispatch/package/mcp — which handler module processes the LLM response) |
 | **Intent** | `sections[]` (ordered section slugs), `analysis_instructions`, `reporting_depth` |
 | **Knowledge** | `domain`, `jurisdiction`, `source_types`, `source_priority` |
 | **Behavior** | `reasoning_style`, `writing_style`, `autonomy_level` |
@@ -330,6 +330,55 @@ agent_capability_assignments (
 
 ## 8. Currently Defined Capabilities
 
+### CAP-PM-01 — Project Manager
+
+```json
+{
+  "slug": "project-manager",
+  "name": "Project Manager",
+  "description": "Receives a Work Order, decomposes it into executable steps, matches steps to available capabilities, assigns agents, flags gaps, and produces an Execution Plan for user approval.",
+  "execution_type": "ai",
+  "tenant_id": null
+}
+```
+
+**Skill Profile assignments:**
+
+| Skill Profile | Level | Required |
+|--------------|-------|---------|
+| `work-order-decomposition` (intent) | L2 | Yes |
+| `capability-assignment` (intent) | L2 | Yes |
+| `execution-plan` (format) | L1 | Yes |
+| `planning-behavior` (behavior) | L2 | Yes |
+| `capability-registry-knowledge` (knowledge) | L2 | Yes |
+
+> **Format Skill role [LOCKED]:** SP-PM-03 is the output contract between Claude and the existing hardcoded AssignWorkScreen. It declares the exact JSON shape Claude must produce. The screen stays deterministic — the Format Skill governs what the LLM outputs so it fits the screen's expectations. No screen changes are needed until S-PM-03 (step schema expansion).
+
+> **output_fields updated (2026-06-19):** Added `agentId`, `agentReason`, `questions` to align with the existing screen's tool schema. Plan-level `agentId` = Orchestrating PM only (never an executor). `questions[]` = empty array when SP-PM-04 clarification policy does not trigger.
+> **output_fields updated (2026-06-22, S-PM-04-design):** Added `title` (LLM-generated deliverable title, max 8 words, required on every format contract — generated as part of the main LLM call, not a separate request) and `taskTitle` (human-readable work order title, max 8 words). Both required fields in the tool schema. `handler: "store"` added to traits — declares which handler module in `api/lib/handlers/` processes the response. DB Assembly extracts `handler` and `guardrails` into `format_contract` (patched S-PM-04a). AI Enrichment appends title instruction to Format section render (patched S-PM-04a).
+
+> **Identity Skill:** CAP-PM-01 currently has 4 of 5 Skill types (no Identity). Identity Skill (SP-PM-06) deferred — to be reviewed during the prompt-assembly design session, where Personnel File Trait usage will be assessed in full context.
+
+**Agent assignments:**
+
+| Agent | Notes |
+|-------|-------|
+| Michelle Manning (PP-01) | Primary orchestrator — replaces hardcoded isPlanner:true |
+
+**Design decisions locked 2026-06-19:**
+- Clarifying questions: conditional behavior trait on SP-PM-04, not a separate Skill. `clarification_policy: "conditional"` — LLM decides, max 3 questions, only when requirements are genuinely ambiguous. SP-PM-00 (Work Order Clarification) is not needed.
+- HITL: LLM-decided per step via PAT-10 during SP-PM-02 (Capability Assignment) pass. Not a hard rule. Intended `technical_services` for SP-PM-02: PAT-11 Agent Orchestration, PAT-07 Chain-of-Verification, PAT-10 HITL.
+- planSummary: required output field on SP-PM-03 (Execution Plan). Pre-populates HITL review card in UI. One sentence. LLM-generated from Work Order goal + assembled steps.
+- Step icons: UI-derived from `step.type`, not LLM output. Not in SP-PM-03 schema.
+- Agent assignment: fully registry-driven via SP-PM-02 — no hardcoded routing. Gap steps are created and preserved in the Execution Plan, never dropped.
+
+**Future additions to this Capability:**
+- `episodic-memory` Knowledge Skill → past Work Orders embedded as training corpus (Orchestrator gets smarter over time)
+
+**Full spec:** `docs/EXECUTION-DELIVERY-MODEL.md` Sections 5–6
+
+---
+
 ### CAP-01 — Data Analyst
 
 ```json
@@ -453,12 +502,14 @@ When the Work Side execution is built, the Skill Profile data drives the capabil
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SK-01 | `skill_types` table + 5 type seeds | ❌ Missing | S-SK-01 |
-| SK-02 | `skill_profiles` table + SP-01 (Data Analysis) + SP-02 (Analysis Report) seeds | ❌ Missing | S-SK-01 |
-| SK-03 | `capabilities` table + CAP-01 (Data Analyst) seed | ❌ Missing | S-SK-01 |
-| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 | ❌ Missing | S-SK-01 |
-| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ❌ Missing | S-SK-01 |
-| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card) | ❌ Missing | S-SK-01 |
+| SK-01 | `skill_types` table + 5 type seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-02 | `skill_profiles` table + SP-01 (Data Analysis) + SP-02 (Analysis Report) seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-03 | `capabilities` table + CAP-01 (Data Analyst) seed | ✅ Done | S-SK-01 (a447e49) |
+| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card) | ✅ Done | S-SK-01 (a447e49) |
+| SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes. | ❌ Missing | S-PM-01 |
+| SK-13 | JD → Capability Auto-Generation — upload job description, extract competencies by Skill type, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval, create records. Extends PE-10 pipeline with new output target. Design session required. | ❌ Missing | S-future (design required) |
 
 ---
 

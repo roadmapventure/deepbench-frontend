@@ -1,7 +1,7 @@
 # DeepBench v5.1 — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Last updated: 2026-06-07a | Category K + L added | Bug library added
+> Last updated: 2026-06-24 | Section 11 added — agent build completeness standard
 
 ---
 
@@ -352,3 +352,72 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
 | 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |
 | 2026-06-09 | BUG-10 added — missing `pdf-parse` + `jszip` in package.json. Dependency audit rule added: every api/ import must exist in package.json dependencies before commit. |
+| 2026-06-24 | Section 11 added — agent build completeness standard. Every agent must ship all 23 required fields + AVATAR_CFG + AGENT_PRONOUNS + Supabase row in one session. No partial entries. Root cause: Victoria Chen shipped without standard fields; RosterScreen crashed on `trainableBy.toUpperCase()`. |
+| 2026-06-24 | Section 12 added — canonical model ID standard (BUG-20) and SERVICE_CATALOG roadmap update rule (BUG-22). Root cause: short-form model IDs in logAICall() call sites split model rows in AI Audit; services shipped without updating roadmap field left live services listed in Platform Roadmap. |
+
+---
+
+## Section 11: Agent Build Completeness Standard
+
+Every agent added to `src/data/agents.js` MUST include ALL of the following fields in a single session. No partial entries permitted — a missing field crashes any component that iterates AGENTS.
+
+**Required fields for every agent:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Unique slug — matches agents table PK in Supabase |
+| `name` | string | Full name |
+| `role` | string | Job title |
+| `code` | string | Agent code (XX-00) |
+| `hiredOn` | string | "Mon YYYY" |
+| `trainer` | string | Who trained this agent |
+| `arch` | string | Architecture label (e.g. "LLM Planning", "RAG", "Catalog") |
+| `specialty` | string | 3 dot-separated specialties |
+| `salary` | number | Annual salary |
+| `value` | number | Billed value |
+| `hourly` | number | Hourly rate |
+| `reportHrs` | number | Avg hours per report |
+| `reportCost` | number | hourly × reportHrs |
+| `docs` | number | Training docs count |
+| `classes` | number | Training classes count |
+| `chunks` | number | RAG chunks count |
+| `skill` | number | Skill score 0–100 |
+| `situational` | number | Situational score 0–100 |
+| `trainable` | boolean | Whether user can train this agent |
+| `trainableBy` | string | Who manages training ("RMV", "NIGP", "None", etc.) |
+| `revenueModel` | string | Revenue model label |
+| `quip` | string | One-line character quip in double quotes |
+| `color` | token | T.brass / T.moss / T.navy / T.muted |
+
+**Also required in the same session:**
+- `AVATAR_CFG` entry (skin, hair, collar, extra, border)
+- `AGENT_PRONOUNS` entry (subject, object, possessive)
+- Supabase `agents` table row (id, name, code, role, specialty, bio, tenant_id)
+
+**Verification before commit:**
+- [ ] Navigate to Bench tab — agent card renders without console errors
+- [ ] Click agent card — Personnel File opens
+- [ ] Zero red errors in DevTools Console
+
+---
+
+## Section 12: Canonical Model ID Standard
+
+### Canonical Anthropic model IDs (always use these exact strings)
+
+| Short-form (DO NOT USE) | Canonical (USE THIS) |
+|-------------------------|----------------------|
+| `claude-haiku-4-5` | `claude-haiku-4-5-20251001` |
+| `claude-sonnet-4-5` | `claude-sonnet-4-6` |
+
+**Rule:** Never use short-form model IDs in `logAICall()` call sites or server-side `ai_activity_log` inserts. Always use the canonical versioned string. `MODEL_ID_NORMALIZE` in `useAIActivity.js` normalizes legacy short-form IDs as a safety net — it is not a license to keep using short-form IDs in new code.
+
+**Why:** The AI Audit panel groups by model string. Short-form and full-version IDs produce two separate rows for the same model, splitting cost and call counts. An AI Transparency screen with fragmented model data or "Unknown provider" labels fails its purpose.
+
+### SERVICE_CATALOG roadmap field rule
+
+When any `api/` route or service capability ships in a coding session, that session MUST update the corresponding `SERVICE_CATALOG` entry in `useAIActivity.js` from `roadmap: 'next'` (or `'later'`) to `roadmap: 'now'` in the same commit.
+
+The Platform Roadmap section of the AI Audit panel shows all services where `roadmap !== 'now'`. A live service appearing in the roadmap is incorrect and will mislead any architect reviewing the panel.
+
+**Add to CLAUDE-DESIGN.md AI Audit wiring checklist:** "SERVICE_CATALOG `roadmap` updated to `'now'` for any service that ships in this session."

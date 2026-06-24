@@ -1,14 +1,15 @@
-// DeepBench v5.2.5 | RosterScreen.jsx | AI-28 badge label sweep — KNOWLEDGE_TRAINING
+// DeepBench v5.2.37 | RosterScreen.jsx | RO-09 — sort agents by usage count
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
 // 7-agent grid + situational awareness bar + Show/Hide Details drawer + bench stats
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { useAgentUsageCounts } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
 
@@ -155,6 +156,16 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
 export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();
+  const usageCounts = useAgentUsageCounts();
+
+  const sortedAgents = useMemo(() => {
+    return [...agents].sort((a, b) => {
+      const ca = usageCounts[a.id] || 0;
+      const cb = usageCounts[b.id] || 0;
+      if (cb !== ca) return cb - ca;
+      return a.name.split(' ')[0].localeCompare(b.name.split(' ')[0]);
+    });
+  }, [agents, usageCounts]);
 
   const stats = {
     size:        agents.length,
@@ -206,7 +217,7 @@ export default function RosterScreen() {
 
         {/* Agent grid */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
-          {agents.map(a=>(
+          {sortedAgents.map(a=>(
             <AgentCard key={a.id} agent={a}
               onViewProfile={a=>navigate(`/bench/${a.id}`)}
               onAddTraining={a=>navigate(`/bench/${a.id}?tab=training`)}

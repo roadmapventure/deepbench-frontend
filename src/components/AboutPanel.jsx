@@ -1,4 +1,4 @@
-// DeepBench v5.2.10 | AboutPanel.jsx | S-RENAME-01 UI label rename
+// DeepBench v5.2.40 | AboutPanel.jsx | S-ABOUT-ARCH-01 Architecture tab refresh
 // FEATURE: SH-05 — About panel replacing Help modal
 
 import { useState } from "react";
@@ -75,6 +75,65 @@ function DecisionItem({ title, desc }) {
     <div style={{ padding: "7px 10px", border: `1px solid ${T.lineSoft}`, marginBottom: 5, borderLeft: `3px solid ${T.brass}` }}>
       <div style={{ fontSize: 11, fontWeight: 500, color: T.navy, marginBottom: 2 }}>{title}</div>
       <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.4 }}>{desc}</div>
+    </div>
+  );
+}
+
+function AIStackDiagram() {
+  return (
+    <svg viewBox="0 0 520 292" style={{ width: "100%", maxWidth: 600, display: "block", margin: "10px 0 14px" }} role="img">
+      {/* Layer 6 — Governance */}
+      <rect x={8} y={8} width={440} height={42} fill="#1e3556"/>
+      <rect x={8} y={8} width={440} height={2} fill="#b6873a"/>
+      <text x={20} y={23} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2465;  GOVERNANCE LAYER  &#x25C0; DeepBench AI Audit</text>
+      <text x={20} y={38} fontFamily="monospace" fontSize={9} fill="#b8c5d8">Audit  ·  Guardrails Enforcement  ·  Cost Controls  ·  Behavioral Prompts</text>
+
+      {/* Layer 5 — Platform */}
+      <rect x={8} y={56} width={440} height={42} fill="#1e3556"/>
+      <rect x={8} y={56} width={440} height={2} fill="#b6873a"/>
+      <text x={20} y={71} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2464;  PLATFORM LAYER  &#x25C0; DeepBench agent workforce</text>
+      <text x={20} y={86} fontFamily="monospace" fontSize={9} fill="#b8c5d8">Named Agents  ·  Skill Profiles  ·  Capabilities  ·  Orchestration  ·  HITL</text>
+
+      {/* Layer 4 — Harness */}
+      <rect x={8} y={104} width={440} height={42} fill="#1e3556"/>
+      <rect x={8} y={104} width={440} height={2} fill="#b6873a"/>
+      <text x={20} y={119} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2463;  HARNESS LAYER  &#x25C0; DeepBench Prompt Service</text>
+      <text x={20} y={134} fontFamily="monospace" fontSize={9} fill="#b8c5d8">DB Assembly  ·  AI Enrichment  ·  Grounding  ·  Context Assembly</text>
+
+      {/* Layer 3 — Patterns */}
+      <rect x={8} y={152} width={440} height={42} fill="#162840"/>
+      <text x={20} y={167} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2462;  PATTERN LAYER</text>
+      <text x={20} y={182} fontFamily="monospace" fontSize={9} fill="#3d5060">RAG  ·  ReAct  ·  Prompt Chaining  ·  Reflection  ·  Streaming  ·  Tool Use</text>
+
+      {/* Layer 2 — Tooling */}
+      <rect x={8} y={200} width={440} height={42} fill="#162840"/>
+      <text x={20} y={215} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2461;  TOOLING LAYER</text>
+      <text x={20} y={230} fontFamily="monospace" fontSize={9} fill="#3d5060">Function Calling  ·  MCP  ·  Browser Automation  ·  External APIs</text>
+
+      {/* Layer 1 — Foundation */}
+      <rect x={8} y={248} width={440} height={42} fill="#162840"/>
+      <text x={20} y={263} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2460;  FOUNDATION LAYER</text>
+      <text x={20} y={278} fontFamily="monospace" fontSize={9} fill="#3d5060">Models (Claude · GPT-4)  ·  Embeddings  ·  pgvector</text>
+
+      {/* DeepBench bracket — layers 4–6, y=8 to y=146 */}
+      <line x1={456} y1={8} x2={456} y2={146} stroke="#b6873a" strokeWidth={2}/>
+      <line x1={456} y1={8} x2={462} y2={8} stroke="#b6873a" strokeWidth={2}/>
+      <line x1={456} y1={146} x2={462} y2={146} stroke="#b6873a" strokeWidth={2}/>
+      <text x={474} y={77} fontFamily="monospace" fontSize={7} fontWeight="700" fill="#b6873a"
+        transform="rotate(-90, 474, 77)" textAnchor="middle" letterSpacing="2">DEEPBENCH</text>
+
+      {/* Infrastructure label */}
+      <text x={474} y={221} fontFamily="monospace" fontSize={7} fill="#2d4050"
+        transform="rotate(-90, 474, 221)" textAnchor="middle" letterSpacing="1.5">INFRASTRUCTURE</text>
+    </svg>
+  );
+}
+
+function GlossaryRow({ term, definition }) {
+  return (
+    <div style={{ display: "flex", gap: 10, padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}` }}>
+      <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: T.navy, width: 120, flexShrink: 0 }}>{term}</div>
+      <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.45, flex: 1 }}>{definition}</div>
     </div>
   );
 }
@@ -179,18 +238,32 @@ function ArchitectureTab() {
         <strong style={{ fontWeight: 500 }}>Skills are the atomic unit.</strong> Skill Profiles — configured instances of a Skill — are independent of agents. An agent is authorized to use a Skill Profile at a specific depth; it does not own it. The same Skill Profile can be shared, upgraded, and priced independently of any individual agent.
       </p>
 
-      <SH>For the Product Manager</SH>
+      <SH>Platform Architecture</SH>
       <div style={{ background: "#1a2e4a", padding: "11px 13px", fontFamily: mono, fontSize: 9, lineHeight: 1.7, marginBottom: 10, borderRadius: 2 }}>
         <div style={{ color: T.brassLight }}>Layer 4 — Platform Services &nbsp;&nbsp;&nbsp;Auth · Multi-tenancy · Security</div>
         <div style={{ color: "#8fa3bf" }}>Layer 2 — Product Modules &nbsp;&nbsp;&nbsp;&nbsp;Work Dashboard · Bench Dashboard</div>
         <div style={{ color: "#8fa3bf" }}>Layer 3 — Capability Services &nbsp;Planning · RAG · Chat · Analysis · Web…</div>
         <div style={{ color: "#8fa3bf" }}>Layer 1 — Shared Foundation &nbsp;&nbsp;&nbsp;Tokens · Agents · Supabase · Config</div>
       </div>
+      <AIStackDiagram />
+      <SH>AI Industry Glossary</SH>
+      <GlossaryRow term="Platform"       definition="Infrastructure that wraps LLMs — handles routing, memory, governance, and output. DeepBench is a platform, not a model." />
+      <GlossaryRow term="Pattern"        definition="A reusable AI architectural approach: RAG, ReAct, Prompt Chaining, etc. Patterns are how you use models, not which model." />
+      <GlossaryRow term="Loop"           definition="The agent execution cycle: Perceive → Reason → Act → Observe → Repeat. Brent's ReAct loop is the live example." />
+      <GlossaryRow term="Harness"        definition="Scaffolding around an LLM call: prompt assembly, tool definitions, response parsing, error handling. DeepBench's Prompt Service is a harness." />
+      <GlossaryRow term="Grounding"      definition="Connecting a model to factual, domain-specific knowledge at call time — what RAG does. Without grounding, models hallucinate on domain questions." />
+      <GlossaryRow term="Governance"     definition="Audit trails, guardrails, cost controls, and accountability over AI decisions. The 'can we trust this output?' layer." />
+      <GlossaryRow term="Tooling"        definition="External capabilities an agent can invoke mid-reasoning — web search, database queries, APIs. Claude's tool use schema is the mechanism." />
+      <GlossaryRow term="Orchestration"  definition="One agent coordinating other agents — delegating subtasks and synthesizing results. Michelle delegating to Brent is the live example." />
+      <GlossaryRow term="Context Window" definition="How much text a model can process in one call. Prompt engineering is largely the art of fitting the right information into this space efficiently." />
+      <GlossaryRow term="Embeddings"     definition="Vector representations of text for semantic search. The foundation of RAG — find knowledge chunks closest in meaning to the query." />
+      <GlossaryRow term="Chain"          definition="Sequential prompts where output of one feeds as input to the next. DeepBench's Prompt Service pipeline (DB Assembly → AI Enrichment → Request) is a chain." />
+      <GlossaryRow term="HITL"           definition="Human-in-the-Loop — agent pauses at a defined step gate and waits for human review before continuing." />
 
       <Divider />
-      <SH>For the Engineer</SH>
+      <SH>By the Numbers</SH>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-        {[["37","Source files"],["~18,600","Lines of code"],["13","API routes"],["5","DB tables"],["28","Doc files"],["17","Kickoff specs"]].map(([n, l]) => (
+        {[["40","Source files"],["~19,000","Lines of code"],["12","API routes"],["11","DB tables (154 cols)"],["23","Arch docs"],["61","Session specs"],["20","AI Patterns"],["19","AI Services"],["13","Bench agents"]].map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
             <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{l}</div>
@@ -198,19 +271,21 @@ function ArchitectureTab() {
         ))}
       </div>
       <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Frontend:</strong> React 18 + Vite · React Router 6 · Recharts · PapaParse · PDF-parse</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>API:</strong> 13 Vercel serverless routes — task planning, RAG query, doc extraction + ingestion, agent configs, self-learning write-back · Railway (Node.js + Playwright) for browser automation only</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Database:</strong> Supabase Postgres + pgvector · 5 tables · tenant_id on every table · Storage bucket for CSV</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5 }}><strong style={{ fontWeight: 500 }}>AI:</strong> Anthropic Claude Haiku (routing/classification) · Claude Sonnet (planning, RAG, ReAct loops) · OpenAI text-embedding-3-small</div>
+      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>API:</strong> 12 Vercel serverless routes — task planning, RAG query, doc extraction + ingestion, agent configs, self-learning write-back, Prompt Service (DB Assembly · AI Enrichment · Request &amp; Receivable) · Railway (Node.js + Playwright) for browser automation only</div>
+      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Database:</strong> Supabase Postgres + pgvector · 11 tables · 154 total columns · tenant_id on every table · Storage bucket for CSV</div>
+      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5 }}><strong style={{ fontWeight: 500 }}>AI:</strong> Anthropic claude-haiku-4-5-20251001 (routing, classification, reflection, guardrails) · claude-sonnet-4-6 (planning, enrichment, ReAct loops) · OpenAI text-embedding-3-small (RAG embeddings)</div>
 
       <Divider />
-      <SH>No Vaporware</SH>
+      <SH>AI Capability Status</SH>
       <BuzzRow term="RAG + Vector Embeddings"             desc="pgvector · Supabase · OpenAI text-embedding-3-small — live at query time"      status="✅ Live"     />
       <BuzzRow term="ReAct Agent Loop"                    desc="Brent — Railway/Playwright — reason + act + observe cycles"                     status="✅ Live"     />
-      <BuzzRow term="Guardrails"                          desc="Per-agent always/never rules in Supabase, enforced on every call"               status="✅ Live"     />
+      <BuzzRow term="Guardrails"                          desc="Per-agent always/never rules in Supabase + post-generation Haiku enforcement check in Request & Receivable"  status="✅ Live"     />
       <BuzzRow term="AI Cost Audit"                       desc="Per-call: model, tokens, cost, latency → Supabase ai_activity_log"             status="✅ Live"     />
       <BuzzRow term="Self-Learning / Knowledge Reinforcement" desc="Brent writes back fetch results as training entries automatically"          status="✅ Live"     />
       <BuzzRow term="Structured Tool Use"                 desc="Claude tool use everywhere — no free-text JSON parsing anywhere"                status="✅ Live"     />
       <BuzzRow term="Prompt Caching"                      desc="Anthropic caching on system prompts — up to 90% cost reduction"                status="✅ Live"     />
+      <BuzzRow term="Prompt Service Pipeline"   desc="DB Assembly → AI Enrichment → Request & Receivable — full 3-stage prompt construction pipeline"  status="✅ Live" />
+      <BuzzRow term="Reflection"                desc="Dan Bingham (PS-01) self-review pass — Haiku critiques assembled prompt before synthesis"           status="✅ Live" />
       <BuzzRow term="Per-Agent Behavioral Prompts"        desc="Personality, tone, reasoning style stored in Supabase — not in code"           status="✅ Live"     />
       <BuzzRow term="Capability Depth Spectrum"           desc="4-level model — General → Trained → Expert → Proprietary"                      status="🔶 Designed" />
       <BuzzRow term="HITL (Human-in-the-Loop)"            desc="Step execution gates — agent pauses for human review"                          status="🔶 Designed" />

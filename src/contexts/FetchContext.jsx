@@ -149,8 +149,8 @@ export function FetchProvider({ children }) {
         // Browser-side memory accuracy patch
         if (data.success && agentId !== "pat") {
           logAICall({type:"summarization",model:"claude-haiku-4-5",location:"Post-fetch web-memory save",agentId:"brent"});
-          fetch("/api/web-memory-patch", {
-            method: "POST",
+          fetch("/api/web-memory", {
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               steps_taken: canonicalSteps,

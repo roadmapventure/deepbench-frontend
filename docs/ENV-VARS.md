@@ -17,6 +17,7 @@
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (server-side only) | ✅ |
 | `OPENAI_API_KEY` | OpenAI embeddings (`text-embedding-3-small`) | ✅ |
 | `VITE_FETCH_API_URL` | Railway backend base URL | ✅ |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel protection bypass for automated QA testing | dev only |
 
 ---
 

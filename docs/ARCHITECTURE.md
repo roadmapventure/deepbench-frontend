@@ -122,6 +122,9 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 | Self-Learning / Knowledge Reinforcement | AI | `api/web-memory.js` | `api/capabilities/knowledge-reinforcement.js` |
 | Capability Audit & Cost Tracking | System | `src/hooks/useAIActivity.js` | stays in hooks (client-side aggregation) |
 | Identity / Persona Replication | AI | ❌ Not yet built | `api/capabilities/persona-replication.js` |
+| DB Assembly | System | `api/agent-run.js` (partial) | `api/prompt/db-assembly.js` |
+| AI Enrichment | AI + System | `api/agent-run.js` (partial) | `api/prompt/ai-enrichment.js` |
+| Request & Receivable | AI | `api/agent-run.js` (partial) | `api/prompt/request-receivable.js` |
 | Procurement Flags | Deterministic | `computeFlags()` inline | `api/capabilities/procurement-flags.js` |
 | Vendor Concentration / HHI | Deterministic | `computeVendorConc()` inline | `api/capabilities/vendor-concentration.js` |
 | Column Detection / NIGP Lookup | Deterministic | inline in AnalyzerScreen | `api/capabilities/column-detection.js` |
@@ -255,6 +258,7 @@ A Skill Profile is a configured instance of a Skill type. It is the unit where p
 | **Confidence** | Calibration level of output | *(scale TBD in design session)* |
 | **LLM Provider** | Which AI provider executes this Skill Profile | Anthropic · OpenAI · *(future: others)* |
 | **LLM Model** | Specific model assigned | Haiku · Sonnet · GPT-4o · *(future: others)* |
+| **Max Tokens** | Token budget ceiling for this Skill's LLM call | Integer — e.g. 1200 · 4000 · 8000 |
 | **API Key Source** | Who provides the API key | Platform · BYOK |
 | **Execution Type** | Technical Service category | AI (+ which pattern) · Deterministic |
 
@@ -347,6 +351,10 @@ skill_profiles (
   guardrails jsonb,
   notes,
   technical_services jsonb,   -- AI Patterns — seeded [] until Work Side wired
+  llm_provider,               -- 'anthropic' | 'openai' | future: others (default: 'anthropic')
+  llm_model,                  -- e.g. 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
+  max_tokens int,             -- token budget ceiling for this Skill's LLM call
+  api_key_source,             -- 'platform' | 'byok'
   execution_type,
   tenant_id,
   created_at
@@ -470,7 +478,21 @@ api/adapters/
   openai.js        — wraps OpenAI API calls (embeddings today, LLM future)
   supabase.js      — wraps Supabase client (references src/lib/supabase.js)
   railway.js       — wraps Railway SSE calls from frontend to backend
+
+api/lib/
+  rag.js           — shared RAG service (embed via OpenAI → vector search via Supabase match_knowledge RPC)
+                     Single source of truth for all RAG retrieval across the platform.
+                     Not a Vercel handler — no default export. Imported directly by:
+                       api/rag-query.js (handler wrapper)
+                       api/agent-run.js (replacing internal HTTP call)
+                       api/prompt/ai-enrichment.js
+                     Interface: queryRAG({ queryText, agentId, tenantId, matchCount, scope })
+                       → { context: string, chunks: Array, matchCount: number }
 ```
+
+**Rule [LOCKED — S-PM-03-design 2026-06-22]:** No capability route calls `/api/rag-query`
+via internal HTTP. All RAG retrieval imports `queryRAG` from `api/lib/rag.js` directly.
+`api/rag-query.js` remains as a thin public handler for external/frontend callers only.
 
 Capability routes import from adapters. Never call vendor APIs directly.
 
@@ -539,8 +561,34 @@ This table evolves — in S-INFRA-01 it gains `skill_profile_slug` scoping.
 
 **`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data. Not changing in S-INFRA-01.
 **`agent_run_log`** — Brent fetch run history.
-**`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries.
+**`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries. `patterns_used jsonb` column added S-PM-04a — records which AI patterns actually fired on each call (e.g. `["structured-output","tool-use"]`). Frontend routes log via `logAICall()`; `api/prompt/request-receivable.js` logs server-side directly (first server-side logger — required because it has no guaranteed frontend caller).
 All tables have `tenant_id`.
+
+**`deliverables`** *(created S-PM-04a)*
+```sql
+id uuid primary key,
+tenant_id text not null,
+task_id uuid,                    -- FK → tasks.id (null for MCP callers)
+step_id uuid,                    -- FK → tasks.steps jsonb (null until S-DELIVER-04)
+agent_id text,                   -- agent who produced this deliverable
+skill_profile_slug text,         -- Format Skill Profile that governed output
+type text,                       -- 'plan' | 'report' | 'brief' | 'analysis' | 'action' | etc.
+title text,                      -- LLM-generated title from response content (max 8 words)
+content jsonb,                   -- parsed response: structured object, html string, prose, or action payload
+format text,                     -- output_type from format_contract: 'json' | 'html' | 'docx' | 'pdf' | 'action'
+status text default 'draft',     -- 'draft' | 'approved' | 'change_requested'
+handler text,                    -- handler slug used: 'store' | 'dispatch' | 'package' | 'mcp'
+level int,                       -- Skill Profile level at time of production (null until S-DELIVER-04)
+is_final boolean default false,  -- true when promoted to task-level final deliverable
+version_of uuid,                 -- FK → deliverables.id for revision history (null for originals)
+consumes jsonb,                  -- upstream deliverable IDs this one consumed as input
+is_public boolean default false,
+is_shared boolean default false,
+share_token text,
+price_usd numeric,
+created_at timestamptz default now()
+```
+S-PM-04a only populates: `id, tenant_id, task_id, agent_id, skill_profile_slug, type, title, content, format, status, handler, created_at`. All other columns nullable until S-DELIVER-04.
 
 **Storage bucket:** `task-data` (private, signed URLs) — path: `{tenant_id}/{task_id}/{filename}.csv`
 
@@ -595,11 +643,13 @@ Never remove them.
 |------|--------|
 | Model selection | Haiku: classification, routing, short answers. Sonnet: complex reasoning, ReAct loops, long briefings. Never Sonnet where Haiku suffices (~20x cost). Future: configurable per Skill Profile via superadmin. |
 | Structured output | Use Claude tool use / `response_format`. Never parse free-text JSON. |
-| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Future: configurable per Skill Profile via superadmin. |
+| Token budgeting | Every call has explicit `max_tokens`. Uncapped calls balloon cost. Configurable per Skill Profile via `skill_profiles.max_tokens`. |
 | Streaming | Only where UX benefit justifies overhead. Yes: task planning, AI Review. No: routing, classification. |
 | Prompt caching | System prompts that don't change use Anthropic prompt caching. |
-| RAG retrieval | Cap `match_count` on vector searches. Never uncap. Future: configurable cap via superadmin. |
+| RAG retrieval | Cap `match_count` on vector searches. Never uncap. Configurable per Skill Profile via fetch_instruction in Prompt Specification. |
 | Logging | Every Layer 3 capability route logs to `ai_activity_log` via `logAICall()`. No exceptions — AI and deterministic alike. |
+| REFLECT | Haiku pre-run synthesis. Declared on a Skill Profile via `technical_services: ["reflect"]`. Runs inside Prompt Builder after Fetch + Render. Inserts an Execution Plan section into the assembled prompt. Never runs automatically — must be declared. |
+| Intelligent Synthesis | Haiku full-prompt rewrite. Declared on a Skill Profile via `technical_services: ["intelligent-synthesis"]`. Runs inside Prompt Builder last — after REFLECT. Rewrites the complete assembled prompt against the token budget. A rewrite, not a filter. Never runs automatically — must be declared. |
 
 ### Capability Badge Rule [LOCKED]
 `✦ AI` badge on every AI-touched UI element.
@@ -626,6 +676,9 @@ These rules apply to every future session. No exceptions without explicit produc
 11. **Never delete Supabase data or agent configuration data without explicit confirmation from John**
 12. Every `logAICall()` invocation must include `skill_profile_slug`, `step_id`, `deliverable_id`, and `level` once S-INFRA-01 ships — no AI call is logged without its full lineage. Until then, pass whatever subset is available and leave the rest null. Never remove an existing logging call.
 13. The platform's internal capabilities (Task Planning, Title Generation, Agent Routing) are Deliverables produced by Competencies — treat them as first-class entries in `ai_activity_log` with the same lineage fields, not as special system events.
+14. **Content specialists (planners, researchers, analysts) never own Format Skills.** Format Skill ownership belongs exclusively to display/editor agents (Screen Controls, HTML Display, PDF Assembly). This enforces the content vs. display separation principle locked in S-PM-08-design (2026-06-23). See Section 19.
+15. **Display agents are the single source of truth for all presentation output.** Never hardcode formatting in content specialist skill profiles or request-receivable.js. One trait update to a display agent propagates to all consumers platform-wide with no code changes.
+16. **Dan Bingham's agent_id (ps-01) must accompany every Prompt Service call** in ai_activity_log. Dan is a named team member, not a platform utility. His contribution is logged separately from the requesting agent so his value is visible in the AI Audit. See Section 19.
 
 ---
 
@@ -706,6 +759,86 @@ Divergence begins only when DeepBench goes live and new training/config work hap
 **Pre-migration question (answer at S-MIGRATE-01 start):**
 Do NIGP and DeepBench share the same Supabase instance?
 Check: `nigp-analyzer-agent-api` env vars or server.js `SUPABASE_URL`.
+
+---
+
+## 19. Agent Collaboration Model — Prompt Architect + Display Specialists [LOCKED S-PM-08-design 2026-06-23]
+
+### The Founding Principle of the Prompt Service (NEVER VIOLATE)
+
+The Prompt Service is a dumb, agnostic assembler and enricher. It has no conditionals based on content type, agent type, or deliverable type. All intelligence lives in skill profile traits. If you find yourself writing an `if (agentId === 'x')` or `if (deliverable_type === 'pdf')` inside db-assembly.js, ai-enrichment.js, or request-receivable.js — stop. The fix is a trait, not a conditional. The value of DeepBench's Prompt Service is that it showcases a higher standard than the industry default (hardcoded prompts, hardcoded logic). That positioning must never be compromised.
+
+---
+
+### Dan Bingham — AI Prompt Strategist (PS-01)
+
+Dan Bingham is a named member of the Bench — not a platform utility. He owns the DB Assembly and AI Enrichment capabilities as his professional expertise. When any agent fires the Prompt Service, Dan is working alongside them as a team member.
+
+| Property | Value |
+|----------|-------|
+| Code | PS-01 |
+| Name | Dan Bingham |
+| Role | AI Prompt Strategist |
+| Specialty | Prompt Engineering · Context Assembly · Intelligence Architecture |
+| Quip | "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
+| Capabilities | DB Assembly, AI Enrichment |
+| Personnel File | Full: Resume, Playbook, Training, Projects |
+| Bench Roster | Yes — visible on Bench alongside all other agents |
+
+**Dan's calling structure:**
+- Dan's agent_id (ps-01) is passed alongside the requesting agent in every Prompt Service call
+- Dan logs to ai_activity_log separately from the requesting agent (his own service entry in SERVICE_CATALOG)
+- The UI shows a small collaboration indicator: "[Primary Agent] + Dan Bingham" wherever the Prompt Service fires
+- Dan does NOT appear as a separate step in the work order — his contribution is a background team collaboration
+
+**Dan's skill profiles declare REFLECT and Synthesis configuration via traits:**
+- `traits.reflect_prompt` — the REFLECT reasoning prompt, read by AI Enrichment instead of a hardcoded string
+- `traits.synthesis_prompt` — the Synthesis quality guidance prompt, read by AI Enrichment instead of a hardcoded string
+- Synthesis quality guidance (locked): preserve agent persona and behavioral character as equally important as format and intent; remove redundancy and conflicts between sections; produce one coherent authoritative prompt
+
+---
+
+### Content Specialists vs. Display Specialists
+
+Content specialists focus on domain expertise. Display specialists focus on presentation. These are two separate concerns and must never be mixed in the same agent.
+
+**Content specialists** (Michelle Manning, future Research & Analysis, Data Insights, Document & Compliance agents):
+- Own: Identity, Behavior, Knowledge, Intent skills
+- **Never own Format Skills** — they are domain experts, not presentation experts
+- Their output is the authoritative subject matter content, independent of how it will be displayed
+- Adding a new content specialist requires no changes to display logic
+
+**Display/Editor agents** (three agents, named in S-EDITOR-01 design session):
+- **Screen Controls Editor** — maps content to defined UI fields and structured screen components
+- **HTML Display Editor** — formats content as polished web HTML with proper visual hierarchy
+- **PDF Assembly Editor** — renders content as a professional PDF document
+- Own the Format Skill for the platform — their traits define presentation for all consumers
+- **Updating one display agent's traits propagates everywhere with no code changes**
+- Full Personnel Files on the Bench (persona, resume, playbook, training, projects)
+
+**Calling structure:**
+1. Work order fires → content specialist agent handles (Michelle for plans, etc.)
+2. Content specialist produces subject matter output via DB Assembly + AI Enrichment (Dan's capabilities)
+3. Output routes to appropriate display agent based on user's requested output format
+4. Display agent applies Format Skill → final Deliverable produced
+
+---
+
+### agents Table in Supabase
+
+A new `agents` table holds professional card data for all agents. Required because DB Assembly needs agent identity data server-side — agents.js is client-only.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| agent_id | text PK | matches agents.js code (e.g. 'pp-01', 'ps-01') |
+| name | text | full display name |
+| role | text | job title |
+| specialty | text | one-line expertise summary |
+| bio | text | longer professional bio |
+| tenant_id | uuid | multi-tenancy stub |
+
+Seeded with all 9 existing agents + Dan Bingham + 3 editor agents (names TBD in S-EDITOR-01).
+Full agents.js migration (salary, stats, avatar, flags) is a separate future session (S-BENCH-FULL-MIGRATE).
 
 ---
 

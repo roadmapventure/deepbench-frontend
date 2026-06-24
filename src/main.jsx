@@ -1,14 +1,14 @@
-// DeepBench v5.1.0 | main.jsx | App entry point — React root + all routes
-// FEATURE: SH-04 — All routes
-// src/main.jsx — v5.0.0
+// DeepBench v5.2.41 | main.jsx | App entry point — React root + all routes
+// FEATURE: SH-14 — Welcome splash modal
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FetchProvider }    from "./contexts/FetchContext.jsx";
 import { AnalyzerProvider } from "./contexts/AnalyzerContext.jsx";
+import WelcomeSplash        from "./components/WelcomeSplash.jsx";
 
 import DashboardScreen        from "./screens/DashboardScreen.jsx";
-import AssignWorkScreen       from "./screens/AssignWorkScreen.jsx";
+import CreateWorkOrderScreen  from "./screens/CreateWorkOrderScreen.jsx";
 import TaskInstructionsScreen from "./screens/TaskInstructionsScreen.jsx";
 import AnalyzerScreen         from "./screens/AnalyzerScreen.jsx";
 import FetchScreen            from "./screens/FetchScreen.jsx";
@@ -21,11 +21,12 @@ import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
+      <WelcomeSplash />
       <FetchProvider>
         <AnalyzerProvider>
           <Routes>
             <Route path="/"                          element={<DashboardScreen />} />
-            <Route path="/work/new"                  element={<AssignWorkScreen />} />
+            <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
             <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
             <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />
             <Route path="/work/:taskId/fetch"        element={<FetchScreen />} />

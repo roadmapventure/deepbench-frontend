@@ -1,24 +1,22 @@
-// DeepBench v5.2.8 | AIActivityPanel.jsx | AI-36 — By Pattern split into Structural / Reasoning subsections
+// DeepBench v5.2.37 | AIActivityPanel.jsx | BUG-21 — replace AGENT_NAMES with AGENTS-derived lookup
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { useAIActivity, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
-
-// FEATURE: AI-18 patch — add michelle + susan so By Agent renders full name + code
-const AGENT_NAMES = {
-  chloe:    { name: "Chloe Okafor",      code: "JR-01" },
-  mike:     { name: "Mike Alvarez",       code: "SR-02" },
-  bob:      { name: "Bob Whitfield",      code: "PR-04" },
-  christy:  { name: "Christy Park",       code: "MK-05" },
-  robyn:    { name: "Robyn Castellanos",  code: "CN-03" },
-  brent:    { name: "Brent Matthews",     code: "DR-06" },
-  pat:      { name: "Pat Smiley",         code: "IR-07" },
-  michelle: { name: "Michelle Manning",   code: "PP-01" },
-  susan:    { name: "Susan Smith",        code: "TR-08" },
-};
+import { AGENTS } from "../data/agents.js";
 import { Corners } from "./SharedUI.jsx";
+
+// FEATURE: BUG-21 — self-maintaining agent lookup derived from AGENTS; never hand-maintained again
+const _agentById   = Object.fromEntries(AGENTS.map(a => [a.id,                    { name: a.name, code: a.code }]));
+const _agentByCode = Object.fromEntries(AGENTS.map(a => [a.code.toUpperCase(),    { name: a.name, code: a.code }]));
+function resolveAgent(agentId) {
+  if (!agentId) return { name: '—', code: '—' };
+  return _agentById[agentId]
+    || _agentByCode[agentId.toUpperCase()]
+    || { name: agentId, code: '?' };
+}
 
 const CHECKLIST = [
   ["Model selection",    "Haiku for routing/classification. Sonnet only for ReAct loops and long-form briefings."],
@@ -354,7 +352,7 @@ export default function AIActivityPanel({ onClose }) {
               agentsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
                 : agentsSorted.map(d => {
-                  const info = AGENT_NAMES[d.agentId] || { name: d.agentId, code: "—" };
+                  const info = resolveAgent(d.agentId);
                   return (
                     <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
                       <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>

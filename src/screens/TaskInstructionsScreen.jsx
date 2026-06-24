@@ -1,4 +1,4 @@
-// DeepBench v5.2.10 | TaskInstructionsScreen.jsx | S-RENAME-01 UI label rename
+// DeepBench v5.2.38 | TaskInstructionsScreen.jsx | TI-20 disable Re-run All + Update Steps
 // FEATURE: TI-UX-15c — Section header "Steps", remove Dashboard/AI nav buttons, rename + move Update Steps CTA
 
 import { useState, useEffect, useRef } from "react";
@@ -184,10 +184,10 @@ function StepRow({ step, index, navigate, isCompleted, answers = {}, setAnswers,
                       <FeatureBadge id="AW-16" />
                       {/* FEATURE: AI-31 — Update Steps: pulsing dot + AiBadge */}
                       <button
-                        onClick={() => onUpdatePlan && onUpdatePlan(step.questions)}
+                        disabled
                         style={{background:T.brass,color:T.navy,
                           border:"none",padding:"7px 18px",fontFamily:display,
-                          fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                          fontSize:12,fontWeight:700,cursor:"not-allowed",display:"flex",alignItems:"center",gap:6,opacity:0.45}}>
                         <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.navyDeep,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
                         Update Steps →
                         <AiBadge label={AI_PAT.TASK_PLANNING}/>
@@ -456,10 +456,10 @@ export default function TaskInstructionsScreen() {
   // FEATURE: DB-17 — Michelle title generation helper
   const callTitleAgent = async (goal, steps) => {
     try {
-      const res = await fetch("/api/title", {
+      const res = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal, steps }),
+        body: JSON.stringify({ action: "title", goal, steps }),
       });
       if (!res.ok) return { taskTitle: null, stepTitles: [] };
       const data = await res.json();
@@ -543,10 +543,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
             description: "Generate a structured task plan",
             input_schema: {
               type: "object",
-              required: ["steps", "questions", "agentId", "planSummary"],
+              required: ["steps", "questions", "agentId", "planSummary", "taskTitle"],
               properties: {
                 planSummary: { type: "string" },
                 agentId: { type: "string" },
+                // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+                taskTitle: { type: "string", description: "Concise work order title, max 8 words, action-oriented. Not the raw goal text." },
                 steps: {
                   type: "array",
                   items: {
@@ -589,10 +591,12 @@ where needed. Use the plan_task tool to return a structured plan.`;
               description: "Generate a structured task plan",
               input_schema: {
                 type: "object",
-                required: ["steps", "questions", "agentId", "planSummary"],
+                required: ["steps", "questions", "agentId", "planSummary", "taskTitle"],
                 properties: {
                   planSummary: { type: "string" },
                   agentId: { type: "string" },
+                  // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
+                  taskTitle: { type: "string", description: "Concise work order title, max 8 words, action-oriented. Not the raw goal text." },
                   steps: {
                     type: "array",
                     items: {
@@ -806,7 +810,7 @@ where needed. Use the plan_task tool to return a structured plan.`;
             {!isCompleted && (
               <div style={{display:"flex",gap:8,flexShrink:0}}>
                 {/* FEATURE: AI-31 — Re-run All: pulsing dot + AiBadge */}
-                <button style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"pointer",textTransform:"uppercase",letterSpacing:.5,display:"flex",alignItems:"center",gap:5}}>
+                <button disabled style={{fontFamily:mono,fontSize:9,color:T.muted,background:"transparent",border:`1px solid ${T.line}`,padding:"5px 12px",cursor:"not-allowed",textTransform:"uppercase",letterSpacing:.5,display:"flex",alignItems:"center",gap:5,opacity:0.45}}>
                   <span style={{display:"inline-block",width:4,height:4,borderRadius:"50%",background:T.brass,animation:"pdot 1.4s ease-in-out infinite",flexShrink:0}}/>
                   Re-run All
                   <AiBadge label={AI_PAT.TASK_PLANNING}/>

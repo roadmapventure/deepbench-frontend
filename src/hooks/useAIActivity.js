@@ -1,4 +1,4 @@
-// DeepBench v5.2.9 | useAIActivity.js | AI-36p — Reflection removed from SERVICE_CATALOG patterns
+// DeepBench v5.2.37 | useAIActivity.js | BUG-20/21/22 byLLM filter, MODEL_PROVIDER, MODEL_ID_NORMALIZE, SERVICE_CATALOG roadmap
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -9,10 +9,23 @@ import { supabase } from '../lib/supabase.js';
 
 // FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
 export const SERVICE_CATALOG = [
-  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
+  // FEATURE: BUG-22 — prompt-assembly is live; move off roadmap
+  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'now'  },
+  // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
+  // FEATURE: BUG-17 — Reflection is live (BUG-15 active:true); surface it in AI Audit By Service view
+  // FEATURE: BUG-22 — ai-enrichment is live (16 calls); move off roadmap
+  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection'],                                roadmap: 'now'  },
+  // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
+  // FEATURE: BUG-22 — request-receivable shipped in S-PM-04b
+  { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'now'  },
+  // FEATURE: AW-27 — goal suggestion: streaming Haiku + RAG
+  { slug: 'goal-suggestion',         name: 'Goal Suggestion',          serviceType: 'ai',     patterns: ['Streaming', 'RAG'],                                                                           roadmap: 'now'  },
+  // FEATURE: AW-28 — preview-prompt: DB Assembly + AI Enrichment without LLM call
+  { slug: 'preview-prompt',          name: 'Prompt Preview',           serviceType: 'preview', patterns: ['RAG'],                                                                                        roadmap: 'now'  },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
-  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
+  // FEATURE: BUG-22 — knowledge-reinforcement live via TeachScreen + FetchContext
+  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'now'  },
   { slug: 'pre-run-planning',        name: 'Pre-Run Planning',          serviceType: 'ai',     patterns: ['RAG'],                                                        roadmap: 'next' },
   { slug: 'task-planning',           name: 'Task Planning',             serviceType: 'ai',     patterns: ['Tool Use','Structured Output','Streaming'],                   roadmap: 'now'  },
   { slug: 'title-generation',        name: 'Title Generation',          serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
@@ -23,6 +36,8 @@ export const SERVICE_CATALOG = [
   { slug: 'procurement-flags',       name: 'Procurement Flags',         serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'vendor-concentration',    name: 'Vendor Concentration',      serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   { slug: 'column-detection',        name: 'Column Detection',          serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+  // FEATURE: AG-13 — DB Assembly service catalog entry (Dan's deterministic capability, AA-59)
+  { slug: 'db-assembly',             name: 'DB Assembly',               serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -33,7 +48,8 @@ export const PATTERN_CATALOG = [
   { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true,  patternType: 'reasoning'  },
   { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true,  patternType: 'reasoning'  },
   { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
-  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formalizes when Prompt Assembly + Knowledge Reinforcement are extracted as discrete services (S-INFRA-01)' },
+  // FEATURE: BUG-15 — reflection is live since S-PROMPT-ARCH-01; flip active: false → true
+  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
   { slug: 'streaming',          name: 'Streaming',          desc: 'Token-by-token output delivery via SSE — response arrives progressively where UX latency matters',                                    active: true,  patternType: 'structural' },
   { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true,  patternType: 'structural' },
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
@@ -41,7 +57,8 @@ export const PATTERN_CATALOG = [
   { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, patternType: 'reasoning',  hitlSpecial: true, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
   { slug: 'agent-orchestration',      name: 'Agent Orchestration',          desc: 'One agent delegates work to a peer agent mid-execution; subagent output feeds back into the orchestrating task. Distinct from agent routing (pre-call selection): orchestration happens inside a running execution loop.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Becomes live in S11 (step execution) + AW-17 (multi-agent step assignment)' },
   { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
-  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'Playbook tab has always/never guardrail records; runtime enforcement not yet wired' },
+  // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
+  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
   { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, patternType: 'structural', partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
   { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Natural fit for PE-12 Test Agent scoring and AI-24 routing feedback loop' },
   { slug: 'multi-agent-debate',       name: 'Multi-Agent Debate',           desc: 'Two agents take opposing positions and argue against each other\'s output; a synthesis agent reads both arguments and produces a reconciled final answer. Agents are adversarially aware — each sees the other\'s response.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Extends Test Team (TT-01/02); adds critique pass + synthesis agent. TT-03 design session required.' },
@@ -62,6 +79,14 @@ const AI_TYPE_TO_SERVICE = {
   react_loop:     'autonomous-research',
   extraction:     'document-extraction',
   reinforcement:  'knowledge-reinforcement',
+  ai_enrichment:        'ai-enrichment',
+  request_receivable:   'request-receivable',
+  goal_suggestion:      'goal-suggestion',
+  preview_prompt:       'preview-prompt',
+  db_assembly:          'db-assembly',
+  // FEATURE: BUG-12 — reflect and synthesis attributed to ai-enrichment service
+  reflect:              'ai-enrichment',
+  synthesis:            'ai-enrichment',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
@@ -83,12 +108,22 @@ export const AI_TYPES = {
 };
 
 // Cost estimates per 1K tokens
-const COST_PER_1K = { "claude-haiku-4-5":0.00025, "claude-sonnet-4-5":0.003, "text-embedding-3-small":0.00002 };
+// FEATURE: BUG-13 — correct model IDs for cost lookup (old short-form keys kept for safety)
+const COST_PER_1K = {
+  "claude-haiku-4-5": 0.00025,
+  "claude-haiku-4-5-20251001": 0.00025,
+  "claude-sonnet-4-5": 0.003,
+  "claude-sonnet-4-6": 0.003,
+  "text-embedding-3-small": 0.00002,
+};
 
+// FEATURE: BUG-20 — add canonical versioned model IDs; keep legacy short-form for historical rows
 const MODEL_PROVIDER = {
-  "claude-haiku-4-5":       "Anthropic",
-  "claude-sonnet-4-5":      "Anthropic",
-  "text-embedding-3-small": "OpenAI",
+  "claude-haiku-4-5":            "Anthropic",
+  "claude-haiku-4-5-20251001":   "Anthropic",
+  "claude-sonnet-4-5":           "Anthropic",
+  "claude-sonnet-4-6":           "Anthropic",
+  "text-embedding-3-small":      "OpenAI",
 };
 
 // ── Module-level store ────────────────────────────────────────────────────────
@@ -97,9 +132,17 @@ let _listeners = [];
 
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
+// FEATURE: BUG-20 — normalize short-form model IDs to canonical versioned IDs at write time
+const MODEL_ID_NORMALIZE = {
+  'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5': 'claude-sonnet-4-6',
+};
+
 // FEATURE: AI-16 — logAICall Supabase persistence
-export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null }) {
-  const resolvedModel = model || AI_TYPES[type]?.model || "claude-haiku-4-5";
+// FEATURE: AA-44 — logAICall gains optional patterns_used param
+export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null, patterns_used = [] }) {
+  // FEATURE: BUG-20 — normalize + canonical fallback
+  const resolvedModel = MODEL_ID_NORMALIZE[model] || model || MODEL_ID_NORMALIZE[AI_TYPES[type]?.model] || AI_TYPES[type]?.model || "claude-haiku-4-5-20251001";
   const entry = {
     id:        Date.now() + Math.random(),
     type,
@@ -127,6 +170,7 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
     latency_ms:     entry.latencyMs || null,
     knowledge_tier: entry.tier || null,
     cost_usd:       entry.cost || null,
+    patterns_used:  patterns_used.length > 0 ? patterns_used : null,
   }).then(({ error }) => {
     if (error) console.warn('[AI log] Supabase write failed:', error.message);
   });
@@ -194,6 +238,8 @@ export function useAIActivity() {
   const byLLM = {};
   for (const e of log) {
     const m = e.model || "unknown";
+    // FEATURE: BUG-20 — only aggregate real LLM model strings; filter service names and junk values
+    if (!m.startsWith('claude-') && !m.startsWith('text-embedding-')) continue;
     if (!byLLM[m]) byLLM[m] = { model: m, calls: 0, cost: 0, tokensIn: 0, latencies: [] };
     byLLM[m].calls++;
     byLLM[m].cost += e.cost || 0;
