@@ -1,4 +1,4 @@
-// DeepBench v5.2.22 | api/prompt/ai-enrichment.js | enrichPrompt named export
+// DeepBench v5.2.27 | api/prompt/ai-enrichment.js | AA-60 reflect_prompt from traits + AA-61 synthesis_prompt from traits
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -136,17 +136,14 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey) {
       try {
+        // FEATURE: AA-60 — use traits.reflect_prompt from fetch_instruction when present
         const fi = reflectSection.fetch_instruction;
         const identityText = renderedMap["identity"] || renderedMap["behavior"] || "";
         const knowledgeText = renderedMap["knowledge"] || Object.entries(renderedMap).find(([k]) => k.startsWith("knowledge-"))?.[1] || "";
 
-        const reflectPrompt = `You are ${identityText ? identityText.split("\n")[0] : "an AI agent"}. Review your background knowledge and the task below. Write a numbered execution plan that reflects your role, incorporates relevant knowledge, and addresses this specific task concretely.
-
-${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n` : ""}
-## SPECIFIC TASK
-${taskContextStr}
-
-Write a numbered execution plan. Be concrete — reference specific knowledge where it applies.`;
+        const reflectPrompt = fi.reflect_prompt
+          ? `${fi.reflect_prompt}\n\n${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n\n` : ""}## SPECIFIC TASK\n${taskContextStr}\n\nWrite a numbered execution plan. Be concrete — reference specific knowledge where it applies.`
+          : `You are ${identityText ? identityText.split("\n")[0] : "an AI agent"}. Review your background knowledge and the task below. Write a numbered execution plan that reflects your role, incorporates relevant knowledge, and addresses this specific task concretely.\n\n${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n` : ""}\n## SPECIFIC TASK\n${taskContextStr}\n\nWrite a numbered execution plan. Be concrete — reference specific knowledge where it applies.`;
 
         const reflectRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -203,9 +200,11 @@ Write a numbered execution plan. Be concrete — reference specific knowledge wh
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey) {
       try {
-        const synthPrompt = `You are a prompt optimization engine. The prompt below will be sent to an AI agent to complete a task. Rewrite it to be maximally clear, coherent, and efficient. Remove redundancy. Tighten language. Preserve all factual content, all constraints, and all output format instructions exactly. The rewritten prompt must be under ${synthesis.max_tokens || 2048} tokens. Do not add new instructions. Do not remove guardrails or format requirements.
+        // FEATURE: AA-61 — use traits.synthesis_prompt from synthesis object when present
+        const baseInstruction = synthesis.prompt ||
+          "You are a prompt optimization engine. The prompt below will be sent to an AI agent to complete a task. Rewrite it to be maximally clear, coherent, and efficient. Remove redundancy. Tighten language. Preserve all factual content, all constraints, and all output format instructions exactly. Do not add new instructions. Do not remove guardrails or format requirements.";
 
-${assembledPrompt}`;
+        const synthPrompt = `${baseInstruction} The rewritten prompt must be under ${synthesis.max_tokens || 2048} tokens.\n\n${assembledPrompt}`;
 
         const synthRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",

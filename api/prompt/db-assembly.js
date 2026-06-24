@@ -1,4 +1,4 @@
-// DeepBench v5.2.25 | api/prompt/db-assembly.js | AA-58 agents table fetch + AA-66 Identity additive assembly
+// DeepBench v5.2.27 | api/prompt/db-assembly.js | AA-60 reflect_prompt + AA-61 synthesis_prompt + AA-67 deliverable_type in WORK ORDER
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -29,6 +29,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
   let reflectSection = null;
   let synthesisEnabled = false;
   let synthesisDeclaringSlug = null;
+  let synthesisPromptText = null;
   let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
   let llm = { ...DEFAULT_LLM };
 
@@ -157,6 +158,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
           max_tokens: 1024,
           inserts_after: "behavior",
           declared_by: sp.slug,
+          reflect_prompt: traits.reflect_prompt || null,  // FEATURE: AA-60
         },
         required: false,
         order: 4.5,
@@ -167,6 +169,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
     if (techServices.includes("intelligent-synthesis") && !synthesisEnabled) {
       synthesisEnabled = true;
       synthesisDeclaringSlug = sp.slug;
+      synthesisPromptText = traits.synthesis_prompt || null;  // FEATURE: AA-61
     }
   }
 
@@ -175,7 +178,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
   sections.sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const synthesis = synthesisEnabled
-    ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug }
+    ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
   return { sections, formatContract, synthesis, llm };
@@ -289,18 +292,23 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
 
   const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow);
 
-  // FEATURE: AA-57 — inject goal as WORK ORDER section so LLM receives the actual task
+  // FEATURE: AA-62 + AA-67 — WORK ORDER section: goal + deliverable_type always present when goal exists
   const goalText = typeof task_context === 'object' && task_context !== null
     ? (task_context.goal || null)
     : (typeof task_context === 'string' ? task_context : null);
+  const deliverableType = typeof task_context === 'object' && task_context !== null
+    ? (task_context.deliverable_type || null)
+    : null;
 
   if (goalText && goalText.trim()) {
+    const workOrderParts = [`Goal: ${goalText.trim()}`];
+    if (deliverableType) workOrderParts.push(`Deliverable type: ${deliverableType}`);
     sections.push({
       slug: 'work-order',
       label: 'WORK ORDER',
       skill_profile_slug: null,
       type: 'stored',
-      content: goalText.trim(),
+      content: workOrderParts.join('\n'),
       fetch_instruction: null,
       required: true,
       order: 2.5,
