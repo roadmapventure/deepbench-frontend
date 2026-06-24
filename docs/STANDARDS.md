@@ -353,6 +353,7 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |
 | 2026-06-09 | BUG-10 added — missing `pdf-parse` + `jszip` in package.json. Dependency audit rule added: every api/ import must exist in package.json dependencies before commit. |
 | 2026-06-24 | Section 11 added — agent build completeness standard. Every agent must ship all 23 required fields + AVATAR_CFG + AGENT_PRONOUNS + Supabase row in one session. No partial entries. Root cause: Victoria Chen shipped without standard fields; RosterScreen crashed on `trainableBy.toUpperCase()`. |
+| 2026-06-24 | Section 12 added — canonical model ID standard (BUG-20) and SERVICE_CATALOG roadmap update rule (BUG-22). Root cause: short-form model IDs in logAICall() call sites split model rows in AI Audit; services shipped without updating roadmap field left live services listed in Platform Roadmap. |
 
 ---
 
@@ -397,3 +398,26 @@ Every agent added to `src/data/agents.js` MUST include ALL of the following fiel
 - [ ] Navigate to Bench tab — agent card renders without console errors
 - [ ] Click agent card — Personnel File opens
 - [ ] Zero red errors in DevTools Console
+
+---
+
+## Section 12: Canonical Model ID Standard
+
+### Canonical Anthropic model IDs (always use these exact strings)
+
+| Short-form (DO NOT USE) | Canonical (USE THIS) |
+|-------------------------|----------------------|
+| `claude-haiku-4-5` | `claude-haiku-4-5-20251001` |
+| `claude-sonnet-4-5` | `claude-sonnet-4-6` |
+
+**Rule:** Never use short-form model IDs in `logAICall()` call sites or server-side `ai_activity_log` inserts. Always use the canonical versioned string. `MODEL_ID_NORMALIZE` in `useAIActivity.js` normalizes legacy short-form IDs as a safety net — it is not a license to keep using short-form IDs in new code.
+
+**Why:** The AI Audit panel groups by model string. Short-form and full-version IDs produce two separate rows for the same model, splitting cost and call counts. An AI Transparency screen with fragmented model data or "Unknown provider" labels fails its purpose.
+
+### SERVICE_CATALOG roadmap field rule
+
+When any `api/` route or service capability ships in a coding session, that session MUST update the corresponding `SERVICE_CATALOG` entry in `useAIActivity.js` from `roadmap: 'next'` (or `'later'`) to `roadmap: 'now'` in the same commit.
+
+The Platform Roadmap section of the AI Audit panel shows all services where `roadmap !== 'now'`. A live service appearing in the roadmap is incorrect and will mislead any architect reviewing the panel.
+
+**Add to CLAUDE-DESIGN.md AI Audit wiring checklist:** "SERVICE_CATALOG `roadmap` updated to `'now'` for any service that ships in this session."

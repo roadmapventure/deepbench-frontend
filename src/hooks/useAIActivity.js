@@ -1,4 +1,4 @@
-// DeepBench v5.2.35 | useAIActivity.js | BUG-17 add Reflection to ai-enrichment SERVICE_CATALOG
+// DeepBench v5.2.37 | useAIActivity.js | BUG-20/21/22 byLLM filter, MODEL_PROVIDER, MODEL_ID_NORMALIZE, SERVICE_CATALOG roadmap
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -9,19 +9,23 @@ import { supabase } from '../lib/supabase.js';
 
 // FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
 export const SERVICE_CATALOG = [
-  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'next' },
+  // FEATURE: BUG-22 — prompt-assembly is live; move off roadmap
+  { slug: 'prompt-assembly',         name: 'Prompt Assembly',          serviceType: 'hybrid', patterns: ['Prompt Chaining','RAG'],                                      roadmap: 'now'  },
   // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
   // FEATURE: BUG-17 — Reflection is live (BUG-15 active:true); surface it in AI Audit By Service view
-  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection'],                                roadmap: 'next' },
+  // FEATURE: BUG-22 — ai-enrichment is live (16 calls); move off roadmap
+  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection'],                                roadmap: 'now'  },
   // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
-  { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'next' },
+  // FEATURE: BUG-22 — request-receivable shipped in S-PM-04b
+  { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'now'  },
   // FEATURE: AW-27 — goal suggestion: streaming Haiku + RAG
   { slug: 'goal-suggestion',         name: 'Goal Suggestion',          serviceType: 'ai',     patterns: ['Streaming', 'RAG'],                                                                           roadmap: 'now'  },
   // FEATURE: AW-28 — preview-prompt: DB Assembly + AI Enrichment without LLM call
   { slug: 'preview-prompt',          name: 'Prompt Preview',           serviceType: 'preview', patterns: ['RAG'],                                                                                        roadmap: 'now'  },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
-  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'next' },
+  // FEATURE: BUG-22 — knowledge-reinforcement live via TeachScreen + FetchContext
+  { slug: 'knowledge-reinforcement', name: 'Knowledge Reinforcement',   serviceType: 'ai',     patterns: ['Embeddings','Structured Output'],                             roadmap: 'now'  },
   { slug: 'pre-run-planning',        name: 'Pre-Run Planning',          serviceType: 'ai',     patterns: ['RAG'],                                                        roadmap: 'next' },
   { slug: 'task-planning',           name: 'Task Planning',             serviceType: 'ai',     patterns: ['Tool Use','Structured Output','Streaming'],                   roadmap: 'now'  },
   { slug: 'title-generation',        name: 'Title Generation',          serviceType: 'ai',     patterns: ['Structured Output'],                                          roadmap: 'now'  },
@@ -113,10 +117,13 @@ const COST_PER_1K = {
   "text-embedding-3-small": 0.00002,
 };
 
+// FEATURE: BUG-20 — add canonical versioned model IDs; keep legacy short-form for historical rows
 const MODEL_PROVIDER = {
-  "claude-haiku-4-5":       "Anthropic",
-  "claude-sonnet-4-5":      "Anthropic",
-  "text-embedding-3-small": "OpenAI",
+  "claude-haiku-4-5":            "Anthropic",
+  "claude-haiku-4-5-20251001":   "Anthropic",
+  "claude-sonnet-4-5":           "Anthropic",
+  "claude-sonnet-4-6":           "Anthropic",
+  "text-embedding-3-small":      "OpenAI",
 };
 
 // ── Module-level store ────────────────────────────────────────────────────────
@@ -125,10 +132,17 @@ let _listeners = [];
 
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
+// FEATURE: BUG-20 — normalize short-form model IDs to canonical versioned IDs at write time
+const MODEL_ID_NORMALIZE = {
+  'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5': 'claude-sonnet-4-6',
+};
+
 // FEATURE: AI-16 — logAICall Supabase persistence
 // FEATURE: AA-44 — logAICall gains optional patterns_used param
 export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null, patterns_used = [] }) {
-  const resolvedModel = model || AI_TYPES[type]?.model || "claude-haiku-4-5";
+  // FEATURE: BUG-20 — normalize + canonical fallback
+  const resolvedModel = MODEL_ID_NORMALIZE[model] || model || MODEL_ID_NORMALIZE[AI_TYPES[type]?.model] || AI_TYPES[type]?.model || "claude-haiku-4-5-20251001";
   const entry = {
     id:        Date.now() + Math.random(),
     type,
@@ -224,6 +238,8 @@ export function useAIActivity() {
   const byLLM = {};
   for (const e of log) {
     const m = e.model || "unknown";
+    // FEATURE: BUG-20 — only aggregate real LLM model strings; filter service names and junk values
+    if (!m.startsWith('claude-') && !m.startsWith('text-embedding-')) continue;
     if (!byLLM[m]) byLLM[m] = { model: m, calls: 0, cost: 0, tokensIn: 0, latencies: [] };
     byLLM[m].calls++;
     byLLM[m].cost += e.cost || 0;
