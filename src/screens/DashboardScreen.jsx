@@ -619,7 +619,7 @@ export default function DashboardScreen() {
           </div>
 
           {/* Right: chat panel */}
-          <div style={{flexShrink:0,width:340,position:"sticky",top:0,paddingLeft:24}}>
+          <div style={{flexShrink:0,width:340,position:"sticky",top:0,paddingLeft:24,marginLeft:"auto"}}>
             <ChatPanel/>
           </div>
         </div>
