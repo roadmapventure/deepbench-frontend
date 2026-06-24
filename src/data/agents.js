@@ -1,4 +1,4 @@
-// DeepBench v5.2.26 | agents.js | AG-13 Dan Bingham (PS-01) added to roster
+// DeepBench v5.2.28 | agents.js | AG-14/15/16 three editor agents added
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -107,6 +107,39 @@ export const AGENTS = [
     color: T.moss,
     isPromptArchitect: true,
   },
+  // FEATURE: AG-14 — Alex Reeves (ED-01) Screen Controls Editor
+  {
+    id: "alex", name: "Alex Reeves", role: "Screen Controls Editor",
+    code: "ED-01", hiredOn: "Jun 2026", trainer: "RMV", arch: "LLM Format",
+    specialty: "UI Field Mapping · Structured Component Assembly · Data-Driven Layouts",
+    salary: 90000, value: 95000, hourly: 47, reportHrs: 1, reportCost: 47,
+    docs: 0, classes: 0, chunks: 0, skill: 72, situational: 30,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: '"Content knows what to say. I decide where it lives on the screen."',
+    color: T.brass,
+  },
+  // FEATURE: AG-15 — Riley Torres (ED-02) HTML Display Editor
+  {
+    id: "riley", name: "Riley Torres", role: "HTML Display Editor",
+    code: "ED-02", hiredOn: "Jun 2026", trainer: "RMV", arch: "LLM Format",
+    specialty: "Web Formatting · Visual Hierarchy · Typography · HTML Presentation",
+    salary: 85000, value: 90000, hourly: 44, reportHrs: 1, reportCost: 44,
+    docs: 0, classes: 0, chunks: 0, skill: 68, situational: 25,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"A well-structured page doesn't need instructions — it just reads itself."`,
+    color: T.brass,
+  },
+  // FEATURE: AG-16 — Claire Sutton (ED-03) PDF Assembly Editor
+  {
+    id: "claire", name: "Claire Sutton", role: "PDF Assembly Editor",
+    code: "ED-03", hiredOn: "Jun 2026", trainer: "RMV", arch: "LLM Format",
+    specialty: "Document Layout · Professional PDF Structure · Formal Presentation Design",
+    salary: 95000, value: 100000, hourly: 50, reportHrs: 1, reportCost: 50,
+    docs: 0, classes: 0, chunks: 0, skill: 75, situational: 28,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: '"Every document is a first impression. I make sure it\'s the right one."',
+    color: T.brass,
+  },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -123,6 +156,10 @@ export const AVATAR_CFG = {
   susan:    { skin:"#e2c4a0", hair:"#5a3a1e", collar:"#3a5a3a", extra:"bun",     border:T.moss  },
   // FEATURE: AG-13 — Dan avatar
   dan: { skin:"#c8a882", hair:"#2a2a2a", collar:"#1a3a4a", extra:"glasses", border:T.moss },
+  // FEATURE: AG-14/15/16 — Editor agent avatars
+  alex:  { skin:"#e0c9a8", hair:"#4a3a2a", collar:"#2a3a52", extra:"glasses", border:T.brass },
+  riley: { skin:"#c8916e", hair:"#1a1a1a", collar:"#3a2a4a", extra:"bob",     border:T.brass },
+  claire:{ skin:"#e8d5b5", hair:"#6a4a2a", collar:"#1e2e3a", extra:"bun",     border:T.brass },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -138,6 +175,10 @@ export const AGENT_PRONOUNS = {
   susan:    { subject:"she", object:"her", possessive:"her" },
   // FEATURE: AG-13 — Dan pronouns
   dan: { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AG-14/15/16 — Editor agent pronouns
+  alex:  { subject:"they", object:"them", possessive:"their" },
+  riley: { subject:"she",  object:"her",  possessive:"her"   },
+  claire:{ subject:"she",  object:"her",  possessive:"her"   },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
