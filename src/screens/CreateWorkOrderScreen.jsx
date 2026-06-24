@@ -778,9 +778,9 @@ export default function CreateWorkOrderScreen() {
             {planGenerated && (
               <div style={{position:"relative",marginTop:12}}>
                 <FeatureBadge id="AW-UX-08" />
-                <button onClick={generatePlan} disabled={!canGenerate||generating}
-                  style={{width:"100%",padding:"11px",background:!canGenerate||generating?T.line:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:!canGenerate||generating?T.muted:T.navy,fontFamily:display,fontSize:14,fontWeight:700,cursor:!canGenerate||generating?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <AiBadge label={AI_PAT.TASK_PLANNING}/> {generating ? "Planning agent is building your work order…" : "Re-generate Plan"}
+                <button disabled
+                  style={{width:"100%",padding:"11px",background:T.line,border:"none",color:T.muted,fontFamily:display,fontSize:14,fontWeight:700,cursor:"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  Re-generate Plan
                 </button>
               </div>
             )}
