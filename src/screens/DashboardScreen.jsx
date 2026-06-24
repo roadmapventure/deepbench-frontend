@@ -564,10 +564,10 @@ export default function DashboardScreen() {
         </div>
 
         {/* 2-col layout */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,alignItems:"start"}}>
+        <div style={{display:"flex",alignItems:"start"}}>
 
           {/* Left: task list */}
-          <div style={{paddingRight:24,borderRight:`1px solid ${T.lineSoft}`}}>
+          <div style={{flex:"0 0 50%",boxSizing:"border-box",paddingRight:24,borderRight:`1px solid ${T.lineSoft}`}}>
             {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Orders</div>
 
@@ -619,7 +619,7 @@ export default function DashboardScreen() {
           </div>
 
           {/* Right: chat panel */}
-          <div style={{position:"sticky",top:0,paddingLeft:24}}>
+          <div style={{flexShrink:0,width:340,position:"sticky",top:0,paddingLeft:24}}>
             <ChatPanel/>
           </div>
         </div>
