@@ -209,6 +209,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       task_context,
       agent_id: null,
       capability_slug: null,
+      agent_card: null,
       sections: [],
       format_contract: DEFAULT_FORMAT_CONTRACT,
       synthesis: DEFAULT_SYNTHESIS,
