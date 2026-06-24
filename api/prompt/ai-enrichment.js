@@ -1,4 +1,4 @@
-// DeepBench v5.2.29 | api/prompt/ai-enrichment.js | BUG-12 enrichment log writes
+// DeepBench v5.2.34 | api/prompt/ai-enrichment.js | BUG-12p tenant_id fix for reflect + synthesis logs
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -255,6 +255,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
         method: "POST",
         headers: sbHeaders,
         body: JSON.stringify({
+          tenant_id: 'global',   // FEATURE: BUG-12p — was missing; hydrateFromSupabase filters by tenant_id='global'
           agent_id: 'dan',
           ai_type: 'reflect',
           model: reflectModel,
@@ -271,6 +272,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
         method: "POST",
         headers: sbHeaders,
         body: JSON.stringify({
+          tenant_id: 'global',   // FEATURE: BUG-12p — was missing; hydrateFromSupabase filters by tenant_id='global'
           agent_id: 'dan',
           ai_type: 'synthesis',
           model: synthesisModel,
