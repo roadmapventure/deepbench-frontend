@@ -463,6 +463,17 @@ Triggered when user clicks Generate Plan on the Create Work Order screen. Fires 
 
 ---
 
+## Section 17 — Agent Avatar Visibility Rule (Locked 2026-07-01 · S-LIBRARIAN-01c-design)
+
+Any UI element that attributes an action to a specific agent — primary execution (agent picker, roster, step cards) or secondary/collaboration credit (e.g. Dan Bingham's Prompt Service chip) — must render that agent's `AgentAvatar`, never a name-only text badge.
+
+- **Shape:** `<AgentAvatar who={agentId} size={18} ring={false} />` immediately before the text it labels, inside the same flex row.
+- **Precedent:** `StepList.jsx` (~line 133/139) — avatar + text span, `gap: 5`.
+- **Retrofit example:** Dan Bingham's collaboration chip in `PromptEvolutionModal.jsx` (S-LIBRARIAN-01c) — the colored `"Dan Bingham PS-01"` text badge gained an avatar to its left; the text badge itself was not removed.
+- Any new agent-attribution UI must ship avatar-inclusive from day one — not retrofitted later.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
@@ -472,4 +483,5 @@ Triggered when user clicks Generate Plan on the Create Work Order screen. Fires 
 | 2026-06-09 | S-MIGRATE-03 | Inline sub-view pattern (PE-10) |
 | 2026-06-09 | S-MIGRATE-03-patch | AiBadge color rule: match button label color. No badge on Cancel state. |
 | 2026-06-09 | S-BENCH-UX-01 | AiBadge known limitation: not visually distinct on brass backgrounds — blocked pending RO-08 design in S-BENCH-UX-02. |
+| 2026-07-01 | S-LIBRARIAN-01c-design | Section 17 added — Agent Avatar Visibility Rule locked (AA-73): any agent-attribution UI, primary or collaboration credit, must render `AgentAvatar`, never name-only text. |
 | 2026-06-09 | S-BENCH-UX-02 | RO-08 resolved: AiBadge on brass = navy chip override; on moss = white chip override. Badge stays inside button. No badge on non-AI actions (file browse). |
