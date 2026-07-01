@@ -57,7 +57,7 @@ All six are full DeepBench personas (agents.js entry, AVATAR_CFG, AGENT_PRONOUNS
 | 1 | **GEO CSO Expert** (CI-01) | Performance Strategist | Answers from the Data Room; classifies intent; conversational routing |
 | 2 | **Forecast/Theory/Performance Expert** | Hypothesis Generator + Stress Test (orig. v3 spec Agents 2+3) | Generates hypotheses; stress-tests Theory/Forecast/Correct claims against evidence — "Performance" = domain scope (channel/program performance), not a distinct call |
 | 3 | **Data Expert** (AG-19, expanded Data Builder) | Data Builder | Retrieval, ingestion, cleaning, updating, restoring. Owns Escalate execution and data-integrity patches |
-| 4 | **The Proofreader** | Guardrail (PAT-13) + Eval (PAT-19) | Pre-display rule enforcement + quality scoring, unified |
+| 4 | **The Proofreader** | Guardrail (`guardrails` pattern) + Eval (`llm-as-judge` pattern) | Pre-display rule enforcement + quality scoring, unified |
 | 5 | **The Intake Assistant** | Decision Maker (orig. Agent 6, deprecated) | Post-decision pipeline routing: commit triage, failure triage |
 | 6 | **The Reasoner** (AG-20, Supreme Reasoner) | Supreme Reasoner | Memory Consolidation — synthesizes a committed correction into reusable institutional memory. Execution (embed + write) hands off to **Susan Smith (TR-08)**, the platform's existing Trainer agent — not duplicated here, see §5.10 |
 
@@ -305,7 +305,7 @@ Two elements on first load, replacing v4's three hand-authored fake chat exchang
 
 A real, honest stat, not decoration — proves the platform pitch ("capabilities are independent of agents, shared resources built once") with this specific build rather than asserting it abstractly. Three counts, each expandable to the underlying list:
 
-- **10 existing platform capabilities reused as-is** — Display Agent (Alex/Riley), Dan Bingham's Prompt Service, `queryRAG()`, `checkRouting()`/Agent Routing, `web-memory.js`'s embed-upsert pipeline, `ingest.js`'s pipeline, Guardrails (PAT-13), LLM-as-Judge (PAT-19), `ai_activity_log`/HITL (PAT-10), **Susan Smith's reinforcement pipeline (PE-03, now agent-triggered for the first time — see §5.10)**
+- **10 existing platform capabilities reused as-is** — Display Agent (Alex/Riley), Dan Bingham's Prompt Service, `queryRAG()`, `checkRouting()`/Agent Routing, `web-memory.js`'s embed-upsert pipeline, `ingest.js`'s pipeline, Guardrails (`guardrails` pattern), LLM-as-Judge (`llm-as-judge` pattern), `ai_activity_log`/HITL (PAT-10), **Susan Smith's reinforcement pipeline (PE-03, now agent-triggered for the first time — see §5.10)**
 - **5 new mechanisms built here, generalizable platform-wide** — Memory Consolidation versioning (`is_baseline`/`status`/`supersedes_id`), the 5-intent front-door model, the Intake Assistant triage pattern, the Intelligence Review Display card format, the Proofreader unified-persona pattern
 - **3 genuinely domain-specific, not transferable** — the CSO's Data Room content, GEO CSO Expert's Identity/Knowledge, the specific Capability slug instances (other domains would need their own instance, even reusing the same call-shape templates)
 
