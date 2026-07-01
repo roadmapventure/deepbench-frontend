@@ -1,4 +1,4 @@
-// DeepBench v5.2.31 | src/data/agents.js | AG-17p Victoria complete entry
+// DeepBench v5.3.0 | agents.js | AG-18/19/20/21/22/23 Apple Channel roster (6 personas) added
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -152,6 +152,78 @@ export const AGENTS = [
     color: T.navy,
     isProductStrategist: true,
   },
+  // FEATURE: AG-18 — Marcus Webb (CI-01) GEO CSO Expert
+  {
+    id: "marcus", name: "Marcus Webb", role: "GEO CSO Expert",
+    code: "CI-01", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Deep Prompt",
+    specialty: "Channel Performance Analysis · Sourced Q&A · Intent Classification",
+    salary: 115000, value: 135000, hourly: 60, reportHrs: 2, reportCost: 120,
+    docs: 0, classes: 0, chunks: 0, skill: 82, situational: 38,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"I own the world's channels."`,
+    color: T.brass,
+    isAppleChannel: true,
+  },
+  // FEATURE: AG-21 — Priya Nair (CI-02) Forecast/Theory/Performance Expert
+  {
+    id: "priya", name: "Priya Nair", role: "Forecast/Theory/Performance Expert",
+    code: "CI-02", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Deep Prompt",
+    specialty: "Hypothesis Generation · Stress Testing · Evidentiary Rigor",
+    salary: 110000, value: 130000, hourly: 57, reportHrs: 2, reportCost: 114,
+    docs: 0, classes: 0, chunks: 0, skill: 80, situational: 42,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"A theory that survives stress testing earns the name forecast."`,
+    color: T.moss,
+    isAppleChannel: true,
+  },
+  // FEATURE: AG-19 — Nadia Farouk (CI-03) Data Expert
+  {
+    id: "nadia", name: "Nadia Farouk", role: "Data Expert",
+    code: "CI-03", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Data Pipeline",
+    specialty: "Corpus Retrieval · Data Integrity · Escalation Research",
+    salary: 105000, value: 120000, hourly: 55, reportHrs: 1, reportCost: 55,
+    docs: 0, classes: 0, chunks: 0, skill: 78, situational: 35,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"Nothing gets erased. Everything gets superseded."`,
+    color: T.moss,
+    isAppleChannel: true,
+  },
+  // FEATURE: AG-22 — Owen Marsh (CI-04) The Proofreader
+  {
+    id: "owen", name: "Owen Marsh", role: "The Proofreader",
+    code: "CI-04", hiredOn: "Jul 2026", trainer: "RMV", arch: "Structured Output",
+    specialty: "Guardrail Enforcement · Quality Scoring · Pre-Display Review",
+    salary: 95000, value: 105000, hourly: 50, reportHrs: 1, reportCost: 50,
+    docs: 0, classes: 0, chunks: 0, skill: 75, situational: 30,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"I don't argue with the answer. I argue with what's missing from it."`,
+    color: T.brass,
+    isAppleChannel: true,
+  },
+  // FEATURE: AG-23 — Sam Reyes (CI-05) The Intake Assistant
+  {
+    id: "sam", name: "Sam Reyes", role: "The Intake Assistant",
+    code: "CI-05", hiredOn: "Jul 2026", trainer: "RMV", arch: "LLM Routing",
+    specialty: "Commit Triage · Failure Triage · Pipeline Routing",
+    salary: 90000, value: 98000, hourly: 47, reportHrs: 1, reportCost: 47,
+    docs: 0, classes: 0, chunks: 0, skill: 70, situational: 28,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"Every decision needs somewhere to go next."`,
+    color: T.brass,
+    isAppleChannel: true,
+  },
+  // FEATURE: AG-20 — Elena Cho (CI-06) The Reasoner
+  {
+    id: "elena", name: "Elena Cho", role: "The Reasoner",
+    code: "CI-06", hiredOn: "Jul 2026", trainer: "RMV", arch: "Structured Output",
+    specialty: "Memory Consolidation · Pattern Synthesis · Institutional Knowledge",
+    salary: 115000, value: 130000, hourly: 60, reportHrs: 1, reportCost: 60,
+    docs: 0, classes: 0, chunks: 0, skill: 84, situational: 40,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"One correction, taught right, answers the next hundred questions."`,
+    color: T.navy,
+    isAppleChannel: true,
+  },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -174,6 +246,13 @@ export const AVATAR_CFG = {
   claire:{ skin:"#e8d5b5", hair:"#6a4a2a", collar:"#1e2e3a", extra:"bun",     border:T.brass },
   // FEATURE: AG-17 — Victoria Chen avatar
   victoria: { skin:"#e8d4b8", hair:"#1a1a2a", collar:"#2a1a3a", extra:"", border:T.navy },
+  // FEATURE: AG-18/19/20/21/22/23 — Apple Channel avatars
+  marcus: { skin:"#d2a679", hair:"#3a2a1a", collar:"#1a2e4a", extra:"glasses", border:T.brass },
+  priya:  { skin:"#8a5a3a", hair:"#1a1a1a", collar:"#2a4a3a", extra:"",        border:T.moss  },
+  nadia:  { skin:"#c48b62", hair:"#2a1a12", collar:"#1e3a2e", extra:"",        border:T.moss  },
+  owen:   { skin:"#e0c2a0", hair:"#5a4a3a", collar:"#2a2a3a", extra:"glasses", border:T.brass },
+  sam:    { skin:"#d8b088", hair:"#3a2a1a", collar:"#2a3a52", extra:"",        border:T.brass },
+  elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -195,6 +274,13 @@ export const AGENT_PRONOUNS = {
   claire:{ subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AG-17 — Victoria Chen pronouns
   victoria: { subject:"she", object:"her", possessive:"her" },
+  // FEATURE: AG-18/19/20/21/22/23 — Apple Channel pronouns
+  marcus: { subject:"he",   object:"him",  possessive:"his"   },
+  priya:  { subject:"she",  object:"her",  possessive:"her"   },
+  nadia:  { subject:"she",  object:"her",  possessive:"her"   },
+  owen:   { subject:"he",   object:"him",  possessive:"his"   },
+  sam:    { subject:"they", object:"them", possessive:"their" },
+  elena:  { subject:"she",  object:"her",  possessive:"her"   },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
