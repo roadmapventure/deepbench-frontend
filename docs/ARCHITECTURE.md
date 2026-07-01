@@ -330,8 +330,10 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 
 ---
 
-### DB Architecture — Target State
-*(Do not build before S-INFRA-01. Design all sessions to not contradict this structure.)*
+### DB Architecture — Current State
+**[CORRECTED 2026-07-01, S-APPLE-02a-design]** This section previously read "Target State... do not build before S-INFRA-01." That was stale: `skill_types` (5 rows), `skill_profiles` (13 rows), `capabilities` (8 rows), `capability_skill_profiles` (13 rows), and `agent_capability_assignments` (8 rows) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()` — confirmed by direct schema query during S-APPLE-02a-design. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill-Profile LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The Taxonomy (Layer 1) and Seniority (Layer 2) tables below are live now — new Capabilities and Skill Profiles can be created against them without waiting for S-INFRA-01.
+
+**Known gap (2026-07-01):** `assemblePrompt()` loads every `skill_profiles` row attached to a `capability_slug` unconditionally — there is no per-call filter when a Capability has more than one Intent-type Skill Profile (e.g. a capability with both a "routing" intent and an "answer" intent would load both into every call). No existing capability has hit this yet; S-APPLE-02b is the first to need it and must add the filter as part of its own scope.
 
 > For the full Skill Profile design guide — Traits, Capabilities assembly, Technical Services invocation,
 > domain-agnostic principle, sprint template — see **docs/SKILL-PROFILE-MODEL.md**.
