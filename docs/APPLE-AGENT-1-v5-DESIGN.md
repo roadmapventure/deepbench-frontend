@@ -278,7 +278,8 @@ Scope: Memory Consolidation is built for Market Intelligence only in this pass. 
 
 ## 10. ROADMAP ITEMS LOGGED, NOT BUILT NOW
 
-- **MI-07** (`FEATURES.md`) — per-GEO and per-GEO-per-program specialist agents, a depth path beyond this platform-wide 5-... now 6-agent model
+- **MI-07** (`FEATURES.md`) — per-GEO and per-GEO-per-program specialist agents, a depth path beyond this platform-wide 6-agent model
+- **AG-25 / AG-26** (`FEATURES.md`) — Emerging Market Prioritization Agent (live external data via Brent) and Partner Training Readiness Agent (serves partner reps, not GEO directors) — the 2nd and 3rd agents of the original 3-agent arc, not part of this Market Intelligence build at all. Draft specs preserved in `docs/DEEPBENCH-APPLE-BUILD-PLAN.md`, not yet designed in depth
 - Platform-wide generalization of Memory Consolidation beyond Market Intelligence
 - Automated re-evaluation triggers for provisional (Forecast) entries beyond "the next relevant interaction picks it up" — no scheduled/background re-check job
 
