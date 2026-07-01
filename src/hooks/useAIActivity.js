@@ -42,6 +42,8 @@ export const SERVICE_CATALOG = [
   { slug: 'librarian',               name: 'The Librarian',             serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
   // FEATURE: MI-10/MI-11 — Channel Intelligence (Marcus/CI-01): Intent Routing + Q&A Answer
   { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG'],                                  roadmap: 'now'  },
+  // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
+  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier'], roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -64,7 +66,8 @@ export const PATTERN_CATALOG = [
   // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
   { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
   { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, patternType: 'structural', partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
-  { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Natural fit for PE-12 Test Agent scoring and AI-24 routing feedback loop' },
+  // FEATURE: MI-12 — llm-as-judge active: true (Quality Gate ships this session)
+  { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: true,  patternType: 'reasoning' },
   { slug: 'multi-agent-debate',       name: 'Multi-Agent Debate',           desc: 'Two agents take opposing positions and argue against each other\'s output; a synthesis agent reads both arguments and produces a reconciled final answer. Agents are adversarially aware — each sees the other\'s response.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Extends Test Team (TT-01/02); adds critique pass + synthesis agent. TT-03 design session required.' },
   { slug: 'chain-of-verification',    name: 'Chain-of-Verification (CoVe)', desc: 'After generating an answer, the model generates a checklist of verification questions about its own factual claims, answers each independently, then revises the original answer. Targets factual accuracy claim by claim.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'High compliance relevance for government procurement deliverables. No implementation planned yet.' },
   { slug: 'episodic-memory',          name: 'Episodic Memory',              desc: 'Agents recall the context of prior interactions with a specific user, task, or organization — separate from factual knowledge in RAG. RAG retrieves facts; episodic memory retrieves experience.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Differentiates AI workforce (colleagues with history) from AI tools (stateless responders). Phase 3+.' },
@@ -94,6 +97,7 @@ const AI_TYPE_TO_SERVICE = {
   librarian:            'librarian',
   ci_routing:           'channel-intelligence',
   ci_answer:            'channel-intelligence',
+  quality_gate_review: 'quality-gate',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────

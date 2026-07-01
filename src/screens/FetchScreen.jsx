@@ -119,10 +119,10 @@ function RunningScreen({ taskId }) {
           reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
-        const uploadRes = await fetch("/api/upload-csv", {
+        const uploadRes = await fetch("/api/extract", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ fileBase64: base64, taskId, tenantId: TENANT_ID }),
+          body:    JSON.stringify({ action: "upload-csv", fileBase64: base64, taskId, tenantId: TENANT_ID }),
         });
         const json = await uploadRes.json();
         if (json.path) console.log("Fetched CSV saved to Storage:", json.path);
