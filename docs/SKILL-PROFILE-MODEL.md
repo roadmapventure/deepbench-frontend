@@ -22,7 +22,7 @@ and reusable. The Skill Profile is specific, configurable, and owned.
 |------|-----------------|----------------------|
 | **Identity** | Who the agent is — mindset, philosophy, personality | Philosophy, Autonomy Level, Skeptic Level |
 | **Behavior** | HOW the agent thinks and communicates — approach, style | Executive Communication Style, Risk-First Framing |
-| **Knowledge** | What the agent knows — domain facts, training corpus | Procurement Domain, HR & Workforce Domain |
+| **Knowledge** | What the agent knows — domain facts, Library content | Procurement Domain, HR & Workforce Domain |
 | **Intent** | WHAT the agent is instructed to do — sections, objectives | Data Analysis, Research & Synthesis |
 | **Format** | The OUTPUT TYPE the agent produces | Analysis Report (HTML), Executive Brief (PDF) |
 
@@ -373,7 +373,7 @@ agent_capability_assignments (
 - Agent assignment: fully registry-driven via SP-PM-02 — no hardcoded routing. Gap steps are created and preserved in the Execution Plan, never dropped.
 
 **Future additions to this Capability:**
-- `episodic-memory` Knowledge Skill → past Work Orders embedded as training corpus (Orchestrator gets smarter over time)
+- `episodic-memory` Knowledge Skill → past Work Orders embedded into the Library (Orchestrator gets smarter over time)
 
 **Full spec:** `docs/EXECUTION-DELIVERY-MODEL.md` Sections 5–6
 

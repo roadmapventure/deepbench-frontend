@@ -576,7 +576,7 @@ Distinct skills required to run the complete execution pipeline end-to-end:
 **Knowledge Skills**
 1. Capability Registry — SP-PM-05
 2. Domain Knowledge — per executor agent (RAG over knowledge_entries)
-3. Episodic Memory — past completed Work Orders (future training corpus for Orchestrator)
+3. Episodic Memory — past completed Work Orders (future Library content for Orchestrator)
 
 ---
 

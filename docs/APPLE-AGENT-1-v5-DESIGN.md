@@ -22,11 +22,11 @@ v4 is a fully scripted UI mock — every "decision" in it (does an answer need r
 
 ## 2. INTERACTION PHILOSOPHY
 
-**The agent reasons and argues; the human declares intent and commits.** The agent never infers or auto-selects the human's intent on their behalf, especially for any action that writes to the corpus. This is the one hard line in an otherwise fully agent-orchestrated flow:
+**The agent reasons and argues; the human declares intent and commits.** The agent never infers or auto-selects the human's intent on their behalf, especially for any action that writes to the Data Room. This is the one hard line in an otherwise fully agent-orchestrated flow:
 
 - **Deterministic, by design (not "hardcoded wizard leftovers"):** intent confirmation, hypothesis selection/writing, and the final commit action (Discard / Track as Assumption / Make Permanent) — these are explicit human-decision affordances. Forcing an explicit human decision at consequential points is the entire point of HITL.
-- **Agent-orchestrated:** whether an answer needs review, how many hypotheses get generated and what they say, whether a hypothesis is supported or complicated by evidence, whether a corpus dispute is real, what gets consolidated into memory, whether a failure should suggest escalation. None of this is scripted.
-- **Consequence-weighted confirmation:** non-destructive actions (Q&A, exploring a Theory) can proceed straight from agent classification. Corpus-writing actions (Forecast, Correct) always require an explicit human click.
+- **Agent-orchestrated:** whether an answer needs review, how many hypotheses get generated and what they say, whether a hypothesis is supported or complicated by evidence, whether a Data Room dispute is real, what gets consolidated into memory, whether a failure should suggest escalation. None of this is scripted.
+- **Consequence-weighted confirmation:** non-destructive actions (Q&A, exploring a Theory) can proceed straight from agent classification. Data Room-writing actions (Forecast, Correct) always require an explicit human click.
 
 ---
 
@@ -38,9 +38,9 @@ Five intents, classified fresh on every chat submission — this is the front do
 |---|---|---|
 | **Q/A** | A genuine question | None — informational |
 | **Run a Theory** | Director wants to test a hunch | None if discarded — exploratory |
-| **Forecast** | Track a provisional assumption | Writes to corpus, `ingest_scope: provisional` |
-| **Correct** | Assert a permanent correction to data or reasoning | Writes to corpus, `ingest_scope: permanent` |
-| **Escalate** | Request deeper research | Writes new corpus content |
+| **Forecast** | Track a provisional assumption | Writes to the Data Room, `ingest_scope: provisional` |
+| **Correct** | Assert a permanent correction to data or reasoning | Writes to the Data Room, `ingest_scope: permanent` |
+| **Escalate** | Request deeper research | Writes new Data Room content |
 
 **Approve is not a top-level intent** — it's a possible *response* within reviewing a flagged Q&A answer (the director confirms the original answer was fine), not a way of initiating a turn.
 
@@ -54,7 +54,7 @@ All six are full DeepBench personas (agents.js entry, AVATAR_CFG, AGENT_PRONOUNS
 
 | # | Agent | Replaces / absorbs | Job |
 |---|---|---|---|
-| 1 | **GEO CSO Expert** (CI-01) | Performance Strategist | Answers from the corpus; classifies intent; conversational routing |
+| 1 | **GEO CSO Expert** (CI-01) | Performance Strategist | Answers from the Data Room; classifies intent; conversational routing |
 | 2 | **Forecast/Theory/Performance Expert** | Hypothesis Generator + Stress Test (orig. v3 spec Agents 2+3) | Generates hypotheses; stress-tests Theory/Forecast/Correct claims against evidence — "Performance" = domain scope (channel/program performance), not a distinct call |
 | 3 | **Data Expert** (AG-19, expanded Data Builder) | Data Builder | Retrieval, ingestion, cleaning, updating, restoring. Owns Escalate execution and data-integrity patches |
 | 4 | **The Proofreader** | Guardrail (PAT-13) + Eval (PAT-19) | Pre-display rule enforcement + quality scoring, unified |
@@ -98,7 +98,7 @@ Trigger: CI-01 answer flagged `needs_review: true` and the director hasn't alrea
 ### 5.4 Forecast/Theory/Performance Expert — Stress Test (Sonnet)
 Trigger: director selects or writes a hypothesis — fires **before** commit (v4 bug: fired only after commit, too late to inform the decision).
 
-**Output is a real analyst-style artifact — "Intelligence Review" — not three loose paragraphs and one fixed chart.** Routes through the existing Display Agent (Alex/Riley) via its "Recommendation mode: structured market intelligence card" format (`APPLE-CORPUS-SOURCE-DATA.md`'s recovered original spec) rather than bespoke Market Intelligence screen rendering — same rule as everywhere else in the platform, display agents are the single source of truth for presentation output. This is a real dependency to build in S-APPLE-03, not just a frontend styling choice.
+**Output is a real analyst-style artifact — "Intelligence Review" — not three loose paragraphs and one fixed chart.** Routes through the existing Display Agent (Alex/Riley) via its "Recommendation mode: structured market intelligence card" format (`APPLE-DATA-ROOM-SOURCE-DATA.md`'s recovered original spec) rather than bespoke Market Intelligence screen rendering — same rule as everywhere else in the platform, display agents are the single source of truth for presentation output. This is a real dependency to build in S-APPLE-03, not just a frontend styling choice.
 
 ```json
 // input
@@ -129,7 +129,7 @@ Trigger: director selects or writes a hypothesis — fires **before** commit (v4
 // output
 { "new_chunks": [ { "content": "string", "source": "string", "data_type": "sourced | inferred | synthesized", "geo": "string | null", "program_area": "string | null" } ], "summary": "string", "citations": ["chunk_id", "..."] }
 ```
-Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Theory/Performance Expert to re-run Stress Test against the enriched corpus.
+Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Theory/Performance Expert to re-run Stress Test against the enriched Data Room.
 
 ### 5.6 Data Expert — Data Integrity Patch (Sonnet)
 Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit disputes a specific existing chunk, not just an interpretation).
@@ -137,7 +137,7 @@ Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit
 // input: { "disputed_chunk_id": "string | null", "correction": "string", "director_reasoning": "string" }
 // output: { "action": "patch | supersede | restore | no_action", "chunk_id": "string | null", "updated_content": "string | null", "version_note": "string" }
 ```
-Never overwrites in place — always inserts a new row that supersedes the original (see §7, Corpus Versioning).
+Never overwrites in place — always inserts a new row that supersedes the original (see §7, Data Room Versioning).
 
 ### 5.7 The Proofreader — combined Guardrail + Eval (Haiku)
 ```json
@@ -197,7 +197,7 @@ This is a genuine platform-wide capability extension, not an Apple-only feature:
 
 ## 5b. SKILL PROFILES & CAPABILITIES
 
-Six Capabilities, one per agent — independent of the agent per the Platform Model, the agent holds Seniority in it. **None of the six own a Format Skill** — output formatting stays exclusively with the existing Screen Controls / HTML Display / PDF Assembly agents (locked rule, `ARCHITECTURE.md` §19: content specialists never own Format Skills). Default Level: **L2 (Trained)** for all six on `capability_skill_profiles` — real domain corpus access, not yet self-improving or proprietary. Product/pricing call, not purely technical — confirm or override per agent later.
+Six Capabilities, one per agent — independent of the agent per the Platform Model, the agent holds Seniority in it. **None of the six own a Format Skill** — output formatting stays exclusively with the existing Screen Controls / HTML Display / PDF Assembly agents (locked rule, `ARCHITECTURE.md` §19: content specialists never own Format Skills). Default Level: **L2 (Trained)** for all six on `capability_skill_profiles` — real domain Data Room access, not yet self-improving or proprietary. Product/pricing call, not purely technical — confirm or override per agent later.
 
 Each Capability gets Identity + Behavior + Knowledge Skill Profiles, plus one Intent Skill Profile per distinct call (agents with two calls get two Intent Skill Profiles):
 
@@ -205,7 +205,7 @@ Each Capability gets Identity + Behavior + Knowledge Skill Profiles, plus one In
 |---|---|---|---|
 | GEO CSO Expert | `channel-intelligence` | `ci-identity`, `ci-behavior`, `ci-knowledge` | `ci-answer-intent` (§5.2, `technical_services: [rag, structured-output]`) · `ci-routing-intent` (§5.1, `technical_services: [structured-output]`) |
 | Forecast/Theory/Performance Expert | `hypothesis-evaluation` | `hyp-identity`, `hyp-behavior`, `hyp-knowledge` | `hyp-generation-intent` (§5.3) · `hyp-stress-test-intent` (§5.4, `technical_services: [rag, structured-output]`) |
-| Data Expert | `corpus-operations` | `data-identity`, `data-behavior`, `data-knowledge` | `data-escalate-intent` (§5.5, `technical_services: [rag, embeddings, structured-output]`) · `data-patch-intent` (§5.6) |
+| Data Expert | `data-room-operations` | `data-identity`, `data-behavior`, `data-knowledge` | `data-escalate-intent` (§5.5, `technical_services: [rag, embeddings, structured-output]`) · `data-patch-intent` (§5.6) |
 | The Proofreader | `quality-gate` | `proof-identity`, `proof-behavior`, `proof-knowledge` | `proof-guardrail-intent` · `proof-eval-intent` (§5.7, both `technical_services: [structured-output]`) |
 | The Intake Assistant | `pipeline-triage` | `intake-identity`, `intake-behavior`, `intake-knowledge` | `intake-commit-intent` · `intake-failure-intent` (§5.8–5.9) |
 | The Reasoner | `memory-consolidation` | `reasoner-identity`, `reasoner-behavior`, `reasoner-knowledge` | `reasoner-intent` (§5.10, `technical_services: [structured-output]` — synthesis only; execution hands off to Susan Smith/TR-08, see §5.10) |
@@ -218,14 +218,14 @@ Each Capability gets Identity + Behavior + Knowledge Skill Profiles, plus one In
 - The Intake Assistant: triage judgment — when a correction needs Data Expert's patch vs. Reasoner alone (§5.8)
 - The Reasoner: "logging fixes one answer, pattern synthesis improves a whole class" (§5.10)
 
-**Knowledge Skill Profile content, per agent:** GEO CSO Expert and Forecast/Theory/Performance Expert both scope to the shared Apple corpus via RAG (same `knowledge_entries`, no separate corpus per agent). Data Expert's knowledge is meta — the metadata schema itself, not domain facts. The Proofreader's knowledge is declarative — the 5 Guardrail rules + 5 Eval rubric dimensions. The Intake Assistant's knowledge is the pipeline topology — which agent handles what. The Reasoner's knowledge is meta-awareness of prior consolidated patterns, to relate a new correction to existing ones.
+**Knowledge Skill Profile content, per agent:** GEO CSO Expert and Forecast/Theory/Performance Expert both scope to the shared CSO's Data Room via RAG (same `knowledge_entries`, no separate Data Room per agent — Apple has only this one Data Room today, see `ARCHITECTURE.md` §3). Data Expert's knowledge is meta — the metadata schema itself, not domain facts. The Proofreader's knowledge is declarative — the 5 Guardrail rules + 5 Eval rubric dimensions. The Intake Assistant's knowledge is the pipeline topology — which agent handles what. The Reasoner's knowledge is meta-awareness of prior consolidated patterns, to relate a new correction to existing ones.
 
 Final DB slugs may get bikeshedded at kickoff-doc time — this table is the structure, not a migration script.
 
 ---
 
 ## 6. DATA LAYERS (carried forward, unchanged)
-> Full source data (Datasets 1–6, synthetic scenario outlines, question bank): `docs/APPLE-CORPUS-SOURCE-DATA.md`
+> Full source data (Datasets 1–6, synthetic scenario outlines, question bank): `docs/APPLE-DATA-ROOM-SOURCE-DATA.md`
 
 | Layer | data_type | Citeable | Source |
 |---|---|---|---|
@@ -236,17 +236,19 @@ Final DB slugs may get bikeshedded at kickoff-doc time — this table is the str
 
 ---
 
-## 7. CORPUS VERSIONING & DEMO RESET
+## 7. DATA ROOM VERSIONING & DEMO RESET
 
 **Rule: `knowledge_entries` rows are never overwritten, only ever inserted.** A correction to a baseline chunk always creates a new row superseding it; the original is untouched. This single rule delivers both requirements below without a separate log table.
 
-**Schema additions to `knowledge_entries`** (additive, nullable/defaulted — no existing rows affected):
+**Schema additions to `knowledge_entries`** (additive, nullable/defaulted — no existing rows affected). **Corrected 2026-07-01 against live schema during S-APPLE-01b-design:** `status` already exists on the live table (default `'active'`, currently only ever `'active'` on all 34 rows) — it needs new *values* (`superseded`/`archived`), not a new column. `data_type` and `citeable` — referenced throughout this doc's §3 four-data-layer model — do **not** exist on the live table at all; that's a gap in this migration list, not a documentation-only fix, since nothing enforces or stores confidence-tier tagging today:
 ```sql
+data_type      text default 'sourced'  -- sourced | inferred | synthesized | learned (§3) — NEW, was missing
+citeable       boolean default true    -- NEW, was missing
 is_baseline    boolean default false   -- true only for S-APPLE-01b seed rows
-status         text default 'active'   -- active | superseded | archived
 supersedes_id  uuid null                -- FK to the row this one replaces
 confidence     text null                -- high/medium/low, when written from a HITL decision
 override_flag  boolean null             -- true if written despite an unresolved stress-test complication
+-- status (existing column, unchanged type/default) gains 'superseded' and 'archived' as valid values
 ```
 
 - **Change log:** falls out for free — every correction, escalation ingestion, and Memory Consolidation write is an insert, so full history already exists as ordered rows with reasoning/confidence intact.
@@ -292,10 +294,10 @@ Two elements on first load, replacing v4's three hand-authored fake chat exchang
 1. **Intro text** — a short orientation block explaining what the chat is for and naming the 5 intents (Q/A, Run a Theory, Forecast, Correct, Escalate), so the director understands the range of activity available before typing anything. Static copy (Layer A), but must accurately describe the real intent model in §3, not placeholder text.
 2. **3 curated example questions**, selectable, that fire the real pipeline (not canned text) — chosen to show the range of real agent behavior across a single click each:
    - One **clean sourced answer** (proves RAG + Proofreader working well) — e.g. "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" (cross-references Dataset 1 GEO revenue + Dataset 2 upgrade cycles)
-   - One **needs_review / HITL trigger** (the differentiated moment — Stress Test + Reasoner) — maps to one of the 10 partner scenarios in `docs/APPLE-CORPUS-SOURCE-DATA.md`. Candidate: scenario 3, "Large Retailer — EMEA — Co-op Budget Underutilization Q3" (55% utilization, real ambiguity between an approval-process bottleneck and an enablement problem — rich enough to support multiple genuine hypotheses)
+   - One **needs_review / HITL trigger** (the differentiated moment — Stress Test + Reasoner) — maps to one of the 10 partner scenarios in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md`. Candidate: scenario 3, "Large Retailer — EMEA — Co-op Budget Underutilization Q3" (55% utilization, real ambiguity between an approval-process bottleneck and an enablement problem — rich enough to support multiple genuine hypotheses)
    - One **graceful failure** (proves guardrails are real, not decorative) — e.g. "How is our authorized reseller network performing in Vietnam?"
    
-   **Dependency:** whichever partner scenario is chosen for the HITL example must be fully drafted (not just the outline in `APPLE-CORPUS-SOURCE-DATA.md`) before S-APPLE-01b, since it's carrying the most important single demo moment — prioritize drafting that one first and most carefully.
+   **Dependency:** whichever partner scenario is chosen for the HITL example must be fully drafted (not just the outline in `APPLE-DATA-ROOM-SOURCE-DATA.md`) before S-APPLE-01b, since it's carrying the most important single demo moment — prioritize drafting that one first and most carefully.
 
 ---
 
@@ -305,7 +307,7 @@ A real, honest stat, not decoration — proves the platform pitch ("capabilities
 
 - **10 existing platform capabilities reused as-is** — Display Agent (Alex/Riley), Dan Bingham's Prompt Service, `queryRAG()`, `checkRouting()`/Agent Routing, `web-memory.js`'s embed-upsert pipeline, `ingest.js`'s pipeline, Guardrails (PAT-13), LLM-as-Judge (PAT-19), `ai_activity_log`/HITL (PAT-10), **Susan Smith's reinforcement pipeline (PE-03, now agent-triggered for the first time — see §5.10)**
 - **5 new mechanisms built here, generalizable platform-wide** — Memory Consolidation versioning (`is_baseline`/`status`/`supersedes_id`), the 5-intent front-door model, the Intake Assistant triage pattern, the Intelligence Review Display card format, the Proofreader unified-persona pattern
-- **3 genuinely domain-specific, not transferable** — the Apple corpus content, GEO CSO Expert's Identity/Knowledge, the specific Capability slug instances (other domains would need their own instance, even reusing the same call-shape templates)
+- **3 genuinely domain-specific, not transferable** — the CSO's Data Room content, GEO CSO Expert's Identity/Knowledge, the specific Capability slug instances (other domains would need their own instance, even reusing the same call-shape templates)
 
 Full breakdown: see the reusability review from this design session (chat log) — worth formalizing into its own doc if this becomes a recurring pitch element beyond Apple.
 
@@ -314,7 +316,7 @@ Full breakdown: see the reusability review from this design session (chat log) �
 ## 11. OPEN ITEMS BEFORE CODING
 
 - `knowledge_entries` schema migration (§7) needs to land before any Reasoner/Data Expert writes
-- Corpus seed (S-APPLE-01b — 5 datasets + 3 GEO briefings + 10 partner scenarios) must exist before real RAG retrieval works; synthetic content still needs drafting
+- Data Room seed (S-APPLE-01b — 5 datasets + 3 GEO briefings + 10 partner scenarios) must exist before real RAG retrieval works; synthetic content still needs drafting
 - Session split required — this design spans 6 full agent personas, a new intent-classification pipeline, a schema migration, and a screen rebuild. Cannot be one kickoff doc under the "max 3 files, max 4 tasks" rule. See `CLAUDE-STATE.md` for the proposed session queue.
 
 ### Stress test findings (2026-06-30) — resolve during the sessions tagged, not before
@@ -325,5 +327,5 @@ Full breakdown: see the reusability review from this design session (chat log) �
 4. **No validity/relevance check on custom hypotheses** — free-text hypothesis box accepts anything; Stress Test (§5.4) will reason over even off-topic input, the highest hallucination-risk surface in the whole design — S-APPLE-03
 5. **Curated example questions vs. Intent Routing** — should the 3 on-load examples (§10b) skip classification since intent is already known, or run the real pipeline including Intent Routing for consistency (no special-cased demo path)? Leaning toward always running it real — S-APPLE-02
 6. **Provisional forecasts don't stay visibly provisional** — `confidence_tier` (§5.2) has no tier distinguishing a citation sourced from an unconfirmed Forecast vs. a permanent Correct; a stale Forecast could read as equally authoritative — S-APPLE-02
-7. **Demo Reset mid-flow** — resetting the corpus while a hypothesis flow is open leaves the UI referencing now-archived chunks; reset should probably clear any open flow too — S-APPLE-04
+7. **Demo Reset mid-flow** — resetting the Data Room while a hypothesis flow is open leaves the UI referencing now-archived chunks; reset should probably clear any open flow too — S-APPLE-04
 8. **Loop closure should extend to Stress Test, not just Q&A** (positive finding, demonstrate on purpose) — a repeat theory-test on a consolidated pattern should find stronger `supports` the second time; worth showing deliberately in the Round 4 demo script, not discovering it live — S-APPLE-05

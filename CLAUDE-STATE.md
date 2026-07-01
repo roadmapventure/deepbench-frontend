@@ -3,12 +3,12 @@
 
 **Version in dev:** v5.3.0
 
-**Next session:** S-APPLE-01b — Knowledge corpus seed (5 datasets + 3 GEO briefings + 10 partner scenarios as knowledge_entries) + corpus versioning schema migration (`is_baseline`, `status`, `supersedes_id`, `confidence`, `override_flag`). Synthetic content still needs drafting before this session (see `docs/APPLE-AGENT-1-v5-DESIGN.md` §10b dependency note).
+**Next session:** S-APPLE-01b (coding) — kickoff doc ready: `docs/kickoffs/v5.3.1-S-APPLE-01b-data-room-seed.md`. Start with: "Read docs/kickoffs/v5.3.1-S-APPLE-01b-data-room-seed.md and CLAUDE-STATE.md, then execute it." **Blocked on one open decision first** — see Open Blockers below.
 
 **Last 3 sessions:**
+- S-APPLE-01b-design (v5.3.1, 2026-07-01) — Data Room seed content fully drafted (3 GEO briefings + 10 partner scenarios, was outline-only). Terminology locked: corpus → Data Room (inside "the Library"), swept across all living docs + file rename. AA-70/AA-71/AG-27 named. Schema gap caught and corrected (`data_type`/`citeable` were never added despite being referenced throughout the design). Kickoff doc written, no code touched. Full detail: `docs/SESSIONS.md`.
 - S-APPLE-01a (v5.3.0, cfbf431, 2026-07-01) — AG-18–23 ✅ Done. 6 Apple Channel agents (Marcus, Priya, Nadia, Owen, Sam, Elena) added to `agents.js` + Supabase, all 23 fields + AVATAR_CFG + AGENT_PRONOUNS. 16/16 tests PASS, 9/9 QA PASS. Identity only — no capabilities/skill profiles/API routes yet (deferred to S-APPLE-02 through S-APPLE-05).
 - S-APPLE-01a-design (v5.3.0, 2026-07-01) — Personas locked for all 6 Apple Channel agents. Kickoff doc written, no code touched.
-- Apple v5 Redesign design (2026-06-30) — Market Intelligence rebuilt fully agent-driven, new 6-agent roster, 5-intent front-door model, corpus versioning design. Superseded prior 7-agent/4-schema model. Full spec: `docs/APPLE-AGENT-1-v5-DESIGN.md`.
 
 Full history (all sessions before this window): `docs/SESSIONS.md`
 
@@ -17,7 +17,8 @@ Full history (all sessions before this window): `docs/SESSIONS.md`
 ---
 
 ## Open Blockers
-- None. Q5 resolved 2026-06-13. CAPABILITIES.md + AI-SERVICES.md design complete.
+- **S-APPLE-01b Task 3 needs a decision before it can run:** the seed script's manifest wants `geo`/`program_area`/`partner_id`/`period` as structured fields, but no such columns exist on `knowledge_entries` and they weren't part of the approved §7 migration scope. Three options laid out in the kickoff doc's Task 3 (add 4 more columns / fold into `teaching_note` / fold into `content`) — surfaced while writing the seed script, not decided yet. Ask John before running Task 3.
+- Q5 resolved 2026-06-13. CAPABILITIES.md + AI-SERVICES.md design complete.
 - **Note:** S-INFRA-01 scope may need splitting into 01a (AI Services catalog + 6 extraction jobs) and 01b (capability registry, BYOK, two-speed routing). Decide before S-INFRA-01 design session.
 
 ---
@@ -27,7 +28,7 @@ Full history (all sessions before this window): `docs/SESSIONS.md`
 ### Apple Demo Track
 > Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md`. No deadline-driven scope cuts by explicit direction — sequenced for correctness.
 - S-APPLE-01a (v5.3.0) — 6 agent personas (identity only) in agents.js + Supabase `agents` rows: Marcus Webb, Priya Nair, Nadia Farouk, Owen Marsh, Sam Reyes, Elena Cho (AG-18/19/20/21/22/23) ✅ done (cfbf431)
-- S-APPLE-01b — Knowledge corpus seed (5 datasets + 3 GEO briefings + 10 partner scenarios as knowledge_entries) + corpus versioning schema migration (`is_baseline`, `status`, `supersedes_id`, `confidence`, `override_flag` — design doc §7), seed rows get `is_baseline: true` — synthetic content to be drafted in Claude.ai before this session
+- S-APPLE-01b — Data Room seed (20 rows: 6 real datasets [Dataset 5 splits into 2] + 3 GEO briefings + 10 partner scenarios) + versioning/confidence-tier schema migration (`data_type`, `citeable`, `is_baseline`, `supersedes_id`, `confidence`, `override_flag`) — content drafted, kickoff doc ready, blocked on one open column decision (see Open Blockers)
 - S-APPLE-02 — Front door: Intent Routing + Q&A Answer (GEO CSO Expert) + The Proofreader (Guardrail+Eval unified, `needs_review` two-layer rule) — design doc §5.1, 5.2, 5.7
 - S-APPLE-03 — Forecast/Theory/Performance Expert (Generate Hypotheses + Stress Test, fires before commit) + The Intake Assistant (Commit + Failure Triage) — design doc §5.3, 5.4, 5.8, 5.9
 - S-APPLE-04 — Data Expert (Escalate execution + Data Integrity Patch) + Demo Reset control (UI + reset operation) — design doc §5.5, 5.6, 7

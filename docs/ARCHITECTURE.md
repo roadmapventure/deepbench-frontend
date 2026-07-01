@@ -215,7 +215,7 @@ Skills are the atomic unit of the platform. Five types are defined. New Skill ty
 |-----------|-----------------|----------------------|
 | **Identity** | Who the agent is — mindset, philosophy, personality, ethics | Philosophy, Autonomy, Skeptic Level, Temporal Stance, Epistemology |
 | **Behavior** | How the agent thinks and communicates — style, reasoning, tone | Behavioral Style, Collaboration Role, Learning Stance, Peter Principle |
-| **Knowledge** | What the agent knows — domain facts, training corpus, IP | NIGP Domain Knowledge, Legal Procurement Expertise, Austin FY2025 Data |
+| **Knowledge** | What the agent knows — domain facts, Library content, IP | NIGP Domain Knowledge, Legal Procurement Expertise, Austin FY2025 Data |
 | **Intent** | What type of cognitive work the agent performs | Analysis Report, Research Findings, Review Feedback, Draft Document, Monitor & Alert |
 | **Format** | What output structures the agent produces | HTML Strategy Brief, Executive Brief, NIGP Dashboard, Structured Report |
 
@@ -417,6 +417,8 @@ This is private to the Agent and makes it unique — it is not shared or exposed
 What the agent knows. Knowledge Skill Profile — domain expertise, frameworks, past work, IP.
 Retrieved at query time. Deepens with every uploaded document.
 
+**The Library and Data Rooms:** `knowledge_entries` is the storage layer for **the Library** — the platform-wide term for all business-data storage, spanning every tenant. **A Data Room is a scoped subset of the Library** — the documents available to one division or Skill Profile (e.g. Apple's CSO's Data Room). Today nothing enforces that scoping in schema; every Apple agent reads from one shared, undivided collection. The planned mechanism for real Data Room boundaries is the `skill_profile_slug` column landing on `knowledge_entries` in S-INFRA-01 (see Section 2 DB Architecture) — filtering the Library by that column is what will produce a specific division's Data Room.
+
 **Skill Profile depth for Persona Replication:**
 - Level 1 — Behavioral Skill Profile loaded (system prompt only, no RAG)
 - Level 2 — Trained on person's domain knowledge (Knowledge Skill Profile via RAG documents)
@@ -563,7 +565,7 @@ Stores Behavioral Skill Profile data (personality layer), output format rules, a
 This table evolves — in S-INFRA-01 it gains `skill_profile_slug` scoping.
 
 **`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data.
-**[UPDATED Apple v5 Redesign 2026-06-30]** Gains 5 additive columns for corpus versioning + Demo Reset (Market Intelligence only — see `docs/APPLE-AGENT-1-v5-DESIGN.md` §7): `is_baseline boolean default false`, `status text default 'active'` (active/superseded/archived), `supersedes_id uuid null`, `confidence text null`, `override_flag boolean null`. Rule: rows are never overwritten, only ever inserted — a correction always supersedes via a new row, never mutates the original. This is otherwise not changing in S-INFRA-01.
+**[UPDATED S-APPLE-01b-design 2026-07-01, corrected against live schema]** Gains 6 new columns for Data Room versioning, confidence-tier tagging, and Demo Reset (Market Intelligence only — see `docs/APPLE-AGENT-1-v5-DESIGN.md` §7): `data_type text default 'sourced'` (sourced/inferred/synthesized/learned — was referenced throughout the design's §3 model but never actually added to schema until this correction), `citeable boolean default true` (same gap), `is_baseline boolean default false`, `supersedes_id uuid null`, `confidence text null`, `override_flag boolean null`. `status` (existing column, unchanged) gains `superseded`/`archived` as valid values alongside its current `active` default — not a new column. Rule: rows are never overwritten, only ever inserted — a correction always supersedes via a new row, never mutates the original. This is otherwise not changing in S-INFRA-01.
 **`agent_run_log`** — Brent fetch run history.
 **`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries. `patterns_used jsonb` column added S-PM-04a — records which AI patterns actually fired on each call (e.g. `["structured-output","tool-use"]`). Frontend routes log via `logAICall()`; `api/prompt/request-receivable.js` logs server-side directly (first server-side logger — required because it has no guaranteed frontend caller).
 All tables have `tenant_id`.
@@ -606,7 +608,7 @@ tenant_api_keys (id, tenant_id, provider, key_encrypted, created_at)
 ```
 
 `agent_configs` gains a `skill_profile_slug` column — training content scoped by Skill Profile, not just by agent.
-`knowledge_entries` gains a `skill_profile_slug` column — RAG knowledge scoped by Skill Profile.
+`knowledge_entries` gains a `skill_profile_slug` column — RAG knowledge scoped by Skill Profile. This is the mechanism that turns the Library into per-division Data Rooms (see Section 3).
 No data is deleted. All existing records remain. New columns are additive.
 
 **Do not migrate before S-INFRA-01.** Design all sessions to not contradict this structure.
@@ -623,6 +625,8 @@ Clerk added when multi-tenancy arrives — replaces one constant.
 
 Multi-tenancy stubs stay in place on every table (`tenant_id` column) and constant (`TENANT_ID = "global"`).
 Never remove them.
+
+**Known gap (2026-07-01):** RLS is currently disabled on `knowledge_entries` and every other Supabase table — `tenant_id` filtering happens only in application code (e.g. `queryRAG()`'s `p_tenant_id` param), not enforced at the data layer. Real tenant isolation (so one tenant's agents cannot read another's Data Room) needs both RLS policies and a real enforcement point at query time. **The Librarian** (`FEATURES.md` AG-27, roadmap) is the proposed agent-level answer to the latter — retrieval brokered through a custodian agent rather than trusted per-caller scoping.
 
 ---
 
