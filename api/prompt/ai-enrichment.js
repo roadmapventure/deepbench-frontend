@@ -1,4 +1,4 @@
-// DeepBench v5.3.3 | api/prompt/ai-enrichment.js | AG-27 — fetch_instruction.broker opt-in wiring to queryLibrary()
+// DeepBench v5.3.6 | api/prompt/ai-enrichment.js | S-APPLE-02b — debug.librarian_tier passthrough (fetchSection() set _librarian_tier per-section but enrichPrompt() never surfaced it on the returned debug object; scope expansion approved by John)
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -131,9 +131,14 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   const omitted = [];
   const fetchErrors = [];
   const ragChunksBySection = {};
+  // FEATURE: S-APPLE-02b — fetchSection() sets _librarian_tier per-section when the broker
+  // engages, but it was never captured before this loop discards non-render fields. Additive,
+  // opt-in: stays null for every call that doesn't route through the Librarian broker.
+  let librarianTier = null;
 
   for (const s of orderedFetched) {
     if (s._fetch_error) fetchErrors.push({ slug: s.slug, error: s._fetch_error });
+    if (s._librarian_tier) librarianTier = s._librarian_tier;
     if (!s.content) { omitted.push(s.slug); continue; }
     renderedMap[s.slug] = s.content;
     if (s._rag_chunks !== undefined) ragChunksBySection[s.slug] = s._rag_chunks;
@@ -314,6 +319,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
       fetch_errors: fetchErrors,
       rag_retrieved: Object.keys(ragChunksBySection).length > 0,
       rag_chunks_by_section: ragChunksBySection,
+      librarian_tier: librarianTier,
       rag_scope_requested: sections.find(s => s.type === "rag")?.fetch_instruction?.scope || null,
       rag_scope_effective: Object.keys(ragChunksBySection).length > 0
         ? (sections.find(s => s.type === "rag")?.fetch_instruction?.agent_id ? "agent" : "platform")

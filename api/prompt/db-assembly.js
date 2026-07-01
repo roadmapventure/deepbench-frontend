@@ -1,4 +1,4 @@
-// DeepBench v5.2.35 | api/prompt/db-assembly.js | BUG-17 enrichment_capability_slug — loads Dan's dan-ai-enrichment capability alongside primary
+// DeepBench v5.3.6 | api/prompt/db-assembly.js | S-APPLE-02b — intent_slug filter (ARCHITECTURE.md §2) + traits.broker passthrough (closes S-LIBRARIAN-01b's stated gap)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -51,6 +51,10 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
         match_count: 5,
         scope: agentId ? "agent" : "platform",
       };
+      // FEATURE: S-APPLE-02b — broker opt-in passthrough. Closes the gap S-LIBRARIAN-01b left
+      // open ("no Skill Profile sets broker: 'librarian' yet — that's S-APPLE-02/03's job").
+      // Reads whatever broker value the Skill Profile declares — never hardcoded to a name.
+      if (traits.broker) fetchInstruction.broker = traits.broker;
 
     } else if (typeSlug === "identity") {
       // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile
@@ -196,7 +200,7 @@ function buildLabel(typeSlug, name) {
   return labels[typeSlug] || (name || typeSlug).toUpperCase();
 }
 
-export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null }) {
+export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl) throw new Error("SUPABASE_URL not configured");
@@ -275,6 +279,18 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
         }
       }
     }
+  }
+
+  // FEATURE: S-APPLE-02b — per-call Intent Skill Profile filter (ARCHITECTURE.md §2 known
+  // gap). A Capability may have more than one Intent-type Skill Profile (e.g.
+  // channel-intelligence's ci-routing-intent + ci-answer-intent) — without this, every call
+  // would load both and both would render as a collided "intent" section. Filtered here,
+  // before the enrichment_capability_slug merge below, so Dan's own Intent Skill Profile
+  // (prompt-synthesis, loaded via enrichment_capability_slug) is never accidentally caught
+  // by a filter meant for the primary capability. intent_slug unset (every existing caller)
+  // is byte-identical to today's behavior.
+  if (intent_slug) {
+    skillProfiles = skillProfiles.filter(sp => sp.skill_type_slug !== 'intent' || sp.slug === intent_slug);
   }
 
   // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)

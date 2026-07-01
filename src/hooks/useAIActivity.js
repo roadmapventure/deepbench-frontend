@@ -1,4 +1,4 @@
-// DeepBench v5.3.3 | useAIActivity.js | AG-27 — librarian SERVICE_CATALOG + AI_TYPE_TO_SERVICE entry
+// DeepBench v5.3.6 | useAIActivity.js | MI-10/MI-11 — channel-intelligence SERVICE_CATALOG + AI_TYPE_TO_SERVICE entries
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -40,6 +40,8 @@ export const SERVICE_CATALOG = [
   { slug: 'db-assembly',             name: 'DB Assembly',               serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   // FEATURE: AG-27 — The Librarian (Eleanor Voss) Data Room broker service catalog entry
   { slug: 'librarian',               name: 'The Librarian',             serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
+  // FEATURE: MI-10/MI-11 — Channel Intelligence (Marcus/CI-01): Intent Routing + Q&A Answer
+  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG'],                                  roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -90,6 +92,8 @@ const AI_TYPE_TO_SERVICE = {
   reflect:              'ai-enrichment',
   synthesis:            'ai-enrichment',
   librarian:            'librarian',
+  ci_routing:           'channel-intelligence',
+  ci_answer:            'channel-intelligence',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
