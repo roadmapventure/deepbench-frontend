@@ -1,7 +1,8 @@
-// DeepBench v5.2.33 | PromptEvolutionModal.jsx | AA-70 Alex chip
+// DeepBench v5.3.4 | PromptEvolutionModal.jsx | AA-73 Dan Bingham avatar retrofit
 // FEATURE: AW-28 — Platform-level Prompt Service visibility modal. Import from any screen that calls prompt-service.
 
 import { T, display, body, mono } from '../tokens.js';
+import { AgentAvatar } from './SharedUI.jsx';
 
 // Props: { preview, planReady, onContinue }
 // preview = response from action:'preview-prompt' (stage1/stage2/stage3/stage4/patterns)
@@ -179,6 +180,7 @@ export default function PromptEvolutionModal({ preview, planReady, onContinue, d
                   <span style={{ color: T.muted }}>+</span>
                 </>
               )}
+              <AgentAvatar who="dan" size={18} ring={false} />
               <span style={{
                 background: T.moss, color: '#fff', fontWeight: 700,
                 padding: '1px 5px', borderRadius: 2,
