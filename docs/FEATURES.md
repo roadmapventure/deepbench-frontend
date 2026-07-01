@@ -27,7 +27,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
-| SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express | ❌ Missing | S-future (do before v6.x) |
+| SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express. **First slice ✅ Done (S-APPLE-02a, 2026-07-01, commit b6f8718):** `api/ingest.js` merged into `api/load-entries.js` (12→11 routes), freeing budget for S-APPLE-02b's new capability route. Broader consolidation + any Railway migration for new capabilities remains open. | 🔶 Partial (one merge done) | S-future (do before v6.x) |
 | SH-12 | About DeepBench panel — display correct current version number (pulled from CLAUDE-STATE.md or package.json, not hardcoded) | ❌ Missing | S-future |
 
 ---
