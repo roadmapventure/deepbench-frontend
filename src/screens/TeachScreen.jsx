@@ -2,7 +2,7 @@
 // FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
-// Upload doc → extract text → AI metadata → form → save to Supabase via /api/ingest
+// Upload doc → extract text → AI metadata → form → save to Supabase via /api/load-entries
 
 import { useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -159,7 +159,7 @@ export default function TeachScreen() {
     if (!form.title || !extractedText) { showToast("Title and document text are required", "⚠"); return; }
     setIsSaving(true);
     try {
-      const res = await fetch("/api/ingest", {
+      const res = await fetch("/api/load-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -655,7 +655,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
         onSaved(mergedEntry);
       } else {
         // Existing add flow — unchanged
-        const res = await fetch("/api/ingest", {
+        const res = await fetch("/api/load-entries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
