@@ -1,4 +1,4 @@
-// DeepBench v5.2.37 | useAIActivity.js | BUG-20/21/22 byLLM filter, MODEL_PROVIDER, MODEL_ID_NORMALIZE, SERVICE_CATALOG roadmap
+// DeepBench v5.3.3 | useAIActivity.js | AG-27 — librarian SERVICE_CATALOG + AI_TYPE_TO_SERVICE entry
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -38,6 +38,8 @@ export const SERVICE_CATALOG = [
   { slug: 'column-detection',        name: 'Column Detection',          serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
   // FEATURE: AG-13 — DB Assembly service catalog entry (Dan's deterministic capability, AA-59)
   { slug: 'db-assembly',             name: 'DB Assembly',               serviceType: 'logic',  patterns: [],                                                             roadmap: 'now'  },
+  // FEATURE: AG-27 — The Librarian (Eleanor Voss) Data Room broker service catalog entry
+  { slug: 'librarian',               name: 'The Librarian',             serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -87,6 +89,7 @@ const AI_TYPE_TO_SERVICE = {
   // FEATURE: BUG-12 — reflect and synthesis attributed to ai-enrichment service
   reflect:              'ai-enrichment',
   synthesis:            'ai-enrichment',
+  librarian:            'librarian',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────

@@ -1,7 +1,8 @@
-// DeepBench v5.2.36 | api/prompt/ai-enrichment.js | BUG-18 fix location→feature in reflect + synthesis ai_activity_log inserts
+// DeepBench v5.3.3 | api/prompt/ai-enrichment.js | AG-27 — fetch_instruction.broker opt-in wiring to queryLibrary()
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
+import { queryLibrary } from "../../lib/librarian.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -19,27 +20,41 @@ async function fetchWithTimeout(promise, timeoutMs) {
   }
 }
 
-async function fetchSection(section, taskContext, tenantId) {
+async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
   if (section.type === "stored") return { ...section };
 
   if (section.type === "rag") {
     const fi = section.fetch_instruction;
     try {
-      const result = await fetchWithTimeout(
-        queryRAG({
-          queryText: taskContext,
-          agentId: fi.agent_id || null,
-          tenantId,
-          matchCount: fi.match_count || 5,
-          scope: fi.scope || "agent",
-        }),
-        RAG_TIMEOUT_MS
-      );
+      // FEATURE: AG-27 — broker opt-in: fi.broker === "librarian" routes through Eleanor's
+      // credential-checked queryLibrary() instead of a direct queryRAG() call. Default
+      // (fi.broker unset) is byte-identical to today's behavior for every existing caller.
+      const result = fi.broker === "librarian"
+        ? await fetchWithTimeout(
+            queryLibrary({
+              requestingAgentId,
+              queryText: taskContext,
+              tenantId,
+              matchCount: fi.match_count || 5,
+            }),
+            RAG_TIMEOUT_MS
+          )
+        : await fetchWithTimeout(
+            queryRAG({
+              queryText: taskContext,
+              agentId: fi.agent_id || null,
+              tenantId,
+              matchCount: fi.match_count || 5,
+              scope: fi.scope || "agent",
+            }),
+            RAG_TIMEOUT_MS
+          );
       return {
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
         _rag_scope_effective: (fi.scope === "agent" && fi.agent_id) ? "agent" : "platform",
+        _librarian_tier: result._librarian?.tier || null,
       };
     } catch (e) {
       console.warn(`[ai-enrichment] RAG fetch failed for section ${section.slug}:`, e.message);
@@ -107,7 +122,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   // STEP 1 — FETCH: run stored pass-through + RAG fetches in parallel
   const nonReflectSections = sections.filter(s => s.type !== "reflect");
   const fetchedSections = await Promise.all(
-    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id))
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId))
   );
 
   // STEP 2 — RENDER: assemble text blocks in section order
