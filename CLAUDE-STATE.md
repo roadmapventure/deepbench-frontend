@@ -2,7 +2,9 @@
 > Updated at the close of every session.
 
 **Version in dev:** v5.2.41
-**Next session:** S-MIGRATE-06 — Test Agent console (PE-12) — needs design session first
+**Next session:** S-APPLE-01a (v5.3.0) — 6 Apple Channel agent personas in agents.js + Supabase seeds (AG-18/19/20/21/22/23). Persona decisions confirmed — kickoff doc ready: `docs/kickoffs/v5.3.0-S-APPLE-01a-apple-channel-personas.md`.
+**Last design session:** S-APPLE-01a-design (v5.3.0) (2026-07-01) — Persona decisions locked for all 6 Apple Channel agents: Marcus Webb (CI-01, GEO CSO Expert, T.brass, he/him), Priya Nair (CI-02, Forecast/Theory/Performance Expert, T.moss, she/her), Nadia Farouk (CI-03, Data Expert, T.moss, she/her), Owen Marsh (CI-04, The Proofreader, T.brass, he/him), Sam Reyes (CI-05, The Intake Assistant, T.brass, they/them), Elena Cho (CI-06, The Reasoner, T.navy, she/her). All 23 required fields + AVATAR_CFG + AGENT_PRONOUNS specced per STANDARDS.md Section 11. Schema-verified against live Supabase `agents` table (no id/code collisions with existing 14 agents). New standing rule locked: design sessions now carry the same version tag as the coding session they hand off to (`CLAUDE-DESIGN.md` "Standing Rule — Version-Paired Session Naming"), applies from this session onward. FEATURES.md AG-18–AG-23 updated with finalized personas. Kickoff doc written, no code touched. Versioning for the whole Apple track set to v5.3.x per John's direction.
+**Prior design session:** Apple v5 Redesign (2026-06-30) — Market Intelligence rebuilt fully agent-driven, zero hardcoded interaction logic (v4 was a scripted mock). Superseded the 7-agent/4-schema model from Apple Design Session 1 entirely — new 6-agent roster (GEO CSO Expert, Forecast/Theory/Performance Expert, Data Expert, The Proofreader, The Intake Assistant, The Reasoner), 5-intent front-door model (Q/A, Run a Theory, Forecast, Correct, Escalate), all 10 agent-call schemas fully specified, corpus versioning + Demo Reset design, AI pattern naming locked (Memory Consolidation / Transfer Learning / Case-Based Reasoning — deliberately distinct from existing "Reflection" pattern). Placement: Market Intelligence becomes the default landing route after splash (supersedes `ARCHITECTURE.md` §8). `docs/APPLE-AGENT-1.md` v1, `-v2.md`, `-v3-V5-SPEC.md` retired — folded into `docs/APPLE-AGENT-1-v5-DESIGN.md`, the new single source of truth. Feature IDs: AG-18/19/20 redefined + AG-21/22/23 added, SH-15, MI-01-08. No deadline-driven scope cuts — design optimized for correctness, not speed, per explicit direction. Session roadmap: S-APPLE-01a → S-APPLE-01b → S-APPLE-02 → S-APPLE-03 → S-APPLE-04 → S-APPLE-05 → S-MARKET-INTEL-01 → S-MARKET-INTEL-02 → S-MARKET-INTEL-03 (see Session Queue below). Session continued (same day): Skill Profiles & Capabilities formalized per agent (design doc §5b, all 6 at default Level L2 — confirm/override before coding), full page-function sign-off matrix reviewed and approved, 8 stress-test findings logged (design doc §11) to resolve during their tagged sessions rather than now. Corpus source data recovered into `docs/APPLE-CORPUS-SOURCE-DATA.md` (was at risk of being lost when placeholder docs were retired — now safely in the repo). Kickoff docs not yet written — next design/coding session should start there.
 **Last session:** S-SPLASH-01 (2026-06-24, 5672ea3) — SH-14 complete. WelcomeSplash.jsx: new full-screen overlay modal (80vw, max 960px, 88vh) with navy/brass Treasury border, dark overlay + blur behind dashboard, DeepBench logo, headline, subhead, animated counters (tasks/agents/deliverables), CTA button. Dismiss stored in sessionStorage key `db_splash_dismissed` — component renders null when key present. main.jsx: WelcomeSplash imported and rendered as first child of BrowserRouter above FetchProvider. 12/12 Node.js tests PASS. Build zero errors.
 **Prior last session:** S-ABOUT-ARCH-01 (2026-06-24, 47b473e) — SH-10 complete. AboutPanel.jsx: Architecture tab refresh — AIStackDiagram SVG component (6-layer stack, brass DeepBench bracket), GlossaryRow component (12 AI industry terms), section relabels (Platform Architecture / By the Numbers / AI Capability Status), 9-stat grid (40 files, ~19K LOC, 12 API routes, 11 DB tables 154 cols, 23 Arch docs, 61 Session specs, 20 AI Patterns, 19 AI Services, 13 Bench agents), updated descriptive lines (model IDs, column count). 38/38 Node.js tests PASS. Build zero errors. 12/12 Manual QA PASS.
 **Prior last session:** S-TI-20p (2026-06-24, 8ce2947) — TI-20 patch complete. StepList.jsx: Update Steps → button — added `disabled`, `opacity:0.45`, `cursor:"not-allowed"`, removed `onClick`. This was the live button; the one patched in S-TI-20 was dead code in TaskInstructionsScreen.jsx. 6/6 Node.js tests PASS. Build zero errors.
@@ -48,12 +50,26 @@
 ---
 
 ## Session Queue (short view)
+
+### Apple Demo Track
+> Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md`. No deadline-driven scope cuts by explicit direction — sequenced for correctness.
+- S-APPLE-01a (v5.3.0) — 6 agent personas (identity only) in agents.js + Supabase `agents` rows: Marcus Webb, Priya Nair, Nadia Farouk, Owen Marsh, Sam Reyes, Elena Cho (AG-18/19/20/21/22/23) — persona decisions confirmed, kickoff doc ready
+- S-APPLE-01b — Knowledge corpus seed (5 datasets + 3 GEO briefings + 10 partner scenarios as knowledge_entries) + corpus versioning schema migration (`is_baseline`, `status`, `supersedes_id`, `confidence`, `override_flag` — design doc §7), seed rows get `is_baseline: true` — synthetic content to be drafted in Claude.ai before this session
+- S-APPLE-02 — Front door: Intent Routing + Q&A Answer (GEO CSO Expert) + The Proofreader (Guardrail+Eval unified, `needs_review` two-layer rule) — design doc §5.1, 5.2, 5.7
+- S-APPLE-03 — Forecast/Theory/Performance Expert (Generate Hypotheses + Stress Test, fires before commit) + The Intake Assistant (Commit + Failure Triage) — design doc §5.3, 5.4, 5.8, 5.9
+- S-APPLE-04 — Data Expert (Escalate execution + Data Integrity Patch) + Demo Reset control (UI + reset operation) — design doc §5.5, 5.6, 7
+- S-APPLE-05 — The Reasoner (Memory Consolidation) + loop-closure verification (ask same question twice, confirm measurably better answer — the Round 4 demo moment) — design doc §5.10, §9
+- S-MARKET-INTEL-01 — Market Intelligence tab: AppShell 3rd tab + default landing route + 3-column screen scaffold per `market-intelligence-v4.html` center content, wired to S-APPLE-02/03 (MI-01, MI-02, SH-15)
+- S-MARKET-INTEL-02 — Pipeline Log wired to real agent events + Evidence panel Theory view (MI-03, MI-04)
+- S-MARKET-INTEL-03 — Apple AI Audit section + Available Data panel full (MI-06)
+
+### Standard Track
 - S-MIGRATE-02 — Training tab: load/toggle/delete wiring + NIGP card layout ✅ done (02ff560)
 - S-MIGRATE-03 — Training tab: Add Courses inline sub-view ✅ done (686007e)
-- S-MIGRATE-04 — Training tab: Edit Course inline sub-view ✅ done (732bf3c)
+- S-MIGRATE-04 — Training tab: Edit Course inline sub-view ✅ done (732ff4c)
 - S-MIGRATE-05 — Playbook tab: output_format CRUD + guardrails ✅ done (1644366)
 - S-AVATAR-01 — Avatar consistency sweep ✅ done (d9d43c2)
-- S-MIGRATE-06 — Test Agent console (PE-12, needs design session)
+- S-MIGRATE-06 — Test Agent console (PE-12, needs design session) — deferred until after Apple demo track
 - S-BENCH-UX-01 — Bench UI polish ✅ done (812ed59)
 - S-BENCH-UX-02 — Bench UI polish round 2 ✅ done (8717106)
 - S-AI-ATTR-01 — Capability-agent attribution Michelle + Susan ✅ done (4d568bd)

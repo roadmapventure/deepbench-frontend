@@ -25,6 +25,8 @@ Sub-session rule:
 - S[X]b takes the NEXT increment
 - Both have fully separate kickoff docs
 
+Design sessions carry the same version tag as the coding session whose kickoff doc they produce — e.g. `S-APPLE-01a-design (v5.3.0)` pairs with `S-APPLE-01a (v5.3.0)`. Locked in `CLAUDE-DESIGN.md` ("Standing Rule — Version-Paired Session Naming"), applies from S-APPLE-01a-design (v5.3.0) onward.
+
 Branch: commit directly to `dev`. No feature branches.
 `dev → main` only when John explicitly confirms.
 

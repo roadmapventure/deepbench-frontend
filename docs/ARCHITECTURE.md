@@ -531,9 +531,12 @@ No feature branches during active development.
 
 ## 8. Routing
 
+**[UPDATED Apple v5 Redesign 2026-06-30]** `/` now routes to Market Intelligence, not Work dashboard — see `docs/APPLE-AGENT-1-v5-DESIGN.md` §1 and `FEATURES.md` SH-15. Work dashboard moves to an explicit path.
+
 | URL | Screen |
 |-----|--------|
-| `/` | Work dashboard |
+| `/` | Market Intelligence (default landing route, after splash) |
+| `/work` | Work dashboard |
 | `/work/new` | Assign new work |
 | `/work/[workOrderId]` | Work Order execution / step detail |
 | `/work/[workOrderId]/analyze` | NIGP Analyzer scoped to a Work Order |
@@ -559,7 +562,8 @@ created_at, updated_at
 Stores Behavioral Skill Profile data (personality layer), output format rules, and guardrails per agent.
 This table evolves — in S-INFRA-01 it gains `skill_profile_slug` scoping.
 
-**`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data. Not changing in S-INFRA-01.
+**`knowledge_entries`** — RAG knowledge base (pgvector embeddings). Stores Knowledge Skill Profile data.
+**[UPDATED Apple v5 Redesign 2026-06-30]** Gains 5 additive columns for corpus versioning + Demo Reset (Market Intelligence only — see `docs/APPLE-AGENT-1-v5-DESIGN.md` §7): `is_baseline boolean default false`, `status text default 'active'` (active/superseded/archived), `supersedes_id uuid null`, `confidence text null`, `override_flag boolean null`. Rule: rows are never overwritten, only ever inserted — a correction always supersedes via a new row, never mutates the original. This is otherwise not changing in S-INFRA-01.
 **`agent_run_log`** — Brent fetch run history.
 **`ai_activity_log`** — All capability executions: AI calls (model, tokens, cost, latency) and deterministic calls (execution count, latency, `ai_type = 'deterministic'`). No tokens or cost for deterministic entries. `patterns_used jsonb` column added S-PM-04a — records which AI patterns actually fired on each call (e.g. `["structured-output","tool-use"]`). Frontend routes log via `logAICall()`; `api/prompt/request-receivable.js` logs server-side directly (first server-side logger — required because it has no guaranteed frontend caller).
 All tables have `tenant_id`.

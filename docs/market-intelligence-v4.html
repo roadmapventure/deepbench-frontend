@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DeepBench — Market Intelligence v4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --navy:#1a2e4a; --navy-deep:#101f33; --brass:#b6873a; --brass-light:#d9ad6a;
+    --paper:#f5f0e8; --paper-dim:#ece5d6; --flag:#a83319; --ink:#1e1c18; --ink-soft:#5c564b;
+    --line:#d8cfbc; --green:#3f6b3f; --green-bg:#e7eee2; --amber-bg:#f3e6cc;
+    --grey:#6b6358; --grey-bg:#e7e2d6;
+    --t-line:#e3dccb; --t-head-bg:#f1ece1; --t-navy:#5a6b80; --t-ink:#6b6457; --t-brass:#c4a878;
+    --purple:#6a5a7a; --purple-bg:#f3f0f6; --purple-light:#9a8aaa;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);font-family:'Inter',sans-serif;color:var(--ink);}
+  .app{display:flex;flex-direction:column;min-height:100vh;}
+  button{font-family:inherit;cursor:pointer;}
+
+  /* ── TOP NAV ── */
+  .topnav{background:linear-gradient(180deg,var(--navy),var(--navy-deep));color:var(--paper);padding:0 28px;border-bottom:3px solid var(--brass);display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .seal{width:34px;height:34px;border:1.5px solid var(--brass);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--brass-light);position:relative;}
+  .seal::before{content:'';position:absolute;inset:-5px;border:1px dotted rgba(182,135,58,0.4);border-radius:50%;}
+  .brand-text .name{font-size:15px;font-weight:800;letter-spacing:0.08em;}
+  .brand-text .sub{font-size:10px;letter-spacing:0.14em;color:var(--brass-light);text-transform:uppercase;margin-top:1px;}
+  .nav-tabs{display:flex;align-items:center;height:100%;gap:2px;}
+  .nav-tab{padding:0 18px;height:100%;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:rgba(245,240,232,0.55);border-bottom:2.5px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+  .nav-tab.active{color:var(--paper);border-bottom-color:var(--brass);background:rgba(182,135,58,0.08);}
+  .nav-tab .sub-label{font-size:9.5px;font-weight:500;text-transform:none;letter-spacing:0.02em;color:var(--brass-light);opacity:.85;}
+  .nav-right{display:flex;align-items:center;gap:10px;}
+  .nav-btn{font-size:11.5px;font-weight:600;color:var(--paper);border:1px solid rgba(245,240,232,0.25);padding:8px 14px;border-radius:3px;background:rgba(255,255,255,0.04);}
+  .nav-btn.solid{background:var(--paper);color:var(--navy);border-color:var(--paper);}
+
+  /* ── TITLE + STATS ── */
+  .title-block{background:var(--paper-dim);border-bottom:1px solid var(--brass);padding:20px 28px;}
+  .title-block h1{margin:0;font-size:26px;font-weight:800;color:var(--navy);letter-spacing:-0.01em;}
+  .title-block p{margin:4px 0 0;font-size:13px;color:var(--ink-soft);}
+  .stats-bar{background:var(--navy);border-bottom:2px solid var(--brass);padding:14px 28px;display:flex;align-items:center;gap:44px;}
+  .stat{display:flex;flex-direction:column;gap:3px;}
+  .stat .stat-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,240,232,0.55);}
+  .stat .stat-val{font-size:20px;font-weight:800;color:var(--paper);}
+  .stat .stat-val.brass{color:var(--brass-light);}
+  .stats-spacer{flex:1;}
+  .stats-meta{font-size:11px;color:rgba(245,240,232,0.55);font-style:italic;}
+
+  /* ── 3-COLUMN GRID ── */
+  .body-grid{display:grid;grid-template-columns:1.15fr 1fr 0.9fr;gap:18px;padding:20px 28px 40px;flex:1;align-items:start;}
+  .col{display:flex;flex-direction:column;gap:14px;}
+  .col-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding-bottom:2px;}
+  .col-label.live{color:var(--brass);}
+  .col-label.muted{color:var(--t-navy);}
+
+  /* ── CARD (Column 1 live) ── */
+  .card{background:#fffdf8;border:1px solid var(--line);border-radius:3px;position:relative;box-shadow:0 1px 2px rgba(26,46,74,.04),0 3px 10px rgba(26,46,74,.03);}
+  .corner{position:absolute;width:13px;height:13px;border:1.5px solid var(--brass);opacity:0.7;}
+  .corner.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;}
+  .corner.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;}
+  .corner.bl{bottom:-1px;left:-1px;border-right:none;border-top:none;}
+  .corner.br{bottom:-1px;right:-1px;border-left:none;border-top:none;}
+  .card-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fbf8f1,#f6f1e7);}
+  .card-head h2{margin:0;font-size:11.5px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--navy);display:flex;align-items:center;gap:8px;}
+  .card-head h2 .glyph{color:var(--brass);font-size:13px;}
+
+  /* ── MUTED CARD (Column 2) ── */
+  .mcard{background:#fbf9f4;border:1px solid var(--t-line);border-radius:3px;position:relative;}
+  .mcard-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--t-line);background:var(--t-head-bg);}
+  .mcard-head h2{margin:0;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--t-navy);display:flex;align-items:center;gap:7px;}
+  .mcard-head h2 .glyph{color:var(--t-brass);font-size:12px;}
+  .mcard-head .count{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t-ink);}
+  .mcard-body{padding:13px 16px;}
+
+  /* ── BADGES + LAYERS ── */
+  .conf-badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:2px;}
+  .conf-badge.high{background:var(--brass);color:var(--navy-deep);}
+  .conf-badge.na{background:transparent;color:var(--brass-light);border:1px solid var(--brass-light);}
+  .conf-badge.review{background:var(--amber-bg);color:#8a5a1f;border:1px solid var(--brass);}
+  .layer-badge{font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:2px;text-transform:uppercase;}
+  .layer-badge.sourced{background:var(--green-bg);color:var(--green);border:1px solid #b9d1ae;}
+  .layer-badge.inferred{background:var(--amber-bg);color:#8c6324;border:1px solid #ddbd86;}
+  .layer-badge.synthesized{background:var(--grey-bg);color:var(--grey);border:1px solid #cbc3b3;}
+  .layer-badge.forecast{background:var(--amber-bg);color:#8a5a1f;border:1px solid var(--brass);}
+  .layer-badge.confirmed{background:var(--green-bg);color:var(--green);border:1px solid #b9d1ae;}
+
+  /* ── CHAT COLUMN ── */
+  .chat-card{display:flex;flex-direction:column;height:760px;}
+  .chat-card .card-body{flex:1;display:flex;flex-direction:column;padding:0;overflow:hidden;}
+  .chat-status{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--green);font-weight:700;}
+  .chat-status .sdot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);}
+
+  .chat-stream{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+  .msg{max-width:88%;}
+  .msg.user{align-self:flex-end;}
+  .msg.agent{align-self:flex-start;}
+  .msg-bubble{border-radius:6px;padding:11px 14px;font-size:12.5px;line-height:1.55;}
+  .msg.user .msg-bubble{background:var(--navy);color:var(--paper);border-bottom-right-radius:2px;}
+  .msg.agent .msg-bubble{background:var(--paper-dim);color:var(--ink);border:1px solid var(--line);border-bottom-left-radius:2px;}
+  .msg-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-soft);margin-top:4px;padding:0 3px;}
+  .msg.user .msg-meta{text-align:right;}
+
+  /* inline answer card */
+  .answer-card-inline{background:#fffdf8;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-top:4px;}
+  .answer-card-inline .ai-head{background:var(--navy);color:var(--paper);padding:8px 12px;display:flex;justify-content:space-between;align-items:center;}
+  .answer-card-inline .ai-head span.tag{font-size:9.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
+  .answer-card-inline .ai-body{padding:11px 13px;}
+  .answer-card-inline .ai-body p{font-size:12px;line-height:1.6;margin:0 0 6px;}
+  .answer-card-inline .ai-body p:last-child{margin-bottom:0;}
+  .num{font-family:'JetBrains Mono',monospace;color:var(--flag);font-weight:600;}
+  .answer-card-inline b{color:var(--navy);}
+  .ai-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:9px 13px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-soft);}
+
+  /* Needs-Review action row inside answer card */
+  .review-action{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--amber-bg);border-top:1px solid #ddbd86;}
+  .review-action .ra-text{font-size:11px;color:#6b4010;line-height:1.4;}
+  .review-action .ra-text b{color:#4a2c0a;}
+  .btn-review{background:var(--brass);color:#fff;border:none;border-radius:3px;padding:7px 14px;font-size:11px;font-weight:700;letter-spacing:.03em;white-space:nowrap;}
+  .btn-review:hover{background:var(--brass-light);}
+
+  /* ── CHAT INPUT (always present, conversation only) ── */
+  .chat-bottom{border-top:1px solid var(--line);background:var(--paper-dim);}
+  .input-layer{padding:12px 14px;display:flex;flex-direction:column;gap:9px;}
+  .chat-topics{display:flex;gap:6px;flex-wrap:wrap;}
+  .chat-topic-chip{font-size:10px;color:var(--navy);background:#fff;border:1px solid var(--line);padding:4px 9px;border-radius:11px;}
+  .chat-topic-chip:hover{border-color:var(--brass);}
+  .chat-input-box{display:flex;gap:8px;}
+  .chat-input-box input{flex:1;border:1.5px solid var(--navy);border-radius:3px;padding:9px 12px;font-size:12.5px;outline:none;font-family:inherit;background:#fff;}
+  .chat-input-box input:focus{box-shadow:0 0 0 3px rgba(182,135,58,0.18);}
+  .chat-send{background:var(--navy);color:var(--paper);border:none;border-radius:3px;padding:9px 18px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+
+  /* human theory card in stream */
+  .theory-card{background:#fff;border:1px solid var(--purple-light);border-left:4px solid var(--purple);border-radius:4px;overflow:hidden;margin-top:4px;}
+  .theory-card .tc-head{background:var(--purple-bg);padding:7px 12px;display:flex;justify-content:space-between;align-items:center;}
+  .theory-card .tc-head span{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--purple);}
+  .theory-card .tc-body{padding:11px 13px;font-size:12px;line-height:1.55;}
+  .attribution{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-soft);margin-bottom:6px;}
+  .avatar{width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+  /* AI stress test card in stream */
+  .stress-card{background:#fff;border:1px solid var(--t-line);border-left:4px solid var(--navy);border-radius:4px;overflow:hidden;margin-top:4px;}
+  .stress-card .sc-head{background:var(--paper-dim);padding:7px 12px;display:flex;justify-content:space-between;align-items:center;}
+  .stress-card .sc-head span{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);}
+  .stress-card .sc-body{padding:11px 13px;display:flex;flex-direction:column;gap:9px;}
+  .stress-section .ss-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;display:flex;align-items:center;gap:5px;}
+  .stress-section.ss-supports .ss-label{color:var(--green);}
+  .stress-section.ss-complicates .ss-label{color:var(--flag);}
+  .stress-section.ss-consider .ss-label{color:var(--ink-soft);}
+  .stress-section p{margin:0;font-size:11.5px;line-height:1.5;color:var(--ink);}
+  .cite-chip{display:inline-flex;font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--grey-bg);color:var(--grey);padding:1px 6px;border-radius:7px;margin-left:5px;}
+
+  /* typing */
+  .typing-indicator{display:flex;gap:4px;padding:12px 14px;align-items:center;}
+  .typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--brass);opacity:.4;animation:blink 1.2s infinite;}
+  .typing-indicator span:nth-child(2){animation-delay:.2s;}
+  .typing-indicator span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:.9;}}
+
+  /* ── COLUMN 2: EVIDENCE ── */
+  /* state chip */
+  .ev-state-chip{display:flex;align-items:center;gap:7px;background:var(--amber-bg);border:1px solid var(--brass);border-radius:3px;padding:7px 11px;font-size:10.5px;font-weight:700;color:#6b4010;margin-bottom:12px;}
+  .ev-state-chip .ecc{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;}
+  .ev-state-chip .ev-flip{margin-left:auto;font-size:9.5px;font-weight:700;color:var(--brass);cursor:pointer;text-decoration:underline;}
+
+  /* chart area */
+  .chart-area{position:relative;}
+  .chart-view{transition:opacity .3s;}
+  .chart-view.hidden{display:none;}
+
+  .chart-divider{display:flex;align-items:center;gap:10px;margin:14px 0 10px;}
+  .chart-divider:first-child{margin-top:0;}
+  .chart-divider span{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t-brass);white-space:nowrap;}
+  .chart-divider::after{content:'';flex:1;height:1px;background:var(--t-line);}
+  .chart-label{font-size:10px;font-weight:700;color:var(--t-navy);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .chart-sub{font-size:9px;color:var(--t-ink);margin-bottom:9px;font-family:'JetBrains Mono',monospace;}
+
+  /* geo bar chart */
+  .bar-chart-group{display:flex;flex-direction:column;gap:8px;}
+  .bar-row{display:flex;align-items:center;gap:7px;}
+  .bar-row .geo-label{width:64px;flex-shrink:0;font-size:9px;font-weight:600;color:var(--t-ink);text-align:right;line-height:1.2;}
+  .bar-track{flex:1;display:flex;gap:2px;align-items:center;height:14px;}
+  .bar-seg{height:11px;border-radius:1px;}
+  .bar-seg.y23{background:#d6d0c2;}
+  .bar-seg.y24{background:#b9b09a;}
+  .bar-seg.y25{background:var(--t-navy);}
+  .bar-val{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t-ink);width:42px;flex-shrink:0;}
+  .chart-legend-row{display:flex;gap:12px;margin-top:8px;font-size:9px;color:var(--t-ink);}
+  .chart-legend-row .lg{display:flex;align-items:center;gap:4px;}
+  .lg-sw{width:8px;height:8px;border-radius:1px;}
+
+  /* upgrade cycle hbars */
+  .hbar-row{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
+  .hbar-row .ctry{width:58px;flex-shrink:0;font-size:9px;font-weight:600;color:var(--t-ink);}
+  .hbar-track{flex:1;background:var(--t-head-bg);border-radius:2px;height:11px;overflow:hidden;}
+  .hbar-fill{height:100%;background:var(--t-brass);}
+  .hbar-num{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t-ink);width:38px;text-align:right;flex-shrink:0;}
+
+  /* HITL decision panel — appears below charts in Column 2, only when triggered */
+  .hitl-panel{display:flex;flex-direction:column;gap:11px;margin-top:6px;}
+  .agent-instruction{display:flex;gap:9px;align-items:flex-start;}
+  .ai-icon{width:22px;height:22px;border-radius:50%;background:var(--navy);color:var(--brass-light);font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+  .agent-instruction p{margin:0;font-size:11.5px;color:var(--ink);line-height:1.5;background:#fff;border:1px solid var(--t-line);border-radius:6px;border-bottom-left-radius:2px;padding:9px 11px;}
+  .intent-label{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);}
+  .intent-tabs{display:flex;border:1px solid var(--t-line);border-radius:3px;overflow:hidden;}
+  .intent-tab{flex:1;padding:9px 6px;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.02em;background:#fff;color:var(--ink-soft);border-right:1px solid var(--t-line);border:none;border-right:1px solid var(--t-line);}
+  .intent-tab:last-child{border-right:none;}
+  .intent-tab .sub{display:block;font-size:9px;font-weight:500;margin-top:1px;opacity:.7;text-transform:none;letter-spacing:0;}
+  .intent-tab.active-theorize{background:var(--purple);color:#fff;}
+  .intent-tab.active-forecast{background:var(--brass);color:#fff;}
+  .intent-tab.active-correct{background:var(--flag);color:#fff;}
+  .hyp-options{display:flex;flex-direction:column;gap:5px;}
+  .hyp-opt{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--t-line);border-radius:3px;font-size:11px;line-height:1.45;cursor:pointer;background:#fff;}
+  .hyp-opt:hover{border-color:var(--brass);}
+  .hyp-opt.selected{border-color:var(--brass);background:var(--amber-bg);}
+  .hyp-num{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;color:var(--brass);flex-shrink:0;margin-top:2px;}
+  .hyp-custom{width:100%;border:1px dashed var(--t-line);border-radius:3px;padding:8px 10px;font-size:11.5px;font-family:inherit;resize:none;min-height:44px;background:#fff;}
+  .action-btns{display:flex;gap:7px;}
+  .action-btn{flex:1;padding:9px 8px;border-radius:3px;border:1.5px solid var(--t-line);background:#fff;font-size:10.5px;font-weight:700;text-align:center;cursor:pointer;}
+  .action-btn .abt{display:block;text-transform:uppercase;letter-spacing:.03em;font-size:9.5px;}
+  .action-btn .abd{display:block;font-weight:500;font-size:8.5px;color:var(--ink-soft);margin-top:2px;text-transform:none;letter-spacing:0;}
+  .action-btn.a-discard{border-color:var(--purple-light);}
+  .action-btn.a-discard .abt{color:var(--purple);}
+  .action-btn.a-forecast{border-color:var(--brass);}
+  .action-btn.a-forecast .abt{color:#8a5a1f;}
+  .action-btn.a-correct{border-color:var(--flag);background:var(--flag);}
+  .action-btn.a-correct .abt,.action-btn.a-correct .abd{color:#fff;}
+  .override-warn{display:flex;align-items:center;gap:7px;background:#fdf3ef;border:1px solid #e8bfb2;border-radius:3px;padding:7px 10px;font-size:10.5px;color:#8a3319;}
+
+  /* Before/After theory chart */
+  .cmp-legend{display:flex;gap:16px;margin-bottom:12px;font-size:10px;color:var(--t-ink);}
+  .cmp-legend .cl{display:flex;align-items:center;gap:5px;}
+  .cl-sw{width:16px;height:8px;border-radius:2px;}
+  .cl-sw.current{background:var(--navy);}
+  .cl-sw.projected{background:repeating-linear-gradient(90deg,var(--brass),var(--brass) 3px,transparent 3px,transparent 6px);border:1px solid var(--brass);}
+  .cl-sw.committed{background:var(--green);}
+
+  .cmp-bars{display:flex;gap:22px;align-items:flex-end;height:130px;border-bottom:1px solid var(--t-line);padding:0 4px 0;}
+  .cmp-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:0;}
+  .cmp-pair{display:flex;align-items:flex-end;gap:4px;height:110px;}
+  .cmp-bar{width:24px;border-radius:2px 2px 0 0;position:relative;transition:height .5s ease;}
+  .cmp-bar.current{background:var(--t-navy);}
+  .cmp-bar.projected{background:repeating-linear-gradient(135deg,var(--brass-light),var(--brass-light) 3px,var(--brass) 3px,var(--brass) 6px);border:1px solid var(--brass);}
+  .cmp-bar.committed{background:var(--green);}
+  .cmp-bar-val{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;white-space:nowrap;color:var(--t-navy);}
+  .cmp-bar.projected .cmp-bar-val{color:#8a5a1f;}
+  .cmp-bar.committed .cmp-bar-val{color:var(--green);}
+  .cmp-group-label{font-size:9.5px;color:var(--t-ink);margin-top:7px;text-align:center;line-height:1.3;}
+
+  .intent-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;}
+  .intent-badge.theorize{background:var(--purple-bg);color:var(--purple);}
+  .intent-badge.forecast{background:var(--amber-bg);color:#8a5a1f;}
+  .intent-badge.correct{background:#fdf3ef;color:var(--flag);}
+
+  /* ── COLUMN 3: AUDIT drawers ── */
+  .drawer{background:#fbf9f4;border:1px solid var(--t-line);border-radius:3px;overflow:hidden;}
+  .drawer-toggle{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--t-head-bg);border:none;width:100%;text-align:left;}
+  .drawer-toggle h2{margin:0;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t-navy);display:flex;align-items:center;gap:7px;}
+  .drawer-toggle h2 .glyph{color:var(--t-brass);font-size:12px;}
+  .drawer-right{display:flex;align-items:center;gap:9px;}
+  .drawer-count{font-family:'JetBrains Mono',monospace;font-size:9px;color:#8c8474;background:var(--paper);padding:2px 8px;border-radius:10px;border:1px solid var(--t-line);}
+  .drawer-chevron{font-size:9px;color:var(--t-brass);transition:transform .15s;}
+  .drawer.open .drawer-chevron{transform:rotate(90deg);}
+  .drawer.open .drawer-toggle{border-bottom:1px solid var(--t-line);}
+  .drawer-content{padding:15px 16px;display:none;}
+  .drawer.open .drawer-content{display:block;}
+
+  /* drawer inner styles */
+  .about-lede{font-size:12px;line-height:1.6;color:var(--ink);margin:0 0 11px;}
+  .about-lede b{color:var(--navy);}
+  .about-sub{font-size:11px;line-height:1.6;color:var(--t-ink);margin:0 0 13px;}
+  .scope-note{background:#f3ecdc;border:1px solid #ddcfa8;border-radius:3px;padding:9px 11px;font-size:10.5px;color:#6b4e1e;line-height:1.5;margin-bottom:13px;}
+  .scope-note b{color:#503815;}
+  .tag-cloud{display:flex;flex-wrap:wrap;gap:6px;}
+  .concept-chip{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:var(--t-navy);background:var(--t-head-bg);border:1px solid var(--t-line);padding:3px 8px;border-radius:9px;}
+
+  .dataset-row{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;padding:9px 0;border-bottom:1px dashed var(--t-line);}
+  .dataset-row:last-child{border-bottom:none;padding-bottom:1px;}
+  .dataset-info .ds-name{font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+  .dataset-info .ds-cat{font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--t-brass);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;display:block;}
+  .dataset-info .ds-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:#8c8474;display:flex;gap:6px;flex-wrap:wrap;}
+
+  .agent-card{border:1px solid var(--t-line);border-radius:3px;padding:11px 12px;margin-bottom:9px;background:var(--paper);}
+  .agent-card:last-child{margin-bottom:0;}
+  .agent-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .agent-id{font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:700;color:var(--t-brass);background:var(--t-head-bg);padding:2px 6px;border-radius:2px;}
+  .agent-status{font-family:'JetBrains Mono',monospace;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b8c6b;display:flex;align-items:center;gap:4px;}
+  .agent-status.roadmap-tag{color:#9c9486;}
+  .agent-status .sdot{width:5px;height:5px;border-radius:50%;background:currentColor;}
+  .agent-name{font-size:12.5px;font-weight:700;color:var(--ink);margin:0 0 2px;}
+  .agent-role{font-size:10px;color:var(--t-ink);margin:0 0 8px;line-height:1.4;}
+  .chip-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+  .chip{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:600;color:var(--t-navy);background:var(--t-head-bg);border:1px solid var(--t-line);padding:2px 6px;border-radius:9px;}
+  .agent-audit-row{display:flex;border-top:1px dashed var(--t-line);padding-top:8px;}
+  .audit-metric{flex:1;text-align:center;}
+  .audit-metric .am-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--t-navy);}
+  .audit-metric .am-label{font-size:7px;color:#8c8474;text-transform:uppercase;letter-spacing:.03em;margin-top:1px;}
+
+  /* pipeline log (now in Col 3) */
+  .log-stream{display:flex;flex-direction:column;}
+  .log-event{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--t-line);font-family:'JetBrains Mono',monospace;font-size:10px;}
+  .log-event:last-child{border-bottom:none;}
+  .log-time{color:#b3ab9b;font-size:9px;width:50px;flex-shrink:0;padding-top:1px;}
+  .log-icon{width:15px;flex-shrink:0;text-align:center;font-weight:700;}
+  .log-icon.pass{color:#6b8c6b;}
+  .log-icon.info{color:var(--t-navy);}
+  .log-icon.score{color:var(--t-brass);}
+  .log-content{flex:1;color:var(--t-ink);}
+  .log-content .lbl{font-weight:700;color:var(--t-navy);}
+  .log-content .detail{color:#8c8474;display:block;margin-top:2px;font-size:9px;}
+  .pass-tag{font-weight:800;color:#6b8c6b;background:#eef2ea;padding:1px 6px;border-radius:2px;font-size:9px;margin-left:4px;}
+  .eval-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px;}
+  .eval-dim{background:var(--t-head-bg);border:1px solid var(--t-line);border-radius:2px;padding:4px 2px;text-align:center;}
+  .eval-dim .ed-label{font-size:7px;color:#8c8474;text-transform:uppercase;letter-spacing:.02em;display:block;margin-bottom:2px;}
+  .eval-dim .ed-score{font-size:11px;font-weight:800;color:var(--t-navy);font-family:'JetBrains Mono',monospace;}
+
+  /* override log */
+  .ol-item{display:flex;gap:9px;padding:9px 0;border-bottom:1px dashed var(--t-line);}
+  .ol-item:last-child{border-bottom:none;}
+  .ol-icon{width:20px;height:20px;border-radius:50%;background:#fdf3ef;color:var(--flag);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px;}
+  .ol-body .ol-title{font-size:11.5px;font-weight:700;color:var(--t-navy);margin-bottom:2px;}
+  .ol-body .ol-meta{font-size:10px;color:var(--t-ink);}
+  .ol-status{font-family:'JetBrains Mono',monospace;font-size:8.5px;padding:2px 6px;border-radius:8px;background:var(--grey-bg);color:var(--grey);white-space:nowrap;height:fit-content;margin-top:2px;}
+
+  .phase-block{margin-top:12px;padding-top:12px;border-top:1px solid var(--t-line);}
+  .phase-label{font-size:9px;font-weight:700;color:var(--t-brass);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+  .phase-item{display:flex;gap:8px;font-size:11px;margin-bottom:7px;color:var(--t-ink);}
+  .phase-item b{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--t-navy);flex-shrink:0;}
+
+  /* prompt build */
+  .timeline-badge{display:inline-flex;align-items:center;gap:6px;background:var(--t-navy);color:#fff;padding:5px 12px;border-radius:3px;font-size:10.5px;font-weight:700;margin-bottom:13px;}
+  .timeline-badge .glyph{color:#d9ad6a;}
+  .step-group-label{font-size:9.5px;font-weight:700;color:var(--t-brass);text-transform:uppercase;letter-spacing:0.07em;margin:13px 0 8px;display:flex;align-items:center;gap:8px;}
+  .step-group-label:first-child{margin-top:0;}
+  .step-group-label::after{content:'';flex:1;height:1px;background:var(--t-line);}
+  .step-list{list-style:none;margin:0;padding:0;}
+  .step-item{display:flex;gap:9px;padding:6px 0;border-bottom:1px dashed var(--t-line);align-items:baseline;}
+  .step-item:last-child{border-bottom:none;}
+  .step-num{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;color:#fff;background:var(--t-navy);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .step-text{font-size:11px;color:var(--ink);line-height:1.4;}
+  .ds-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
+  .audit-section-label{font-size:9.5px;font-weight:700;color:var(--t-brass);text-transform:uppercase;letter-spacing:0.06em;margin:13px 0 8px;display:flex;align-items:center;gap:8px;}
+  .audit-section-label:first-child{margin-top:0;}
+  .audit-section-label::after{content:'';flex:1;height:1px;background:var(--t-line);}
+  .audit-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--t-line);}
+  .audit-row:last-child{border-bottom:none;}
+  .audit-row-name{font-size:11px;font-weight:600;color:var(--ink);}
+  .audit-row-stats{display:flex;gap:12px;align-items:center;}
+  .audit-stat{text-align:right;}
+  .audit-stat .as-val{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--t-navy);}
+  .audit-stat .as-label{font-size:7px;color:#8c8474;text-transform:uppercase;letter-spacing:0.02em;}
+  /* Learned Context card (Supreme Reasoner output) */
+  .lc-card{border:1px solid #c9bcd6;border-left:3px solid var(--purple);border-radius:3px;padding:11px 12px;margin-bottom:10px;background:var(--purple-bg);}
+  .lc-row{display:flex;gap:8px;font-size:10.5px;line-height:1.5;margin-bottom:6px;}
+  .lc-row:last-child{margin-bottom:0;}
+  .lc-row b{color:var(--purple);font-weight:700;flex-shrink:0;min-width:108px;}
+  .lc-row span{color:var(--ink);}
+  .lc-empty{font-size:11px;color:var(--t-ink);font-style:italic;}
+  .lc-arrow{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--purple);margin-top:8px;padding-top:8px;border-top:1px dashed var(--t-line);}
+
+  .pb-section{border-top:1px solid var(--t-line);margin-top:10px;padding-top:2px;}
+  .pb-toggle{display:flex;justify-content:space-between;align-items:center;padding:8px 0;background:none;border:none;width:100%;text-align:left;}
+  .pb-toggle .pb-title{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t-navy);display:flex;align-items:center;gap:5px;}
+  .pb-chevron{font-size:9px;color:var(--t-brass);transition:transform .15s;display:inline-block;}
+  .pb-toggle.open .pb-chevron{transform:rotate(90deg);}
+  .pb-body{padding-bottom:6px;display:none;}
+  .pb-body.open{display:block;}
+  .pb-layer{display:flex;gap:8px;padding:6px 0;border-top:1px dashed var(--t-line);font-family:'JetBrains Mono',monospace;font-size:9px;}
+  .pb-layer:first-child{border-top:none;}
+  .pb-tag{background:var(--t-navy);color:#fff;padding:1px 5px;border-radius:2px;font-size:8px;font-weight:700;height:fit-content;flex-shrink:0;}
+  .pb-text{color:#8c8474;line-height:1.4;}
+
+  .footer-strip{padding:10px 28px;background:var(--navy-deep);color:rgba(245,240,232,.45);font-family:'JetBrains Mono',monospace;font-size:9.5px;display:flex;justify-content:space-between;border-top:1px solid var(--brass);}
+  @media(max-width:1180px){.body-grid{grid-template-columns:1fr;}.chat-card{height:560px;}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- NAV -->
+<header class="topnav">
+  <div class="brand">
+    <div class="seal">DB</div>
+    <div class="brand-text"><div class="name">DEEPBENCH</div><div class="sub">AI Workforce Platform</div></div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active">&#9670; <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.25;"><span>Market Intelligence</span><span class="sub-label">— LLM Wiki (Applied AI demo)</span></span></button>
+    <button class="nav-tab">&#128221; Work</button>
+    <button class="nav-tab">&#128101; Bench</button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-btn">&#9670; AI Audit</div>
+    <div class="nav-btn solid">About DeepBench</div>
+  </div>
+</header>
+
+<!-- TITLE -->
+<div class="title-block">
+  <h1>Market Intelligence</h1>
+  <p>Ask the Performance Strategist about GEO markets, upgrade cycles, and channel programs — every answer sourced, scored, and open to GEO director correction.</p>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat"><span class="stat-label">Queries Today</span><span class="stat-val" id="statQueries">14</span></div>
+  <div class="stat"><span class="stat-label">Avg Confidence</span><span class="stat-val brass">HIGH</span></div>
+  <div class="stat"><span class="stat-label">Guardrail Pass Rate</span><span class="stat-val">100%</span></div>
+  <div class="stat"><span class="stat-label">Avg Eval Score</span><span class="stat-val">4.4 / 5.0</span></div>
+  <div class="stat"><span class="stat-label">Agents Active</span><span class="stat-val">2</span></div>
+  <div class="stats-spacer"></div>
+  <div class="stats-meta">John Leonard · Apple Channel Intelligence Pipeline</div>
+</div>
+
+<!-- 3-COLUMN -->
+<div class="body-grid">
+
+  <!-- ══════════════ COLUMN 1: INTERACT ══════════════ -->
+  <div class="col">
+    <div class="col-label live">Interact</div>
+
+    <div class="card chat-card">
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <div class="card-head">
+        <h2><span class="glyph">&#9670;</span> Chat with Performance Strategist</h2>
+        <div class="chat-status"><span class="sdot"></span>CI-01 Online</div>
+      </div>
+
+      <div class="card-body">
+        <div class="chat-stream" id="chatStream">
+
+          <!-- Exchange 1: Layer 1 answer -->
+          <div class="msg user">
+            <div class="msg-bubble">Which GEO markets have the highest iPhone upgrade opportunity in the next 12 months?</div>
+            <div class="msg-meta">You · 10:42 AM</div>
+          </div>
+          <div class="msg agent">
+            <div class="answer-card-inline">
+              <div class="ai-head"><span class="tag">Performance Strategist</span><span class="conf-badge high">HIGH</span></div>
+              <div class="ai-body">
+                <p><b>Rest of Asia Pacific and Japan show the strongest upgrade opportunity.</b> Japan has the shortest replacement cycle at <span class="num">26 months</span>, with GEO revenue growing <span class="num">+14.57%</span> YoY in FY25 — fastest of any region. Rest of Asia Pacific growing <span class="num">+9.91%</span> from the smallest base.</p>
+                <p>Greater China is the outlier: cycles shortening but revenue declined <span class="num">-3.85%</span> — a share problem, not a category problem.</p>
+              </div>
+              <div class="ai-footer"><span>Apple 10-K · Counterpoint · Canalys</span><span class="layer-badge sourced">Sourced</span></div>
+            </div>
+            <div class="msg-meta">CI-01 · 10:42 AM · 1.8s</div>
+          </div>
+
+          <!-- Exchange 2: graceful failure -->
+          <div class="msg user">
+            <div class="msg-bubble">Which carrier partners are underutilizing co-op budgets this quarter?</div>
+            <div class="msg-meta">You · 10:44 AM</div>
+          </div>
+          <div class="msg agent">
+            <div class="answer-card-inline">
+              <div class="ai-head"><span class="tag">Performance Strategist</span><span class="conf-badge na">N/A</span></div>
+              <div class="ai-body">
+                <p>I do not have sourced data on partner-level co-op utilization — that is internal performance data outside this corpus. What I know about co-op program structure: funds are typically allocated quarterly against approved marketing activity, with reimbursement contingent on compliance documentation.</p>
+              </div>
+              <div class="ai-footer"><span>Guardrail: blocked internal performance claim</span><span class="layer-badge inferred">Inferred</span></div>
+            </div>
+            <div class="msg-meta">CI-01 · 10:44 AM · graceful failure</div>
+          </div>
+
+          <!-- Exchange 3: Needs Review → triggers HITL -->
+          <div class="msg user">
+            <div class="msg-bubble">Why is the Thailand carrier partner underperforming on co-op utilization this quarter?</div>
+            <div class="msg-meta">You · 10:47 AM</div>
+          </div>
+          <div class="msg agent" id="needsReviewMsg">
+            <div class="answer-card-inline">
+              <div class="ai-head"><span class="tag">Performance Strategist</span><span class="conf-badge review">⚠ NEEDS REVIEW</span></div>
+              <div class="ai-body">
+                <p>Based on synthesized benchmarks and regional context, co-op underutilization typically signals budget-cycle friction, enablement gaps, or competitive displacement. I have identified Thailand as a candidate for one or more of these — but this is a <b>synthesized inference</b>, not a sourced fact. Synthesized claims presented as recommendations require GEO director review.</p>
+              </div>
+              <div class="ai-footer"><span>Channel Fusion · WorldMetrics · synthesized scenario</span><span class="layer-badge synthesized">Synthesized</span></div>
+            </div>
+            <div class="review-action">
+              <div class="ra-text"><b>This answer requires GEO director input.</b> The agent cannot confirm root cause without partner-specific knowledge.</div>
+              <button class="btn-review" id="openHitl">Review This Answer →</button>
+            </div>
+            <div class="msg-meta">CI-01 · 10:47 AM · decision required</div>
+          </div>
+
+          <!-- HITL thread cards: hidden until triggered -->
+          <div id="hitlThread" style="display:none;width:100%;display:flex;flex-direction:column;gap:10px;display:none;">
+
+            <!-- Human theory card -->
+            <div class="msg agent" id="theoryCard" style="display:none;max-width:96%;">
+              <div class="theory-card">
+                <div class="tc-head"><span>Submitted Hypothesis</span><span class="intent-badge forecast">Forecasting</span></div>
+                <div class="tc-body">
+                  <div class="attribution"><span class="avatar">TH</span> Thailand GEO Director</div>
+                  <p style="margin:0;" id="theoryText">Thailand's fiscal calendar (Apr–Mar) doesn't align with Apple's quarterly co-op disbursement windows — partners are holding unspent funds waiting for their own budget cycle to open.</p>
+                </div>
+              </div>
+              <div class="msg-meta">GEO Director · 10:49 AM</div>
+            </div>
+
+            <!-- AI stress test card -->
+            <div class="msg agent" id="stressCard" style="display:none;max-width:96%;">
+              <div class="stress-card">
+                <div class="sc-head"><span>AI Stress Test · CI-01</span></div>
+                <div class="sc-body">
+                  <div class="stress-section ss-supports">
+                    <div class="ss-label">✓ Supports</div>
+                    <p>Fiscal-year misalignment is a documented APAC co-op pattern<span class="cite-chip">channel-fusion · sourced</span>. No Thailand-specific training anomaly is currently flagged in the corpus, consistent with a calendar rather than enablement explanation.</p>
+                  </div>
+                  <div class="stress-section ss-complicates">
+                    <div class="ss-label">⚠ Complicates</div>
+                    <p>Thailand retail staff turnover is <span class="num">8 pts</span> above regional average this quarter<span class="cite-chip">worldmetrics · sourced</span> — overlaps with hypothesis 03 (training-threshold co-op block) and is not fully ruled out by a calendar-only explanation.</p>
+                  </div>
+                  <div class="stress-section ss-consider">
+                    <div class="ss-label">→ Consider also</div>
+                    <p>Calendar misalignment may be the proximate cause this quarter with turnover as a compounding factor into next — both could be partially true.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="msg-meta">CI-01 stress test · 10:49 AM · 2.1s</div>
+            </div>
+
+          </div>
+
+        </div><!-- /chat-stream -->
+
+        <!-- BOTTOM: conversation input only — always, never replaced by controls -->
+        <div class="chat-bottom" id="chatBottom">
+          <div class="input-layer" id="inputLayer">
+            <div class="chat-topics">
+              <button class="chat-topic-chip" data-topic="Which GEO markets have the highest iPhone upgrade opportunity?">GEO Markets</button>
+              <button class="chat-topic-chip" data-topic="How does Japan's upgrade cycle compare to the global average?">Upgrade Cycles</button>
+              <button class="chat-topic-chip" data-topic="What is the competitive threat from Transsion in emerging markets?">Competitive</button>
+              <button class="chat-topic-chip" data-topic="Why is the Thailand carrier partner underperforming on co-op utilization?">Thailand Co-op</button>
+            </div>
+            <div class="chat-input-box">
+              <input type="text" id="chatInput" placeholder="Ask about GEO markets, upgrade cycles, or channel programs...">
+              <button class="chat-send" id="chatSend">Send</button>
+            </div>
+          </div>
+        </div><!-- /chat-bottom -->
+
+      </div><!-- /card-body -->
+    </div><!-- /chat-card -->
+  </div><!-- /col 1 -->
+
+
+  <!-- ══════════════ COLUMN 2: EVIDENCE ══════════════ -->
+  <div class="col">
+    <div class="col-label muted">Evidence</div>
+
+    <div class="mcard" id="evidenceCard">
+      <div class="mcard-head">
+        <h2><span class="glyph">&#9670;</span> <span id="evTitle">Corpus Charts</span></h2>
+        <span class="count" id="evCount">default view</span>
+      </div>
+      <div class="mcard-body" id="evBody">
+
+        <!-- DEFAULT VIEW: existing charts -->
+        <div id="viewDefault">
+          <div class="chart-divider"><span>Apple GEO Revenue</span></div>
+          <div class="chart-label">Net Sales by Reportable Segment</div>
+          <div class="chart-sub">$B · FY2023–FY2025 · Source: Apple 10-K</div>
+          <div class="bar-chart-group">
+            <div class="bar-row"><div class="geo-label">Americas</div><div class="bar-track"><div class="bar-seg y23" style="width:35%"></div><div class="bar-seg y24" style="width:36%"></div><div class="bar-seg y25" style="width:38.5%"></div></div><div class="bar-val">$178.4B</div></div>
+            <div class="bar-row"><div class="geo-label">Europe</div><div class="bar-track"><div class="bar-seg y23" style="width:20.3%"></div><div class="bar-seg y24" style="width:21.8%"></div><div class="bar-seg y25" style="width:24%"></div></div><div class="bar-val">$111.0B</div></div>
+            <div class="bar-row"><div class="geo-label">Greater China</div><div class="bar-track"><div class="bar-seg y23" style="width:15.6%"></div><div class="bar-seg y24" style="width:14.4%"></div><div class="bar-seg y25" style="width:13.9%"></div></div><div class="bar-val">$64.4B</div></div>
+            <div class="bar-row"><div class="geo-label">Japan</div><div class="bar-track"><div class="bar-seg y23" style="width:5.2%"></div><div class="bar-seg y24" style="width:5.4%"></div><div class="bar-seg y25" style="width:6.2%"></div></div><div class="bar-val">$28.7B</div></div>
+            <div class="bar-row"><div class="geo-label">Rest of Asia Pac.</div><div class="bar-track"><div class="bar-seg y23" style="width:6.4%"></div><div class="bar-seg y24" style="width:6.6%"></div><div class="bar-seg y25" style="width:7.3%"></div></div><div class="bar-val">$33.7B</div></div>
+          </div>
+          <div class="chart-legend-row">
+            <div class="lg"><span class="lg-sw" style="background:#d6d0c2"></span>FY23</div>
+            <div class="lg"><span class="lg-sw" style="background:#b9b09a"></span>FY24</div>
+            <div class="lg"><span class="lg-sw" style="background:var(--t-navy)"></span>FY25</div>
+          </div>
+
+          <div class="chart-divider" style="margin-top:18px;"><span>Upgrade Cycles by Country</span></div>
+          <div class="chart-label">Smartphone Replacement Cycle</div>
+          <div class="chart-sub">Months · Source: Counterpoint Research</div>
+          <div class="hbar-row"><div class="ctry">Japan</div><div class="hbar-track"><div class="hbar-fill" style="width:52%"></div></div><div class="hbar-num">26 mo</div></div>
+          <div class="hbar-row"><div class="ctry">India (prem.)</div><div class="hbar-track"><div class="hbar-fill" style="width:54%"></div></div><div class="hbar-num">27 mo</div></div>
+          <div class="hbar-row"><div class="ctry">China</div><div class="hbar-track"><div class="hbar-fill" style="width:66%"></div></div><div class="hbar-num">33 mo</div></div>
+          <div class="hbar-row"><div class="ctry">W. Europe</div><div class="hbar-track"><div class="hbar-fill" style="width:66%"></div></div><div class="hbar-num">33 mo</div></div>
+          <div class="hbar-row"><div class="ctry">Global Avg</div><div class="hbar-track"><div class="hbar-fill" style="width:70%"></div></div><div class="hbar-num">35 mo</div></div>
+          <div class="hbar-row"><div class="ctry">US</div><div class="hbar-track"><div class="hbar-fill" style="width:92%"></div></div><div class="hbar-num">46 mo</div></div>
+        </div>
+
+        <!-- THEORY VIEW: before/after chart -->
+        <div id="viewTheory" style="display:none;">
+          <div id="evStateChip" class="ev-state-chip">
+            <span>&#9670;</span>
+            <span><span class="ecc" id="evIntentLabel">Forecast</span> active · Thailand co-op utilization</span>
+            <span class="ev-flip" onclick="flipToDefault()">← Back to corpus</span>
+          </div>
+
+          <div class="chart-label">Co-op Utilization · Thailand</div>
+          <div class="chart-sub" id="evChartSub">Current vs. Projected — Budget-Cycle Theory</div>
+
+          <div class="cmp-legend" id="cmpLegend">
+            <div class="cl"><span class="cl-sw current"></span> Current (corpus)</div>
+            <div class="cl"><span class="cl-sw projected"></span> Projected (if theory holds)</div>
+          </div>
+
+          <div class="cmp-bars">
+            <div class="cmp-group">
+              <div class="cmp-pair">
+                <div class="cmp-bar current" style="height:50px;"><span class="cmp-bar-val">41%</span></div>
+                <div class="cmp-bar projected" id="bar2" style="height:50px;"><span class="cmp-bar-val" id="bar2val">41%</span></div>
+              </div>
+              <div class="cmp-group-label">Co-op<br>Utilization</div>
+            </div>
+            <div class="cmp-group">
+              <div class="cmp-pair">
+                <div class="cmp-bar current" style="height:35px;"><span class="cmp-bar-val">Low</span></div>
+                <div class="cmp-bar projected" id="bar4" style="height:35px;"><span class="cmp-bar-val" id="bar4val">Low</span></div>
+              </div>
+              <div class="cmp-group-label">Root-Cause<br>Confidence</div>
+            </div>
+            <div class="cmp-group">
+              <div class="cmp-pair">
+                <div class="cmp-bar current" style="height:28px;"><span class="cmp-bar-val">Low</span></div>
+                <div class="cmp-bar projected" id="bar6" style="height:28px;"><span class="cmp-bar-val" id="bar6val">Low</span></div>
+              </div>
+              <div class="cmp-group-label">Enablement<br>Priority</div>
+            </div>
+          </div>
+
+          <div id="commitNote" style="display:none;margin-top:12px;padding:9px 11px;background:var(--green-bg);border:1px solid #b9d1ae;border-radius:3px;font-size:11px;color:var(--green);">
+            ✓ Committed to corpus — projected state is now the current state. Corpus chunk count updated.
+          </div>
+        </div>
+
+        <!-- HITL DECISION PANEL — only appears below the charts when a "Needs Review" answer is opened in Column 1 -->
+        <div class="hitl-panel" id="hitlPanel" style="display:none;">
+          <div class="chart-divider"><span>Your Decision</span></div>
+
+          <div class="agent-instruction">
+            <div class="ai-icon">CI</div>
+            <p>This answer draws on synthesized data and needs your judgment. Choose your intent below, then select or write your explanation — the chart above will update in real time.</p>
+          </div>
+
+          <div>
+            <div class="intent-label" style="margin-bottom:6px;">Your intent</div>
+            <div class="intent-tabs">
+              <button class="intent-tab" id="tabTheorize" onclick="setIntent('theorize')">Theorize<span class="sub">test a hunch</span></button>
+              <button class="intent-tab" id="tabForecast" onclick="setIntent('forecast')">Forecast<span class="sub">track assumption</span></button>
+              <button class="intent-tab" id="tabCorrect" onclick="setIntent('correct')">Correct<span class="sub">this is fact</span></button>
+            </div>
+          </div>
+
+          <div>
+            <div class="intent-label" style="margin-bottom:6px;">Select or write a hypothesis</div>
+            <div class="hyp-options">
+              <div class="hyp-opt" onclick="selectHyp(this,0)"><span class="hyp-num">01</span><span>Thailand's fiscal calendar (Apr–Mar) doesn't align with Apple's quarterly co-op disbursement windows — partners sitting on unspent funds.</span></div>
+              <div class="hyp-opt" onclick="selectHyp(this,1)"><span class="hyp-num">02</span><span>Transsion's regional promo budget surged this quarter, pulling carrier marketing focus away from Apple SKUs.</span></div>
+              <div class="hyp-opt" onclick="selectHyp(this,2)"><span class="hyp-num">03</span><span>Retail staff turnover spiked; replacement staff haven't re-certified — co-op funds tied to training-completion thresholds going unused.</span></div>
+            </div>
+            <textarea class="hyp-custom" id="hypCustom" placeholder="...or write your own explanation" rows="2"></textarea>
+          </div>
+
+          <div class="override-warn" id="overrideWarn" style="display:none;">⚑ AI flagged a complicating factor not fully resolved by this hypothesis. Committing will log this as an override for forecast-accuracy tracking.</div>
+
+          <div class="action-btns">
+            <button class="action-btn a-discard" onclick="commitDecision('discard')"><span class="abt">Discard</span><span class="abd">Untested — won't write to corpus</span></button>
+            <button class="action-btn a-forecast" onclick="commitDecision('forecast')"><span class="abt">Track as Assumption</span><span class="abd">Provisional — re-evaluated next cycle</span></button>
+            <button class="action-btn a-correct" onclick="commitDecision('correct')"><span class="abt">Make Permanent</span><span class="abd">Confirmed fact — ingest now</span></button>
+          </div>
+        </div><!-- /hitl-panel -->
+
+      </div>
+    </div>
+  </div><!-- /col 2 -->
+
+
+  <!-- ══════════════ COLUMN 3: AUDIT ══════════════ -->
+  <div class="col">
+    <div class="col-label muted">Audit</div>
+
+    <!-- 1. ABOUT MARKET INTELLIGENCE -->
+    <div class="drawer open" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> About Market Intelligence</h2>
+        <div class="drawer-right"><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div class="timeline-badge"><span class="glyph">&#9201;</span> 2-Day Build Turnaround</div>
+        <p class="about-lede"><b>This screen is a showcase</b> — a demonstration of how I build agents, routines, and evaluation, not a finished Apple Channel solution.</p>
+        <p class="about-sub">It's meant to show how quickly I can stand up an "Applied AI" concept from scratch: a working multi-agent pipeline with sourced data, guardrails, and scoring — including a live HITL learning loop — and how much further it goes once it's built with Apple's own datasets, processes, and domain instruction in the loop.</p>
+        <div class="scope-note"><b>Built without domain instruction.</b> No leadership interviews, no internal data access, no Apple-specific process input. The reasoning, scenarios, and channel-program assumptions here are my best-guess construction from public sources — meant to demonstrate platform thinking, not domain expertise.</div>
+        <div class="audit-section-label" style="margin-top:0;">What this demonstrates</div>
+        <div class="tag-cloud">
+          <span class="concept-chip">Conceptual Thinking</span>
+          <span class="concept-chip">Platform Thinking</span>
+          <span class="concept-chip">Data Understanding</span>
+          <span class="concept-chip">Agent Routine Design</span>
+          <span class="concept-chip">AI Pattern Choices</span>
+          <span class="concept-chip">Evaluation Concept</span>
+          <span class="concept-chip">HITL Learning Loop</span>
+          <span class="concept-chip">2-Day Build</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. AGENT BUILD APPROACH -->
+    <div class="drawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Agent Build Approach</h2>
+        <div class="drawer-right"><span class="drawer-count">23 steps</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+
+        <div class="step-group-label">Research &amp; Intent</div>
+        <ul class="step-list">
+          <li class="step-item"><span class="step-num">1</span><span class="step-text">Industry domain research</span></li>
+          <li class="step-item"><span class="step-num">2</span><span class="step-text">Competitive review</span></li>
+          <li class="step-item"><span class="step-num">3</span><span class="step-text">Domain interviews</span></li>
+          <li class="step-item"><span class="step-num">4</span><span class="step-text">AI analysis source</span></li>
+        </ul>
+
+        <div class="step-group-label">Assembly &amp; Mock</div>
+        <ul class="step-list">
+          <li class="step-item"><span class="step-num">5</span><span class="step-text">Data assembly interface</span></li>
+          <li class="step-item"><span class="step-num">6</span><span class="step-text">Mock concept</span></li>
+          <li class="step-item"><span class="step-num">7</span><span class="step-text">Delivery format decisions</span></li>
+          <li class="step-item"><span class="step-num">8</span><span class="step-text">Reporting review</span></li>
+          <li class="step-item"><span class="step-num">9</span><span class="step-text">Platform scaling analysis</span></li>
+        </ul>
+
+        <div class="step-group-label">Agent Design &amp; Reasoning</div>
+        <ul class="step-list">
+          <li class="step-item"><span class="step-num">10</span><span class="step-text">Agent persona mapping</span></li>
+          <li class="step-item"><span class="step-num">11</span><span class="step-text">AI stress test</span></li>
+          <li class="step-item"><span class="step-num">12</span><span class="step-text">Reasoning decision points</span></li>
+          <li class="step-item"><span class="step-num">13</span><span class="step-text">AI pattern inventory</span></li>
+          <li class="step-item"><span class="step-num">14</span><span class="step-text">UX mock final engine</span></li>
+          <li class="step-item"><span class="step-num">15</span><span class="step-text">AI stress test</span></li>
+        </ul>
+
+        <div class="step-group-label">Build</div>
+        <ul class="step-list">
+          <li class="step-item"><span class="step-num">16</span><span class="step-text">Agent task breakdown</span></li>
+          <li class="step-item"><span class="step-num">17</span><span class="step-text">Agent skills assembly</span></li>
+          <li class="step-item"><span class="step-num">18</span><span class="step-text">Agent configuration</span></li>
+          <li class="step-item"><span class="step-num">19</span><span class="step-text">Platform coding / deterministic</span></li>
+          <li class="step-item"><span class="step-num">20</span><span class="step-text">Dashboard creation finalization</span></li>
+        </ul>
+
+        <div class="step-group-label">Test &amp; Release</div>
+        <ul class="step-list">
+          <li class="step-item"><span class="step-num">21</span><span class="step-text">Testing</span></li>
+          <li class="step-item"><span class="step-num">22</span><span class="step-text">Eval rating — guardrail determination</span></li>
+          <li class="step-item"><span class="step-num">23</span><span class="step-text">Release</span></li>
+        </ul>
+
+      </div>
+    </div>
+
+    <!-- 3. AI AUDIT -->
+    <div class="drawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> AI Audit</h2>
+        <div class="drawer-right"><span class="drawer-count">17 calls today</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+
+        <div class="audit-section-label">AI Patterns</div>
+        <div class="audit-row"><div class="audit-row-name">RAG Retrieval</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val">14</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">0.4s</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">$0.01</div><div class="as-label">Cost</div></div></div></div>
+        <div class="audit-row"><div class="audit-row-name">Guardrail (PAT-13)</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val">14</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">0.6s</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">$0.01</div><div class="as-label">Cost</div></div></div></div>
+        <div class="audit-row"><div class="audit-row-name">LLM-as-Judge (PAT-19)</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val">14</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">0.5s</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">$0.02</div><div class="as-label">Cost</div></div></div></div>
+        <div class="audit-row"><div class="audit-row-name">HITL Gate (TI-18)</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val" id="hitlGateCount">0</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">—</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">—</div><div class="as-label">Cost</div></div></div></div>
+
+        <div class="audit-section-label">LLMs</div>
+        <div class="audit-row"><div class="audit-row-name">Claude Sonnet 4.6</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val">14</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">1.8s</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">$0.04</div><div class="as-label">Cost</div></div></div></div>
+        <div class="audit-row"><div class="audit-row-name">Claude Haiku 4.5</div><div class="audit-row-stats"><div class="audit-stat"><div class="as-val">17</div><div class="as-label">Count</div></div><div class="audit-stat"><div class="as-val">0.5s</div><div class="as-label">Latency</div></div><div class="audit-stat"><div class="as-val">$0.02</div><div class="as-label">Cost</div></div></div></div>
+
+      </div>
+    </div>
+
+    <!-- 4. DATA SOURCES -->
+    <div class="drawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Data Sources</h2>
+        <div class="drawer-right"><span class="drawer-count" id="corpusChunkLabel">5 datasets · 312 chunks</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Regional Performance</span><div class="ds-name">Apple GEO Revenue 2023–2025</div><div class="ds-meta"><span>Apple 10-K · Bullfincher</span><span>·</span><span>15 chunks</span></div></div><div class="ds-right"><span class="layer-badge sourced">Sourced</span></div></div>
+        <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Behavioral Trend</span><div class="ds-name">Smartphone Upgrade Cycles 2009–2026</div><div class="ds-meta"><span>SellCell · Counterpoint</span><span>·</span><span>41 chunks</span></div></div><div class="ds-right"><span class="layer-badge sourced">Sourced</span></div></div>
+        <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Market Growth</span><div class="ds-name">Emerging Markets Smartphone Growth</div><div class="ds-meta"><span>KrASIA · Canalys · IDC</span><span>·</span><span>23 chunks</span></div></div><div class="ds-right"><span class="layer-badge sourced">Sourced</span></div></div>
+        <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Program Structure</span><div class="ds-name">Channel Program Structure</div><div class="ds-meta"><span>Apple job postings</span><span>·</span><span>19 chunks</span></div></div><div class="ds-right"><span class="layer-badge inferred">Inferred</span></div></div>
+        <div class="dataset-row" id="hitlDatasetRow" style="display:none;"><div class="dataset-info"><span class="ds-cat">GEO Director Input</span><div class="ds-name" id="hitlDatasetName">Thailand Co-op — Budget-Cycle Theory</div><div class="ds-meta"><span>HITL Correction · <span id="hitlIntentLabel2">Forecast</span></span><span>·</span><span id="hitlChunkCount">1 chunk</span></div></div><div class="ds-right"><span class="layer-badge" id="hitlLayerBadge">forecast</span></div></div>
+        <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Partner Scenarios</span><div class="ds-name">Benchmark-Anchored Scenarios</div><div class="ds-meta"><span>Channel Co. · eduMe</span><span>·</span><span>10 chunks</span></div></div><div class="ds-right"><span class="layer-badge synthesized">Synthesized</span></div></div>
+      </div>
+    </div>
+
+    <!-- 5. AVAILABLE AGENTS -->
+    <div class="drawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Available Agents</h2>
+        <div class="drawer-right"><span class="drawer-count">2 live · 1 roadmap</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div class="agent-card">
+          <div class="agent-top"><span class="agent-id">CI-01</span><span class="agent-status"><span class="sdot"></span>Live</span></div>
+          <p class="agent-name">Performance Strategist</p>
+          <p class="agent-role">Answers market and channel questions with sourced, attributed analysis. Triggers HITL on synthesized claims.</p>
+          <div class="chip-row"><span class="chip">RAG Retrieval</span><span class="chip">Cross-Reference</span><span class="chip">HITL Trigger</span></div>
+          <div class="agent-audit-row"><div class="audit-metric"><div class="am-val">14</div><div class="am-label">Used Today</div></div><div class="audit-metric"><div class="am-val">1.8s</div><div class="am-label">Avg Latency</div></div><div class="audit-metric"><div class="am-val">$0.04</div><div class="am-label">Avg Cost</div></div></div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-top"><span class="agent-id">AG-01</span><span class="agent-status"><span class="sdot"></span>Live</span></div>
+          <p class="agent-name">Data Builder</p>
+          <p class="agent-role">Corpus curator — ingests, tags, and chunks every dataset with seven-field metadata schema. Ingests HITL corrections.</p>
+          <div class="chip-row"><span class="chip">Metadata Tagging</span><span class="chip">Chunk Ingestion</span><span class="chip">HITL Ingest</span></div>
+          <div class="agent-audit-row"><div class="audit-metric"><div class="am-val" id="agChunkCount">312</div><div class="am-label">Chunks</div></div><div class="audit-metric"><div class="am-val">4.2s</div><div class="am-label">Avg Latency</div></div><div class="audit-metric"><div class="am-val">$0.11</div><div class="am-label">Avg Cost</div></div></div>
+        </div>
+        <div class="agent-card" style="opacity:.62;">
+          <div class="agent-top"><span class="agent-id">SR-01</span><span class="agent-status roadmap-tag"><span class="sdot"></span>Roadmap</span></div>
+          <p class="agent-name">Supreme Reasoner</p>
+          <p class="agent-role">Synthesizes HITL corrections into reusable reasoning patterns, fed back to Data Builder. See Learned Context below for live output.</p>
+          <div class="chip-row"><span class="chip">Pattern Synthesis</span><span class="chip">Institutional Memory</span></div>
+          <div class="agent-audit-row"><div class="audit-metric"><div class="am-val">—</div><div class="am-label">Used Today</div></div><div class="audit-metric"><div class="am-val">—</div><div class="am-label">Avg Latency</div></div><div class="audit-metric"><div class="am-val">—</div><div class="am-label">Avg Cost</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. FORECAST OVERRIDE LOG (new) -->
+    <div class="drawer" id="overrideLogDrawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Forecast Override Log</h2>
+        <div class="drawer-right"><span class="drawer-count" id="overrideCount">0 logged</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div id="overrideLogEmpty" style="font-size:11px;color:var(--t-ink);font-style:italic;">No overrides yet. When a GEO director commits a theory over AI pushback, it appears here.</div>
+        <div id="overrideLogItems"></div>
+        <div class="phase-block">
+          <div class="phase-label">Roadmap</div>
+          <div class="phase-item"><b>MVP</b> Log when human overrides AI complication. Capture intent, hypothesis, and what was overridden.</div>
+          <div class="phase-item"><b>PH 2</b> Surface override-accuracy rate per director once cycles close and outcomes are scored.</div>
+          <div class="phase-item"><b>PH 3</b> Auto-flag theory types AI is frequently right to contest — tune Guardrail sensitivity over time.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. LEARNED CONTEXT (new — Supreme Reasoner output) -->
+    <div class="drawer" id="learnedContextDrawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Learned Context</h2>
+        <div class="drawer-right"><span class="drawer-count" id="learnedContextCount">0 patterns</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div id="learnedContextEmpty" class="lc-empty">No patterns synthesized yet. When a GEO director commits a theory, the Supreme Reasoner (SR-01) synthesizes it into a reusable reasoning pattern here.</div>
+        <div id="learnedContextItems"></div>
+      </div>
+    </div>
+
+    <!-- 8. PIPELINE LOG (moved from Col 2 in v3 — last drawer in Col 3) -->
+    <div class="drawer" data-drawer>
+      <button class="drawer-toggle" data-drawer-toggle>
+        <h2><span class="glyph">&#9670;</span> Pipeline Log</h2>
+        <div class="drawer-right"><span class="drawer-count">last query · 23 steps</span><span class="drawer-chevron">&#9656;</span></div>
+      </button>
+      <div class="drawer-content">
+        <div class="log-stream">
+          <div class="log-event"><div class="log-time">00:00.2</div><div class="log-icon info">&#9678;</div><div class="log-content"><span class="lbl">RAG Retrieval</span> — 4 chunks<span class="detail">Apple 10-K (2), Counterpoint (1), Canalys Q3'24 (1) · confidence: high</span></div></div>
+          <div class="log-event"><div class="log-time">00:00.9</div><div class="log-icon pass">✓</div><div class="log-content"><span class="lbl">Guardrail Agent</span><span class="pass-tag">PASS</span><span class="detail">Every claim carries source tag · no synthesized data presented as fact</span></div></div>
+          <div class="log-event"><div class="log-time">00:01.4</div><div class="log-icon score">★</div><div class="log-content"><span class="lbl">Eval Agent</span> — 4.4 / 5.0<span class="detail">LLM-as-Judge · all dimensions above threshold</span><div class="eval-grid"><div class="eval-dim"><span class="ed-label">Accuracy</span><span class="ed-score">5</span></div><div class="eval-dim"><span class="ed-label">Specif.</span><span class="ed-score">4</span></div><div class="eval-dim"><span class="ed-label">Action.</span><span class="ed-score">5</span></div><div class="eval-dim"><span class="ed-label">Sourcing</span><span class="ed-score">4</span></div><div class="eval-dim"><span class="ed-label">Respons.</span><span class="ed-score">4</span></div></div></div></div>
+          <div class="log-event"><div class="log-time">00:01.8</div><div class="log-icon info">&#9636;</div><div class="log-content"><span class="lbl">Display Agent</span> — Q&amp;A mode<span class="detail">Confidence badge + source attribution + layer tag applied</span></div></div>
+        </div>
+        <div class="pb-section">
+          <button class="pb-toggle" id="pbToggle"><span class="pb-title"><span class="pb-chevron">&#9656;</span> Prompt Build</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8c8474;">3 layers · 612 tok</span></button>
+          <div class="pb-body" id="pbBody">
+            <div class="pb-layer"><span class="pb-tag">IDENTITY</span><span class="pb-text">10-year GEO director persona — sourced, specific, direct.</span></div>
+            <div class="pb-layer"><span class="pb-tag">CONTEXT</span><span class="pb-text">4 retrieved chunks injected with full metadata headers.</span></div>
+            <div class="pb-layer"><span class="pb-tag">FORMAT</span><span class="pb-text">Q&A mode — answer, source, confidence in order.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col 3 -->
+
+</div><!-- /body-grid -->
+
+<div class="footer-strip">
+  <span>DeepBench v4.0 · Apple Channel Intelligence Pipeline · Interact / Evidence / Audit</span>
+  <span>Layer 1 Sourced · Layer 2 Inferred · Layer 3 Synthesized · HITL Tier 2 loop active</span>
+</div>
+
+</div><!-- /app -->
+
+<script>
+  // ── drawer toggles ──
+  document.querySelectorAll('[data-drawer-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('[data-drawer]').classList.toggle('open'));
+  });
+
+  document.getElementById('pbToggle').addEventListener('click', function(){
+    this.classList.toggle('open');
+    document.getElementById('pbBody').classList.toggle('open');
+  });
+
+  // ── chat ──
+  const stream = document.getElementById('chatStream');
+  const input = document.getElementById('chatInput');
+  let queryCount = 14;
+
+  function appendMsg(html, cls){
+    const d = document.createElement('div');
+    d.className = 'msg ' + cls;
+    d.innerHTML = html;
+    stream.appendChild(d);
+    stream.scrollTop = stream.scrollHeight;
+    return d;
+  }
+
+  function sendQuery(text){
+    if(!text.trim()) return;
+    const t = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    appendMsg(`<div class="msg-bubble">${text}</div><div class="msg-meta">You · ${t}</div>`,'user');
+    input.value='';
+    const typing = appendMsg(`<div class="answer-card-inline"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`,'agent');
+    setTimeout(()=>{
+      typing.remove();
+      appendMsg(`<div class="answer-card-inline">
+        <div class="ai-head"><span class="tag">Performance Strategist</span><span class="conf-badge high">HIGH</span></div>
+        <div class="ai-body"><p style="font-size:12px;line-height:1.6;margin:0;"><b>Based on the available corpus</b>, here is what I can confirm with sourced data. Multiple data points across the Apple 10-K, Counterpoint Research, and Canalys datasets support this analysis.</p></div>
+        <div class="ai-footer"><span>Apple 10-K · Counterpoint · Canalys</span><span class="layer-badge sourced">Sourced</span></div>
+      </div>`,'agent');
+      queryCount++;
+      document.getElementById('statQueries').textContent = queryCount;
+      stream.scrollTop = stream.scrollHeight;
+    },1100);
+  }
+
+  document.getElementById('chatSend').addEventListener('click',()=>sendQuery(input.value));
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')sendQuery(input.value);});
+  document.querySelectorAll('.chat-topic-chip').forEach(c=>{
+    c.addEventListener('click',()=>{input.value=c.dataset.topic;input.focus();});
+  });
+
+  // ── HITL state ──
+  let currentIntent = null;
+  let currentHypIndex = null;
+  const hyps = [
+    "Thailand's fiscal calendar (Apr–Mar) doesn't align with Apple's quarterly co-op disbursement windows — partners sitting on unspent funds waiting for their own budget cycle.",
+    "Transsion's regional promo budget surged this quarter, pulling carrier marketing focus away from Apple SKUs.",
+    "Retail staff turnover spiked above regional average; replacement staff haven't re-certified — co-op funds tied to training-completion thresholds going unused."
+  ];
+
+  // chart data per hypothesis [co-op%, root-cause height, priority height]
+  const chartData = [
+    {bar2h:50,bar2v:'41%',bar4h:85,bar4v:'Budget-Cycle',bar6h:65,bar6v:'Elevated',sub:'Current vs. Projected — Budget-Cycle Theory'},
+    {bar2h:50,bar2v:'41%',bar4h:70,bar4v:'Competitive',bar6h:55,bar6v:'Moderate',sub:'Current vs. Projected — Competitive Displacement Theory'},
+    {bar2h:50,bar2v:'41%',bar4h:75,bar4v:'Enablement',bar6h:90,bar6v:'High',sub:'Current vs. Projected — Training-Completion Theory'},
+  ];
+
+  // Open HITL decision panel (Column 2, below charts)
+  document.getElementById('openHitl').addEventListener('click', ()=>{
+    document.getElementById('hitlPanel').style.display='flex';
+    // Switch Column 2 to theory view
+    document.getElementById('viewDefault').style.display='none';
+    document.getElementById('viewTheory').style.display='block';
+    document.getElementById('evTitle').textContent='Theory Evidence';
+    document.getElementById('evCount').textContent='active theory';
+    document.getElementById('hitlPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+
+  function setIntent(intent){
+    currentIntent = intent;
+    ['tabTheorize','tabForecast','tabCorrect'].forEach(id=>{
+      document.getElementById(id).className='intent-tab';
+    });
+    const map = {theorize:'tabTheorize',forecast:'tabForecast',correct:'tabCorrect'};
+    document.getElementById(map[intent]).classList.add('active-'+intent);
+    // update evidence col label
+    document.getElementById('evIntentLabel').textContent = intent.charAt(0).toUpperCase()+intent.slice(1);
+    // show override warn for complicating hypotheses when intent is forecast/correct
+    checkOverrideWarn();
+    updateChart();
+  }
+
+  function selectHyp(el, idx){
+    document.querySelectorAll('.hyp-opt').forEach(o=>o.classList.remove('selected'));
+    el.classList.add('selected');
+    currentHypIndex = idx;
+    checkOverrideWarn();
+    updateChart();
+  }
+
+  function checkOverrideWarn(){
+    // Show warning if hyp 0 (budget-cycle) is selected AND intent is forecast/correct
+    // because AI flagged staff turnover as complication
+    const warn = (currentHypIndex === 0 || currentHypIndex === 1) &&
+                 (currentIntent === 'forecast' || currentIntent === 'correct');
+    document.getElementById('overrideWarn').style.display = warn ? 'flex' : 'none';
+  }
+
+  function updateChart(){
+    if(currentHypIndex === null) return;
+    const d = chartData[currentHypIndex];
+    document.getElementById('evChartSub').textContent = d.sub;
+    document.getElementById('bar2').style.height = d.bar2h+'px';
+    document.getElementById('bar2val').textContent = d.bar2v;
+    document.getElementById('bar4').style.height = d.bar4h+'px';
+    document.getElementById('bar4val').textContent = d.bar4v;
+    document.getElementById('bar6').style.height = d.bar6h+'px';
+    document.getElementById('bar6val').textContent = d.bar6v;
+  }
+
+  function flipToDefault(){
+    document.getElementById('viewDefault').style.display='block';
+    document.getElementById('viewTheory').style.display='none';
+    document.getElementById('evTitle').textContent='Corpus Charts';
+    document.getElementById('evCount').textContent='tap to return to theory';
+  }
+
+  function commitDecision(decision){
+    if(!currentHypIndex && currentHypIndex!==0){ alert('Select a hypothesis first.'); return; }
+    if(!currentIntent){ alert('Select your intent first.'); return; }
+
+    const hypText = hyps[currentHypIndex];
+    const t = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+    // Show theory card in stream
+    document.getElementById('hitlThread').style.display='flex';
+    document.getElementById('theoryText').textContent = hypText;
+    document.getElementById('theoryCard').style.display='flex';
+
+    // Show stress test after brief delay
+    setTimeout(()=>{
+      document.getElementById('stressCard').style.display='flex';
+      stream.scrollTop = stream.scrollHeight;
+    }, 600);
+
+    // Hide the decision panel, return to normal state
+    setTimeout(()=>{
+      document.getElementById('hitlPanel').style.display='none';
+
+      // Return evidence col to theory committed state or discard
+      if(decision === 'discard'){
+        document.getElementById('viewDefault').style.display='block';
+        document.getElementById('viewTheory').style.display='none';
+        document.getElementById('evTitle').textContent='Corpus Charts';
+        document.getElementById('evCount').textContent='default view';
+        // Add discard note to chat
+        appendMsg(`<div class="answer-card-inline">
+          <div class="ai-head"><span class="tag">System</span><span class="conf-badge na">DISCARDED</span></div>
+          <div class="ai-body"><p style="font-size:12px;margin:0;">Theory discarded — not written to corpus. Ask another question or submit a different hypothesis.</p></div>
+        </div>`,'agent');
+      } else {
+        // Commit: flush chart to permanent state
+        const intentLabel = currentIntent === 'forecast' ? 'Forecast' : 'Confirmed';
+        const badgeClass = currentIntent === 'forecast' ? 'forecast' : 'confirmed';
+
+        // Swap projected bars to committed (green) style
+        ['bar2','bar4','bar6'].forEach(id=>{
+          document.getElementById(id).className = 'cmp-bar committed';
+        });
+        // Update legend
+        document.getElementById('cmpLegend').innerHTML =
+          `<div class="cl"><span class="cl-sw committed"></span> Current (post-commit)</div>`;
+        document.getElementById('evCount').textContent = intentLabel.toLowerCase()+' · committed';
+        document.getElementById('commitNote').style.display='block';
+
+        // Update corpus chunk count
+        const chunkEl = document.getElementById('agChunkCount');
+        const current = parseInt(chunkEl.textContent);
+        chunkEl.textContent = current + 1;
+        document.getElementById('corpusChunkLabel').textContent = `5 datasets · ${current+1} chunks`;
+
+        // Show HITL dataset row in corpus
+        document.getElementById('hitlDatasetRow').style.display='flex';
+        document.getElementById('hitlIntentLabel2').textContent = intentLabel;
+        document.getElementById('hitlLayerBadge').textContent = badgeClass;
+        document.getElementById('hitlLayerBadge').className = 'layer-badge '+badgeClass;
+
+        // Log override if warning was showing
+        if(document.getElementById('overrideWarn').style.display !== 'none'){
+          const logItems = document.getElementById('overrideLogItems');
+          document.getElementById('overrideLogEmpty').style.display='none';
+          const item = document.createElement('div');
+          item.className='ol-item';
+          item.innerHTML=`<div class="ol-icon">⚑</div>
+            <div class="ol-body">
+              <div class="ol-title">Thailand co-op · ${hyps[currentHypIndex].substring(0,48)}...</div>
+              <div class="ol-meta">Thailand GEO Director · overrode AI complication · ${intentLabel} · ${t}</div>
+            </div>
+            <span class="ol-status">PENDING</span>`;
+          logItems.appendChild(item);
+          const count = logItems.querySelectorAll('.ol-item').length;
+          document.getElementById('overrideCount').textContent = count+' logged';
+          // Open the drawer
+          document.getElementById('overrideLogDrawer').classList.add('open');
+        }
+
+        // Confirm in chat stream
+        appendMsg(`<div class="answer-card-inline">
+          <div class="ai-head"><span class="tag">Data Builder · AG-01</span><span class="conf-badge high">INGESTED</span></div>
+          <div class="ai-body"><p style="font-size:12px;margin:0;"><b>Correction captured.</b> Thailand co-op context tagged as <b>${intentLabel}</b> and ingested to corpus. Chunk count: ${current+1}. Supreme Reasoner synthesizing pattern now — see Learned Context.</p></div>
+          <div class="ai-footer"><span>HITL ingest · AG-01 · ${t}</span><span class="layer-badge ${badgeClass}">${badgeClass}</span></div>
+        </div>`,'agent');
+
+        // Supreme Reasoner: synthesize Learned Context card (Addition 2)
+        const hitlGate = document.getElementById('hitlGateCount');
+        hitlGate.textContent = parseInt(hitlGate.textContent) + 1;
+
+        const lcItems = document.getElementById('learnedContextItems');
+        document.getElementById('learnedContextEmpty').style.display='none';
+        const lc = document.createElement('div');
+        lc.className='lc-card';
+        lc.innerHTML = `
+          <div class="lc-row"><b>Question Type</b><span>Partner co-op underperformance — root-cause attribution</span></div>
+          <div class="lc-row"><b>What Was Wrong</b><span>AI presented a synthesized, benchmark-anchored guess as the likely cause without GEO-specific context.</span></div>
+          <div class="lc-row"><b>Correct Reasoning</b><span>${hyps[currentHypIndex]}</span></div>
+          <div class="lc-row"><b>Pattern Applies To</b><span>Co-op utilization questions for any GEO with fiscal-year misalignment to Apple's quarterly disbursement cycle.</span></div>
+          <div class="lc-row"><b>Confidence</b><span><span class="layer-badge ${badgeClass}">${intentLabel.toUpperCase()}</span></span></div>
+          <div class="lc-row"><b>Ingest to Corpus</b><span>YES — chunk #${current+1}</span></div>
+          <div class="lc-arrow">→ ingested to corpus · Data Builder chunk count now ${current+1}</div>`;
+        lcItems.prepend(lc);
+        const lcCount = lcItems.querySelectorAll('.lc-card').length;
+        document.getElementById('learnedContextCount').textContent = lcCount + (lcCount===1?' pattern':' patterns');
+        document.getElementById('learnedContextDrawer').classList.add('open');
+      }
+
+      stream.scrollTop = stream.scrollHeight;
+    }, 1200);
+  }
+</script>
+
+</body>
+</html>

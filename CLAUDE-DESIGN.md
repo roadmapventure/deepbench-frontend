@@ -16,6 +16,16 @@ This separation is what enforces branch discipline. A coding session starts cold
 
 ---
 
+## Standing Rule — Version-Paired Session Naming
+
+Every design session must be tagged with the version number of the kickoff doc(s) it produces, matching the version the paired coding session will carry. This makes the design ↔ coding pairing visible at a glance in `CLAUDE-STATE.md` and `docs/FEATURES.md`.
+
+Format: `S-[FEATURE-ID]-design (v[X.X.X])` for the design session, `S-[FEATURE-ID] (v[X.X.X])` for the coding session that executes its kickoff doc. Sub-sessions (`a`/`b`) each get their own version per the existing sub-session versioning rule (`STANDARDS.md` Section 1).
+
+Applies from S-APPLE-01a-design (v5.3.0) onward.
+
+---
+
 ## Standing Rule — Backlog Capture
 
 **Any feature, agent, or requirement named during a design session must be written to `docs/FEATURES.md` immediately — not deferred to session close-out.**
