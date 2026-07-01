@@ -55,23 +55,11 @@ Corner ornaments: 9px brass SVG, absolute positioned on cards.
 
 ---
 
-## 4. Agent Roster (Current — `src/data/agents.js`)
+## 4. Agent Roster
 
-| Code | Name | Role |
-|------|------|------|
-| JR-01 | Chloe Okafor | Junior Procurement Analyst |
-| SR-02 | Mike Alvarez | Senior Procurement Analyst |
-| PR-04 | Bob Whitfield | Professional Analyst / Legal |
-| MK-05 | Christy Park | Marketing Designer |
-| CN-03 | Robyn Castellanos | NIGP Consultant / Strategist |
-| DR-06 | Brent Matthews | Web Agent (Railway + Playwright) |
-| IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
+Current roster (20 agents as of v5.3.0) lives in `src/data/agents.js` — read it directly. Do not maintain a hardcoded roster table in this file; it will go stale the next time an agent session ships (this table listed 7 agents and a "Michelle is a stub" note long after both were out of date).
 
-**Michelle Manning (PP-01)** — stub only until S-BENCH-01:
-```js
-const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" }
-```
-Michelle's system prompt lives in Supabase `agent_configs` — NOT in code.
+Agent system prompts / capability logic live in Supabase (`agent_configs`, `skill_profiles`, `capabilities`) — NOT hardcoded in `agents.js`. `agents.js` holds identity/display fields only (see STANDARDS.md Section 11 for the required field list).
 
 ---
 

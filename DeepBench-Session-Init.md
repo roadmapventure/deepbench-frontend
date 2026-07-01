@@ -111,18 +111,7 @@ Kickoff docs rendered as artifact panels (copy icon accessible) — never as dow
 
 ## Step 6 — Agent Roster
 
-| Code | Name | Role | Notes |
-|---|---|---|---|
-| JR-01 | Chloe Okafor | Junior Procurement Analyst | |
-| SR-02 | Mike Alvarez | Senior Procurement Analyst | |
-| PP-01 | Michelle Manning | Project Planner | Stub only until S-BENCH-01 |
-| PR-04 | Bob Whitfield | Professional Analyst / Legal | |
-| CN-03 | Robyn Castellanos | NIGP Consultant / Strategist | |
-| MK-05 | Christy Park | Marketing Designer | |
-| DR-06 | Brent Matthews | Web Agent (Railway + Playwright) | |
-| IR-07 | Pat Smiley | Intern Researcher | isIntern:true, no RAG |
-
-Michelle stub until S-BENCH-01: `const MICHELLE = { name: "Michelle Manning", code: "PP-01", initials: "MM" }`
+Current roster (20 agents as of v5.3.0) lives in `src/data/agents.js` (filesystem MCP) — read it directly rather than relying on a table here. A hardcoded list in this doc goes stale the moment any agent session ships — this table listed 8 agents and a "Michelle is a stub until S-BENCH-01" note that was already wrong (S-BENCH-01 shipped 2026-06-19).
 
 AIDiamond.jsx — animated heartbeat component (S15a). Do not refactor without a dedicated session.
 
@@ -134,8 +123,8 @@ AIDiamond.jsx — animated heartbeat component (S15a). Do not refactor without a
 |---|---|---|
 | Update Steps button | StepList.jsx | NOT TaskInstructionsScreen.jsx |
 | Design tokens | src/tokens.js | Never hardcode values |
-| Agent roster | src/data/agents.js | Do not add Michelle until S-BENCH-01 |
-| Michelle avatar | MichelleAvatar.jsx | Stub — Supabase wiring S-BENCH-01 |
+| Agent roster | src/data/agents.js | Source of truth — read directly, do not trust hardcoded roster tables in docs |
+| Michelle avatar | MichelleAvatar.jsx | Wired to Supabase since S-BENCH-01 (2026-06-19) |
 | AI heartbeat | AIDiamond.jsx | Do not refactor |
 | Step merge logic | mergeSteps.js | Three named operations only |
 
@@ -168,7 +157,7 @@ When John says "generate kickoff doc for [session]":
 4. Fetch PRD.md + MOCK-NOTES.md — confirm spec and UI conventions
 5. Read relevant source files directly via filesystem MCP (preferred) or REPO-SNAPSHOT.md (fallback) — confirm what already exists
 6. If UI work: ask John for screenshot or describe mock for approval
-7. Write kickoff doc with all 10 required sections — Section 9 (COMMIT) must include `git push origin dev` after the commit
+7. Write kickoff doc with all 10 required sections — Section 9 (COMMIT) must include `git push origin dev` after the commit. **Standing rules by reference (2026-07-01):** the coding session that executes this doc is always Claude Code, which now carries persistent cross-session memory — don't restate a standing rule (23-field agent standard, AI Audit wiring requirement, STANDARDS.md Section 5 checklist categories) in full prose, name it instead (e.g. "STANDARDS.md Section 11 applies"). Session-specific facts (exact values, files, scope) still must be fully spelled out — this rule shrinks boilerplate, not content.
 8. Save kickoff doc to `docs/kickoffs/[version]-[featureId]-[featureName].md`
 9. **Update `docs/FEATURES.md` (mandatory — do not skip):**
    - Mark newly designed features with correct status (🔶 Partial) and session ID

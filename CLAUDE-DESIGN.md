@@ -88,11 +88,13 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 
    If any check reveals a contradiction, duplication, or violation — resolve it now. Do not write a kickoff doc that contains a known inconsistency.
 
-7. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, explicitly mark N/A in the kickoff doc. Do not skip this step.
+7. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, mark N/A in the kickoff doc — a single line is enough ("N/A — no api/ route touched"), not a justifying paragraph. Do not skip the section itself.
 8. If UI work: describe mock for John's approval before writing the kickoff doc
 9. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
 10. Write kickoff doc with all 11 required sections
 11. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+
+**Standing rules by reference (added 2026-07-01, see STANDARDS.md Section 3):** Claude Code has persistent cross-session memory now — a kickoff doc does not need to restate a standing rule (23-field agent standard, AI Audit wiring requirement, Section 5 verification checklist categories, known bug patterns) in full prose. Name it instead: "STANDARDS.md Section 11 applies" is sufficient. Session-specific facts — exact values, files, scope, test assertions for *this* session — still must be fully spelled out. This shrinks Section 3 (AI Pattern Check, when N/A) and Section 9 (Verification Checklist) the most; it does not change Section 5 (TASKS) or Section 8 (Node.js test), which are inherently session-specific content, not restated rules.
 
 **Mandatory kickoff doc compliance check — AI Audit wiring (never skip):**
 Every kickoff doc for any `api/` route must explicitly spec:
@@ -102,8 +104,8 @@ Every kickoff doc for any `api/` route must explicitly spec:
 If wiring these would push the session over 4 tasks or 3 files — split into `a` (build) and `b` (audit wiring). Never defer audit wiring to an unscheduled future session. Applies to deterministic routes too (`ai_type: 'deterministic'`).
 
 **Mandatory close-out steps (do not skip):**
-9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs, update session order table
-10. Update `CLAUDE-STATE.md` — set next session, clear resolved blockers
+9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs (the old "session order table" at the bottom of this file was moved to `docs/SESSIONS.md` 2026-07-01 — update the session queue in `CLAUDE-STATE.md` instead, next step)
+10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" (drop the oldest of the 3 into `docs/SESSIONS.md` if it's about to fall off), clear resolved blockers
 11. If UI work: update `docs/STYLE-GUIDE.md` with any rules locked this session
 12. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev`
 13. End with a clearly bordered code block — the exact Claude Code coding session start prompt:
@@ -131,23 +133,9 @@ When John pastes the Claude Code completion report, respond with the Manual QA C
 
 ---
 
-## Step 6 — Agent Roster (quick ref)
+## Step 6 — Agent Roster
 
-| Code | Name | Role |
-|------|------|------|
-| JR-01 | Chloe Okafor | Junior Procurement Analyst |
-| SR-02 | Mike Alvarez | Senior Procurement Analyst |
-| PR-04 | Bob Whitfield | Professional Analyst / Legal |
-| MK-05 | Christy Park | Marketing Designer |
-| CN-03 | Robyn Castellanos | NIGP Consultant / Strategist |
-| DR-06 | Brent Matthews | Web Agent (Railway + Playwright) |
-| IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
-| PP-01 | Michelle Manning | Project Manager — stub until S-BENCH-01 |
-| TR-08 | Susan Smith | Trainer Agent — stub until S-BENCH-01b |
-| PS-01 | Dan Bingham | AI Prompt Strategist — owns DB Assembly + AI Enrichment. Full persona in S-DAN-01. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
-| TBD | Screen Controls Editor | Display agent — maps content to defined UI screen fields (persona + name in S-EDITOR-01) |
-| TBD | HTML Display Editor | Display agent — web HTML formatting and visual hierarchy (persona + name in S-EDITOR-01) |
-| TBD | PDF Assembly Editor | Display agent — professional PDF document layout (persona + name in S-EDITOR-01) |
+Current roster lives in `src/data/agents.js` — read it directly, do not rely on a hardcoded table here. A static roster list in this doc goes stale the moment any agent session ships (this table listed 14 agents when the real count was 20 before removal — including a "stub until S-BENCH-01" note on Michelle Manning after S-BENCH-01 had already shipped). If you need "who exists right now," grep `agents.js` for the `AGENTS` array.
 
 ---
 

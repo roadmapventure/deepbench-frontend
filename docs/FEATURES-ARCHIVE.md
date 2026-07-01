@@ -1,0 +1,210 @@
+# DeepBench — Completed Feature Archive
+
+> Auto-split from FEATURES.md on 2026-07-01. Contains every row marked ✅ Done, grouped by area, in original order.
+> FEATURES.md keeps only 🔶 Partial / ❌ Missing / — rows going forward. Read this file only when checking whether something specific already shipped — not by default.
+
+---
+## SHELL & INFRASTRUCTURE — SH
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SH-01 | Treasury design system (tokens.js) | ✅ Done | DONE |
+| SH-02 | Multi-tenancy stubs | ✅ Done | DONE |
+| SH-03 | useAgents() hook | ✅ Done | DONE |
+| SH-04 | React Router — all routes | ✅ Done | DONE |
+| SH-05 | App shell: header, Work/Bench tabs | ✅ Done | DONE |
+| SH-10 | About DeepBench panel — 7-tab portfolio + product info | ✅ Done | S-ABOUT-ARCH-01 |
+| SH-12 | About panel: Architecture tab — AI stack diagram, glossary, updated stats, relabeled sections | ✅ Done | S-ABOUT-ARCH-01 |
+| SH-14 | Welcome splash modal — marketing/orientation overlay on initial load, session-dismissed | ✅ Done | S-SPLASH-01 |
+## DASHBOARD — DB
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| DB-02 | Stats strip | ✅ Done | DONE |
+| DB-03 | Show more drawer | ✅ Done | DONE |
+| DB-05 | "Awaiting your input" draft state | ✅ Done | DONE |
+| DB-06 | Assign New Work button → "Create a new Task" | ✅ Done | S15a |
+| DB-07 | Chat panel — topic pills | ✅ Done | DONE |
+| DB-08 | Chat panel — direct agent pills | ✅ Done | DONE |
+| DB-09 | Chat panel — AI routing / switchboard | ✅ Done | DONE |
+| DB-10 | Chat panel — knowledge tier indicator | ✅ Done | DONE |
+| DB-11 | Chat panel — answer provenance chips | ✅ Done | DONE |
+| DB-12 | Chat panel — general knowledge disclaimer | ✅ Done | DONE |
+| DB-13 | Chat panel — "Save as Assignment" affordance | ✅ Done | DONE |
+| DB-15 | NIGP Demo task pre-loaded | ✅ Done | DONE |
+| DB-16 | Completed task cards clickable → Task Instructions | ✅ Done | S08 |
+| DB-17 | Task title editable inline + Michelle suggested | ✅ Done | S14 |
+| DB-19 | Module naming — Work/Bench dashboards | ✅ Done | S15a |
+| DB-20 | Nav tab styling — brass borders, active states | ✅ Done | S15a |
+| DB-21 | AIDiamond.jsx — animated heartbeat AI indicator | ✅ Done | S15a |
+| DB-22 | "Create a New Task" button on Work dashboard — add AiBadge showing all patterns used across the full Create New Task flow: RAG · Embeddings · Tool Use · Structured Output · Streaming · Prompt Chaining · Reflection | ✅ Done | S-AI-BADGE-01 (a6d00c9) |
+## ASSIGN WORK — AW
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AW-01 | Task type picker tiles | ✅ Done | DONE |
+| AW-02 | Free-form goal input | ✅ Done | DONE |
+| AW-03 | Two-panel layout | ✅ Done | DONE |
+| AW-04 | Planning agent — clarifying questions | ✅ Done | DONE |
+| AW-05 | Planning agent — step plan generation | ✅ Done | DONE |
+| AW-06 | Agent suggestion with reason chips + brass glow | ✅ Done | DONE |
+| AW-08 | Change log / plan history collapsible | ✅ Done | DONE |
+| AW-09 | Save draft → "Awaiting your input" | ✅ Done | DONE |
+| AW-10 | Persistent save state indicator | ✅ Done | DONE |
+| AW-16 | Update Plan wires answers + regenerates | ✅ Done | S09 |
+| AW-18 | Assign Work terminology standardized (Tasks/Instructions) | ✅ Done | S15b-A |
+| AW-19 | Top nav cleanup + AI icon additions | ✅ Done | S15b-A |
+| AW-20 | CTA renamed to "Approve Steps & Launch" | ✅ Done | S15b-A |
+| AW-21 | Michelle Manning humanized as planning agent PP-01 | ✅ Done | S15b-B |
+| AW-22 | Per-step agent attribution on step cards | ✅ Done | S15b-B |
+| AW-23 | Read-only hover agent info card | ✅ Done | S15b-B |
+| AW-24 | Screen renamed to Create Work Order — page title, section header, and route label updated from "Assign Work" to "Create Work Order" throughout AssignWorkScreen.jsx. | ✅ Done | S-PM-05b |
+| AW-25 | PM agent picker — Step 01 on Create Work Order screen. Filters agents by role containing "Project Manager". Agent cards with avatar, name, code. One selection at a time. Deliverable picker appears after selection. | ✅ Done | S-PM-05b |
+| AW-26 | DB-driven deliverable picker — Step 02. Reads `deliverables` array from selected agent's Format Skill (SP-PM-03 traits). Tiles with icon, label, description. Replaces hardcoded 5 task type tiles. Add a deliverable in DB → appears on screen automatically. No code change required. | ✅ Done | S-PM-05b |
+| AW-27 | AI goal suggestion — auto-fires on deliverable selection. Streaming Haiku call (PAT-06 Streaming + PAT-01 RAG). Goal text streams token-by-token into goal textarea using Michelle's knowledge entries as context. User edits freely. Wired as `action: 'suggest-goal'` on plan.js. Stops streaming on first user keystroke. | ✅ Done | S-PM-05b |
+| AW-29 | Victoria Chen solution catalog UI — after PM selection (Step 1), Victoria's avatar chip appears with consultation message "Here's what we can help you with right now:" followed by live solution tiles (2-col grid). Below: "Available in our next roadmap:" with greyed coming-soon tiles. Three tile states: active:true = clickable, active:false+coming_soon:true = greyed badge non-clickable, active:false+coming_soon:false = hidden. Tile loader reads from Victoria's solution-catalog skill profile by slug, filtered by pm_agent_id. Replaces broken AW-26 capability traversal. | ✅ Done | S-VICTORIA-01 |
+## TASK INSTRUCTIONS — TI
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| TI-01 | Step timeline (agent/HITL/sub-agent types + color) | ✅ Done | DONE |
+| TI-04 | Inline step text editing | ✅ Done | Bonus |
+| TI-05 | Re-run All button | ✅ Done | Bonus |
+| TI-06 | Mark Complete button | ✅ Done | Bonus |
+| TI-08 | View Brent sub-agent CTA | ✅ Done | Bonus |
+| TI-09 | mergeSteps.js utility | ✅ Done | S10a |
+| TI-10 | Step merge visual — type-based card color | ✅ Done | S10a-patch |
+| TI-11 | Threaded archive approval flow | ✅ Done | S10a-patch2 |
+| TI-12 | Prominent agent attribution on step cards | ✅ Done | S10a |
+| TI-13 | Step color preserved through regeneration (bug fix) | ✅ Done | S10a-patch |
+| TI-19 | Header renamed to "Steps" | ✅ Done | S15c |
+| TI-20 | Disable Re-run All + Update Steps buttons — roadmap-gated until tested | ✅ Done | S-TI-20 + S-TI-20p (8ce2947) |
+| TI-20 | Nav buttons removed from Task Instructions | ✅ Done | S15c |
+| TI-21 | CTA renamed "Update Steps →" | ✅ Done | S15c |
+| TI-22 | Update Steps button repositioned below HITL comment textarea | ✅ Done | S15c |
+## NIGP ANALYZER — AZ
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AZ-01 | CSV upload → PapaParse + column detection | ✅ Done | DONE |
+| AZ-02 | Column mapping screen | ✅ Done | DONE |
+| AZ-06 | Tab: Dashboard / Overview | ✅ Done | DONE |
+| AZ-07 | Tab: Categories | ✅ Done | DONE |
+| AZ-08 | Tab: Treemap | ✅ Done | DONE |
+| AZ-09 | Tab: Vendors | ✅ Done | DONE |
+| AZ-10 | Tab: Departments | ✅ Done | DONE |
+| AZ-11 | Tab: Timeline | ✅ Done | DONE |
+| AZ-12 | Tab: Concerns / Flags | ✅ Done | DONE |
+| AZ-13 | Tab: Local Spend | ✅ Done | DONE |
+| AZ-14 | Tab: Vendor Diversity / HHI | ✅ Done | DONE |
+| AZ-16 | Tab: Cleanup | ✅ Done | DONE |
+| AZ-17 | Tab: Full Table | ✅ Done | DONE |
+## FETCH — FT
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| FT-01 | Fetch config screen | ✅ Done | DONE |
+| FT-02 | Run Fetch Agent → SSE to Railway | ✅ Done | DONE |
+| FT-03 | Agent running: event log, screenshot, stop | ✅ Done | DONE |
+## ROSTER / BENCH — RO
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| RO-01 | Roster screen — all 7 agents including Pat | ✅ Done | DONE |
+| RO-02 | Agent cards with workload indicators | ✅ Done | DONE |
+| RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
+| RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
+| RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
+| RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
+| RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
+| RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ✅ Done | S-BENCH-UX-02 (8717106) |
+| RO-09 | Bench roster sort by usage count — agents sorted by AI call count DESC, alpha first name on tie; zero-count agents at bottom sorted alpha | ✅ Done | S-RO-09 (4c4bdb2) |
+## PERSONNEL FILE — PE
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| PE-01 | Profile tab | ✅ Done | DONE |
+| PE-02 | Resume tab | ✅ Done | DONE |
+| PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | ✅ Done | S-MIGRATE-02 (02ff560) |
+| PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ✅ Done | S-BENCH-UX-01 (812ed59) |
+| PE-05 | Workflow tab (stub) | ✅ Done | DONE |
+| PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
+| PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ✅ Done | S-MIGRATE-03 (299f1c0) + patch (686007e) |
+| PE-11 | Training tab — Edit Course inline sub-view (edit title, category, jurisdiction, field notes, triggers, priority — no re-vectorization; EDIT+DELETE only for trainable+active entries) | ✅ Done | S-MIGRATE-04 (732bf3c) |
+## TEACH — TC
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| TC-01 | Upload → extract → ingest → RAG | ✅ Done | DONE |
+## TEST TEAM — TT
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| TT-01 | Multi-agent query runner — runs two agents on the same query in parallel (PAT-14 Parallelization, 🔶 partial implementation) | ✅ Done | DONE |
+| TT-02 | Prompt comparison / diff panel — side-by-side output + diff metric dashboard | ✅ Done | DONE |
+## AI INFRASTRUCTURE — AI
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance | ✅ Done | S-AI01b + patch + patch2 (e975715) |
+| AI-02 | Universal AI status dot | ✅ Done | DONE |
+| AI-04 | Intelligent agent routing | ✅ Done | DONE |
+| AI-05 | Planning agent — structured Claude tool use | ✅ Done | DONE |
+| AI-08 | Brent ReAct agent (Railway, Playwright) | ✅ Done | DONE |
+| AI-09 | RAG pipeline (ingest → pgvector → query) | ✅ Done | DONE |
+| AI-10 | AI Activity Panel — header entry point, grouped by AI type | ✅ Done | S16b |
+| AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | ✅ Done | S16a |
+| AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | ✅ Done | S16a |
+| AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
+| AI-16 | AI Audit persistence — write every AI call to Supabase ai_activity_log; hydrate on mount for lifetime totals | ✅ Done | S16b |
+| AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ✅ Done | S-AI-ATTR-01 (4d568bd) |
+| AI-23 | AI Audit rebuilt on AI Services model — five sections replace current "By Activity Type": (1) By Service — one row per AI/Mixed Service, columns: Service Name · Type · Calls · Est. Cost · Avg Latency; (2) By Pattern — one row per AI Pattern rolled up from Services declaring it; (3) Deterministic — execution count + latency for deterministic Services, no LLM cost; (4) By LLM — keep existing; (5) By Agent — keep existing. Existing ai_type strings remapped to service_slug values. Requires `ai_services` table (AI-25). Design session: S-AI-AUDIT-REDESIGN. | ✅ Done | S-AI-AUDIT-REDESIGN (da40458 + f0ecd09) |
+| AI-30 | AI Audit By Pattern section: expand client-side pattern catalog from 10 to 20 entries (PAT-01–PAT-20); update Patterns Roadmap section (Now/Next/Later) with PAT-12 through PAT-20; update header stat to reflect new totals. HITL row (PAT-10) uses "Gates Triggered" + "Avg Response Time" columns instead of LLM Calls / Cost / Latency — source is task execution log not ai_activity_log; show as 🔶 Partial until TI-18 ships. PAT-14 Parallelization shows as 🔶 Partial (TT-01/02). One file: AIActivityPanel.jsx. | ✅ Done | S-AI-BADGE-04 (5c2b8d2) |
+| AI-32 | By Pattern section — "Not yet active" collapse card: group all inactive patterns (those showing "Not yet active" chip) into a collapsed card identical to "Not yet called · N services" in By Service section. Collapsed by default. Click to expand and see all inactive pattern rows. HITL (hitlSpecial) and Parallelization (partial) stay as individual rows. File: AIActivityPanel.jsx. | ✅ Done | S-AI-AUDIT-UX-01 (c919af4) |
+| AI-33 | Platform Roadmap redesign — replace current flat Services + AI Patterns lists with 2-section × 2-column layout: Next and Later only (no Now — all Now items already coded). Each section: AI Patterns (left) + DeepBench Services (right). Data driven from PATTERN_CATALOG and SERVICE_CATALOG roadmap fields. File: AIActivityPanel.jsx. | ✅ Done | S-AI-AUDIT-UX-01 (c919af4) |
+| AI-28 | AiBadge label sweep — update all 21 existing AiBadge tooltip labels app-wide to AI Pattern names (full pattern list per responsible service); remove FlagCard deterministic badge (SharedUI); add `built` prop to AiBadge for greyed/dashed visual when pattern not yet implemented. Constants centralized in `src/aiPatterns.js`. Three coding sessions: S-AI-BADGE-01/02/03. | ✅ Done | S-AI-BADGE-01 ✅ (a6d00c9) — S-AI-BADGE-02 ✅ (b03d04e) — S-AI-BADGE-03 ✅ (8d63915) |
+| AI-29 | Step card conditional pattern badge — derive execution patterns from assigned agent code (Approach A: agent→AGENT_PATTERNS map) with step-name keyword fallback (Approach B); HITL steps = no badge; greyed dashed badge for unbuilt patterns (Pat IR-07, Susan TR-08, multi-agent PAT-11); no badge on deterministic steps. | ✅ Done | S-AI-BADGE-02 (b03d04e) |
+## AGENT IDENTITY & CONFIGURATION — AG
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AG-02 | Michelle system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-03 | Michelle trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-07 | Susan Smith static identity in agents.js | ✅ Done | DONE |
+| AG-08 | Susan Smith system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-09 | Susan Smith trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
+| AG-13 | Dan Bingham (PS-01) — AI Prompt Strategist — static identity in agents.js, Supabase agents table entry, Personnel File, avatar. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." Specialty: Prompt Engineering · Context Assembly · Intelligence Architecture. Owns DB Assembly + AI Enrichment capabilities. Shown as collaborator in UI alongside primary agent everywhere Prompt Service fires. Logs to ai_activity_log separately. Design session: S-DAN-01. | ✅ Done | S-DAN-02 (eb8285d) |
+| AG-14 | Screen Controls Editor agent — **Alex Reeves (ED-01)**. agents.js entry, AVATAR_CFG (glasses, T.brass), AGENT_PRONOUNS (they/them). Specialty: UI Field Mapping · Structured Component Assembly · Data-Driven Layouts. Quip: "Content knows what to say. I decide where it lives on the screen." Capability: screen-controls. Format Skill Profile: screen-controls-format (output_type: json, handler: store, technical_services: structured-output + tool-use). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
+| AG-15 | HTML Display Editor agent — **Riley Torres (ED-02)**. agents.js entry, AVATAR_CFG (bob, T.brass), AGENT_PRONOUNS (she/her). Specialty: Web Formatting · Visual Hierarchy · Typography · HTML Presentation. Quip: "A well-structured page doesn't need instructions — it just reads itself." Capability: html-display. Format Skill Profile: html-display-format (output_type: html, handler: store). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
+| AG-16 | PDF Assembly Editor agent — **Claire Sutton (ED-03)**. agents.js entry, AVATAR_CFG (bun, T.brass), AGENT_PRONOUNS (she/her). Specialty: Document Layout · Professional PDF Structure · Formal Presentation Design. Quip: "Every document is a first impression. I make sure it's the right one." Capability: pdf-assembly. Format Skill Profile: pdf-assembly-format (output_type: html, handler: package, requires_packaging: true). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
+| AG-17 | Product Strategist agent — **Victoria Chen (SP-01)**. Head of Product Strategy. Owns the solution catalog — defines what DeepBench offers clients and routes each engagement to the correct PM, format skill, and display agent. agents.js entry, AVATAR_CFG (navy border), AGENT_PRONOUNS (she/her). Specialty: Solution Design · Service Line Strategy · Product Catalog Management. Supabase: agents table row, solution-catalog capability, solution-catalog skill profile (traits.solutions array = product menu). Visible on Create Work Order screen as consultation chip after PM selection. | ✅ Done | S-VICTORIA-01 |
+| AG-18 | Apple Channel Intelligence — **GEO CSO Expert (CI-01)**. Face of the LLM-wiki (renamed from Performance Strategist in v5 redesign). Two capabilities: Q&A Answer (Sonnet — answers from sourced RAG corpus, self-flags `needs_review`) and Intent Routing (Haiku — classifies every chat turn as qa/theory/forecast/correct/escalate, extends existing DB-09 `checkRouting()` pattern). Identity: "10-year GEO director voice — sourced, specific, direct." Full schemas: `docs/APPLE-AGENT-1-v5-DESIGN.md` §5.1–5.2. **Persona: Marcus Webb**, he/him, `T.brass` avatar border + glasses. Quip: "I own the world's channels." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+| AG-19 | Apple Channel — **Data Expert (CI-03)** (expanded from Data Builder in v5 redesign). Retrieval, ingestion, cleaning, updating, restoring. Owns Escalate execution (research request → new corpus chunks) and Data Integrity Patch (only when a Correct commit disputes a specific existing chunk — routed here by Intake Assistant, never automatic). Never overwrites `knowledge_entries` rows in place — always inserts a superseding row (see corpus versioning, `docs/APPLE-AGENT-1-v5-DESIGN.md` §7). Full schemas: §5.5–5.6. **Persona: Nadia Farouk**, she/her, `T.moss` avatar border. Quip: "Nothing gets erased. Everything gets superseded." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+| AG-20 | Apple Channel — **The Reasoner (CI-06)** (renamed from Supreme Reasoner in v5 redesign; role deepened, no longer roadmap-only). Owns Memory Consolidation — **synthesis only**: takes a committed Forecast/Correct decision and writes a structured Learned Context entry (`data_type: learned`). Execution (embed + upsert to `knowledge_entries`) is **not duplicated here** — hands off to Susan Smith (TR-08, existing platform Trainer agent, AG-09/PE-03), reusing her live reinforcement pipeline instead of building a parallel one. See AG-24. Enables true loop closure: the next relevant question in-session picks up the correction automatically through normal RAG retrieval. Pattern terms: Memory Consolidation (write) / Transfer Learning (generalization) / Case-Based Reasoning (later retrieval) — deliberately distinct from the existing `PATTERN_CATALOG` "Reflection" entry to avoid collision. Full schema: §5.10. In scope for Market Intelligence now; platform-wide generalization is roadmap only. **Persona: Elena Cho**, she/her, `T.navy` avatar border + bun. Quip: "One correction, taught right, answers the next hundred questions." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+| AG-21 | Apple Channel — **Forecast/Theory/Performance Expert (CI-02)** (new in v5 redesign). Two capabilities: Generate Hypotheses (fires when a Q&A answer is flagged `needs_review` and the director hasn't supplied their own claim) and Stress Test (fires when a hypothesis is selected/written, before commit — fixes v4's bug of showing this after commit). "Performance" = domain scope (channel/program performance claims), not a distinct capability. `override_warning` is the model's own judgment, never derived from a hardcoded index/intent check. Full schemas: §5.3–5.4. **Persona: Priya Nair**, she/her, `T.moss` avatar border. Quip: "A theory that survives stress testing earns the name forecast." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+| AG-22 | Apple Channel — **The Proofreader (CI-04)** (new in v5 redesign; unifies Guardrail PAT-13 + Eval PAT-19 into one persona instead of two invisible platform services). Pre-display gate on every Q&A answer: Guardrail rule check (pass/block + specific rule violated) and Eval 5-dimension scoring (pass/revise + critique). Block → silent 1x retry to CI-01; still-blocked → honest failure state shown to the director with the real rule and reason, never a generic error. Full schema: §5.7. **Persona: Owen Marsh**, he/him, `T.brass` avatar border + glasses. Quip: "I don't argue with the answer. I argue with what's missing from it." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+| AG-23 | Apple Channel — **The Intake Assistant (CI-05)** (new in v5 redesign; replaces the deprecated "Decision Maker" concept from v1). Two triage capabilities, both Haiku: Commit Triage (decides whether a Correct commit needs Data Expert's chunk-level patch, always routes Forecast/Correct to the Reasoner) and Failure Triage (decides whether a Proofreader hard-failure should offer Escalate as a next step). Distinct from CI-01's conversational Intent Routing — this fires only after an explicit human decision exists. Full schemas: §5.8–5.9. **Persona: Sam Reyes**, they/them, `T.brass` avatar border. Quip: "Every decision needs somewhere to go next." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
+## AGENT ARCHITECTURE — AA
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| AA-03 | DB Assembly (`api/prompt/db-assembly.js`) — reads capability_slug + agent_id, queries Supabase (agent_configs / capabilities / skill_profiles), returns Prompt Request organized by source. Required: tenant_id + task_context. Optional: agent_id, capability_slug. No AI calls, no writes. Degrades gracefully on missing data. | ✅ Done | S-PM-02 |
+| AA-43 | AI Enrichment (`api/prompt/ai-enrichment.js`) — takes Prompt Request, executes platform patterns: RAG (agent/capability/platform-wide scope), REFLECT, intelligent synthesis. Resolves conflicts and duplication from multiple sources. Returns assembled system prompt + debug object. All patterns always run regardless of DB content availability. | ✅ Done | S-PM-03a |
+| AA-53 | Seed knowledge entries for Michelle (pp-01) — capability-registry-knowledge skill profile has no knowledge_entries rows scoped to pp-01. RAG section is always omitted for Michelle until seeded. Seed with: capability registry docs, DeepBench agent roster, skill type definitions. | ✅ Done | S-PM-03b |
+| AA-44 | Request & Receivable (`api/prompt/request-receivable.js`) — Send + Parse + Guardrails (PAT-13) + Deliver via handler registry. Direct Anthropic fetch (no adapter). Guardrails post-generation Haiku check. Handler registry delegates to `api/_lib/handlers/store.js` (content) or future dispatch/mcp/package handlers (action). Server-side ai_activity_log write with `patterns_used`. Full deliverables table write including LLM-generated `title`. | ✅ Done | S-PM-04b |
+| AA-58 | `agents` table in Supabase — professional card for all agents: id (name slug PK), code (XX-00), name, role, specialty, bio, tenant_id. 10 agents seeded: 9 existing + Dan Bingham (PS-01). Editor agents AG-14/15/16 seeded in S-EDITOR-01. DB Assembly fetches row and exposes as agent_card in response. Note: PK column is `id` (not `agent_id`) — existing table schema. Full agents.js migration deferred to S-BENCH-FULL-MIGRATE. | ✅ Done | S-AGENT-TABLE-01 (754e3f1) |
+| AA-60 | REFLECT prompt moved into traits — `traits.reflect_prompt` on the skill profile that declares `technical_services: ["reflect"]`. AI Enrichment reads `fetch_instruction.reflect_prompt` (populated by DB Assembly from the declaring skill profile's traits) instead of using a hardcoded prompt string. Makes each agent's REFLECT reasoning unique and trainable. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
+| AA-61 | Synthesis prompt moved into traits — `traits.synthesis_prompt` on the skill profile that declares `technical_services: ["intelligent-synthesis"]`. Quality guidance included: preserve agent persona and behavioral character as equally important as format and intent; remove redundancy and conflicts between sections; produce one coherent authoritative prompt. AI Enrichment reads from traits instead of hardcoded string. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
+| AA-62 | WORK ORDER section extended to include deliverable_type — goal and deliverable_type rendered together in the WORK ORDER stored section (order 2.5) in DB Assembly. Visible in all 4 columns of Prompt Evolution Modal. task_context always present as goal anchor; deliverable_type flows to LLM alongside goal. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
+| AA-64 | Display agent routing — content specialist output routes to the appropriate display agent (Screen Controls / HTML Display / PDF Assembly) based on the user's requested output format. Display agents own the Format Skill for the platform. Deliverable tiles declare `format_skill_profile_slug` + `display_agent_id`; plan.js reads whatever the frontend passes — no hardcoding. Agents designed in S-EDITOR-01. | ✅ Done | S-CONTENT-01a (backend routing) + S-CONTENT-01b (frontend wiring) |
+| AA-69 | Format-last pattern — plan.js appends the display agent's Format Skill as the final section in `enriched.system_prompt` AFTER `enrichPrompt()` completes. Dan's full enrichment (RAG + REFLECT + Synthesis) builds content intelligence without a schema constraint; Alex's output contract arrives last as the final LLM instruction. Visible in Column 4 of Prompt Evolution Modal. Format section also includes the title instruction (moved from `ai-enrichment.js` renderSection). | ✅ Done | S-CONTENT-01a |
+| AA-70 | Alex Reeves UI attribution — CreateWorkOrderScreen reads `display_agent_card` from plan API response and renders Alex byline above step cards ("Screen formatted by Alex Reeves · Screen Controls Editor"). PromptEvolutionModal footer gains Alex chip (ED-01, brass border) alongside Dan chip (PS-01, moss border). `displayAgentCard` prop added to PromptEvolutionModal. | ✅ Done | S-CONTENT-01b |
+| AA-67 | deliverable_type in task_context — CreateWorkOrderScreen passes deliverable_type in task_context alongside goal when calling prompt-service and preview-prompt. Flows through as part of the always-present task_context block (AA-62) so the LLM knows what type of deliverable is being planned and generates appropriate steps. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
+| AA-68 | BUG-11 patch — api/plan.js default plan handler: change tool_choice from `{ type: "auto" }` to `{ type: "any" }` to force Haiku to call the plan_task tool. Fixes TaskInstructionsScreen Re-generate returning no steps when Haiku returns text instead of tool_use. One line, one file. No design session required. | ✅ Done | S-PM-08a (170da34) |
+## WORK ORDER — WO
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| WO-01 | Work Order UI label rename — all user-visible "Task" → "Work Order" labels across DashboardScreen, AssignWorkScreen, TaskInstructionsScreen, BenchNewScreen, AboutPanel. Backend rename (DB table, routes, variables) deferred to future session. | ✅ Done | S-RENAME-01 (0348066) |
+## SKILLS & CAPABILITIES — SK
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SK-01 | `skill_types` table + 5 type seeds (identity, behavior, knowledge, intent, format) | ✅ Done | S-SK-01 (a447e49) |
+| SK-02 | `skill_profiles` table + SP-01 Data Analysis (type: intent) + SP-02 Analysis Report (type: format) seeds | ✅ Done | S-SK-01 (a447e49) |
+| SK-03 | `capabilities` table + CAP-01 Data Analyst seed | ✅ Done | S-SK-01 (a447e49) |
+| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 at L2/L1 | ✅ Done | S-SK-01 (a447e49) |
+| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
+| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card); SkillHoverCard on each Skill row shows all Traits, type-specific jsonb fields, and guardrails; empty state for unassigned agents; all agents show container | ✅ Done | S-SK-01 (a447e49) |
+| SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles links + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes required. | ✅ Done | S-PM-01 (9255c22) |
+| SK-22 | Seed `deliverables` array on SP-PM-03 (execution-plan Format Skill) traits — 7 entries: Data Analysis, Web Data Fetch, Document Draft, Research Summary, Compliance Review, Spend Analysis, Market Research. Each entry: id, label, icon, description, default_context. Read by Create Work Order screen to populate deliverable picker. DB seed only — no src/ changes. | ✅ Done | S-PM-05b |
+| SK-23 | Update `execution-plan` Format Skill schema — add `steps.items` definition (required: id, label, type, text; optional: icon), `questions.items` definition (required: id, q), and `title` as required field. Without items definitions Anthropic tool_use returns empty objects — screen renders blank step cards and blank questions. DB seed only. | ✅ Done | S-PM-05b-schema-patch |
+| SK-24 | Reclassify SP-PM-02 (Capability Assignment) from `skill_type_slug = 'intent'` to `skill_type_slug = 'behavior'` in Supabase. SP-PM-02 describes HOW Michelle decides which capability to assign to each step — cognitive reasoning behavior, not task output intent. Fixes duplicate INTENT sections in Prompt Evolution Modal Column 2. DB-only change, single UPDATE. No code changes. Note: actual DB slug is `capability-assignment` (not `sp-pm-02` as in kickoff). Traits also updated post-QA to distinct assignment-reasoning content for prompt service behavior testing. | ✅ Done | S-PM-08a (170da34) |
+| SK-25 | Victoria Chen solution catalog — `solution-catalog` capability + `solution-catalog` skill profile (skill_type: intent). `traits.solutions` array is the authoritative product menu. Each entry declares: id, label, description, icon, pm_agent_id, format_skill_profile_slug, display_agent_id, active, coming_soon. Add a new solution to DB → appears on Create Work Order screen automatically. Replaces SK-22 deliverables array on SP-PM-03 (which was Michelle's Format Skill — wrong owner). Victoria is the correct owner of the product catalog. | ✅ Done | S-VICTORIA-01 |

@@ -7,6 +7,7 @@
 >
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
+> **✅ Done rows archived (2026-07-01):** this file now holds only 🔶 Partial / ❌ Missing / — N/A rows. If a feature isn't listed here, check `docs/FEATURES-ARCHIVE.md` before assuming it's missing.
 
 ---
 
@@ -21,18 +22,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SH-01 | Treasury design system (tokens.js) | ✅ Done | DONE |
-| SH-02 | Multi-tenancy stubs | ✅ Done | DONE |
-| SH-03 | useAgents() hook | ✅ Done | DONE |
-| SH-04 | React Router — all routes | ✅ Done | DONE |
-| SH-05 | App shell: header, Work/Bench tabs | ✅ Done | DONE |
-| SH-10 | About DeepBench panel — 7-tab portfolio + product info | ✅ Done | S-ABOUT-ARCH-01 |
-| SH-12 | About panel: Architecture tab — AI stack diagram, glossary, updated stats, relabeled sections | ✅ Done | S-ABOUT-ARCH-01 |
 | SH-13 | About panel: GitHub Action auto-update stats.json on push to dev | ❌ Missing | S-ABOUT-STATS-01 (future, separate session) |
 | SH-06 | Supabase tasks table integration | ❌ Missing | S-future |
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
-| SH-14 | Welcome splash modal — marketing/orientation overlay on initial load, session-dismissed | ✅ Done | S-SPLASH-01 |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
 | SH-11 | Restructure serverless API layer — consolidate Vercel routes, move new capabilities to Railway Express | ❌ Missing | S-future (do before v6.x) |
 | SH-12 | About DeepBench panel — display correct current version number (pulled from CLAUDE-STATE.md or package.json, not hardcoded) | ❌ Missing | S-future |
@@ -44,27 +37,9 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | DB-01 | Task list — active tasks, status, priority, HITL | 🔶 Partial (mock data) | — |
-| DB-02 | Stats strip | ✅ Done | DONE |
-| DB-03 | Show more drawer | ✅ Done | DONE |
 | DB-04 | Recently completed section | 🔶 Partial (mock only) | — |
-| DB-05 | "Awaiting your input" draft state | ✅ Done | DONE |
-| DB-06 | Assign New Work button → "Create a new Task" | ✅ Done | S15a |
-| DB-07 | Chat panel — topic pills | ✅ Done | DONE |
-| DB-08 | Chat panel — direct agent pills | ✅ Done | DONE |
-| DB-09 | Chat panel — AI routing / switchboard | ✅ Done | DONE |
-| DB-10 | Chat panel — knowledge tier indicator | ✅ Done | DONE |
-| DB-11 | Chat panel — answer provenance chips | ✅ Done | DONE |
-| DB-12 | Chat panel — general knowledge disclaimer | ✅ Done | DONE |
-| DB-13 | Chat panel — "Save as Assignment" affordance | ✅ Done | DONE |
 | DB-14 | Chat panel — real RAG + AI call | 🔶 Partial | — |
-| DB-15 | NIGP Demo task pre-loaded | ✅ Done | DONE |
-| DB-16 | Completed task cards clickable → Task Instructions | ✅ Done | S08 |
-| DB-17 | Task title editable inline + Michelle suggested | ✅ Done | S14 |
 | DB-18 | Auto-select best agent via AI | ❌ Missing | S13 (deferred) |
-| DB-19 | Module naming — Work/Bench dashboards | ✅ Done | S15a |
-| DB-20 | Nav tab styling — brass borders, active states | ✅ Done | S15a |
-| DB-21 | AIDiamond.jsx — animated heartbeat AI indicator | ✅ Done | S15a |
-| DB-22 | "Create a New Task" button on Work dashboard — add AiBadge showing all patterns used across the full Create New Task flow: RAG · Embeddings · Tool Use · Structured Output · Streaming · Prompt Chaining · Reflection | ✅ Done | S-AI-BADGE-01 (a6d00c9) |
 
 **DB-17 Notes:** Michelle generates concise title + step names on first draft. `title_edited` flag — user owns title after first edit, never overwritten. `api/title.js`: direct Claude Haiku call; Supabase agent_configs wired in S-BENCH-01.
 
@@ -74,33 +49,12 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AW-01 | Task type picker tiles | ✅ Done | DONE |
-| AW-02 | Free-form goal input | ✅ Done | DONE |
-| AW-03 | Two-panel layout | ✅ Done | DONE |
-| AW-04 | Planning agent — clarifying questions | ✅ Done | DONE |
-| AW-05 | Planning agent — step plan generation | ✅ Done | DONE |
-| AW-06 | Agent suggestion with reason chips + brass glow | ✅ Done | DONE |
 | AW-07 | Agent swap → plan regeneration | 🔶 Partial | S12 (deferred) |
-| AW-08 | Change log / plan history collapsible | ✅ Done | DONE |
-| AW-09 | Save draft → "Awaiting your input" | ✅ Done | DONE |
-| AW-10 | Persistent save state indicator | ✅ Done | DONE |
 | AW-11 | "Approve Plan & Launch" → Supabase | 🔶 Partial | Blocked by SH-06 |
 | AW-12 | Pre-populate from chat (from=chat param) | 🔶 Partial | — |
 | AW-13 | Chat transcript in task | ❌ Missing | S-future |
 | AW-15 | Pre-populated goal appends not replaces | 🔶 Partial | post-core |
-| AW-16 | Update Plan wires answers + regenerates | ✅ Done | S09 |
 | AW-17 | Michelle assigns steps to multiple agents | ❌ Missing | S12 (deferred) |
-| AW-18 | Assign Work terminology standardized (Tasks/Instructions) | ✅ Done | S15b-A |
-| AW-19 | Top nav cleanup + AI icon additions | ✅ Done | S15b-A |
-| AW-20 | CTA renamed to "Approve Steps & Launch" | ✅ Done | S15b-A |
-| AW-21 | Michelle Manning humanized as planning agent PP-01 | ✅ Done | S15b-B |
-| AW-22 | Per-step agent attribution on step cards | ✅ Done | S15b-B |
-| AW-23 | Read-only hover agent info card | ✅ Done | S15b-B |
-| AW-24 | Screen renamed to Create Work Order — page title, section header, and route label updated from "Assign Work" to "Create Work Order" throughout AssignWorkScreen.jsx. | ✅ Done | S-PM-05b |
-| AW-25 | PM agent picker — Step 01 on Create Work Order screen. Filters agents by role containing "Project Manager". Agent cards with avatar, name, code. One selection at a time. Deliverable picker appears after selection. | ✅ Done | S-PM-05b |
-| AW-26 | DB-driven deliverable picker — Step 02. Reads `deliverables` array from selected agent's Format Skill (SP-PM-03 traits). Tiles with icon, label, description. Replaces hardcoded 5 task type tiles. Add a deliverable in DB → appears on screen automatically. No code change required. | ✅ Done | S-PM-05b |
-| AW-27 | AI goal suggestion — auto-fires on deliverable selection. Streaming Haiku call (PAT-06 Streaming + PAT-01 RAG). Goal text streams token-by-token into goal textarea using Michelle's knowledge entries as context. User edits freely. Wired as `action: 'suggest-goal'` on plan.js. Stops streaming on first user keystroke. | ✅ Done | S-PM-05b |
-| AW-29 | Victoria Chen solution catalog UI — after PM selection (Step 1), Victoria's avatar chip appears with consultation message "Here's what we can help you with right now:" followed by live solution tiles (2-col grid). Below: "Available in our next roadmap:" with greyed coming-soon tiles. Three tile states: active:true = clickable, active:false+coming_soon:true = greyed badge non-clickable, active:false+coming_soon:false = hidden. Tile loader reads from Victoria's solution-catalog skill profile by slug, filtered by pm_agent_id. Replaces broken AW-26 capability traversal. | ✅ Done | S-VICTORIA-01 |
 | AW-28 | Prompt Evolution Modal — pops up when user clicks Generate Plan. 4-column comparison: Col 1 = bare goal, Col 2 = DB Assembly sections, Col 3 = +RAG, Col 4 = +Reflect/Synthesis + Alex's FORMAT appended last. Token deltas, pattern badges, agent collaboration chips (Dan PS-01 + Alex ED-01). Continue dismisses modal — plan renders when pipeline completes. Wired as `action: 'preview-prompt'` fired in parallel with `action: 'prompt-service'`. | 🔶 Partial | S-PM-07b (modal built); S-CONTENT-01a (format-last Column 4 + display_agent_card); S-CONTENT-01b (Alex chip in footer) |
 
 **Architectural boundary (locked 2026-06-23):** Create Work Order screen is scoped to work orders and steps only. Other task types (e.g. send email, web fetch) are handled by different screen views — not by adding new deliverable types to this screen.
@@ -111,29 +65,14 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| TI-01 | Step timeline (agent/HITL/sub-agent types + color) | ✅ Done | DONE |
 | TI-02 | HITL step opens relevant screen | 🔶 Partial | S-future |
 | TI-03 | Step history from Supabase steps JSONB | ❌ Missing | Blocked by SH-06 |
-| TI-04 | Inline step text editing | ✅ Done | Bonus |
-| TI-05 | Re-run All button | ✅ Done | Bonus |
-| TI-06 | Mark Complete button | ✅ Done | Bonus |
 | TI-07 | Chat transcript in task | ❌ Missing | S-future |
-| TI-08 | View Brent sub-agent CTA | ✅ Done | Bonus |
-| TI-09 | mergeSteps.js utility | ✅ Done | S10a |
-| TI-10 | Step merge visual — type-based card color | ✅ Done | S10a-patch |
-| TI-11 | Threaded archive approval flow | ✅ Done | S10a-patch2 |
-| TI-12 | Prominent agent attribution on step cards | ✅ Done | S10a |
-| TI-13 | Step color preserved through regeneration (bug fix) | ✅ Done | S10a-patch |
 | TI-14 | Start button — triggers step execution | ❌ Missing | S11 (deferred) |
 | TI-15 | Per-step execution running state | ❌ Missing | S11 (deferred) |
 | TI-16 | Step output storage to Supabase JSONB | ❌ Missing | S11 (deferred, Q5 needed) |
 | TI-17 | Pat execution via Railway | ❌ Missing | S11b (deferred) |
 | TI-18 | HITL step gate — full runtime execution contract: (1) execution pauses when a HITL step is reached, (2) signal emitted to notify human (UI state change + future notification), (3) human provides input via the step's comment/approval interface, (4) input injected into the next agent step's context, (5) execution resumes. Activates PAT-10 HITL in AI Audit By Pattern — triggers "Gates Triggered" counter + records human response time. Design session required before coding — needs: pause signal architecture, notification mechanism, resume-with-context handoff spec. | ❌ Missing | S-future (design required) |
-| TI-19 | Header renamed to "Steps" | ✅ Done | S15c |
-| TI-20 | Disable Re-run All + Update Steps buttons — roadmap-gated until tested | ✅ Done | S-TI-20 + S-TI-20p (8ce2947) |
-| TI-20 | Nav buttons removed from Task Instructions | ✅ Done | S15c |
-| TI-21 | CTA renamed "Update Steps →" | ✅ Done | S15c |
-| TI-22 | Update Steps button repositioned below HITL comment textarea | ✅ Done | S15c |
 
 ---
 
@@ -141,23 +80,10 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AZ-01 | CSV upload → PapaParse + column detection | ✅ Done | DONE |
-| AZ-02 | Column mapping screen | ✅ Done | DONE |
 | AZ-03 | Column mapping saved to task record | ❌ Missing | Blocked by SH-06 |
 | AZ-04 | CSV upload to Supabase Storage | ❌ Missing | S-future (SH-07) |
 | AZ-05 | CSV load from Supabase Storage on return | ❌ Missing | S-future (SH-07) |
-| AZ-06 | Tab: Dashboard / Overview | ✅ Done | DONE |
-| AZ-07 | Tab: Categories | ✅ Done | DONE |
-| AZ-08 | Tab: Treemap | ✅ Done | DONE |
-| AZ-09 | Tab: Vendors | ✅ Done | DONE |
-| AZ-10 | Tab: Departments | ✅ Done | DONE |
-| AZ-11 | Tab: Timeline | ✅ Done | DONE |
-| AZ-12 | Tab: Concerns / Flags | ✅ Done | DONE |
-| AZ-13 | Tab: Local Spend | ✅ Done | DONE |
-| AZ-14 | Tab: Vendor Diversity / HHI | ✅ Done | DONE |
 | AZ-15 | Tab: AI Review (3-stage, RAG-augmented) | 🔶 Partial | — |
-| AZ-16 | Tab: Cleanup | ✅ Done | DONE |
-| AZ-17 | Tab: Full Table | ✅ Done | DONE |
 | AZ-18 | Demo task pre-loaded: Austin FY2025 | 🔶 Partial | Blocked by SH-07 |
 
 ---
@@ -166,9 +92,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| FT-01 | Fetch config screen | ✅ Done | DONE |
-| FT-02 | Run Fetch Agent → SSE to Railway | ✅ Done | DONE |
-| FT-03 | Agent running: event log, screenshot, stop | ✅ Done | DONE |
 | FT-04 | Post-fetch: download CSV + Map Fields | 🔶 Partial | — |
 | FT-05 | Fetched CSV to Supabase Storage | ❌ Missing | S-future (SH-07) |
 | FT-06 | Pat selectable as fetch agent | 🔶 Partial | S11b (deferred) |
@@ -179,15 +102,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| RO-01 | Roster screen — all 7 agents including Pat | ✅ Done | DONE |
-| RO-02 | Agent cards with workload indicators | ✅ Done | DONE |
-| RO-03 | "Add a Player" → /bench/new | ✅ Done | DONE |
-| RO-04 | Illustrated SVG avatars (AgentAvatar in SharedUI), AVATAR_CFG in agents.js, + Add a Player in stats strip. DeepBench headline preserved. | ✅ Done | S-MIGRATE-01a (621eb31) |
-| RO-05 | Vacancy card as primary Add entry point (click → /bench/new) | ✅ Done | DONE |
-| RO-06 | Avatar consistency sweep — add michelle to AVATAR_CFG; replace hand-rolled letter circles in DashboardScreen (task cards + chat messages) and StepList with AgentAvatar | ✅ Done | S-AVATAR-01 (d9d43c2) |
-| RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
-| RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ✅ Done | S-BENCH-UX-02 (8717106) |
-| RO-09 | Bench roster sort by usage count — agents sorted by AI call count DESC, alpha first name on tie; zero-count agents at bottom sorted alpha | ✅ Done | S-RO-09 (4c4bdb2) |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
@@ -198,19 +112,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| PE-01 | Profile tab | ✅ Done | DONE |
-| PE-02 | Resume tab | ✅ Done | DONE |
-| PE-03 | Training tab live wiring — load from Supabase, toggle, delete, NIGP card layout (date col + green node + right-side actions) | ✅ Done | S-MIGRATE-02 (02ff560) |
 | PE-04 | Playbook tab live wiring (output_format CRUD + guardrails — ResumeTab pattern) | 🔶 Partial (static mock) | S-MIGRATE-05 |
-| PE-13 | Personnel file polish — remove "The Bench" back button from header, add ACTIVE/TRAINEE chips to sidebar, fix T.paper token bug in guardrail textareas | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | PE-12 | Training tab — Test Agent console (inline sub-view: config selectors, scenario picker, live brief + RAG call, system prompt inspector, RAG chunks panel) | ❌ Missing | S-MIGRATE-06 |
-| PE-05 | Workflow tab (stub) | ✅ Done | DONE |
 | PE-06 | Projects tab — live wiring to `deliverables` table; shows agent's completed deliverables: count, type, task name, date; stub until DL-04 ships | 🔶 Partial (stub) | S-DELIVER-04 |
-| PE-07 | Left-sidebar nav (OVERVIEW + CONFIGURE groups, no OPERATE); replaces horizontal tab bar | ✅ Done | S-MIGRATE-01b (8660e42) |
-| PE-08 | Profile tab 2-col layout — ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right | ✅ Done | S-MIGRATE-01b (8660e42) |
-| PE-09 | Page header breadcrumb from NAV_GROUPS; subtitle uses -level agent (not -level analyst) | ✅ Done | S-MIGRATE-01b (8660e42) |
-| PE-10 | Training tab — Add Courses inline sub-view (upload → extract → ingest pipeline, embedded in Training tab, no page navigation) | ✅ Done | S-MIGRATE-03 (299f1c0) + patch (686007e) |
-| PE-11 | Training tab — Edit Course inline sub-view (edit title, category, jurisdiction, field notes, triggers, priority — no re-vectorization; EDIT+DELETE only for trainable+active entries) | ✅ Done | S-MIGRATE-04 (732bf3c) |
 | PE-14 | Training tab — "What X Learned" panel UX fix: (1) move AiBadge outside the expandable so it is visible immediately before and after expansion; (2) replace clickable expansion trigger with inline "more..." text after "What X Learned" label | ❌ Missing | S-future |
 | PE-15 | Training tab — Add Courses loading state: (1) spinner + status text during Exhibit B pre-fill lag so user knows system is working and cannot click "Teach X this document" yet; (2) AiBadge + AI pulse icon on Exhibit B section showing the pattern being used (KNOWLEDGE_TRAINING) | ❌ Missing | S-future |
 | PE-16 | Playbook tab — guardrails section AI Pulse + hover label: add `<AIDiamond>` to the guardrails card header (always/never section) with a hover label identifying PAT-13 Guardrails / Output Filtering as the pattern these constraints feed into. AIDiamond should render in inactive/roadmap state (PAT-13 is `active: false` in PATTERN_CATALOG) — visually distinct from a live-pattern pulse. Exact inactive AIDiamond treatment must be specced in the AI-34/AI-31 design session before this can be coded. Depends on: PE-04 ✅ Done, AI-34 design (AIDiamond pattern label spec). File: PersonnelScreen.jsx (Playbook tab). | ❌ Missing | S-future (depends on AI-34 design session) |
@@ -265,7 +169,6 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| TC-01 | Upload → extract → ingest → RAG | ✅ Done | DONE |
 | TC-02 | Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log | ❌ Missing | S-future |
 
 **TC-02 Notes (added 2026-06-09):**
@@ -281,8 +184,6 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| TT-01 | Multi-agent query runner — runs two agents on the same query in parallel (PAT-14 Parallelization, 🔶 partial implementation) | ✅ Done | DONE |
-| TT-02 | Prompt comparison / diff panel — side-by-side output + diff metric dashboard | ✅ Done | DONE |
 | TT-03 | Multi-Agent Debate upgrade — after parallel run, feed each agent the other's output for a critique pass; add synthesis agent that reads both critiques and produces a reconciled final answer (PAT-16 Multi-Agent Debate). Extends TT-01/02 foundation. Design session required. | ❌ Missing | S-future (design required) |
 
 ---
@@ -291,38 +192,20 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance | ✅ Done | S-AI01b + patch + patch2 (e975715) |
-| AI-02 | Universal AI status dot | ✅ Done | DONE |
 | AI-03 | AI Activity Panel wiring (3 screens) | 🔶 Partial | S-AI-01 |
-| AI-04 | Intelligent agent routing | ✅ Done | DONE |
-| AI-05 | Planning agent — structured Claude tool use | ✅ Done | DONE |
 | AI-06 | Semantic similarity scoring in knowledge tier | 🔶 Partial | S-future |
 | AI-07 | Summarization/synthesis in AI Activity Panel | 🔶 Partial | S-future |
-| AI-08 | Brent ReAct agent (Railway, Playwright) | ✅ Done | DONE |
-| AI-09 | RAG pipeline (ingest → pgvector → query) | ✅ Done | DONE |
-| AI-10 | AI Activity Panel — header entry point, grouped by AI type | ✅ Done | S16b |
 | AI-11 | Per-step AI execution log → Supabase agent_run_log | ❌ Missing | S11 |
 | AI-12 | Full AI Audit Screen (/work/[taskId]/audit) | ❌ Missing | S-AI-01 Part B |
-| AI-13 | AI Audit panel — rename, header strip (Total Calls, Total Cost, Active Types, Models in Use), remove Clear Log | ✅ Done | S16a |
-| AI-14 | AI Audit — 4 sections: By Activity Type (9 Phase 1 + 4 Future Tracking), By LLM, By Agent (dynamic) | ✅ Done | S16a |
-| AI-15 | Architect Checklist tab in AI Audit — 8-item checklist | ✅ Done | DONE |
-| AI-16 | AI Audit persistence — write every AI call to Supabase ai_activity_log; hydrate on mount for lifetime totals | ✅ Done | S16b |
 | AI-17 | Auto-Training service — extract synthesis+embed+write pattern from web-memory.js POST into standalone `/api/auto-train` endpoint, callable by any agent/capability | ❌ Missing | S-INFRA-02 |
-| AI-18 | Capability-agent attribution — wire agentId to planning (Michelle), extraction (Susan), reinforcement (Susan); fix "knowledge-reinforcement" type key bug | ✅ Done | S-AI-ATTR-01 (4d568bd) |
 | AI-19 | Latency capture for extraction + reinforcement call sites — wrap fetch() with Date.now() timing so avg latency shows in AI Audit (currently "—" for Susan + OpenAI rows) | ❌ Missing | S-future |
 | AI-20 | AI Audit cost formatter — replace `<$0.01` floor with 4-decimal display so sub-penny costs show visible movement (e.g. `$0.0023`); one-liner change to `fmt$` in AIActivityPanel.jsx | ❌ Missing | S-future |
 | AI-21 | AI Audit output token tracking — extend `logAICall()` to accept `outputTokens` param; include output cost in formula; write to existing `output_tokens` column in ai_activity_log; all `logAICall()` call sites updated | ❌ Missing | S-future |
 | AI-22 | Full lineage columns on `ai_activity_log` — add `service_slug`, `service_version`, `deliverable_id`, `step_id`, `level` so every AI call is traceable from Task → Step → Agent → Service → Pattern → Deliverable → Cost. Also adds `success` boolean and `error_type` for Service Health (AI-27). Do alongside S-INFRA-01. All `logAICall()` call sites updated. | ❌ Missing | S-INFRA-01 |
-| AI-23 | AI Audit rebuilt on AI Services model — five sections replace current "By Activity Type": (1) By Service — one row per AI/Mixed Service, columns: Service Name · Type · Calls · Est. Cost · Avg Latency; (2) By Pattern — one row per AI Pattern rolled up from Services declaring it; (3) Deterministic — execution count + latency for deterministic Services, no LLM cost; (4) By LLM — keep existing; (5) By Agent — keep existing. Existing ai_type strings remapped to service_slug values. Requires `ai_services` table (AI-25). Design session: S-AI-AUDIT-REDESIGN. | ✅ Done | S-AI-AUDIT-REDESIGN (da40458 + f0ecd09) |
 | AI-24 | Routing feedback loop — deliverable approval and change-request rates produce a per-agent-capability preference score; routing uses Capability match + Level + approval history as a third factor after Seniority. Design session required before building. | ❌ Missing | S-future (after S-DELIVER-04) |
 | AI-25 | `ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs), properties jsonb (llm_provider, llm_model, token_budget, execution_mode, rag_match_count, byok_eligible), in_nigp, in_deepbench, current_route, target_route, version, created_at. Seed with all 14 services (SVC-01 through SVC-14) on creation. | ❌ Missing | S-INFRA-01 |
 | AI-26 | `ai_patterns` table — Supabase catalog of 20 industry-standard AI Patterns: slug, name, description, in_deepbench boolean (true = active, false = roadmap). Seed with PAT-01 through PAT-20 on creation. PAT-01–11 active or partial; PAT-12–20 roadmap. Referenced by `ai_services.patterns` jsonb array. | ❌ Missing | S-INFRA-01 |
-| AI-30 | AI Audit By Pattern section: expand client-side pattern catalog from 10 to 20 entries (PAT-01–PAT-20); update Patterns Roadmap section (Now/Next/Later) with PAT-12 through PAT-20; update header stat to reflect new totals. HITL row (PAT-10) uses "Gates Triggered" + "Avg Response Time" columns instead of LLM Calls / Cost / Latency — source is task execution log not ai_activity_log; show as 🔶 Partial until TI-18 ships. PAT-14 Parallelization shows as 🔶 Partial (TT-01/02). One file: AIActivityPanel.jsx. | ✅ Done | S-AI-BADGE-04 (5c2b8d2) |
-| AI-32 | By Pattern section — "Not yet active" collapse card: group all inactive patterns (those showing "Not yet active" chip) into a collapsed card identical to "Not yet called · N services" in By Service section. Collapsed by default. Click to expand and see all inactive pattern rows. HITL (hitlSpecial) and Parallelization (partial) stay as individual rows. File: AIActivityPanel.jsx. | ✅ Done | S-AI-AUDIT-UX-01 (c919af4) |
-| AI-33 | Platform Roadmap redesign — replace current flat Services + AI Patterns lists with 2-section × 2-column layout: Next and Later only (no Now — all Now items already coded). Each section: AI Patterns (left) + DeepBench Services (right). Data driven from PATTERN_CATALOG and SERVICE_CATALOG roadmap fields. File: AIActivityPanel.jsx. | ✅ Done | S-AI-AUDIT-UX-01 (c919af4) |
 | AI-27 | Service Health tracking — `success` boolean + `error_type` text column on `ai_activity_log`; enables per-Service failure rate, uptime, and p50/p95 latency in AI Audit. Part of AI-22 lineage work or separate extension. | ❌ Missing | S-INFRA-01 |
-| AI-28 | AiBadge label sweep — update all 21 existing AiBadge tooltip labels app-wide to AI Pattern names (full pattern list per responsible service); remove FlagCard deterministic badge (SharedUI); add `built` prop to AiBadge for greyed/dashed visual when pattern not yet implemented. Constants centralized in `src/aiPatterns.js`. Three coding sessions: S-AI-BADGE-01/02/03. | ✅ Done | S-AI-BADGE-01 ✅ (a6d00c9) — S-AI-BADGE-02 ✅ (b03d04e) — S-AI-BADGE-03 ✅ (8d63915) |
-| AI-29 | Step card conditional pattern badge — derive execution patterns from assigned agent code (Approach A: agent→AGENT_PATTERNS map) with step-name keyword fallback (Approach B); HITL steps = no badge; greyed dashed badge for unbuilt patterns (Pat IR-07, Susan TR-08, multi-agent PAT-11); no badge on deterministic steps. | ✅ Done | S-AI-BADGE-02 (b03d04e) |
 | AI-31 | Task Instructions AI pulse buttons — "Re-run All" and "Update Steps →" buttons each get AI activity signal + pattern label. Byline badge fix in AssignWorkScreen also shipped. Functionally complete (195aeda + 8bd3f23) but VISUAL TREATMENT WRONG: currently uses raw `<span>` dot + AiBadge chip, which is not in the style guide. Must be replaced with `<AIDiamond>` + pattern tooltip pattern (spec TBD in S-AI-AUDIT-UX-01). Files: TaskInstructionsScreen.jsx, StepList.jsx, AssignWorkScreen.jsx. | 🔶 Partial (visual redesign needed — see AI-31 notes) | S-AI-BADGE-05/05p ✅ functional · S-AI-AUDIT-UX-01 visual redesign |
 | AI-34 | Step card AI pattern display — each step card in Task Instructions and Assign Work shows which AI patterns are used for that step, plus an `<AIDiamond>` AI pulse icon. Source: AGENT_PATTERNS map (same as AI-29). Visual treatment: AIDiamond + pattern label, exact placement TBD in design session. Do not use AiBadge chip for this. File: StepList.jsx. | ❌ Missing | S-AI-AUDIT-UX-01 (design session required) |
 | AI-35 | Unified AI Pattern Registry — single source of truth for all pattern tracking across the platform. Replaces the current split between `PATTERN_CATALOG` (useAIActivity.js), `AI_PAT` constants + `AGENT_PATTERNS` map (aiPatterns.js), and scattered AiBadge label strings. The registry owns: (1) **Active status** — which patterns are actually firing in DeepBench code today vs roadmap-only, so AiBadge labels and the Platform Roadmap never contradict each other; (2) **Label/feature associations** — which UI elements (buttons, cards, step types) declare each pattern, so AiBadge labels derive from the registry instead of being hardcoded per component; (3) **AI Audit display** — By Pattern row status (active/partial/roadmap) and roadmap tier driven from one source; (4) **Metric logging** — pattern-level calls, cost, and latency logged directly to `ai_activity_log` via pattern slug, not only rolled up from service calls; (5) **Full graph** — each pattern knows which Services declare it, which Deliverables those Services produce, and which Capabilities invoke those Deliverables. Resolves the AI-28/PATTERN_CATALOG contradiction discovered 2026-06-15: AiBadge labels were set from SVC design intent (Reflection listed on Playbook badge) but PATTERN_CATALOG correctly marks Reflection inactive — a split source caused the inconsistency. Design session required before coding — needs: registry schema, migration path from aiPatterns.js + PATTERN_CATALOG, AiBadge label derivation mechanism, metric log schema. | ❌ Missing | S-PAT-REGISTRY-01 (design required) |
@@ -371,8 +254,6 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | AG-01 | Michelle static identity in agents.js | ❌ Missing | S-BENCH-01 |
-| AG-02 | Michelle system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
-| AG-03 | Michelle trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
 | AG-04 | Michelle UI presence on planning screens | 🔶 Partial | S10b ✅ S10p ✅ S-BENCH-01 full |
 | AG-04a | Michelle avatar — silhouette placeholder → replaced by AgentAvatar (RO-06) | ✅ Done | S10p → S-AVATAR-01 |
 | AG-04b | Update Plan thinking state — three-layer | ✅ Done | S10p |
@@ -384,26 +265,12 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 - Roster position: after Pat Smiley (IR-07)
 - Full spec requires dedicated design session before S-BENCH-01b
 
-| AG-07 | Susan Smith static identity in agents.js | ✅ Done | DONE |
-| AG-08 | Susan Smith system prompt in Supabase agent_configs | ✅ Done | S-BENCH-01 (ad31191) |
-| AG-09 | Susan Smith trainable via Teach + RAG | ✅ Done | S-BENCH-01 (ad31191) |
 | AG-10 | Susan Smith UI presence as Trainer in Training tab | ❌ Missing | S-BENCH-01b |
 | AG-11 | api/train.js reads Susan Smith prompt from Supabase | ❌ Missing | S-BENCH-01b LOCKED |
 | AG-12 | Susan Smith can be assigned to train other bench agents | ❌ Missing | S-BENCH-01b LOCKED |
-| AG-13 | Dan Bingham (PS-01) — AI Prompt Strategist — static identity in agents.js, Supabase agents table entry, Personnel File, avatar. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." Specialty: Prompt Engineering · Context Assembly · Intelligence Architecture. Owns DB Assembly + AI Enrichment capabilities. Shown as collaborator in UI alongside primary agent everywhere Prompt Service fires. Logs to ai_activity_log separately. Design session: S-DAN-01. | ✅ Done | S-DAN-02 (eb8285d) |
-| AG-14 | Screen Controls Editor agent — **Alex Reeves (ED-01)**. agents.js entry, AVATAR_CFG (glasses, T.brass), AGENT_PRONOUNS (they/them). Specialty: UI Field Mapping · Structured Component Assembly · Data-Driven Layouts. Quip: "Content knows what to say. I decide where it lives on the screen." Capability: screen-controls. Format Skill Profile: screen-controls-format (output_type: json, handler: store, technical_services: structured-output + tool-use). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
-| AG-15 | HTML Display Editor agent — **Riley Torres (ED-02)**. agents.js entry, AVATAR_CFG (bob, T.brass), AGENT_PRONOUNS (she/her). Specialty: Web Formatting · Visual Hierarchy · Typography · HTML Presentation. Quip: "A well-structured page doesn't need instructions — it just reads itself." Capability: html-display. Format Skill Profile: html-display-format (output_type: html, handler: store). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
-| AG-16 | PDF Assembly Editor agent — **Claire Sutton (ED-03)**. agents.js entry, AVATAR_CFG (bun, T.brass), AGENT_PRONOUNS (she/her). Specialty: Document Layout · Professional PDF Structure · Formal Presentation Design. Quip: "Every document is a first impression. I make sure it's the right one." Capability: pdf-assembly. Format Skill Profile: pdf-assembly-format (output_type: html, handler: package, requires_packaging: true). Bio seeded in Supabase agents table. Design session: S-EDITOR-01. | ✅ Done | S-EDITOR-02 (c309e94) |
-| AG-17 | Product Strategist agent — **Victoria Chen (SP-01)**. Head of Product Strategy. Owns the solution catalog — defines what DeepBench offers clients and routes each engagement to the correct PM, format skill, and display agent. agents.js entry, AVATAR_CFG (navy border), AGENT_PRONOUNS (she/her). Specialty: Solution Design · Service Line Strategy · Product Catalog Management. Supabase: agents table row, solution-catalog capability, solution-catalog skill profile (traits.solutions array = product menu). Visible on Create Work Order screen as consultation chip after PM selection. | ✅ Done | S-VICTORIA-01 |
-| AG-18 | Apple Channel Intelligence — **GEO CSO Expert (CI-01)**. Face of the LLM-wiki (renamed from Performance Strategist in v5 redesign). Two capabilities: Q&A Answer (Sonnet — answers from sourced RAG corpus, self-flags `needs_review`) and Intent Routing (Haiku — classifies every chat turn as qa/theory/forecast/correct/escalate, extends existing DB-09 `checkRouting()` pattern). Identity: "10-year GEO director voice — sourced, specific, direct." Full schemas: `docs/APPLE-AGENT-1-v5-DESIGN.md` §5.1–5.2. **Persona: Marcus Webb**, he/him, `T.brass` avatar border + glasses. Quip: "I own the world's channels." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
-| AG-19 | Apple Channel — **Data Expert (CI-03)** (expanded from Data Builder in v5 redesign). Retrieval, ingestion, cleaning, updating, restoring. Owns Escalate execution (research request → new corpus chunks) and Data Integrity Patch (only when a Correct commit disputes a specific existing chunk — routed here by Intake Assistant, never automatic). Never overwrites `knowledge_entries` rows in place — always inserts a superseding row (see corpus versioning, `docs/APPLE-AGENT-1-v5-DESIGN.md` §7). Full schemas: §5.5–5.6. **Persona: Nadia Farouk**, she/her, `T.moss` avatar border. Quip: "Nothing gets erased. Everything gets superseded." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
-| AG-20 | Apple Channel — **The Reasoner (CI-06)** (renamed from Supreme Reasoner in v5 redesign; role deepened, no longer roadmap-only). Owns Memory Consolidation — **synthesis only**: takes a committed Forecast/Correct decision and writes a structured Learned Context entry (`data_type: learned`). Execution (embed + upsert to `knowledge_entries`) is **not duplicated here** — hands off to Susan Smith (TR-08, existing platform Trainer agent, AG-09/PE-03), reusing her live reinforcement pipeline instead of building a parallel one. See AG-24. Enables true loop closure: the next relevant question in-session picks up the correction automatically through normal RAG retrieval. Pattern terms: Memory Consolidation (write) / Transfer Learning (generalization) / Case-Based Reasoning (later retrieval) — deliberately distinct from the existing `PATTERN_CATALOG` "Reflection" entry to avoid collision. Full schema: §5.10. In scope for Market Intelligence now; platform-wide generalization is roadmap only. **Persona: Elena Cho**, she/her, `T.navy` avatar border + bun. Quip: "One correction, taught right, answers the next hundred questions." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
 | AG-24 | Susan Smith (TR-08) — **agent-triggered reinforcement**, new platform-wide capability extension (not Apple-only). Today her reinforcement pipeline (PE-03) only fires from a human clicking "Add Courses" in the Training tab. This adds the first agent-triggered call into it — The Reasoner's synthesized Learned Context hands off to her for embedding, same mechanism, new trigger source. Both agents visibly attributed wherever this fires (Learned Context card, `ai_activity_log`) — same pattern as Dan Bingham's Prompt Service collaboration credit, never a silent single-agent write. Built as part of S-APPLE-05, benefits the whole platform. | ❌ Missing | S-APPLE-05 |
 | AG-25 | Apple Channel — **Emerging Market Prioritization Agent** (roadmap, not yet designed in depth — draft only). Distinct from the GEO CSO Expert: pulls **live external data via Brent** (existing ReAct/Playwright web agent) rather than static pre-seeded RAG — smartphone penetration (GSMA), upgrade cycle data (Counterpoint), GDP growth (World Bank public API), carrier landscape (GSMA/Wikipedia). Outputs a structured Market Prioritization card (opportunity signal, signal strength, recommended channel motion, key data points, data gaps). Not part of the Market Intelligence 6-agent build — a separate future capability, second of the original 3-agent arc (90 days / 6 months / 12 months). Draft spec: `docs/DEEPBENCH-APPLE-BUILD-PLAN.md` "Agent 2". | ❌ Missing | S-future (design session required) |
 | AG-26 | Apple Channel — **Partner Training Readiness Agent** (roadmap, not yet designed in depth — draft only). Different user than every other Apple Channel agent — serves partner reps (carrier/retail staff), not GEO directors. Conversational product/program Q&A, sales-scenario coaching, quiz mode. HITL-gated on pricing/promo questions (change frequently) or low confidence. Third of the original 3-agent arc. Draft spec: `docs/DEEPBENCH-APPLE-BUILD-PLAN.md` "Agent 3". | ❌ Missing | S-future (design session required) |
-| AG-21 | Apple Channel — **Forecast/Theory/Performance Expert (CI-02)** (new in v5 redesign). Two capabilities: Generate Hypotheses (fires when a Q&A answer is flagged `needs_review` and the director hasn't supplied their own claim) and Stress Test (fires when a hypothesis is selected/written, before commit — fixes v4's bug of showing this after commit). "Performance" = domain scope (channel/program performance claims), not a distinct capability. `override_warning` is the model's own judgment, never derived from a hardcoded index/intent check. Full schemas: §5.3–5.4. **Persona: Priya Nair**, she/her, `T.moss` avatar border. Quip: "A theory that survives stress testing earns the name forecast." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
-| AG-22 | Apple Channel — **The Proofreader (CI-04)** (new in v5 redesign; unifies Guardrail PAT-13 + Eval PAT-19 into one persona instead of two invisible platform services). Pre-display gate on every Q&A answer: Guardrail rule check (pass/block + specific rule violated) and Eval 5-dimension scoring (pass/revise + critique). Block → silent 1x retry to CI-01; still-blocked → honest failure state shown to the director with the real rule and reason, never a generic error. Full schema: §5.7. **Persona: Owen Marsh**, he/him, `T.brass` avatar border + glasses. Quip: "I don't argue with the answer. I argue with what's missing from it." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
-| AG-23 | Apple Channel — **The Intake Assistant (CI-05)** (new in v5 redesign; replaces the deprecated "Decision Maker" concept from v1). Two triage capabilities, both Haiku: Commit Triage (decides whether a Correct commit needs Data Expert's chunk-level patch, always routes Forecast/Correct to the Reasoner) and Failure Triage (decides whether a Proofreader hard-failure should offer Escalate as a next step). Distinct from CI-01's conversational Intent Routing — this fires only after an explicit human decision exists. Full schemas: §5.8–5.9. **Persona: Sam Reyes**, they/them, `T.brass` avatar border. Quip: "Every decision needs somewhere to go next." Confirmed S-APPLE-01a-design (v5.3.0). | ✅ Done | S-APPLE-01a (cfbf431) |
 
 ---
 
@@ -496,27 +363,14 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 |----|---------|--------|---------|
 | AA-01 | `agent_character` table — character settings per agent (philosophy, skeptic_level, autonomy_level, temporal_stance, epistemology, confidence_calibration, peter_principle, collaboration_role, ethical_constraints, learning_stance, lock states per field) | ❌ Missing | S-INFRA-01 |
 | AA-02 | `training_type` column on `knowledge_entries` — tags: knowledge / behavioral / reasoning / character | ❌ Missing | S-INFRA-01 |
-| AA-03 | DB Assembly (`api/prompt/db-assembly.js`) — reads capability_slug + agent_id, queries Supabase (agent_configs / capabilities / skill_profiles), returns Prompt Request organized by source. Required: tenant_id + task_context. Optional: agent_id, capability_slug. No AI calls, no writes. Degrades gracefully on missing data. | ✅ Done | S-PM-02 |
-| AA-43 | AI Enrichment (`api/prompt/ai-enrichment.js`) — takes Prompt Request, executes platform patterns: RAG (agent/capability/platform-wide scope), REFLECT, intelligent synthesis. Resolves conflicts and duplication from multiple sources. Returns assembled system prompt + debug object. All patterns always run regardless of DB content availability. | ✅ Done | S-PM-03a |
-| AA-53 | Seed knowledge entries for Michelle (pp-01) — capability-registry-knowledge skill profile has no knowledge_entries rows scoped to pp-01. RAG section is always omitted for Michelle until seeded. Seed with: capability registry docs, DeepBench agent roster, skill type definitions. | ✅ Done | S-PM-03b |
-| AA-44 | Request & Receivable (`api/prompt/request-receivable.js`) — Send + Parse + Guardrails (PAT-13) + Deliver via handler registry. Direct Anthropic fetch (no adapter). Guardrails post-generation Haiku check. Handler registry delegates to `api/_lib/handlers/store.js` (content) or future dispatch/mcp/package handlers (action). Server-side ai_activity_log write with `patterns_used`. Full deliverables table write including LLM-generated `title`. | ✅ Done | S-PM-04b |
 | AA-54 | Handler registry expansion — `api/lib/handlers/dispatch.js` (route to agent/capability-route), `api/lib/handlers/package.js` (prose → docx/pdf), `api/lib/handlers/mcp.js` (call MCP server with result). Action deliverable category: `format: "action"`, `handler: "dispatch"` or `"mcp"`. Hybrid deliverable: runs both store + action handlers. `format_contract.handler` slug on Format Skill Profile routes to correct module. Design session required. | ❌ Missing | S-future (design required) |
 | AA-56 | DB Assembly `runtime_context` input parameter — optional string injected as "Additional Context" section at the end of the assembled sections array. Passes Q&A clarifying answers from the re-generate flow into the full Prompt Service pipeline so Michelle receives the best possible context on regeneration. Without this, re-generate would fall back to the hardcoded pass-through path and bypass Michelle's Skill Profiles. | ❌ Missing | S-PM-05a |
 | AA-55 | Server-side `ai_activity_log` write pattern for all Prompt Service routes — currently only `request-receivable.js` logs server-side. When MCP callers or non-frontend callers are introduced for DB Assembly or AI Enrichment, those routes need server-side logging too. Extend pattern to `db-assembly.js` and `ai-enrichment.js`. | ❌ Missing | S-future (MCP era) |
-| AA-58 | `agents` table in Supabase — professional card for all agents: id (name slug PK), code (XX-00), name, role, specialty, bio, tenant_id. 10 agents seeded: 9 existing + Dan Bingham (PS-01). Editor agents AG-14/15/16 seeded in S-EDITOR-01. DB Assembly fetches row and exposes as agent_card in response. Note: PK column is `id` (not `agent_id`) — existing table schema. Full agents.js migration deferred to S-BENCH-FULL-MIGRATE. | ✅ Done | S-AGENT-TABLE-01 (754e3f1) |
 | AA-59 | Dan Bingham as Prompt Architect — DB Assembly + AI Enrichment become Dan's named capability routes. Dan's agent_id (ps-01) is passed alongside the requesting agent in every Prompt Service call. Dan's skill profiles carry REFLECT and Synthesis configuration as traits. Dan is shown as a collaborator in the UI alongside the primary agent everywhere the Prompt Service fires. Dan logs to ai_activity_log separately from the requesting agent with his own service entry in SERVICE_CATALOG. Partial: db-assembly SERVICE_CATALOG entry + AI_TYPE_TO_SERVICE wired. Logging (ps-01 in ai_activity_log) → S-PROMPT-ARCH-01. | 🔶 Partial | S-DAN-02 (eb8285d) → S-PROMPT-ARCH-01 |
-| AA-60 | REFLECT prompt moved into traits — `traits.reflect_prompt` on the skill profile that declares `technical_services: ["reflect"]`. AI Enrichment reads `fetch_instruction.reflect_prompt` (populated by DB Assembly from the declaring skill profile's traits) instead of using a hardcoded prompt string. Makes each agent's REFLECT reasoning unique and trainable. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
-| AA-61 | Synthesis prompt moved into traits — `traits.synthesis_prompt` on the skill profile that declares `technical_services: ["intelligent-synthesis"]`. Quality guidance included: preserve agent persona and behavioral character as equally important as format and intent; remove redundancy and conflicts between sections; produce one coherent authoritative prompt. AI Enrichment reads from traits instead of hardcoded string. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
-| AA-62 | WORK ORDER section extended to include deliverable_type — goal and deliverable_type rendered together in the WORK ORDER stored section (order 2.5) in DB Assembly. Visible in all 4 columns of Prompt Evolution Modal. task_context always present as goal anchor; deliverable_type flows to LLM alongside goal. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
 | AA-63 | Content specialist routing — deliverable tiles on Create Work Order route to the appropriate content specialist agent based on deliverable type. Michelle remains the planner specialist. Brent remains the web specialist (Railway + Playwright — unchanged). Future content specialists: Research & Analysis, Data Insights, Document & Compliance. Each has Identity + Behavior + Knowledge + Intent skills only — no Format Skill. Design session required before coding. | ❌ Missing | S-CONTENT-01 (design required) |
-| AA-64 | Display agent routing — content specialist output routes to the appropriate display agent (Screen Controls / HTML Display / PDF Assembly) based on the user's requested output format. Display agents own the Format Skill for the platform. Deliverable tiles declare `format_skill_profile_slug` + `display_agent_id`; plan.js reads whatever the frontend passes — no hardcoding. Agents designed in S-EDITOR-01. | ✅ Done | S-CONTENT-01a (backend routing) + S-CONTENT-01b (frontend wiring) |
-| AA-69 | Format-last pattern — plan.js appends the display agent's Format Skill as the final section in `enriched.system_prompt` AFTER `enrichPrompt()` completes. Dan's full enrichment (RAG + REFLECT + Synthesis) builds content intelligence without a schema constraint; Alex's output contract arrives last as the final LLM instruction. Visible in Column 4 of Prompt Evolution Modal. Format section also includes the title instruction (moved from `ai-enrichment.js` renderSection). | ✅ Done | S-CONTENT-01a |
-| AA-70 | Alex Reeves UI attribution — CreateWorkOrderScreen reads `display_agent_card` from plan API response and renders Alex byline above step cards ("Screen formatted by Alex Reeves · Screen Controls Editor"). PromptEvolutionModal footer gains Alex chip (ED-01, brass border) alongside Dan chip (PS-01, moss border). `displayAgentCard` prop added to PromptEvolutionModal. | ✅ Done | S-CONTENT-01b |
 | AA-65 | Dan Bingham UI collaboration indicator — when the Prompt Service fires for any agent, a small secondary indicator shows Dan as a collaborator alongside the primary agent. Not a separate step in the work order. Applied everywhere the Prompt Service runs: Create Work Order Generate Plan, TaskInstructionsScreen Re-generate (post S-PM-06), and all future prompt-service callers. Dan's contribution is also visible in the AI Audit as a separate team member row. Partial: PromptEvolutionModal footer two-chip indicator (primary agent chip T.brass + Dan chip T.moss). Other surfaces → S-PROMPT-ARCH-01. | 🔶 Partial | S-DAN-02 (eb8285d) → S-PROMPT-ARCH-01 |
 | AA-66 | Identity section additive assembly — db-assembly.js Identity section combines ALL non-blank sources: agents table (name, role, specialty), all role_prompt entries from agent_configs (not just is_default), skill profile objective + method. Every source that is not blank is included. No OR logic — additive always. Depends on AA-58 (agents table). Partial implementation in S-AGENT-TABLE-01 (assembly logic wired; full integration tested when identity skill profiles are seeded). | 🔶 Partial | S-AGENT-TABLE-01 → S-PROMPT-ARCH-01 |
-| AA-67 | deliverable_type in task_context — CreateWorkOrderScreen passes deliverable_type in task_context alongside goal when calling prompt-service and preview-prompt. Flows through as part of the always-present task_context block (AA-62) so the LLM knows what type of deliverable is being planned and generates appropriate steps. | ✅ Done | S-PROMPT-ARCH-01 (1060dff) |
 | AA-69 | Prompt Service chain timeout risk — plan.js maxDuration is 60s but request-receivable.js has AbortSignal.timeout(55000) on the main Sonnet call. DB Assembly (~5s) + AI Enrichment (~10s) + Request & Receivable (up to 55s) = up to 70s total, exceeding the 60s budget. Intermittent 504s observed under load. Fix: reduce AbortSignal timeout in request-receivable to 40s to guarantee headroom. Low priority while calls typically complete in 15–25s. | ❌ Missing | S-future (low priority) |
-| AA-68 | BUG-11 patch — api/plan.js default plan handler: change tool_choice from `{ type: "auto" }` to `{ type: "any" }` to force Haiku to call the plan_task tool. Fixes TaskInstructionsScreen Re-generate returning no steps when Haiku returns text instead of tool_use. One line, one file. No design session required. | ✅ Done | S-PM-08a (170da34) |
 | AA-45 | Multi-LLM conflict resolution — when multiple Skill Profiles in a Capability declare different LLM configs, resolve by Format Skill priority. Platform defaults handle for now. | ❌ Missing | S-future (design required) |
 | AA-46 | User-declared priority in task_context — formal parsing of priority signals embedded in the task string (e.g. "urgent", section weighting). AI Enrichment surfaces naturally for now. | ❌ Missing | S-future |
 | AA-47 | DB Assembly relevance flagging — lightweight AI annotation on Prompt Request sections to guide AI Enrichment prioritization. Deferred until pipeline is proven. | ❌ Missing | S-future (design required) |
@@ -630,7 +484,6 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| WO-01 | Work Order UI label rename — all user-visible "Task" → "Work Order" labels across DashboardScreen, AssignWorkScreen, TaskInstructionsScreen, BenchNewScreen, AboutPanel. Backend rename (DB table, routes, variables) deferred to future session. | ✅ Done | S-RENAME-01 (0348066) |
 | WO-02 | Work Order creation flow — replace current Assign Work screen with Work Order creation: Intent picker (9 intents), Format picker (filtered by Intent), goal/purpose/audience/scope fields, Deliverable specs array with per-spec constraints | ❌ Missing | S-WO-01 |
 | WO-03 | Work Order `deliverables[]` — structured Deliverable spec array inside Work Order jsonb; minimum 1 spec; each spec carries intent, format, action, constraints (must/must-not), template ref | ❌ Missing | S-WO-01 |
 | WO-04 | Work Order lifecycle states — draft → submitted → planning → awaiting_approval → in_progress → paused → change_requested → complete / failed / gap_flagged | ❌ Missing | S-WO-01 |
@@ -678,18 +531,11 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SK-01 | `skill_types` table + 5 type seeds (identity, behavior, knowledge, intent, format) | ✅ Done | S-SK-01 (a447e49) |
-| SK-02 | `skill_profiles` table + SP-01 Data Analysis (type: intent) + SP-02 Analysis Report (type: format) seeds | ✅ Done | S-SK-01 (a447e49) |
-| SK-03 | `capabilities` table + CAP-01 Data Analyst seed | ✅ Done | S-SK-01 (a447e49) |
-| SK-04 | `capability_skill_profiles` join table + seeds linking SP-01 + SP-02 to CAP-01 at L2/L1 | ✅ Done | S-SK-01 (a447e49) |
-| SK-05 | `agent_capability_assignments` table + Bob (PR-04) assigned to CAP-01 | ✅ Done | S-SK-01 (a447e49) |
-| SK-06 | Personnel File Profile tab — Capabilities read section (between profile card and compensation card); SkillHoverCard on each Skill row shows all Traits, type-specific jsonb fields, and guardrails; empty state for unassigned agents; all agents show container | ✅ Done | S-SK-01 (a447e49) |
 | SK-07 | AiBadge on Capabilities card — shows all technical_services patterns per Skill when Work Side is wired | ❌ Missing | S-future (Work Side execution sprint) |
 | SK-08 | CRUD UI for Skill Profile creation and editing | ❌ Missing | S-future (design required) |
 | SK-09 | Capability builder UI — assemble Skill Profiles into a new Capability, set Level per Skill | ❌ Missing | S-future (design required) |
 | SK-10 | Agent Capability assignment UI — assign/unassign Capabilities on Personnel File | ❌ Missing | S-future (design required) |
 | SK-11 | Capability hover card on Personnel File — hovering the capability name/title shows a summary popup of all the Capability's traits (name, description, Skill count, execution type). Mirrors SkillHoverCard pattern. Design session required before coding. | ❌ Missing | S-future (design required) |
-| SK-12 | Seed Project Manager Capability — 5 skill profiles (SP-PM-01 through SP-PM-05) + CAP-PM-01 + capability_skill_profiles links + Michelle (PP-01) assigned. Immediately visible on Michelle's Personnel File via existing SK-06 UI. No src/ changes required. | ✅ Done | S-PM-01 (9255c22) |
 | SK-13 | JD → Capability Auto-Generation — upload a job description, extract competencies mapped to Skill types, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval before creation. Extends PE-10 upload pipeline with capability records as output target instead of knowledge_entries. Design session required. | ❌ Missing | S-future (design required) |
 | SK-14 | SkillHoverCard z-index fix — hover popup renders behind sibling controls on Personnel File Profile tab. CSS z-index elevation required on the hover card container. Small patch — can go into any upcoming coding session. | ❌ Missing | S-next-patch |
 | SK-15 | Identity Skill for Project Manager (SP-PM-06) — orchestrator philosophy, autonomy dial, skeptic level. Deferred — design session required before coding. | ❌ Missing | S-future (design required) |
@@ -698,10 +544,6 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | SK-18 | Seed `traits.schema` on SP-PM-03 (execution-plan Format Skill) — the JSON schema (planSummary, agentId, agentReason, steps[], questions[]) currently hardcoded in `api/plan.js` as a tool definition must be stored in `skill_profiles.traits.schema`. Required before Prompt Container can pass format_contract.schema to the Builder/Sender. DB seed only — no src/ changes. | ❌ Missing | S-PM-02 |
 | SK-19 | Refactor `api/brief.js` legacy path — remove hardcoded McKinsey memo system prompt from the no-agent_id path; route through Prompt Container + Builder instead. Currently bypasses all Skill Profile assembly for legacy calls. | ❌ Missing | S-future (after S-PM-04) |
 | SK-20 | Refactor `api/plan.js` — replace hardcoded system prompt and hardcoded tool schema with Prompt Container + Builder; tool schema moves to SP-PM-03 traits.schema (SK-18). This is when the Work Order screen starts using the new Prompt Service. Depends on AA-03 + AA-43 complete. | ❌ Missing | S-PM-05 |
-| SK-22 | Seed `deliverables` array on SP-PM-03 (execution-plan Format Skill) traits — 7 entries: Data Analysis, Web Data Fetch, Document Draft, Research Summary, Compliance Review, Spend Analysis, Market Research. Each entry: id, label, icon, description, default_context. Read by Create Work Order screen to populate deliverable picker. DB seed only — no src/ changes. | ✅ Done | S-PM-05b |
-| SK-23 | Update `execution-plan` Format Skill schema — add `steps.items` definition (required: id, label, type, text; optional: icon), `questions.items` definition (required: id, q), and `title` as required field. Without items definitions Anthropic tool_use returns empty objects — screen renders blank step cards and blank questions. DB seed only. | ✅ Done | S-PM-05b-schema-patch |
-| SK-24 | Reclassify SP-PM-02 (Capability Assignment) from `skill_type_slug = 'intent'` to `skill_type_slug = 'behavior'` in Supabase. SP-PM-02 describes HOW Michelle decides which capability to assign to each step — cognitive reasoning behavior, not task output intent. Fixes duplicate INTENT sections in Prompt Evolution Modal Column 2. DB-only change, single UPDATE. No code changes. Note: actual DB slug is `capability-assignment` (not `sp-pm-02` as in kickoff). Traits also updated post-QA to distinct assignment-reasoning content for prompt service behavior testing. | ✅ Done | S-PM-08a (170da34) |
-| SK-25 | Victoria Chen solution catalog — `solution-catalog` capability + `solution-catalog` skill profile (skill_type: intent). `traits.solutions` array is the authoritative product menu. Each entry declares: id, label, description, icon, pm_agent_id, format_skill_profile_slug, display_agent_id, active, coming_soon. Add a new solution to DB → appears on Create Work Order screen automatically. Replaces SK-22 deliverables array on SP-PM-03 (which was Michelle's Format Skill — wrong owner). Victoria is the correct owner of the product catalog. | ✅ Done | S-VICTORIA-01 |
 | SK-21 | Wire Pat (IR-07) bypass as a Skill Profile declaration — currently hardcoded in `api/brief.js` as `if (agent_id === "pat")`. Pat's no-RAG, no-config behavior should be declared via Identity + Knowledge Skill Profile constraints (`isIntern: true` mapped to Skill Profile level), not as a named code exception. Requires S-INFRA-01 design session to map isIntern to Skill types. | ❌ Missing | S-INFRA-01 |
 
 ---
@@ -727,156 +569,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+
 ## Full Session Order
 
-### Work Side
-| Session | Feature | Status |
-|---------|---------|--------|
-| S15a | UX Review — Dashboard | ✅ DONE |
-| S15b-A | UX Review — Assign Work Part A | ✅ DONE |
-| S15b-B | UX Review — Assign Work Part B | ✅ DONE |
-| S15c | UX Review — Task Instructions | ✅ DONE |
-
-
-| S16a | AI Audit UI — rename, restructure, By LLM + By Agent sections (AI-13, AI-14) | ✅ DONE |
-| S16b | AI Audit persistence + live panel wiring — Supabase ai_call_log, lifetime metrics, AI-10 full wiring (AI-16, AI-10) | ← NEXT |
-
-### Architecture + Migration (inserted before Bench side — decided 2026-06-08)
-| Session | Feature | Status |
-|---------|---------|--------|
-| S-ARCH-01 | Write full ARCHITECTURE.md — four-layer model, capability spectrum, adapter layer, DB target state, session rules | ✅ DONE |
-| S-MIGRATE-UX | UX/UI design — Roster + Personnel screens walk-through, design decisions locked | ✅ DONE |
-| S-MIGRATE-01-design | Design session: produce coding kickoff doc for S-MIGRATE-01 | ✅ DONE |
-| S-MIGRATE-01a | Illustrated SVG avatars + AgentAvatar in SharedUI + Roster visual port (RO-04) | ✅ DONE (621eb31) |
-| S-MIGRATE-01b | Personnel File left-sidebar nav + Profile tab 2-col layout (PE-07, PE-08, PE-09) | ✅ DONE (8660e42) |
-| S-MIGRATE-02 | Training tab: live load + toggle + delete + NIGP card layout (PE-03) | ✅ DONE (02ff560) |
-| S-MIGRATE-03 | Training tab: Add Courses inline sub-view — upload → ingest pipeline embedded (PE-10) | ✅ DONE (686007e) |
-| S-MIGRATE-04 | Training tab: Edit Course inline sub-view — all form fields editable, PATCH metadata, trainable+active guard (PE-11) | ✅ DONE (732bf3c) |
-| S-MIGRATE-05 | Playbook tab: output_format CRUD + guardrails live wiring (PE-04) | ✅ DONE (1644366) |
-| S-AVATAR-01 | Avatar consistency sweep — RO-06 (michelle in AVATAR_CFG, Dashboard + StepList) | ✅ DONE (d9d43c2) |
-| S-BENCH-UX-01 | Bench UI polish — Roster stats strip, AiBadge, Add a Player, sidebar chips, T.paper fix, back button removal (RO-07, PE-13) | ✅ DONE (812ed59) |
-| S-BENCH-UX-02 | Bench UI polish round 2 — AiBadge brass fix (RO-08), AddConfigForm labels, Resume structural fixes, Add Courses polish | ⏳ Design done — ready to code |
-| S-AI-ATTR-01 | Capability-agent attribution — Michelle (planning) + Susan (extraction, reinforcement) + type key bug fix (AI-18) | ⏳ Design done — ready to code |
-
-### Bench Side (begins after S-MIGRATE-01)
-| Session | Feature |
-|---------|---------|
-| S-BENCH-01 | Michelle + Susan: trainable flag + role_prompt seed (AG-02, AG-03, AG-08, AG-09) | ✅ DONE (ad31191) |
-| S-BENCH-01b | Michelle + Susan full API wiring — deferred to S-INFRA-01 (unified capability service) |
-| S-BENCH-02 | Personnel File — post-migration audit + capability dashboard view |
-| S-BENCH-03 | Teach screen audit |
-| S-BENCH-04 | Test Team audit |
-| S-UX-BENCH-01 | UX Review — Roster / Bench screen |
-| S-UX-BENCH-02 | UX Review — Personnel File |
-| S-UX-BENCH-03 | UX Review — Teach screen |
-| S-UX-BENCH-04 | UX Review — Test Team |
-
-### Skills & Capabilities (Bench side — before Work Side wiring)
-| Session | Feature | Status |
-|---------|---------|--------|
-| S-SK-01-design | Skill/Capability data model design session — locked 2026-06-18 | ✅ DONE |
-| S-SK-01 | SK-01 through SK-06 — 5 tables + seeds + Personnel File Capabilities section | ✅ DONE (a447e49) |
-
-### Project Manager Capability & Execution Delivery Model
-| Session | Feature | Status |
-|---------|---------|--------|
-| S-EXEC-DESIGN | Execution & Delivery Model design session — locked 2026-06-18. Full pipeline spec, Project Manager Capability defined (5 Skill Profiles), 6 deliverable types, AI pattern map, DB impact, Michelle transition path. Produced: EXECUTION-DELIVERY-MODEL.md, updated SKILL-PROFILE-MODEL.md + FEATURES.md | ✅ DONE |
-| S-PM-01 | Seed Project Manager Capability in DB — SK-12. Supabase only, no src/ changes. Michelle's Personnel File immediately shows CAP-PM-01 via existing SK-06 UI. Kickoff doc required. | ✅ DONE (9255c22) |
-| S-PM-01b-design | PM Format Skill alignment design session (2026-06-19) — SP-PM-03 output_fields updated: added agentId, agentReason, questions[]. Orchestrator/Executor field distinction locked. S-PM-02 scope confirmed: prompt-assembly only, no deliverables table (Option A). Execution Plan storage deferred to S-DELIVER-04. SK-14 (z-index bug) + SK-15 (Identity Skill) added. | ✅ DONE |
-| S-PROMPT-DESIGN | Prompt Service Model design session (2026-06-19) — 3-service architecture locked: Container (AA-03), Builder (AA-43), Sender (AA-44). Input model: Credentials / Skills / Deliverable. Minimum call: task_context only (L1 baseline). Sections capability-defined — no override flag. LLM + max_tokens live on Skill Profile. PROMPT-SERVICE-MODEL.md produced. ARCHITECTURE.md + FEATURES.md updated. | ✅ DONE |
-| S-PM-02-design | DB Assembly design session (2026-06-22) — Full Prompt Service terminology rename: Container→DB Assembly, Builder→AI Enrichment, Sender→Request & Receivable, Specification→Prompt Request. DB Assembly architecture locked: faithful collector, organized by source, section priority order, tenant_id always explicit, graceful degradation. AI Enrichment principle locked: all patterns always run, RAG scoped to agent/capability/platform-wide. 4 future features added (AA-45–AA-48). PROMPT-SERVICE-MODEL.md + ARCHITECTURE.md + FEATURES.md updated. Kickoff doc written. | ✅ DONE |
-| S-PM-02 | Build DB Assembly API (AA-03) — `api/prompt/db-assembly.js`. Reads capability_slug + agent_id, returns Prompt Request organized by source. Kickoff doc ready. | ✅ Done (b3c5415) |
-| S-PM-03a | Build AI Enrichment API (AA-43) — patch `db-assembly.js` (full section assembly + format_contract), create `lib/rag.js` (shared RAG service, moved to project root to stay under Vercel 12-function limit), patch `rag-query.js` + `agent-run.js` imports, build `api/prompt/ai-enrichment.js` (Fetch + Render + REFLECT + Synthesis). QA PASS (2026-06-22). New requirement: AA-53 (seed Michelle knowledge entries). | ✅ Done (fc885ed) |
-| S-PM-03b | AI Audit wiring for AI Enrichment + AA-53 Michelle knowledge seed — `SERVICE_CATALOG` entry (slug: ai-enrichment, patterns: RAG · Prompt Chaining, roadmap: next), `AI_TYPE_TO_SERVICE` mapping (ai_enrichment → ai-enrichment). logAICall call sites deferred to S-PM-04 (frontend caller). AA-53: 3 knowledge_entries seeded for agent_id 'michelle' (Agent Roster, Skill Profile Types, CAP-PM-01 spec). QA PASS (2026-06-22). Note: seed used wrong agent_id 'pp-01' initially — patched to 'michelle' before close. | ✅ Done (a010136) |
-| S-PM-04a | Foundation for Request & Receivable — Supabase: create `deliverables` table (full schema), ALTER `ai_activity_log` (add `patterns_used jsonb`), UPDATE `execution-plan` skill profile (add `handler: "store"`, `title` + `taskTitle` to output_fields). Merge `title.js` into `plan.js` (action param, frees Vercel slot). Patch `db-assembly.js` (extract `handler` + `guardrails` into format_contract). Patch `ai-enrichment.js` (append title instruction to Format section render). Extend `logAICall()` optional `patterns_used` param. Add `request-receivable` to SERVICE_CATALOG. PAT-13 Guardrails → `active: true` in PATTERN_CATALOG. | ❌ Not started |
-| S-PM-04b | Build Request & Receivable API (AA-44) — `api/prompt/request-receivable.js` (Send + Parse + Guardrails + Deliver) + `api/_lib/handlers/store.js`. Server-side ai_activity_log write. Full deliverables table write. Handler registry pattern. Guardrails (PAT-13) Haiku check. Node.js + live API tests. | ✅ Done (b7e465f) |
-| S-PM-05-design | Design session — Create Work Order screen redesign + Prompt Service wiring. Key decisions: (1) Screen renamed Create Work Order; (2) Hardcoded 5 tiles replaced by PM agent picker + DB-driven deliverable picker from Format Skill traits; (3) AI goal suggestion auto-fires on deliverable selection (Streaming + RAG); (4) plan.js dual-mode — new prompt-service path + existing pass-through kept for TaskInstructionsScreen; (5) DB Assembly gains runtime_context param for Q&A re-generate context; (6) R&R returns content alongside deliverable metadata; (7) callTitleAgent() removed; (8) TaskInstructionsScreen untouched (S-PM-06). Split into S-PM-05a (backend named exports + pipeline prep) + S-PM-05b (frontend + plan.js wiring). | ✅ Done (2026-06-23) |
-| S-PM-05a | Backend pipeline prep — extract named exports from db-assembly.js (assemblePrompt + runtime_context), ai-enrichment.js (enrichPrompt), request-receivable.js (sendRequest + content in response). 3 files, no frontend changes. Enables plan.js to orchestrate the full pipeline without internal HTTP calls. | ❌ Not started |
-| S-PM-05b | Create Work Order frontend wiring — plan.js gains action: 'prompt-service' (orchestrates full pipeline) + action: 'suggest-goal' (RAG + streaming Haiku). AssignWorkScreen.jsx redesigned: agent picker (AW-25), deliverable tiles (AW-26), AI goal suggestion (AW-27), screen rename (AW-24), new callPlanningAgent routing. SP-PM-03 deliverables trait seeded (SK-22). useAIActivity.js wired (goal-suggestion SERVICE_CATALOG entry). | ❌ Not started |
-| S-DAN-PIPELINE-01 | Design session — Wire Dan's enrichment pipeline into plan.js. Three decisions to lock: (1) How does Dan's `dan-ai-enrichment` capability get assembled? Options: plan.js calls `assemblePrompt` twice (once for Michelle, once for Dan) and merges reflect/synthesis sections; or enrichPrompt internally fetches Dan's capability. (2) Clear `technical_services: ["reflect"]` from Michelle's `planning-behavior` and `["intelligent-synthesis"]` from `work-order-decomposition` — these are SK-16 legacy seeds that predate the Dan design. (3) Add `'Reflection'` to `ai-enrichment` SERVICE_CATALOG patterns array. Completes AA-59. Fixes BUG-17. | ❌ Not started (design first) |
-| BUG-19 | Re-generate broken on TaskInstructionsScreen — QA item 6 failed S-DAN-PIPELINE-01 (2026-06-24). Default `plan` action was not touched in S-DAN-PIPELINE-01. Deferred as pre-existing issue; full investigation required before S-PM-06 (which migrates this screen). Design session required to identify root cause before coding. | ❌ Missing — investigate before S-PM-06 |
-| BUG-20 | `prompt-service` appearing as LLM model in AI Audit By LLM section — 16 stale rows in `ai_activity_log` from pre-BUG-14 code that wrote `model: 'prompt-service'` (now removed). Two fixes: (1) Supabase MCP: delete 16 rows where `model='prompt-service' AND ai_type='planning'`; (2) Add `KNOWN_LLM_MODELS` prefix filter to `byLLM` aggregation in `useAIActivity.js` as permanent defense. Also: `MODEL_PROVIDER` missing `claude-haiku-4-5-20251001` + `claude-sonnet-4-6` — both show "Unknown provider." Add both as "Anthropic." Also: add `MODEL_ID_NORMALIZE` map in `logAICall()` to canonicalize short-form model IDs at write time. | ❌ Missing — S-AI-AUDIT-FIX-01 |
-| BUG-21 | Agent name falls back to raw ID in AI Audit By Agent — `AGENT_NAMES` in `AIActivityPanel.jsx` is a manually-maintained static map never updated when Dan Bingham (PS-01) was added in S-DAN-02. Legacy DB rows with `agent_id='pp-01'` (code instead of slug) also have no entry. Fix: replace `AGENT_NAMES` with self-maintaining lookup derived from `AGENTS` in `agents.js`. Build `_agentById` (keyed by id) + `_agentByCode` (keyed by code); `resolveAgent()` checks id first, code second, falls back to `{ name: agentId, code: '?' }`. Never goes stale. | ❌ Missing — S-AI-AUDIT-FIX-01 |
-| BUG-22 | SERVICE_CATALOG roadmap field not updated when services ship — four built services (`ai-enrichment`, `request-receivable`, `prompt-assembly`, `knowledge-reinforcement`) still have `roadmap: 'next'` and appear in Platform Roadmap NEXT section as if unbuilt. Fix: update four roadmap fields to `'now'` in `useAIActivity.js`. Add standing rule to `STANDARDS.md` Section 12: SERVICE_CATALOG `roadmap` must be updated to `'now'` in the same coding session when a service ships. | ❌ Missing — S-AI-AUDIT-FIX-01 |
-| S-PM-06 | Migrate TaskInstructionsScreen re-generate to Prompt Service pipeline. Replaces hardcoded system prompt + tool schema in handleUpdatePlan() with action: 'prompt-service'. Removes callTitleAgent() from TaskInstructionsScreen. Design session required first. | ❌ Not started (design first) |
-| S-PM-07-design | Design session — Prompt Visibility Modal (AW-28) + goal injection bug fix (AA-57). Key decisions: (1) Modal fires on Generate Plan click — two parallel frontend calls: preview-prompt (fast, db-assembly + enrichment only) triggers modal, prompt-service (full pipeline) runs in background; (2) Three-panel comparison: bare goal / DB assembly sections with source labels / enriched prompt with RAG + Reflect + pattern badges; (3) Token/word count per panel; (4) Summary line before Continue; (5) Continue dismisses modal — plan renders when ready regardless; (6) AA-57: inject task_context.goal as WORK ORDER section in assemblePrompt (db-assembly.js) — intent skill says "Read the full Work Order" but goal never appears in assembled prompt; (7) task_context passed as object { goal, deliverable_type } but ai-enrichment uses it as string (RAG query + Reflect prompt) — must stringify goal for both. Split into S-PM-07a (db-assembly goal injection) + S-PM-07b (plan.js preview-prompt + modal). | ❌ Not started (design first) |
-| S-PM-07a | Fix goal injection in db-assembly.js (AA-57) — inject task_context.goal as a WORK ORDER section in assemblePrompt after intent sections. Fix task_context stringification in ai-enrichment.js (RAG queryText + Reflect prompt currently receive [object Object]). 2 files. | ✅ Done (415c8c6) |
-| S-PM-07b | Prompt Evolution Modal (AW-28) — plan.js gains action: 'preview-prompt'. PromptEvolutionModal.jsx is a platform-level reusable component (src/components/). CreateWorkOrderScreen.jsx is first consumer. Modal: four-column comparison (goal only / +DB Assembly / +RAG / +Reflect) with token deltas, pattern badges, Synthesis indicator, Continue button. | ✅ Done (da0c1e1) |
-| BUG-11 | TaskInstructionsScreen Re-generate broken — discovered during S-PM-07a QA (2026-06-23). Root cause identified in S-PM-08-design (2026-06-23): api/plan.js default handler uses `tool_choice: { type: "auto" }` — Haiku returns text instead of tool_use, steps array is empty. Fix: change to `{ type: "any" }`. One line. See AA-68. | ✅ Done (170da34) |
-| BUG-12 | AI Enrichment not logged — REFLECT (Haiku) and Synthesis (Haiku) each make LLM calls in `ai-enrichment.js` but write nothing to `ai_activity_log`. SERVICE_CATALOG entry for `ai-enrichment` always shows 0 calls in AI Audit. Fix: two fire-and-forget Supabase inserts at end of `enrichPrompt()` — one for REFLECT (`ai_type: 'reflect'`, `patterns_used: ['reflection']`, `agent_id: 'dan'`) and one for Synthesis (`ai_type: 'synthesis'`, `patterns_used: ['prompt-chaining']`, `agent_id: 'dan'`). Also adds `reflect → ai-enrichment` and `synthesis → ai-enrichment` mappings to `AI_TYPE_TO_SERVICE` in useAIActivity.js (see BUG-12 wiring in S-CONTENT-01b). Partial implementation of AA-55. BUG-12p: original inserts were missing `tenant_id: 'global'` — `hydrateFromSupabase` queries with `.eq('tenant_id','global')` so rows were never returned to UI despite inserting. QA confirmed AI Enrichment still shows "No calls yet" after BUG-12p — root cause escalated to BUG-17 (reflect/synthesis not running at all). | 🔶 Partial | S-CONTENT-01a (log writes) + S-CONTENT-01b (mappings) + S-BUG12p (tenant_id fix) → BUG-17 |
-| BUG-18 | ai-enrichment reflect/synthesis log inserts fail silently — fire-and-forget inserts in `ai-enrichment.js` include `location: 'ai-enrichment'` but `ai_activity_log` has no `location` column (actual column is `feature`). Supabase returns 42703 error, swallowed by `.catch()`. Zero reflect/synthesis rows ever written. Dan never appears in AI Audit By Agent. Root cause confirmed via schema query (2026-06-24). Fix: rename `location` → `feature` in both inserts. One file: `api/prompt/ai-enrichment.js`. | ⏳ Kickoff ready: docs/kickoffs/v5.2.36-BUG18p-enrichment-log-location-column.md |
-| BUG-17 | AI Enrichment pipeline never fires — reflect and synthesis calls never reach `ai_activity_log` despite BUG-12 + BUG-12p fixes. Root cause confirmed via full execution path audit (2026-06-24): (1) `plan.js` calls `assemblePrompt({ capability_slug: 'project-manager', agent_id: 'michelle' })` — assembles Michelle's profiles only. Dan's `dan-ai-enrichment` capability (which holds `prompt-reflect` + `prompt-synthesis`) is never assembled. Dan's profiles are correctly seeded in Supabase with `technical_services: ["reflect"]` and `["intelligent-synthesis"]` but never reach `enrichPrompt()`. (2) Michelle's `planning-behavior` still has `technical_services: ["reflect"]` and `work-order-decomposition` has `["intelligent-synthesis"]` — legacy seeds from SK-16 (S-PM-02), predating the design decision that moved reflect/synthesis ownership to Dan. These should be cleared from Michelle's profiles once Dan's pipeline is wired. (3) `ai-enrichment` SERVICE_CATALOG entry has `patterns: ['RAG', 'Prompt Chaining']` — missing `'Reflection'`. By Pattern → Reflection shows 0 calls even if rows existed. Fix: S-DAN-PIPELINE-01 — (a) assemblePrompt() gains `enrichment_capability_slug` param; plan.js passes `'dan-ai-enrichment'` in prompt-service + preview-prompt; (b) Supabase: clear technical_services from planning-behavior + work-order-decomposition; (c) add 'Reflection' to ai-enrichment SERVICE_CATALOG patterns. Architecture locked: Michelle is purely declarative, Dan owns all enrichment triggers. | ⏳ Design done — kickoff doc: docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md |
-| BUG-13 | COST_PER_1K model name mismatch — `useAIActivity.js` COST_PER_1K has keys `'claude-haiku-4-5'` and `'claude-sonnet-4-5'` but actual model IDs in use are `'claude-haiku-4-5-20251001'` and `'claude-sonnet-4-6'`. No key match → cost always null in AI Audit. Fix: add correct model ID strings as additional keys. Old keys kept for backwards compatibility. | ✅ Done | S-CONTENT-01b |
-| BUG-14 | Double-count on planning — `callPlanningAgent()` in CreateWorkOrderScreen.jsx calls `logAICall({ type: 'planning', ... })` on the frontend. The actual LLM call happens in `request-receivable.js` server-side which already logs `ai_type: 'request-receivable'` to Supabase. Every plan generation creates one false `task-planning` entry + one correct `request-receivable` entry. Fix: remove `logAICall({ type: 'planning' })` from `callPlanningAgent()` entirely. | ✅ Done | S-CONTENT-01b |
-| BUG-15 | `reflection` pattern marked `active: false` while REFLECT is live — `PATTERN_CATALOG` in `useAIActivity.js` has `reflection` slug with `active: false`. But REFLECT has been running in `ai-enrichment.js` since S-PROMPT-ARCH-01 (2026-06-23). All calls fire with `patterns_used: ['reflection']` but the pattern appears on Platform Roadmap as "not live." Fix: flip to `active: true`. Pattern then excluded from Platform Roadmap (which filters on `active: false`). | ✅ Done | S-CONTENT-01b |
-| S-PM-08-design | S-PM-08 Design Session (2026-06-23) — Resolved all 5 gaps from S-PM-07 QA findings. Evolved Prompt Service architecture: (1) BUG-11 root cause: tool_choice auto→any (AA-68); (2) SP-PM-02 reclassify to behavior (SK-24); (3) Identity section additive assembly + agents table in Supabase (AA-58, AA-66); (4) deliverable_type in task_context (AA-67); (5) Synthesis quality guidance: preserve persona + remove redundancy/conflicts (AA-61). Major architectural decisions: Dan Bingham (PS-01, AI Prompt Strategist) owns DB Assembly + AI Enrichment capabilities (AG-13, AA-59); three display/editor agents created (AG-14/15/16, AA-64); content specialists never own Format Skills (AA-63); REFLECT/Synthesis prompts move to traits (AA-60/61); task_context becomes always-present separate context block (AA-62); Dan shown as UI collaborator everywhere Prompt Service fires (AA-65). Session queue reordered into 9 buckets. | ✅ Done (2026-06-23) |
-| S-PM-08a | **Coding only — no design required.** (1) BUG-11: api/plan.js default handler — change tool_choice from `{ type: "auto" }` to `{ type: "any" }` (AA-68). (2) SK-24: UPDATE skill_profiles SET skill_type_slug = 'behavior' WHERE slug = 'capability-assignment' in Supabase (actual slug differed from kickoff). Post-QA: capability-assignment traits updated to distinct assignment-reasoning content. | ✅ Done (170da34) |
-| S-AGENT-TABLE-01 | Design + coding — agents table in Supabase (AA-58 + AA-66 partial). 10 agents seeded. DB Assembly: agentRow fetch + agent_card + additive Identity assembly. PK is `id` (not `agent_id`) — existing table. 9/9 Manual QA PASS. | ✅ DONE (754e3f1) |
-| S-DAN-01 | Design session — Dan Bingham (PS-01, AI Prompt Strategist) full design. Resolved: traits.reflect_prompt and traits.synthesis_prompt live on Dan's own skill profiles (SP-DAN-01 prompt-reflect, SP-DAN-02 prompt-synthesis) linked to dan-ai-enrichment capability. UI indicator: "✦ Prompt assembled with Dan Bingham (PS-01) · AI Prompt Strategist" in PromptEvolutionModal footer. Session queue: S-DAN-02 → S-PROMPT-ARCH-01. | ✅ Done (2026-06-23) |
-| S-DAN-02 | Coding — Dan Bingham bench presence + service catalog + modal indicator. agents.js (AGENTS + AVATAR_CFG + AGENT_PRONOUNS), useAIActivity.js (db-assembly SERVICE_CATALOG + AI_TYPE_TO_SERVICE), PromptEvolutionModal.jsx (footer two-chip indicator), plan.js (agent_card in preview-prompt response). Supabase: dan-db-assembly + dan-ai-enrichment capabilities, prompt-reflect + prompt-synthesis skill profiles, links + assignments. 11/11 Manual QA PASS. | ✅ DONE (eb8285d) |
-| S-EDITOR-01 | Design session — Three display/editor agents (AG-14/15/16): Alex Reeves (ED-01), Riley Torres (ED-02), Claire Sutton (ED-03). Personas, Format Skill Profiles, Capabilities, calling structure principle locked. Kickoff doc: docs/kickoffs/v5.2.28-S-EDITOR-02-editor-agents.md. | ✅ Done (2026-06-23) |
-| S-EDITOR-02 | Coding — Three editor agent bench presence: agents.js (3 agents + AVATAR_CFG + AGENT_PRONOUNS) + Supabase seeds (agents table, skill_profiles, capabilities, links). Implements AG-14 + AG-15 + AG-16. AA-64 (routing) is S-CONTENT-01. | ✅ Done (c309e94) |
-| S-DAN-PIPELINE-01 | BUG-17 fix — Dan's enrichment pipeline wired into plan.js. (1) Supabase: clear technical_services from planning-behavior + work-order-decomposition. (2) db-assembly.js: add enrichment_capability_slug param to assemblePrompt(). (3) plan.js: pass enrichment_capability_slug:'dan-ai-enrichment' in prompt-service + preview-prompt actions. (4) useAIActivity.js: add 'Reflection' to ai-enrichment SERVICE_CATALOG patterns. 3 files + 2 Supabase UPDATEs. Vercel function count unchanged at 12. | ⏳ Design done — kickoff doc ready |
-| S-PROMPT-ARCH-01 | Design + coding — Prompt Service architectural improvements. (1) AA-60: REFLECT prompt → traits.reflect_prompt on declaring skill profile; (2) AA-61: Synthesis prompt → traits.synthesis_prompt with quality guidance; (3) AA-62: task_context as always-present separate context block, remove WORK ORDER hardcode from assembler; (4) AA-66: Identity section additive assembly (depends on AA-58); (5) AA-67: deliverable_type in task_context. Preserves founding principle: no conditionals in assembler, all intelligence in traits. Design session first. | ❌ Not started — design first |
-| S-CONTENT-01 | Design session — Content specialist routing (AA-63). Research & Analysis specialist, Data Insights specialist, Document & Compliance specialist. Michelle stays as planner specialist. Brent stays as web specialist. Deliverable tile → routing logic → content specialist agent → display agent handoff. Requires S-EDITOR-01 complete (display agents must be defined). | ❌ Not started — design first |
-| S-BENCH-FULL-MIGRATE | Full agent profile migration — move remaining agent data from agents.js to Supabase: salary, stats, avatar URL, flags (isIntern, isSenior, etc.). After this, agents.js becomes a thin ID-to-route mapping only. Deferred until agents table (AA-58) is proven stable. Low urgency — no current feature blocks on this. Design session required. | ❌ Not started — deferred (after AA-58 stable) |
-
-### Infrastructure (after Bench side is stable)
-| Session | Feature |
-|---------|---------|
-| S-INFRA-01 | Capability registry, per-agent LLM assignment, BYOK infrastructure, DB migration to capability model |
-| S-INFRA-02 | Auto-Training service — extract `/api/auto-train` from web-memory.js; reusable by any capability (AI-17) |
-
-### Apple Interview Sprint — 2 weeks starting 2026-06-16
-> Goal: agents produce visible, typed, reviewable, stored deliverables. Story: assign task → steps run → deliverable appears → user reviews → agent work tracked on profile.
-> Priority order: AI Audit redesign first (showcases architecture + correct terminology), then Deliverables model.
-
-| Session | Feature | Status |
-|---------|---------|--------|
-| S-AI-BADGE-01 | AiBadge foundation — `src/aiPatterns.js` constants + AGENT_PATTERNS map, AiBadge greyed/dashed state for unbuilt patterns, DashboardScreen badge label updates (3), DB-22 Create New Task badge (AI-28 partial, DB-22) | ✅ DONE (a6d00c9) |
-| S-AI-BADGE-02 | AiBadge sweep — AssignWorkScreen label updates (7 badges), step card conditional pattern badge logic, AIReviewTab label update (AI-28 partial, AI-29) | ⏳ Design done — ready to code |
-| S-AI-BADGE-03 | AiBadge sweep — PersonnelScreen (4 badges), ResumeTab (2 badges), RosterScreen (1 badge) label updates (AI-28 complete) | ⏳ Design done — ready to code |
-| S-AI-BADGE-04 | AI Audit pattern catalog expansion — expand By Pattern section from 10 to 20 patterns; update Patterns Roadmap (Now/Next/Later) with PAT-12–20; header stat "8/10" → "8/20". One file: AIActivityPanel.jsx (AI-30) | ⏳ Design done — ready to code |
-| S-AI-BADGE-05 | Task Instructions AI pulse buttons + AssignWorkScreen byline badge fix — Re-run All + Update Steps → AiBadge + pdot pulse; fix AI-29 byline badge (AgentHoverCard hover conflict). Files: TaskInstructionsScreen.jsx + AssignWorkScreen.jsx (AI-31) | — |
-| S-DELIVER-DESIGN | **Design session (3 parts)** — Part 1: Agent Profile Model locked (ARCHITECTURE.md Section 2). Part 2: CAPABILITIES.md + AI-SERVICES.md created — full Services/Deliverables registry, AI Patterns catalog (10), AI Services catalog (14), sharing patterns, feedback loops, MCP surfaces. Part 3: kickoff docs for S-AI-AUDIT-REDESIGN + S11 + S-DELIVER-04. | ✅ Parts 1–2 done ⬅ Part 3 after badge sessions |
-| S-AI-AUDIT-REDESIGN | **Design session first, then coding** — Rebuild AI Audit screen on AI Services model: (1) rename By Activity Type → By Service; (2) add By Pattern section; (3) add Deterministic section; (4–5) keep By LLM + By Agent. Remap existing ai_type strings to service_slug values. Seed `ai_services` + `ai_patterns` tables (AI-25, AI-26). Updates AI-23. Read `docs/AI-SERVICES.md` Sections 2, 3, 6 before starting. | — |
-| S11 | TI-14 + TI-15 + TI-16 + AI-11 — Start button, per-step running state, step output written to `deliverables` table | — |
-| S-DELIVER-04 | DL-04 + DL-05 + DL-07 + DL-10 + DL-11 + DL-12 — `deliverables` table, change request flow, agent Projects tab, Web Research/Fetch/Plan/Flags/Analysis write | — |
-| S-DELIVER-02 | DL-02 + DL-03 — Deliverables Card on task view + per-step inline access + approve/request change UI | — |
-| S-DELIVER-01 | DL-01 — Michelle labels step output types at plan time | — |
-| S-POLISH-01 | Demo path audit — golden path: assign → approve → run → deliverable → review | — |
-
-### Platform Entity Sessions (new — from S-DELIVER-DESIGN Part 3, 2026-06-16)
-> Pre-requisite: S-RENAME-01 must run before any WO coding session.
-> Design sessions (S-INTENT-01, S-FORMAT-01, S-WO-01) precede coding sessions.
-
-| Session | Feature | Status |
-|---------|---------|--------|
-| S-RENAME-01 | Terminology rename cascade — Tasks → Work Orders app-wide; task_id → work_order_id; tasks table → work_orders table; Assign Work → New Work Order; Task Instructions → Execution Plan; update all routes, UI labels, API contracts. See PLATFORM-ENTITIES.md rename table. | ❌ Not started |
-| S-WO-01 | Work Order entity — DB migration, creation flow (Intent picker → Format picker → goal/purpose/audience/scope), deliverables[] spec array, lifecycle states, parent_work_order_id stub, Michelle Execution Plan routing | ❌ Not started |
-| S-INTENT-01 | Intent entity — intents catalog table, admin UI, canned configuration management, gap flagging storage (product_gaps table), agent assignment table, capability assignment table | ❌ Not started |
-| S-FORMAT-01 | Format entity — formats catalog table, section schema editor, data variable schema editor, tier management, agent assignment table, capability assignment table, Format picker component | ❌ Not started |
-| S-SERVICE-01 | Service entity — services catalog table, packaging UI (Intent + Format → Service), pricing model, MCP endpoint registration, marketplace listing | ❌ Not started |
-| S-CAP-01 | Capability entity full design — capability profile UI, assignment tables (to Intent, Format, Agent), Level grading, gap flag, Universal Profile Structure applied to Capability | ❌ Not started |
-| S-METHOD-01 | Method definition + adapter layer formalization — methods table, capability↔method mapping, adapter layer contracts | ❌ Not started |
-| S-MONITOR-01 | Monitor & Alert intent — recurring/trigger-based execution pattern, scheduler, trigger model, notification layer (separate architecture from one-shot Intents) | ❌ Not started |
-
-### Deferred (resume after sprint)
-| Session | Feature |
-|---------|---------|
-| S-RESILIENCE-01 | Model fallback service — `api/lib/modelFallback.js` shared utility. Named fallback chains (fast: Haiku→Sonnet, standard: Sonnet→Haiku). Called by all Anthropic API actions in plan.js (suggest-goal + plan generation). Returns `{ res, model }` so AI audit logging stays accurate. Triggered by: Anthropic API degraded (Jun 24 2026 outage) + API credit exhaustion. Design session first. |
-| S11b | TI-17 + FT-06 — Pat execution + fetch agent |
-| S12 | AW-17 — Michelle assigns steps to multiple agents |
-| S13 | DB-18 — Auto-select best agent |
-| S-DELIVER-06 | DL-08 — Deliverable sharing (signed URL, tiers) |
-| S-AI-01 Part B | AI Audit Screen per-task deep dive (AI-12) |
-| S-POLISH-01 | Known issue fixes (see STANDARDS.md S-POLISH-01 section) |
-| S-MIGRATE-06 | Training tab: Test Agent console inline sub-view (PE-12, needs design session) |
-
----
-
-## Open Questions
-
-| ID | Question | Blocks |
-|----|----------|--------|
-| Q5 | Agent step output destination — **RESOLVED 2026-06-13.** Two-tier deliverables model. See DL section above. | ~~S11~~ unblocked |
+Moved to `docs/SESSIONS.md` (2026-07-01 cleanup — this table duplicated session history already tracked there). See SESSIONS.md "Full Session Order (archived from FEATURES.md)" section.
