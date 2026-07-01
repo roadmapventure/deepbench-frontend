@@ -1,3 +1,4 @@
+// DeepBench v5.3.1 | api/ingest.js | FEATURE: MI-08 — accepts data_type, citeable, is_baseline, supersedes_id, confidence, override_flag, geo, program_area, partner_id, period
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
@@ -50,6 +51,8 @@ export default async function handler(req, res) {
       triggers, content, status, tenant_id,
       agent_id,       // v3: which agent this document belongs to
       teaching_note,  // v3: admin instruction to agent on how to use this doc
+      data_type, citeable, is_baseline, supersedes_id, confidence, override_flag,
+      geo, program_area, partner_id, period,
     } = req.body;
 
     if (!title || !content) {
@@ -98,6 +101,16 @@ export default async function handler(req, res) {
       tenant_id:     tenant_id     || "global",
       agent_id:      agent_id      || "legacy",   // "legacy" = v1/v2 entries
       teaching_note: teaching_note || null,
+      data_type:     data_type     || "sourced",
+      citeable:      citeable      === undefined ? true : citeable,
+      is_baseline:   is_baseline   || false,
+      supersedes_id: supersedes_id || null,
+      confidence:    confidence    || null,
+      override_flag: override_flag === undefined ? null : override_flag,
+      geo:           geo           || null,
+      program_area:  program_area  || null,
+      partner_id:    partner_id    || null,
+      period:        period        || null,
     };
 
     if (id) payload.id = id;
