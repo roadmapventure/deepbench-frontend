@@ -127,7 +127,7 @@ When John pastes the Claude Code completion report, respond with the Manual QA C
 ⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until John reports QA results.
 
 ### 5c — Act on QA results
-- **All PASS** → Mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE-STATE.md` (bump version, set next session), commit and push both to dev.
+- **All PASS** → Move the feature ID's row from `docs/FEATURES.md` to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in `FEATURES.md` — that's what caused it to balloon to 127.8 KB before the 2026-07-01 cleanup), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all three to dev.
 - **Any FAIL** → Full root cause analysis first. Read complete execution path. Compare against NIGP reference. A bug that fails QA once must not fail QA twice. Generate a patch kickoff doc.
 - **New requirement found** → Add to `docs/FEATURES.md` as ❌ Missing. Commit and push.
 

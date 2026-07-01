@@ -195,7 +195,7 @@ When John pastes the Claude Code verification checklist showing all items checke
 
 ### 10c — Act on QA results
 
-- **All PASS** → Close out: mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE-STATE.md` (bump version, set next session), commit and push both files to dev.
+- **All PASS** → Close out: move the feature ID's row from `docs/FEATURES.md` to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in `FEATURES.md` — that's what caused it to balloon to 127.8 KB before the 2026-07-01 cleanup), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all three files to dev.
 - **Any FAIL** → Perform full root cause analysis before writing any patch: read the complete execution path (browser → call site → API handler → package.json → runtime), compare against the working NIGP reference line by line, identify the deepest cause — not the nearest symptom. A bug that fails QA once must not fail QA twice. Then generate a patch kickoff doc targeting the confirmed root cause.
 - **NEW REQUIREMENT discovered during QA** → Add to `docs/FEATURES.md` under the correct area as ❌ Missing, session = S-future. Commit and push.
 
