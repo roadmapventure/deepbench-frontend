@@ -1,4 +1,4 @@
-// DeepBench v5.3.0 | agents.js | AG-18/19/20/21/22/23 Apple Channel roster (6 personas) added
+// DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -152,6 +152,18 @@ export const AGENTS = [
     color: T.navy,
     isProductStrategist: true,
   },
+  // FEATURE: AG-27 — Eleanor Voss (LB-01) The Librarian
+  {
+    id: "eleanor", name: "Eleanor Voss", role: "The Librarian",
+    code: "LB-01", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG Broker + Access Control",
+    specialty: "Data Room Access Control · Tenant Isolation · Retrieval Brokering",
+    salary: 110000, value: 130000, hourly: 58, reportHrs: 0, reportCost: 0,
+    docs: 0, classes: 0, chunks: 0, skill: 82, situational: 50,
+    trainable: false, trainableBy: "RMV", revenueModel: "Platform",
+    quip: `"Knowledge without access control isn't a library — it's a leak waiting to happen."`,
+    color: T.navy,
+    isLibrarian: true,
+  },
   // FEATURE: AG-18 — Marcus Webb (CI-01) GEO CSO Expert
   {
     id: "marcus", name: "Marcus Webb", role: "GEO CSO Expert",
@@ -246,6 +258,8 @@ export const AVATAR_CFG = {
   claire:{ skin:"#e8d5b5", hair:"#6a4a2a", collar:"#1e2e3a", extra:"bun",     border:T.brass },
   // FEATURE: AG-17 — Victoria Chen avatar
   victoria: { skin:"#e8d4b8", hair:"#1a1a2a", collar:"#2a1a3a", extra:"", border:T.navy },
+  // FEATURE: AG-27 — Eleanor Voss avatar
+  eleanor: { skin:"#d8c4a8", hair:"#c9c5bc", collar:"#1a2e3a", extra:"glasses", border:T.navy },
   // FEATURE: AG-18/19/20/21/22/23 — Apple Channel avatars
   marcus: { skin:"#d2a679", hair:"#3a2a1a", collar:"#1a2e4a", extra:"glasses", border:T.brass },
   priya:  { skin:"#8a5a3a", hair:"#1a1a1a", collar:"#2a4a3a", extra:"",        border:T.moss  },
@@ -274,6 +288,8 @@ export const AGENT_PRONOUNS = {
   claire:{ subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AG-17 — Victoria Chen pronouns
   victoria: { subject:"she", object:"her", possessive:"her" },
+  // FEATURE: AG-27 — Eleanor Voss pronouns
+  eleanor: { subject:"she", object:"her", possessive:"her" },
   // FEATURE: AG-18/19/20/21/22/23 — Apple Channel pronouns
   marcus: { subject:"he",   object:"him",  possessive:"his"   },
   priya:  { subject:"she",  object:"her",  possessive:"her"   },
