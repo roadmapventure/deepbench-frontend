@@ -1,4 +1,4 @@
-// DeepBench v5.3.10 | useAIActivity.js | AG-28 — hypothesis-evaluation SERVICE_CATALOG entry (Priya Nair, Generate Hypotheses)
+// DeepBench v5.3.12 | useAIActivity.js | AG-29 — pipeline-triage SERVICE_CATALOG entry (Sam Reyes, Commit Triage + Failure Triage)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -51,6 +51,11 @@ export const SERVICE_CATALOG = [
   // ai_type will equal capability_slug ('hypothesis-evaluation') exactly, resolved by the existing
   // `|| e.type` fallback (line 280) — same pattern as channel-intelligence/quality-gate.
   { slug: 'hypothesis-evaluation',   name: 'Hypothesis Evaluation',     serviceType: 'ai',     patterns: ['Structured Output', 'RAG'], roadmap: 'now'  },
+  // FEATURE: AG-29 — pipeline-triage capability (Sam Reyes, Commit Triage + Failure Triage).
+  // No AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('pipeline-triage')
+  // exactly, resolved by the existing `|| e.type` fallback (line ~280) — same pattern as
+  // channel-intelligence/quality-gate/hypothesis-evaluation.
+  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
