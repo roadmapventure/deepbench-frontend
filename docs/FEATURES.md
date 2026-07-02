@@ -485,7 +485,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| MC-01 | MCP Agent — expose a named agent as an MCP server; agent capabilities available as MCP tools to Claude Desktop and external AI clients | ❌ Missing | S-MCP-01 |
+| MC-01 | MCP Agent — expose a named agent as an MCP server; agent capabilities available as MCP tools to Claude Desktop and external AI clients. **Confirmed compatible with the Agent Loop (`ARCHITECTURE.md` §19d, 2026-07-02):** a thin MCP adapter calling `runCapability()` directly, same shape as `execute.js`'s existing HTTP handler — no capability logic duplicated, and an external caller transparently gets the agent's real internal delegation (e.g. calling Priya via MCP still lets her pull in Nadia). Two things this depends on when actually scheduled: (1) `AA-83` (`_hop_counter` request-body hardening) becomes a hard prerequisite, not optional, once an untrusted external caller exists; (2) `pending_confirmation`'s resume flow is undesigned for a non-interactive MCP caller (return the gated payload and let the calling system's own human resolve it? a separate resume tool?) — needs its own decision in `S-MCP-01`'s design session. | ❌ Missing | S-MCP-01 |
 | MC-02 | MCP Capability — expose a specific Capability without full agent persona; more granular than MC-01 | ❌ Missing | S-MCP-01 |
 | MC-03 | MCP Deliverable — expose deliverable production as an MCP tool; caller receives structured typed deliverable output | ❌ Missing | S-MCP-01 |
 | MC-04 | MCP Service — expose a single AI Service directly as an MCP tool; finest granularity; infrastructure licensing tier | ❌ Missing | S-MCP-01 |
