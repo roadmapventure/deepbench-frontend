@@ -105,7 +105,7 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 - No UI logic inside capability routes
 - Every capability route logs to `ai_activity_log` via `logAICall()` — no exceptions, including deterministic capabilities
 - All external service calls go through the adapter layer (see Section 5)
-- New capabilities are new routes — never bolt onto existing ones
+- **[SUPERSEDED 2026-07-01, S-APPLE-03-design — see §19b]** New capabilities are new *data*, not new routes. All capability execution flows through one generic executor (`api/capabilities/execute.js`) — never a hand-rolled route per capability.
 
 **Phase 1 capability routes:**
 
@@ -677,7 +677,7 @@ These rules apply to every future session. No exceptions without explicit produc
 2. Never put AI call logic inside a React component — it belongs in a Layer 3 capability route
 3. Every Layer 3 route logs to `ai_activity_log` via `logAICall()` — no exceptions, including deterministic capabilities
 4. Capability routes are named for the capability, never for the agent
-5. Each capability is one independent route — new capabilities are new routes, never bolted onto existing ones
+5. **[SUPERSEDED — see §19b]** Capability execution is data, not routes. Every capability runs through the one generic executor (`api/capabilities/execute.js`); a new capability requires zero new route files — only Skill Profile rows + `capability_skill_profiles` + `agent_capability_assignments`. Never treat existing shared pipeline code (`db-assembly.js`/`ai-enrichment.js`/`request-receivable.js`) as a "precedent to copy" rather than code to import and extend — that exact anti-pattern produced `channel-intelligence.js`/`quality-gate.js`'s drift from the generic pipeline, found and retired via S-APPLE-03/S-CAPABILITY-EXEC (2026-07-01).
 6. All external service calls go through the adapter layer — no direct vendor API calls in routes
 7. Agent profiles define voice and persona only — Skill Profiles are never written into an Agent's persona definition
 8. Railway is for browser automation only — all AI and Supabase calls go through Vercel serverless
@@ -849,6 +849,25 @@ A new `agents` table holds professional card data for all agents. Required becau
 
 Seeded with all 9 existing agents + Dan Bingham + 3 editor agents (names TBD in S-EDITOR-01).
 Full agents.js migration (salary, stats, avatar, flags) is a separate future session (S-BENCH-FULL-MIGRATE).
+
+---
+
+## 19b. The Generic Capability Executor [LOCKED S-APPLE-03-design 2026-07-01]
+
+**This is the platform's founding intent, restated precisely: capabilities are data, not code.** A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format) plus rows in `capability_skill_profiles` and `agent_capability_assignments`. Building a new capability should never require writing or deploying a new route — only inserting new Supabase rows. The platform is the container; agents are configurations that live inside it.
+
+**The mechanism:** `api/capabilities/execute.js` — one generic route, called with `{ capability_slug, intent_slug, agent_id, task_context, tenant_id }`. It runs the same three already-generic pipeline steps every capability needs, in sequence:
+1. `assemblePrompt()` (`db-assembly.js`) — loads the Skill Profiles for `capability_slug`, filtered to `intent_slug`
+2. `enrichPrompt()` (`ai-enrichment.js`) — REFLECT/synthesis, RAG retrieval via `fetch_instruction`
+3. `sendRequest()` (`request-receivable.js`) — builds the model call from `format_contract` (model, max_tokens, schema — all Skill Profile data per §2's universal properties and the `AA-75` fix), calls Anthropic, runs declared guardrails, dispatches to a handler, logs to `ai_activity_log`, returns content
+
+None of these three files change per capability. `execute.js` itself contains zero capability-specific logic — no `if (capability_slug === 'x')`, ever. That conditional is exactly the thing this section exists to prevent.
+
+**What this retires:** Prior to this decision, two shipped capabilities (`channel-intelligence.js`, `quality-gate.js`) each hand-rolled their own Anthropic call and `ai_activity_log` write instead of calling `sendRequest()` — duplicating logic that already existed generically. The root cause is on record in the `S-APPLE-02b` kickoff doc, which directed a session to read `request-receivable.js` "as precedent only, not imported or modified" and copy its pattern into a new file. **That instruction, and that pattern, is the anti-pattern this section bans.** If existing shared Layer 3 pipeline code doesn't yet support what a new capability needs, the correct move is to extend the shared code generically (gated by data or parameters, never by agent or capability identity) — not to copy it. If a genuine extension isn't possible, that is itself a decision requiring explicit sign-off from John in the design session, never a silent workaround.
+
+**Cross-capability handoff stays out of the executor, by design.** A capability's result may carry a routing signal (quality-gate's `guardrail.result: 'block'` triggering a retry; the Intake Assistant's `route_to: ['reasoner', 'data-expert']`). `execute.js` does not act on these — reading a result and deciding to make a follow-up call to a different `capability_slug` is Layer 2's job (the calling screen), the same way a Work Order Step already declares `consumes: [deliverable_id]` to chain on a prior Deliverable (§2). This keeps the executor itself permanently free of capability-specific branching, no matter how many capabilities get built on it.
+
+**Migration status:** `channel-intelligence.js` and `quality-gate.js` are being retrofitted onto `execute.js` and retired as standalone routes (`S-CAPABILITY-EXEC-01`/`02`). `hypothesis-evaluation` and `pipeline-triage` (`S-APPLE-03`) are built directly as Skill Profile data from day one — neither ever gets its own route file. Once the retrofit lands, `SH-11` (`FEATURES.md`) is permanently resolved, not patched: new capabilities cost zero serverless functions, structurally, going forward.
 
 ---
 
