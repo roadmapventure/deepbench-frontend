@@ -574,6 +574,19 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+## STRUCTURAL ENFORCEMENT — SE
+> New prefix, opened by `S-ARCH-AUDIT-01-design` (2026-07-02). Groups every `ARCHITECTURE.md`/`STANDARDS.md` rule found stated in prose but not backed by any code/schema check — the audit's finding, not a build gap. Each row below turns a discipline-only rule into a repeatable, automatable check. See `S-ARCH-AUDIT-01-design` in `CLAUDE-STATE.md`/`docs/SESSIONS.md` for the full walk of every LOCKED section (most were already fine — either genuinely discipline-only with no automatable form, or already structurally enforced, e.g. `logAICall()` via the Generic Capability Executor).
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SE-01 | Boundary Enforcement Grep — repo-grep check script covering `ARCHITECTURE.md` §5 ("no capability route calls `/api/rag-query` via internal HTTP — all RAG retrieval imports `queryRAG` from `api/lib/rag.js` directly") and §6 ("no AI calls in Railway backend, no Playwright imports in Vercel `api/`"). Turns the one-time hardcoded-agent-routing grep (run manually 2026-07-02, clean) into a permanent, rerunnable script covering these two boundary rules. | ❌ Missing | S-ARCH-ENFORCE-01 (design required) |
+| SE-02 | Shared-Pipeline No-Conditionals Grep — repo-grep check script covering §19's Founding Principle ("no `if(agentId===)` / `if(deliverable_type===)` inside `db-assembly.js`/`ai-enrichment.js`/`request-receivable.js`") and §19b ("`execute.js` contains zero capability-specific logic, ever — no `if(capability_slug===)`"). This is the exact anti-pattern that already caused the `channel-intelligence.js`/`quality-gate.js` drift once (retired via S-CAPABILITY-EXEC-01/02) — a permanent check prevents it recurring silently. | ❌ Missing | S-ARCH-ENFORCE-02 (design required) |
+| SE-03 | Agent Build Completeness Node Test — persistent (not delete-before-commit) Node test asserting every entry in `AGENTS` (`src/data/agents.js`) has all 23 required fields (STANDARDS.md §11) plus a matching `AVATAR_CFG` and `AGENT_PRONOUNS` entry. Root cause this closes: Victoria Chen shipped without standard fields and crashed `RosterScreen` on `trainableBy.toUpperCase()` — the rule was written down reactively after the fact and has had zero machine enforcement since. | ❌ Missing | S-ARCH-ENFORCE-03 (design required) |
+| SE-04 | Format Skill Exclusivity Data Audit — check script querying live Supabase (`capability_skill_profiles` joined to `skill_profiles` where `skill_type_slug = 'format'`, joined to `agent_capability_assignments`) confirming every Format Skill Profile is assigned only to a display/editor agent (Screen Controls, HTML Display, PDF Assembly), never a content specialist. Enforces STANDARDS.md §13 rule 14 / `ARCHITECTURE.md` §19 ("content specialists never own Format Skills") — currently nothing but discipline stops a future assignment from violating it. | ❌ Missing | S-ARCH-ENFORCE-04 (design required) |
+| SE-05 | Serverless Function Count Check Script — wraps the `find api -name "*.js" | grep -v "/_lib/" | wc -l` command (currently run by hand and typed into each kickoff doc) into a small checked script that fails/warns above the Vercel Hobby 12-function ceiling. Trivial, but every kickoff doc references this count manually today with no automated guard. | ❌ Missing | S-ARCH-ENFORCE-05 (design required) |
+
+---
+
 
 ## Full Session Order
 
