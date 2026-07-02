@@ -1,8 +1,9 @@
-// DeepBench v5.3.14 | api/prompt/ai-enrichment.js | S-APPLE-02b — debug.librarian_tier passthrough (fetchSection() set _librarian_tier per-section but enrichPrompt() never surfaced it on the returned debug object; scope expansion approved by John)
+// DeepBench v6.0.0 | api/prompt/ai-enrichment.js | S-APPLE-02b — debug.librarian_tier passthrough (fetchSection() set _librarian_tier per-section but enrichPrompt() never surfaced it on the returned debug object; scope expansion approved by John)
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
 import { queryLibrary } from "../../lib/librarian.js";
+import { getRosterCandidates } from "../../lib/project-manager.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -30,7 +31,9 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
       // fallback branch for this value -- unlike the retired fi.broker opt-in, a the_Library-targeting
       // fetch_instruction cannot silently fall through to a direct call, because queryRAG() (the other
       // branch) cannot reach the_Library at all anymore -- the data physically isn't in that table.
-      const result = fi.source === "the_library"
+      const result = fi.source === "roster"
+        ? await fetchWithTimeout(getRosterCandidates({ requestingAgentId }), RAG_TIMEOUT_MS)
+        : fi.source === "the_library"
         ? await fetchWithTimeout(
             queryLibrary({
               requestingAgentId,
@@ -54,7 +57,7 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
-        _rag_scope_effective: fi.source === "the_library" ? "the_library" : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
+        _rag_scope_effective: fi.source === "roster" ? "roster" : fi.source === "the_library" ? "the_library" : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
         _librarian_tier: result._librarian?.tier || null,
       };
     } catch (e) {
