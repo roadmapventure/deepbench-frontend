@@ -1,4 +1,4 @@
-// DeepBench v5.3.9 | useAIActivity.js | AI-41 — project-manager AI_TYPE_TO_SERVICE entry + AI_TYPE_TO_SERVICE export
+// DeepBench v5.3.10 | useAIActivity.js | AG-28 — hypothesis-evaluation SERVICE_CATALOG entry (Priya Nair, Generate Hypotheses)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -44,6 +44,13 @@ export const SERVICE_CATALOG = [
   { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG'],                                  roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
   { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier'], roadmap: 'now'  },
+  // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
+  // RAG listed at capability level even though this specific call's design doc technical_services
+  // don't name it — hyp-knowledge fires a RAG fetch unconditionally, same accepted behavior as
+  // channel-intelligence's ci-routing-intent (Section 2 above). No AI_TYPE_TO_SERVICE entry needed:
+  // ai_type will equal capability_slug ('hypothesis-evaluation') exactly, resolved by the existing
+  // `|| e.type` fallback (line 280) — same pattern as channel-intelligence/quality-gate.
+  { slug: 'hypothesis-evaluation',   name: 'Hypothesis Evaluation',     serviceType: 'ai',     patterns: ['Structured Output', 'RAG'], roadmap: 'now'  },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
