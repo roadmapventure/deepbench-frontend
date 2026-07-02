@@ -70,12 +70,19 @@ function buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRe
   };
 }
 
-// FEATURE: AA-87 -- harness recognizes exactly two literal tool names as delegate calls. No
-// data-driven match against a delegates array anymore -- that array no longer exists.
-function parseModelTurn(responseData, tools) {
-  if (tools.length > 0) {
-    const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
-    if (!toolUseBlock) throw new Error('No tool_use block in response');
+// FEATURE: AA-97 -- accepts a plain-text final turn whenever no schema tool was offered
+// (hasSchemaTool=false). tool_choice is 'auto' in that regime (harnessTools present, no
+// schemaTool) -- the model is always allowed to finish with text instead of a tool call, but
+// the old branch (keyed on tools.length > 0) required a tool_use block whenever ANY tools were
+// offered, making it structurally impossible for a can_request_help capability with no schema
+// (e.g. hyp-stress-test-intent) to ever end its own loop turn -- it could only call
+// request_help/delegate_to_agent, looping to depth_exceeded. Root-caused live in
+// S-ARCH-AGENT-LOOP-02 (Priya's hyp-stress-test-intent, first real profile to combine
+// can_request_help with no schema). No ARCHITECTURE.md change -- §19d never required a schema
+// alongside can_request_help, this is a parser gap, not a design change. ARCHITECTURE.md §19d.
+export function parseModelTurn(responseData, hasSchemaTool) {
+  const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
+  if (toolUseBlock) {
     const isHarnessTool = toolUseBlock.name === 'request_help' || toolUseBlock.name === 'delegate_to_agent';
     return {
       is_delegate_call: isHarnessTool,
@@ -84,6 +91,7 @@ function parseModelTurn(responseData, tools) {
       tool_input: toolUseBlock.input,
     };
   }
+  if (hasSchemaTool) throw new Error('No tool_use block in response');
   const textBlock = responseData.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text block in response');
   return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
@@ -103,6 +111,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
     : null;
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
+  const hasSchemaTool = !!schemaTool;
 
   const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp, conversation_history });
 
@@ -119,7 +128,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   let turn;
 
   try {
-    turn = parseModelTurn(llmData, tools);
+    turn = parseModelTurn(llmData, hasSchemaTool);
   } catch (parseErr) {
     if (tools.length > 0) {
       retryCount = 1;
@@ -131,7 +140,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
       if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
       llmData = await retryRes.json();
       usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
-      turn = parseModelTurn(llmData, tools);
+      turn = parseModelTurn(llmData, hasSchemaTool);
     } else {
       throw Object.assign(new Error('Parse failed'), { status: 422, detail: parseErr.message });
     }
