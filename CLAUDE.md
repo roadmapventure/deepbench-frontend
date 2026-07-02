@@ -22,4 +22,4 @@
 > **Hard rule:** Never merge `dev → main` without John's explicit sign-off.
 > **Hard rule:** One feature per session. Max 3 files. Max 4 tasks.
 > **Hard rule:** Every coding session must be preceded by a design session that produced a kickoff doc.
-> **Hard rule:** For git commands, always use `git -C "C:/Projects/deepbench-frontend" <command>` — never `cd "C:/Projects/deepbench-frontend" && git <command>`. The `cd &&` form triggers a hardcoded, non-suppressible permission prompt with no Always-allow option.
+> **Hard rule:** Never write `cd "C:/Projects/deepbench-frontend" && <command>` in a Bash call. Any `cd && ...` compound — not just git — can trigger a hardcoded, non-suppressible permission prompt with no Always-allow option (confirmed for `cd && git ...` and `cd && grep ... | ...`). Instead, pass the path directly as an argument to the command (`git -C "path" <command>`, `grep -rn "pattern" "path/subdir1" "path/subdir2"`, etc.) so no directory change occurs at all.
