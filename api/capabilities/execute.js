@@ -1,4 +1,4 @@
-// DeepBench v5.3.11 | api/capabilities/execute.js | S-APPLE-03a-2 — generalized format-last support (AA-77)
+// DeepBench v6.0.0 | api/capabilities/execute.js | S-APPLE-03a-2 — generalized format-last support (AA-77)
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -10,9 +10,14 @@
 
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
-import { sendRequest } from '../prompt/request-receivable.js';
+import { sendRequest, callModel } from '../prompt/request-receivable.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
+
+// FEATURE: AA-80 — platform-level hard ceiling on delegate hops per top-level request. Not
+// data-overridable by any Skill Profile — infrastructure, same category as the maxDuration/
+// AbortSignal.timeout() limits already in request-receivable.js. ARCHITECTURE.md §19d.
+const MAX_LOOP_DEPTH = 5;
 
 function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
@@ -86,6 +91,7 @@ export async function runCapability({
   enrichment_capability_slug = null,
   format_skill_profile_slug = null,
   display_agent_id = null,
+  _hop_counter = null,
 }) {
   if (!capability_slug) throw new Error('capability_slug required');
   if (!agent_id) throw new Error('agent_id required');
@@ -119,9 +125,94 @@ export async function runCapability({
     display_agent_card = displayAgentCard;
   }
 
-  const result = await sendRequest({ prompt_request: enriched, agent_id, capability_slug, tenant_id });
+  // FEATURE: AA-80 — delegates come from promptRequest (db-assembly's raw output), never from
+  // `enriched` -- ai-enrichment.js rebuilds its return object and does not pass unknown fields
+  // through. Confirmed via source read, S-ARCH-AGENT-LOOP-01-design. ARCHITECTURE.md §19d.
+  const delegates = promptRequest.delegates || [];
 
-  return { ...result, display_agent_card, display_agent_id: display_agent_id || null };
+  // Every capability without available_delegates data takes exactly this path it always has:
+  // one callModel() turn, sendRequest() finalizes. Zero behavior change when delegates=[].
+  let conversationHistory = [];
+  let delegationOccurred = false;
+  const delegateRoundCounts = {};
+
+  // FEATURE: AA-80 — _hop_counter is a single object shared across the entire recursive
+  // runCapability() chain (never recreated per call), so ARCHITECTURE.md §19d's "hard ceiling on
+  // total delegate hops per top-level request" is enforced against the whole call tree, not just
+  // this invocation's own turns. A local per-invocation depth range does not satisfy this: a
+  // delegate that (directly or via a cycle) targets its own capability would spawn a fresh range
+  // on every recursive call, producing unbounded (or combinatorial) hops instead of a hard total.
+  // Internal-only param: every external caller omits it and gets a fresh { n: 0 } counter.
+  const hopCounter = _hop_counter || { n: 0 };
+
+  for (let depth = 0; ; depth++) {
+    const turn = await callModel({
+      systemPrompt: enriched.system_prompt,
+      model: enriched.llm.model,
+      max_tokens: enriched.llm.max_tokens,
+      format_contract: enriched.format_contract,
+      delegates,
+      conversation_history: conversationHistory,
+    });
+
+    if (!turn.is_delegate_call) {
+      const result = await sendRequest({
+        prompt_request: enriched, agent_id, capability_slug, tenant_id,
+        precomputed_turn: turn, delegation_occurred: delegationOccurred,
+      });
+      return { ...result, display_agent_card, display_agent_id: display_agent_id || null };
+    }
+
+    const { delegate } = turn;
+
+    // FEATURE: AA-80 — per-relationship cap is data (delegate.max_delegate_rounds), checked
+    // before the platform's hard ceiling ever matters for a well-behaved delegate relationship.
+    const roundsSoFar = delegateRoundCounts[turn.tool_name] || 0;
+    if (delegate.max_delegate_rounds != null && roundsSoFar >= delegate.max_delegate_rounds) {
+      return { status: 'delegate_round_limit', tool_name: turn.tool_name, limit: delegate.max_delegate_rounds, depth, agent_id, capability_slug };
+    }
+    delegateRoundCounts[turn.tool_name] = roundsSoFar + 1;
+
+    // FEATURE: AA-80 — honest failure, never silent truncation. Checked against the shared
+    // hopCounter (total hops across the whole call tree), not a local per-invocation range, so
+    // a delegate that (directly or via a cycle) targets its own capability still terminates at
+    // exactly MAX_LOOP_DEPTH total dispatches. ARCHITECTURE.md §19d.
+    if (hopCounter.n >= MAX_LOOP_DEPTH) {
+      return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+    }
+    hopCounter.n++;
+
+    if (delegate.requires_human_confirmation) {
+      let critique = null;
+      if (delegate.critique_agent) {
+        critique = await runCapability({
+          capability_slug: delegate.critique_capability_slug,
+          intent_slug: delegate.critique_intent_slug || null,
+          agent_id: delegate.critique_agent,
+          task_context: turn.tool_input,
+          tenant_id,
+          _hop_counter: hopCounter,
+        });
+      }
+      return { status: 'pending_confirmation', proposed_action: turn.tool_input, delegate, critique, depth, agent_id, capability_slug };
+    }
+
+    delegationOccurred = true;
+    const delegateResult = await runCapability({
+      capability_slug: delegate.capability_slug,
+      intent_slug: delegate.intent_slug || null,
+      agent_id: delegate.executing_agent_id,
+      task_context: turn.tool_input,
+      tenant_id,
+      _hop_counter: hopCounter,
+    });
+
+    conversationHistory = [
+      ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
+      { role: 'assistant', content: turn.raw_content },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: turn.tool_use_id, content: JSON.stringify(delegateResult) }] },
+    ];
+  }
 }
 
 export default async function handler(req, res) {

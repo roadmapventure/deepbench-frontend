@@ -1,4 +1,4 @@
-// DeepBench v5.3.14 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration)
+// DeepBench v6.0.0 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -32,6 +32,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
   let synthesisPromptText = null;
   let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
   let llm = { ...DEFAULT_LLM };
+  let delegates = [];
 
   for (const sp of skillProfiles) {
     const typeSlug = sp.skill_type_slug;
@@ -125,6 +126,13 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
             guardrails: sp.guardrails || { must: [], must_not: [] },
           };
         }
+
+        // FEATURE: AA-80 — available_delegates passthrough, ARCHITECTURE.md §19d. Read from
+        // the calling agent's own targeted Intent Skill Profile, same gate as traits.schema
+        // above -- never from any other Intent-type profile that happens to be stacked in.
+        if (Array.isArray(traits.available_delegates)) {
+          delegates = traits.available_delegates;
+        }
       }
 
     } else if (typeSlug === "format") {
@@ -216,7 +224,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
-  return { sections, formatContract, synthesis, llm };
+  return { sections, formatContract, synthesis, llm, delegates };
 }
 
 function buildLabel(typeSlug, name) {
@@ -252,6 +260,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       format_contract: DEFAULT_FORMAT_CONTRACT,
       synthesis: DEFAULT_SYNTHESIS,
       llm: DEFAULT_LLM,
+      delegates: [],
     };
   }
 
@@ -357,7 +366,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, delegates } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — WORK ORDER section: goal + deliverable_type always present when goal exists
   const goalText = typeof task_context === 'object' && task_context !== null
@@ -402,6 +411,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     format_contract: formatContract,
     synthesis,
     llm,
+    delegates: delegates || [],
   };
 }
 
