@@ -1,4 +1,4 @@
-// DeepBench v5.3.6 | api/prompt/db-assembly.js | S-APPLE-02b — intent_slug filter (ARCHITECTURE.md §2) + traits.broker passthrough (closes S-LIBRARIAN-01b's stated gap)
+// DeepBench v5.3.8 | api/prompt/db-assembly.js | S-CAPABILITY-EXEC-01 — Intent Skill Profile llm/schema (AA-75)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -24,7 +24,7 @@ function getSupabaseHeaders(key) {
   };
 }
 
-function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
+function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlug) {
   const sections = [];
   let reflectSection = null;
   let synthesisEnabled = false;
@@ -95,6 +95,38 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow) {
       if (sp.method) intentParts.push(sp.method);
       if (traits.analysis_instructions) intentParts.push(traits.analysis_instructions);
       content = intentParts.length ? intentParts.join("\n") : null;
+
+      // FEATURE: AA-75/AA-76 — Intent Skill Profiles can carry their own llm/schema data,
+      // mirroring the format branch below (~line 114). Content-specialist capabilities are
+      // barred from owning a Format Skill (ARCHITECTURE.md §19), so this is their only
+      // data-driven path to per-call model/max_tokens/schema selection. Gated on
+      // sp.slug === intentSlug (the SP the caller explicitly targeted via intent_slug) —
+      // NOT just "llm_model happens to be set" — because several other Intent Skill Profiles
+      // (e.g. dan-ai-enrichment's prompt-synthesis) already carry inert llm_model/max_tokens
+      // values from when those columns were added platform-wide. Without this gate those
+      // stray values would silently override the primary capability's llm selection whenever
+      // they're loaded as one of several stacked Intent-type profiles (verified live: this
+      // downgraded project-manager's Work Order flow from sonnet-4-6 to haiku-4-5 before the
+      // gate was added). Byte-identical for every caller that doesn't pass intent_slug.
+      if (intentSlug && sp.slug === intentSlug) {
+        if (sp.llm_provider || sp.llm_model) {
+          llm = {
+            provider: sp.llm_provider || DEFAULT_LLM.provider,
+            model: sp.llm_model || DEFAULT_LLM.model,
+            max_tokens: sp.max_tokens || DEFAULT_LLM.max_tokens,
+            api_key_source: sp.api_key_source || DEFAULT_LLM.api_key_source,
+          };
+        }
+        if (traits.schema) {
+          formatContract = {
+            output_type: "json",
+            skill_profile_slug: sp.slug,
+            schema: traits.schema,
+            handler: traits.handler || "store",
+            guardrails: sp.guardrails || { must: [], must_not: [] },
+          };
+        }
+      }
 
     } else if (typeSlug === "format") {
       const outputType = traits.output_type || "html";
@@ -326,7 +358,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow);
+  const { sections, formatContract, synthesis, llm } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — WORK ORDER section: goal + deliverable_type always present when goal exists
   const goalText = typeof task_context === 'object' && task_context !== null
