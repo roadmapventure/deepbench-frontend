@@ -3,16 +3,16 @@
 
 **Version in dev:** v5.3.14
 
-**Next session:** S-APPLE-04a-design — Data Expert Escalate (§5.5). Apple Demo Track resumes; the Structural Enforcement Track (spawned by `S-ARCH-AUDIT-01-design`) is deliberately interleaved later, not blocking — no SE- item is a prerequisite for Apple track work, since the manual Architect Review process already covers the same rules SE-01–05 would automate. See Session Queue below for both tracks.
+**Next session:** S-ARCH-AGENT-LOOP-01 (v6.0.0) — The Agent Loop harness build (`execute.js`/`request-receivable.js` generic multi-turn loop + consequential-action gate). Architecture locked this session (`S-ARCH-AGENT-LOOP-01-design`, `ARCHITECTURE.md` §19d, supersedes §19b's screen-handoff paragraph) — **`S-APPLE-04a` is paused, not next.** Kickoff doc pending final mechanism confirmation with John before commit.
 
-**Then:** S-APPLE-04b (Data Integrity Patch, §5.6) → S-APPLE-04c (Demo Reset mechanism only, §7 — UI control deferred to S-MARKET-INTEL-01/03) → S-APPLE-05 (The Reasoner — Memory Consolidation + loop-closure verification) → Structural Enforcement Track (S-ARCH-ENFORCE-03 → 04 → 01 → 02 → 05, see below) → S-MARKET-INTEL-01/02/03.
+**Then:** S-ARCH-AGENT-LOOP-02 (Market Intelligence agent Skill Profile data — Marcus orchestrator role, Priya/Nadia signals, Owen critique role) → S-ARCH-AGENT-LOOP-03 (retrofit `channel-intelligence`/`hypothesis-evaluation`/`pipeline-triage`/`quality-gate`, MI-scoped only) → S-APPLE-04a (Data Expert Escalate, §5.5 — now built on the Agent Loop foundation) → S-APPLE-04b (Data Integrity Patch, §5.6) → S-APPLE-04c (Demo Reset mechanism only, §7 — UI control deferred to S-MARKET-INTEL-01/03) → S-APPLE-05 (The Reasoner — Memory Consolidation + loop-closure verification) → Structural Enforcement Track (S-ARCH-ENFORCE-03 → 04 → 01 → 02 → 05, see below) → S-MARKET-INTEL-01/02/03.
 
 **Last 3 sessions:**
+- S-ARCH-AGENT-LOOP-01-design (v6.0.0, 2026-07-02) — Design-only. Locked `ARCHITECTURE.md` §19d (The Agent Loop — True Agentic Orchestration), superseding §19b's screen-handoff paragraph. Surfaced mid-`S-APPLE-04a` design pass — cross-capability handoff was being pushed to Layer 2 (screen) scripting, not real agent-initiated delegation via tool use, required architecture since the NIGP build's inception. `FEATURES.md` AA-80/81/82 + `SE-02` extension logged. Kickoff doc written for `S-ARCH-AGENT-LOOP-01`. Full detail: `docs/SESSIONS.md`.
 - S-ARCH-AUDIT-01-design (v5.3.14, 2026-07-02) — Design-only. Walked every `ARCHITECTURE.md` LOCKED section + `STANDARDS.md` completeness rule; classified each as code/schema-enforced vs. discipline-only. 5 new `SE-` (Structural Enforcement) backlog items logged to `FEATURES.md`, sequenced as their own track below. Full detail: `docs/SESSIONS.md`.
 - S-LIBRARIAN-03 (v5.3.14, c3b0d72, 2026-07-02) — `AG-30` ✅ Done. `the_Library`/`data_rooms` tables built, `knowledge_entries` reverted to 34 rows, `lib/librarian.js` rewritten. Full detail: `docs/SESSIONS.md`.
-- S-LIBRARIAN-03-design (v5.3.14, 2026-07-02) — Design-only. Locked `ARCHITECTURE.md` §19c (`the_Library` vs `knowledge_entries` split). Full detail: `docs/SESSIONS.md`.
 
-Full history (all sessions before this window): `docs/SESSIONS.md` (S-LIBRARIAN-02, S-APPLE-04-design, S-APPLE-03b, S-APPLE-03b-design, S-APPLE-03a-2, S-APPLE-03a-2-design, S-APPLE-03a-1, S-APPLE-03a-1-design, S-CAPABILITY-EXEC-02, S-CAPABILITY-EXEC-02-design, S-CAPABILITY-EXEC-01, S-APPLE-03-design, S-APPLE-02c, S-APPLE-02c-design, S-APPLE-02b, S-APPLE-02b-design — have rolled out of this window; see SESSIONS.md for full detail)
+Full history (all sessions before this window): `docs/SESSIONS.md` (S-LIBRARIAN-03-design, S-LIBRARIAN-02, S-APPLE-04-design, S-APPLE-03b, S-APPLE-03b-design, S-APPLE-03a-2, S-APPLE-03a-2-design, S-APPLE-03a-1, S-APPLE-03a-1-design, S-CAPABILITY-EXEC-02, S-CAPABILITY-EXEC-02-design, S-CAPABILITY-EXEC-01, S-APPLE-03-design, S-APPLE-02c, S-APPLE-02c-design, S-APPLE-02b, S-APPLE-02b-design — have rolled out of this window; see SESSIONS.md for full detail)
 
 **Branch rule:** NEVER merge `dev → main` without John's explicit sign-off.
 
@@ -29,8 +29,14 @@ Full history (all sessions before this window): `docs/SESSIONS.md` (S-LIBRARIAN-
 
 ## Session Queue (short view)
 
-### Apple Demo Track
-> Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md`. No deadline-driven scope cuts by explicit direction — sequenced for correctness.
+### Agent Loop Track [v6.0.0 — blocks Apple Demo Track resumption]
+> Opened `S-ARCH-AGENT-LOOP-01-design` (2026-07-02). `ARCHITECTURE.md` §19d (LOCKED), `FEATURES.md` AA-80/81/82. True agent-initiated delegation (tool-based, multi-turn loop) replacing the screen-scripted handoff model §19b previously specified. Required architecture since the NIGP build's inception — corrected here before any Market Intelligence capability shipped against the old model.
+- S-ARCH-AGENT-LOOP-01 (v6.0.0) — The Agent Loop harness: generic multi-turn loop + consequential-action gate in `execute.js`/`request-receivable.js` (AA-80), plus SE-02 grep extension. **Next session.**
+- S-ARCH-AGENT-LOOP-02 — Market Intelligence agent Skill Profile data: Marcus (orchestrator), Priya/Nadia (self-assessment signals), Owen (critique role) (AA-81)
+- S-ARCH-AGENT-LOOP-03 — Retrofit `channel-intelligence`/`hypothesis-evaluation`/`pipeline-triage`/`quality-gate` onto the loop model, MI-scoped only (AA-82)
+
+### Apple Demo Track [paused — resumes after Agent Loop Track lands]
+> Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md`. No deadline-driven scope cuts by explicit direction — sequenced for correctness. `S-APPLE-04a` onward now builds on the Agent Loop foundation (v6.0.0), not the superseded single-shot/screen-handoff model.
 - S-APPLE-01a (v5.3.0) — 6 agent personas (identity only) in agents.js + Supabase `agents` rows: Marcus Webb, Priya Nair, Nadia Farouk, Owen Marsh, Sam Reyes, Elena Cho (AG-18/19/20/21/22/23) ✅ done (cfbf431)
 - S-APPLE-01b — Data Room seed (20 rows) + versioning/confidence-tier schema migration (10 new columns) ✅ done (7dbba0b). **Corrected `S-LIBRARIAN-03`:** the 20 rows + 10 columns were added onto `knowledge_entries` (wrong table — that's the production personal-training store); moved to a new dedicated `the_Library` table, `ARCHITECTURE.md` §19c.
 - S-LIBRARIAN-01a — Eleanor Voss (LB-01) persona + `lib/librarian.js` `queryLibrary()` broker ✅ done (542b1fe)
