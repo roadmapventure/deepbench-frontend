@@ -1,4 +1,4 @@
-// DeepBench v5.2.19 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support
+// DeepBench v5.3.9 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
@@ -255,12 +255,17 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   const patternsUsed = buildPatternsUsed(isJson, guardrailsRan);
   const latency_ms = Date.now() - startTime;
 
+  // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
+  // directly for channel-intelligence/quality-gate today, needs zero new AI_TYPE_TO_SERVICE entries
+  // for either) instead of the hardcoded 'request-receivable' literal, which previously collapsed
+  // every capability's calls into one undifferentiated AI Audit bucket. Fallback preserved for the
+  // unreachable case where capability_slug is somehow absent.
   await fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
     method: 'POST',
     headers: supabaseHeaders,
     body: JSON.stringify({
       tenant_id: tenant_id || 'global',
-      ai_type: 'request-receivable',
+      ai_type: capability_slug || 'request-receivable',
       feature: 'request-receivable',
       model,
       agent_id: agent_id || null,

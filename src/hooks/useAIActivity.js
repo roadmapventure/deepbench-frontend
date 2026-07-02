@@ -1,4 +1,4 @@
-// DeepBench v5.3.6 | useAIActivity.js | MI-10/MI-11 — channel-intelligence SERVICE_CATALOG + AI_TYPE_TO_SERVICE entries
+// DeepBench v5.3.9 | useAIActivity.js | AI-41 — project-manager AI_TYPE_TO_SERVICE entry + AI_TYPE_TO_SERVICE export
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -76,7 +76,7 @@ export const PATTERN_CATALOG = [
 ];
 
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
-const AI_TYPE_TO_SERVICE = {
+export const AI_TYPE_TO_SERVICE = {
   rag_briefing:   'prompt-assembly',
   planning:       'task-planning',
   routing:        'agent-routing',
@@ -98,6 +98,12 @@ const AI_TYPE_TO_SERVICE = {
   ci_routing:           'channel-intelligence',
   ci_answer:            'channel-intelligence',
   quality_gate_review: 'quality-gate',
+  // FEATURE: AI-41 — plan.js's capability_slug defaults to 'project-manager' (api/plan.js line 130),
+  // which now flows through as ai_type per request-receivable.js's Task 2 fix. No SERVICE_CATALOG
+  // slug named 'project-manager' exists — its calls belong under the existing 'task-planning' entry.
+  // channel-intelligence and quality-gate need no new entry here: their capability_slug values
+  // already equal their SERVICE_CATALOG slugs exactly, resolved by the existing `|| e.type` fallback.
+  'project-manager': 'task-planning',
 };
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
