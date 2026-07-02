@@ -3,9 +3,9 @@
 
 **Version in dev:** v5.3.14
 
-**Next session:** S-ARCH-ENFORCE-01-design — first of 5 Structural Enforcement sessions spawned by `S-ARCH-AUDIT-01-design`'s findings. See Session Queue below (Structural Enforcement Track) for the full list and suggested order.
+**Next session:** S-APPLE-04a-design — Data Expert Escalate (§5.5). Apple Demo Track resumes; the Structural Enforcement Track (spawned by `S-ARCH-AUDIT-01-design`) is deliberately interleaved later, not blocking — no SE- item is a prerequisite for Apple track work, since the manual Architect Review process already covers the same rules SE-01–05 would automate. See Session Queue below for both tracks.
 
-**Then:** S-APPLE-04a (Data Expert Escalate, §5.5) → S-APPLE-04b (Data Integrity Patch, §5.6) → S-APPLE-04c (Demo Reset mechanism only, §7 — UI control deferred to S-MARKET-INTEL-01/03) → S-APPLE-05 (The Reasoner — Memory Consolidation + loop-closure verification).
+**Then:** S-APPLE-04b (Data Integrity Patch, §5.6) → S-APPLE-04c (Demo Reset mechanism only, §7 — UI control deferred to S-MARKET-INTEL-01/03) → S-APPLE-05 (The Reasoner — Memory Consolidation + loop-closure verification) → Structural Enforcement Track (S-ARCH-ENFORCE-03 → 04 → 01 → 02 → 05, see below) → S-MARKET-INTEL-01/02/03.
 
 **Last 3 sessions:**
 - S-ARCH-AUDIT-01-design (v5.3.14, 2026-07-02) — Design-only. Walked every `ARCHITECTURE.md` LOCKED section + `STANDARDS.md` completeness rule; classified each as code/schema-enforced vs. discipline-only. 5 new `SE-` (Structural Enforcement) backlog items logged to `FEATURES.md`, sequenced as their own track below. Full detail: `docs/SESSIONS.md`.
@@ -56,7 +56,7 @@ Full history (all sessions before this window): `docs/SESSIONS.md` (S-LIBRARIAN-
 - S-MARKET-INTEL-03 — Apple AI Audit section + Available Data panel full (MI-06)
 
 ### Structural Enforcement Track
-> Spawned by `S-ARCH-AUDIT-01-design` (2026-07-02). Each session turns one discipline-only `ARCHITECTURE.md`/`STANDARDS.md` rule into a repeatable, automatable check — see `FEATURES.md` STRUCTURAL ENFORCEMENT — SE section for full detail. Suggested order below (not yet confirmed with John): cheapest / highest-proven-risk first.
+> Spawned by `S-ARCH-AUDIT-01-design` (2026-07-02). Each session turns one discipline-only `ARCHITECTURE.md`/`STANDARDS.md` rule into a repeatable, automatable check — see `FEATURES.md` STRUCTURAL ENFORCEMENT — SE section for full detail. **Deliberately deferred behind the Apple Demo Track** (John, 2026-07-02) — no SE- item blocks Apple track work; resumes after S-APPLE-05. Order below confirmed: cheapest / highest-proven-risk first.
 - S-ARCH-ENFORCE-03 (design required) — Agent Build Completeness Node test (`SE-03`, STANDARDS.md §11) — prioritized first: this rule already caused one real production crash (Victoria Chen/`RosterScreen`)
 - S-ARCH-ENFORCE-04 (design required) — Format Skill Exclusivity data audit (`SE-04`, §13 rule 14 / §19)
 - S-ARCH-ENFORCE-01 (design required) — Boundary Enforcement grep: Adapter Layer + Frontend/Backend Distribution (`SE-01`, §5 + §6)
