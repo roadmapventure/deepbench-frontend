@@ -1,8 +1,12 @@
-// DeepBench v5.3.5 | load-entries.js | SH-11 — merged POST (ingest) handler; ingest.js retired to stay within Vercel Hobby 12-function limit
+// DeepBench v5.3.13 | load-entries.js | SH-11 — merged POST (ingest) handler; ingest.js retired to stay within Vercel Hobby 12-function limit
 // FEATURE: PE-03 — Training tab live wiring
 // FEATURE: PE-11 — Edit Course inline sub-view
 // FEATURE: SH-11 — Merged from ingest.js (2026-07-01) — second merge into this file, see history below
 // Merged from knowledge-entry.js to stay within Vercel Hobby 12-function limit
+// FEATURE: AG-27 — POST handler extracted to lib/knowledge-write.js's embedAndUpsertEntry(),
+// shared with writeLibrary()'s insert operation. GET/PATCH/DELETE untouched.
+
+import { embedAndUpsertEntry } from '../lib/knowledge-write.js';
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -25,94 +29,16 @@ export default async function handler(req, res) {
 
   try {
     // ── POST — embed and upsert a new knowledge entry ─────────────────────────
-    // FEATURE: SH-11 — merged from ingest.js unchanged
     if (req.method === "POST") {
-      if (!openaiKey) return res.status(500).json({ error: "OPENAI_API_KEY not configured" });
-
-      const {
-        id, title, category, jurisdiction, priority,
-        triggers, content, status, tenant_id,
-        agent_id, teaching_note,
-        data_type, citeable, is_baseline, supersedes_id, confidence, override_flag,
-        geo, program_area, partner_id, period,
-      } = req.body;
-
-      if (!title || !content) {
-        return res.status(400).json({ error: "title and content are required" });
+      try {
+        const saved = await embedAndUpsertEntry(req.body);
+        return res.status(200).json({ success: true, entry: saved });
+      } catch (err) {
+        // Preserves the pre-extraction status code: 400 for the one client-input validation
+        // error, 500 for everything else (config/embedding/upsert failures) — Category M.
+        const status = err.message === "title and content are required" ? 400 : 500;
+        return res.status(status).json({ error: err.message });
       }
-
-      const MAX_EMBED_CHARS = 12000;
-      const truncatedContent = content.length > MAX_EMBED_CHARS
-        ? content.slice(0, MAX_EMBED_CHARS) + " [truncated for embedding]"
-        : content;
-
-      const cleanedContent = truncatedContent
-        .replace(/[^\x20-\x7E\n\r]/g, " ")
-        .replace(/\s{3,}/g, "  ")
-        .trim();
-
-      const textToEmbed = `${title}\n\n${cleanedContent}`;
-
-      const embeddingRes = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({ model: "text-embedding-3-small", input: textToEmbed }),
-      });
-
-      if (!embeddingRes.ok) {
-        const err = await embeddingRes.text();
-        return res.status(500).json({ error: "OpenAI embedding failed: " + err.slice(0, 200) });
-      }
-
-      const embeddingData = await embeddingRes.json();
-      const embedding = embeddingData.data?.[0]?.embedding;
-      if (!embedding) return res.status(500).json({ error: "No embedding returned from OpenAI" });
-
-      const payload = {
-        title,
-        category:      category      || "Compliance",
-        jurisdiction:  jurisdiction  || "All",
-        priority:      priority      || 50,
-        triggers:      triggers      || [],
-        content,
-        embedding,
-        status:        status        || "active",
-        tenant_id:     tenant_id     || "global",
-        agent_id:      agent_id      || "legacy",
-        teaching_note: teaching_note || null,
-        data_type:     data_type     || "sourced",
-        citeable:      citeable      === undefined ? true : citeable,
-        is_baseline:   is_baseline   || false,
-        supersedes_id: supersedes_id || null,
-        confidence:    confidence    || null,
-        override_flag: override_flag === undefined ? null : override_flag,
-        geo:           geo           || null,
-        program_area:  program_area  || null,
-        partner_id:    partner_id    || null,
-        period:        period        || null,
-      };
-
-      if (id) payload.id = id;
-
-      const upsertRes = await fetch(
-        `${supabaseUrl}/rest/v1/knowledge_entries?on_conflict=id`,
-        {
-          method: "POST",
-          headers: { ...headers, "Prefer": "resolution=merge-duplicates,return=representation" },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!upsertRes.ok) {
-        const err = await upsertRes.text();
-        return res.status(500).json({ error: "Supabase upsert failed: " + err.slice(0, 200) });
-      }
-
-      const saved = await upsertRes.json();
-      return res.status(200).json({ success: true, entry: saved?.[0] || payload });
     }
 
     // ── GET — fetch and format knowledge entries for an agent ─────────────────
