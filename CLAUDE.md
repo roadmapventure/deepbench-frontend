@@ -22,3 +22,4 @@
 > **Hard rule:** Never merge `dev → main` without John's explicit sign-off.
 > **Hard rule:** One feature per session. Max 3 files. Max 4 tasks.
 > **Hard rule:** Every coding session must be preceded by a design session that produced a kickoff doc.
+> **Hard rule:** For git commands, always use `git -C "C:/Projects/deepbench-frontend" <command>` — never `cd "C:/Projects/deepbench-frontend" && git <command>`. The `cd &&` form triggers a hardcoded, non-suppressible permission prompt with no Always-allow option.
