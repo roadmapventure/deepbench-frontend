@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration)
+// DeepBench v6.0.0 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration) | S-ARCH-LOOP-PATCH-01 — AA-87 canRequestHelp/confirmation-gate passthrough
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -32,7 +32,10 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
   let synthesisPromptText = null;
   let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
   let llm = { ...DEFAULT_LLM };
-  let delegates = [];
+  let canRequestHelp = false;
+  let requiresHumanConfirmation = false;
+  let critiqueCapabilitySlug = null;
+  let critiqueIntentSlug = null;
 
   for (const sp of skillProfiles) {
     const typeSlug = sp.skill_type_slug;
@@ -127,11 +130,18 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
           };
         }
 
-        // FEATURE: AA-80 — available_delegates passthrough, ARCHITECTURE.md §19d. Read from
-        // the calling agent's own targeted Intent Skill Profile, same gate as traits.schema
-        // above -- never from any other Intent-type profile that happens to be stacked in.
-        if (Array.isArray(traits.available_delegates)) {
-          delegates = traits.available_delegates;
+        // FEATURE: AA-87 -- can_request_help/requires_human_confirmation passthrough,
+        // ARCHITECTURE.md §19d/§19e. Read from the calling agent's own targeted Intent Skill
+        // Profile, same gate as traits.schema above. Replaces the removed available_delegates
+        // array -- no per-relationship data, no agent-naming, just two booleans plus (when the
+        // second is true) a capability_slug/intent_slug to resolve live at dispatch time.
+        if (traits.can_request_help === true) {
+          canRequestHelp = true;
+        }
+        if (traits.requires_human_confirmation === true) {
+          requiresHumanConfirmation = true;
+          critiqueCapabilitySlug = traits.critique_capability_slug || null;
+          critiqueIntentSlug = traits.critique_intent_slug || null;
         }
       }
 
@@ -224,7 +234,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
-  return { sections, formatContract, synthesis, llm, delegates };
+  return { sections, formatContract, synthesis, llm, canRequestHelp, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug };
 }
 
 function buildLabel(typeSlug, name) {
@@ -260,7 +270,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       format_contract: DEFAULT_FORMAT_CONTRACT,
       synthesis: DEFAULT_SYNTHESIS,
       llm: DEFAULT_LLM,
-      delegates: [],
+      canRequestHelp: false,
+      requiresHumanConfirmation: false,
+      critiqueCapabilitySlug: null,
+      critiqueIntentSlug: null,
     };
   }
 
@@ -366,7 +379,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, delegates } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — WORK ORDER section: goal + deliverable_type always present when goal exists
   const goalText = typeof task_context === 'object' && task_context !== null
@@ -411,7 +424,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     format_contract: formatContract,
     synthesis,
     llm,
-    delegates: delegates || [],
+    canRequestHelp,
+    requiresHumanConfirmation,
+    critiqueCapabilitySlug,
+    critiqueIntentSlug,
   };
 }
 

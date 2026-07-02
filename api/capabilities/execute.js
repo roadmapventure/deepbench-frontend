@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/capabilities/execute.js | S-APPLE-03a-2 — generalized format-last support (AA-77)
+// DeepBench v6.0.0 | api/capabilities/execute.js | S-ARCH-LOOP-PATCH-01 — AA-87/AA-83 harness patch
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -21,6 +21,25 @@ const MAX_LOOP_DEPTH = 5;
 
 function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
+}
+
+// FEATURE: AA-87 -- live resolver, replaces the removed executing_agent_id/critique_agent
+// fields. A Skill Profile may only name a capability_slug; the harness resolves who currently
+// holds it at the moment of dispatch, never a static agent reference. Single-holder assumption
+// (AA-93 covers the future multi-holder case -- not built here). ARCHITECTURE.md §19d/§19e.
+async function resolveCapabilityHolder(capability_slug) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase not configured');
+  const headers = getSupabaseHeaders(supabaseKey);
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/agent_capability_assignments?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=agent_id&limit=1`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`Failed to resolve holder of capability "${capability_slug}"`);
+  const rows = await res.json();
+  if (!rows.length) throw new Error(`No agent currently holds capability "${capability_slug}"`);
+  return rows[0].agent_id;
 }
 
 // FEATURE: AA-77 — fetch a display agent's Format Skill by slug and build the override pieces.
@@ -109,10 +128,6 @@ export async function runCapability({
 
   const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug });
 
-  // FEATURE: AA-77 — format-last: a display agent's Format Skill overrides format_contract and
-  // appends an OUTPUT FORMAT section, same single call, same ai_activity_log row (agent_id stays
-  // the requesting agent — the display agent is attributed via display_agent_card in the response,
-  // never a second logged call, per ARCHITECTURE.md §19's "no silent single-agent credit" rule).
   let display_agent_card = null;
   if (format_skill_profile_slug) {
     const { formatContract, formatSection, displayAgentCard } = await fetchFormatOverride({
@@ -125,24 +140,16 @@ export async function runCapability({
     display_agent_card = displayAgentCard;
   }
 
-  // FEATURE: AA-80 — delegates come from promptRequest (db-assembly's raw output), never from
-  // `enriched` -- ai-enrichment.js rebuilds its return object and does not pass unknown fields
-  // through. Confirmed via source read, S-ARCH-AGENT-LOOP-01-design. ARCHITECTURE.md §19d.
-  const delegates = promptRequest.delegates || [];
+  // FEATURE: AA-87 -- canRequestHelp/requiresHumanConfirmation/critique* read from promptRequest
+  // (db-assembly's raw output), never from `enriched` -- same reason the old `delegates` field
+  // bypassed it: ai-enrichment.js rebuilds its own return object and drops unknown fields.
+  const canRequestHelp = promptRequest.canRequestHelp === true;
+  const requiresHumanConfirmation = promptRequest.requiresHumanConfirmation === true;
+  const critiqueCapabilitySlug = promptRequest.critiqueCapabilitySlug || null;
+  const critiqueIntentSlug = promptRequest.critiqueIntentSlug || null;
 
-  // Every capability without available_delegates data takes exactly this path it always has:
-  // one callModel() turn, sendRequest() finalizes. Zero behavior change when delegates=[].
   let conversationHistory = [];
   let delegationOccurred = false;
-  const delegateRoundCounts = {};
-
-  // FEATURE: AA-80 — _hop_counter is a single object shared across the entire recursive
-  // runCapability() chain (never recreated per call), so ARCHITECTURE.md §19d's "hard ceiling on
-  // total delegate hops per top-level request" is enforced against the whole call tree, not just
-  // this invocation's own turns. A local per-invocation depth range does not satisfy this: a
-  // delegate that (directly or via a cycle) targets its own capability would spawn a fresh range
-  // on every recursive call, producing unbounded (or combinatorial) hops instead of a hard total.
-  // Internal-only param: every external caller omits it and gets a fresh { n: 0 } counter.
   const hopCounter = _hop_counter || { n: 0 };
 
   for (let depth = 0; ; depth++) {
@@ -151,11 +158,35 @@ export async function runCapability({
       model: enriched.llm.model,
       max_tokens: enriched.llm.max_tokens,
       format_contract: enriched.format_contract,
-      delegates,
+      canRequestHelp,
       conversation_history: conversationHistory,
     });
 
     if (!turn.is_delegate_call) {
+      // FEATURE: AA-87 -- consequential-action gate now lives on the capability's own final
+      // output (its own Intent Skill Profile traits), not the deleted delegate-object shape.
+      // Critique dispatch resolves live via resolveCapabilityHolder(), same as request_help
+      // below -- never a named agent anywhere in this mechanism. ARCHITECTURE.md §19d.
+      if (requiresHumanConfirmation) {
+        let critique = null;
+        if (critiqueCapabilitySlug) {
+          if (hopCounter.n >= MAX_LOOP_DEPTH) {
+            return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+          }
+          hopCounter.n++;
+          const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
+          critique = await runCapability({
+            capability_slug: critiqueCapabilitySlug,
+            intent_slug: critiqueIntentSlug,
+            agent_id: critiqueAgentId,
+            task_context: turn.tool_input,
+            tenant_id,
+            _hop_counter: hopCounter,
+          });
+        }
+        return { status: 'pending_confirmation', proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
+      }
+
       const result = await sendRequest({
         prompt_request: enriched, agent_id, capability_slug, tenant_id,
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
@@ -163,49 +194,48 @@ export async function runCapability({
       return { ...result, display_agent_card, display_agent_id: display_agent_id || null };
     }
 
-    const { delegate } = turn;
-
-    // FEATURE: AA-80 — per-relationship cap is data (delegate.max_delegate_rounds), checked
-    // before the platform's hard ceiling ever matters for a well-behaved delegate relationship.
-    const roundsSoFar = delegateRoundCounts[turn.tool_name] || 0;
-    if (delegate.max_delegate_rounds != null && roundsSoFar >= delegate.max_delegate_rounds) {
-      return { status: 'delegate_round_limit', tool_name: turn.tool_name, limit: delegate.max_delegate_rounds, depth, agent_id, capability_slug };
-    }
-    delegateRoundCounts[turn.tool_name] = roundsSoFar + 1;
-
-    // FEATURE: AA-80 — honest failure, never silent truncation. Checked against the shared
-    // hopCounter (total hops across the whole call tree), not a local per-invocation range, so
-    // a delegate that (directly or via a cycle) targets its own capability still terminates at
-    // exactly MAX_LOOP_DEPTH total dispatches. ARCHITECTURE.md §19d.
+    // FEATURE: AA-87 -- turn.is_delegate_call is now true only for the two harness-generic
+    // tools (request_help, delegate_to_agent) -- there is no more data-driven delegate array
+    // to match against. The same shared hopCounter ceiling applies to both. ARCHITECTURE.md §19d.
     if (hopCounter.n >= MAX_LOOP_DEPTH) {
       return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
     }
     hopCounter.n++;
-
-    if (delegate.requires_human_confirmation) {
-      let critique = null;
-      if (delegate.critique_agent) {
-        critique = await runCapability({
-          capability_slug: delegate.critique_capability_slug,
-          intent_slug: delegate.critique_intent_slug || null,
-          agent_id: delegate.critique_agent,
-          task_context: turn.tool_input,
-          tenant_id,
-          _hop_counter: hopCounter,
-        });
-      }
-      return { status: 'pending_confirmation', proposed_action: turn.tool_input, delegate, critique, depth, agent_id, capability_slug };
-    }
-
     delegationOccurred = true;
-    const delegateResult = await runCapability({
-      capability_slug: delegate.capability_slug,
-      intent_slug: delegate.intent_slug || null,
-      agent_id: delegate.executing_agent_id,
-      task_context: turn.tool_input,
-      tenant_id,
-      _hop_counter: hopCounter,
-    });
+
+    let delegateResult;
+    if (turn.tool_name === 'request_help') {
+      // FEATURE: AA-87 -- every unresolved skill need routes to whoever currently holds
+      // project-manager. This capability_slug/intent_slug pair is a platform-level constant
+      // (same category as MAX_LOOP_DEPTH) -- structurally there is exactly one such broker
+      // today (ARCHITECTURE.md §19e); the agent_id who holds it is still resolved live, never
+      // the literal string "michelle". No fast path exists -- every request_help call reasons
+      // through here, even when the roster's current state makes the outcome predictable.
+      const pmAgentId = await resolveCapabilityHolder('project-manager');
+      delegateResult = await runCapability({
+        capability_slug: 'project-manager',
+        intent_slug: 'agent-selection-intent',
+        agent_id: pmAgentId,
+        task_context: JSON.stringify(turn.tool_input),
+        tenant_id,
+        _hop_counter: hopCounter,
+      });
+    } else if (turn.tool_name === 'delegate_to_agent') {
+      // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
+      // call here: the model is choosing an agent_id it was just handed as a candidate (via
+      // request_help above), not asserting one unprompted. This is the only place in the whole
+      // mechanism an agent_id may appear, and it is always the requester's own tool-call
+      // argument, never a static field.
+      const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = turn.tool_input;
+      delegateResult = await runCapability({
+        capability_slug: targetCapabilitySlug,
+        intent_slug: targetIntentSlug || null,
+        agent_id: targetAgentId,
+        task_context: task,
+        tenant_id,
+        _hop_counter: hopCounter,
+      });
+    }
 
     conversationHistory = [
       ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
@@ -224,7 +254,16 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const result = await runCapability(req.body || {});
+    // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
+    // _hop_counter so no external caller can seed or override the platform's hop ceiling.
+    const {
+      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+    } = req.body || {};
+    const result = await runCapability({
+      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+    });
     return res.status(200).json(result);
   } catch (e) {
     console.error('[execute] error:', e);

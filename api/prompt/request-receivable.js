@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support
+// DeepBench v6.0.0 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-ARCH-LOOP-PATCH-01 — AA-87 generic delegation tools
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
@@ -7,16 +7,54 @@ export const config = { maxDuration: 60, runtime: 'nodejs' };
 
 const KNOWN_HANDLERS = ['store'];
 
-// FEATURE: AA-80 — buildCallBody() generalized to accept delegate tools. Byte-identical output
-// to pre-v6.0.0 when delegates=[] and conversation_history=[]: no `system` field, systemPrompt
-// as the first user message, tool_choice forced to the schema tool. ARCHITECTURE.md §19d.
-function buildCallBody({ format_contract, systemPrompt, model, max_tokens, delegates = [], conversation_history = [] }) {
+// FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
+// injected automatically whenever canRequestHelp is true. request_help has no capability_slug
+// field: every unresolved skill need routes to whoever holds project-manager, no exceptions,
+// no fast path. delegate_to_agent's agent_id is only ever the model's own tool-call argument,
+// filled in from a candidate it was actually given -- never a static field anywhere in the
+// platform. ARCHITECTURE.md §19d/§19e.
+const REQUEST_HELP_TOOL = {
+  name: 'request_help',
+  description: 'Ask the platform to find an agent who can help with a skill need you cannot resolve yourself. This always routes to whoever currently holds the project-manager capability -- you cannot and should not name a specific colleague.',
+  input_schema: {
+    type: 'object',
+    required: ['skill_needed', 'task_description', 'reasoning'],
+    properties: {
+      skill_needed: { type: 'string', description: 'Plain-language description of the capability or expertise needed' },
+      task_description: { type: 'string', description: 'The specific task that needs to be done' },
+      context: { type: 'string', description: 'Any relevant context for whoever picks this up' },
+      reasoning: { type: 'string', description: 'Why you are asking for help rather than completing this yourself' },
+    },
+  },
+};
+
+const DELEGATE_TO_AGENT_TOOL = {
+  name: 'delegate_to_agent',
+  description: 'Dispatch a task to a specific agent and capability chosen from candidates you were actually given (e.g. by request_help). Never use an agent_id you were not given as a candidate.',
+  input_schema: {
+    type: 'object',
+    required: ['agent_id', 'capability_slug', 'task', 'reasoning'],
+    properties: {
+      agent_id: { type: 'string' },
+      capability_slug: { type: 'string' },
+      intent_slug: { type: ['string', 'null'] },
+      task: { type: 'string', description: 'The task for the chosen agent to perform' },
+      reasoning: { type: 'string', description: 'Why you chose this candidate' },
+    },
+  },
+};
+
+// FEATURE: AA-87 -- buildCallBody() takes canRequestHelp (boolean) instead of a delegates
+// array. Byte-identical output to pre-v6.0.0 when canRequestHelp=false and
+// conversation_history=[]: no `system` field, systemPrompt as the first user message,
+// tool_choice forced to the schema tool. ARCHITECTURE.md §19d.
+function buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
-  const delegateTools = delegates.map(d => ({ name: d.tool_name, description: d.tool_description, input_schema: d.input_schema }));
-  const tools = [...(schemaTool ? [schemaTool] : []), ...delegateTools];
+  const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
+  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
 
   if (tools.length === 0) {
     return {
@@ -27,26 +65,20 @@ function buildCallBody({ format_contract, systemPrompt, model, max_tokens, deleg
 
   return {
     model, max_tokens, tools,
-    // FEATURE: AA-80 — disable_parallel_tool_use: the harness's conversation-history bookkeeping
-    // (execute.js) attaches exactly one tool_result per turn, for the delegate it dispatches.
-    // Without this flag Anthropic's 'auto' choice may return multiple simultaneous tool_use
-    // blocks, leaving the others without a matching tool_result and failing the next API call
-    // ("tool_use ids were found without tool_result blocks"). Found via live test, S-ARCH-AGENT-LOOP-01.
-    tool_choice: delegateTools.length > 0 ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
+    tool_choice: harnessTools.length > 0 ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
     messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: systemPrompt }],
   };
 }
 
-// FEATURE: AA-80 — parses either the schema tool or a delegate tool; identifies which by name
-// against the delegates list, never by capability/agent identity assumption.
-function parseModelTurn(responseData, tools, delegates) {
+// FEATURE: AA-87 -- harness recognizes exactly two literal tool names as delegate calls. No
+// data-driven match against a delegates array anymore -- that array no longer exists.
+function parseModelTurn(responseData, tools) {
   if (tools.length > 0) {
     const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
     if (!toolUseBlock) throw new Error('No tool_use block in response');
-    const matchedDelegate = delegates.find(d => d.tool_name === toolUseBlock.name);
+    const isHarnessTool = toolUseBlock.name === 'request_help' || toolUseBlock.name === 'delegate_to_agent';
     return {
-      is_delegate_call: !!matchedDelegate,
-      delegate: matchedDelegate || null,
+      is_delegate_call: isHarnessTool,
       tool_name: toolUseBlock.name,
       tool_use_id: toolUseBlock.id,
       tool_input: toolUseBlock.input,
@@ -54,13 +86,13 @@ function parseModelTurn(responseData, tools, delegates) {
   }
   const textBlock = responseData.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text block in response');
-  return { is_delegate_call: false, delegate: null, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
+  return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
 }
 
 // FEATURE: AA-80 — callModel(): pure extraction of sendRequest()'s prior Step 1 (call + retry-
 // once-on-parse-failure), now shared by sendRequest() itself and execute.js's loop. Never runs
 // guardrails/handler/logging -- that stays exclusively in sendRequest(). ARCHITECTURE.md §19d.
-export async function callModel({ systemPrompt, model, max_tokens, format_contract, delegates = [], conversation_history = [] }) {
+export async function callModel({ systemPrompt, model, max_tokens, format_contract, canRequestHelp = false, conversation_history = [] }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const anthropicHeaders = { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' };
@@ -69,10 +101,10 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
-  const delegateTools = delegates.map(d => ({ name: d.tool_name, description: d.tool_description, input_schema: d.input_schema }));
-  const tools = [...(schemaTool ? [schemaTool] : []), ...delegateTools];
+  const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
+  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, delegates, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp, conversation_history });
 
   const llmRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: anthropicHeaders, body: JSON.stringify(callBody), signal: AbortSignal.timeout(55000),
@@ -87,7 +119,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   let turn;
 
   try {
-    turn = parseModelTurn(llmData, tools, delegates);
+    turn = parseModelTurn(llmData, tools);
   } catch (parseErr) {
     if (tools.length > 0) {
       retryCount = 1;
@@ -99,7 +131,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
       if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
       llmData = await retryRes.json();
       usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
-      turn = parseModelTurn(llmData, tools, delegates);
+      turn = parseModelTurn(llmData, tools);
     } else {
       throw Object.assign(new Error('Parse failed'), { status: 422, detail: parseErr.message });
     }
@@ -176,7 +208,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
   } else {
-    const turn = await callModel({ systemPrompt, model, max_tokens, format_contract, delegates: [], conversation_history: [] });
+    const turn = await callModel({ systemPrompt, model, max_tokens, format_contract, conversation_history: [] });
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;
