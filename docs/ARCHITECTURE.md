@@ -1,5 +1,5 @@
 # DeepBench — Architecture North Star
-# Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-AGENT-LOOP-01-design — True Agent Orchestration (Agent Loop)
+# Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
 > This document supersedes all prior architecture notes.
@@ -917,6 +917,40 @@ None of these three files change per capability. `execute.js` itself contains ze
 **What this does not change:** §19b's still-valid principles remain in force unchanged — capabilities are data, not code; one generic executor, never a capability-specific route file; dispatch by data field (`format_contract.handler`), never by identity conditional. This section extends that discipline one level up, from "how is output formatted" to "does this agent need backup, and does this action need review" — it does not replace it.
 
 **Build sequence (`CLAUDE-STATE.md` Session Queue):** `S-ARCH-AGENT-LOOP-01` (the two generic primitives, `execute.js`/`request-receivable.js`, plus the `SE-02` grep extension) → `S-ARCH-AGENT-LOOP-02` (Market Intelligence agent Skill Profile data — Marcus's `available_delegates`, Priya/Nadia's self-assessment signals, Owen's `critique_agent` role) → `S-ARCH-AGENT-LOOP-03` (retrofit the 4 already-shipped capabilities, MI-scoped only) → `S-APPLE-04a` onward, now built on this foundation instead of the superseded model.
+
+**Correction (2026-07-02, `S-ARCH-OWNERSHIP-01-design`) — `available_delegates`'s `executing_agent_id` and `critique_agent` fields are known-wrong, do not build against them.** Both name a specific agent id directly inside another agent's Skill Profile data — the same peer-to-peer dependency this section's own principle bans ("an agent's decision to call on another agent... must be an inference the model makes for itself"), just moved from code into data. A harness-level deterministic lookup (`capability_slug → agent_id`) was also considered and also rejected — genericness doesn't cure it, only real agent judgment does. See `§19e` (Resource Ownership Brokers) for the corrected model: no agent's data ever names another agent; cross-agent skill needs are brokered through Michelle Manning (Project Manager, `PP-01`), who resolves the executing agent herself, as her own reasoning output, not a static field. The loop/depth-cap/`pending_confirmation` machinery in this section is still believed correct and reusable — only the resolution of *who executes* changes. Patch session for the shipped `S-ARCH-AGENT-LOOP-01` harness not yet scheduled as of this note; `S-ARCH-AGENT-LOOP-02`/`03` are blocked until it lands.
+
+---
+
+## 19e. Resource Ownership Brokers [LOCKED `S-ARCH-AGENT-LOOP-02-design`, 2026-07-02]
+
+**The rule:** certain platform resources are owned exclusively by one agent. No other agent, no harness code, no future `api/` route gets a second code path to that resource — access is structurally impossible, not merely discouraged. This is distinct from routing/orchestration (`§19d`), which stays fully agent-intelligence-driven with zero hardcoded targets. Ownership answers *"who is allowed to touch this data or state, ever"*; the Agent Loop answers *"how does one agent's request reach another agent's reasoning."* An agent that needs an owned resource cannot go around the owner — it can only ask the owner, through the normal Agent Loop delegation mechanism, and the owner decides how to help. **Rule #1 of this platform: no agent is dependent on another, ever, in its own data.** An ownership broker's code may only answer "is this caller allowed" — never "which agent should handle this." The instant a broker's code starts picking a target agent — even via a "generic" registry lookup — it has become hardcoded routing wearing a broker's costume. Only agent reasoning (the owner's own judgment, or the requester's own judgment to ask at all) may pick a target.
+
+**Two ownership flavors exist in this platform already — do not conflate them:**
+
+| | Exclusive Access-Control Broker | Collaborative Service Attribution |
+|---|---|---|
+| Example | Eleanor Voss / `the_Library` (`§19c`) | Dan Bingham / DB Assembly + AI Enrichment (`§19`) |
+| Who can call it | Only the owner's broker code path | Any agent — it's shared infrastructure |
+| What's enforced | Structural: no other file imports the primitives; credential check per caller | Nothing — everyone benefits from the specialist's traits shaping the process |
+| Why | Real trust boundary — cross-agent leakage or unauthorized write is a breach | No trust boundary — the specialist is a collaborator, not a gatekeeper |
+
+**A resource needs an Exclusive Access-Control Broker only when unauthorized access would break a real trust boundary** (data leakage across tenants/clients, an unauthorized write, identity impersonation) — not merely because one agent happens to specialize in the domain. Confusing the two produces either an over-locked platform (nobody can use a shared service) or an under-locked one (a real trust boundary left open).
+
+**The registry (open — add rows here as new ownership rules surface, this list is not exhaustive; `S-ARCH-OWNERSHIP-02-design` walks the full agent roster to find the rest):**
+
+| Resource | Owner | Broker | Status |
+|---|---|---|---|
+| `the_Library` (Data Room reads/writes) | Eleanor Voss (LB-01) | `lib/librarian.js` — `queryLibrary()`/`writeLibrary()` | ✅ Built (`S-LIBRARIAN-01a`/`02`/`03`) |
+| DB Assembly + AI Enrichment (shared service, not access-gated — listed for contrast, not as an ownership boundary) | Dan Bingham (PS-01) | none — collaborative attribution only | ✅ Built (`S-PM-08`) |
+| Skills / Capabilities / `agent_capability_assignments` roster; selecting the executing agent for a delegated skill need | Michelle Manning (PP-01) | *new* — TBD in the `S-ARCH-AGENT-LOOP-01` harness patch session | ❌ Not built |
+| Writes to an agent's own personnel file (training stats, skill/situational scores, docs/classes/chunks counts) | The Trainer (Susan Smith, TR-08) | *new* — none exists yet | ❌ Not built |
+| An agent reading its *own* personnel file (self-read only, agent-to-agent — distinct from the human-facing Personnel screen, which is unrestricted UI display) | Each agent, for itself only | *new* — none exists yet | ❌ Not built |
+| Answers / HITL interaction surface on the Market Intelligence screen | Marcus Webb (GEO CSO Expert, CI-01) | *new* — screen doesn't exist yet (`S-MARKET-INTEL-01`) | ❌ Not built, blocked on screen |
+
+**Not yet catalogued — flagged, not resolved.** John noted there are likely more ownership rules not yet named. Any future design session that identifies one adds a row here immediately (Backlog Capture rule) rather than letting it live only in conversation. `S-ARCH-OWNERSHIP-02-design` is the dedicated session for walking the full agent roster and classifying each one.
+
+**Logged reasoning as a byproduct, not a separate feature.** Every ask-the-owner hop is a real Agent Loop tool call — requiring a `reasoning` field on the request/delegate tool schemas costs nothing extra and gives an audit trail of *why* an agent asked and *why* the owner picked who it picked. This reasoning trail is exactly the "annotated decision transcript" training material `AGENT-ARCHITECTURE.md` §2 already defines as the most valuable, hardest-to-replicate kind — an owning agent's routing judgment can become its own Reasoning-dimension training material later (Supervised Adaptive, John approves before ingestion), same mechanism as any other agent, nothing new to invent.
 
 ---
 
