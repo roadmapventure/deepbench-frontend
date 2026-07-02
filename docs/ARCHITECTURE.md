@@ -891,6 +891,8 @@ None of these three files change per capability. `execute.js` itself contains ze
 
 **Origin note:** `the_Library`'s content originally shipped as 6 additive columns directly on `knowledge_entries` (`S-APPLE-01b-design`, 2026-07-01) rather than its own table, conflating shared business data with an unrelated, already-production personal-training table. Corrected here after review surfaced the trust-boundary conflict. See `docs/kickoffs/[version]-S-LIBRARIAN-03-the-library-migration.md` for the migration that moved the 20 existing `apple-cso-data-room` rows and reverted `knowledge_entries` to its original shape.
 
+**Implementation note (found in QA, 2026-07-02):** Postgres folds unquoted mixed-case identifiers to lowercase, so `create table the_Library` in the Task 1 migration actually created a table named `the_library`. `match_the_library`'s RPC body (also unquoted) resolves consistently against that same lowercase name, so vector search worked untouched — but `lib/librarian.js`'s direct PostgREST calls (`writeTheLibraryEntry`, `update_status`, `bulk_reset`) originally targeted `/rest/v1/the_Library` and 404'd until corrected to `/rest/v1/the_library`. The physical table, going forward, is `the_library` (lowercase) — "`the_Library`" survives only as the conceptual/prose name in this document and in code comments.
+
 ---
 
 ## 17. v4 Preservation [LOCKED]

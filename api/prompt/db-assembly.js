@@ -1,4 +1,4 @@
-// DeepBench v5.3.8 | api/prompt/db-assembly.js | S-CAPABILITY-EXEC-01 — Intent Skill Profile llm/schema (AA-75)
+// DeepBench v5.3.14 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration)
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -51,10 +51,9 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
         match_count: 5,
         scope: agentId ? "agent" : "platform",
       };
-      // FEATURE: S-APPLE-02b — broker opt-in passthrough. Closes the gap S-LIBRARIAN-01b left
-      // open ("no Skill Profile sets broker: 'librarian' yet — that's S-APPLE-02/03's job").
-      // Reads whatever broker value the Skill Profile declares — never hardcoded to a name.
-      if (traits.broker) fetchInstruction.broker = traits.broker;
+      // FEATURE: AG-30 — traits.source passthrough, replaces the retired traits.broker opt-in.
+      // Reads whatever source value the Skill Profile declares — never hardcoded to a name.
+      if (traits.source) fetchInstruction.source = traits.source;
 
     } else if (typeSlug === "identity") {
       // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile
