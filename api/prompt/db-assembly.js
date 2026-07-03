@@ -1,4 +1,4 @@
-// DeepBench v6.0.10 | api/prompt/db-assembly.js | AI-44 — TASK DETAILS fallback section for task_context with no .goal field
+// DeepBench v6.0.16 | api/prompt/db-assembly.js | AA-108 — fail loudly on unmatched intent_slug
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -346,7 +346,18 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // (prompt-synthesis, loaded via enrichment_capability_slug) is never accidentally caught
   // by a filter meant for the primary capability. intent_slug unset (every existing caller)
   // is byte-identical to today's behavior.
+  // FEATURE: AA-108 -- fail loudly instead of silently degrading. Before this fix, an intent_slug
+  // that didn't match any loaded Intent Skill Profile filtered the set down to zero intent
+  // profiles with no error -- the downstream call proceeded with no schema/handler at all, which
+  // let a model free-write a fully fabricated "success" response with nothing actually enforced.
+  // Checked against the pre-filter set (every skill profile loaded for this capability_slug), so
+  // this only fires when intent_slug genuinely doesn't exist for this capability -- byte-identical
+  // for every existing caller, which always passes a real, matching intent_slug.
   if (intent_slug) {
+    const matchedIntent = skillProfiles.some(sp => sp.skill_type_slug === 'intent' && sp.slug === intent_slug);
+    if (!matchedIntent) {
+      throw new Error(`assemblePrompt: intent_slug "${intent_slug}" does not match any Intent Skill Profile for capability "${capability_slug}"`);
+    }
     skillProfiles = skillProfiles.filter(sp => sp.skill_type_slug !== 'intent' || sp.slug === intent_slug);
   }
 
