@@ -56,7 +56,7 @@ All six are full DeepBench personas (agents.js entry, AVATAR_CFG, AGENT_PRONOUNS
 |---|---|---|---|
 | 1 | **GEO CSO Expert** (CI-01) | Performance Strategist | Answers from the Data Room; classifies intent; conversational routing |
 | 2 | **Forecast/Theory/Performance Expert** | Hypothesis Generator + Stress Test (orig. v3 spec Agents 2+3) | Generates hypotheses; stress-tests Theory/Forecast/Correct claims against evidence — "Performance" = domain scope (channel/program performance), not a distinct call |
-| 3 | **Data Expert** (AG-19, expanded Data Builder) | Data Builder | Retrieval, ingestion, cleaning, updating, restoring. Owns Escalate execution and data-integrity patches |
+| 3 | **Data Analyst** (AG-19, expanded Data Builder) | Data Builder | Research judgment for Escalate and data-integrity patches — decides what's needed and drafts it. Never touches `the_Library` directly; Eleanor Voss (LB-01) performs every actual read/write on her behalf. |
 | 4 | **The Proofreader** | Guardrail (`guardrails` pattern) + Eval (`llm-as-judge` pattern) | Pre-display rule enforcement + quality scoring, unified |
 | 5 | **The Intake Assistant** | Decision Maker (orig. Agent 6, deprecated) | Post-decision pipeline routing: commit triage, failure triage |
 | 6 | **The Reasoner** (AG-20, Supreme Reasoner) | Supreme Reasoner | Memory Consolidation — synthesizes a committed correction into reusable institutional memory. Execution (embed + write) hands off to **Susan Smith (TR-08)**, the platform's existing Trainer agent — not duplicated here, see §5.10 |
@@ -123,7 +123,8 @@ Trigger: director selects or writes a hypothesis — fires **before** commit (v4
 - `intent` calibrates evidentiary rigor via the Behavior Skill Profile/prompt (Correct held to a stricter bar than Theory) — never a code conditional
 - Fresh `queryRAG({ queryText: hypothesis })` via `api/lib/rag.js` — never reuses Agent 1's original retrieval, since a hypothesis can reference evidence the original question never touched
 
-### 5.5 Data Expert — Escalate (Sonnet)
+### 5.5 Data Analyst — Escalate (Sonnet)
+**Corrected 2026-07-02, `PLATFORM-AGENT-RULEBOOK.md` AR-3.1:** Nadia does the research and drafts `new_chunks` — she does not call `writeLibrary()` herself. The actual write is Eleanor's action, reached via delegation, not a direct function call. This section's original text below still describes the research/output shape correctly; only the persistence mechanism changes.
 ```json
 // input: { "hypothesis": "string", "flagged_question": "string", "research_request": "string" }
 // output
@@ -131,7 +132,7 @@ Trigger: director selects or writes a hypothesis — fires **before** commit (v4
 ```
 Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Theory/Performance Expert to re-run Stress Test against the enriched Data Room.
 
-### 5.6 Data Expert — Data Integrity Patch (Sonnet)
+### 5.6 Data Analyst — Data Integrity Patch (Sonnet)
 Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit disputes a specific existing chunk, not just an interpretation).
 ```json
 // input: { "disputed_chunk_id": "string | null", "correction": "string", "director_reasoning": "string" }
@@ -160,7 +161,7 @@ Trigger: director commits Forecast or Correct.
 // input: { "intent": "forecast | correct", "hypothesis": "string", "stress_test": { ... }, "correction_text": "string | null" }
 // output: { "route_to": ["reasoner", "data-expert"], "data_expert_reason": "string | null", "disputed_chunk_id": "string | null" }
 ```
-Always routes to Reasoner on Forecast/Correct. Routes to Data Expert only when the correction disputes a *specific existing chunk's accuracy* — this is a judgment call, not a fixed rule.
+Always routes to Reasoner on Forecast/Correct. Routes to Data Analyst only when the correction disputes a *specific existing chunk's accuracy* — this is a judgment call, not a fixed rule.
 
 ### 5.9 The Intake Assistant — Failure Triage (Haiku)
 Trigger: Proofreader hard-fails (§5.7).
@@ -168,7 +169,7 @@ Trigger: Proofreader hard-fails (§5.7).
 // input: { "guardrail_failure": { ... }, "original_question": "string" }
 // output: { "recommend_escalate": true, "suggested_research_request": "string | null" }
 ```
-Turns a dead-end failure into an offered next step (route to Data Expert's Escalate) rather than a wall.
+Turns a dead-end failure into an offered next step (route to Data Analyst's Escalate) rather than a wall.
 
 ### 5.10 The Reasoner — Memory Consolidation (Haiku)
 Trigger: director commits Forecast or Correct only (never Theorize/Discard — nothing was decided, nothing to consolidate).
@@ -205,7 +206,7 @@ Each Capability gets Identity + Behavior + Knowledge Skill Profiles, plus one In
 |---|---|---|---|
 | GEO CSO Expert | `channel-intelligence` | `ci-identity`, `ci-behavior`, `ci-knowledge` | `ci-answer-intent` (§5.2, `technical_services: [rag, structured-output]`) · `ci-routing-intent` (§5.1, `technical_services: [structured-output]`) |
 | Forecast/Theory/Performance Expert | `hypothesis-evaluation` | `hyp-identity`, `hyp-behavior`, `hyp-knowledge` | `hyp-generation-intent` (§5.3) · `hyp-stress-test-intent` (§5.4, `technical_services: [rag, structured-output]`) |
-| Data Expert | `data-room-operations` | `data-identity`, `data-behavior`, `data-knowledge` | `data-escalate-intent` (§5.5, `technical_services: [rag, embeddings, structured-output]`) · `data-patch-intent` (§5.6) |
+| Data Analyst | `data-analysis` | `data-identity`, `data-behavior`, `data-knowledge` | `data-escalate-intent` (§5.5, `technical_services: [rag, structured-output]` — research/drafting only, no direct `embeddings`; the write itself is Eleanor's) · `data-patch-intent` (§5.6) |
 | The Proofreader | `quality-gate` | `proof-identity`, `proof-behavior`, `proof-knowledge` | `proof-guardrail-intent` · `proof-eval-intent` (§5.7, both `technical_services: [structured-output]`) |
 | The Intake Assistant | `pipeline-triage` | `intake-identity`, `intake-behavior`, `intake-knowledge` | `intake-commit-intent` · `intake-failure-intent` (§5.8–5.9) |
 | The Reasoner | `memory-consolidation` | `reasoner-identity`, `reasoner-behavior`, `reasoner-knowledge` | `reasoner-intent` (§5.10, `technical_services: [structured-output]` — synthesis only; execution hands off to Susan Smith/TR-08, see §5.10) |
@@ -213,12 +214,12 @@ Each Capability gets Identity + Behavior + Knowledge Skill Profiles, plus one In
 **Behavior Skill Profile content, per agent (the "how it thinks" trait):**
 - GEO CSO Expert: RAG-first, cite every claim, explicit gap acknowledgment, confidence tiers always attached
 - Forecast/Theory/Performance Expert: evidentiary rigor calibrated by intent — stricter bar for Correct than Theory (§5.4)
-- Data Expert: never overwrite, always supersede — versioning discipline (§7)
+- Data Analyst: never overwrite, always supersede — versioning discipline (§7). She proposes the supersede/patch; Eleanor executes it.
 - The Proofreader: enforce-don't-evaluate for the guardrail half, score-and-critique for the eval half
-- The Intake Assistant: triage judgment — when a correction needs Data Expert's patch vs. Reasoner alone (§5.8)
+- The Intake Assistant: triage judgment — when a correction needs Data Analyst's patch vs. Reasoner alone (§5.8)
 - The Reasoner: "logging fixes one answer, pattern synthesis improves a whole class" (§5.10)
 
-**Knowledge Skill Profile content, per agent:** GEO CSO Expert and Forecast/Theory/Performance Expert both scope to the shared CSO's Data Room via RAG (same `knowledge_entries`, no separate Data Room per agent — Apple has only this one Data Room today, see `ARCHITECTURE.md` §3). Data Expert's knowledge is meta — the metadata schema itself, not domain facts. The Proofreader's knowledge is declarative — the 5 Guardrail rules + 5 Eval rubric dimensions. The Intake Assistant's knowledge is the pipeline topology — which agent handles what. The Reasoner's knowledge is meta-awareness of prior consolidated patterns, to relate a new correction to existing ones.
+**Knowledge Skill Profile content, per agent:** GEO CSO Expert and Forecast/Theory/Performance Expert both scope to the shared CSO's Data Room via RAG (same `the_Library`, brokered through Eleanor per `ARCHITECTURE.md` §19c — no separate Data Room per agent, Apple has only this one Data Room today). Data Analyst's knowledge is meta — the metadata schema itself, not domain facts. The Proofreader's knowledge is declarative — the 5 Guardrail rules + 5 Eval rubric dimensions. The Intake Assistant's knowledge is the pipeline topology — which agent handles what. The Reasoner's knowledge is meta-awareness of prior consolidated patterns, to relate a new correction to existing ones.
 
 Final DB slugs may get bikeshedded at kickoff-doc time — this table is the structure, not a migration script.
 
@@ -315,7 +316,7 @@ Full breakdown: see the reusability review from this design session (chat log) �
 
 ## 11. OPEN ITEMS BEFORE CODING
 
-- `knowledge_entries` schema migration (§7) needs to land before any Reasoner/Data Expert writes
+- `the_Library` schema migration (§7) needs to land before any Reasoner/Data Analyst-drafted, Eleanor-executed writes
 - Data Room seed (S-APPLE-01b — 5 datasets + 3 GEO briefings + 10 partner scenarios) must exist before real RAG retrieval works; synthetic content still needs drafting
 - Session split required — this design spans 6 full agent personas, a new intent-classification pipeline, a schema migration, and a screen rebuild. Cannot be one kickoff doc under the "max 3 files, max 4 tasks" rule. See `CLAUDE-STATE.md` for the proposed session queue.
 
