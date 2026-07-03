@@ -1,4 +1,4 @@
-// DeepBench v6.0.5 | api/prompt/db-assembly.js | AG-33 — data_room_tag passthrough for the_library RAG sources
+// DeepBench v6.0.10 | api/prompt/db-assembly.js | AI-44 — TASK DETAILS fallback section for task_context with no .goal field
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -407,6 +407,32 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       order: 2.5,
     });
     sections.sort((a, b) => (a.order || 0) - (b.order || 0));
+  } else if (typeof task_context === 'object' && task_context !== null && Object.keys(task_context).length > 0) {
+    // FEATURE: AI-44 -- TASK DETAILS: generic fallback for any capability whose task_context is a
+    // plain object without a .goal field (e.g. Nadia's {disputed_chunk_id, correction, ...}, Sam's
+    // {intent, hypothesis, correction_text, ...}). Without this, a capability with neither a RAG
+    // section nor a Reflect section never sees its own specific task at all -- confirmed live
+    // 2026-07-03 during S-APPLE-04b QA (data-patch-intent returned a generic, input-blind response
+    // regardless of task_context content). Fires only when the .goal path above does NOT -- never
+    // both, no duplicate task text for existing .goal-shaped callers (api/plan.js Work Orders).
+    // Shape-driven, not identity-driven -- AR-1.1.
+    const taskDetailsText = Object.entries(task_context)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join('\n');
+    if (taskDetailsText) {
+      sections.push({
+        slug: 'task-details',
+        label: 'TASK DETAILS',
+        skill_profile_slug: null,
+        type: 'stored',
+        content: taskDetailsText,
+        fetch_instruction: null,
+        required: true,
+        order: 2.5,
+      });
+      sections.sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
   }
 
   // FEATURE: AA-56 — runtime_context injected as Additional Context section when present
