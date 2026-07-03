@@ -1,12 +1,13 @@
-// DeepBench v6.0.5 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-LIBRARIAN-04 — AG-33 library-write handler registry
+// DeepBench v6.0.13 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-APPLE-04b re-scope — reasoning-write handler registry
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
 import { handle as libraryWriteHandle } from '../_lib/handlers/library-write.js';
+import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle };
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
