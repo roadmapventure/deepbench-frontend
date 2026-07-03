@@ -1,4 +1,4 @@
-// DeepBench v6.0.4 | useAIActivity.js | AG-32 — data-analysis SERVICE_CATALOG entry (Nadia Farouk, Escalate)
+// DeepBench v6.0.5 | useAIActivity.js | AG-33 — data-room-custody SERVICE_CATALOG entry (Eleanor Voss, Data Room Custody)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -64,6 +64,11 @@ export const SERVICE_CATALOG = [
   // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
   // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage.
   { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
+  // FEATURE: AG-33 -- data-room-custody capability (Eleanor Voss, The Librarian, LB-01). The only
+  // capability whose execution performs a real the_library write, via the existing writeLibrary()
+  // broker -- not a new access path, the same one S-LIBRARIAN-02 already built. patterns gained
+  // 'RAG' (Task 2b/4e) -- she now genuinely retrieves Library context before deciding.
+  { slug: 'data-room-custody', name: 'Data Room Custody', serviceType: 'ai', patterns: ['Structured Output', 'RAG'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)

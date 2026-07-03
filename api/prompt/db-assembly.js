@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/prompt/db-assembly.js | AG-30 — traits.source passthrough (the_Library migration) | S-ARCH-LOOP-PATCH-01 — AA-87 canRequestHelp/confirmation-gate passthrough
+// DeepBench v6.0.5 | api/prompt/db-assembly.js | AG-33 — data_room_tag passthrough for the_library RAG sources
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -58,6 +58,10 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
       // FEATURE: AG-30 — traits.source passthrough, replaces the retired traits.broker opt-in.
       // Reads whatever source value the Skill Profile declares — never hardcoded to a name.
       if (traits.source) fetchInstruction.source = traits.source;
+      // FEATURE: AG-33 -- data_room_tag passthrough, needed for any uber_access holder's the_library
+      // RAG search (queryLibrary()'s uber_access branch requires an explicit tag, denies without one).
+      // Generic: reads a new optional trait, not gated on any agent identity.
+      if (traits.data_room_tag) fetchInstruction.data_room_tag = traits.data_room_tag;
 
     } else if (typeSlug === "identity") {
       // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile

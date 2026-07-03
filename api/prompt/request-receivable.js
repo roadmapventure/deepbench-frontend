@@ -1,11 +1,13 @@
-// DeepBench v6.0.0 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-ARCH-LOOP-PATCH-01 — AA-87 generic delegation tools
+// DeepBench v6.0.5 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-LIBRARIAN-04 — AG-33 library-write handler registry
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
+import { handle as libraryWriteHandle } from '../_lib/handlers/library-write.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const KNOWN_HANDLERS = ['store'];
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle };
+const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
 // injected automatically whenever canRequestHelp is true. request_help has no capability_slug
@@ -307,9 +309,11 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   // ── STEP 3: Handler dispatch ─────────────────────────────────────────────────
   let deliverable_id;
   const title = typeof parsedResponse === 'object' ? parsedResponse.title : null;
-  const result = await storeHandle({
+  const handlerFn = HANDLERS[handlerSlug];
+  const result = await handlerFn({
     task_id: task_id || null,
     agent_id,
+    tenant_id,
     skill_profile_slug: format_contract.skill_profile_slug,
     title,
     content: parsedResponse,
@@ -347,7 +351,13 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
 
   // ── STEP 5: Return response ──────────────────────────────────────────────────
   // FEATURE: SK-20 — content returned in response for frontend plan rendering
+  // FEATURE: AG-33 — spread handler result generically so any handler's own return fields
+  // (e.g. library-write's entry_id/handler_result) surface on the top-level response, not just
+  // store's deliverable_id. Additive only: store.js returns exactly { deliverable_id }, so this
+  // is byte-identical for every existing caller (api/plan.js, execute.js) — deliverable_id below
+  // still wins if a future handler ever returned a conflicting key, same value either way today.
   return {
+    ...result,
     deliverable_id,
     title,
     handler: handlerSlug,

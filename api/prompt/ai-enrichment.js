@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/prompt/ai-enrichment.js | S-APPLE-02b — debug.librarian_tier passthrough (fetchSection() set _librarian_tier per-section but enrichPrompt() never surfaced it on the returned debug object; scope expansion approved by John)
+// DeepBench v6.0.5 | api/prompt/ai-enrichment.js | AG-33 — data_room_tag passthrough for the_library RAG sources
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -40,6 +40,7 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
               queryText: taskContext,
               tenantId,
               matchCount: fi.match_count || 5,
+              data_room_tag: fi.data_room_tag || undefined,
             }),
             RAG_TIMEOUT_MS
           )
