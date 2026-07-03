@@ -1,4 +1,4 @@
-// DeepBench v5.3.15 | useAIActivity.js | AG-29 — pipeline-triage SERVICE_CATALOG entry (Sam Reyes, Commit Triage + Failure Triage)
+// DeepBench v6.0.4 | useAIActivity.js | AG-32 — data-analysis SERVICE_CATALOG entry (Nadia Farouk, Escalate)
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -59,6 +59,11 @@ export const SERVICE_CATALOG = [
   // FEATURE: AA-86 -- Michelle's roster broker (lib/project-manager.js). Deterministic read, no
   // LLM call of its own -- mirrors db-assembly's shape, not librarian's (no RAG/embedding step).
   { slug: 'agent-directory', name: 'Agent Directory', serviceType: 'logic', patterns: [], roadmap: 'now' },
+  // FEATURE: AG-32 -- data-analysis capability (Nadia Farouk, Data Analyst, CI-03, Escalate).
+  // No AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('data-analysis')
+  // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
+  // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage.
+  { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
