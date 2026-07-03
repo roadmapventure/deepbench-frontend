@@ -1,4 +1,4 @@
-// DeepBench v6.0.0 | api/capabilities/execute.js | S-ARCH-LOOP-PATCH-01 — AA-87/AA-83 harness patch
+// DeepBench v6.0.6 | api/capabilities/execute.js | S-ARCH-HITL-RESUME-01a — AA-100 Confirmation service
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -11,6 +11,7 @@
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
+import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation } from '../_lib/handlers/confirmation.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -184,7 +185,13 @@ export async function runCapability({
             _hop_counter: hopCounter,
           });
         }
-        return { status: 'pending_confirmation', proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
+        const confirmation_id = await insertPendingConfirmation({
+          tenant_id, agent_id, capability_slug, intent_slug,
+          proposed_action: turn.tool_input, critique,
+          prompt_request: { system_prompt: enriched.system_prompt, format_contract: enriched.format_contract, llm: enriched.llm },
+          delegation_occurred: delegationOccurred, depth,
+        });
+        return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
       }
 
       const result = await sendRequest({
@@ -254,6 +261,33 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
+    // FEATURE: AA-100 -- resolve branch checked first, additive only. No existing caller sends
+    // `action`, so the normal run path below is unreached by anything but a resolve request.
+    const body = req.body || {};
+    if (body.action === 'resolve') {
+      const { confirmation_id, resolution, edited_task_context } = body;
+      if (!confirmation_id) return res.status(400).json({ error: 'confirmation_id required' });
+      if (!['accept', 'reject', 'edit'].includes(resolution)) {
+        return res.status(400).json({ error: 'resolution must be accept, reject, or edit' });
+      }
+
+      if (resolution === 'edit') {
+        const row = await getPendingConfirmation(confirmation_id);
+        if (!row) return res.status(404).json({ error: 'confirmation not found' });
+        if (row.status !== 'pending') return res.status(409).json({ error: `confirmation already ${row.status}` });
+        if (!edited_task_context) return res.status(400).json({ error: 'edited_task_context required for edit' });
+        await markEdited(confirmation_id);
+        const result = await runCapability({
+          capability_slug: row.capability_slug, intent_slug: row.intent_slug,
+          agent_id: row.agent_id, task_context: edited_task_context, tenant_id: row.tenant_id,
+        });
+        return res.status(200).json(result);
+      }
+
+      const result = await resolvePendingConfirmation({ confirmation_id, resolution });
+      return res.status(200).json(result);
+    }
+
     // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
     // _hop_counter so no external caller can seed or override the platform's hop ceiling.
     const {
