@@ -134,10 +134,18 @@ Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Th
 
 ### 5.6 Data Analyst — Data Integrity Patch (Sonnet)
 Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit disputes a specific existing chunk, not just an interpretation).
+
+**Corrected 2026-07-03 (`AA-104`, `S-ARCH-REASONING-LAYER-01-design`) — supersedes the 2026-07-02 `AR-3.1` correction below.** The output of this call is Nadia's own opinion/interpretation about a disputed chunk — not automatically a verified fact. It writes directly into `the_reasoning` (`ARCHITECTURE.md` §19f), a new physically-separate store for opinion/reasoning content, with **zero round trip to Eleanor** — she writes her own content as its owner, gated only by the same `data_room_tag`/credential check `the_library` already uses. This is what actually fixes the hop-budget bug that motivated `AA-104` in the first place: recording an opinion is no longer the same action as promoting a fact, so the expensive Eleanor round trip becomes the rare, deliberate exception (see below), not the default outcome of every correction.
 ```json
 // input: { "disputed_chunk_id": "string | null", "correction": "string", "director_reasoning": "string" }
-// output: { "action": "patch | supersede | restore | no_action", "chunk_id": "string | null", "updated_content": "string | null", "version_note": "string" }
+// output: { "action": "opinion | promote | no_action", "chunk_id": "string | null", "content": "string | null", "confidence": "high | medium | low", "version_note": "string" }
 ```
+- `action: "opinion"` — the default outcome. Writes a new `the_reasoning` row (`source_chunk_ids: [disputed_chunk_id]`, `source_question: director_reasoning`) via `lib/search-harness.js`'s `writeContent({ store: 'the_reasoning', ... })`. No gate, no Eleanor.
+- `action: "promote"` — Nadia's own judgment that this opinion should override the record of fact, not just stay in the reasoning mix (the `§19d` sniff test, applied per-decision, not a fixed rule). This is a consequential action (`requires_human_confirmation: true`) — on human accept, hands off to Eleanor's `data-room-custody` capability via `on_accept_intent_slug` (`AA-103`, already built), which executes the actual `the_library` insert (`data_type: 'consolidated'`, `supersedes_id` set to the disputed chunk, `promoted_from_reasoning_id` set to the opinion row).
+- `action: "no_action"` — unchanged from the original design, no dispute found.
+
+**Original 2026-07-02 text, preserved for history, now superseded:** "Corrected 2026-07-02, `PLATFORM-AGENT-RULEBOOK.md` AR-3.1: Nadia does the research and drafts `new_chunks` — she does not call `writeLibrary()` herself. The actual write is Eleanor's action, reached via delegation, not a direct function call." — this assumed every correction was a verified fact Eleanor alone could write. `AA-104` found that assumption wrong for the common case (opinion, not fact) — Eleanor now only re-enters the picture for the `promote` action specifically, not every correction.
+
 Never overwrites in place — always inserts a new row that supersedes the original (see §7, Data Room Versioning).
 
 ### 5.7 The Proofreader — combined Guardrail + Eval (Haiku)
@@ -188,11 +196,13 @@ Trigger: director commits Forecast or Correct only (never Theorize/Discard — n
   "geo": "string | null", "program_area": "string | null", "citations": ["chunk_id", "..."]
 }
 ```
-**Execution is split across two agents, not one.** The Reasoner's call above produces the synthesis only — it does not embed or write anything itself. That output hands off to **Susan Smith (TR-08, the platform's existing Trainer agent)**, who executes the actual embed-and-upsert into `knowledge_entries` — reusing her existing reinforcement pipeline (already live, `PersonnelScreen.jsx` Training tab, already attributed to `agentId: "susan"` in `ai_activity_log`) rather than The Reasoner duplicating that mechanism. `source: "hitl-consolidation"`, `data_type: "learned"` (already the planned 4th data layer — see §6), scoped to the GEO CSO Expert's `agent_id` as the knowledge owner.
+**Corrected 2026-07-03 (`AA-104`, `S-ARCH-REASONING-LAYER-01-design`) — this section's original execution target (`knowledge_entries` via Susan Smith) is superseded.** Checked against the live schema, not just this doc's prose: `knowledge_entries` never actually had a `data_type` column to write `"learned"` into (only `the_library` does) — this was a live design/schema gap, found while resolving `AA-104` for Nadia's Data Integrity Patch (§5.6) and equally applicable here, since Memory Consolidation is the same category of content (an agent's own synthesized reasoning, not agent training data). **The Reasoner's synthesis now writes into `the_reasoning` (`ARCHITECTURE.md` §19f)** — the same physically-separate opinion/reasoning store Nadia's `data-patch-intent` uses, via `lib/search-harness.js`'s `writeContent({ store: 'the_reasoning', agent_id: 'reasoner', ... })`, self-attributed, no round trip to Eleanor or Susan. The Reasoner is the second of `the_reasoning`'s two writers (`§19f`'s registry), and holds `uber_access` on it — the same existing boolean column Eleanor already holds for `the_library`, extended to a second holder — for cross-Data-Room pattern visibility when explicitly queried that way.
 
-This is a genuine platform-wide capability extension, not an Apple-only feature: today Susan's reinforcement pipeline only fires from a human clicking "Add Courses" in the Training tab UI. This is its first **agent-triggered** call — any future agent's synthesized output could hand off to her the same way. Both agents are visibly attributed wherever this fires (Learned Context card, `ai_activity_log`) — same pattern already locked for Dan Bingham accompanying every Prompt Service call, never a silent single-agent credit.
+If a consolidated pattern should override the record of fact rather than just stay in the reasoning mix, that's the same `promote` action §5.6 defines for Nadia's opinions — not a separate mechanism. Susan Smith's reinforcement pipeline (`PersonnelScreen.jsx` Training tab, `PE-03`) is **not involved in this path** — it remains scoped to agent training content (`knowledge_entries`), a structurally different thing (`ARCHITECTURE.md` §19c) from an agent's reasoning about a Data Room's business data. The "genuine platform-wide capability extension" framing below described the wrong mechanism as a result and is preserved for history only.
 
-`technical_services` on the Reasoner's own Skill Profile (§5b) is `[structured-output]` only — `embeddings` belongs to Susan's execution, not duplicated on The Reasoner.
+**Original 2026-07-02 text, preserved for history, now superseded:** "Execution is split across two agents, not one. The Reasoner's call above produces the synthesis only — it does not embed or write anything itself. That output hands off to Susan Smith (TR-08, the platform's existing Trainer agent), who executes the actual embed-and-upsert into `knowledge_entries`... This is a genuine platform-wide capability extension, not an Apple-only feature: today Susan's reinforcement pipeline only fires from a human clicking 'Add Courses' in the Training tab UI. This is its first agent-triggered call..." — this assumed Memory Consolidation output was the same kind of content as agent training material. `AA-104` found it isn't; it's opinion/reasoning about business data, which needed its own physically-separate home, not a repurposing of Susan's existing pipeline.
+
+`technical_services` on the Reasoner's own Skill Profile (§5b) is `[structured-output]` only — `embeddings` still doesn't belong on the Reasoner's own call; the embedding happens inside `lib/search-harness.js`'s `writeContent()` (via `lib/vector-search.js`), unchanged in spirit from the original design, just pointed at a different table.
 
 ---
 
@@ -316,7 +326,7 @@ Full breakdown: see the reusability review from this design session (chat log) �
 
 ## 11. OPEN ITEMS BEFORE CODING
 
-- `the_Library` schema migration (§7) needs to land before any Reasoner/Data Analyst-drafted, Eleanor-executed writes
+- `the_Library` schema migration (§7) needs to land before any Reasoner/Data Analyst-drafted, Eleanor-executed writes. **Updated 2026-07-03 (`AA-104`):** `the_reasoning` schema migration (`ARCHITECTURE.md` §19f) needs to land before either Nadia's `data-patch-intent` (§5.6) or the Reasoner's Memory Consolidation (§5.10) can write anything — both now target it directly, not `the_library`/`knowledge_entries`.
 - Data Room seed (S-APPLE-01b — 5 datasets + 3 GEO briefings + 10 partner scenarios) must exist before real RAG retrieval works; synthetic content still needs drafting
 - Session split required — this design spans 6 full agent personas, a new intent-classification pipeline, a schema migration, and a screen rebuild. Cannot be one kickoff doc under the "max 3 files, max 4 tasks" rule. See `CLAUDE-STATE.md` for the proposed session queue.
 
