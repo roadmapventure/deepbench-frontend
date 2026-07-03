@@ -1,8 +1,8 @@
-// DeepBench v6.0.5 | api/prompt/ai-enrichment.js | AG-33 — data_room_tag passthrough for the_library RAG sources
+// DeepBench v6.0.12 | api/prompt/ai-enrichment.js | AA-107 -- the_library + the_reasoning both route through lib/search-harness.js
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
-import { queryLibrary } from "../../lib/librarian.js";
+import { queryContent } from "../../lib/search-harness.js";
 import { getRosterCandidates } from "../../lib/project-manager.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
@@ -27,16 +27,19 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
   if (section.type === "rag") {
     const fi = section.fetch_instruction;
     try {
-      // FEATURE: AG-30 -- fi.source === "the_library" is the only path to the_Library. There is no
-      // fallback branch for this value -- unlike the retired fi.broker opt-in, a the_Library-targeting
-      // fetch_instruction cannot silently fall through to a direct call, because queryRAG() (the other
-      // branch) cannot reach the_Library at all anymore -- the data physically isn't in that table.
+      // FEATURE: AA-107 -- fi.source === "the_library" and "the_reasoning" both route through
+      // lib/search-harness.js's queryContent() -- the single public entry point for either store
+      // (ARCHITECTURE.md §19f). "the_library" behavior is unchanged: search-harness.js's the_library
+      // branch is a thin pass-through to lib/librarian.js's existing queryLibrary(), proven
+      // byte-identical by S-ARCH-REASONING-LAYER-01a's M1/M2 regression test. There is no fallback
+      // branch for either value -- same "exactly one path" posture AG-30 established for the_library.
       const result = fi.source === "roster"
         ? await fetchWithTimeout(getRosterCandidates({ requestingAgentId }), RAG_TIMEOUT_MS)
-        : fi.source === "the_library"
+        : (fi.source === "the_library" || fi.source === "the_reasoning")
         ? await fetchWithTimeout(
-            queryLibrary({
+            queryContent({
               requestingAgentId,
+              store: fi.source,
               queryText: taskContext,
               tenantId,
               matchCount: fi.match_count || 5,
@@ -58,8 +61,8 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
-        _rag_scope_effective: fi.source === "roster" ? "roster" : fi.source === "the_library" ? "the_library" : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
-        _librarian_tier: result._librarian?.tier || null,
+        _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
+        _librarian_tier: result._librarian?.tier || result._access?.tier || null,
       };
     } catch (e) {
       console.warn(`[ai-enrichment] RAG fetch failed for section ${section.slug}:`, e.message);
