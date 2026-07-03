@@ -16,6 +16,20 @@ This separation is what enforces branch discipline. A coding session starts cold
 
 ---
 
+## Standing Rule — Automated Design→Code→Verify Loop (added 2026-07-02, John)
+
+**Once a kickoff doc is committed, the design session spawns the coding session itself** — via the `Agent` tool, foreground, no `isolation` param (operates directly on the real working tree, not a worktree copy, so it can push straight to `dev` the same way a manually-started coding session always has). The prompt passed is exactly the bordered code block the kickoff doc already ends with: `Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.` — self-contained, no other context, so the spawned agent starts exactly as cold as a human-started session would. **This does not weaken the No-Coding-in-Design-Sessions rule above** — the design session's own reasoning process still writes zero code; it only spawns a fresh, memory-less agent that does, the automated equivalent of John opening a second window and pasting the prompt himself.
+
+**When the coding agent finishes** (tests pass, build succeeds, committed and pushed to `dev`), its full report returns directly into the design session — no manual paste needed. The design session then runs Step 5 (below) itself: Manual QA Checklist verified directly against live systems (Supabase, `git status`, Vercel logs where reachable), not handed to John to run. Accept on indirect evidence, explicitly documented, for whatever genuinely can't be checked directly (e.g. no Vercel connection in this environment) — same as established precedent, just no longer gated on John confirming it.
+
+**Still stop and ask John, mid-flow, when:** the coding agent's own report surfaces a genuine scope conflict, an ambiguous finding, or a decision the kickoff doc didn't already resolve — same bar that already makes sessions stop today (e.g. `S-ARCH-AGENT-LOOP-02` halting rather than patching inline, per John's call at the time). Routine PASS-through-to-close-out needs no human checkpoint; a real judgment call still does.
+
+**Always report the outcome to John at the end regardless** — what shipped, test results, QA results, PASS/FAIL — even though he didn't have to run anything himself. Automating the loop removes his manual steps, not his visibility into what happened.
+
+**This supersedes `feedback-manual-qa-gate`'s "wait for John's PASS/FAIL" for this flow specifically** — the design session is now the one confirming PASS/FAIL. That memory's underlying concern (never silently closing out after a completion report without real verification) still fully applies — it's just the design session doing the verifying now, not John.
+
+---
+
 ## Standing Rule — Version-Paired Session Naming
 
 Every design session must be tagged with the version number of the kickoff doc(s) it produces, matching the version the paired coding session will carry. This makes the design ↔ coding pairing visible at a glance in `CLAUDE-STATE.md` and `docs/FEATURES.md`.
@@ -111,7 +125,7 @@ If wiring these would push the session over 4 tasks or 3 files — split into `a
 10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" (drop the oldest of the 3 into `docs/SESSIONS.md` if it's about to fall off), clear resolved blockers
 11. If UI work: update `docs/STYLE-GUIDE.md` with any rules locked this session
 12. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev`
-13. End with a clearly bordered code block — the exact Claude Code coding session start prompt:
+13. Show the bordered code block (the exact coding-session start prompt) for the record, then immediately use it as the `Agent` tool prompt per the Automated Design→Code→Verify Loop rule above — proceed straight to Step 5, no pause waiting for John to start a session manually:
     ```
     Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
     ```
@@ -120,19 +134,19 @@ If wiring these would push the session over 4 tasks or 3 files — split into `a
 
 ## Step 5 — How to Close a Session
 
-### 5a — Wait for Claude Code to confirm
-Node.js tests pass + `npm run build` succeeds. Do not proceed until both confirmed.
+### 5a — Spawn the coding session and wait for its report
+Per the Automated Design→Code→Verify Loop rule above: spawn via `Agent`, foreground, the bordered `Read docs/kickoffs/...` prompt. Wait for its own report — Node.js tests pass + `npm run build` succeeds, committed and pushed to `dev`. (If John instead ran a coding session manually and pastes a completion report himself — still valid, same as before — proceed from here identically either way.)
 
-### 5b — Present Manual QA Checklist (mandatory)
-When John pastes the Claude Code completion report, respond with the Manual QA Checklist from Section 10 of the kickoff doc:
-> "Before I close this out — please run these manual checks on the dev URL and report back PASS or FAIL for each item."
+### 5b — Run the Manual QA Checklist directly (no longer a human hand-off)
+Take the Manual QA Checklist from Section 11 of the kickoff doc and verify each item directly — query Supabase, check `git status`/`git log`, hit the dev URL, check Vercel logs where reachable. Accept on indirect evidence only where genuinely unreachable in this environment, documented explicitly (not silently skipped). For UI/frontend work, use the preview tools to actually exercise the feature — don't skip to indirect evidence when a live check is possible.
 
-⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until John reports QA results.
+⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until this verification is actually done — self-verification is not a rubber stamp, it carries the same weight the John-confirmed gate used to.
 
 ### 5c — Act on QA results
 - **All PASS** → Move the feature ID's row from `docs/FEATURES.md` to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in `FEATURES.md` — that's what caused it to balloon to 127.8 KB before the 2026-07-01 cleanup), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all three to dev.
 - **Any FAIL** → Full root cause analysis first. Read complete execution path. Compare against NIGP reference. A bug that fails QA once must not fail QA twice. Generate a patch kickoff doc.
 - **New requirement found** → Add to `docs/FEATURES.md` as ❌ Missing. Commit and push.
+- **Either way — report the full outcome to John** before ending the session: what shipped, test results, QA results, PASS/FAIL per item.
 
 ---
 
