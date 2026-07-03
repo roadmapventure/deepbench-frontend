@@ -1,4 +1,4 @@
-// DeepBench v6.0.5 | useAIActivity.js | AG-33 — data-room-custody SERVICE_CATALOG entry (Eleanor Voss, Data Room Custody)
+// DeepBench v6.0.7 | useAIActivity.js | SK-22 — Display/Format capability SERVICE_CATALOG entries
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -69,6 +69,14 @@ export const SERVICE_CATALOG = [
   // broker -- not a new access path, the same one S-LIBRARIAN-02 already built. patterns gained
   // 'RAG' (Task 2b/4e) -- she now genuinely retrieves Library context before deciding.
   { slug: 'data-room-custody', name: 'Data Room Custody', serviceType: 'ai', patterns: ['Structured Output', 'RAG'], roadmap: 'now' },
+  // FEATURE: SK-22 — Display/Format specialist capabilities (Alex Reeves, Riley Torres, Claire
+  // Sutton). Previously dormant (zero live call sites); now legitimate live candidates for any
+  // capability's request_help call once display routing is agent-reasoned (S-ARCH-HITL-RESUME-01).
+  // No AI_TYPE_TO_SERVICE entry needed for any of the three: each capability_slug already equals
+  // its own ai_type exactly (same `|| e.type` fallback pattern as data-analysis/quality-gate/etc.)
+  { slug: 'screen-controls', name: 'Screen Controls (Alex Reeves)', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
+  { slug: 'html-display',    name: 'HTML Display (Riley Torres)',   serviceType: 'ai', patterns: [], roadmap: 'now' },
+  { slug: 'pdf-assembly',    name: 'PDF Assembly (Claire Sutton)',  serviceType: 'ai', patterns: [], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
