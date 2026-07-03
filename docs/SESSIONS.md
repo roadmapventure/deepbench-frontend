@@ -464,3 +464,9 @@ See `docs/STANDARDS.md` Section 3 for the full rule.
 | ID | Question | Blocks |
 |----|----------|--------|
 | Q5 | Agent step output destination — **RESOLVED 2026-06-13.** Two-tier deliverables model. See DL section above. | ~~S11~~ unblocked |
+
+---
+
+## Rolled-out session detail (from CLAUDE-STATE.md's 3-session rolling window)
+
+- **S-APPLE-04a** (v6.0.4, 50cac01, 2026-07-02) — `AG-32` ✅ Done. Nadia Farouk's `data-analysis` capability + `data-escalate-intent` live in Supabase, plus a `SERVICE_CATALOG` entry. `data-knowledge` deliberately not created. Node test 25/25 PASS, including the platform's first-ever live exercise of `requires_human_confirmation`. Manual QA: all 12 items independently verified. Moved to `docs/FEATURES-ARCHIVE.md`.

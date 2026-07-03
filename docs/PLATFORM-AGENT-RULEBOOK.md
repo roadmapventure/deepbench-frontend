@@ -64,6 +64,8 @@
 
 **AR-4.2 — The consequential-action gate is the one reusable mechanism for HITL, not a bespoke UX per capability.** Any tool/delegate declaration can carry `requires_human_confirmation: true` (+ optional `critique_capability_slug`). When set, the harness pauses the loop and surfaces the proposed action (plus an optional single critique pass) to the human, who resolves it as accept / reject / edit — never an iterative negotiation. Before inventing a new HITL pattern for a capability, check whether this existing gate already covers it. *Source: `ARCHITECTURE.md` §19d. As of this draft, zero live Skill Profiles actually set this trait — it exists in the harness but is unused in production; check whether a UI consumer exists before wiring it live.*
 
+**AR-4.3 — Anything shown to a person on a screen must go through a Display agent — never shown raw, and never a content-specialist agent formatting its own output.** This is `AR-1.4`'s existing rule applied specifically to the HITL confirmation screen: whatever a paused proposal contains, a Display agent (e.g. Alex Reeves, Riley Torres, Claire Sutton — whichever currently holds that job, resolved the same way as any other capability, never hardcoded to one name) turns it into something a human can read. The proposing agent (e.g. Nadia Farouk) never renders its own output for display. Which specific Display agent is used is not decided by this rule — a live decision for the session that builds this screen. *Source: John, 2026-07-03 (`S-ARCH-HITL-RESUME-01-design`).*
+
 ---
 
 ## 5. Agent Build Completeness
