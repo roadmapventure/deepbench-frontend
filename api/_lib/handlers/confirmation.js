@@ -1,4 +1,4 @@
-// DeepBench v6.0.6 | api/_lib/handlers/confirmation.js | S-ARCH-HITL-RESUME-01a — AA-100 Confirmation service
+// DeepBench v6.0.8 | api/_lib/handlers/confirmation.js | S-APPLE-04b — AA-103 generic accept hand-off
 // FEATURE: AA-100 — accept/reject/edit resume for execute.js's consequential-action gate (AA-87).
 // Deterministic plumbing only: save the paused proposal, wait, carry out exactly what was decided.
 // Zero capability-specific logic — works identically for any agent/capability that pauses.
@@ -78,4 +78,27 @@ export async function resolvePendingConfirmation({ confirmation_id, resolution }
   });
   await updateStatus(confirmation_id, { status: 'accepted', resolution: result });
   return result;
+}
+
+// FEATURE: AA-103 -- looks up whether the given intent declares a follow-up intent to run once
+// a human accepts (traits.on_accept_intent_slug). Generic: reads a data field on the confirmed
+// intent's own Skill Profile row, never a capability- or agent-specific conditional. Returns
+// null for any intent that doesn't declare one -- the existing terminal-dispatch accept behavior
+// is unchanged for those. ARCHITECTURE.md §19b/§19d.
+export async function getOnAcceptIntentSlug(intent_slug) {
+  if (!intent_slug) return null;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  const headers = getSupabaseHeaders(supabaseKey);
+  const res = await fetch(`${supabaseUrl}/rest/v1/skill_profiles?slug=eq.${encodeURIComponent(intent_slug)}&select=traits&limit=1`, { headers });
+  if (!res.ok) return null;
+  const [row] = await res.json();
+  return row?.traits?.on_accept_intent_slug || null;
+}
+
+// FEATURE: AA-103 -- closes out a confirmation whose accept was fulfilled by delegating to a
+// follow-up intent (getOnAcceptIntentSlug found one) rather than by resolvePendingConfirmation's
+// own terminal dispatch. Mirrors that function's accept tail exactly, minus the sendRequest call.
+export async function markAcceptedDelegated(confirmation_id, result) {
+  await updateStatus(confirmation_id, { status: 'accepted', resolution: result });
 }

@@ -1,4 +1,4 @@
-// DeepBench v6.0.6 | api/capabilities/execute.js | S-ARCH-HITL-RESUME-01a — AA-100 Confirmation service
+// DeepBench v6.0.8 | api/capabilities/execute.js | S-APPLE-04b — AA-103 generic accept hand-off
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -11,7 +11,7 @@
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
-import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation } from '../_lib/handlers/confirmation.js';
+import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated } from '../_lib/handlers/confirmation.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -252,6 +252,35 @@ export async function runCapability({
   }
 }
 
+// FEATURE: AA-103 -- accept resolution, exported separately so the Node.js test can call it
+// directly (same reasoning as runCapability's own export). Checks whether the confirmed intent
+// declares a follow-up intent to run now that a human has approved (on_accept_intent_slug)
+// before falling back to the original terminal-dispatch behavior (resolvePendingConfirmation) --
+// unchanged for any intent that doesn't declare one. This is what lets an agent who needed a
+// human's OK before acting actually go act on it afterward, via the same request_help loop every
+// other cross-agent hand-off uses -- never a direct call to whichever agent ends up executing it.
+// ARCHITECTURE.md §19b/§19d, PLATFORM-AGENT-RULEBOOK.md AR-2.2/2.3/3.1.
+export async function resolveAccept({ confirmation_id }) {
+  const row = await getPendingConfirmation(confirmation_id);
+  if (!row) throw Object.assign(new Error('confirmation not found'), { status: 404 });
+  if (row.status !== 'pending') throw Object.assign(new Error(`confirmation already ${row.status}`), { status: 409 });
+
+  const onAcceptIntentSlug = await getOnAcceptIntentSlug(row.intent_slug);
+  if (!onAcceptIntentSlug) {
+    return resolvePendingConfirmation({ confirmation_id, resolution: 'accept' });
+  }
+
+  const result = await runCapability({
+    capability_slug: row.capability_slug,
+    intent_slug: onAcceptIntentSlug,
+    agent_id: row.agent_id,
+    task_context: row.proposed_action,
+    tenant_id: row.tenant_id,
+  });
+  await markAcceptedDelegated(confirmation_id, result);
+  return result;
+}
+
 export default async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
@@ -281,6 +310,14 @@ export default async function handler(req, res) {
           capability_slug: row.capability_slug, intent_slug: row.intent_slug,
           agent_id: row.agent_id, task_context: edited_task_context, tenant_id: row.tenant_id,
         });
+        return res.status(200).json(result);
+      }
+
+      // FEATURE: AA-103 -- accept now routes through resolveAccept(), which itself falls back
+      // to resolvePendingConfirmation() when the confirmed intent has no on_accept_intent_slug
+      // (byte-identical old behavior for reject, and for any accept without one declared).
+      if (resolution === 'accept') {
+        const result = await resolveAccept({ confirmation_id });
         return res.status(200).json(result);
       }
 
