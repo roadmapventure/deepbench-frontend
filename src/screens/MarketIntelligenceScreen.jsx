@@ -1,16 +1,19 @@
-// DeepBench v6.0.20 | MarketIntelligenceScreen.jsx | S-MARKET-INTEL-01c — Proofreader retrofit (two-layer needs_review + retry-once-on-block) + Pipeline Log
+// DeepBench v6.0.21 | MarketIntelligenceScreen.jsx | S-MARKET-INTEL-01d — commit actions (Elena +
+// Nadia direct, generic ConfirmationCard), Sam's failure triage, Owen's real delegate_to_agent retry
 // FEATURE: MI-01 — Market Intelligence screen, three-column layout per market-intelligence-v4.html
-// FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard are explicit
-// human controls (Track as Assumption / Make Permanent ship in S-MARKET-INTEL-01d)
+// FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard + commit
+// actions (Track as Assumption / Make Permanent) are explicit human controls, all live as of 01d
 // FEATURE: MI-03 — Theory Evidence swap-on-hypothesis-select (live); Data Room default charts still roadmap
 // FEATURE: AI-39 — two-layer needs_review OR-gate (Marcus self-flag OR Owen/Proofreader eval.result
-// ==='revise'), plus retry-once-on-block, rebuilt as Layer 2 orchestration (ARCHITECTURE.md §19b)
-// FEATURE: MI-04 — Pipeline Log, real events only (Intent Routing, Q&A Answer, Proofreader, Stress Test)
+// ==='revise'), plus real retry-once-on-block via Owen's own delegate_to_agent call (01d correction —
+// see runQaWithQualityGate below; the 01c screen-scripted retry was an architecture regression)
+// FEATURE: MI-04 — Pipeline Log, real events only (Intent Routing, Q&A Answer, Proofreader incl. real
+// retry hand-off, Stress Test, Memory Consolidation, Data Integrity Patch, Failure Triage)
 import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
+import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -24,17 +27,28 @@ const EXAMPLE_QUESTIONS = [
 const ESCALATE_PLACEHOLDER =
   `That reads as an "escalate" request. Escalating for deeper research ships in a future build — ask a direct question, or run a Theory/Forecast/Correct for now.`;
 
-const QA_FAILURE_TEXT =
-  `Marcus couldn't produce an answer that passed review after two attempts — try rephrasing the question.`;
-
 const INTENT_LABEL = { theory: "Theory", forecast: "Forecast", correct: "Correct" };
 
+// FEATURE: MI-01d — Sam Reyes (pipeline-triage/intake-failure-intent) replaces the static failure
+// message with a real diagnosis, per design doc §5.9's "fail safe, never fake" principle.
+function buildFailureText(guardrail, triage) {
+  const base = `Marcus couldn't produce an answer that passed review (${guardrail?.rule_violated || "review failed"}).`;
+  if (!triage) return `${base} Try rephrasing the question.`;
+  const suggestion = triage.suggested_research_request ? ` Sam suggests: "${triage.suggested_research_request}"` : "";
+  return triage.recommend_escalate
+    ? `${base} Sam's diagnosis: this looks like a Data Room coverage gap.${suggestion}`
+    : `${base} Sam's diagnosis: escalating wouldn't help here — try rephrasing instead.`;
+}
+
 // FEATURE: MI-04 — capability display metadata, sourced from the same SERVICE_CATALOG entries
-// already live in useAIActivity.js (not duplicated data — just the 3 slugs this screen calls)
+// already live in useAIActivity.js (not duplicated data — just the slugs this screen calls)
 const SERVICE_LABEL = {
   "channel-intelligence": { name: "Channel Intelligence", patterns: "Structured Output, RAG, Case-Based Reasoning" },
-  "quality-gate": { name: "Quality Gate", patterns: "Structured Output, Guardrails / Output Filtering, LLM-as-Judge / Verifier" },
+  "quality-gate": { name: "Quality Gate", patterns: "Structured Output, Guardrails / Output Filtering, LLM-as-Judge / Verifier, Agent Delegation" },
   "hypothesis-evaluation": { name: "Hypothesis Evaluation", patterns: "Structured Output, RAG, Case-Based Reasoning" },
+  "memory-consolidation": { name: "Memory Consolidation", patterns: "Structured Output, Memory Consolidation, Transfer Learning" },
+  "data-analysis": { name: "Data Analysis", patterns: "Structured Output, Agent Delegation" },
+  "pipeline-triage": { name: "Pipeline Triage", patterns: "Structured Output, Agent Delegation" },
 };
 
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
@@ -44,16 +58,25 @@ function describePipelineEvent(evt) {
     case "intent_routing":
       return { capability: "channel-intelligence", summary: `Classified intent: ${evt.data.intent} (confidence: ${evt.data.confidence})`, color: T.navyMid };
     case "qa_answer":
-      return { capability: "channel-intelligence", summary: `Answered${evt.attempt === 2 ? " (attempt 2)" : ""} · confidence_tier: ${evt.data.confidence_tier} · self-flag: ${evt.data.needs_review ? "yes" : "no"}`, color: evt.data.needs_review ? T.brass : T.moss };
+      return { capability: "channel-intelligence", summary: `Answered · confidence_tier: ${evt.data.confidence_tier} · self-flag: ${evt.data.needs_review ? "yes" : "no"}`, color: evt.data.needs_review ? T.brass : T.moss };
     case "proofreader": {
       const g = evt.data.guardrail || {}, e = evt.data.eval || {};
       if (g.result === "block") {
-        return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated}${evt.attempt === 1 ? " → retrying" : " (attempt 2) — answer withheld"}`, color: T.flag };
+        return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated} — escalated to Sam`, color: T.flag };
       }
-      return { capability: "quality-gate", summary: `Guardrail: pass${evt.attempt === 2 ? " (attempt 2)" : ""} · Eval: ${e.result}${e.result === "revise" ? ` — ${e.critique}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
+      const retriedNote = evt.data.final_answer ? " (Owen retried via Marcus)" : "";
+      return { capability: "quality-gate", summary: `Guardrail: pass${retriedNote} · Eval: ${e.result}${e.result === "revise" ? ` — ${e.critique}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
     }
+    case "failure_triage":
+      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Recommends escalating: ${evt.data.suggested_research_request || ""}` : "Escalating would not help here", color: T.brass };
     case "stress_test":
       return { capability: "hypothesis-evaluation", summary: `Stress test complete · confidence: ${evt.data.confidence}`, color: T.moss };
+    case "memory_consolidation":
+      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? `Consolidated: ${(evt.data.content || "").slice(0, 90)}${(evt.data.content || "").length > 90 ? "…" : ""}` : "No pattern worth consolidating (no_action)", color: evt.data.action === "consolidate" ? T.moss : T.muted };
+    case "patch_proposed":
+      return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : ""}`, color: T.brass };
+    case "patch_resolved":
+      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${evt.data.result?.content?.confirmation_note || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by director`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -61,8 +84,17 @@ function describePipelineEvent(evt) {
 
 // FEATURE: MI-02 — generalized to accept any capability/agent/task_context (was hardcoded to
 // channel-intelligence/marcus/{goal:message}) — same contract execute.js already exposes, now
-// used by Marcus's channel-intelligence calls, Priya's hypothesis-evaluation calls, and Owen's
-// quality-gate calls.
+// used by Marcus's channel-intelligence calls, Priya's hypothesis-evaluation calls, Owen's
+// quality-gate calls, and (MI-01d) Elena's memory-consolidation / Nadia's data-analysis calls.
+// FEATURE: MI-01d — a capability whose Skill Profile sets requires_human_confirmation: true
+// (Nadia's data-patch-intent) short-circuits execute.js's normal terminal dispatch and returns
+// a flat { status:'pending_confirmation', confirmation_id, proposed_action, critique, ... } object
+// with no `.content` wrapper (api/capabilities/execute.js runCapability(), the pending_confirmation
+// branch) — found live this session, first UI caller of that branch anywhere. Unwrapping `.content`
+// unconditionally (the pre-01d behavior) would silently discard confirmation_id/proposed_action/
+// critique and hand the screen an empty object. Any response carrying a top-level `status` field
+// is one of execute.js's own flat early-return shapes (pending_confirmation, depth_exceeded) and
+// is returned as-is; only the ordinary terminal-dispatch shape is unwrapped from `.content`.
 async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
@@ -75,52 +107,59 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   });
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
   const result = await res.json();
+  if (result.status) return result;
   return result.content || {};
 }
 
-// FEATURE: AI-39 — two-layer needs_review OR-gate (self-flag OR Proofreader eval.result==='revise')
-// plus retry-once-on-block. This is a Layer 2 orchestration of two ordinary execute.js calls —
-// the retry mechanism used to live inside a standalone quality-gate.js route (S-APPLE-02c) that
-// directly imported runChannelIntelligence; S-CAPABILITY-EXEC-02 deleted that route entirely when
-// it generalized every capability onto execute.js (ARCHITECTURE.md §19b: cross-capability handoff
-// is Layer 2's job, never Layer 3's). Rebuilt here, same behavior, no capability-specific Layer 3 code.
+// FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
+// capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
+async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null }) {
+  const res = await fetch("/api/capabilities/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "resolve", confirmation_id, resolution, edited_task_context }),
+  });
+  if (!res.ok) throw new Error(`resolve ${resolution} failed: ${res.status}`);
+  return res.json();
+}
+
+// FEATURE: MI-01d — Owen's own delegate_to_agent call replaces the screen-scripted retry
+// (AI-39, S-MARKET-INTEL-01c) that bypassed the mechanism AA-82/S-ARCH-AGENT-LOOP-03 specifically
+// built for this exact live-caller case. Orchestrator-workers pattern (Anthropic, "Building
+// Effective Agents"): Owen decides whether a block is worth one retry and calls Marcus himself;
+// his own final output (final_answer) carries the delegated result forward, since nothing outside
+// his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
+// data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
 async function runQaWithQualityGate(message, conversationContext, onEvent) {
-  const answer = async (attempt) => {
-    const qa = await callCapability({
-      capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-      task_context: { goal: message }, runtime_context: conversationContext,
-    });
-    onEvent({ type: "qa_answer", agentId: "marcus", attempt, data: qa });
-    return qa;
-  };
+  const qa = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
+    task_context: { goal: message }, runtime_context: conversationContext,
+  });
+  onEvent({ type: "qa_answer", agentId: "marcus", data: qa });
 
-  // FEATURE: AI-39 — question included for the first time (gap in the original S-APPLE-02c design:
-  // qg-review-intent scores a `responsiveness` dimension that cannot be judged without the question).
-  const review = async (qa, attempt) => {
-    const gate = await callCapability({
-      capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
-      task_context: { question: message, candidate_answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations },
-    });
-    const retrying = gate.guardrail?.result === "block" && attempt === 1;
-    onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retrying ? "marcus" : null, attempt, data: gate });
-    return gate;
-  };
-
-  let qa = await answer(1);
-  let gate = await review(qa, 1);
+  const gate = await callCapability({
+    capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
+    task_context: {
+      question: message, candidate_answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations,
+      agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
+    },
+  });
+  const retried = !!gate.final_answer;
+  onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate });
 
   if (gate.guardrail?.result === "block") {
-    if (!message) throw new Error("message required to retry a blocked answer");
-    qa = await answer(2);
-    gate = await review(qa, 2);
-    if (gate.guardrail?.result === "block") {
-      return { kind: "qa_failed", text: QA_FAILURE_TEXT };
-    }
+    const triage = await callCapability({
+      capability_slug: "pipeline-triage", intent_slug: "intake-failure-intent", agent_id: "sam",
+      task_context: { guardrail_failure: gate.guardrail, original_question: message },
+    });
+    onEvent({ type: "failure_triage", agentId: "sam", data: triage });
+    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, triage) };
   }
 
+  const finalAnswer = retried ? gate.final_answer : qa;
   const needs_review = !!qa.needs_review || gate.eval?.result === "revise";
   const review_reason = qa.needs_review ? qa.review_reason : (gate.eval?.result === "revise" ? gate.eval.critique : null);
-  return { kind: "qa", answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations, needs_review, review_reason };
+  return { kind: "qa", answer: finalAnswer.answer, confidence_tier: finalAnswer.confidence_tier, citations: finalAnswer.citations, needs_review, review_reason };
 }
 
 async function runIntentPipeline(message, conversationContext, onEvent) {
@@ -245,8 +284,10 @@ function MessageBubble({ msg, onReview }) {
   );
 }
 
-function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard }) {
+function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
   const [customText, setCustomText] = useState("");
+  const agents = useAgents();
+  const nadia = agents.find(a => a.id === "nadia");
 
   useEffect(() => {
     if (hypFlow && hypFlow.prefillText) setCustomText(hypFlow.prefillText);
@@ -366,31 +407,43 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
           </>
         )}
 
-        {hypFlow.stage === "result" && (
+        {hypFlow.stage === "result" && !hypFlow.confirmation && (
           <div style={{display:"flex",gap:6,marginTop:4}}>
             <button onClick={onDiscard}
               style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
               Discard
             </button>
-            <button disabled title="Ships in the next Market Intelligence session"
-              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:"not-allowed"}}>
+            <button onClick={() => onCommit("forecast")}
+              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
               Track as Assumption
             </button>
-            <button disabled title="Ships in the next Market Intelligence session"
-              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:"not-allowed"}}>
+            <button onClick={() => onCommit("correct")}
+              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
               Make Permanent
             </button>
           </div>
+        )}
+
+        {hypFlow.stage === "committing" && (
+          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Elena and Nadia are reviewing this commit…</div>
+        )}
+
+        {hypFlow.confirmation && (
+          <ConfirmationCard
+            agent={nadia}
+            proposedAction={hypFlow.confirmation.proposed_action}
+            critique={hypFlow.confirmation.critique}
+            onResolve={onResolveConfirmation}
+          />
         )}
       </div>
     </div>
   );
 }
 
-// FEATURE: MI-04 — Pipeline Log: real event log driven by actual agent calls (Intent Routing,
-// Q&A Answer, Proofreader pass/block/revise incl. retry hand-off, Stress Test). Intake Assistant
-// triage and Reasoner Memory Consolidation are not rendered — neither is called anywhere on this
-// screen yet (01d scope) — never fabricate an event type nothing on the page actually triggers.
+// FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
+// Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, Stress Test,
+// Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
 function AuditColumn({ events }) {
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
@@ -514,14 +567,14 @@ export default function MarketIntelligenceScreen() {
   const conversationContext = () =>
     messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
 
-  const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, reviewReason }) => {
+  const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, citations, reviewReason }) => {
     if (extractedHypothesis) {
       setHypFlow({ stage:"choosing", intent, candidates:null, prefillText:extractedHypothesis, chosenText:null,
-        flaggedQuestion, flaggedAnswer, reviewReason, stressTest:null, priorStressTest:null });
+        flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, stressTest:null, priorStressTest:null, confirmation:null });
       return;
     }
     setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
-      flaggedQuestion, flaggedAnswer, reviewReason, stressTest:null, priorStressTest:null });
+      flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, stressTest:null, priorStressTest:null, confirmation:null });
     try {
       const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
@@ -540,12 +593,12 @@ export default function MarketIntelligenceScreen() {
     try {
       const result = await runIntentPipeline(clean, conversationContext(), logEvent);
       if (result.kind === "qa") {
-        setMessages(prev => [...prev, { role:"assistant", text: result.answer, needs_review: !!result.needs_review, review_reason: result.review_reason, question: clean, kind:"qa" }]);
+        setMessages(prev => [...prev, { role:"assistant", text: result.answer, needs_review: !!result.needs_review, review_reason: result.review_reason, question: clean, citations: result.citations || [], kind:"qa" }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
       } else if (result.kind === "hyp_entry") {
         setMessages(prev => [...prev, { role:"assistant", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. Pick or refine a hypothesis on the right.`, kind:"non_qa" }]);
-        await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, reviewReason: null });
+        await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, citations: [], reviewReason: null });
       } else {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
       }
@@ -559,7 +612,7 @@ export default function MarketIntelligenceScreen() {
   };
 
   const onReview = (msg) => {
-    enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: msg.question, flaggedAnswer: msg.text, reviewReason: msg.review_reason });
+    enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: msg.question, flaggedAnswer: msg.text, citations: msg.citations || [], reviewReason: msg.review_reason });
   };
 
   const onIntentChange = (intent) => setHypFlow(prev => prev && ({ ...prev, intent }));
@@ -588,6 +641,85 @@ export default function MarketIntelligenceScreen() {
     setHypFlow(null);
   };
 
+  // FEATURE: MI-01d — Track as Assumption / Make Permanent. Calls Elena (memory-consolidation,
+  // unconditional, self-gated, no confirmation) and Nadia (data-analysis, unconditional, always
+  // pending_confirmation) directly — no Intake Assistant involvement, no delegation, no nesting
+  // (see kickoff CONTEXT for why intake-commit-intent's route_to fan-out is deliberately unused).
+  const onCommit = async (intent) => {
+    if (!hypFlow) return;
+    const { flaggedQuestion, flaggedAnswer, citations, chosenText, stressTest } = hypFlow;
+    setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
+    setAIStatus("Elena and Nadia are reviewing this commit…");
+    try {
+      const disputedChunkId = Array.isArray(citations) && citations.length === 1 ? citations[0] : null;
+      const stressTestText = stressTest
+        ? [stressTest.supports?.text, stressTest.complicates?.text, stressTest.consider?.text].filter(Boolean).join(" ")
+        : "";
+
+      const elenaResult = await callCapability({
+        capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
+        task_context: {
+          original_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
+          committed_hypothesis: chosenText, intent, stress_test: stressTestText,
+          was_override: !!stressTest?.override_warning,
+        },
+      });
+      logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult });
+
+      const nadiaResult = await callCapability({
+        capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
+        task_context: {
+          disputed_chunk_id: disputedChunkId, correction: chosenText,
+          director_reasoning: stressTestText || chosenText,
+        },
+      });
+      logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult });
+
+      setHypFlow(prev => prev && ({
+        ...prev, stage: "result",
+        confirmation: {
+          confirmation_id: nadiaResult.confirmation_id,
+          proposed_action: nadiaResult.proposed_action,
+          critique: nadiaResult.critique,
+          disputed_chunk_id: disputedChunkId,
+          director_reasoning: stressTestText || chosenText,
+        },
+      }));
+    } catch (e) {
+      console.error("[MarketIntelligenceScreen] onCommit", e.message);
+      setHypFlow(prev => prev && ({ ...prev, stage: "result" }));
+    } finally {
+      clearAIStatus();
+    }
+  };
+
+  const onResolveConfirmation = async (resolution, editedText = null) => {
+    if (!hypFlow?.confirmation) return;
+    const { confirmation_id, disputed_chunk_id } = hypFlow.confirmation;
+    const edited_task_context = resolution === "edit"
+      ? { disputed_chunk_id, correction: editedText, director_reasoning: editedText }
+      : null;
+    const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
+
+    if (resolution === "edit") {
+      setHypFlow(prev => prev && ({
+        ...prev,
+        confirmation: {
+          ...prev.confirmation,
+          confirmation_id: result.confirmation_id,
+          proposed_action: result.proposed_action,
+          critique: result.critique,
+        },
+      }));
+      return;
+    }
+
+    logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result } });
+    setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
+      text: resolution === "accept" ? (result.content?.confirmation_note || "Recorded.") : "Nadia's proposal was rejected — not recorded." }]);
+    setHypFlow(null);
+  };
+
   return (
     <AppShell>
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding:"20px 28px 28px"}}>
@@ -599,7 +731,7 @@ export default function MarketIntelligenceScreen() {
         <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0,alignItems:"start"}}>
           <FeatureBadge id="MI-02"/>
           <InteractColumn messages={messages} loading={loading} onSubmit={submit} onReview={onReview}/>
-          <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard}/>
+          <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
           <AuditColumn events={pipelineEvents}/>
         </div>
       </div>

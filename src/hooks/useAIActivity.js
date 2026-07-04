@@ -1,4 +1,4 @@
-// DeepBench v6.0.17 | useAIActivity.js | S-APPLE-05 — Elena's memory-consolidation SERVICE_CATALOG entry + Memory Consolidation/Transfer Learning/Case-Based Reasoning patterns
+// DeepBench v6.0.21 | useAIActivity.js | S-MARKET-INTEL-01d — agent-delegation pattern catalog fix (replaces stale agent-orchestration), quality-gate/pipeline-triage/data-analysis patterns retrofit
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -43,7 +43,9 @@ export const SERVICE_CATALOG = [
   // FEATURE: MI-10/MI-11 — Channel Intelligence (Marcus/CI-01): Intent Routing + Q&A Answer
   { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning'],          roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
-  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier'], roadmap: 'now'  },
+  // FEATURE: MI-01d — Agent Delegation added: Owen's own delegate_to_agent retry (Task 3) is this
+  // service's first live delegating caller.
+  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Agent Delegation'], roadmap: 'now'  },
   // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
   // RAG listed at capability level even though this specific call's design doc technical_services
   // don't name it — hyp-knowledge fires a RAG fetch unconditionally, same accepted behavior as
@@ -55,7 +57,9 @@ export const SERVICE_CATALOG = [
   // No AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('pipeline-triage')
   // exactly, resolved by the existing `|| e.type` fallback (line ~280) — same pattern as
   // channel-intelligence/quality-gate/hypothesis-evaluation.
-  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
+  // FEATURE: MI-01d — Agent Delegation added: Sam's intake-failure-intent gets its first live
+  // caller this session (Task 2).
+  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation'], roadmap: 'now' },
   // FEATURE: AA-86 -- Michelle's roster broker (lib/project-manager.js). Deterministic read, no
   // LLM call of its own -- mirrors db-assembly's shape, not librarian's (no RAG/embedding step).
   { slug: 'agent-directory', name: 'Agent Directory', serviceType: 'logic', patterns: [], roadmap: 'now' },
@@ -63,7 +67,9 @@ export const SERVICE_CATALOG = [
   // No AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('data-analysis')
   // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
   // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage.
-  { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
+  // FEATURE: MI-01d — Agent Delegation added: live since S-APPLE-04b (Escalate delegates via
+  // request_help/delegate_to_agent) but never retrofitted onto this catalog entry until now.
+  { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation'], roadmap: 'now' },
   // FEATURE: AG-33 -- data-room-custody capability (Eleanor Voss, The Librarian, LB-01). The only
   // capability whose execution performs a real the_library write, via the existing writeLibrary()
   // broker -- not a new access path, the same one S-LIBRARIAN-02 already built. patterns gained
@@ -99,7 +105,11 @@ export const PATTERN_CATALOG = [
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
   { slug: 'browser-automation', name: 'Browser Automation', desc: 'Playwright-controlled browser execution — agent drives a real browser instance on Railway infrastructure',                            active: true,  patternType: 'structural' },
   { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, patternType: 'reasoning',  hitlSpecial: true, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
-  { slug: 'agent-orchestration',      name: 'Agent Orchestration',          desc: 'One agent delegates work to a peer agent mid-execution; subagent output feeds back into the orchestrating task. Distinct from agent routing (pre-call selection): orchestration happens inside a running execution loop.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Becomes live in S11 (step execution) + AW-17 (multi-agent step assignment)' },
+  // FEATURE: MI-01d — replaces the stale agent-orchestration placeholder (written before the real
+  // mechanism existed, never activated). The live mechanism shipped as S-ARCH-LOOP-PATCH-01's
+  // request_help/delegate_to_agent tools (2026-07-02) and has been firing in production since,
+  // with zero catalog backing until this fix. Same slot in the array — not a duplicate entry.
+  { slug: 'agent-delegation', name: 'Agent Delegation', desc: 'Orchestrator-workers pattern (Anthropic, "Building Effective Agents") -- an agent delegates a subtask to another agent via request_help/delegate_to_agent and synthesizes the delegated result into its own final output. Distinct from agent routing (pre-call selection): delegation happens inside a running multi-turn loop. ARCHITECTURE.md §19d.', active: true, patternType: 'reasoning' },
   { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
   // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
   { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
