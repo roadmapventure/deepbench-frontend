@@ -1,8 +1,9 @@
-// DeepBench v6.0.18 | MarketIntelligenceScreen.jsx | S-MARKET-INTEL-01a — 3-column scaffold, live Column 1 chat
+// DeepBench v6.0.19 | MarketIntelligenceScreen.jsx | S-MARKET-INTEL-01b — live hypothesis flow (Generate Hypotheses + Stress Test)
 // FEATURE: MI-01 — Market Intelligence screen, three-column layout per market-intelligence-v4.html
-// FEATURE: MI-02 — deterministic human-decision layer (Q/A path only this session; Theory/Forecast/
-// Correct/Escalate's hypothesis-pick/commit controls ship in S-MARKET-INTEL-01b)
-import { useState, useRef } from "react";
+// FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard are explicit
+// human controls this session (Track as Assumption / Make Permanent ship in S-MARKET-INTEL-01d)
+// FEATURE: MI-03 — Theory Evidence swap-on-hypothesis-select (live); Data Room default charts still roadmap
+import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
@@ -11,54 +12,131 @@ import { useAgents } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
 
-// FEATURE: MI-01 §10b — on-load example questions, fire the real pipeline (not canned text)
 const EXAMPLE_QUESTIONS = [
   { id: "clean",  label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
   { id: "review", label: "Why is our EMEA retail partner's co-op budget utilization so low this quarter?" },
   { id: "fail",   label: "How is our authorized reseller network performing in Vietnam?" },
 ];
 
-const NON_QA_PLACEHOLDER = (intent) =>
-  `That reads as a "${intent}" request. Running a Theory, tracking a Forecast, asserting a Correction, or Escalating for deeper research ships in the next build (S-MARKET-INTEL-01b) — ask a direct question for now.`;
+const ESCALATE_PLACEHOLDER =
+  `That reads as an "escalate" request. Escalating for deeper research ships in a future build — ask a direct question, or run a Theory/Forecast/Correct for now.`;
 
-async function callCapability({ intent_slug, message, conversationContext }) {
+const INTENT_LABEL = { theory: "Theory", forecast: "Forecast", correct: "Correct" };
+
+// FEATURE: MI-02 — generalized to accept any capability/agent/task_context (was hardcoded to
+// channel-intelligence/marcus/{goal:message}) — same contract execute.js already exposes, now
+// used by both Marcus's channel-intelligence calls and Priya's hypothesis-evaluation calls.
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      capability_slug: "channel-intelligence",
-      intent_slug,
-      agent_id: "marcus",
-      task_context: { goal: message },
-      runtime_context: conversationContext,
+      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      format_skill_profile_slug, display_agent_id,
       tenant_id: TENANT_ID,
     }),
   });
-  if (!res.ok) throw new Error(`channel-intelligence ${intent_slug} failed: ${res.status}`);
+  if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
   const result = await res.json();
-  // FEATURE: MI-01 — /api/capabilities/execute's sendRequest() returns the model's structured
-  // output under `content` (deliverable_id/handler/debug live alongside it at the top level,
-  // per api/prompt/request-receivable.js Step 5) — never spread directly. First UI caller of
-  // this pipeline; unwrapped once here so runIntentPipeline below can read routing.intent /
-  // qa.answer directly, matching the already-proven ci-routing-intent/ci-answer-intent schemas.
   return result.content || {};
 }
 
-// FEATURE: MI-02 — intent confirmation is implicit for Q/A (non-destructive, per design doc §2:
-// "non-destructive actions can proceed straight from agent classification"). Theory/Forecast/
-// Correct/Escalate all write or propose consequential state and get their own explicit human
-// controls in S-MARKET-INTEL-01b — never silently answered as if they were Q/A.
 async function runIntentPipeline(message, conversationContext) {
-  const routing = await callCapability({ intent_slug: "ci-routing-intent", message, conversationContext });
-  if (routing.intent !== "qa") {
-    return { kind: "non_qa", intent: routing.intent, text: NON_QA_PLACEHOLDER(routing.intent) };
+  const routing = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
+    task_context: { goal: message }, runtime_context: conversationContext,
+  });
+  if (routing.intent === "escalate") {
+    return { kind: "non_qa", text: ESCALATE_PLACEHOLDER };
   }
-  const qa = await callCapability({ intent_slug: "ci-answer-intent", message, conversationContext });
+  if (routing.intent !== "qa") {
+    return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
+  }
+  const qa = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
+    task_context: { goal: message }, runtime_context: conversationContext,
+  });
   return { kind: "qa", ...qa };
 }
 
-function MessageBubble({ msg }) {
+// FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
+// the picker, pre-filled, when the director already wrote their own claim.
+async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason }) {
+  const gen = await callCapability({
+    capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
+    task_context: {
+      flagged_question: flaggedQuestion,
+      flagged_answer: flaggedAnswer || "",
+      review_reason: reviewReason || "director-initiated, no explicit claim extracted",
+    },
+  });
+  return gen.hypotheses || [];
+}
+
+// FEATURE: MI-02/MI-03 — live Stress Test (Priya/hypothesis-evaluation), rendered via Alex
+// Reeves's intelligence-review-format Format Skill (format-last, AA-77) — the 8-field schema
+// lives entirely on Alex's Skill Profile, never hardcoded here (ARCHITECTURE.md §13 rule 14).
+async function runStressTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorStressTest }) {
+  return callCapability({
+    capability_slug: "hypothesis-evaluation", intent_slug: "hyp-stress-test-intent", agent_id: "priya",
+    task_context: {
+      hypothesis, intent,
+      flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
+      prior_stress_test: priorStressTest || null,
+    },
+    format_skill_profile_slug: "intelligence-review-format",
+    display_agent_id: "alex",
+  });
+}
+
+function MessageBubble({ msg, onReview }) {
   const isUser = msg.role === "user";
+
+  if (msg.kind === "hyp_submitted") {
+    return (
+      <div style={{marginBottom:12,maxWidth:"96%"}}>
+        <div style={{background:T.card,border:`1px solid ${T.brassLight}`,borderLeft:`4px solid ${T.brass}`,borderRadius:3}}>
+          <div style={{background:"#f6ecd8",padding:"7px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep}}>Submitted Hypothesis</span>
+            <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase"}}>{INTENT_LABEL[msg.intent] || msg.intent}</span>
+          </div>
+          <div style={{padding:"11px 13px",fontFamily:body,fontSize:12,lineHeight:1.55,color:T.ink}}>{msg.text}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.kind === "stress_test") {
+    const st = msg.stressTest || {};
+    const sections = [
+      { key: "supports",    label: "✓ Supports",      color: T.moss,      data: st.supports },
+      { key: "complicates", label: "⚠ Complicates",   color: T.flag,      data: st.complicates },
+      { key: "consider",    label: "→ Consider also",  color: T.mutedDeep, data: st.consider },
+    ];
+    return (
+      <div style={{marginBottom:12,maxWidth:"96%"}}>
+        <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
+          <div style={{background:T.cardAlt,padding:"7px 12px"}}>
+            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>AI Stress Test · Priya Nair</span>
+          </div>
+          <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
+            {st.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{st.headline}</div>}
+            {sections.map(s => (s.data && s.data.text) ? (
+              <div key={s.key}>
+                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:s.color,marginBottom:3}}>{s.label}</div>
+                <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{s.data.text}</p>
+              </div>
+            ) : null)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.kind === "hyp_discard") {
+    return <div style={{marginBottom:12,fontFamily:body,fontSize:12,fontStyle:"italic",color:T.muted}}>{msg.text}</div>;
+  }
+
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:isUser?"flex-end":"flex-start",marginBottom:12}}>
       <div style={{
@@ -71,8 +149,14 @@ function MessageBubble({ msg }) {
         {msg.text}
       </div>
       {!isUser && msg.needs_review && (
-        <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,marginTop:4,letterSpacing:0.3}}>
-          ⚑ NEEDS REVIEW — {msg.review_reason || "flagged for review"}
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+          <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
+            ⚑ NEEDS REVIEW — {msg.review_reason || "flagged for review"}
+          </div>
+          <button onClick={() => onReview(msg)}
+            style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontFamily:body,fontSize:11.5,padding:"5px 10px",borderRadius:2,cursor:"pointer"}}>
+            Review This Answer →
+          </button>
         </div>
       )}
       {!isUser && !msg.needs_review && msg.kind === "qa" && (
@@ -82,80 +166,172 @@ function MessageBubble({ msg }) {
   );
 }
 
-// FEATURE: MI-03 — structural placeholder only this session. Live Data Room charts +
-// Theory Evidence swap-on-hypothesis-select ship in S-MARKET-INTEL-03 / 01b.
-function EvidenceColumn() {
-  const layers = [
-    { label: "Sourced",     color: T.moss },
-    { label: "Inferred",    color: T.brass },
-    { label: "Synthesized", color: T.mutedDeep },
-    { label: "Learned",     color: T.navyMid },
-  ];
+function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard }) {
+  const [customText, setCustomText] = useState("");
+
+  useEffect(() => {
+    if (hypFlow && hypFlow.prefillText) setCustomText(hypFlow.prefillText);
+  }, [hypFlow && hypFlow.prefillText]);
+
+  if (!hypFlow) {
+    const layers = [
+      { label: "Sourced",     color: T.moss },
+      { label: "Inferred",    color: T.brass },
+      { label: "Synthesized", color: T.mutedDeep },
+      { label: "Learned",     color: T.navyMid },
+    ];
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
+        <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,position:"relative"}}>
+          <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:12}}>
+            Data Room charts ship in S-MARKET-INTEL-03. Run a Theory, Forecast, or Correct to see live Theory Evidence here.
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {layers.map(l => (
+              <span key={l.label} style={{fontFamily:mono,fontSize:9,padding:"3px 8px",border:`1px solid ${l.color}`,color:l.color}}>
+                {l.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const st = hypFlow.stressTest;
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,position:"relative"}}>
-        <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:12}}>
-          Data Room evidence charts and Theory Evidence view ship in S-MARKET-INTEL-01b / 03.
-        </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-          {layers.map(l => (
-            <span key={l.label} style={{fontFamily:mono,fontSize:9,padding:"3px 8px",border:`1px solid ${l.color}`,color:l.color}}>
-              {l.label}
-            </span>
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Theory Evidence</div>
+      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:14}}>
+
+        <div style={{display:"flex",gap:6}}>
+          {["theory","forecast","correct"].map(i => (
+            <button key={i} onClick={() => onIntentChange(i)}
+              style={{flex:1,padding:"8px 6px",fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",
+                background: hypFlow.intent === i ? T.brass : "transparent",
+                color: hypFlow.intent === i ? T.card : T.muted,
+                border:`1px solid ${T.brass}`,cursor:"pointer"}}>
+              {INTENT_LABEL[i] || i}
+            </button>
           ))}
         </div>
+
+        {hypFlow.stage === "generating" && (
+          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is generating hypotheses…</div>
+        )}
+
+        {hypFlow.candidates && hypFlow.candidates.length > 0 && hypFlow.stage !== "generating" && (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Select or write a hypothesis</div>
+            {hypFlow.candidates.map(h => (
+              <div key={h.id} onClick={() => onSelectHypothesis(h.text)}
+                style={{padding:"9px 11px",background:T.card,border:`1px solid ${hypFlow.chosenText===h.text?T.brass:T.lineSoft}`,
+                  fontFamily:body,fontSize:12,color:T.ink,cursor:"pointer",display:"flex",gap:8}}>
+                <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{h.id}</span>
+                <span>{h.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hypFlow.stage !== "generating" && (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {!hypFlow.candidates && <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Write your hypothesis</div>}
+            <textarea rows={2} value={customText} onChange={e => setCustomText(e.target.value)}
+              placeholder="...or write your own explanation"
+              style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
+            <button onClick={() => { if (customText.trim()) { onSelectHypothesis(customText.trim()); setCustomText(""); } }}
+              disabled={!customText.trim()}
+              style={{alignSelf:"flex-start",padding:"6px 12px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11.5,cursor:customText.trim()?"pointer":"default"}}>
+              Use this hypothesis
+            </button>
+          </div>
+        )}
+
+        {hypFlow.stage === "testing" && (
+          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is stress-testing this hypothesis…</div>
+        )}
+
+        {st && hypFlow.stage === "result" && (
+          <>
+            {st.override_warning && (
+              <div style={{padding:"9px 11px",background:"#f3e6cc",border:`1px solid ${T.brass}`,fontFamily:body,fontSize:11,color:T.brassDeep}}>
+                ⚑ AI flagged a complicating factor not fully resolved by this hypothesis. Committing will log this as an override.
+              </div>
+            )}
+
+            {Array.isArray(st.projected_state) && st.projected_state.length > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected</div>
+                {st.projected_state.map((m, i) => (
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontFamily:body,fontSize:11.5,color:T.ink,padding:"6px 0",borderBottom:`1px solid ${T.lineSoft}`}}>
+                    <span>{m.metric}</span>
+                    <span style={{color:T.muted}}>{m.current} <span style={{color:T.brassDeep}}>→</span> {m.projected} {m.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {Array.isArray(st.key_data_points) && st.key_data_points.length > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points</div>
+                {st.key_data_points.map((d, i) => (
+                  <div key={i} style={{fontFamily:body,fontSize:11,color:T.ink}}>
+                    <b>{d.label}:</b> {d.value} <span style={{color:T.muted,fontFamily:mono,fontSize:9.5}}>· {d.source} · {d.confidence}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {hypFlow.stage === "result" && (
+          <div style={{display:"flex",gap:6,marginTop:4}}>
+            <button onClick={onDiscard}
+              style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+              Discard
+            </button>
+            <button disabled title="Ships in the next Market Intelligence session"
+              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:"not-allowed"}}>
+              Track as Assumption
+            </button>
+            <button disabled title="Ships in the next Market Intelligence session"
+              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:"not-allowed"}}>
+              Make Permanent
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// FEATURE: MI-04 — structural placeholder only this session. Real event log (Intent Routing,
-// Proofreader, Stress Test, Intake Assistant, Reasoner) ships in S-MARKET-INTEL-01b / 02.
 function AuditColumn() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
         <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-          Pipeline Log, About Market Intelligence, and Demo Reset controls ship in S-MARKET-INTEL-01b / 03.
+          Pipeline Log, About Market Intelligence, and Demo Reset controls ship in S-MARKET-INTEL-01c / 01d / 03.
         </div>
       </div>
     </div>
   );
 }
 
-function InteractColumn() {
+function InteractColumn({ messages, loading, onSubmit, onReview }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
-  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  const conversationContext = () =>
-    messages.map(m => `${m.role}: ${m.text}`).join("\n");
-
-  const submit = async (text) => {
+  const submit = (text) => {
     const clean = (text || "").trim();
     if (!clean || loading || !marcus) return;
     setInput("");
-    setMessages(prev => [...prev, { role: "user", text: clean }]);
-    setLoading(true);
-    setAIStatus("Marcus is thinking…");
-    try {
-      const result = await runIntentPipeline(clean, conversationContext());
-      const assistantMsg = result.kind === "qa"
-        ? { role: "assistant", text: result.answer, needs_review: !!result.needs_review, review_reason: result.review_reason, kind: "qa" }
-        : { role: "assistant", text: result.text, kind: "non_qa" };
-      setMessages(prev => [...prev, assistantMsg]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong reaching Marcus — try again.", kind: "error" }]);
-      console.error("[MarketIntelligenceScreen]", e.message);
-    } finally {
-      setLoading(false);
-      clearAIStatus();
-    }
+    onSubmit(clean);
   };
 
   return (
@@ -189,7 +365,7 @@ function InteractColumn() {
               </div>
             </div>
           ) : (
-            messages.map((m, i) => <MessageBubble key={i} msg={m}/>)
+            messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
           )}
           {loading && <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Marcus is thinking…</div>}
         </div>
@@ -214,6 +390,84 @@ function InteractColumn() {
 }
 
 export default function MarketIntelligenceScreen() {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hypFlow, setHypFlow] = useState(null);
+
+  const conversationContext = () =>
+    messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
+
+  const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, reviewReason }) => {
+    if (extractedHypothesis) {
+      setHypFlow({ stage:"choosing", intent, candidates:null, prefillText:extractedHypothesis, chosenText:null,
+        flaggedQuestion, flaggedAnswer, reviewReason, stressTest:null, priorStressTest:null });
+      return;
+    }
+    setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
+      flaggedQuestion, flaggedAnswer, reviewReason, stressTest:null, priorStressTest:null });
+    try {
+      const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
+      setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
+    } catch (e) {
+      console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
+      setHypFlow(null);
+    }
+  };
+
+  const submit = async (text) => {
+    const clean = (text || "").trim();
+    if (!clean || loading) return;
+    setMessages(prev => [...prev, { role:"user", text: clean }]);
+    setLoading(true);
+    setAIStatus("Marcus is thinking…");
+    try {
+      const result = await runIntentPipeline(clean, conversationContext());
+      if (result.kind === "qa") {
+        setMessages(prev => [...prev, { role:"assistant", text: result.answer, needs_review: !!result.needs_review, review_reason: result.review_reason, question: clean, kind:"qa" }]);
+      } else if (result.kind === "hyp_entry") {
+        setMessages(prev => [...prev, { role:"assistant", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. Pick or refine a hypothesis on the right.`, kind:"non_qa" }]);
+        await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, reviewReason: null });
+      } else {
+        setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { role:"assistant", text: "Something went wrong reaching Marcus — try again.", kind:"error" }]);
+      console.error("[MarketIntelligenceScreen]", e.message);
+    } finally {
+      setLoading(false);
+      clearAIStatus();
+    }
+  };
+
+  const onReview = (msg) => {
+    enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: msg.question, flaggedAnswer: msg.text, reviewReason: msg.review_reason });
+  };
+
+  const onIntentChange = (intent) => setHypFlow(prev => prev && ({ ...prev, intent }));
+
+  const onSelectHypothesis = async (text) => {
+    if (!hypFlow) return;
+    const { intent, flaggedQuestion, flaggedAnswer, stressTest } = hypFlow;
+    setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
+    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
+    setAIStatus("Priya is stress-testing…");
+    try {
+      const st = await runStressTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorStressTest: stressTest || null });
+      setMessages(prev => [...prev, { role:"assistant", kind:"stress_test", stressTest: st }]);
+      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, stressTest: st, priorStressTest: prev.stressTest || null }));
+    } catch (e) {
+      console.error("[MarketIntelligenceScreen] runStressTest", e.message);
+      setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
+    } finally {
+      clearAIStatus();
+    }
+  };
+
+  const onDiscard = () => {
+    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_discard", text: "Theory discarded — not written to the Data Room." }]);
+    setHypFlow(null);
+  };
+
   return (
     <AppShell>
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding:"20px 28px 28px"}}>
@@ -224,8 +478,8 @@ export default function MarketIntelligenceScreen() {
         </div>
         <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0,alignItems:"start"}}>
           <FeatureBadge id="MI-02"/>
-          <InteractColumn/>
-          <EvidenceColumn/>
+          <InteractColumn messages={messages} loading={loading} onSubmit={submit} onReview={onReview}/>
+          <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard}/>
           <AuditColumn/>
         </div>
       </div>
