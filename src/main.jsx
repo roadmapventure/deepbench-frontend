@@ -1,4 +1,4 @@
-// DeepBench v5.2.41 | main.jsx | App entry point — React root + all routes
+// DeepBench v6.0.18 | main.jsx | SH-15 — / now routes to Market Intelligence, Work moved to /work
 // FEATURE: SH-14 — Welcome splash modal
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,6 +17,7 @@ import PersonnelScreen        from "./screens/PersonnelScreen.jsx";
 import TeachScreen            from "./screens/TeachScreen.jsx";
 import TestTeamScreen         from "./screens/TestTeamScreen.jsx";
 import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
+import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -25,7 +26,8 @@ createRoot(document.getElementById("root")).render(
       <FetchProvider>
         <AnalyzerProvider>
           <Routes>
-            <Route path="/"                          element={<DashboardScreen />} />
+            <Route path="/"                          element={<MarketIntelligenceScreen />} />
+            <Route path="/work"                      element={<DashboardScreen />} />
             <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
             <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
             <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />

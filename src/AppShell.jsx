@@ -1,11 +1,11 @@
-// DeepBench v5.1.33 | AppShell.jsx | AI Audit button tooltip
+// DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, about panel
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
-import { Toast } from "./components/SharedUI.jsx";
+import { Toast, FeatureBadge } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
 import AIDiamond from "./components/AIDiamond.jsx";
@@ -83,8 +83,9 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
 
   useEffect(() => () => cleanup(), [cleanup]);
 
-  const isWork  = location.pathname === "/" || location.pathname.startsWith("/work");
+  const isWork  = location.pathname.startsWith("/work");
   const isBench = location.pathname.startsWith("/bench");
+  const isMI    = location.pathname === "/";
 
   return (
     <div style={{background:T.navy,color:T.card,padding:"0 28px",display:"flex",alignItems:"center",height:60,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:12,position:"relative"}}>
@@ -103,7 +104,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
         <NavTab
           isActive={isWork}
-          onClick={()=>navigate("/")}
+          onClick={()=>navigate("/work")}
           icon="📋"
           label="Work"
           hasBorderLeft={true}
@@ -115,6 +116,17 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           label="Bench"
           hasBorderLeft={false}
         />
+        {/* FEATURE: SH-15 — Market Intelligence tab, 3rd tab, default landing route */}
+        <span style={{position:"relative",display:"flex"}}>
+          <FeatureBadge id="SH-15"/>
+          <NavTab
+            isActive={isMI}
+            onClick={()=>navigate("/")}
+            icon="◈"
+            label="Market Intelligence"
+            hasBorderLeft={false}
+          />
+        </span>
       </div>
 
       <div style={{flex:1}}/>
