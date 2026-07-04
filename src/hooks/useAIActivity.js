@@ -1,4 +1,4 @@
-// DeepBench v6.0.7 | useAIActivity.js | SK-22 — Display/Format capability SERVICE_CATALOG entries
+// DeepBench v6.0.17 | useAIActivity.js | S-APPLE-05 — Elena's memory-consolidation SERVICE_CATALOG entry + Memory Consolidation/Transfer Learning/Case-Based Reasoning patterns
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
 // Module-level AI call log. Any component calls logAICall() to record.
@@ -41,7 +41,7 @@ export const SERVICE_CATALOG = [
   // FEATURE: AG-27 — The Librarian (Eleanor Voss) Data Room broker service catalog entry
   { slug: 'librarian',               name: 'The Librarian',             serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
   // FEATURE: MI-10/MI-11 — Channel Intelligence (Marcus/CI-01): Intent Routing + Q&A Answer
-  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG'],                                  roadmap: 'now'  },
+  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning'],          roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
   { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier'], roadmap: 'now'  },
   // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
@@ -50,7 +50,7 @@ export const SERVICE_CATALOG = [
   // channel-intelligence's ci-routing-intent (Section 2 above). No AI_TYPE_TO_SERVICE entry needed:
   // ai_type will equal capability_slug ('hypothesis-evaluation') exactly, resolved by the existing
   // `|| e.type` fallback (line 280) — same pattern as channel-intelligence/quality-gate.
-  { slug: 'hypothesis-evaluation',   name: 'Hypothesis Evaluation',     serviceType: 'ai',     patterns: ['Structured Output', 'RAG'], roadmap: 'now'  },
+  { slug: 'hypothesis-evaluation',   name: 'Hypothesis Evaluation',     serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning'], roadmap: 'now'  },
   // FEATURE: AG-29 — pipeline-triage capability (Sam Reyes, Commit Triage + Failure Triage).
   // No AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('pipeline-triage')
   // exactly, resolved by the existing `|| e.type` fallback (line ~280) — same pattern as
@@ -77,6 +77,11 @@ export const SERVICE_CATALOG = [
   { slug: 'screen-controls', name: 'Screen Controls (Alex Reeves)', serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
   { slug: 'html-display',    name: 'HTML Display (Riley Torres)',   serviceType: 'ai', patterns: [], roadmap: 'now' },
   { slug: 'pdf-assembly',    name: 'PDF Assembly (Claire Sutton)',  serviceType: 'ai', patterns: [], roadmap: 'now' },
+  // FEATURE: AG-24 -- memory-consolidation capability (Elena Cho, The Reasoner, CI-06). No
+  // AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('memory-consolidation')
+  // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
+  // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage/data-analysis.
+  { slug: 'memory-consolidation', name: 'Memory Consolidation (Elena Cho)', serviceType: 'ai', patterns: ['Structured Output', 'Memory Consolidation', 'Transfer Learning'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
@@ -98,6 +103,9 @@ export const PATTERN_CATALOG = [
   { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
   // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
   { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
+  { slug: 'memory-consolidation', name: 'Memory Consolidation', desc: 'An agent turns one human-confirmed decision into durable, structured reasoning -- the write half of closing a correction loop.', active: true, patternType: 'reasoning' },
+  { slug: 'transfer-learning', name: 'Transfer Learning', desc: 'Generalizing a specific correction into a pattern applicable to a class of future, related questions -- not just fixing the one answer.', active: true, patternType: 'reasoning' },
+  { slug: 'case-based-reasoning', name: 'Case-Based Reasoning', desc: 'Retrieving a previously consolidated case/pattern to inform a new, related question -- the read half of closing a correction loop.', active: true, patternType: 'reasoning' },
   { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, patternType: 'structural', partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
   // FEATURE: MI-12 — llm-as-judge active: true (Quality Gate ships this session)
   { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: true,  patternType: 'reasoning' },
