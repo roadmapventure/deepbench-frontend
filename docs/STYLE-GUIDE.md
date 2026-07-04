@@ -414,6 +414,18 @@ The Create Work Order screen uses a strict two-column layout: all user entry con
 
 ---
 
+## 16. ConfirmationCard — Generic `pending_confirmation` Gate (Locked 2026-07-04, S-MARKET-INTEL-01d-design)
+
+The platform's `requires_human_confirmation` mechanism (`ARCHITECTURE.md` §19d) has exactly one frontend rendering, `ConfirmationCard` (`SharedUI.jsx`) — never a bespoke per-capability card. Any future capability that gates on human accept/reject/edit reuses this component; do not build a second one.
+
+- **Visual family:** same as `MessageBubble`'s "Submitted Hypothesis" card — bordered card, brass-tinted header strip (`background: "#f6ecd8"`, `borderLeft: 4px solid T.brass`), agent avatar + name + role in the header.
+- **Body:** every non-null key in `proposedAction` rendered generically as a label/value pair (label = key with underscores replaced by spaces, uppercase mono) — never a hand-picked subset of fields per capability. `critique`, when present, renders as a separate inset block below.
+- **Actions:** always exactly three — Reject (ghost), Edit (ghost, opens an inline textarea + Resubmit/Cancel), Accept (brass-filled, primary). Edit re-submits and expects a *new* proposal back (loop), never closes the card itself — only Accept/Reject close it.
+- **Props:** `{ agent, proposedAction, critique, onResolve }` — `onResolve(resolution, editedText)` is the only capability-specific wiring; the component itself contains zero capability-specific strings or logic.
+- **Placement:** wherever the triggering action lives (e.g. Market Intelligence's Evidence column, replacing the commit-button row while a confirmation is pending) — not a modal, not the chat.
+
+---
+
 ---
 
 ## Section 16 — Prompt Visibility Modal (Locked 2026-06-23 · S-PM-07-design)
