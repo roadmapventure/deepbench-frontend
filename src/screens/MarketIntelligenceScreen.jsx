@@ -225,20 +225,33 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
   return gen.hypotheses || [];
 }
 
-// FEATURE: MI-02/MI-03 — live AI - Hypothesis Test (Priya/hypothesis-evaluation), rendered via Alex
-// Reeves's intelligence-review-format Format Skill (format-last, AA-77) — the 8-field schema
-// lives entirely on Alex's Skill Profile, never hardcoded here (ARCHITECTURE.md §13 rule 14).
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest }) {
-  return callCapability({
+// FEATURE: S-ARCH-DISPLAY-LOOP-02 (AA-116) — real Display-agent hand-off for AI - Hypothesis
+// Test, mirroring runQaWithQualityGate's real two-call chain (S-ARCH-DISPLAY-LOOP-01/AA-115):
+// Priya's own hyp-hypothesis-test-intent call (her genuine analytical schema, separate from
+// Alex's presentational one) followed by a real request_help -> Michelle (agent-selection-intent)
+// -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
+// candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
+// format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent }) {
+  const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
       hypothesis, intent,
       flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
       prior_hypothesis_test: priorHypothesisTest || null,
     },
-    format_skill_profile_slug: "intelligence-review-format",
-    display_agent_id: "alex",
   });
+
+  const display = await callCapability({
+    capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-display-intent", agent_id: "priya",
+    task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
+  });
+  if (display.selection) {
+    onEvent({ type: "agent_selection", agentId: "priya", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection });
+  }
+  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "priya", secondaryAgentId: display.display_agent_id, data: display });
+
+  return display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
 }
 
 function MessageBubble({ msg, onReview }) {
@@ -280,6 +293,14 @@ function MessageBubble({ msg, onReview }) {
               </div>
             ) : null)}
           </div>
+          {msg.displayAgentCard && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
+              <AgentAvatar who={msg.displayAgentId} size={16} ring={false} />
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>Formatted by</span>
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>{msg.displayAgentCard.name}</span>
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: '#777' }}>{msg.displayAgentCard.role}</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -726,9 +747,9 @@ export default function MarketIntelligenceScreen() {
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
     setAIStatus("Priya is running a hypothesis test…");
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null });
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent });
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st });
-      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st }]);
+      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id }]);
       setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
     } catch (e) {
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
