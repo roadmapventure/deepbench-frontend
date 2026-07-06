@@ -1,4 +1,4 @@
-// DeepBench v6.0.8 | api/capabilities/execute.js | S-APPLE-04b — AA-103 generic accept hand-off
+// DeepBench v6.0.22 | api/capabilities/execute.js | S-ARCH-DISPLAY-LOOP-01 — is_final terminal delegation + fetchAgentCard() extraction
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -43,6 +43,26 @@ async function resolveCapabilityHolder(capability_slug) {
   return rows[0].agent_id;
 }
 
+// FEATURE: S-ARCH-DISPLAY-LOOP-01 -- shared helper, extracted from fetchFormatOverride()'s inline
+// agent-card lookup so the new terminal-delegation path (is_final branch below) and the existing
+// bundled format-override path share one fetch, never two copies of the same lookup.
+async function fetchAgentCard(agentId, headers, supabaseUrl) {
+  if (!agentId) return null;
+  try {
+    const agRes = await fetch(
+      `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(agentId)}&select=name,role,specialty,bio&limit=1`,
+      { headers }
+    );
+    if (agRes.ok) {
+      const [agRow] = await agRes.json();
+      return agRow || null;
+    }
+  } catch (e) {
+    console.warn('[execute] agent card fetch failed:', e.message);
+  }
+  return null;
+}
+
 // FEATURE: AA-77 — fetch a display agent's Format Skill by slug and build the override pieces.
 // Mirrors api/plan.js lines 198-234 exactly (same fetch, same formatContract shape) — generalized
 // here so any capability can opt in, not duplicated a third time.
@@ -80,21 +100,7 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
     console.warn('[execute] format override fetch failed:', e.message);
   }
 
-  let displayAgentCard = null;
-  if (display_agent_id) {
-    try {
-      const agRes = await fetch(
-        `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(display_agent_id)}&select=name,role,specialty,bio&limit=1`,
-        { headers }
-      );
-      if (agRes.ok) {
-        const [agRow] = await agRes.json();
-        displayAgentCard = agRow || null;
-      }
-    } catch (e) {
-      console.warn('[execute] display agent fetch failed:', e.message);
-    }
-  }
+  const displayAgentCard = display_agent_id ? await fetchAgentCard(display_agent_id, headers, supabaseUrl) : null;
 
   return { formatContract, formatSection, displayAgentCard };
 }
@@ -151,6 +157,12 @@ export async function runCapability({
 
   let conversationHistory = [];
   let delegationOccurred = false;
+  // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- threads the most recent request_help hop's real selection
+  // forward instead of discarding it once delegate_to_agent fires. Generic: captures whatever a
+  // request_help call in this loop resolved to, for any future capability using this same pattern,
+  // not something Display-agent-specific. Reset to null on every request_help hop below so it never
+  // survives stale from an earlier turn.
+  let lastHelpSelection = null;
   const hopCounter = _hop_counter || { n: 0 };
 
   for (let depth = 0; ; depth++) {
@@ -227,6 +239,16 @@ export async function runCapability({
         tenant_id,
         _hop_counter: hopCounter,
       });
+      // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- thread Michelle's real selection forward instead of
+      // discarding it. Generic to any request_help hop, not Display-agent-specific: captures
+      // whatever agent-selection-intent's own schema returned (reasoning/candidates), reading it
+      // from delegateResult.content since sendRequest()'s handler (store) does not spread the
+      // model's structured fields onto the top-level result.
+      lastHelpSelection = {
+        selected_by_agent_id: pmAgentId,
+        reasoning: delegateResult?.content?.reasoning ?? null,
+        candidates_considered: delegateResult?.content?.candidates ?? null,
+      };
     } else if (turn.tool_name === 'delegate_to_agent') {
       // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
       // call here: the model is choosing an agent_id it was just handed as a candidate (via
@@ -242,6 +264,40 @@ export async function runCapability({
         tenant_id,
         _hop_counter: hopCounter,
       });
+
+      // FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- is_final terminates the loop here,
+      // returning the delegate's own output as the final result, attributed to them, instead of
+      // feeding back for the delegator's own next turn. selection is null (never fabricated) when
+      // no request_help hop preceded this delegate_to_agent call in this same loop -- a legitimate
+      // shape per the tool's own description (task_context-supplied candidates), same as Owen's
+      // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
+      // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
+      if (turn.tool_input.is_final === true) {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        const headers = getSupabaseHeaders(supabaseKey);
+        const card = await fetchAgentCard(targetAgentId, headers, supabaseUrl);
+        // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own
+        // structured output (e.g. qa-answer-format's headline/body/citations/...); spread at the
+        // top level here, same place callers already read it after callCapability()'s existing
+        // `.content` unwrap for the ordinary terminal-dispatch shape. `status: 'final_delegation'`
+        // reuses callCapability()'s existing generic `if (result.status) return result;` passthrough
+        // (already built for pending_confirmation/depth_exceeded) so this flat shape survives the
+        // frontend unwrap unchanged -- no capability-specific branch added to callCapability() itself.
+        // patterns_used: start from the delegate's own patterns (e.g. Alex's structured-output),
+        // then guarantee 'agent-delegation' is present -- this hop, by definition, just delegated
+        // (delegationOccurred is already true in this loop's own scope), regardless of whether the
+        // delegate itself further delegated.
+        const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
+        return {
+          status: 'final_delegation',
+          ...delegateResult.content,
+          patterns_used: finalPatterns,
+          display_agent_card: card,
+          display_agent_id: targetAgentId,
+          selection: lastHelpSelection,
+        };
+      }
     }
 
     conversationHistory = [

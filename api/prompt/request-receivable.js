@@ -1,4 +1,4 @@
-// DeepBench v6.0.13 | api/prompt/request-receivable.js | sendRequest named export + content in response + enriched prompt_request support | S-APPLE-04b re-scope — reasoning-write handler registry
+// DeepBench v6.0.22 | api/prompt/request-receivable.js | S-ARCH-DISPLAY-LOOP-01 — is_final flag on delegate_to_agent (terminal Display-agent hand-off)
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
 import { handle as storeHandle } from '../_lib/handlers/store.js';
@@ -31,9 +31,12 @@ const REQUEST_HELP_TOOL = {
   },
 };
 
+// FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- optional is_final flag. Set true only when
+// this delegation fully completes the delegator's task -- the delegate's own output becomes the
+// final result, credited to them, instead of feeding back for the delegator to keep working.
 const DELEGATE_TO_AGENT_TOOL = {
   name: 'delegate_to_agent',
-  description: 'Dispatch a task to a specific agent and capability chosen from candidates you were actually given (e.g. by request_help). Never use an agent_id you were not given as a candidate.',
+  description: 'Dispatch a task to a specific agent and capability chosen from candidates you were actually given (e.g. by request_help). Never use an agent_id you were not given as a candidate. Set is_final true for a hand-off where nothing more is expected of you once the delegate responds.',
   input_schema: {
     type: 'object',
     required: ['agent_id', 'capability_slug', 'task', 'reasoning'],
@@ -43,6 +46,7 @@ const DELEGATE_TO_AGENT_TOOL = {
       intent_slug: { type: ['string', 'null'] },
       task: { type: 'string', description: 'The task for the chosen agent to perform' },
       reasoning: { type: 'string', description: 'Why you chose this candidate' },
+      is_final: { type: 'boolean', description: 'Set true only when this delegation fully completes your task and no further judgment from you is needed -- the delegate\'s own output becomes the final result, credited to them. Omit or set false when you need to see the delegate\'s result before finishing your own turn (e.g. reviewing a regenerated answer before deciding whether it now passes).' },
     },
   },
 };

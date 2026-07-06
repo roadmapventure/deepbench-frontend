@@ -1,5 +1,6 @@
-// DeepBench v6.0.21 | MarketIntelligenceScreen.jsx | S-MARKET-INTEL-01d — commit actions (Elena +
-// Nadia direct, generic ConfirmationCard), Sam's failure triage, Owen's real delegate_to_agent retry
+// DeepBench v6.0.22 | MarketIntelligenceScreen.jsx | S-ARCH-DISPLAY-LOOP-01 — real Display-agent
+// hand-off for Marcus's Q&A answer (request_help -> Michelle -> delegate_to_agent(is_final:true) ->
+// Alex), fixes raw-markdown-in-chat bug, closes AA-101
 // FEATURE: MI-01 — Market Intelligence screen, three-column layout per market-intelligence-v4.html
 // FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard + commit
 // actions (Track as Assumption / Make Permanent) are explicit human controls, all live as of 01d
@@ -8,7 +9,8 @@
 // ==='revise'), plus real retry-once-on-block via Owen's own delegate_to_agent call (01d correction —
 // see runQaWithQualityGate below; the 01c screen-scripted retry was an architecture regression)
 // FEATURE: MI-04 — Pipeline Log, real events only (Intent Routing, Q&A Answer, Proofreader incl. real
-// retry hand-off, Stress Test, Memory Consolidation, Data Integrity Patch, Failure Triage)
+// retry hand-off, Stress Test, Memory Consolidation, Data Integrity Patch, Failure Triage, and now
+// (S-ARCH-DISPLAY-LOOP-01) Agent Selection + Display Format for Marcus's real Display-agent hand-off)
 import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
@@ -77,6 +79,14 @@ function describePipelineEvent(evt) {
       return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : ""}`, color: T.brass };
     case "patch_resolved":
       return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${evt.data.result?.content?.confirmation_note || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by director`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
+    // FEATURE: S-ARCH-DISPLAY-LOOP-01 — the two connected hand-off entries proving the real
+    // request_help -> Michelle -> delegate_to_agent(is_final:true) round trip: Marcus asking for
+    // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
+    // to the chosen Display agent.
+    case "agent_selection":
+      return { capability: "channel-intelligence", summary: `${evt.data.reasoning}`, color: T.moss };
+    case "display_format":
+      return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${evt.data.confidence_tier}`, color: T.moss };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -159,7 +169,28 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   const finalAnswer = retried ? gate.final_answer : qa;
   const needs_review = !!qa.needs_review || gate.eval?.result === "revise";
   const review_reason = qa.needs_review ? qa.review_reason : (gate.eval?.result === "revise" ? gate.eval.critique : null);
-  return { kind: "qa", answer: finalAnswer.answer, confidence_tier: finalAnswer.confidence_tier, citations: finalAnswer.citations, needs_review, review_reason };
+
+  // FEATURE: S-ARCH-DISPLAY-LOOP-01 — real Display-agent hand-off (AA-101/AA-114/AA-115), proven
+  // here via Marcus's Q&A path: request_help -> Michelle (agent-selection-intent) ->
+  // delegate_to_agent(is_final:true) -> whichever Display agent she ranked highest. Runs after the
+  // Proofreader gate/retry sequence resolves, on finalAnswer (whichever of qa/gate.final_answer
+  // won) — Owen's own evaluation semantics above are completely unchanged by this step.
+  const display = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
+    task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
+  });
+  if (display.selection) {
+    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection });
+  }
+  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "marcus", secondaryAgentId: display.display_agent_id, data: display });
+
+  return {
+    kind: "qa",
+    headline: display.headline, body: display.body, key_data_points: display.key_data_points,
+    citations: display.citations, confidence_tier: display.confidence_tier,
+    needs_review: display.needs_review, review_reason: display.review_reason,
+    displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
+  };
 }
 
 async function runIntentPipeline(message, conversationContext, onEvent) {
@@ -255,6 +286,71 @@ function MessageBubble({ msg, onReview }) {
     return <div style={{marginBottom:12,fontFamily:body,fontSize:12,fontStyle:"italic",color:T.muted}}>{msg.text}</div>;
   }
 
+  // FEATURE: S-ARCH-DISPLAY-LOOP-01 — Marcus's Q&A answer, formatted by a real Display agent
+  // (request_help -> Michelle -> delegate_to_agent(is_final:true)), never {msg.text} raw markdown.
+  // Reuses the exact stress_test bubble's card treatment (border/header/spacing) — a consistency
+  // requirement, not a new visual pattern (DESIGN RULES). Byline visual treatment matches
+  // CreateWorkOrderScreen.jsx's existing "Screen formatted by [Name] [Role]" byline exactly, with
+  // AgentAvatar added per Style Guide Section 17 (avatar mandatory, never name-only text).
+  if (msg.kind === "qa") {
+    return (
+      <div style={{marginBottom:12,maxWidth:"96%"}}>
+        <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
+          <div style={{background:T.cardAlt,padding:"7px 12px"}}>
+            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
+          </div>
+          <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
+            {msg.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{msg.headline}</div>}
+            {(msg.body || []).map((b, i) => (
+              <div key={i}>
+                {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
+                <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
+              </div>
+            ))}
+            {Array.isArray(msg.keyDataPoints) && msg.keyDataPoints.length > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points</div>
+                {msg.keyDataPoints.map((d, i) => (
+                  <div key={i} style={{fontFamily:body,fontSize:11,color:T.ink}}>
+                    <b>{d.label}:</b> {d.value} <span style={{color:T.muted,fontFamily:mono,fontSize:9.5}}>· {d.source} · {d.confidence}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {msg.displayAgentCard && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
+              <AgentAvatar who={msg.displayAgentId} size={16} ring={false} />
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>
+                Formatted by
+              </span>
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>
+                {msg.displayAgentCard.name}
+              </span>
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: '#777' }}>
+                {msg.displayAgentCard.role}
+              </span>
+            </div>
+          )}
+        </div>
+        {msg.needs_review && (
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
+              ⚑ NEEDS REVIEW — {msg.review_reason || "flagged for review"}
+            </div>
+            <button onClick={() => onReview(msg)}
+              style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontFamily:body,fontSize:11.5,padding:"5px 10px",borderRadius:2,cursor:"pointer"}}>
+              Review This Answer →
+            </button>
+          </div>
+        )}
+        {!msg.needs_review && (
+          <div style={{marginTop:4}}><AiBadge label={AI_PAT.AGENT_ROUTING}/></div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:isUser?"flex-end":"flex-start",marginBottom:12}}>
       <div style={{
@@ -276,9 +372,6 @@ function MessageBubble({ msg, onReview }) {
             Review This Answer →
           </button>
         </div>
-      )}
-      {!isUser && !msg.needs_review && msg.kind === "qa" && (
-        <div style={{marginTop:4}}><AiBadge label={AI_PAT.AGENT_ROUTING}/></div>
       )}
     </div>
   );
@@ -593,7 +686,18 @@ export default function MarketIntelligenceScreen() {
     try {
       const result = await runIntentPipeline(clean, conversationContext(), logEvent);
       if (result.kind === "qa") {
-        setMessages(prev => [...prev, { role:"assistant", text: result.answer, needs_review: !!result.needs_review, review_reason: result.review_reason, question: clean, citations: result.citations || [], kind:"qa" }]);
+        // FEATURE: S-ARCH-DISPLAY-LOOP-01 — msg.text stays a plain-text join of the formatted body
+        // (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep working
+        // unchanged (both need a plain string, not the structured card shape); rendering itself
+        // reads the structured fields below, never {msg.text}, for kind === "qa" bubbles.
+        const plainText = [result.headline, ...(result.body || []).map(b => b.text)].filter(Boolean).join("\n\n");
+        setMessages(prev => [...prev, {
+          role:"assistant", text: plainText, kind:"qa",
+          headline: result.headline, body: result.body, keyDataPoints: result.key_data_points,
+          displayAgentCard: result.displayAgentCard, displayAgentId: result.displayAgentId,
+          needs_review: !!result.needs_review, review_reason: result.review_reason,
+          question: clean, citations: result.citations || [],
+        }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
       } else if (result.kind === "hyp_entry") {
