@@ -37,14 +37,14 @@ Five intents, classified fresh on every chat submission — this is the front do
 | Intent | What it means | Consequence |
 |---|---|---|
 | **Q/A** | A genuine question | None — informational |
-| **Run a Theory** | Director wants to test a hunch | None if discarded — exploratory |
+| **Run a Theory** | User wants to test a hunch | None if discarded — exploratory |
 | **Forecast** | Track a provisional assumption | Writes to the Data Room, `ingest_scope: provisional` |
 | **Correct** | Assert a permanent correction to data or reasoning | Writes to the Data Room, `ingest_scope: permanent` |
 | **Escalate** | Request deeper research | Writes new Data Room content |
 
-**Approve is not a top-level intent** — it's a possible *response* within reviewing a flagged Q&A answer (the director confirms the original answer was fine), not a way of initiating a turn.
+**Approve is not a top-level intent** — it's a possible *response* within reviewing a flagged Q&A answer (the user confirms the original answer was fine), not a way of initiating a turn.
 
-A director can enter Theory/Forecast/Correct/Escalate either by writing their own claim unprompted, or by starting from a flagged Q&A answer and picking/writing a hypothesis from there. Both paths converge on the same downstream calls.
+A user can enter Theory/Forecast/Correct/Escalate either by writing their own claim unprompted, or by starting from a flagged Q&A answer and picking/writing a hypothesis from there. Both paths converge on the same downstream calls.
 
 ---
 
@@ -55,7 +55,7 @@ All six are full DeepBench personas (agents.js entry, AVATAR_CFG, AGENT_PRONOUNS
 | # | Agent | Replaces / absorbs | Job |
 |---|---|---|---|
 | 1 | **GEO CSO Expert** (CI-01) | Performance Strategist | Answers from the Data Room; classifies intent; conversational routing |
-| 2 | **Forecast/Theory/Performance Expert** | Hypothesis Generator + Stress Test (orig. v3 spec Agents 2+3) | Generates hypotheses; stress-tests Theory/Forecast/Correct claims against evidence — "Performance" = domain scope (channel/program performance), not a distinct call |
+| 2 | **Forecast/Theory/Performance Expert** | Hypothesis Generator + AI - Hypothesis Test (orig. v3 spec Agents 2+3) | Generates hypotheses; stress-tests Theory/Forecast/Correct claims against evidence — "Performance" = domain scope (channel/program performance), not a distinct call |
 | 3 | **Data Analyst** (AG-19, expanded Data Builder) | Data Builder | Research judgment for Escalate and data-integrity patches — decides what's needed and drafts it. Never touches `the_Library` directly; Eleanor Voss (LB-01) performs every actual read/write on her behalf. |
 | 4 | **The Proofreader** | Guardrail (`guardrails` pattern) + Eval (`llm-as-judge` pattern) | Pre-display rule enforcement + quality scoring, unified |
 | 5 | **The Intake Assistant** | Decision Maker (orig. Agent 6, deprecated) | Post-decision pipeline routing: commit triage, failure triage |
@@ -76,7 +76,7 @@ All six are full DeepBench personas (agents.js entry, AVATAR_CFG, AGENT_PRONOUNS
 // output
 { "intent": "qa | theory | forecast | correct | escalate", "confidence": "high | medium | low", "extracted_hypothesis": "string | null" }
 ```
-Extends the existing `checkRouting()` pattern (DB-09) to a new classification target. `extracted_hypothesis` pre-fills (never auto-submits) the hypothesis UI when a director writes a claim unprompted.
+Extends the existing `checkRouting()` pattern (DB-09) to a new classification target. `extracted_hypothesis` pre-fills (never auto-submits) the hypothesis UI when a user writes a claim unprompted.
 
 ### 5.2 GEO CSO Expert — Q&A Answer (Sonnet)
 ```json
@@ -88,15 +88,15 @@ Extends the existing `checkRouting()` pattern (DB-09) to a new classification ta
 - Proofreader independently flags post-generation if any Eval rubric dimension scores below 3
 
 ### 5.3 Forecast/Theory/Performance Expert — Generate Hypotheses (Sonnet)
-Trigger: CI-01 answer flagged `needs_review: true` and the director hasn't already supplied their own claim.
+Trigger: CI-01 answer flagged `needs_review: true` and the user hasn't already supplied their own claim.
 ```json
 // input: { "flagged_question": "string", "flagged_answer": "string", "review_reason": "string" }
 // output
 { "hypotheses": [ { "id": "01", "text": "string", "rationale": "string" } ] }  // 2-4 entries, dynamic
 ```
 
-### 5.4 Forecast/Theory/Performance Expert — Stress Test (Sonnet)
-Trigger: director selects or writes a hypothesis — fires **before** commit (v4 bug: fired only after commit, too late to inform the decision).
+### 5.4 Forecast/Theory/Performance Expert — AI - Hypothesis Test (Sonnet)
+Trigger: user selects or writes a hypothesis — fires **before** commit (v4 bug: fired only after commit, too late to inform the decision).
 
 **Output is a real analyst-style artifact — "Intelligence Review" — not three loose paragraphs and one fixed chart.** Routes through the existing Display Agent (Alex/Riley) via its "Recommendation mode: structured market intelligence card" format (`APPLE-DATA-ROOM-SOURCE-DATA.md`'s recovered original spec) rather than bespoke Market Intelligence screen rendering — same rule as everywhere else in the platform, display agents are the single source of truth for presentation output. This is a real dependency to build in S-APPLE-03, not just a frontend styling choice.
 
@@ -119,7 +119,7 @@ Trigger: director selects or writes a hypothesis — fires **before** commit (v4
 - `key_data_points` — structured, sourced stats (mirrors the Display Agent's existing `KEY DATA POINTS` field, not a new pattern)
 - `projected_state` is now a **dynamic array**, not a fixed 2-metric object — the model decides which metrics matter for *this* hypothesis and how many (a training theory surfaces different numbers than a co-op-budget theory). Column 2 renders however many come back, not always three bars. Still must never say something the `supports`/`complicates`/`consider` text doesn't already say — an extension of one conclusion, not an independent guess. Closes the `chartData` gap (v4 hardcoded a lookup table keyed to hypothesis index).
 - `override_warning` is the model's own judgment (not derived from `complicates != null`) — fixes v4's hardcoded index/intent-based logic
-- `prior_stress_test` enables a revision loop: director revises hypothesis after pushback, same call re-fires
+- `prior_hypothesis_test` enables a revision loop: user revises hypothesis after pushback, same call re-fires
 - `intent` calibrates evidentiary rigor via the Behavior Skill Profile/prompt (Correct held to a stricter bar than Theory) — never a code conditional
 - Fresh `queryRAG({ queryText: hypothesis })` via `api/lib/rag.js` — never reuses Agent 1's original retrieval, since a hypothesis can reference evidence the original question never touched
 
@@ -130,7 +130,7 @@ Trigger: director selects or writes a hypothesis — fires **before** commit (v4
 // output
 { "new_chunks": [ { "content": "string", "source": "string", "data_type": "sourced | inferred | synthesized", "geo": "string | null", "program_area": "string | null" } ], "summary": "string", "citations": ["chunk_id", "..."] }
 ```
-Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Theory/Performance Expert to re-run Stress Test against the enriched Data Room.
+Reuses `ingest.js`'s embed-and-upsert pattern. Hands control back to Forecast/Theory/Performance Expert to re-run AI - Hypothesis Test against the enriched Data Room.
 
 ### 5.6 Data Analyst — Data Integrity Patch (Sonnet)
 Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit disputes a specific existing chunk, not just an interpretation).
@@ -139,7 +139,7 @@ Trigger: only when Intake Assistant's Commit Triage routes to it (Correct commit
 
 **Gate model corrected 2026-07-03 (`S-APPLE-04b` re-scope, John):** every decision — `opinion`, `promote`, or `no_action` — still goes through one human accept/reject step (`requires_human_confirmation: true`, unchanged mechanism, no harness change). What accepting *does* differs by `action`. The line below this note, from the original `AA-104` correction, is superseded: `opinion` does **not** skip the confirmation card — it skips only the *Eleanor* round trip. **Original, now-superseded text, preserved for history:** *"No gate, no Eleanor"* for `opinion`.
 ```json
-// input: { "disputed_chunk_id": "string | null", "correction": "string", "director_reasoning": "string" }
+// input: { "disputed_chunk_id": "string | null", "correction": "string", "user_reasoning": "string" }
 // output: { "action": "opinion | promote | no_action", "chunk_id": "string | null", "content": "string | null", "confidence": "high | medium | low", "version_note": "string" }
 ```
 - `action: "opinion"` — the default outcome. On accept, writes a new `the_reasoning` row (`source_chunk_ids: [chunk_id]`, `source_question: version_note`) via `lib/search-harness.js`'s `writeContent({ store: 'the_reasoning', ... })`, dispatched through `on_accept_intent_slug` → `data-patch-execute-intent`'s own terminal output (`handler: 'reasoning-write'`, new this session). No Eleanor, no change to `the_library`.
@@ -166,7 +166,7 @@ Never overwrites in place — always inserts a new row that supersedes the origi
 - `eval.result: revise` → merges into the visible `needs_review` flag, `eval.critique` becomes part of `review_reason`
 
 ### 5.8 The Intake Assistant — Commit Triage (Haiku)
-Trigger: director commits Forecast or Correct.
+Trigger: user commits Forecast or Correct.
 ```json
 // input: { "intent": "forecast | correct", "hypothesis": "string", "stress_test": { ... }, "correction_text": "string | null" }
 // output: { "route_to": ["reasoner", "data-expert"], "data_expert_reason": "string | null", "disputed_chunk_id": "string | null" }
@@ -182,7 +182,7 @@ Trigger: Proofreader hard-fails (§5.7).
 Turns a dead-end failure into an offered next step (route to Data Analyst's Escalate) rather than a wall.
 
 ### 5.10 The Reasoner — Memory Consolidation (Haiku)
-Trigger: director commits Forecast or Correct only (never Theorize/Discard — nothing was decided, nothing to consolidate).
+Trigger: user commits Forecast or Correct only (never Theorize/Discard — nothing was decided, nothing to consolidate).
 ```json
 // input
 {
@@ -294,7 +294,7 @@ Scope: Memory Consolidation is built for Market Intelligence only in this pass. 
 ## 10. ROADMAP ITEMS LOGGED, NOT BUILT NOW
 
 - **MI-07** (`FEATURES.md`) — per-GEO and per-GEO-per-program specialist agents, a depth path beyond this platform-wide 6-agent model
-- **AG-25 / AG-26** (`FEATURES.md`) — Emerging Market Prioritization Agent (live external data via Brent) and Partner Training Readiness Agent (serves partner reps, not GEO directors) — the 2nd and 3rd agents of the original 3-agent arc, not part of this Market Intelligence build at all. Draft specs preserved in `docs/DEEPBENCH-APPLE-BUILD-PLAN.md`, not yet designed in depth
+- **AG-25 / AG-26** (`FEATURES.md`) — Emerging Market Prioritization Agent (live external data via Brent) and Partner Training Readiness Agent (serves partner reps, not GEO users) — the 2nd and 3rd agents of the original 3-agent arc, not part of this Market Intelligence build at all. Draft specs preserved in `docs/DEEPBENCH-APPLE-BUILD-PLAN.md`, not yet designed in depth
 - Platform-wide generalization of Memory Consolidation beyond Market Intelligence
 - Automated re-evaluation triggers for provisional (Forecast) entries beyond "the next relevant interaction picks it up" — no scheduled/background re-check job
 
@@ -304,10 +304,10 @@ Scope: Memory Consolidation is built for Market Intelligence only in this pass. 
 
 Two elements on first load, replacing v4's three hand-authored fake chat exchanges:
 
-1. **Intro text** — a short orientation block explaining what the chat is for and naming the 5 intents (Q/A, Run a Theory, Forecast, Correct, Escalate), so the director understands the range of activity available before typing anything. Static copy (Layer A), but must accurately describe the real intent model in §3, not placeholder text.
+1. **Intro text** — a short orientation block explaining what the chat is for and naming the 5 intents (Q/A, Run a Theory, Forecast, Correct, Escalate), so the user understands the range of activity available before typing anything. Static copy (Layer A), but must accurately describe the real intent model in §3, not placeholder text.
 2. **3 curated example questions**, selectable, that fire the real pipeline (not canned text) — chosen to show the range of real agent behavior across a single click each:
    - One **clean sourced answer** (proves RAG + Proofreader working well) — e.g. "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" (cross-references Dataset 1 GEO revenue + Dataset 2 upgrade cycles)
-   - One **needs_review / HITL trigger** (the differentiated moment — Stress Test + Reasoner) — maps to one of the 10 partner scenarios in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md`. Candidate: scenario 3, "Large Retailer — EMEA — Co-op Budget Underutilization Q3" (55% utilization, real ambiguity between an approval-process bottleneck and an enablement problem — rich enough to support multiple genuine hypotheses)
+   - One **needs_review / HITL trigger** (the differentiated moment — AI - Hypothesis Test + Reasoner) — maps to one of the 10 partner scenarios in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md`. Candidate: scenario 3, "Large Retailer — EMEA — Co-op Budget Underutilization Q3" (55% utilization, real ambiguity between an approval-process bottleneck and an enablement problem — rich enough to support multiple genuine hypotheses)
    - One **graceful failure** (proves guardrails are real, not decorative) — e.g. "How is our authorized reseller network performing in Vietnam?"
    
    **Dependency:** whichever partner scenario is chosen for the HITL example must be fully drafted (not just the outline in `APPLE-DATA-ROOM-SOURCE-DATA.md`) before S-APPLE-01b, since it's carrying the most important single demo moment — prioritize drafting that one first and most carefully.
@@ -332,13 +332,13 @@ Full breakdown: see the reusability review from this design session (chat log) �
 - Data Room seed (S-APPLE-01b — 5 datasets + 3 GEO briefings + 10 partner scenarios) must exist before real RAG retrieval works; synthetic content still needs drafting
 - Session split required — this design spans 6 full agent personas, a new intent-classification pipeline, a schema migration, and a screen rebuild. Cannot be one kickoff doc under the "max 3 files, max 4 tasks" rule. See `CLAUDE-STATE.md` for the proposed session queue.
 
-### Stress test findings (2026-06-30) — resolve during the sessions tagged, not before
+### AI - Hypothesis Test findings (2026-06-30) — resolve during the sessions tagged, not before
 
 1. **Concurrent flagged answers** — design assumes one active flagged answer at a time. Multiple `needs_review` answers in a row: queue, drop, or force-close? — resolve in S-MARKET-INTEL-01 (screen state) / S-APPLE-02 (front door)
-2. **Abandoning an in-progress theory** — director opens a hypothesis flow, then asks something unrelated before commit/discard. Persist or silently drop? — S-MARKET-INTEL-01
-3. **No cap on Escalate rounds** — §5.5 hands back to Stress Test, which can re-trigger Escalate. Needs a hard cap (e.g. 2 rounds/hypothesis) to bound live-demo risk — S-APPLE-04
-4. **No validity/relevance check on custom hypotheses** — free-text hypothesis box accepts anything; Stress Test (§5.4) will reason over even off-topic input, the highest hallucination-risk surface in the whole design — S-APPLE-03
+2. **Abandoning an in-progress theory** — user opens a hypothesis flow, then asks something unrelated before commit/discard. Persist or silently drop? — S-MARKET-INTEL-01
+3. **No cap on Escalate rounds** — §5.5 hands back to AI - Hypothesis Test, which can re-trigger Escalate. Needs a hard cap (e.g. 2 rounds/hypothesis) to bound live-demo risk — S-APPLE-04
+4. **No validity/relevance check on custom hypotheses** — free-text hypothesis box accepts anything; AI - Hypothesis Test (§5.4) will reason over even off-topic input, the highest hallucination-risk surface in the whole design — S-APPLE-03
 5. **Curated example questions vs. Intent Routing** — should the 3 on-load examples (§10b) skip classification since intent is already known, or run the real pipeline including Intent Routing for consistency (no special-cased demo path)? Leaning toward always running it real — S-APPLE-02
 6. **Provisional forecasts don't stay visibly provisional** — `confidence_tier` (§5.2) has no tier distinguishing a citation sourced from an unconfirmed Forecast vs. a permanent Correct; a stale Forecast could read as equally authoritative — S-APPLE-02
 7. **Demo Reset mid-flow** — resetting the Data Room while a hypothesis flow is open leaves the UI referencing now-archived chunks; reset should probably clear any open flow too — S-APPLE-04
-8. **Loop closure should extend to Stress Test, not just Q&A** (positive finding, demonstrate on purpose) — a repeat theory-test on a consolidated pattern should find stronger `supports` the second time; worth showing deliberately in the Round 4 demo script, not discovering it live — S-APPLE-05
+8. **Loop closure should extend to AI - Hypothesis Test, not just Q&A** (positive finding, demonstrate on purpose) — a repeat theory-test on a consolidated pattern should find stronger `supports` the second time; worth showing deliberately in the Round 4 demo script, not discovering it live — S-APPLE-05

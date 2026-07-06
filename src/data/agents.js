@@ -180,7 +180,7 @@ export const AGENTS = [
   {
     id: "priya", name: "Priya Nair", role: "Forecast/Theory/Performance Expert",
     code: "CI-02", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Deep Prompt",
-    specialty: "Hypothesis Generation · Stress Testing · Evidentiary Rigor",
+    specialty: "Hypothesis Generation · Hypothesis Testing · Evidentiary Rigor",
     salary: 110000, value: 130000, hourly: 57, reportHrs: 2, reportCost: 114,
     docs: 0, classes: 0, chunks: 0, skill: 80, situational: 42,
     trainable: true, trainableBy: "RMV", revenueModel: "Included",

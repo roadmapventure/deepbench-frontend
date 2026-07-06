@@ -138,7 +138,7 @@
   .attribution{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-soft);margin-bottom:6px;}
   .avatar{width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 
-  /* AI stress test card in stream */
+  /* AI - Hypothesis Test card in stream */
   .stress-card{background:#fff;border:1px solid var(--t-line);border-left:4px solid var(--navy);border-radius:4px;overflow:hidden;margin-top:4px;}
   .stress-card .sc-head{background:var(--paper-dim);padding:7px 12px;display:flex;justify-content:space-between;align-items:center;}
   .stress-card .sc-head span{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);}
@@ -397,7 +397,7 @@
 <!-- TITLE -->
 <div class="title-block">
   <h1>Market Intelligence</h1>
-  <p>Ask the Performance Strategist about GEO markets, upgrade cycles, and channel programs — every answer sourced, scored, and open to GEO director correction.</p>
+  <p>Ask the Performance Strategist about GEO markets, upgrade cycles, and channel programs — every answer sourced, scored, and open to GEO user correction.</p>
 </div>
 
 <!-- STATS -->
@@ -470,12 +470,12 @@
             <div class="answer-card-inline">
               <div class="ai-head"><span class="tag">Performance Strategist</span><span class="conf-badge review">⚠ NEEDS REVIEW</span></div>
               <div class="ai-body">
-                <p>Based on synthesized benchmarks and regional context, co-op underutilization typically signals budget-cycle friction, enablement gaps, or competitive displacement. I have identified Thailand as a candidate for one or more of these — but this is a <b>synthesized inference</b>, not a sourced fact. Synthesized claims presented as recommendations require GEO director review.</p>
+                <p>Based on synthesized benchmarks and regional context, co-op underutilization typically signals budget-cycle friction, enablement gaps, or competitive displacement. I have identified Thailand as a candidate for one or more of these — but this is a <b>synthesized inference</b>, not a sourced fact. Synthesized claims presented as recommendations require GEO user review.</p>
               </div>
               <div class="ai-footer"><span>Channel Fusion · WorldMetrics · synthesized scenario</span><span class="layer-badge synthesized">Synthesized</span></div>
             </div>
             <div class="review-action">
-              <div class="ra-text"><b>This answer requires GEO director input.</b> The agent cannot confirm root cause without partner-specific knowledge.</div>
+              <div class="ra-text"><b>This answer requires GEO user input.</b> The agent cannot confirm root cause without partner-specific knowledge.</div>
               <button class="btn-review" id="openHitl">Review This Answer →</button>
             </div>
             <div class="msg-meta">CI-01 · 10:47 AM · decision required</div>
@@ -489,17 +489,17 @@
               <div class="theory-card">
                 <div class="tc-head"><span>Submitted Hypothesis</span><span class="intent-badge forecast">Forecasting</span></div>
                 <div class="tc-body">
-                  <div class="attribution"><span class="avatar">TH</span> Thailand GEO Director</div>
+                  <div class="attribution"><span class="avatar">TH</span> Thailand GEO User</div>
                   <p style="margin:0;" id="theoryText">Thailand's fiscal calendar (Apr–Mar) doesn't align with Apple's quarterly co-op disbursement windows — partners are holding unspent funds waiting for their own budget cycle to open.</p>
                 </div>
               </div>
-              <div class="msg-meta">GEO Director · 10:49 AM</div>
+              <div class="msg-meta">GEO User · 10:49 AM</div>
             </div>
 
-            <!-- AI stress test card -->
+            <!-- AI - Hypothesis Test card -->
             <div class="msg agent" id="stressCard" style="display:none;max-width:96%;">
               <div class="stress-card">
-                <div class="sc-head"><span>AI Stress Test · CI-01</span></div>
+                <div class="sc-head"><span>AI - Hypothesis Test · CI-01</span></div>
                 <div class="sc-body">
                   <div class="stress-section ss-supports">
                     <div class="ss-label">✓ Supports</div>
@@ -515,7 +515,7 @@
                   </div>
                 </div>
               </div>
-              <div class="msg-meta">CI-01 stress test · 10:49 AM · 2.1s</div>
+              <div class="msg-meta">CI-01 hypothesis test · 10:49 AM · 2.1s</div>
             </div>
 
           </div>
@@ -727,11 +727,11 @@
         <div class="step-group-label">Agent Design &amp; Reasoning</div>
         <ul class="step-list">
           <li class="step-item"><span class="step-num">10</span><span class="step-text">Agent persona mapping</span></li>
-          <li class="step-item"><span class="step-num">11</span><span class="step-text">AI stress test</span></li>
+          <li class="step-item"><span class="step-num">11</span><span class="step-text">AI - Hypothesis Test</span></li>
           <li class="step-item"><span class="step-num">12</span><span class="step-text">Reasoning decision points</span></li>
           <li class="step-item"><span class="step-num">13</span><span class="step-text">AI pattern inventory</span></li>
           <li class="step-item"><span class="step-num">14</span><span class="step-text">UX mock final engine</span></li>
-          <li class="step-item"><span class="step-num">15</span><span class="step-text">AI stress test</span></li>
+          <li class="step-item"><span class="step-num">15</span><span class="step-text">AI - Hypothesis Test</span></li>
         </ul>
 
         <div class="step-group-label">Build</div>
@@ -785,7 +785,7 @@
         <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Behavioral Trend</span><div class="ds-name">Smartphone Upgrade Cycles 2009–2026</div><div class="ds-meta"><span>SellCell · Counterpoint</span><span>·</span><span>41 chunks</span></div></div><div class="ds-right"><span class="layer-badge sourced">Sourced</span></div></div>
         <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Market Growth</span><div class="ds-name">Emerging Markets Smartphone Growth</div><div class="ds-meta"><span>KrASIA · Canalys · IDC</span><span>·</span><span>23 chunks</span></div></div><div class="ds-right"><span class="layer-badge sourced">Sourced</span></div></div>
         <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Program Structure</span><div class="ds-name">Channel Program Structure</div><div class="ds-meta"><span>Apple job postings</span><span>·</span><span>19 chunks</span></div></div><div class="ds-right"><span class="layer-badge inferred">Inferred</span></div></div>
-        <div class="dataset-row" id="hitlDatasetRow" style="display:none;"><div class="dataset-info"><span class="ds-cat">GEO Director Input</span><div class="ds-name" id="hitlDatasetName">Thailand Co-op — Budget-Cycle Theory</div><div class="ds-meta"><span>HITL Correction · <span id="hitlIntentLabel2">Forecast</span></span><span>·</span><span id="hitlChunkCount">1 chunk</span></div></div><div class="ds-right"><span class="layer-badge" id="hitlLayerBadge">forecast</span></div></div>
+        <div class="dataset-row" id="hitlDatasetRow" style="display:none;"><div class="dataset-info"><span class="ds-cat">GEO User Input</span><div class="ds-name" id="hitlDatasetName">Thailand Co-op — Budget-Cycle Theory</div><div class="ds-meta"><span>HITL Correction · <span id="hitlIntentLabel2">Forecast</span></span><span>·</span><span id="hitlChunkCount">1 chunk</span></div></div><div class="ds-right"><span class="layer-badge" id="hitlLayerBadge">forecast</span></div></div>
         <div class="dataset-row"><div class="dataset-info"><span class="ds-cat">Partner Scenarios</span><div class="ds-name">Benchmark-Anchored Scenarios</div><div class="ds-meta"><span>Channel Co. · eduMe</span><span>·</span><span>10 chunks</span></div></div><div class="ds-right"><span class="layer-badge synthesized">Synthesized</span></div></div>
       </div>
     </div>
@@ -828,12 +828,12 @@
         <div class="drawer-right"><span class="drawer-count" id="overrideCount">0 logged</span><span class="drawer-chevron">&#9656;</span></div>
       </button>
       <div class="drawer-content">
-        <div id="overrideLogEmpty" style="font-size:11px;color:var(--t-ink);font-style:italic;">No overrides yet. When a GEO director commits a theory over AI pushback, it appears here.</div>
+        <div id="overrideLogEmpty" style="font-size:11px;color:var(--t-ink);font-style:italic;">No overrides yet. When a GEO user commits a theory over AI pushback, it appears here.</div>
         <div id="overrideLogItems"></div>
         <div class="phase-block">
           <div class="phase-label">Roadmap</div>
           <div class="phase-item"><b>MVP</b> Log when human overrides AI complication. Capture intent, hypothesis, and what was overridden.</div>
-          <div class="phase-item"><b>PH 2</b> Surface override-accuracy rate per director once cycles close and outcomes are scored.</div>
+          <div class="phase-item"><b>PH 2</b> Surface override-accuracy rate per user once cycles close and outcomes are scored.</div>
           <div class="phase-item"><b>PH 3</b> Auto-flag theory types AI is frequently right to contest — tune Guardrail sensitivity over time.</div>
         </div>
       </div>
@@ -846,7 +846,7 @@
         <div class="drawer-right"><span class="drawer-count" id="learnedContextCount">0 patterns</span><span class="drawer-chevron">&#9656;</span></div>
       </button>
       <div class="drawer-content">
-        <div id="learnedContextEmpty" class="lc-empty">No patterns synthesized yet. When a GEO director commits a theory, the Supreme Reasoner (SR-01) synthesizes it into a reusable reasoning pattern here.</div>
+        <div id="learnedContextEmpty" class="lc-empty">No patterns synthesized yet. When a GEO user commits a theory, the Supreme Reasoner (SR-01) synthesizes it into a reusable reasoning pattern here.</div>
         <div id="learnedContextItems"></div>
       </div>
     </div>
@@ -867,7 +867,7 @@
         <div class="pb-section">
           <button class="pb-toggle" id="pbToggle"><span class="pb-title"><span class="pb-chevron">&#9656;</span> Prompt Build</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8c8474;">3 layers · 612 tok</span></button>
           <div class="pb-body" id="pbBody">
-            <div class="pb-layer"><span class="pb-tag">IDENTITY</span><span class="pb-text">10-year GEO director persona — sourced, specific, direct.</span></div>
+            <div class="pb-layer"><span class="pb-tag">IDENTITY</span><span class="pb-text">10-year GEO user persona — sourced, specific, direct.</span></div>
             <div class="pb-layer"><span class="pb-tag">CONTEXT</span><span class="pb-text">4 retrieved chunks injected with full metadata headers.</span></div>
             <div class="pb-layer"><span class="pb-tag">FORMAT</span><span class="pb-text">Q&A mode — answer, source, confidence in order.</span></div>
           </div>
@@ -1024,7 +1024,7 @@
     document.getElementById('theoryText').textContent = hypText;
     document.getElementById('theoryCard').style.display='flex';
 
-    // Show stress test after brief delay
+    // Show hypothesis test after brief delay
     setTimeout(()=>{
       document.getElementById('stressCard').style.display='flex';
       stream.scrollTop = stream.scrollHeight;
@@ -1081,7 +1081,7 @@
           item.innerHTML=`<div class="ol-icon">⚑</div>
             <div class="ol-body">
               <div class="ol-title">Thailand co-op · ${hyps[currentHypIndex].substring(0,48)}...</div>
-              <div class="ol-meta">Thailand GEO Director · overrode AI complication · ${intentLabel} · ${t}</div>
+              <div class="ol-meta">Thailand GEO User · overrode AI complication · ${intentLabel} · ${t}</div>
             </div>
             <span class="ol-status">PENDING</span>`;
           logItems.appendChild(item);

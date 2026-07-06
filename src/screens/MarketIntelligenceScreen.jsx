@@ -1,3 +1,5 @@
+// DeepBench v6.0.25 | MarketIntelligenceScreen.jsx | S-MI-14 — full terminology rename sweep
+// (AI - Hypothesis Test branding, generalized human-operator term); no mechanism/behavior change.
 // DeepBench v6.0.24 | MarketIntelligenceScreen.jsx | S-MI-13 — EvidenceColumn consumes the
 // generic ChartRenderer (ARCHITECTURE.md §19g) via st.visualization, replaces the retired
 // st.projected_state plain-text block
@@ -9,7 +11,7 @@
 // ==='revise'), plus real retry-once-on-block via Owen's own delegate_to_agent call (01d correction —
 // see runQaWithQualityGate below; the 01c screen-scripted retry was an architecture regression)
 // FEATURE: MI-04 — Pipeline Log, real events only (Intent Routing, Q&A Answer, Proofreader incl. real
-// retry hand-off, Stress Test, Memory Consolidation, Data Integrity Patch, Failure Triage, and now
+// retry hand-off, AI - Hypothesis Test, Memory Consolidation, Data Integrity Patch, Failure Triage, and now
 // (S-ARCH-DISPLAY-LOOP-01) Agent Selection + Display Format for Marcus's real Display-agent hand-off)
 // FEATURE: MI-13 — Theory Evidence renders via the generic visualization mechanism, not a hardcoded chart
 import { useState, useRef, useEffect } from "react";
@@ -72,14 +74,14 @@ function describePipelineEvent(evt) {
     }
     case "failure_triage":
       return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Recommends escalating: ${evt.data.suggested_research_request || ""}` : "Escalating would not help here", color: T.brass };
-    case "stress_test":
-      return { capability: "hypothesis-evaluation", summary: `Stress test complete · confidence: ${evt.data.confidence}`, color: T.moss };
+    case "hypothesis_test":
+      return { capability: "hypothesis-evaluation", summary: `Hypothesis test complete · confidence: ${evt.data.confidence}`, color: T.moss };
     case "memory_consolidation":
       return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? `Consolidated: ${(evt.data.content || "").slice(0, 90)}${(evt.data.content || "").length > 90 ? "…" : ""}` : "No pattern worth consolidating (no_action)", color: evt.data.action === "consolidate" ? T.moss : T.muted };
     case "patch_proposed":
       return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : ""}`, color: T.brass };
     case "patch_resolved":
-      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${evt.data.result?.content?.confirmation_note || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by director`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
+      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${evt.data.result?.content?.confirmation_note || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by user`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
     // FEATURE: S-ARCH-DISPLAY-LOOP-01 — the two connected hand-off entries proving the real
     // request_help -> Michelle -> delegate_to_agent(is_final:true) round trip: Marcus asking for
     // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
@@ -210,29 +212,29 @@ async function runIntentPipeline(message, conversationContext, onEvent) {
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
-// the picker, pre-filled, when the director already wrote their own claim.
+// the picker, pre-filled, when the user already wrote their own claim.
 async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason }) {
   const gen = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
     task_context: {
       flagged_question: flaggedQuestion,
       flagged_answer: flaggedAnswer || "",
-      review_reason: reviewReason || "director-initiated, no explicit claim extracted",
+      review_reason: reviewReason || "user-initiated, no explicit claim extracted",
     },
   });
   return gen.hypotheses || [];
 }
 
-// FEATURE: MI-02/MI-03 — live Stress Test (Priya/hypothesis-evaluation), rendered via Alex
+// FEATURE: MI-02/MI-03 — live AI - Hypothesis Test (Priya/hypothesis-evaluation), rendered via Alex
 // Reeves's intelligence-review-format Format Skill (format-last, AA-77) — the 8-field schema
 // lives entirely on Alex's Skill Profile, never hardcoded here (ARCHITECTURE.md §13 rule 14).
-async function runStressTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorStressTest }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest }) {
   return callCapability({
-    capability_slug: "hypothesis-evaluation", intent_slug: "hyp-stress-test-intent", agent_id: "priya",
+    capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
       hypothesis, intent,
       flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
-      prior_stress_test: priorStressTest || null,
+      prior_hypothesis_test: priorHypothesisTest || null,
     },
     format_skill_profile_slug: "intelligence-review-format",
     display_agent_id: "alex",
@@ -256,8 +258,8 @@ function MessageBubble({ msg, onReview }) {
     );
   }
 
-  if (msg.kind === "stress_test") {
-    const st = msg.stressTest || {};
+  if (msg.kind === "hypothesis_test") {
+    const st = msg.hypothesisTest || {};
     const sections = [
       { key: "supports",    label: "✓ Supports",      color: T.moss,      data: st.supports },
       { key: "complicates", label: "⚠ Complicates",   color: T.flag,      data: st.complicates },
@@ -267,7 +269,7 @@ function MessageBubble({ msg, onReview }) {
       <div style={{marginBottom:12,maxWidth:"96%"}}>
         <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
           <div style={{background:T.cardAlt,padding:"7px 12px"}}>
-            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>AI Stress Test · Priya Nair</span>
+            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>AI - Hypothesis Test · Priya Nair</span>
           </div>
           <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
             {st.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{st.headline}</div>}
@@ -289,7 +291,7 @@ function MessageBubble({ msg, onReview }) {
 
   // FEATURE: S-ARCH-DISPLAY-LOOP-01 — Marcus's Q&A answer, formatted by a real Display agent
   // (request_help -> Michelle -> delegate_to_agent(is_final:true)), never {msg.text} raw markdown.
-  // Reuses the exact stress_test bubble's card treatment (border/header/spacing) — a consistency
+  // Reuses the exact hypothesis_test bubble's card treatment (border/header/spacing) — a consistency
   // requirement, not a new visual pattern (DESIGN RULES). Byline visual treatment matches
   // CreateWorkOrderScreen.jsx's existing "Screen formatted by [Name] [Role]" byline exactly, with
   // AgentAvatar added per Style Guide Section 17 (avatar mandatory, never name-only text).
@@ -413,7 +415,7 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
     );
   }
 
-  const st = hypFlow.stressTest;
+  const st = hypFlow.hypothesisTest;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -465,7 +467,7 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
         )}
 
         {hypFlow.stage === "testing" && (
-          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is stress-testing this hypothesis…</div>
+          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is running a hypothesis test…</div>
         )}
 
         {st && hypFlow.stage === "result" && (
@@ -531,7 +533,7 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
 }
 
 // FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
-// Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, Stress Test,
+// Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
 function AuditColumn({ events }) {
   const agents = useAgents();
@@ -659,11 +661,11 @@ export default function MarketIntelligenceScreen() {
   const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, citations, reviewReason }) => {
     if (extractedHypothesis) {
       setHypFlow({ stage:"choosing", intent, candidates:null, prefillText:extractedHypothesis, chosenText:null,
-        flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, stressTest:null, priorStressTest:null, confirmation:null });
+        flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
       return;
     }
     setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
-      flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, stressTest:null, priorStressTest:null, confirmation:null });
+      flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
     try {
       const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
@@ -719,17 +721,17 @@ export default function MarketIntelligenceScreen() {
 
   const onSelectHypothesis = async (text) => {
     if (!hypFlow) return;
-    const { intent, flaggedQuestion, flaggedAnswer, stressTest } = hypFlow;
+    const { intent, flaggedQuestion, flaggedAnswer, hypothesisTest } = hypFlow;
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
-    setAIStatus("Priya is stress-testing…");
+    setAIStatus("Priya is running a hypothesis test…");
     try {
-      const st = await runStressTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorStressTest: stressTest || null });
-      logEvent({ type: "stress_test", agentId: "priya", data: st });
-      setMessages(prev => [...prev, { role:"assistant", kind:"stress_test", stressTest: st }]);
-      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, stressTest: st, priorStressTest: prev.stressTest || null }));
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null });
+      logEvent({ type: "hypothesis_test", agentId: "priya", data: st });
+      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st }]);
+      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
     } catch (e) {
-      console.error("[MarketIntelligenceScreen] runStressTest", e.message);
+      console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
     } finally {
       clearAIStatus();
@@ -747,21 +749,21 @@ export default function MarketIntelligenceScreen() {
   // (see kickoff CONTEXT for why intake-commit-intent's route_to fan-out is deliberately unused).
   const onCommit = async (intent) => {
     if (!hypFlow) return;
-    const { flaggedQuestion, flaggedAnswer, citations, chosenText, stressTest } = hypFlow;
+    const { flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
     setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
     setAIStatus("Elena and Nadia are reviewing this commit…");
     try {
       const disputedChunkId = Array.isArray(citations) && citations.length === 1 ? citations[0] : null;
-      const stressTestText = stressTest
-        ? [stressTest.supports?.text, stressTest.complicates?.text, stressTest.consider?.text].filter(Boolean).join(" ")
+      const hypothesisTestText = hypothesisTest
+        ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
 
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
         task_context: {
           original_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
-          committed_hypothesis: chosenText, intent, stress_test: stressTestText,
-          was_override: !!stressTest?.override_warning,
+          committed_hypothesis: chosenText, intent, hypothesis_test: hypothesisTestText,
+          was_override: !!hypothesisTest?.override_warning,
         },
       });
       logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult });
@@ -770,7 +772,7 @@ export default function MarketIntelligenceScreen() {
         capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
         task_context: {
           disputed_chunk_id: disputedChunkId, correction: chosenText,
-          director_reasoning: stressTestText || chosenText,
+          user_reasoning: hypothesisTestText || chosenText,
         },
       });
       logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult });
@@ -782,7 +784,7 @@ export default function MarketIntelligenceScreen() {
           proposed_action: nadiaResult.proposed_action,
           critique: nadiaResult.critique,
           disputed_chunk_id: disputedChunkId,
-          director_reasoning: stressTestText || chosenText,
+          user_reasoning: hypothesisTestText || chosenText,
         },
       }));
     } catch (e) {
@@ -797,7 +799,7 @@ export default function MarketIntelligenceScreen() {
     if (!hypFlow?.confirmation) return;
     const { confirmation_id, disputed_chunk_id } = hypFlow.confirmation;
     const edited_task_context = resolution === "edit"
-      ? { disputed_chunk_id, correction: editedText, director_reasoning: editedText }
+      ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
       : null;
     const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
