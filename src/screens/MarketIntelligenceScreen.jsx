@@ -1,6 +1,6 @@
-// DeepBench v6.0.22 | MarketIntelligenceScreen.jsx | S-ARCH-DISPLAY-LOOP-01 — real Display-agent
-// hand-off for Marcus's Q&A answer (request_help -> Michelle -> delegate_to_agent(is_final:true) ->
-// Alex), fixes raw-markdown-in-chat bug, closes AA-101
+// DeepBench v6.0.24 | MarketIntelligenceScreen.jsx | S-MI-13 — EvidenceColumn consumes the
+// generic ChartRenderer (ARCHITECTURE.md §19g) via st.visualization, replaces the retired
+// st.projected_state plain-text block
 // FEATURE: MI-01 — Market Intelligence screen, three-column layout per market-intelligence-v4.html
 // FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard + commit
 // actions (Track as Assumption / Make Permanent) are explicit human controls, all live as of 01d
@@ -11,11 +11,12 @@
 // FEATURE: MI-04 — Pipeline Log, real events only (Intent Routing, Q&A Answer, Proofreader incl. real
 // retry hand-off, Stress Test, Memory Consolidation, Data Integrity Patch, Failure Triage, and now
 // (S-ARCH-DISPLAY-LOOP-01) Agent Selection + Display Format for Marcus's real Display-agent hand-off)
+// FEATURE: MI-13 — Theory Evidence renders via the generic visualization mechanism, not a hardcoded chart
 import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard } from "../components/SharedUI.jsx";
+import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -475,15 +476,10 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
               </div>
             )}
 
-            {Array.isArray(st.projected_state) && st.projected_state.length > 0 && (
+            {st.visualization && (
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected</div>
-                {st.projected_state.map((m, i) => (
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontFamily:body,fontSize:11.5,color:T.ink,padding:"6px 0",borderBottom:`1px solid ${T.lineSoft}`}}>
-                    <span>{m.metric}</span>
-                    <span style={{color:T.muted}}>{m.current} <span style={{color:T.brassDeep}}>→</span> {m.projected} {m.unit}</span>
-                  </div>
-                ))}
+                <ChartRenderer type={st.visualization.chart_type} data={st.visualization.chart_data} caption={st.visualization.caption}/>
               </div>
             )}
 
