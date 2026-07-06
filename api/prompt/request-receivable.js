@@ -240,6 +240,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
 
   if (shouldRunGuardrails) {
     // FEATURE: AA-44 — PAT-13 post-generation Haiku guardrails check
+    const guardrailsStart = Date.now();
     const guardrailsModel = 'claude-haiku-4-5-20251001';
     const guardrailsPrompt = `You are a content validator. Review the following AI output and check it against the rules below.
 
@@ -290,6 +291,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
 
         // FEATURE: AA-44 — guardrails logged as separate ai_activity_log row
         const gTokens = (gData.usage?.input_tokens || 0) + (gData.usage?.output_tokens || 0);
+        const guardrailsLatency = Date.now() - guardrailsStart;
         await fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
           method: 'POST',
           headers: supabaseHeaders,
@@ -301,7 +303,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
             agent_id: agent_id || null,
             task_id: task_id || null,
             input_tokens: gTokens || null,
-            latency_ms: null,
+            latency_ms: guardrailsLatency,
             patterns_used: ['guardrails', 'prompt-chaining'],
           }),
         }).catch(e => console.warn('[request-receivable] guardrails log failed:', e.message));
