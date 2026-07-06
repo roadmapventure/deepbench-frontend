@@ -1,4 +1,5 @@
-// DeepBench v6.0.21 | SharedUI.jsx | S-MARKET-INTEL-01d — generic ConfirmationCard export
+// DeepBench v6.0.23 | SharedUI.jsx | S-ARCH-VIZ-01 — generic ChartRenderer + CHART_RENDERERS
+// registry (ARCHITECTURE.md §19g), first type bar_pair, capability-agnostic
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -8,6 +9,7 @@ import { useState, useRef } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
 import { AVATAR_CFG } from "../data/agents.js";
+import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from "recharts";
 
 // ── Corners — brass SVG corner ornaments ─────────────────────────────────────
 export const Corners = ({ color = T.brass }) => (
@@ -40,6 +42,60 @@ export const PctBar = ({ pct, color = T.brass, width = 80 }) => (
     <span style={{color:T.brassDeep,fontSize:11,minWidth:38,fontWeight:600,fontFamily:mono}}>{fmtPct(pct)}</span>
   </div>
 );
+
+// FEATURE: S-ARCH-VIZ-01 — ChartRenderer + CHART_RENDERERS registry (ARCHITECTURE.md §19g)
+// ── ChartRenderer — generic visualization dispatch, ARCHITECTURE.md §19g ────
+// Dispatch by chart_type string only, same shape as the backend HANDLERS
+// registry (request-receivable.js). Never branches on capability identity —
+// any Format Skill's visualization output renders through this, unmodified.
+function BarPairChart({ data }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {(data || []).map((m, i) => {
+        const curNum = Number(m.current);
+        const projNum = Number(m.projected);
+        const cur = Number.isFinite(curNum) ? curNum : 0;
+        const proj = Number.isFinite(projNum) ? projNum : 0;
+        const maxVal = Math.max(cur, proj, 1);
+        const barData = [{ name: "now", value: cur }, { name: "proj", value: proj }];
+        return (
+          <div key={i} style={{display:"flex",flexDirection:"column",gap:4,padding:"6px 0",borderBottom:`1px solid ${T.lineSoft}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontFamily:body,fontSize:11.5,color:T.ink}}>
+              <span>{m.metric}</span>
+              <span style={{color:T.muted}}>{m.current} <span style={{color:T.brassDeep}}>→</span> {m.projected} {m.unit || ""}</span>
+            </div>
+            <ResponsiveContainer width="100%" height={46}>
+              <BarChart data={barData} layout="vertical" margin={{left:0,right:0,top:0,bottom:0}}>
+                <XAxis type="number" domain={[0, maxVal]} hide/>
+                <YAxis type="category" dataKey="name" width={30} tick={{fill:T.muted,fontSize:9,fontFamily:mono}} axisLine={false} tickLine={false}/>
+                <Bar dataKey="value" radius={[0,2,2,0]} barSize={9}>
+                  <Cell fill={T.mutedDeep}/>
+                  <Cell fill={T.brass}/>
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Registered chart_type -> renderer. Adding a type: register a renderer here +
+// extend the enum in whichever skill's schema opts in. Never edit ChartRenderer
+// itself, never add a capability/screen conditional here or at any call site.
+export const CHART_RENDERERS = { bar_pair: BarPairChart };
+
+export const ChartRenderer = ({ type, data, caption }) => {
+  const Renderer = CHART_RENDERERS[type];
+  if (!Renderer) return null;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {caption && <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{caption}</div>}
+      <Renderer data={data}/>
+    </div>
+  );
+};
 
 // ── SkillBar — agent skill level bar ─────────────────────────────────────────
 export const SkillBar = ({ skill, color = T.brass, size = 6 }) => (
