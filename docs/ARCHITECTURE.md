@@ -1019,6 +1019,48 @@ Concretely: Nadia (Data Analyst) and the Reasoner (`AG-20`, once built) each wri
 
 ---
 
+## 19g. The Generic Visualization Layer [LOCKED `S-ARCH-VIZ-01-design`, 2026-07-06]
+
+**Origin — `MI-13`.** Found live 2026-07-06 (`S-ARCH-DISPLAY-LOOP-01-design`, from a screenshot): Theory Evidence's `projected_state` (Stress Test's before/after metrics) rendered as plain text rows even though `recharts` was already a project dependency. The narrow fix — hand-roll one chart component for this one field in `EvidenceColumn` — was rejected mid-design (John, 2026-07-06) as the same anti-pattern `§19b` exists to prevent: a hardcoded, capability-specific piece of Layer 2 code standing in for what should be data. `docs/FEATURES.md`'s other open chart item, `MI-03` (Data Room default charts, `S-MARKET-INTEL-03`), independently confirms nothing in the platform has ever addressed "charting" as a concept — it describes "pre-built static charts carried from v4," not agent-driven, not even live-data-driven.
+
+**The rule:** whether a piece of agent output deserves a chart, what shape that chart should take, and what values/labels go into it are inferences the formatting agent makes for itself — the same standing principle `§19d` established for delegation ("an inference the model makes for itself... never code that inspects a result afterward and decides on the agent's behalf"), applied one layer further down the stack, to visual presentation instead of orchestration. Layer 2 owns exactly one generic thing: given a `chart_type` string and matching `chart_data`, draw it. It never owns *which* type applies to *which* capability's content — that would be `§19b`'s banned `if (capability_slug === 'x')` conditional, wearing a chart instead of a route.
+
+**The mechanism — three pieces, one already fully generic:**
+
+1. **Schema convention (`visualization`)** — an optional object property added to a Format Skill's existing JSON output schema (`format_contract.schema`), alongside whatever content fields that skill already returns (e.g. `qa-answer-format`'s `headline`/`body`/`citations`):
+   ```json
+   "visualization": {
+     "type": ["object", "null"],
+     "description": "Only include this if the content you're producing contains metric-driven, comparable, or trend-shaped data that would help the reader more as a chart than as prose. Omit entirely (null) if nothing here is naturally chartable.",
+     "properties": {
+       "chart_type": {
+         "type": "string",
+         "enum": ["bar_pair"],
+         "description": "bar_pair: a set of one or more before/after or current-vs-target single-value comparisons, one pair per metric."
+       },
+       "chart_data": { "type": "array", "description": "Shape depends on chart_type — see that type's own registered contract." },
+       "caption": { "type": "string", "description": "One plain-language sentence: what this chart shows and why it matters." }
+     }
+   }
+   ```
+   `chart_type`'s enum is the platform's current chart-type registry (starts with one member, grows additively — see below). `chart_data`'s inner shape is defined per chart_type, documented where that type is registered, the same way each backend `HANDLERS` entry (`§19b`) documents its own expected request shape without the dispatcher needing to know it. `caption` is the agent's own plain-language read of what the chart shows and why it matters — carried alongside the chart, not reconstructed by Layer 2 from raw values.
+
+2. **Reasoning criteria — JSON Schema `description` fields, not Behavior prose, not RAG.** Verified against the live schema and runtime code, not assumed: a Format Skill Profile's `method`/`objective`/`output_desc` columns are **never assembled into the system prompt for this skill type**, in either path that exists today — the native `buildSections()` path (`db-assembly.js`, the `format`-type branch builds its section content from only `output_type`/`section_structure`, nothing else) or the override path every format-last call actually uses (`execute.js`'s `fetchFormatOverride()`, `AA-77`, an identical minimal `output_type`/`section_structure` build). Those columns are Supabase-side design documentation, not live instruction, for Format Skills specifically — unlike Identity-type profiles, where `objective`/`method` genuinely are assembled into the prompt (`db-assembly.js` lines 82-84). The one channel proven to reach the model in both paths is `format_contract.schema` itself, passed verbatim as the Anthropic tool's `input_schema` (`request-receivable.js`) — including every property's `description` field. So the reasoning criteria for `chart_type`/`chart_data`/`caption` live as `description` text directly on those schema properties, domain-agnostic by construction — "does this content contain metric-driven, comparable, or trend-shaped data that would help the reader more as a chart than as prose? If yes, which registered chart_type's shape matches, and what are the actual values? If no, omit `visualization` entirely" — never "for capability X, always emit chart_type Y." This is also the more portable home for it: copying the `visualization` schema fragment onto a different skill carries its own reasoning with it — no separate profile update required (see Portability, below). **Not `knowledge_entries`/RAG** (`fetch_instruction` → `queryRAG()`, `api/prompt/ai-enrichment.js`) either way: RAG retrieval is semantic and per-query, appropriate for supplementary recalled content, wrong for an instruction that must be present every time the schema property itself is present.
+
+3. **`ChartRenderer` + `CHART_RENDERERS` registry (Layer 2, `SharedUI.jsx`)** — one generic component, dispatch-by-string-key on `chart_type`, structurally identical to the backend `HANDLERS` registry `§19b` already locked (`request-receivable.js:10`): `const CHART_RENDERERS = { bar_pair: BarPairChart }`. A screen that wants to show whatever chart an agent chose does exactly one thing: `result.visualization && <ChartRenderer type={result.visualization.chart_type} data={result.visualization.chart_data} caption={result.visualization.caption}/>`. That call site never branches on which capability produced the data — it would render identically for a Stress Test result, a Data Room chart, or an unrelated future screen's content. Each registered renderer draws its own type-specific presentation (axis labels, legends, bar labels) — that specificity is expected and lives with the renderer, not with the calling screen.
+
+**What stays deterministic, and why that is not a `§19b` violation:** the closed `chart_type` enum and its registered renderers. Layer 2 can only draw types it has renderer code for — unavoidable in any generic system, the same non-violation as `§19b`'s `KNOWN_HANDLERS` throwing a 501 for an unimplemented handler rather than silently no-op-ing. Adding a second chart type later is additive (register one more renderer, extend one enum) — it is never a reason to write capability-specific Layer 2 code, and it never touches an existing renderer or an existing skill's schema.
+
+**No new call, no new latency, no new `ai_activity_log` row.** `visualization` is one more optional property in a JSON schema already sent as an Anthropic tool's `input_schema` on a call the formatting agent was already making (`§19b`, `sendRequest()`). The agent reasons about content and visualization together, in the same single inference pass — there is no separate "chart decision" request/help hop, no second agent in the loop.
+
+**Ownership — an extension of Format Skill Exclusivity, not a new exception.** Only a display/editor agent may hold a Format Skill at all (`STANDARDS.md` §13 rule 14, enforced going forward by `SE-04`) — a content specialist (Priya, Nadia, Sam) never reasons about its own presentation. `visualization` is additive to that same exclusive domain: any display agent that already owns a Format Skill can be given the `visualization` schema fragment and reasoning criteria on its own Skill Profile. It is not inherited platform-wide the moment one agent (Alex) gets it — each display agent that should be able to visualize needs the same fragment added to its own profile, once, the same way each of Alex's existing schema fields had to be defined once for him and would need defining again for a second display agent.
+
+**Portability (worked example, not yet built):** if a future "cooking info" screen's capability also routes its formatting through Alex, he reasons about *that* content with the exact same domain-agnostic criteria — extracting e.g. before/after calorie values from a recipe substitution into the same `bar_pair` shape, with his own labels and caption — with zero changes to his Skill Profile. Two things could still require one-time, additive work, neither of them capability-specific: a genuinely new `chart_type` the registry doesn't have yet (register one renderer, reusable by anyone after), or a different display agent (not Alex) owning that screen's formatting, who would need the same schema fragment and criteria added to their own profile once.
+
+**Migration status:** the mechanism itself — schema convention, reasoning-criteria pattern, `ChartRenderer`/registry — is built and proven live in `S-ARCH-VIZ-01` against Alex's real `intelligence-review-format` skill, independent of any screen. `S-MI-13` is its first concrete consumer: `EvidenceColumn` swaps its old hardcoded `projected_state` plain-text block for the generic `<ChartRenderer/>` call. `MI-03` (Data Room default charts) is not retrofitted onto this mechanism in either session — logged separately, `S-MARKET-INTEL-03`.
+
+---
+
 ## 17. v4 Preservation [LOCKED]
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.

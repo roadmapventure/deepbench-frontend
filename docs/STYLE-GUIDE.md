@@ -486,6 +486,18 @@ Any UI element that attributes an action to a specific agent — primary executi
 
 ---
 
+## Section 18 — ChartRenderer / Generic Visualization (Locked 2026-07-06 · S-ARCH-VIZ-01-design)
+
+The platform's `visualization` mechanism (`ARCHITECTURE.md` §19g) has exactly one frontend rendering path, `ChartRenderer` (`SharedUI.jsx`) — never a bespoke per-capability chart component. Any future capability whose Format Skill returns `visualization` reuses this component; do not hand-roll a second chart for a new data shape — register a new renderer in `CHART_RENDERERS` instead.
+
+- **Props:** `{ type, data, caption }` — `type` selects the renderer from `CHART_RENDERERS` (returns `null` if unregistered), `data` is passed through untouched to that renderer, `caption` renders generically above the chart regardless of type.
+- **Caption styling:** `body` font, `11px`, `T.mutedDeep`, italic — same treatment as other small explanatory text in the app (compare `VendorDiversityTab.jsx`'s benchmark-line captions).
+- **`bar_pair` (first registered type):** one row per metric, label line (`metric  current → projected unit`, `body` `11.5px`, arrow in `T.brassDeep`) above a fixed-height (`46px`) two-bar `recharts` `BarChart` — current bar `T.mutedDeep`, projected bar `T.brass`, `XAxis` hidden (units vary per metric, a shared scale would mislead), `YAxis` shows only `"now"`/`"proj"` category ticks (`mono`, `9px`, `T.muted`). Each metric's bars scale against their own independent max, never a shared axis across metrics.
+- **Placement:** wherever the capability's own content renders (e.g. Market Intelligence's Evidence column) — the calling screen's only job is `{result.visualization && <ChartRenderer type={result.visualization.chart_type} data={result.visualization.chart_data} caption={result.visualization.caption}/>}`, never a capability/screen conditional around it.
+- **Adding a chart type:** register one more renderer in `CHART_RENDERERS`, extend the enum in whichever skill's schema opts in. Never edit `ChartRenderer` itself, never add a capability-specific branch anywhere in this file.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
@@ -497,3 +509,4 @@ Any UI element that attributes an action to a specific agent — primary executi
 | 2026-06-09 | S-BENCH-UX-01 | AiBadge known limitation: not visually distinct on brass backgrounds — blocked pending RO-08 design in S-BENCH-UX-02. |
 | 2026-07-01 | S-LIBRARIAN-01c-design | Section 17 added — Agent Avatar Visibility Rule locked (AA-73): any agent-attribution UI, primary or collaboration credit, must render `AgentAvatar`, never name-only text. |
 | 2026-06-09 | S-BENCH-UX-02 | RO-08 resolved: AiBadge on brass = navy chip override; on moss = white chip override. Badge stays inside button. No badge on non-AI actions (file browse). |
+| 2026-07-06 | S-ARCH-VIZ-01-design | Section 18 added — `ChartRenderer`/`CHART_RENDERERS` generic visualization dispatch locked (`AA-117`, `ARCHITECTURE.md` §19g): one frontend rendering path for any capability's agent-chosen `visualization` output, first registered type `bar_pair`. |
