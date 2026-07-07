@@ -1,3 +1,4 @@
+// DeepBench v6.0.47 | MarketIntelligenceScreen.jsx | S-MI-15 — Data Sources drawer + describeDataType() display-label taxonomy
 // DeepBench v6.0.46 | MarketIntelligenceScreen.jsx | S-MI-20 — latency broken out by kind, blended stat removed
 // DeepBench v6.0.44 | MarketIntelligenceScreen.jsx | S-MI-18c — Agents drawer sorted descending by calls
 // DeepBench v6.0.43 | MarketIntelligenceScreen.jsx | S-MI-18b — full loop roster + page-scoped metrics
@@ -24,7 +25,7 @@ import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
-import { useAgents, useLearnedContext, useAgentActivitySummary } from "../hooks/useAgents.js";
+import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
 
@@ -93,6 +94,32 @@ function formatDuration(ms) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
+// FEATURE: MI-15 — shared display-label mapping for the raw data_type (the_library rows) /
+// confidence_tier (Q&A answers) vocabulary. Display-layer relabel only — the stored enum strings
+// (sourced/inferred/synthesized/learned/na) are unchanged everywhere else (DB, all 7 live Skill
+// Profile schemas). Locked mapping: STYLE-GUIDE.md Section 19 — do not re-litigate without
+// re-reading it. whoTag only ever applies to the "Analysis" label, sourced from the_library.source
+// (user->"Human", agent->"AI"); a confidence_tier context has no source column, so it's implicitly
+// AI but still renders no who-tag (per the locked table, only the_library rows carry a source col).
+function describeDataType(dataType, { isBaseline, source } = {}) {
+  const whoTag = source === 'user' ? "Human" : source === 'agent' ? "AI" : null;
+
+  switch (dataType) {
+    case 'sourced':
+      return { label: "Sourced", color: T.moss, whoTag: null };
+    case 'inferred':
+      return { label: "Analysis", color: T.brass, whoTag };
+    case 'synthesized':
+      return isBaseline
+        ? { label: "Source Simulation", color: T.mutedDeep, whoTag: null }
+        : { label: "Analysis", color: T.brass, whoTag };
+    case 'learned':
+      return { label: "Learned", color: T.navyMid, whoTag: null };
+    default:
+      return { label: "—", color: T.muted, whoTag: null };
+  }
+}
+
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
 // never scripted text. Color: T.moss = pass/clean, T.brass = flagged/revise, T.flag = blocked.
 function describePipelineEvent(evt) {
@@ -100,7 +127,8 @@ function describePipelineEvent(evt) {
     case "intent_routing":
       return { capability: "channel-intelligence", summary: `Classified intent: ${evt.data.intent} (confidence: ${evt.data.confidence})`, color: T.navyMid };
     case "qa_answer":
-      return { capability: "channel-intelligence", summary: `Answered · confidence_tier: ${evt.data.confidence_tier} · self-flag: ${evt.data.needs_review ? "yes" : "no"}`, color: evt.data.needs_review ? T.brass : T.moss };
+      // FEATURE: MI-15 — confidence_tier routed through describeDataType() instead of the raw enum string
+      return { capability: "channel-intelligence", summary: `Answered · confidence_tier: ${describeDataType(evt.data.confidence_tier).label} · self-flag: ${evt.data.needs_review ? "yes" : "no"}`, color: evt.data.needs_review ? T.brass : T.moss };
     case "proofreader": {
       const g = evt.data.guardrail || {}, e = evt.data.eval || {};
       if (g.result === "block") {
@@ -126,7 +154,8 @@ function describePipelineEvent(evt) {
     case "agent_selection":
       return { capability: "channel-intelligence", summary: shapeForLog(evt.data.reasoning), color: T.moss };
     case "display_format":
-      return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${evt.data.confidence_tier}`, color: T.moss };
+      // FEATURE: MI-15 — confidence_tier routed through describeDataType() instead of the raw enum string
+      return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${describeDataType(evt.data.confidence_tier).label}`, color: T.moss };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -475,11 +504,14 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
   }, [hypFlow && hypFlow.prefillText]);
 
   if (!hypFlow) {
+    // FEATURE: MI-15 — legend now routes through describeDataType() instead of 4 hardcoded
+    // {label,color} pairs, so it stays in sync with the locked taxonomy (STYLE-GUIDE.md §19).
+    // Context-free static legend — no who-tag shown here, it isn't tied to a specific row.
     const layers = [
-      { label: "Sourced",     color: T.moss },
-      { label: "Inferred",    color: T.brass },
-      { label: "Synthesized", color: T.mutedDeep },
-      { label: "Learned",     color: T.navyMid },
+      describeDataType('sourced'),
+      describeDataType('inferred'),
+      describeDataType('synthesized', { isBaseline: true }),
+      describeDataType('learned'),
     ];
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -677,6 +709,7 @@ function formatKindLabel(kind) {
 function AuditColumn({ events }) {
   const agents = useAgents();
   const learned = useLearnedContext();
+  const dataSources = useDataSources();
   const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
@@ -685,11 +718,23 @@ function AuditColumn({ events }) {
     .sort((a, b) => (agentActivity[b]?.calls || 0) - (agentActivity[a]?.calls || 0));
   const potentialIds = PROPOSED_MI_AGENT_IDS.filter(id => !agentActivity[id]?.calls);
 
+  // FEATURE: MI-15 — Data Sources drawer counts, computed from real rows via describeDataType(),
+  // never hardcoded. "sourced"/"analysis"/"simulation" bucket names are display-only groupings of
+  // the mapped label, not raw data_type values.
+  const dataSourceCounts = dataSources.reduce((acc, row) => {
+    const { label } = describeDataType(row.data_type, { isBaseline: row.is_baseline, source: row.source });
+    if (label === "Sourced") acc.sourced++;
+    else if (label === "Source Simulation") acc.simulation++;
+    else if (label === "Analysis") acc.analysis++;
+    return acc;
+  }, { sourced: 0, analysis: 0, simulation: 0 });
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
       <FeatureBadge id="MI-17"/>
       <FeatureBadge id="MI-06"/>
       <FeatureBadge id="MI-18"/>
+      <FeatureBadge id="MI-15"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Pipeline Log</div>
@@ -798,6 +843,36 @@ function AuditColumn({ events }) {
                 <span style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.ink}}>{agent.name}</span>
                 <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{agent.role} · not yet used on this screen</span>
               </div>
+            </div>
+          );
+        })}
+      </Drawer>
+      {/* FEATURE: MI-15 — Data Sources drawer, read-only reference list of the Data Room's
+          available data (John: "just like a real library index card booth" — explicitly not
+          interactive/clickable). Reuses the same Drawer shell as Learned Context/Agents above. */}
+      <Drawer title="Data Sources" count={`${dataSources.length} dataset${dataSources.length === 1 ? "" : "s"} · ${dataSourceCounts.sourced} sourced · ${dataSourceCounts.analysis} analysis · ${dataSourceCounts.simulation} simulation`}>
+        {dataSources.length === 0 ? (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
+            No Data Room content loaded yet.
+          </div>
+        ) : dataSources.map(row => {
+          const { label, color, whoTag } = describeDataType(row.data_type, { isBaseline: row.is_baseline, source: row.source });
+          const meta = [row.geo, row.program_area, row.period, row.partner_id].filter(Boolean).join(" · ");
+          return (
+            <div key={row.id} style={{display:"flex",flexDirection:"column",gap:4,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                <span style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink}}>{row.title}</span>
+                <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                  <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",border:`1px solid ${color}`,color}}>{label}</span>
+                  {whoTag && <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>· {whoTag}</span>}
+                </div>
+              </div>
+              {row.category && (
+                <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{row.category}</span>
+              )}
+              {meta && (
+                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{meta}</span>
+              )}
             </div>
           );
         })}

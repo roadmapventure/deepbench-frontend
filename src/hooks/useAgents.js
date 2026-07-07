@@ -1,6 +1,7 @@
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
 // DeepBench v6.0.40 | useAgents.js | MI-18 — Agent Activity drawer data hook
+// DeepBench v6.0.47 | useAgents.js | S-MI-15 — useDataSources() hook, Data Sources drawer
 // DeepBench v6.0.46 | useAgents.js | S-MI-20 — latency broken out by kind, blended avgLatency removed
 // DeepBench v6.0.43 | useAgents.js | S-MI-18b — useAgentActivitySummary() gains optional scope filter
 // FEATURE: SH-03 — Agent roster hook
@@ -197,6 +198,33 @@ export function useAgentActivitySummary(agentIds, scope) {
   }, []); // agentIds/scope are stable, page-defined constants — same no-deps precedent as before
 
   return summary;
+}
+
+// FEATURE: MI-15 — Data Sources drawer data source. Same direct-frontend-Supabase-read precedent
+// as useLearnedContext() above (no api/ route, RLS is disabled platform-wide, AI-42). Dumb data
+// fetcher only — label mapping (data_type -> display label/color/who-tag) happens in the
+// component via describeDataType(), not here. .eq('status','active') excludes the 7 leftover
+// status='archived' test-artifact rows from S-LIBRARIAN-04's write-capability tests (confirmed
+// live this design session: 20 active + 7 archived rows in the_library) — filtered by the query
+// itself, not client-side, per the kickoff.
+export function useDataSources() {
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    supabase
+      .from('the_library')
+      .select('id,title,category,data_type,is_baseline,source,geo,program_area,partner_id,period')
+      .eq('data_room_tag', APPLE_DATA_ROOM_TAG)
+      .eq('status', 'active')
+      .order('data_type')
+      .order('title')
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        setRows(data);
+      });
+  }, []);
+
+  return rows;
 }
 
 export function useAgents() {
