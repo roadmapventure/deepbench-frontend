@@ -1,30 +1,19 @@
 // DeepBench v5.2.41 | WelcomeSplash.jsx | S-SPLASH-01 welcome splash modal
 // FEATURE: SH-14 — Welcome splash modal
+// DeepBench v6.1.11 | WelcomeSplash.jsx | S-SPLASH-02/SH-18 — stat counters replaced with static capability strip
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { T, display, mono } from "../tokens.js";
 
 const STORAGE_KEY = "db_splash_dismissed";
 
 export default function WelcomeSplash() {
   const [visible, setVisible] = useState(false);
-  const countersRan = useRef(false);
 
   useEffect(() => {
     if (sessionStorage.getItem(STORAGE_KEY)) return;
     setVisible(true);
   }, []);
-
-  useEffect(() => {
-    if (!visible || countersRan.current) return;
-    countersRan.current = true;
-    const timer = setTimeout(() => {
-      animateCounter("splash-tasks-active", 6, 800);
-      animateCounter("splash-agents-active", 4, 600);
-      animateCounter("splash-tasks-done", 41, 1400);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [visible]);
 
   function dismiss() {
     sessionStorage.setItem(STORAGE_KEY, "1");
@@ -77,50 +66,19 @@ export default function WelcomeSplash() {
 
           {/* Pulse strip */}
           <div style={pulseStrip}>
-            <div style={pulseLabel}>
-              <div style={pulseDot} />
-              Practice live
-            </div>
-            <StatBlock id="splash-tasks-active" desc="tasks in progress" />
-            <div style={divider} />
-            <StatBlock id="splash-agents-active" desc="agents working" />
-            <div style={divider} />
-            <StatBlock id="splash-tasks-done" desc="deliverables completed" />
-            <div style={divider} />
-            <div style={statBlock}>
-              <span style={statNumber}>$372M</span>
-              <span style={statDesc}>in spend analyzed</span>
+            <div style={pulseLabel}>Automate</div>
+            <div style={capabilityRow}>
+              <span style={capabilityItem}>Market Intelligence</span>
+              <div style={divider} />
+              <span style={capabilityItem}>Data Analysis</span>
+              <div style={divider} />
+              <span style={capabilityItem}>Project Management</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-function StatBlock({ id, desc }) {
-  return (
-    <div style={statBlock}>
-      <span id={id} style={statNumber}>0</span>
-      <span style={statDesc}>{desc}</span>
-    </div>
-  );
-}
-
-function animateCounter(id, target, duration) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  let start = 0;
-  const step = target / (duration / 16);
-  const timer = setInterval(() => {
-    start += step;
-    if (start >= target) {
-      el.textContent = target;
-      clearInterval(timer);
-    } else {
-      el.textContent = Math.round(start);
-    }
-  }, 16);
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -280,34 +238,19 @@ const pulseLabel = {
   gap: 6,
 };
 
-const pulseDot = {
-  width: 6,
-  height: 6,
-  background: T.moss,
-  borderRadius: "50%",
-};
-
-const statBlock = {
+const capabilityRow = {
   display: "flex",
-  alignItems: "baseline",
-  gap: 6,
+  alignItems: "center",
+  gap: 20,
+  flexWrap: "wrap",
 };
 
-const statNumber = {
+const capabilityItem = {
   fontFamily: display,
-  fontSize: 26,
+  fontSize: 16,
   fontWeight: 500,
   color: T.navy,
-  letterSpacing: "-0.5px",
-  minWidth: 44,
-  display: "inline-block",
-};
-
-const statDesc = {
-  fontFamily: "'Inter', sans-serif",
-  fontSize: 12,
-  fontWeight: 400,
-  color: T.muted,
+  letterSpacing: "-0.2px",
 };
 
 const divider = {
