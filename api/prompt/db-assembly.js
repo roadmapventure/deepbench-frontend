@@ -396,7 +396,11 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
 
   const { sections, formatContract, synthesis, llm, canRequestHelp, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
-  // FEATURE: AA-62 + AA-67 — WORK ORDER section: goal + deliverable_type always present when goal exists
+  // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
+  // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used
+  // by every capability (Q&A, hypothesis tests, quality-gate, actual Work Orders via api/plan.js),
+  // not specific to the Work Order screen/feature; the old name read as a direct reference to that
+  // unrelated feature.
   const goalText = typeof task_context === 'object' && task_context !== null
     ? (task_context.goal || null)
     : (typeof task_context === 'string' ? task_context : null);
@@ -408,8 +412,8 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     const workOrderParts = [`Goal: ${goalText.trim()}`];
     if (deliverableType) workOrderParts.push(`Deliverable type: ${deliverableType}`);
     sections.push({
-      slug: 'work-order',
-      label: 'WORK ORDER',
+      slug: 'current-task',
+      label: 'CURRENT TASK',
       skill_profile_slug: null,
       type: 'stored',
       content: workOrderParts.join('\n'),
@@ -446,20 +450,34 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  // FEATURE: AA-56 — runtime_context injected as Additional Context section when present
+  // FEATURE: AA-136 — runtime_context (prior conversation) must render BEFORE CURRENT TASK/TASK
+  // DETAILS, not silently after. Previously this section had no `order` (landed at array-push end,
+  // after the sort above -- i.e. after the actual current-turn goal, closest of anything to the
+  // always-final VOICE section, read by the model as most current) and no `label` (rendered as a
+  // literal "=== undefined ===" header via ai-enrichment.js's renderSection()). Both stemmed from
+  // this section never being built as a first-class section like every other one in this function --
+  // fixed together. order: 2.4 places it just before CURRENT TASK/TASK DETAILS (2.5) and before the
+  // agent's own identity/behavior/knowledge sections (3/4/5) -- background context first, agent's own
+  // instructions next, current task last before RAG/VOICE.
   if (runtime_context && typeof runtime_context === 'string' && runtime_context.trim()) {
     sections.push({
-      source: 'task_context',
-      type: 'Additional Context',
+      slug: 'prior-conversation',
+      label: 'PRIOR CONVERSATION (context only — see CURRENT TASK for what to actually do)',
+      skill_profile_slug: null,
+      type: 'stored',
       content: runtime_context.trim(),
+      fetch_instruction: null,
+      required: false,
+      order: 2.4,
     });
+    sections.sort((a, b) => (a.order || 0) - (b.order || 0));
   }
 
   // FEATURE: AA-127 — VOICE section, always appended last, every call, every agent. Fixes
   // third-person bleed-through ("the user should...") into generated output — the model was
   // mirroring third-person framing from its own instructional text (see AA-127 in
   // docs/FEATURES.md). Platform-wide constant, not sourced from any Skill Profile row — same
-  // unconditional-append pattern as the WORK ORDER/TASK DETAILS/runtime_context sections above,
+  // unconditional-append pattern as the CURRENT TASK/TASK DETAILS/runtime_context sections above,
   // deliberately placed after all of them so it is always the final thing the model reads.
   sections.push({
     slug: 'voice',
