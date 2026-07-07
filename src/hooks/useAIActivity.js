@@ -88,6 +88,14 @@ export const SERVICE_CATALOG = [
   // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
   // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage/data-analysis.
   { slug: 'memory-consolidation', name: 'Memory Consolidation (Elena Cho)', serviceType: 'ai', patterns: ['Structured Output', 'Memory Consolidation', 'Transfer Learning'], roadmap: 'now' },
+  // FEATURE: AA-122 -- Agent Turn (Delegation Loop Reasoning) service catalog entry. Logged by
+  // AA-120's logAgentTurn() (execute.js) for every delegation-loop callModel() turn, any capability
+  // -- generic and agent-agnostic, not Marcus-specific. No AI_TYPE_TO_SERVICE entry needed: ai_type
+  // will equal this slug ('agent-turn') exactly, resolved by the existing `|| e.type` fallback --
+  // same pattern as pipeline-triage/agent-directory/data-analysis/screen-controls/etc. above. Carries
+  // no cost_usd/input_tokens by design (the real billed cost is already attributed to the capability-
+  // level row sendRequest() writes separately) -- real call count + avg latency, $0 cost, as intended.
+  { slug: 'agent-turn', name: 'Agent Turn (Delegation Loop Reasoning)', serviceType: 'ai', patterns: ['Tool Use', 'Agent Delegation'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
