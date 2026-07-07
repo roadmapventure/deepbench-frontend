@@ -1,4 +1,4 @@
-// DeepBench v6.0.16 | api/prompt/db-assembly.js | AA-108 — fail loudly on unmatched intent_slug
+// DeepBench v6.0.34 | api/prompt/db-assembly.js | AA-127 — global VOICE section
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -454,6 +454,23 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       content: runtime_context.trim(),
     });
   }
+
+  // FEATURE: AA-127 — VOICE section, always appended last, every call, every agent. Fixes
+  // third-person bleed-through ("the user should...") into generated output — the model was
+  // mirroring third-person framing from its own instructional text (see AA-127 in
+  // docs/FEATURES.md). Platform-wide constant, not sourced from any Skill Profile row — same
+  // unconditional-append pattern as the WORK ORDER/TASK DETAILS/runtime_context sections above,
+  // deliberately placed after all of them so it is always the final thing the model reads.
+  sections.push({
+    slug: 'voice',
+    label: 'VOICE',
+    skill_profile_slug: null,
+    type: 'stored',
+    content: `Speak directly to the user — the human you are working with — in second person ("you") or first person for your own analysis ("I recommend", "I'd flag", "Worth confirming"). Never refer to them in third person (e.g. "the user should..."). This applies to every piece of text you generate, including structured fields like "consider"/"complicates"/"supports", not just conversational replies.`,
+    fetch_instruction: null,
+    required: true,
+    order: 100,
+  });
 
   return {
     tenant_id,
