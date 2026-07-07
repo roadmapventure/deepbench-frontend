@@ -122,7 +122,7 @@ If wiring these would push the session over 4 tasks or 3 files — split into `a
 
 **Mandatory close-out steps (do not skip):**
 9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs (the old "session order table" at the bottom of this file was moved to `docs/SESSIONS.md` 2026-07-01 — update the session queue in `CLAUDE-STATE.md` instead, next step)
-10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" (drop the oldest of the 3 into `docs/SESSIONS.md` if it's about to fall off), clear resolved blockers
+10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" as a **one-line** entry (session, version, commit, one clause on what/why), and write the session's full detail directly to `docs/SESSIONS.md` in that same commit — do not leave the full paragraph sitting in `CLAUDE-STATE.md` for a future close-out to migrate "when it's about to fall off"; that deferred-migration step is what let `CLAUDE-STATE.md` balloon past its 4.6 KB baseline before (found and fixed 2026-07-07, doc-cleanup session). Also clear resolved blockers, and delete your own bullet from "In flight now" (`CLAUDE.md` concurrent-sessions rule §8).
 11. If UI work: update `docs/STYLE-GUIDE.md` with any rules locked this session
 12. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev`
 13. Show the bordered code block (the exact coding-session start prompt) for the record, then immediately use it as the `Agent` tool prompt per the Automated Design→Code→Verify Loop rule above — proceed straight to Step 5, no pause waiting for John to start a session manually:
