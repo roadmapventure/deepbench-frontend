@@ -35,15 +35,21 @@ const ESCALATE_PLACEHOLDER =
 
 const INTENT_LABEL = { theory: "Theory", forecast: "Forecast", correct: "Correct" };
 
-// FEATURE: MI-01d — Sam Reyes (pipeline-triage/intake-failure-intent) replaces the static failure
-// message with a real diagnosis, per design doc §5.9's "fail safe, never fake" principle.
+// FEATURE: AA-130 — Sam's intake-failure-intent schema (traits.schema, confirmed live in Supabase)
+// only ever outputs recommend_escalate/suggested_research_request, per the original spec
+// (APPLE-AGENT-1-v5-DESIGN.md §5.9) — he was never designed to produce an explanatory string, and
+// the prior hardcoded phrase (falsely attributed to Sam, wrongly implying a Data Room gap in the
+// live case that surfaced this, AA-130) was fabricated at the frontend layer, not real agent output.
+// Owen's guardrail object already carries a real, specific `reason` explaining the actual failure —
+// this now surfaces that, correctly attributed to Owen, instead of inventing something on Sam's behalf.
 function buildFailureText(guardrail, triage) {
   const base = `Marcus couldn't produce an answer that passed review (${guardrail?.rule_violated || "review failed"}).`;
-  if (!triage) return `${base} Try rephrasing the question.`;
-  const suggestion = triage.suggested_research_request ? ` Sam suggests: "${triage.suggested_research_request}"` : "";
+  const reason = guardrail?.reason ? ` ${guardrail.reason}` : "";
+  if (!triage) return `${base}${reason} Try rephrasing the question.`;
+  const suggestion = triage.suggested_research_request ? ` Suggested next step: "${triage.suggested_research_request}"` : "";
   return triage.recommend_escalate
-    ? `${base} Sam's diagnosis: this looks like a Data Room coverage gap.${suggestion}`
-    : `${base} Sam's diagnosis: escalating wouldn't help here — try rephrasing instead.`;
+    ? `${base}${reason}${suggestion}`
+    : `${base}${reason} Try rephrasing the question.`;
 }
 
 // FEATURE: MI-04 — capability display metadata, sourced from the same SERVICE_CATALOG entries
