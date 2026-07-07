@@ -1,4 +1,4 @@
-// DeepBench v6.1.1 | api/capabilities/execute.js | S-ARCH-DURABLE-LOOP-02a — hybrid budget-aware checkpoint/resume
+// DeepBench v6.1.7 | api/capabilities/execute.js | S-ARCH-DELEGATION-FIDELITY-01 — forward real task_context through delegate_to_agent, fail loudly on empty final delegation
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -168,7 +168,7 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
 // job_id: null) and a resumed call (resumeCapability(), state loaded from durable_hops,
 // job_id: row.id) share this one implementation. No second copy of the loop logic anywhere.
 async function runLoop({
-  capability_slug, intent_slug, agent_id, tenant_id, enriched, canRequestHelp,
+  capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
   requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
   display_agent_id, display_agent_card,
   conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
@@ -302,11 +302,24 @@ async function runLoop({
       // mechanism an agent_id may appear, and it is always the requester's own tool-call
       // argument, never a static field.
       const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = turn.tool_input;
+      // FEATURE: AA-126 -- forward the delegator's own real task_context (whatever structured data
+      // THIS agent's own call was given -- e.g. Priya's supports/complicates/consider with real
+      // citations) to the delegate, not just the delegator's own free-text `task` paraphrase. Root
+      // cause: `task` is a plain string by design (generic across every delegate_to_agent use), so a
+      // delegating agent has to paraphrase structured content into it -- a format skill that requires
+      // every claim to trace back to real given text (e.g. Alex's intelligence-review-format) can't
+      // produce a valid response from a paraphrase with no real citation IDs, and silently returns
+      // little or nothing. Merging keeps the delegator's own framing (as `delegation_task`) while
+      // guaranteeing the real underlying data travels intact. Generic to every delegate_to_agent call
+      // -- no capability/agent name involved, no branch on which capability is being called.
+      const delegateTaskContext = (task_context && typeof task_context === 'object')
+        ? { ...task_context, delegation_task: task }
+        : { delegation_task: task };
       delegateResult = await runCapability({
         capability_slug: targetCapabilitySlug,
         intent_slug: targetIntentSlug || null,
         agent_id: targetAgentId,
-        task_context: task,
+        task_context: delegateTaskContext,
         tenant_id,
         _hop_counter: hopCounter,
         _deadline: deadline,
@@ -320,6 +333,17 @@ async function runLoop({
       // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
       // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
       if (turn.tool_input.is_final === true) {
+        // FEATURE: AA-126 -- fail loudly instead of silently returning a hollow card. Before this
+        // guard, a delegate that couldn't produce its schema-required output (insufficient
+        // task_context, a guardrail block, a decline -- exact sub-mode not distinguished here,
+        // deliberately: any of them means something real went wrong) resulted in
+        // `...delegateResult.content` spreading nothing into finalResult, no error surfaced, no way
+        // for the frontend to tell an empty card from a legitimate response. Same "fail safe, never
+        // fake" principle as AA-108's assemblePrompt() guard -- a genuine platform fault, not
+        // something the calling agent is expected to gracefully recover from.
+        if (!delegateResult.content || Object.keys(delegateResult.content).length === 0) {
+          throw new Error(`delegate_to_agent: ${targetAgentId}/${targetCapabilitySlug}${targetIntentSlug ? '/' + targetIntentSlug : ''} returned no content for a final delegation (violations: ${JSON.stringify(delegateResult.violations || [])})`);
+        }
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
         const headers = getSupabaseHeaders(supabaseKey);
@@ -421,7 +445,7 @@ export async function runCapability({
   const deadline = _deadline || (Date.now() + 60000 - SAFETY_MARGIN_MS);
 
   return runLoop({
-    capability_slug, intent_slug, agent_id, tenant_id, enriched, canRequestHelp,
+    capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
     requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
     display_agent_id, display_agent_card,
     conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
@@ -455,6 +479,11 @@ export async function resumeCapability({ job_id }) {
 
   return runLoop({
     capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+    // FEATURE: AA-126 -- durable_hops does not persist the original task_context (AA-138's schema,
+    // unchanged). A delegate_to_agent hop that fires *after* a resume falls back to task-string-only
+    // forwarding -- the pre-existing behavior, not a regression -- same accepted-gap class as the
+    // requiresHumanConfirmation/critique/display fields already left unpersisted by AA-139.
+    task_context: null,
     enriched, canRequestHelp: row.can_request_help,
     requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
     display_agent_id: null, display_agent_card: null,
