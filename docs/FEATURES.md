@@ -104,7 +104,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| RO-10 | Bench screen left-nav category filters (All/Market Intel/Platform Wide/NIGP Experts/Special Interests), reuses PersonnelScreen's locked left-sidebar nav pattern. Agents can belong to multiple groups. | ❌ Missing | S-BENCH-FILTER-01 |
 
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.

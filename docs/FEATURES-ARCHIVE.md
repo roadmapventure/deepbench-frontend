@@ -115,6 +115,7 @@
 | RO-07 | Bench UI polish — stats strip Corners + border, AiBadge on Add Training, Add a Player ghost button | ✅ Done | S-BENCH-UX-01 (812ed59) |
 | RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ✅ Done | S-BENCH-UX-02 (8717106) |
 | RO-09 | Bench roster sort by usage count — agents sorted by AI call count DESC, alpha first name on tie; zero-count agents at bottom sorted alpha | ✅ Done | S-RO-09 (4c4bdb2) |
+| RO-10 | Bench screen left-nav category filters (All/Market Intel/Platform Wide/NIGP Experts/Special Interests), reuses PersonnelScreen's locked left-sidebar nav pattern. Agents can belong to multiple groups. | ✅ Done | S-BENCH-FILTER-01 (21d261f) |
 ## PERSONNEL FILE — PE
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
