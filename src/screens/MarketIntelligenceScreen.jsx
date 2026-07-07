@@ -84,6 +84,12 @@ function shapeForLog(text, maxLen = 140) {
   return `${s.slice(0, maxLen).trim()}…`;
 }
 
+// FEATURE: MI-19 — render a per-step Pipeline Log duration the same way everywhere.
+function formatDuration(ms) {
+  if (ms == null) return "";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
 // never scripted text. Color: T.moss = pass/clean, T.brass = flagged/revise, T.flag = blocked.
 function describePipelineEvent(evt) {
@@ -172,12 +178,14 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
 // data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
 async function runQaWithQualityGate(message, conversationContext, onEvent) {
+  let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
     task_context: { goal: message }, runtime_context: conversationContext,
   });
-  onEvent({ type: "qa_answer", agentId: "marcus", data: qa });
+  onEvent({ type: "qa_answer", agentId: "marcus", data: qa, durationMs: Date.now() - t0 });
 
+  t0 = Date.now();
   const gate = await callCapability({
     capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
     task_context: {
@@ -186,14 +194,15 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
     },
   });
   const retried = !!gate.final_answer;
-  onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate });
+  onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate, durationMs: Date.now() - t0 });
 
   if (gate.guardrail?.result === "block") {
+    const t0 = Date.now();
     const triage = await callCapability({
       capability_slug: "pipeline-triage", intent_slug: "intake-failure-intent", agent_id: "sam",
       task_context: { guardrail_failure: gate.guardrail, original_question: message },
     });
-    onEvent({ type: "failure_triage", agentId: "sam", data: triage });
+    onEvent({ type: "failure_triage", agentId: "sam", data: triage, durationMs: Date.now() - t0 });
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, triage) };
   }
 
@@ -206,14 +215,15 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   // delegate_to_agent(is_final:true) -> whichever Display agent she ranked highest. Runs after the
   // Proofreader gate/retry sequence resolves, on finalAnswer (whichever of qa/gate.final_answer
   // won) — Owen's own evaluation semantics above are completely unchanged by this step.
+  t0 = Date.now();
   const display = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
   });
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection });
+    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
   }
-  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "marcus", secondaryAgentId: display.display_agent_id, data: display });
+  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "marcus", secondaryAgentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
 
   return {
     kind: "qa",
@@ -225,11 +235,12 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
 }
 
 async function runIntentPipeline(message, conversationContext, onEvent) {
+  const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
     task_context: { goal: message }, runtime_context: conversationContext,
   });
-  onEvent({ type: "intent_routing", agentId: "marcus", data: routing });
+  onEvent({ type: "intent_routing", agentId: "marcus", data: routing, durationMs: Date.now() - t0 });
   if (routing.intent === "escalate") {
     return { kind: "non_qa", text: ESCALATE_PLACEHOLDER };
   }
@@ -270,14 +281,15 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     },
   });
 
+  const t0 = Date.now();
   const display = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-display-intent", agent_id: "priya",
     task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
   });
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: "priya", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection });
+    onEvent({ type: "agent_selection", agentId: "priya", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
   }
-  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "priya", secondaryAgentId: display.display_agent_id, data: display });
+  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "priya", secondaryAgentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
 
   return display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
 }
@@ -628,6 +640,7 @@ function AuditColumn({ events }) {
           return (
             <div key={evt.id} style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
               <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
                 {primary && <AgentAvatar who={primary.id} size={20}/>}
                 <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? primary.name : evt.agentId}</span>
                 <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
@@ -641,7 +654,7 @@ function AuditColumn({ events }) {
                 )}
               </div>
               {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
-              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}</div>
+              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
             </div>
           );
         })}
@@ -862,8 +875,9 @@ export default function MarketIntelligenceScreen() {
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
     setAIStatus("Priya is running a hypothesis test…");
     try {
+      const t0 = Date.now();
       const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent });
-      logEvent({ type: "hypothesis_test", agentId: "priya", data: st });
+      logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
       setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id }]);
       setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
     } catch (e) {
@@ -894,6 +908,7 @@ export default function MarketIntelligenceScreen() {
         ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
 
+      let t0 = Date.now();
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
         task_context: {
@@ -902,8 +917,9 @@ export default function MarketIntelligenceScreen() {
           was_override: !!hypothesisTest?.override_warning,
         },
       });
-      logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult });
+      logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
 
+      t0 = Date.now();
       const nadiaResult = await callCapability({
         capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
         task_context: {
@@ -911,7 +927,7 @@ export default function MarketIntelligenceScreen() {
           user_reasoning: hypothesisTestText || chosenText,
         },
       });
-      logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult });
+      logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult, durationMs: Date.now() - t0 });
 
       setHypFlow(prev => prev && ({
         ...prev, stage: "result",
@@ -937,6 +953,7 @@ export default function MarketIntelligenceScreen() {
     const edited_task_context = resolution === "edit"
       ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
       : null;
+    const t0 = Date.now();
     const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
     if (resolution === "edit") {
@@ -952,7 +969,7 @@ export default function MarketIntelligenceScreen() {
       return;
     }
 
-    logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result } });
+    logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
     setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
       text: resolution === "accept" ? (result.content?.confirmation_note || "Recorded.") : "Nadia's proposal was rejected — not recorded." }]);
     setHypFlow(null);
