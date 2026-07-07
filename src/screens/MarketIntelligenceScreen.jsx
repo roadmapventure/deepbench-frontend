@@ -1,6 +1,8 @@
 // DeepBench v6.1.5 | MarketIntelligenceScreen.jsx | S-MI-23 — chat-embedded AgentWorkingIndicator replaces header dot + Theory Evidence duplicate lines
 // v6.1.5 — S-MI-23 workingStatus wiring, all 6 turns
 // DeepBench v6.1.3 | MarketIntelligenceScreen.jsx | S-MI-21/MI-21 — Pipeline Log converted to a Drawer, default open
+// DeepBench v6.1.4 | MarketIntelligenceScreen.jsx | S-MI-22 — Data Sources drawer regrouped into
+// Sourced/Simulation (sub-grouped by category)/Analysis sections; Analysis moved to its own Drawer
 // DeepBench v6.0.47 | MarketIntelligenceScreen.jsx | S-MI-15 — Data Sources drawer + describeDataType() display-label taxonomy
 // DeepBench v6.0.46 | MarketIntelligenceScreen.jsx | S-MI-20 — latency broken out by kind, blended stat removed
 // DeepBench v6.0.44 | MarketIntelligenceScreen.jsx | S-MI-18c — Agents drawer sorted descending by calls
@@ -150,6 +152,38 @@ function describeDataType(dataType, { isBaseline, source } = {}) {
     default:
       return { label: "—", color: T.muted, whoTag: null };
   }
+}
+
+// FEATURE: MI-22 — category→label lookup for the Simulation sub-grouping. Genuinely new/minimal;
+// reuses the existing category-badge text style (mono, uppercase, T.muted) already used for
+// row.category below rather than inventing a new visual. Not a duplicate of describeDataType()'s
+// data_type→label mapping — this maps the_library.category, a different column entirely.
+const SIMULATION_CATEGORY_LABELS = { geo_briefing: "GEO", partner_scenario: "Partner" };
+
+// FEATURE: MI-22 — pure grouping helper for the Data Sources / Analysis drawers. Buckets the raw
+// dataSources rows into Sourced (pinned top) / Simulation (sub-grouped by category, first-seen
+// key order, no pre-seeded categories) / Analysis. Calls describeDataType() exactly once per row
+// (Category M — single source of truth for the data_type→label mapping) and carries the result
+// forward on each row as `_display`, so no render path below ever needs to re-derive it. Rows
+// keep the hook's existing arrival order within each bucket (already title-sorted).
+function groupDataSources(rows) {
+  const sourced = [];
+  const simulationByCategory = {};
+  const analysis = [];
+  for (const row of rows) {
+    const display = describeDataType(row.data_type, { isBaseline: row.is_baseline, source: row.source });
+    const decorated = { ...row, _display: display };
+    if (display.label === "Sourced") {
+      sourced.push(decorated);
+    } else if (display.label === "Source Simulation") {
+      const key = row.category;
+      if (!simulationByCategory[key]) simulationByCategory[key] = [];
+      simulationByCategory[key].push(decorated);
+    } else if (display.label === "Analysis") {
+      analysis.push(decorated);
+    }
+  }
+  return { sourced, simulationByCategory, analysis };
 }
 
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
@@ -768,16 +802,11 @@ function AuditColumn({ events }) {
     .sort((a, b) => (agentActivity[b]?.calls || 0) - (agentActivity[a]?.calls || 0));
   const potentialIds = PROPOSED_MI_AGENT_IDS.filter(id => !agentActivity[id]?.calls);
 
-  // FEATURE: MI-15 — Data Sources drawer counts, computed from real rows via describeDataType(),
-  // never hardcoded. "sourced"/"analysis"/"simulation" bucket names are display-only groupings of
-  // the mapped label, not raw data_type values.
-  const dataSourceCounts = dataSources.reduce((acc, row) => {
-    const { label } = describeDataType(row.data_type, { isBaseline: row.is_baseline, source: row.source });
-    if (label === "Sourced") acc.sourced++;
-    else if (label === "Source Simulation") acc.simulation++;
-    else if (label === "Analysis") acc.analysis++;
-    return acc;
-  }, { sourced: 0, analysis: 0, simulation: 0 });
+  // FEATURE: MI-22 — Sourced/Simulation(sub-grouped)/Analysis buckets, single describeDataType()
+  // pass per row via groupDataSources() (Category M) — replaces S-MI-15's flat count reduce.
+  const { sourced, simulationByCategory, analysis } = groupDataSources(dataSources);
+  const simulationCategories = Object.keys(simulationByCategory).sort();
+  const simulationTotal = simulationCategories.reduce((n, cat) => n + simulationByCategory[cat].length, 0);
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
@@ -786,6 +815,7 @@ function AuditColumn({ events }) {
       <FeatureBadge id="MI-18"/>
       <FeatureBadge id="MI-15"/>
       <FeatureBadge id="MI-21"/>
+      <FeatureBadge id="MI-22"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <Drawer title="Pipeline Log" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
         {ordered.length === 0 ? (
@@ -899,34 +929,76 @@ function AuditColumn({ events }) {
       </Drawer>
       {/* FEATURE: MI-15 — Data Sources drawer, read-only reference list of the Data Room's
           available data (John: "just like a real library index card booth" — explicitly not
-          interactive/clickable). Reuses the same Drawer shell as Learned Context/Agents above. */}
-      <Drawer title="Data Sources" count={`${dataSources.length} dataset${dataSources.length === 1 ? "" : "s"} · ${dataSourceCounts.sourced} sourced · ${dataSourceCounts.analysis} analysis · ${dataSourceCounts.simulation} simulation`}>
-        {dataSources.length === 0 ? (
+          interactive/clickable). Reuses the same Drawer shell as Learned Context/Agents above.
+          FEATURE: MI-22 — regrouped into Sourced (pinned top) + Simulation (sub-grouped by
+          category, alphabetical by raw category string). Analysis moved to its own Drawer below. */}
+      <Drawer title="Data Sources" count={`${sourced.length + simulationTotal} dataset${sourced.length + simulationTotal === 1 ? "" : "s"} · ${sourced.length} sourced · ${simulationTotal} simulation`}>
+        {sourced.length === 0 && simulationTotal === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
             No Data Room content loaded yet.
           </div>
-        ) : dataSources.map(row => {
-          const { label, color, whoTag } = describeDataType(row.data_type, { isBaseline: row.is_baseline, source: row.source });
-          const meta = [row.geo, row.program_area, row.period, row.partner_id].filter(Boolean).join(" · ");
-          return (
-            <div key={row.id} style={{display:"flex",flexDirection:"column",gap:4,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                <span style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink}}>{row.title}</span>
-                <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                  <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",border:`1px solid ${color}`,color}}>{label}</span>
-                  {whoTag && <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>· {whoTag}</span>}
-                </div>
-              </div>
-              {row.category && (
-                <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{row.category}</span>
-              )}
-              {meta && (
-                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{meta}</span>
-              )}
-            </div>
-          );
-        })}
+        ) : (
+          <>
+            {sourced.length > 0 && (
+              <>
+                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Sourced ({sourced.length})</div>
+                {sourced.map(row => <DataSourceRow key={row.id} row={row}/>)}
+              </>
+            )}
+            {simulationTotal > 0 && (
+              <>
+                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Simulation ({simulationTotal})</div>
+                {simulationCategories.map(cat => (
+                  <div key={cat} style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>
+                      {SIMULATION_CATEGORY_LABELS[cat] ?? cat} ({simulationByCategory[cat].length})
+                    </div>
+                    {simulationByCategory[cat].map(row => <DataSourceRow key={row.id} row={row}/>)}
+                  </div>
+                ))}
+              </>
+            )}
+          </>
+        )}
       </Drawer>
+
+      {/* FEATURE: MI-22 — Analysis pulled out into its own sibling Drawer, same AuditColumn
+          wrapper/shell: interpretive content layered on top of Sourced/Simulation's raw Data
+          Room material, conceptually distinct (John's design-session call). */}
+      <Drawer title="Analysis" count={`${analysis.length} item${analysis.length === 1 ? "" : "s"}`}>
+        {analysis.length === 0 ? (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
+            No analysis content yet.
+          </div>
+        ) : analysis.map(row => <DataSourceRow key={row.id} row={row}/>)}
+      </Drawer>
+    </div>
+  );
+}
+
+// FEATURE: MI-22 — shared per-row card markup for the Data Sources / Analysis drawers, unchanged
+// visually from S-MI-15 (title, badge, who-tag, category line, metadata line) — only extracted so
+// it can be reused across the three new render paths (Sourced, each Simulation sub-group, Analysis)
+// without a second describeDataType() call site; label/color/whoTag come from groupDataSources()'s
+// already-computed `_display`.
+function DataSourceRow({ row }) {
+  const { label, color, whoTag } = row._display;
+  const meta = [row.geo, row.program_area, row.period, row.partner_id].filter(Boolean).join(" · ");
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <span style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink}}>{row.title}</span>
+        <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",border:`1px solid ${color}`,color}}>{label}</span>
+          {whoTag && <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>· {whoTag}</span>}
+        </div>
+      </div>
+      {row.category && (
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{row.category}</span>
+      )}
+      {meta && (
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{meta}</span>
+      )}
     </div>
   );
 }
