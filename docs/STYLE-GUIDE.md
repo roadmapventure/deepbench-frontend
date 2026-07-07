@@ -498,10 +498,32 @@ The platform's `visualization` mechanism (`ARCHITECTURE.md` §19g) has exactly o
 
 ---
 
+## Section 19 — Data Type / Confidence Tier Display Labels (Locked 2026-07-07 · S-MI-15-design)
+
+The raw `data_type` (`the_library` rows) and `confidence_tier` (Q&A answers) values are **display-layer relabeled only** — the underlying enum strings (`sourced`/`inferred`/`synthesized`/`learned`/`na`) are unchanged in the DB and in every Skill Profile's LLM-facing schema (7 live profiles reference this vocabulary: `ci-answer-intent`, `data-escalate-intent`, `intelligence-review-format`, `library-write-intent`, `qa-answer-format`, `qg-review-intent`, `solution-catalog`). Never rename the stored enum value itself — only the human-facing label a component renders.
+
+One shared mapping (name TBD by the coding session, lives in `MarketIntelligenceScreen.jsx` since every current usage site is in that file):
+
+| Raw value | Context | Display label | Badge color | Who-tag? |
+|---|---|---|---|---|
+| `sourced` | any | **Sourced** | `T.moss` | No |
+| `inferred` | any | **Analysis** | `T.brass` | Yes — from `the_library.source` (`user`→"Human", `agent`→"AI"). No `source` column exists on a `confidence_tier` context (a live answer) — that case has no who-tag, it's implicitly AI |
+| `synthesized` | `the_library` row, `is_baseline=true` | **Source Simulation** | `T.mutedDeep` | No |
+| `synthesized` | `the_library` row, `is_baseline=false` — OR any `confidence_tier` context (no baseline concept applies to a live answer) | **Analysis** | `T.brass` | Same rule as `inferred` above |
+| `learned` | `the_reasoning` row | **Learned** | `T.navyMid` | No |
+| `na` | `confidence_tier` only | *(no `the_library` equivalent)* | `T.muted` | No |
+
+**Why this split exists (don't re-litigate without re-reading this):** "Analysis" is deliberately the *only* type with a who-tag — Sourced's trust comes from the external citation regardless of who entered it, Source Simulation is inherently a one-time demo-seeding action, and Learned is always the Reasoner's own automatic write. Analysis is the one type a human's own judgment and an AI's own judgment can both produce (confirmed live: the two seeded `inferred` rows have `source: 'user'`, i.e. human-authored analysis already exists today), so it's the one place the distinction changes how much a user should trust it.
+
+**Existing render sites this rule already applies to** (found during `S-MI-15-design`'s Architect Review — do not add a second, inconsistent mapping): the Evidence column's static layer legend, the Pipeline Log's `confidence_tier` summary text (previously raw, e.g. `confidence_tier: inferred`), and the new Data Sources drawer (`MI-15`).
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-07 | S-MI-15-design | Section 19 added — Data Type/Confidence Tier display-label relabel locked: `inferred`/non-baseline-`synthesized` → "Analysis" (with Human/AI who-tag from `source`), baseline-`synthesized` → "Source Simulation", `sourced`/`learned` unchanged. Display-only — zero backend/schema change. |
 | 2026-06-08 | S-MIGRATE-UX | Treasury palette locked, left nav pattern locked |
 | 2026-06-08 | S-MIGRATE-01a | AgentAvatar, illustrated SVG avatars in SharedUI |
 | 2026-06-09 | S-MIGRATE-03 | Inline sub-view pattern (PE-10) |

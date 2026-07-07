@@ -237,15 +237,17 @@ Final DB slugs may get bikeshedded at kickoff-doc time — this table is the str
 
 ---
 
-## 6. DATA LAYERS (carried forward, unchanged)
+## 6. DATA LAYERS
 > Full source data (Datasets 1–6, synthetic scenario outlines, question bank): `docs/APPLE-DATA-ROOM-SOURCE-DATA.md`
+> **Display labels relabeled 2026-07-07 (`S-MI-15-design`)** — the raw `data_type` values below are unchanged (still exactly what every Skill Profile's schema outputs, zero backend/schema impact), only the human-facing label changed. Full rationale + the "why not one more label" discussion: `docs/STYLE-GUIDE.md` Section 19.
 
-| Layer | data_type | Citeable | Source |
-|---|---|---|---|
-| 1 | `sourced` | true | Apple 10-K, SellCell, KrASIA, Counterpoint |
-| 2 | `inferred` | false | Implied conclusions from public sources |
-| 3 | `synthesized` | false | Authored scenarios, anchored to real industry benchmarks |
-| 4 | `learned` | false | Reasoner's consolidated corrections |
+| Layer | data_type | Citeable | Source | Display label | Who-tag |
+|---|---|---|---|---|---|
+| 1 | `sourced` | true | Apple 10-K, SellCell, KrASIA, Counterpoint | **Sourced** | No |
+| 2 | `inferred` | false | Implied conclusions from public sources | **Analysis** | Yes — `source` column (`user`→Human, `agent`→AI) |
+| 3a | `synthesized` + `is_baseline=true` | false | Authored scenarios, anchored to real industry benchmarks, built to demo platform potential | **Source Simulation** | No |
+| 3b | `synthesized` + `is_baseline=false` (or any `confidence_tier` context, which has no baseline concept) | false | Live agent analysis of real loaded data, not yet confirmed | **Analysis** | Yes (same as row 2) |
+| 4 | `learned` | false | Reasoner's consolidated corrections | **Learned** | No |
 
 ---
 
