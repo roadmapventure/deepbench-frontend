@@ -1,6 +1,6 @@
 // DeepBench v5.2.41 | WelcomeSplash.jsx | S-SPLASH-01 welcome splash modal
 // FEATURE: SH-14 — Welcome splash modal
-// DeepBench v6.1.11 | WelcomeSplash.jsx | S-SPLASH-02/SH-18 — stat counters replaced with static capability strip
+// DeepBench v6.1.12 | WelcomeSplash.jsx | S-SPLASH-02/SH-18 — stat counters replaced with static capability strip
 
 import { useState, useEffect } from "react";
 import { T, display, mono } from "../tokens.js";
