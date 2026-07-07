@@ -1,4 +1,5 @@
 // DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
+// DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -174,7 +175,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"I own the world's channels."`,
     color: T.brass,
-    isAppleChannel: true,
   },
   // FEATURE: AG-21 — Priya Nair (CI-02) Forecast/Theory/Performance Expert
   {
@@ -186,7 +186,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"A theory that survives a hypothesis test earns the name forecast."`,
     color: T.moss,
-    isAppleChannel: true,
   },
   // FEATURE: AG-19 — Nadia Farouk (CI-03) Data Expert
   {
@@ -198,7 +197,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"Nothing gets erased. Everything gets superseded."`,
     color: T.moss,
-    isAppleChannel: true,
   },
   // FEATURE: AG-22 — Owen Marsh (CI-04) The Proofreader
   {
@@ -210,7 +208,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"I don't argue with the answer. I argue with what's missing from it."`,
     color: T.brass,
-    isAppleChannel: true,
   },
   // FEATURE: AG-23 — Sam Reyes (CI-05) The Intake Assistant
   {
@@ -222,7 +219,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"Every decision needs somewhere to go next."`,
     color: T.brass,
-    isAppleChannel: true,
   },
   // FEATURE: AG-20 — Elena Cho (CI-06) The Reasoner
   {
@@ -234,7 +230,6 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"One correction, taught right, answers the next hundred questions."`,
     color: T.navy,
-    isAppleChannel: true,
   },
 ];
 

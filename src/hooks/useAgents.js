@@ -1,5 +1,6 @@
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
+// DeepBench v6.0.40 | useAgents.js | MI-18 — Agent Activity drawer data hook
 // FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
 // Returns the agent roster. Swap internals for Supabase query when auth arrives.
@@ -59,6 +60,47 @@ export function useLearnedContext() {
   }, []);
 
   return entries;
+}
+
+// FEATURE: MI-18 — per-agent all-time usage summary (calls/avgLatency/avgCost) for a given set of
+// agent IDs. Distinct from useAgentUsageCounts() above (RO-09): deliberately not reused/modified,
+// see Task 1 note in the kickoff doc — that hook's flat number shape is a direct sort-comparator
+// input in RosterScreen.jsx, changing it would silently break that sort. Also distinct from
+// useAIActivity()'s byAgent (src/hooks/useAIActivity.js): that aggregation is backed by an
+// in-memory log capped at 500 rows (hydrateFromSupabase()'s .limit(500)) — a rolling window, not
+// full history, so an occasionally-used agent could scroll out of it and be wrongly reported as
+// unused. This hook queries Supabase directly, independent of that cap, so an agent's "used at
+// least once, ever" status is never lost.
+export function useAgentActivitySummary(agentIds) {
+  const [summary, setSummary] = useState({});
+
+  useEffect(() => {
+    if (!agentIds || agentIds.length === 0) { setSummary({}); return; }
+    supabase
+      .from('ai_activity_log')
+      .select('agent_id,latency_ms,cost_usd')
+      .eq('tenant_id', 'global')
+      .in('agent_id', agentIds)
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        const map = {};
+        for (const row of data) {
+          if (!row.agent_id) continue;
+          if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalLatency: 0, latencyCount: 0, totalCost: 0, costCount: 0 };
+          const d = map[row.agent_id];
+          d.calls++;
+          if (row.latency_ms) { d.totalLatency += row.latency_ms; d.latencyCount++; }
+          if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
+        }
+        Object.values(map).forEach(d => {
+          d.avgLatency = d.latencyCount ? Math.round(d.totalLatency / d.latencyCount) : null;
+          d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
+        });
+        setSummary(map);
+      });
+  }, []); // agentIds is a stable, page-defined constant — same no-deps precedent as useLearnedContext() above
+
+  return summary;
 }
 
 export function useAgents() {

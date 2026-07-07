@@ -1,3 +1,4 @@
+// DeepBench v6.0.40 | MarketIntelligenceScreen.jsx | MI-18 — Agent Activity drawer, Column 3 (closes MI-06)
 // DeepBench v6.0.36 | MarketIntelligenceScreen.jsx | MI-17 — Learned Context drawer, Column 3
 // DeepBench v6.0.25 | MarketIntelligenceScreen.jsx | S-MI-14 — full terminology rename sweep
 // (AI - Hypothesis Test branding, generalized human-operator term); no mechanism/behavior change.
@@ -20,7 +21,7 @@ import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
-import { useAgents, useLearnedContext } from "../hooks/useAgents.js";
+import { useAgents, useLearnedContext, useAgentActivitySummary } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
 
@@ -580,18 +581,38 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
   );
 }
 
+// FEATURE: MI-18 — this screen's own proposed roster for the Agents drawer. Lives here, not on
+// agents.js, so the roster stays platform-wide/page-agnostic — closes MI-06's AI-38 dependency,
+// no isAppleChannel/section field needed. Any future screen wanting this drawer defines its own
+// list the same way, passed to the same reusable useAgentActivitySummary()/Drawer pieces.
+const PROPOSED_MI_AGENT_IDS = ["marcus", "priya", "nadia", "owen", "sam", "elena"];
+
+function StatCell({ val, label }) {
+  return (
+    <div style={{textAlign:"center"}}>
+      <div style={{fontFamily:mono,fontSize:11,fontWeight:800,color:T.navy}}>{val}</div>
+      <div style={{fontFamily:mono,fontSize:7,color:T.muted,textTransform:"uppercase",letterSpacing:"0.03em"}}>{label}</div>
+    </div>
+  );
+}
+
 // FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
 // Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
 function AuditColumn({ events }) {
   const agents = useAgents();
   const learned = useLearnedContext();
+  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS);
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
+  const activeIds = PROPOSED_MI_AGENT_IDS.filter(id => agentActivity[id]?.calls > 0);
+  const potentialIds = PROPOSED_MI_AGENT_IDS.filter(id => !agentActivity[id]?.calls);
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
       <FeatureBadge id="MI-17"/>
+      <FeatureBadge id="MI-06"/>
+      <FeatureBadge id="MI-18"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Pipeline Log</div>
@@ -645,6 +666,47 @@ function AuditColumn({ events }) {
                 <div style={{fontFamily:mono,fontSize:9,color:T.muted,fontStyle:"italic"}}>&ldquo;{shapeForLog(entry.source_question, 100)}&rdquo;</div>
               )}
               <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{shapeForLog(entry.content, 220)}</div>
+            </div>
+          );
+        })}
+      </Drawer>
+      <Drawer title="Agents" count={`${activeIds.length} active · ${potentialIds.length} potential`}>
+        {activeIds.map(id => {
+          const agent = agentById(id);
+          if (!agent) return null;
+          const stats = agentActivity[id];
+          return (
+            <div key={id} style={{display:"flex",flexDirection:"column",gap:6,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <AgentAvatar who={agent.id} size={24}/>
+                <div style={{display:"flex",flexDirection:"column"}}>
+                  <span style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.ink}}>{agent.name}</span>
+                  <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{agent.role}</span>
+                </div>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {agent.specialty.split(" · ").map(chip => (
+                  <span key={chip} style={{fontFamily:mono,fontSize:8,color:T.brassDeep,background:T.paperDeep,border:`1px solid ${T.lineSoft}`,borderRadius:10,padding:"2px 7px"}}>{chip}</span>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:16}}>
+                <StatCell val={stats?.calls ?? 0} label="Calls"/>
+                <StatCell val={stats?.avgLatency != null ? `${(stats.avgLatency/1000).toFixed(1)}s` : "—"} label="Avg Latency"/>
+                <StatCell val={stats?.avgCost != null ? `$${stats.avgCost.toFixed(2)}` : "—"} label="Avg Cost"/>
+              </div>
+            </div>
+          );
+        })}
+        {potentialIds.map(id => {
+          const agent = agentById(id);
+          if (!agent) return null;
+          return (
+            <div key={id} style={{display:"flex",alignItems:"center",gap:8,opacity:0.38}}>
+              <AgentAvatar who={agent.id} size={24}/>
+              <div style={{display:"flex",flexDirection:"column"}}>
+                <span style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.ink}}>{agent.name}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{agent.role} · not yet used on this screen</span>
+              </div>
             </div>
           );
         })}
