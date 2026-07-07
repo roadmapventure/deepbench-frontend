@@ -6,7 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None from this window — `S-MI-18b` closed out below.
+- `S-MI-18c` (v6.0.44) — kickoff written 2026-07-07 (`docs/kickoffs/v6.0.44-S-MI-18c-agents-sort-by-calls.md`), John asked for the Agents drawer's active cards to sort descending by call count instead of fixed roster order. Pure display-ordering change, 1 file, 1 task.
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
