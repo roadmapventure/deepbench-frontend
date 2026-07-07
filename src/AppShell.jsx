@@ -1,4 +1,5 @@
 // DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
+// DeepBench v6.1.5 | AppShell.jsx | S-MI-23 — header AI status dot suppressed on MI route
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, about panel
 
 import { useNavigate, useLocation } from "react-router-dom";
@@ -131,8 +132,8 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
 
       <div style={{flex:1}}/>
 
-      {/* AI status dot */}
-      {status.active && (
+      {/* AI status dot — FEATURE: MI-23 — suppressed on MI route, which shows its own chat-embedded version instead */}
+      {status.active && !isMI && (
         <div style={{display:"flex",alignItems:"center",gap:6,marginRight:8}}>
           <span style={{width:7,height:7,borderRadius:"50%",background:T.brass,display:"inline-block",animation:"aiBlink 1.2s ease-in-out infinite"}}/>
           <span style={{fontFamily:mono,fontSize:10,color:T.brassLight,letterSpacing:.3}}>{status.message}</span>

@@ -1,3 +1,5 @@
+// DeepBench v6.1.5 | MarketIntelligenceScreen.jsx | S-MI-23 — chat-embedded AgentWorkingIndicator replaces header dot + Theory Evidence duplicate lines
+// v6.1.5 — S-MI-23 workingStatus wiring, all 6 turns
 // DeepBench v6.0.47 | MarketIntelligenceScreen.jsx | S-MI-15 — Data Sources drawer + describeDataType() display-label taxonomy
 // DeepBench v6.0.46 | MarketIntelligenceScreen.jsx | S-MI-20 — latency broken out by kind, blended stat removed
 // DeepBench v6.0.44 | MarketIntelligenceScreen.jsx | S-MI-18c — Agents drawer sorted descending by calls
@@ -26,7 +28,7 @@ import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
-import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
+import AIDiamond from "../components/AIDiamond.jsx";
 import { AI_PAT } from "../aiPatterns.js";
 
 const EXAMPLE_QUESTIONS = [
@@ -94,6 +96,35 @@ function formatDuration(ms) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
+// FEATURE: MI-23 — live m:ss elapsed timer for the chat-embedded working-status indicator
+function formatElapsed(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// FEATURE: MI-23 — replaces the header's global AI status dot for this screen; one line, swaps
+// message + resets its timer each time control passes to a new agent (only one agent ever runs
+// at a time on this platform today, confirmed no concurrent dispatch anywhere in this file or the
+// execute.js harness loop — see kickoff CONTEXT). Keyed by startedAt at the call site (not here)
+// so React fully remounts this component on every new turn instead of trying to reset internal
+// tick state — the simplest correct way to guarantee the timer starts at 0:00 every time.
+function AgentWorkingIndicator({ message, startedAt }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+      <AIDiamond size="7px" color={T.brass}/>
+      <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic"}}>{message}</span>
+      <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+    </div>
+  );
+}
+
 // FEATURE: MI-15 — shared display-label mapping for the raw data_type (the_library rows) /
 // confidence_tier (Q&A answers) vocabulary. Display-layer relabel only — the stored enum strings
 // (sourced/inferred/synthesized/learned/na) are unchanged everywhere else (DB, all 7 live Skill
@@ -156,6 +187,9 @@ function describePipelineEvent(evt) {
     case "display_format":
       // FEATURE: MI-15 — confidence_tier routed through describeDataType() instead of the raw enum string
       return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${describeDataType(evt.data.confidence_tier).label}`, color: T.moss };
+    // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
+    case "hypothesis_generation":
+      return { capability: "hypothesis-evaluation", summary: `Generated ${evt.data.candidates?.length ?? 0} hypothesis candidate${evt.data.candidates?.length === 1 ? "" : "s"}`, color: T.moss };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -578,10 +612,6 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
           ))}
         </div>
 
-        {hypFlow.stage === "generating" && (
-          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is generating hypotheses…</div>
-        )}
-
         {hypFlow.candidates && hypFlow.candidates.length > 0 && hypFlow.stage !== "generating" && (
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Select or write a hypothesis</div>
@@ -608,10 +638,6 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
               Use this hypothesis
             </button>
           </div>
-        )}
-
-        {hypFlow.stage === "testing" && (
-          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Priya is running a hypothesis test…</div>
         )}
 
         {st && hypFlow.stage === "result" && (
@@ -657,10 +683,6 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
               Make Permanent
             </button>
           </div>
-        )}
-
-        {hypFlow.stage === "committing" && (
-          <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Elena and Nadia are reviewing this commit…</div>
         )}
 
         {hypFlow.confirmation && (
@@ -908,7 +930,7 @@ function AuditColumn({ events }) {
   );
 }
 
-function InteractColumn({ messages, loading, onSubmit, onReview }) {
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -954,7 +976,7 @@ function InteractColumn({ messages, loading, onSubmit, onReview }) {
           ) : (
             messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
           )}
-          {loading && <div style={{fontFamily:mono,fontSize:11,color:T.muted}}>Marcus is thinking…</div>}
+          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt}/>}
         </div>
 
         <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
@@ -981,6 +1003,7 @@ export default function MarketIntelligenceScreen() {
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
+  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt } | null
 
   const logEvent = (evt) => setPipelineEvents(prev => [...prev, { ...evt, id: prev.length }]);
 
@@ -995,12 +1018,17 @@ export default function MarketIntelligenceScreen() {
     }
     setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
       flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
+    const t0 = Date.now();
+    setWorkingStatus({ message: "Priya is generating hypotheses…", startedAt: t0 });
     try {
       const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
+      logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates }, durationMs: Date.now() - t0 });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
     } catch (e) {
       console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
       setHypFlow(null);
+    } finally {
+      setWorkingStatus(null);
     }
   };
 
@@ -1009,7 +1037,7 @@ export default function MarketIntelligenceScreen() {
     if (!clean || loading) return;
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
-    setAIStatus("Marcus is thinking…");
+    setWorkingStatus({ message: "Marcus is thinking…", startedAt: Date.now() });
     try {
       const result = await runIntentPipeline(clean, conversationContext(), logEvent);
       if (result.kind === "qa") {
@@ -1038,7 +1066,7 @@ export default function MarketIntelligenceScreen() {
       console.error("[MarketIntelligenceScreen]", e.message);
     } finally {
       setLoading(false);
-      clearAIStatus();
+      setWorkingStatus(null);
     }
   };
 
@@ -1053,9 +1081,9 @@ export default function MarketIntelligenceScreen() {
     const { intent, flaggedQuestion, flaggedAnswer, hypothesisTest } = hypFlow;
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
-    setAIStatus("Priya is running a hypothesis test…");
+    const t0 = Date.now();
+    setWorkingStatus({ message: "Priya is running a hypothesis test…", startedAt: t0 });
     try {
-      const t0 = Date.now();
       const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent });
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
       setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id }]);
@@ -1064,7 +1092,7 @@ export default function MarketIntelligenceScreen() {
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
     } finally {
-      clearAIStatus();
+      setWorkingStatus(null);
     }
   };
 
@@ -1081,7 +1109,6 @@ export default function MarketIntelligenceScreen() {
     if (!hypFlow) return;
     const { flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
     setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
-    setAIStatus("Elena and Nadia are reviewing this commit…");
     try {
       const disputedChunkId = Array.isArray(citations) && citations.length === 1 ? citations[0] : null;
       const hypothesisTestText = hypothesisTest
@@ -1089,6 +1116,7 @@ export default function MarketIntelligenceScreen() {
         : "";
 
       let t0 = Date.now();
+      setWorkingStatus({ message: "Elena is consolidating this into memory…", startedAt: t0 });
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
         task_context: {
@@ -1100,6 +1128,7 @@ export default function MarketIntelligenceScreen() {
       logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
 
       t0 = Date.now();
+      setWorkingStatus({ message: "Nadia is drafting a data patch…", startedAt: t0 });
       const nadiaResult = await callCapability({
         capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
         task_context: {
@@ -1123,7 +1152,7 @@ export default function MarketIntelligenceScreen() {
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
       setHypFlow(prev => prev && ({ ...prev, stage: "result" }));
     } finally {
-      clearAIStatus();
+      setWorkingStatus(null);
     }
   };
 
@@ -1134,25 +1163,26 @@ export default function MarketIntelligenceScreen() {
       ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
       : null;
     const t0 = Date.now();
-    const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
+    setWorkingStatus({ message: "Nadia is processing your response…", startedAt: t0 });
+    try {
+      const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
-    if (resolution === "edit") {
-      setHypFlow(prev => prev && ({
-        ...prev,
-        confirmation: {
-          ...prev.confirmation,
-          confirmation_id: result.confirmation_id,
-          proposed_action: result.proposed_action,
-          critique: result.critique,
-        },
-      }));
-      return;
+      if (resolution === "edit") {
+        logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
+        setHypFlow(prev => prev && ({
+          ...prev,
+          confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique },
+        }));
+        return;
+      }
+
+      logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
+      setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
+        text: resolution === "accept" ? (result.content?.confirmation_note || "Recorded.") : "Nadia's proposal was rejected — not recorded." }]);
+      setHypFlow(null);
+    } finally {
+      setWorkingStatus(null);
     }
-
-    logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
-    setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
-      text: resolution === "accept" ? (result.content?.confirmation_note || "Recorded.") : "Nadia's proposal was rejected — not recorded." }]);
-    setHypFlow(null);
   };
 
   return (
@@ -1165,7 +1195,7 @@ export default function MarketIntelligenceScreen() {
         </div>
         <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0,alignItems:"start"}}>
           <FeatureBadge id="MI-02"/>
-          <InteractColumn messages={messages} loading={loading} onSubmit={submit} onReview={onReview}/>
+          <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}/>
           <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
           <AuditColumn events={pipelineEvents}/>
         </div>
