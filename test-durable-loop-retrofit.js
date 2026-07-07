@@ -9,9 +9,9 @@ async function testFastPathUnaffected() {
     capability_slug: 'channel-intelligence', intent_slug: 'ci-routing-intent', agent_id: 'marcus',
     task_context: { goal: 'What drove growth in Japan?' }, tenant_id: 'global',
   });
-  assert(result.intent, 'ordinary short call must complete normally, not checkpoint');
+  assert(result.content?.intent, 'ordinary short call must complete normally, not checkpoint');
   assert(result.status !== 'in_progress', 'fast path must not return in_progress for a short chain');
-  console.log('[fast-path] PASS — short chain completed in one call, no checkpoint:', result.intent);
+  console.log('[fast-path] PASS — short chain completed in one call, no checkpoint:', result.content.intent);
 }
 
 async function testForcedCheckpointAndResume() {
@@ -40,7 +40,13 @@ async function testForcedCheckpointAndResume() {
     current = await resumeCapability({ job_id: start.job_id });
     console.log(`[resume ${iterations}] ->`, current.status);
   }
-  assert.strictEqual(current.status, 'complete', `chain did not complete after resume: ${JSON.stringify(current)}`);
+  // ci-answer-display-intent legitimately terminates via delegate_to_agent(is_final: true)
+  // (Marcus -> Alex's qa-answer-format) -- the harness's documented terminal shape for that path
+  // is status: 'final_delegation' (S-ARCH-DISPLAY-LOOP-01), not 'complete'. 'complete' is purely
+  // the internal durable_hops DB column value written by patchDurableHopRow() -- runLoop()/
+  // resumeCapability() never return that literal to a caller (the ordinary non-delegate dispatch
+  // path has no top-level .status field at all). Confirmed against a real live run's actual output.
+  assert.strictEqual(current.status, 'final_delegation', `chain did not reach the expected terminal state after resume: ${JSON.stringify(current)}`);
   assert(current.headline || (current.body && current.body.length), 'resumed chain must produce real display-agent output');
   console.log('PASS — forced checkpoint resumed to completion across', iterations, 'resumeCapability() call(s).');
 }
