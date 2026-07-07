@@ -6,7 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
 **In flight now:**
-- None.
+- `S-MI-27` (v6.1.11, `MI-27`/`MI-28`, worktree `session/mi-chat-ux-review`) — Submitted Hypothesis "You" attribution + AI card header-order fix, both found live 2026-07-07 during John's own UX test. Two isolated `MessageBubble` rendering changes, no logic/behavior risk. Kickoff committed, coding session spawning now.
 
 **Next session (queued behind this one):** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit, bigger scope — schema migration + UI. Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
