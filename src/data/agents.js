@@ -17,6 +17,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 18, situational: 10,
     trainable: false, trainableBy: "RMV", revenueModel: "Freemium · Included",
     quip: '"I spot the obvious stuff fast."', color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "mike", name: "Mike Alvarez", role: "Senior Procurement Analyst",
@@ -26,6 +27,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 42, situational: 25,
     trainable: false, trainableBy: "RMV", revenueModel: "Teaser · 10% NIGP split",
     quip: '"Industry patterns are where I shine."', color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "bob", name: "Bob Whitfield", role: "Professional Procurement Analyst",
@@ -35,6 +37,7 @@ export const AGENTS = [
     docs: 50, classes: 10, chunks: 842, skill: 71, situational: 25,
     trainable: true, trainableBy: "Gov't", revenueModel: "Offer · 20% consultant split",
     quip: '"Legally, where are we?"', color: T.moss,
+    benchGroups: ["nigp"],
   },
   {
     id: "christy", name: "Christy Park", role: "Marketing Designer",
@@ -44,6 +47,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 36, situational: 5,
     trainable: false, trainableBy: "RMV", revenueModel: "Split · 50% RMV",
     quip: '"Make it look like a cover story."', color: T.brass,
+    benchGroups: ["platform"],
   },
   {
     id: "robyn", name: "Robyn Castellanos", role: "NIGP Consultant",
@@ -53,6 +57,7 @@ export const AGENTS = [
     docs: 100, classes: 25, chunks: 1685, skill: 88, situational: 35,
     trainable: true, trainableBy: "NIGP", revenueModel: "Split · 50% NIGP · $260/rpt",
     quip: `"Next year's strategy, not last year's report."`, color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "brent", name: "Brent Matthews", role: "Data Research Specialist",
@@ -63,6 +68,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV + Self", revenueModel: "Usage · Per Fetch",
     quip: `"If it's on a government server, I'll find it."`,
     color: T.moss, isWebAgent: true,
+    benchGroups: ["nigp"],
   },
   {
     id: "pat", name: "Pat Smiley", role: "Intern Researcher",
@@ -73,6 +79,7 @@ export const AGENTS = [
     trainable: false, trainableBy: "None", revenueModel: "Demo Only",
     quip: `"I'm just here to learn... I think."`,
     color: T.muted, isWebAgent: true, isIntern: true, noMemory: true,
+    benchGroups: ["special"],
   },
   {
     id: "michelle", name: "Michelle Manning", role: "Project Manager",
@@ -84,6 +91,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I map the mission before anyone moves."', color: T.brass,
     isPlanner: true,
+    benchGroups: ["mi", "platform"],
   },
   {
     id: "susan", name: "Susan Smith", role: "Trainer Agent",
@@ -95,6 +103,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I turn knowledge into capability."', color: T.brass,
     isTrainer: true,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-13 — Dan Bingham (PS-01) AI Prompt Strategist
   {
@@ -107,6 +116,7 @@ export const AGENTS = [
     quip: `"The right prompt doesn't ask for the answer — it makes the answer inevitable."`,
     color: T.moss,
     isPromptArchitect: true,
+    benchGroups: ["mi", "platform"],
   },
   // FEATURE: AG-14 — Alex Reeves (ED-01) Screen Controls Editor
   {
@@ -118,6 +128,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"Content knows what to say. I decide where it lives on the screen."',
     color: T.brass,
+    benchGroups: ["mi", "platform"],
   },
   // FEATURE: AG-15 — Riley Torres (ED-02) HTML Display Editor
   {
@@ -129,6 +140,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"A well-structured page doesn't need instructions — it just reads itself."`,
     color: T.brass,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-16 — Claire Sutton (ED-03) PDF Assembly Editor
   {
@@ -140,6 +152,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"Every document is a first impression. I make sure it\'s the right one."',
     color: T.brass,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-17 — Victoria Chen (SP-01) Head of Product Strategy
   {
@@ -152,6 +165,7 @@ export const AGENTS = [
     quip: '"The catalog is the strategy. Everything else is execution."',
     color: T.navy,
     isProductStrategist: true,
+    benchGroups: ["special"],
   },
   // FEATURE: AG-27 — Eleanor Voss (LB-01) The Librarian
   {
@@ -164,6 +178,7 @@ export const AGENTS = [
     quip: `"Knowledge without access control isn't a library — it's a leak waiting to happen."`,
     color: T.navy,
     isLibrarian: true,
+    benchGroups: ["mi", "platform"],
   },
   // FEATURE: AG-18 — Marcus Webb (CI-01) GEO CSO Expert
   {
@@ -175,6 +190,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"I own the world's channels."`,
     color: T.brass,
+    benchGroups: ["mi"],
   },
   // FEATURE: AG-21 — Priya Nair (CI-02) Forecast/Theory/Performance Expert
   {
@@ -186,6 +202,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"A theory that survives a hypothesis test earns the name forecast."`,
     color: T.moss,
+    benchGroups: ["mi"],
   },
   // FEATURE: AG-19 — Nadia Farouk (CI-03) Data Expert
   {
@@ -197,6 +214,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"Nothing gets erased. Everything gets superseded."`,
     color: T.moss,
+    benchGroups: ["mi"],
   },
   // FEATURE: AG-22 — Owen Marsh (CI-04) The Proofreader
   {
@@ -208,6 +226,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"I don't argue with the answer. I argue with what's missing from it."`,
     color: T.brass,
+    benchGroups: ["mi"],
   },
   // FEATURE: AG-23 — Sam Reyes (CI-05) The Intake Assistant
   {
@@ -219,6 +238,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"Every decision needs somewhere to go next."`,
     color: T.brass,
+    benchGroups: ["mi"],
   },
   // FEATURE: AG-20 — Elena Cho (CI-06) The Reasoner
   {
@@ -230,7 +250,17 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"One correction, taught right, answers the next hundred questions."`,
     color: T.navy,
+    benchGroups: ["mi"],
   },
+];
+
+// FEATURE: RO-10 — Bench screen category filter definitions. "all" is not
+// listed here — it is the unfiltered view, not a stored group.
+export const BENCH_FILTERS = [
+  { id: "mi",       label: "Market Intel"      },
+  { id: "platform", label: "Platform Wide"     },
+  { id: "nigp",     label: "NIGP Experts"      },
+  { id: "special",  label: "Special Interests" },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
