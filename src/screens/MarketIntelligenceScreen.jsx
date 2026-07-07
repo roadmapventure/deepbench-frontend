@@ -174,6 +174,33 @@ function describePipelineEvent(evt) {
 // critique and hand the screen an empty object. Any response carrying a top-level `status` field
 // is one of execute.js's own flat early-return shapes (pending_confirmation, depth_exceeded) and
 // is returned as-is; only the ordinary terminal-dispatch shape is unwrapped from `.content`.
+const MAX_CONTINUE_ITERATIONS = 10; // client-side safety cap -- generous headroom over a real
+// chain's expected hop count (harness's own MAX_LOOP_DEPTH is 5), guards against an unbounded
+// client loop if something's genuinely wrong server-side rather than duplicating that ceiling.
+
+// FEATURE: AA-139 (S-ARCH-DURABLE-LOOP-02b) -- a chain that risked the shared 60s Vercel ceiling
+// checkpoints server-side (S-ARCH-DURABLE-LOOP-02a) instead of dying silently, returning
+// {status:'in_progress', job_id} instead of a terminal result. This continues it until a terminal
+// status, so every existing caller keeps its current contract unchanged -- none of them ever need
+// to know a checkpoint happened. Shared by callCapability() and resolveConfirmation() -- one
+// implementation, not two copies of the same loop.
+async function resolveInProgress(result) {
+  let iterations = 0;
+  while (result.status === "in_progress") {
+    if (++iterations > MAX_CONTINUE_ITERATIONS) {
+      throw new Error(`Chain did not complete after ${MAX_CONTINUE_ITERATIONS} continuations (job_id: ${result.job_id})`);
+    }
+    const res = await fetch("/api/capabilities/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "continue", job_id: result.job_id }),
+    });
+    if (!res.ok) throw new Error(`continue (job_id: ${result.job_id}) failed: ${res.status}`);
+    result = await res.json();
+  }
+  return result;
+}
+
 async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
@@ -185,7 +212,7 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
     }),
   });
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
-  const result = await res.json();
+  const result = await resolveInProgress(await res.json());
   if (result.status) return result;
   return result.content || {};
 }
@@ -199,7 +226,7 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
     body: JSON.stringify({ action: "resolve", confirmation_id, resolution, edited_task_context }),
   });
   if (!res.ok) throw new Error(`resolve ${resolution} failed: ${res.status}`);
-  return res.json();
+  return resolveInProgress(await res.json());
 }
 
 // FEATURE: MI-01d — Owen's own delegate_to_agent call replaces the screen-scripted retry
