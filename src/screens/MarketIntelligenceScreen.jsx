@@ -1,3 +1,4 @@
+// DeepBench v6.1.9 | MarketIntelligenceScreen.jsx | S-MI-25/MI-25 — Data Sources drawer: section headers (Sourced/Simulation/category) swapped to T.ink, DataSourceRow title swapped to T.muted
 // DeepBench v6.1.6 | MarketIntelligenceScreen.jsx | S-MI-24/MI-24 — Column 3 drawer rename (Pipeline Log -> Agent Routing, Learned Context -> Agent Reasoning)
 // DeepBench v6.1.5 | MarketIntelligenceScreen.jsx | S-MI-23 — chat-embedded AgentWorkingIndicator replaces header dot + Theory Evidence duplicate lines
 // v6.1.5 — S-MI-23 workingStatus wiring, all 6 turns
@@ -942,16 +943,16 @@ function AuditColumn({ events }) {
           <>
             {sourced.length > 0 && (
               <>
-                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Sourced ({sourced.length})</div>
+                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.ink}}>Sourced ({sourced.length})</div>
                 {sourced.map(row => <DataSourceRow key={row.id} row={row}/>)}
               </>
             )}
             {simulationTotal > 0 && (
               <>
-                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Simulation ({simulationTotal})</div>
+                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.ink}}>Simulation ({simulationTotal})</div>
                 {simulationCategories.map(cat => (
                   <div key={cat} style={{display:"flex",flexDirection:"column",gap:10}}>
-                    <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>
+                    <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.ink}}>
                       {SIMULATION_CATEGORY_LABELS[cat] ?? cat} ({simulationByCategory[cat].length})
                     </div>
                     {simulationByCategory[cat].map(row => <DataSourceRow key={row.id} row={row}/>)}
@@ -988,7 +989,8 @@ function DataSourceRow({ row }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:4,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-        <span style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink}}>{row.title}</span>
+        {/* FEATURE: MI-25 — row title/section-header color weighting swapped (John's request) */}
+        <span style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.muted}}>{row.title}</span>
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
           <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",border:`1px solid ${color}`,color}}>{label}</span>
           {whoTag && <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>· {whoTag}</span>}
