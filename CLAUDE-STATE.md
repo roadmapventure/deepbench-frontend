@@ -1,12 +1,13 @@
 # DeepBench — Current State
 > Updated at the close of every session. **Keep this file short.** Only the current version, the next session, and the last 3 sessions (one line each) belong here. Full session history lives in `docs/SESSIONS.md` — read it only when you need version history or root-cause context from a past session, never by default.
 
-**Version in dev:** v6.1.2
+**Version in dev:** v6.1.3
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
 - `S-ARCH-DURABLE-LOOP-02b` (v6.1.2, `AA-139`, worktree `session/durable-loop-frontend`) — frontend continuation wiring, sub-session `b` of 2, John's go-ahead 2026-07-07. One shared `resolveInProgress()` helper wired into both `callCapability()` (9 call sites) and `resolveConfirmation()` (1 call site) — the session that actually closes the original live incident (Marcus's Japan-GEO chat failure) for real users, not just at the harness level.
+- `S-MI-21` (v6.1.3) — nav tab reorder (`SH-16`, Market Intelligence moved to 1st position) + Pipeline Log converted to a default-open `Drawer` (`MI-21`). Ad-hoc John request, not part of the queue re-sequencing above. Kickoff: `docs/kickoffs/v6.1.3-S-MI-21-nav-order-pipeline-log-drawer.md`. Worktree: `session/mi-nav-pipeline-drawer`.
 
 **Next session (queued behind this one):** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit, bigger scope — schema migration + UI. Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 

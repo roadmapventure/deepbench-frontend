@@ -28,6 +28,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
 | SH-09 | Case study screen | — | INTENTIONALLY EXCLUDED |
 | SH-12 | About DeepBench panel — display correct current version number (pulled from CLAUDE-STATE.md or package.json, not hardcoded) | ❌ Missing | S-future |
+| SH-16 | **New, found 2026-07-07 (S-MI-21-design).** AppShell nav tab order — Market Intelligence moved to 1st position (was 3rd, after Work/Bench). John's explicit call. | 🔶 In progress | S-MI-21 |
 
 ---
 
@@ -292,6 +293,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | MI-09 | Platform Leverage callout — folds into "About Market Intelligence" drawer. Three honest counts: existing platform capabilities reused as-is, new mechanisms built here that are generalizable platform-wide, and genuinely domain-specific/non-transferable pieces. Proves the platform pitch with this specific build rather than asserting it abstractly. Full spec: design doc §10c. | ❌ Missing | S-MARKET-INTEL-01 or S-MARKET-INTEL-03 |
 | MI-08 | Data Room versioning + Demo Reset. **Schema migration ✅ Done (S-APPLE-01b, 2026-07-01, commit 7dbba0b):** `knowledge_entries` gained 10 columns (`data_type`, `citeable`, `is_baseline`, `supersedes_id`, `confidence`, `override_flag`, `geo`, `program_area`, `partner_id`, `period`) — `status` already existed, gains `superseded`/`archived` as valid values, not a new column. 20 baseline rows seeded, all verified (row count, category distribution, embeddings, content integrity, existing 34 rows unaffected). Rows never overwritten, only superseded via insert. **Demo Reset UI control ❌ Missing** — Column 3 Audit control, one confirm step, archives (never deletes) all non-baseline rows and restores baseline to active — ships with the Market Intelligence screen, not part of S-APPLE-01b's scope. Full spec: design doc §7. | 🔶 Partial (schema done, UI control pending) | Demo Reset UI: S-MARKET-INTEL-01 or 03 |
 | MI-16 | **New, found 2026-07-07 (design session gap-fill, Column 3 controls review).** Forecast Override Log drawer — running log of override events: when a GEO user commits a theory/claim over AI/Proofreader pushback (Stress Test complication, `needs_review` gate). The commit mechanism itself already shipped (`01c`/`01d` — Track as Assumption / Make Permanent, Proofreader gate) but nothing currently surfaces override history anywhere. Carried from v4 mockup ("Forecast Override Log," already marked "new" there in v4). Natural companion to `S-APPLE-05`'s loop-closure verification (ask same question twice, confirm measurably better answer). | ❌ Missing | S-MARKET-INTEL-03 or S-APPLE-05 (needs design session to decide which track owns it) |
+| MI-21 | **New, found 2026-07-07 (S-MI-21-design).** Column 3 Pipeline Log converted from a plain always-expanded block to the shared `Drawer` component (matching Learned Context/Agents/Data Sources) — but defaults **open**, unlike those three, since it's the primary audit trail (John's explicit call). | 🔶 In progress | S-MI-21 |
 
 ---
 
