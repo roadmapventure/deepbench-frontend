@@ -6,7 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None currently in flight.
+- `S-ARCH-QG-SCHEMA-01` (`AA-131`) — kickoff written 2026-07-07 (`docs/kickoffs/v6.0.39-S-ARCH-QG-SCHEMA-01-owen-review-schema-trim.md`). Found while evaluating whether fixing Owen would help speed: real `deliverables` content shows `eval.critique`/`guardrail.reason` running 500-950 characters on every `qg-review-intent` call, pass or fail — same uncapped-field class as `AA-113`/`AA-120`/`AA-124`/`AA-128`, broader reach since it fires on every Q&A review, not just a hand-off path. `guardrail.reason` also has a real UX angle (`AA-130` confirmed it displays raw, unshaped, in the failure banner). Confirmed separate from Owen's ~50s regenerate-chain (Marcus's real regeneration cost, not touched). Supabase-only, zero code files. Running in its own worktree (`session/qg-schema-trim-01`) per the concurrent-sessions protocol.
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff.
 
