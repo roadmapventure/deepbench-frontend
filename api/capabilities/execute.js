@@ -416,6 +416,23 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
+    // FEATURE: AA-138 (S-ARCH-DURABLE-LOOP-01) -- checkpoint/resume POC dispatch, additive only.
+    // runCapability() itself is untouched; these two branches delegate to lib/durable-loop-poc.js,
+    // a separate opt-in mechanism that persists loop state to Supabase instead of a JS call stack.
+    if (body.action === 'durable_start') {
+      const { startDurableChain } = await import('../../lib/durable-loop-poc.js');
+      const { capability_slug, intent_slug, agent_id, task_context, runtime_context, tenant_id } = body;
+      const result = await startDurableChain({ capability_slug, intent_slug, agent_id, task_context, runtime_context, tenant_id });
+      return res.status(200).json(result);
+    }
+    if (body.action === 'durable_continue') {
+      const { continueDurableChain } = await import('../../lib/durable-loop-poc.js');
+      const { job_id } = body;
+      if (!job_id) return res.status(400).json({ error: 'job_id required' });
+      const result = await continueDurableChain({ job_id });
+      return res.status(200).json(result);
+    }
+
     // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
     // _hop_counter so no external caller can seed or override the platform's hop ceiling.
     const {
