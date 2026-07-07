@@ -1,3 +1,4 @@
+// DeepBench v6.1.11 | MarketIntelligenceScreen.jsx | S-MI-27/MI-27+MI-28 — Submitted Hypothesis card gets a "Submitted by You" attribution row (UserAvatar); AI - Hypothesis Test header swapped to actor-first order (Priya Nair · AI - Hypothesis Test), matching the Q&A card's existing order
 // DeepBench v6.1.10 | MarketIntelligenceScreen.jsx | S-MI-26/MI-26 — Data Sources drawer: section headers (Sourced/Simulation/category) bumped to 12.5px matching row title size, DataSourceRow title dropped to fontWeight:400
 // DeepBench v6.1.9 | MarketIntelligenceScreen.jsx | S-MI-25/MI-25 — Data Sources drawer: section headers (Sourced/Simulation/category) swapped to T.ink, DataSourceRow title swapped to T.muted
 // DeepBench v6.1.6 | MarketIntelligenceScreen.jsx | S-MI-24/MI-24 — Column 3 drawer rename (Pipeline Log -> Agent Routing, Learned Context -> Agent Reasoning)
@@ -32,7 +33,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
+import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import AIDiamond from "../components/AIDiamond.jsx";
 import { AI_PAT } from "../aiPatterns.js";
@@ -458,6 +459,14 @@ function MessageBubble({ msg, onReview }) {
             <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase"}}>{INTENT_LABEL[msg.intent] || msg.intent}</span>
           </div>
           <div style={{padding:"11px 13px",fontFamily:body,fontSize:12,lineHeight:1.55,color:T.ink}}>{msg.text}</div>
+          {/* FEATURE: MI-27 -- attribution row, same shape as the existing "Formatted by [Agent]"
+              byline on the qa/hypothesis_test cards below, but with UserAvatar instead of
+              AgentAvatar since this is always the human's own submission, never an agent's. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
+            <UserAvatar size={16} />
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>Submitted by</span>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>You</span>
+          </div>
         </div>
       </div>
     );
@@ -474,7 +483,7 @@ function MessageBubble({ msg, onReview }) {
       <div style={{marginBottom:12,maxWidth:"96%"}}>
         <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
           <div style={{background:T.cardAlt,padding:"7px 12px"}}>
-            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>AI - Hypothesis Test · Priya Nair</span>
+            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Priya Nair · AI - Hypothesis Test</span>
           </div>
           <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
             {st.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{st.headline}</div>}

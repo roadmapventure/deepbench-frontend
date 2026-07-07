@@ -1,3 +1,4 @@
+// DeepBench v6.1.11 | SharedUI.jsx | MI-27 — UserAvatar, generic non-agent "You" attribution avatar
 // DeepBench v6.0.23 | SharedUI.jsx | S-ARCH-VIZ-01 — generic ChartRenderer + CHART_RENDERERS
 // registry (ARCHITECTURE.md §19g), first type bar_pair, capability-agnostic
 // DeepBench v6.0.36 | SharedUI.jsx | MI-17 — generic Drawer component
@@ -242,6 +243,27 @@ export function AgentAvatar({ who, size = 68, ring = true }) {
       </g>
       {ring&&<circle cx="36" cy="36" r="34.5" fill="none" stroke={c.border} strokeWidth="0.5" strokeDasharray="0.5 2" opacity="0.5"/>}
     </svg>
+  );
+}
+
+// FEATURE: MI-27 -- generic "You" attribution avatar for human-authored chat content (the
+// Submitted Hypothesis card). Deliberately separate from AgentAvatar: STYLE-GUIDE.md Section 17's
+// avatar-mandatory rule is scoped to *agent* attribution specifically -- the human submitter has
+// no agent identity to represent, so this is a plain silhouette, never an illustrated agent
+// portrait or an AVATAR_CFG/roster entry. Approved by John via live HTML mock, Option A (a plain
+// navy circle + simple figure, distinguishable at a glance from every illustrated agent avatar).
+export function UserAvatar({ size = 16 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", background: T.navy,
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      border: `1.5px solid ${T.brassLight}`,
+    }}>
+      <svg viewBox="0 0 24 24" fill="none" width={size * 0.55} height={size * 0.55}>
+        <circle cx="12" cy="8" r="4" fill={T.brassLight} />
+        <path d="M4 20c0-4.5 3.6-7 8-7s8 2.5 8 7" stroke={T.brassLight} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      </svg>
+    </div>
   );
 }
 
