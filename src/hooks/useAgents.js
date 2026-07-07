@@ -1,6 +1,7 @@
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
 // DeepBench v6.0.40 | useAgents.js | MI-18 — Agent Activity drawer data hook
+// DeepBench v6.0.46 | useAgents.js | S-MI-20 — latency broken out by kind, blended avgLatency removed
 // DeepBench v6.0.43 | useAgents.js | S-MI-18b — useAgentActivitySummary() gains optional scope filter
 // FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
@@ -89,6 +90,39 @@ export function useLearnedContext() {
 // short page confirms the end, same pattern needed anywhere row count isn't bounded in advance.
 const PAGE_SIZE = 1000;
 
+// FEATURE: S-MI-20 — capability-dispatch wrapper ai_types (sendRequest()'s own log write in
+// request-receivable.js, feature: 'request-receivable'). These sometimes duplicate a nearby
+// 'agent-turn' row's own latency for the same real call (verified live: a wrapper logged
+// 34538ms next to an agent-turn logged 33928ms, ~120ms apart, same agent) — but not always: live
+// data confirmed most wrapper rows for these ai_types have no nearby agent-turn at all
+// (data-analysis 0/21 paired, memory-consolidation 0/13, hypothesis-evaluation 5/73) — most are
+// the sole record of a simpler, single-shot dispatch that never entered execute.js's turn loop.
+// A blanket "always skip" or "always keep" rule would misrepresent one case or the other; each
+// row is checked individually against nearby agent-turn timestamps instead (see classifyRow).
+const CAPABILITY_WRAPPER_TYPES = new Set([
+  "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
+  "memory-consolidation", "data-analysis", "project-manager", "screen-controls",
+]);
+const PAIR_WINDOW_MS = 2000;
+
+// FEATURE: S-MI-20 — classifies one ai_activity_log row into a display "kind" for the by-kind
+// latency breakdown, and whether it should be counted there at all. turnTimestampsByAgent is a
+// Map<agent_id, number[]> of every 'agent-turn' row's own created_at (ms) for that agent, built
+// once per fetch, used only for the nearby-pairing check below.
+function classifyRow(row, turnTimestampsByAgent) {
+  if (row.ai_type === 'agent-turn') {
+    const intentSlug = row.feature ? row.feature.split(':')[1] : null;
+    return { kind: intentSlug || row.feature || 'unknown', include: true };
+  }
+  if (CAPABILITY_WRAPPER_TYPES.has(row.ai_type) && row.feature === 'request-receivable') {
+    const rowTime = new Date(row.created_at).getTime();
+    const turnTimes = turnTimestampsByAgent.get(row.agent_id) || [];
+    const paired = turnTimes.some(t => Math.abs(t - rowTime) < PAIR_WINDOW_MS);
+    return { kind: row.ai_type, include: !paired };
+  }
+  return { kind: row.ai_type, include: true };
+}
+
 export function useAgentActivitySummary(agentIds, scope) {
   const [summary, setSummary] = useState({});
 
@@ -102,7 +136,7 @@ export function useAgentActivitySummary(agentIds, scope) {
       while (true) {
         const { data, error } = await supabase
           .from('ai_activity_log')
-          .select('agent_id,ai_type,feature,latency_ms,cost_usd')
+          .select('agent_id,ai_type,feature,latency_ms,cost_usd,created_at')
           .eq('tenant_id', 'global')
           .in('agent_id', agentIds)
           .range(from, from + PAGE_SIZE - 1);
@@ -122,18 +156,39 @@ export function useAgentActivitySummary(agentIds, scope) {
         if (row.feature && scope.featurePrefixes?.some(p => row.feature.startsWith(p))) return true;
         return false;
       };
+
+      const scoped = data.filter(row => row.agent_id && inScope(row));
+
+      const turnTimestampsByAgent = new Map();
+      for (const row of scoped) {
+        if (row.ai_type !== 'agent-turn') continue;
+        if (!turnTimestampsByAgent.has(row.agent_id)) turnTimestampsByAgent.set(row.agent_id, []);
+        turnTimestampsByAgent.get(row.agent_id).push(new Date(row.created_at).getTime());
+      }
+
       const map = {};
-      for (const row of data) {
-        if (!row.agent_id || !inScope(row)) continue;
-        if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalLatency: 0, latencyCount: 0, totalCost: 0, costCount: 0 };
+      for (const row of scoped) {
+        if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
         const d = map[row.agent_id];
         d.calls++;
-        if (row.latency_ms) { d.totalLatency += row.latency_ms; d.latencyCount++; }
         if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
+
+        const { kind, include } = classifyRow(row, turnTimestampsByAgent);
+        if (!include) continue;
+        if (!d.byKind[kind]) d.byKind[kind] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
+        const k = d.byKind[kind];
+        k.calls++;
+        if (row.latency_ms) {
+          k.totalLatency += row.latency_ms;
+          k.latencyCount++;
+          k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
+        }
       }
       Object.values(map).forEach(d => {
-        d.avgLatency = d.latencyCount ? Math.round(d.totalLatency / d.latencyCount) : null;
         d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
+        Object.values(d.byKind).forEach(k => {
+          k.avgLatency = k.latencyCount ? Math.round(k.totalLatency / k.latencyCount) : null;
+        });
       });
       setSummary(map);
     });

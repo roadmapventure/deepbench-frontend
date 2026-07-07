@@ -1,3 +1,4 @@
+// DeepBench v6.0.46 | MarketIntelligenceScreen.jsx | S-MI-20 — latency broken out by kind, blended stat removed
 // DeepBench v6.0.44 | MarketIntelligenceScreen.jsx | S-MI-18c — Agents drawer sorted descending by calls
 // DeepBench v6.0.43 | MarketIntelligenceScreen.jsx | S-MI-18b — full loop roster + page-scoped metrics
 // DeepBench v6.0.40 | MarketIntelligenceScreen.jsx | MI-18 — Agent Activity drawer, Column 3 (closes MI-06)
@@ -660,6 +661,16 @@ function StatCell({ val, label }) {
   );
 }
 
+// FEATURE: S-MI-20 — generic title-case formatter for a raw kind key (an intent_slug like
+// "ci-answer-intent" or a standalone ai_type like "guardrails-check") into a readable label.
+// Deliberately not a hardcoded per-intent label map (e.g. "ci-answer-intent" -> "Answer
+// generation") — that would need manual upkeep every time a new intent/capability ships across
+// any of the 10 agents. This stays generic and maintenance-free; exact wording is less polished
+// but always correct and never goes stale.
+function formatKindLabel(kind) {
+  return kind.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 // FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
 // Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
@@ -758,9 +769,22 @@ function AuditColumn({ events }) {
               </div>
               <div style={{display:"flex",gap:16}}>
                 <StatCell val={stats?.calls ?? 0} label="Calls"/>
-                <StatCell val={stats?.avgLatency != null ? `${(stats.avgLatency/1000).toFixed(1)}s` : "—"} label="Avg Latency"/>
                 <StatCell val={stats?.avgCost != null ? `$${stats.avgCost.toFixed(2)}` : "—"} label="Avg Cost"/>
               </div>
+              {stats?.byKind && Object.keys(stats.byKind).length > 0 && (
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  {Object.entries(stats.byKind)
+                    .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
+                    .map(([kind, k]) => (
+                      <div key={kind} style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
+                        <span>{formatKindLabel(kind)}</span>
+                        <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
+                          {k.avgLatency != null ? `${(k.avgLatency/1000).toFixed(1)}s avg` : "—"} ({k.calls} call{k.calls === 1 ? "" : "s"}{k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           );
         })}
