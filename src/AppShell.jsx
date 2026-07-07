@@ -1,3 +1,4 @@
+// DeepBench v6.1.3 | AppShell.jsx | S-MI-21/SH-16 — Market Intelligence nav tab moved to 1st position
 // DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
 // DeepBench v6.1.5 | AppShell.jsx | S-MI-23 — header AI status dot suppressed on MI route
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, about panel
@@ -101,14 +102,26 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </div>
       </div>
 
-      {/* Work Dashboard / Bench Dashboard nav tabs — centered absolutely */}
+      {/* Market Intelligence / Work / Bench nav tabs — centered absolutely */}
       <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
+        {/* FEATURE: SH-15 — Market Intelligence tab, default landing route. SH-16 — moved to 1st position, John's explicit call, 2026-07-07 */}
+        <span style={{position:"relative",display:"flex"}}>
+          <FeatureBadge id="SH-15"/>
+          <FeatureBadge id="SH-16"/>
+          <NavTab
+            isActive={isMI}
+            onClick={()=>navigate("/")}
+            icon="◈"
+            label="Market Intelligence"
+            hasBorderLeft={true}
+          />
+        </span>
         <NavTab
           isActive={isWork}
           onClick={()=>navigate("/work")}
           icon="📋"
           label="Work"
-          hasBorderLeft={true}
+          hasBorderLeft={false}
         />
         <NavTab
           isActive={isBench}
@@ -117,17 +130,6 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           label="Bench"
           hasBorderLeft={false}
         />
-        {/* FEATURE: SH-15 — Market Intelligence tab, 3rd tab, default landing route */}
-        <span style={{position:"relative",display:"flex"}}>
-          <FeatureBadge id="SH-15"/>
-          <NavTab
-            isActive={isMI}
-            onClick={()=>navigate("/")}
-            icon="◈"
-            label="Market Intelligence"
-            hasBorderLeft={false}
-          />
-        </span>
       </div>
 
       <div style={{flex:1}}/>

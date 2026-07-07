@@ -1,5 +1,6 @@
 // DeepBench v6.1.5 | MarketIntelligenceScreen.jsx | S-MI-23 — chat-embedded AgentWorkingIndicator replaces header dot + Theory Evidence duplicate lines
 // v6.1.5 — S-MI-23 workingStatus wiring, all 6 turns
+// DeepBench v6.1.3 | MarketIntelligenceScreen.jsx | S-MI-21/MI-21 — Pipeline Log converted to a Drawer, default open
 // DeepBench v6.0.47 | MarketIntelligenceScreen.jsx | S-MI-15 — Data Sources drawer + describeDataType() display-label taxonomy
 // DeepBench v6.0.46 | MarketIntelligenceScreen.jsx | S-MI-20 — latency broken out by kind, blended stat removed
 // DeepBench v6.0.44 | MarketIntelligenceScreen.jsx | S-MI-18c — Agents drawer sorted descending by calls
@@ -784,9 +785,9 @@ function AuditColumn({ events }) {
       <FeatureBadge id="MI-06"/>
       <FeatureBadge id="MI-18"/>
       <FeatureBadge id="MI-15"/>
+      <FeatureBadge id="MI-21"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:10}}>
-        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Pipeline Log</div>
+      <Drawer title="Pipeline Log" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
@@ -817,7 +818,7 @@ function AuditColumn({ events }) {
             </div>
           );
         })}
-      </div>
+      </Drawer>
       <Drawer title="Learned Context" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
         {learned.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
