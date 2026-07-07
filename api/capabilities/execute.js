@@ -1,4 +1,4 @@
-// DeepBench v6.0.22 | api/capabilities/execute.js | S-ARCH-DISPLAY-LOOP-01 — is_final terminal delegation + fetchAgentCard() extraction
+// DeepBench v6.1.1 | api/capabilities/execute.js | S-ARCH-DURABLE-LOOP-02a — hybrid budget-aware checkpoint/resume
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -7,11 +7,20 @@
 // pattern api/plan.js already uses for Work Orders (AA-69), so any capability can have its
 // output shaped by a display agent's Format Skill in the same single call — not capability-
 // specific logic, this applies to every caller that opts in via these two new params.
+// FEATURE: AA-139 — promotes AA-138's proven checkpoint/resume POC into the real loop. The
+// existing loop body is extracted into runLoop(), shared by both a fresh runCapability() call
+// and a new resumeCapability() call. Hybrid, not unconditional: runCapability() stays fully
+// in-process/synchronous by default (zero added latency for the common case) — only when a
+// chain has run long enough that another hop risks the shared maxDuration ceiling does runLoop()
+// checkpoint state to durable_hops and return control to the caller instead of recursing
+// further. lib/durable-loop-poc.js (AA-138's isolated proof copy) is retired by this session —
+// ARCHITECTURE.md §19b bans two live copies of shared pipeline loop logic.
 
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated } from '../_lib/handlers/confirmation.js';
+import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow } from '../_lib/handlers/durable-loop.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -19,6 +28,26 @@ export const config = { maxDuration: 60, runtime: "nodejs" };
 // data-overridable by any Skill Profile — infrastructure, same category as the maxDuration/
 // AbortSignal.timeout() limits already in request-receivable.js. ARCHITECTURE.md §19d.
 const MAX_LOOP_DEPTH = 5;
+
+// FEATURE: AA-139 — the hybrid trigger's budget constants, grounded in real measured data, not
+// guessed. AA-138's live run and the original incident measured real hop latencies ranging
+// 0.15s (agent-directory lookup) to 26.1s (Marcus's own Sonnet-based answer generation) to 26.9s
+// peak observed elsewhere in AA-120's prior incident report.
+const MAX_ESTIMATED_HOP_MS = 30000; // worst real hop observed (AA-120/AA-138): Marcus's Sonnet answer turn, 26.1s, + buffer
+const SAFETY_MARGIN_MS = 5000;      // checkpoint write + response round trip
+const HOP_BUDGET_RESERVE_MS = MAX_ESTIMATED_HOP_MS + SAFETY_MARGIN_MS;
+
+// FEATURE: AA-139 — test-only override for HOP_BUDGET_RESERVE_MS's comparison. Defaults to null,
+// which is a no-op (runLoop() computes the real `deadline - Date.now()` remaining-time value on
+// every hop, exactly as production does). When a test sets this, runLoop() uses this value in
+// place of the computed remaining time instead, so a test can force the checkpoint branch
+// deterministically without waiting out a real ~55s chain. Does not gate on NODE_ENV — this repo
+// has no existing test/production env split convention to hook into; the override is inert
+// whenever a test doesn't explicitly call it, which is the real safety property that matters.
+let __testBudgetMs = null;
+export function __setTestBudgetMs(ms) {
+  __testBudgetMs = ms;
+}
 
 function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
@@ -133,8 +162,210 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
   return { formatContract, formatSection, displayAgentCard };
 }
 
+// FEATURE: AA-139 -- the shared loop body, extracted unchanged in behavior from runCapability()'s
+// former in-place `for` loop, plus the new hybrid budget check. Takes fully explicit state, never
+// reads closure variables, so both a fresh call (runCapability(), conversationHistory: [],
+// job_id: null) and a resumed call (resumeCapability(), state loaded from durable_hops,
+// job_id: row.id) share this one implementation. No second copy of the loop logic anywhere.
+async function runLoop({
+  capability_slug, intent_slug, agent_id, tenant_id, enriched, canRequestHelp,
+  requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+  display_agent_id, display_agent_card,
+  conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
+  job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
+}) {
+  for (let depth = hopCounter.n; ; depth++) {
+    // FEATURE: AA-139 -- the hybrid trigger. Checked before every hop, not just once: a chain
+    // that's already spent most of its budget on earlier hops checkpoints here instead of risking
+    // the next one blowing the shared maxDuration ceiling. Cheap chains (the common case) never
+    // hit this -- remainingMs stays well above HOP_BUDGET_RESERVE_MS for a short chain's whole
+    // life. __testBudgetMs, when set by a test, stands in for the computed remaining time so the
+    // branch can be forced deterministically; it is null (inert) in every real request.
+    const remainingMs = __testBudgetMs !== null ? __testBudgetMs : (deadline - Date.now());
+    if (remainingMs < HOP_BUDGET_RESERVE_MS) {
+      let row_id = job_id;
+      if (!row_id) {
+        const row = await createDurableHopRow({
+          tenant_id, capability_slug, intent_slug, agent_id,
+          system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
+          llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens }, can_request_help: canRequestHelp,
+        });
+        row_id = row.id;
+      }
+      await patchDurableHopRow(row_id, {
+        conversation_history: conversationHistory, hop_counter: depth,
+        delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
+      });
+      return { status: 'in_progress', job_id: row_id };
+    }
+
+    const turnStart = Date.now();
+    const turn = await callModel({
+      systemPrompt: enriched.system_prompt,
+      model: enriched.llm.model,
+      max_tokens: enriched.llm.max_tokens,
+      format_contract: enriched.format_contract,
+      canRequestHelp,
+      conversation_history: conversationHistory,
+    });
+    logAgentTurn({
+      capability_slug, intent_slug, agent_id, tenant_id,
+      model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
+      is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
+    });
+
+    if (!turn.is_delegate_call) {
+      // FEATURE: AA-87 -- consequential-action gate now lives on the capability's own final
+      // output (its own Intent Skill Profile traits), not the deleted delegate-object shape.
+      // Critique dispatch resolves live via resolveCapabilityHolder(), same as request_help
+      // below -- never a named agent anywhere in this mechanism. ARCHITECTURE.md §19d.
+      if (requiresHumanConfirmation) {
+        let critique = null;
+        if (critiqueCapabilitySlug) {
+          if (hopCounter.n >= MAX_LOOP_DEPTH) {
+            return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+          }
+          hopCounter.n++;
+          const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
+          critique = await runCapability({
+            capability_slug: critiqueCapabilitySlug,
+            intent_slug: critiqueIntentSlug,
+            agent_id: critiqueAgentId,
+            task_context: turn.tool_input,
+            tenant_id,
+            _hop_counter: hopCounter,
+            _deadline: deadline,
+          });
+        }
+        const confirmation_id = await insertPendingConfirmation({
+          tenant_id, agent_id, capability_slug, intent_slug,
+          proposed_action: turn.tool_input, critique,
+          prompt_request: { system_prompt: enriched.system_prompt, format_contract: enriched.format_contract, llm: enriched.llm },
+          delegation_occurred: delegationOccurred, depth,
+        });
+        return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
+      }
+
+      const result = await sendRequest({
+        prompt_request: enriched, agent_id, capability_slug, tenant_id,
+        precomputed_turn: turn, delegation_occurred: delegationOccurred,
+        turn_started_at: turnStart,
+      });
+      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null };
+      if (job_id) {
+        await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
+      }
+      return finalResult;
+    }
+
+    // FEATURE: AA-87 -- turn.is_delegate_call is now true only for the two harness-generic
+    // tools (request_help, delegate_to_agent) -- there is no more data-driven delegate array
+    // to match against. The same shared hopCounter ceiling applies to both. ARCHITECTURE.md §19d.
+    if (hopCounter.n >= MAX_LOOP_DEPTH) {
+      return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+    }
+    hopCounter.n++;
+    delegationOccurred = true;
+
+    let delegateResult;
+    if (turn.tool_name === 'request_help') {
+      // FEATURE: AA-87 -- every unresolved skill need routes to whoever currently holds
+      // project-manager. This capability_slug/intent_slug pair is a platform-level constant
+      // (same category as MAX_LOOP_DEPTH) -- structurally there is exactly one such broker
+      // today (ARCHITECTURE.md §19e); the agent_id who holds it is still resolved live, never
+      // the literal string "michelle". No fast path exists -- every request_help call reasons
+      // through here, even when the roster's current state makes the outcome predictable.
+      const pmAgentId = await resolveCapabilityHolder('project-manager');
+      delegateResult = await runCapability({
+        capability_slug: 'project-manager',
+        intent_slug: 'agent-selection-intent',
+        agent_id: pmAgentId,
+        task_context: JSON.stringify(turn.tool_input),
+        tenant_id,
+        _hop_counter: hopCounter,
+        _deadline: deadline,
+      });
+      // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- thread Michelle's real selection forward instead of
+      // discarding it. Generic to any request_help hop, not Display-agent-specific: captures
+      // whatever agent-selection-intent's own schema returned (reasoning/candidates), reading it
+      // from delegateResult.content since sendRequest()'s handler (store) does not spread the
+      // model's structured fields onto the top-level result.
+      lastHelpSelection = {
+        selected_by_agent_id: pmAgentId,
+        reasoning: delegateResult?.content?.reasoning ?? null,
+        candidates_considered: delegateResult?.content?.candidates ?? null,
+      };
+    } else if (turn.tool_name === 'delegate_to_agent') {
+      // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
+      // call here: the model is choosing an agent_id it was just handed as a candidate (via
+      // request_help above), not asserting one unprompted. This is the only place in the whole
+      // mechanism an agent_id may appear, and it is always the requester's own tool-call
+      // argument, never a static field.
+      const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = turn.tool_input;
+      delegateResult = await runCapability({
+        capability_slug: targetCapabilitySlug,
+        intent_slug: targetIntentSlug || null,
+        agent_id: targetAgentId,
+        task_context: task,
+        tenant_id,
+        _hop_counter: hopCounter,
+        _deadline: deadline,
+      });
+
+      // FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- is_final terminates the loop here,
+      // returning the delegate's own output as the final result, attributed to them, instead of
+      // feeding back for the delegator's own next turn. selection is null (never fabricated) when
+      // no request_help hop preceded this delegate_to_agent call in this same loop -- a legitimate
+      // shape per the tool's own description (task_context-supplied candidates), same as Owen's
+      // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
+      // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
+      if (turn.tool_input.is_final === true) {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        const headers = getSupabaseHeaders(supabaseKey);
+        const card = await fetchAgentCard(targetAgentId, headers, supabaseUrl);
+        // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own
+        // structured output (e.g. qa-answer-format's headline/body/citations/...); spread at the
+        // top level here, same place callers already read it after callCapability()'s existing
+        // `.content` unwrap for the ordinary terminal-dispatch shape. `status: 'final_delegation'`
+        // reuses callCapability()'s existing generic `if (result.status) return result;` passthrough
+        // (already built for pending_confirmation/depth_exceeded) so this flat shape survives the
+        // frontend unwrap unchanged -- no capability-specific branch added to callCapability() itself.
+        // patterns_used: start from the delegate's own patterns (e.g. Alex's structured-output),
+        // then guarantee 'agent-delegation' is present -- this hop, by definition, just delegated
+        // (delegationOccurred is already true in this loop's own scope), regardless of whether the
+        // delegate itself further delegated.
+        const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
+        const finalResult = {
+          status: 'final_delegation',
+          ...delegateResult.content,
+          patterns_used: finalPatterns,
+          display_agent_card: card,
+          display_agent_id: targetAgentId,
+          selection: lastHelpSelection,
+        };
+        if (job_id) {
+          await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
+        }
+        return finalResult;
+      }
+    }
+
+    conversationHistory = [
+      ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
+      { role: 'assistant', content: turn.raw_content },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: turn.tool_use_id, content: JSON.stringify(delegateResult) }] },
+    ];
+  }
+}
+
 // FEATURE: AA-76 — core logic exported separately from the HTTP handler so the Node.js test
 // can call it directly, same pattern as runChannelIntelligence/assemblePrompt/enrichPrompt.
+// FEATURE: AA-139 — builds `enriched` exactly as before, then hands off to the shared runLoop().
+// _deadline is threaded exactly like the existing _hop_counter pattern: a nested call (request_help
+// broker turn, delegate_to_agent hop, critique dispatch) inherits its caller's real deadline
+// instead of computing a fresh 60s window of its own, so the shared per-request ceiling stays
+// real across the whole chain, not just the top-level invocation.
 export async function runCapability({
   capability_slug,
   intent_slug = null,
@@ -146,6 +377,7 @@ export async function runCapability({
   format_skill_profile_slug = null,
   display_agent_id = null,
   _hop_counter = null,
+  _deadline = null,
 }) {
   if (!capability_slug) throw new Error('capability_slug required');
   if (!agent_id) throw new Error('agent_id required');
@@ -183,164 +415,53 @@ export async function runCapability({
   const critiqueCapabilitySlug = promptRequest.critiqueCapabilitySlug || null;
   const critiqueIntentSlug = promptRequest.critiqueIntentSlug || null;
 
-  let conversationHistory = [];
-  let delegationOccurred = false;
-  // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- threads the most recent request_help hop's real selection
-  // forward instead of discarding it once delegate_to_agent fires. Generic: captures whatever a
-  // request_help call in this loop resolved to, for any future capability using this same pattern,
-  // not something Display-agent-specific. Reset to null on every request_help hop below so it never
-  // survives stale from an earlier turn.
-  let lastHelpSelection = null;
-  const hopCounter = _hop_counter || { n: 0 };
+  // FEATURE: AA-139 -- computed only when this is the top-level call (no _deadline passed in).
+  // SAFETY_MARGIN_MS is reserved off the real 60s ceiling for the checkpoint write + response
+  // round trip on whichever hop ultimately triggers it.
+  const deadline = _deadline || (Date.now() + 60000 - SAFETY_MARGIN_MS);
 
-  for (let depth = 0; ; depth++) {
-    const turnStart = Date.now();
-    const turn = await callModel({
-      systemPrompt: enriched.system_prompt,
-      model: enriched.llm.model,
-      max_tokens: enriched.llm.max_tokens,
-      format_contract: enriched.format_contract,
-      canRequestHelp,
-      conversation_history: conversationHistory,
-    });
-    logAgentTurn({
-      capability_slug, intent_slug, agent_id, tenant_id,
-      model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
-      is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
-    });
+  return runLoop({
+    capability_slug, intent_slug, agent_id, tenant_id, enriched, canRequestHelp,
+    requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+    display_agent_id, display_agent_card,
+    conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
+    hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
+  });
+}
 
-    if (!turn.is_delegate_call) {
-      // FEATURE: AA-87 -- consequential-action gate now lives on the capability's own final
-      // output (its own Intent Skill Profile traits), not the deleted delegate-object shape.
-      // Critique dispatch resolves live via resolveCapabilityHolder(), same as request_help
-      // below -- never a named agent anywhere in this mechanism. ARCHITECTURE.md §19d.
-      if (requiresHumanConfirmation) {
-        let critique = null;
-        if (critiqueCapabilitySlug) {
-          if (hopCounter.n >= MAX_LOOP_DEPTH) {
-            return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
-          }
-          hopCounter.n++;
-          const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
-          critique = await runCapability({
-            capability_slug: critiqueCapabilitySlug,
-            intent_slug: critiqueIntentSlug,
-            agent_id: critiqueAgentId,
-            task_context: turn.tool_input,
-            tenant_id,
-            _hop_counter: hopCounter,
-          });
-        }
-        const confirmation_id = await insertPendingConfirmation({
-          tenant_id, agent_id, capability_slug, intent_slug,
-          proposed_action: turn.tool_input, critique,
-          prompt_request: { system_prompt: enriched.system_prompt, format_contract: enriched.format_contract, llm: enriched.llm },
-          delegation_occurred: delegationOccurred, depth,
-        });
-        return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
-      }
+// FEATURE: AA-139 -- resumes a chain runLoop() previously checkpointed. Loads the persisted state
+// from durable_hops (job_id is the only thing the caller needs to carry between invocations) and
+// hands off to the same runLoop() a fresh call uses -- no second loop implementation. Gets a
+// genuinely fresh deadline (this is a new invocation with its own real 60s budget), not the
+// exhausted one that triggered the checkpoint. `requires_human_confirmation`/critique/display
+// override fields are not persisted on durable_hops (schema from AA-138, unchanged) -- a resumed
+// chain runs without the consequential-action gate and without a display-card override, matching
+// AA-138's proven scope; no live path today reaches the gate via a chain that also risks the
+// budget ceiling (kickoff SCOPE RULES).
+export async function resumeCapability({ job_id }) {
+  if (!job_id) throw new Error('job_id required');
+  const row = await loadDurableHopRow(job_id);
 
-      const result = await sendRequest({
-        prompt_request: enriched, agent_id, capability_slug, tenant_id,
-        precomputed_turn: turn, delegation_occurred: delegationOccurred,
-        turn_started_at: turnStart,
-      });
-      return { ...result, display_agent_card, display_agent_id: display_agent_id || null };
-    }
-
-    // FEATURE: AA-87 -- turn.is_delegate_call is now true only for the two harness-generic
-    // tools (request_help, delegate_to_agent) -- there is no more data-driven delegate array
-    // to match against. The same shared hopCounter ceiling applies to both. ARCHITECTURE.md §19d.
-    if (hopCounter.n >= MAX_LOOP_DEPTH) {
-      return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
-    }
-    hopCounter.n++;
-    delegationOccurred = true;
-
-    let delegateResult;
-    if (turn.tool_name === 'request_help') {
-      // FEATURE: AA-87 -- every unresolved skill need routes to whoever currently holds
-      // project-manager. This capability_slug/intent_slug pair is a platform-level constant
-      // (same category as MAX_LOOP_DEPTH) -- structurally there is exactly one such broker
-      // today (ARCHITECTURE.md §19e); the agent_id who holds it is still resolved live, never
-      // the literal string "michelle". No fast path exists -- every request_help call reasons
-      // through here, even when the roster's current state makes the outcome predictable.
-      const pmAgentId = await resolveCapabilityHolder('project-manager');
-      delegateResult = await runCapability({
-        capability_slug: 'project-manager',
-        intent_slug: 'agent-selection-intent',
-        agent_id: pmAgentId,
-        task_context: JSON.stringify(turn.tool_input),
-        tenant_id,
-        _hop_counter: hopCounter,
-      });
-      // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- thread Michelle's real selection forward instead of
-      // discarding it. Generic to any request_help hop, not Display-agent-specific: captures
-      // whatever agent-selection-intent's own schema returned (reasoning/candidates), reading it
-      // from delegateResult.content since sendRequest()'s handler (store) does not spread the
-      // model's structured fields onto the top-level result.
-      lastHelpSelection = {
-        selected_by_agent_id: pmAgentId,
-        reasoning: delegateResult?.content?.reasoning ?? null,
-        candidates_considered: delegateResult?.content?.candidates ?? null,
-      };
-    } else if (turn.tool_name === 'delegate_to_agent') {
-      // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
-      // call here: the model is choosing an agent_id it was just handed as a candidate (via
-      // request_help above), not asserting one unprompted. This is the only place in the whole
-      // mechanism an agent_id may appear, and it is always the requester's own tool-call
-      // argument, never a static field.
-      const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = turn.tool_input;
-      delegateResult = await runCapability({
-        capability_slug: targetCapabilitySlug,
-        intent_slug: targetIntentSlug || null,
-        agent_id: targetAgentId,
-        task_context: task,
-        tenant_id,
-        _hop_counter: hopCounter,
-      });
-
-      // FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- is_final terminates the loop here,
-      // returning the delegate's own output as the final result, attributed to them, instead of
-      // feeding back for the delegator's own next turn. selection is null (never fabricated) when
-      // no request_help hop preceded this delegate_to_agent call in this same loop -- a legitimate
-      // shape per the tool's own description (task_context-supplied candidates), same as Owen's
-      // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
-      // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
-      if (turn.tool_input.is_final === true) {
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-        const headers = getSupabaseHeaders(supabaseKey);
-        const card = await fetchAgentCard(targetAgentId, headers, supabaseUrl);
-        // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own
-        // structured output (e.g. qa-answer-format's headline/body/citations/...); spread at the
-        // top level here, same place callers already read it after callCapability()'s existing
-        // `.content` unwrap for the ordinary terminal-dispatch shape. `status: 'final_delegation'`
-        // reuses callCapability()'s existing generic `if (result.status) return result;` passthrough
-        // (already built for pending_confirmation/depth_exceeded) so this flat shape survives the
-        // frontend unwrap unchanged -- no capability-specific branch added to callCapability() itself.
-        // patterns_used: start from the delegate's own patterns (e.g. Alex's structured-output),
-        // then guarantee 'agent-delegation' is present -- this hop, by definition, just delegated
-        // (delegationOccurred is already true in this loop's own scope), regardless of whether the
-        // delegate itself further delegated.
-        const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
-        return {
-          status: 'final_delegation',
-          ...delegateResult.content,
-          patterns_used: finalPatterns,
-          display_agent_card: card,
-          display_agent_id: targetAgentId,
-          selection: lastHelpSelection,
-        };
-      }
-    }
-
-    conversationHistory = [
-      ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
-      { role: 'assistant', content: turn.raw_content },
-      { role: 'user', content: [{ type: 'tool_result', tool_use_id: turn.tool_use_id, content: JSON.stringify(delegateResult) }] },
-    ];
+  if (row.status !== 'in_progress') {
+    return { status: row.status, job_id, result: row.result, error: row.error };
   }
+
+  const enriched = {
+    system_prompt: row.system_prompt,
+    format_contract: row.format_contract,
+    llm: row.llm,
+  };
+  const deadline = Date.now() + 60000 - SAFETY_MARGIN_MS;
+
+  return runLoop({
+    capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+    enriched, canRequestHelp: row.can_request_help,
+    requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
+    display_agent_id: null, display_agent_card: null,
+    conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
+    lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
+    deadline, job_id: row.id,
+  });
 }
 
 // FEATURE: AA-103 -- accept resolution, exported separately so the Node.js test can call it
@@ -416,20 +537,16 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    // FEATURE: AA-138 (S-ARCH-DURABLE-LOOP-01) -- checkpoint/resume POC dispatch, additive only.
-    // runCapability() itself is untouched; these two branches delegate to lib/durable-loop-poc.js,
-    // a separate opt-in mechanism that persists loop state to Supabase instead of a JS call stack.
-    if (body.action === 'durable_start') {
-      const { startDurableChain } = await import('../../lib/durable-loop-poc.js');
-      const { capability_slug, intent_slug, agent_id, task_context, runtime_context, tenant_id } = body;
-      const result = await startDurableChain({ capability_slug, intent_slug, agent_id, task_context, runtime_context, tenant_id });
-      return res.status(200).json(result);
-    }
-    if (body.action === 'durable_continue') {
-      const { continueDurableChain } = await import('../../lib/durable-loop-poc.js');
+    // FEATURE: AA-139 (S-ARCH-DURABLE-LOOP-02a) -- resumes a chain runLoop() previously
+    // checkpointed to durable_hops. Supersedes AA-138's POC-only durable_start/durable_continue
+    // branches (removed) -- no new `action` needed for "start": every existing caller's default
+    // (no `action` field) already goes through runCapability() unchanged below, and it is now
+    // budget-aware automatically, for every capability on the platform, with zero caller-side
+    // changes required.
+    if (body.action === 'continue') {
       const { job_id } = body;
       if (!job_id) return res.status(400).json({ error: 'job_id required' });
-      const result = await continueDurableChain({ job_id });
+      const result = await resumeCapability({ job_id });
       return res.status(200).json(result);
     }
 
