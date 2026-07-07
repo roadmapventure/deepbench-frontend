@@ -1,3 +1,4 @@
+// DeepBench v6.0.43 | MarketIntelligenceScreen.jsx | S-MI-18b — full loop roster + page-scoped metrics
 // DeepBench v6.0.40 | MarketIntelligenceScreen.jsx | MI-18 — Agent Activity drawer, Column 3 (closes MI-06)
 // DeepBench v6.0.36 | MarketIntelligenceScreen.jsx | MI-17 — Learned Context drawer, Column 3
 // DeepBench v6.0.25 | MarketIntelligenceScreen.jsx | S-MI-14 — full terminology rename sweep
@@ -597,7 +598,36 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
 // agents.js, so the roster stays platform-wide/page-agnostic — closes MI-06's AI-38 dependency,
 // no isAppleChannel/section field needed. Any future screen wanting this drawer defines its own
 // list the same way, passed to the same reusable useAgentActivitySummary()/Drawer pieces.
-const PROPOSED_MI_AGENT_IDS = ["marcus", "priya", "nadia", "owen", "sam", "elena"];
+// FEATURE: S-MI-18b — expanded from the original 6 front-line agents to the full cast that
+// actually touches this page's Agent Loop: Michelle Manning (PP-01, PM broker), Alex Reeves
+// (ED-01, Format Skill), Dan Bingham (PS-01, Prompt Service), Eleanor Voss (LB-01, Librarian) —
+// confirmed live via ai_activity_log this design session, not hypothetical (Michelle alone: 595
+// all-time calls). Still page-local, not stored on agents.js — same platform-wide-roster
+// principle as the original MI-18 design.
+const PROPOSED_MI_AGENT_IDS = ["marcus", "priya", "nadia", "owen", "sam", "elena", "michelle", "alex", "dan", "eleanor"];
+
+// FEATURE: S-MI-18b — this page's own loop-access scope, passed to useAgentActivitySummary() so
+// the drawer's metrics reflect real Market Intelligence activity, not a shared broker/utility
+// agent's platform-wide total. Every value below verified live this design session against the
+// entire ai_activity_log table (not just these 10 agents) — confirmed zero leakage to any
+// non-MI/legacy agent_id. Deliberately excludes the generic bare 'request-receivable' ai_type and
+// any ai_type not seen in real, current production data (conservative: undercounts rather than
+// risks a false match).
+const MI_LOOP_SCOPE = {
+  aiTypes: [
+    "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
+    "memory-consolidation", "data-analysis",
+    "project-manager", "screen-controls", "agent-directory",
+    "librarian", "librarian-write", "data-room-custody",
+    "reflect", "synthesis",
+    "guardrails-check",
+  ],
+  featurePrefixes: [
+    "channel-intelligence:", "hypothesis-evaluation:", "quality-gate:", "pipeline-triage:",
+    "project-manager:agent-selection-intent:",
+    "screen-controls:qa-answer-format:", "screen-controls:intelligence-review-format:",
+  ],
+};
 
 function StatCell({ val, label }) {
   return (
@@ -614,7 +644,7 @@ function StatCell({ val, label }) {
 function AuditColumn({ events }) {
   const agents = useAgents();
   const learned = useLearnedContext();
-  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS);
+  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
   const activeIds = PROPOSED_MI_AGENT_IDS.filter(id => agentActivity[id]?.calls > 0);

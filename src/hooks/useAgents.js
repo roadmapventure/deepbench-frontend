@@ -1,6 +1,7 @@
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
 // DeepBench v6.0.40 | useAgents.js | MI-18 — Agent Activity drawer data hook
+// DeepBench v6.0.43 | useAgents.js | S-MI-18b — useAgentActivitySummary() gains optional scope filter
 // FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
 // Returns the agent roster. Swap internals for Supabase query when auth arrives.
@@ -71,34 +72,74 @@ export function useLearnedContext() {
 // full history, so an occasionally-used agent could scroll out of it and be wrongly reported as
 // unused. This hook queries Supabase directly, independent of that cap, so an agent's "used at
 // least once, ever" status is never lost.
-export function useAgentActivitySummary(agentIds) {
+// FEATURE: S-MI-18b — added optional `scope` param: { aiTypes: string[], featurePrefixes: string[] }.
+// When provided, only rows matching scope.aiTypes exactly OR whose `feature` starts with one of
+// scope.featurePrefixes are counted — lets a caller scope metrics to "this page's real loop
+// activity" instead of an agent's platform-wide total (found necessary this session: Michelle/
+// Alex/Dan/Eleanor are shared broker/utility agents also used by other screens, so their raw
+// all-time counts would otherwise include non-MI activity). Omitting `scope` preserves the
+// original all-time-platform-wide behavior for any future non-scoped caller.
+//
+// BUGFIX: S-MI-18b — MI-18's original single-shot `.select()` silently truncated at Supabase/
+// PostgREST's default 1000-row response cap. Invisible with the original 6-agent roster (their
+// combined matching rows stayed under 1000) but confirmed live this session once the roster grew
+// to 10: the unpaginated query returned only ~1000 of 1616 real rows, undercounting Michelle
+// (234 vs. a true 467) and Eleanor (275 vs. a true 408) by roughly half. Root cause, not a symptom
+// patch — fixed by paging through the full result set with `.range()` in PAGE_SIZE chunks until a
+// short page confirms the end, same pattern needed anywhere row count isn't bounded in advance.
+const PAGE_SIZE = 1000;
+
+export function useAgentActivitySummary(agentIds, scope) {
   const [summary, setSummary] = useState({});
 
   useEffect(() => {
     if (!agentIds || agentIds.length === 0) { setSummary({}); return; }
-    supabase
-      .from('ai_activity_log')
-      .select('agent_id,latency_ms,cost_usd')
-      .eq('tenant_id', 'global')
-      .in('agent_id', agentIds)
-      .then(({ data, error }) => {
-        if (error || !data) return;
-        const map = {};
-        for (const row of data) {
-          if (!row.agent_id) continue;
-          if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalLatency: 0, latencyCount: 0, totalCost: 0, costCount: 0 };
-          const d = map[row.agent_id];
-          d.calls++;
-          if (row.latency_ms) { d.totalLatency += row.latency_ms; d.latencyCount++; }
-          if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
-        }
-        Object.values(map).forEach(d => {
-          d.avgLatency = d.latencyCount ? Math.round(d.totalLatency / d.latencyCount) : null;
-          d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
-        });
-        setSummary(map);
+    let cancelled = false;
+
+    async function fetchAll() {
+      const rows = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('ai_activity_log')
+          .select('agent_id,ai_type,feature,latency_ms,cost_usd')
+          .eq('tenant_id', 'global')
+          .in('agent_id', agentIds)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data) return null;
+        rows.push(...data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      return rows;
+    }
+
+    fetchAll().then((data) => {
+      if (cancelled || !data) return;
+      const inScope = (row) => {
+        if (!scope) return true;
+        if (scope.aiTypes?.includes(row.ai_type)) return true;
+        if (row.feature && scope.featurePrefixes?.some(p => row.feature.startsWith(p))) return true;
+        return false;
+      };
+      const map = {};
+      for (const row of data) {
+        if (!row.agent_id || !inScope(row)) continue;
+        if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalLatency: 0, latencyCount: 0, totalCost: 0, costCount: 0 };
+        const d = map[row.agent_id];
+        d.calls++;
+        if (row.latency_ms) { d.totalLatency += row.latency_ms; d.latencyCount++; }
+        if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
+      }
+      Object.values(map).forEach(d => {
+        d.avgLatency = d.latencyCount ? Math.round(d.totalLatency / d.latencyCount) : null;
+        d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
       });
-  }, []); // agentIds is a stable, page-defined constant — same no-deps precedent as useLearnedContext() above
+      setSummary(map);
+    });
+
+    return () => { cancelled = true; };
+  }, []); // agentIds/scope are stable, page-defined constants — same no-deps precedent as before
 
   return summary;
 }
