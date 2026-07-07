@@ -104,6 +104,32 @@ export function parseModelTurn(responseData, hasSchemaTool) {
   return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
 }
 
+// FEATURE: AA-113 -- retry once on a transient non-2xx Anthropic HTTP error (429/500/502/503/529),
+// with a short backoff, before giving up. Every callModel() caller across the whole platform
+// (execute.js's delegation loop, sendRequest()'s own non-precomputed path) shares this helper --
+// generic infrastructure, not capability-specific. Previously any transient API hiccup at any hop
+// threw immediately with zero retry, killing the whole call with no trace (confirmed live 2026-07-04:
+// a pending_confirmation accept 500'd once then succeeded cleanly on an immediate manual retry with
+// no duplicate write). Non-transient errors (4xx other than 429) still fail fast, unchanged --
+// retrying a malformed request or an auth failure would never help. Deliberately scoped to the
+// initial call only -- the existing parse-failure retry's own second fetch() is untouched.
+const TRANSIENT_ANTHROPIC_STATUS = new Set([429, 500, 502, 503, 529]);
+const API_RETRY_BACKOFF_MS = 1000;
+
+async function postToAnthropicWithRetry(body, headers) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(55000),
+    });
+    if (res.ok) return { res, apiRetryCount: attempt };
+    if (attempt > 0 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
+      const text = await res.text();
+      throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), { status: 502, detail: text });
+    }
+    await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS));
+  }
+}
+
 // FEATURE: AA-80 — callModel(): pure extraction of sendRequest()'s prior Step 1 (call + retry-
 // once-on-parse-failure), now shared by sendRequest() itself and execute.js's loop. Never runs
 // guardrails/handler/logging -- that stays exclusively in sendRequest(). ARCHITECTURE.md §19d.
@@ -122,13 +148,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
 
   const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp, conversation_history });
 
-  const llmRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST', headers: anthropicHeaders, body: JSON.stringify(callBody), signal: AbortSignal.timeout(55000),
-  });
-  if (!llmRes.ok) {
-    const text = await llmRes.text();
-    throw Object.assign(new Error(`Anthropic call failed: ${llmRes.status}`), { status: 502, detail: text });
-  }
+  const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders);
   let llmData = await llmRes.json();
   let usage = llmData.usage || { input_tokens: 0, output_tokens: 0 };
   let retryCount = 0;
@@ -153,7 +173,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
     }
   }
 
-  return { ...turn, raw_content: llmData.content, usage, retryCount };
+  return { ...turn, raw_content: llmData.content, usage, retryCount, apiRetryCount };
 }
 
 // FEATURE: AA-44 — patterns_used array built from call shape and guardrails state
