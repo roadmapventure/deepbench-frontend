@@ -5,19 +5,21 @@
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
-**Next session:** `AI-43` — fix `latency_ms` mis-reporting (wrong for every capability since the v6.0.0 loop shipped; the clock starts after the real model call already happened). Cheap, single-purpose, and restores a trustworthy latency signal before judging whether anything else in this block actually made the loop faster. Design required (small).
+**In flight now:** `S-ARCH-LATENCY-FIX-01` (`AI-43`) — kickoff written 2026-07-07 (`docs/kickoffs/v6.0.31-S-ARCH-LATENCY-FIX-01-sendrequest-latency-fix.md`). Fixes `latency_ms` mis-reporting (wrong for every capability since the v6.0.0 loop shipped; `sendRequest()`'s own clock starts after the real model call already happened). Cheap, single-purpose, restores a trustworthy latency signal before judging whether anything else in this block actually made the loop faster. **Reconfirmed live 2026-07-07** during John's own MI screen test — Priya's real 27.5s analytical call logged `latency_ms: 116` on its wrapper row. 2 files (`request-receivable.js`, `execute.js`), threads `turnStart` through as a new optional `turn_started_at` param.
+
+**Next session (after `S-ARCH-LATENCY-FIX-01` closes):** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI), sequenced right after this one per its own kickoff note.
 
 **After that (MI Loop — Solid & Fast track, new):**
 1. `AA-121` — gate Knowledge Skill Profiles by `intent_slug` so RAG doesn't fire on hand-off-only intents that never use it (cheap, cuts real wasted latency/cost). Design required.
 2. `task_a8249f13` — harness `tool_choice: 'auto'` lets schema calls silently return `{}`; found live in `S-MARKET-INTEL-01a`, already spawned as its own task, still needs a scoped harness-fix session.
-3. **Decision needed, not just a design session:** Owen's `qg-review-intent` retry-to-Marcus delegation is architecturally clean (self-routing rule confirmed compliant) but can chain ~50s of real LLM work inside one 60s-budgeted request. Needs a structural-fix-vs-trim call with John before this can even be scoped.
+3. **Decision needed, not just a design session:** Owen's `qg-review-intent` retry-to-Marcus delegation can chain ~50s of real LLM work inside one 60s-budgeted request. **Now confirmed generalizable, not Owen-specific:** `AA-124` (**new, 2026-07-07**) live-measured the same pattern on Priya/Michelle/Alex's hypothesis-test format hand-off — ~44s of pure delegation/routing overhead (Priya's own display-intent depth0+depth1, Michelle's agent-selection turn, Alex's format turn) on top of 27.5s of real analytical work. Recommend one structural-fix-vs-trim decision with John covering both, not two capability patches.
 4. `AA-112` — `needs_review`/intent-routing misclassification (`ci-routing-intent` unstable on ambiguous phrasings). Design required.
 5. `AA-110` — delegation chain can hallucinate a `data_room_tag` value with no real source, crashing on an FK violation; same fabrication class as the already-fixed `AA-108`, not reliably reproducible. Design required.
 6. `AA-90` — Marcus's MI-screen front-door chat/answer surface ownership broker. Was blocked on the screen existing; screen shipped (`S-MARKET-INTEL-01a`), so this is now unblocked.
 
 **Then (MI Page — Charts & Display track, new):**
 7. `AI-38` — Agent Section/Team taxonomy (`agents.js`'s unused `isAppleChannel` boolean generalized into a real field) — prerequisite for `S-MARKET-INTEL-03`'s Column 3 grouping to be clean rather than another one-off. Design required.
-8. `S-MARKET-INTEL-03` — Data Room default charts (`MI-03`), Column 3 local AI Audit drawer (`MI-06`), Available Data panel full. This is the "has charts" deliverable. `S-APPLE-04c` (Demo Reset mechanism) folds in here per John's 2026-07-04 call.
+8. `S-MARKET-INTEL-03` — Data Room default charts (`MI-03`), Column 3 local AI Audit drawer (`MI-06`), Available Data panel full. This is the "has charts" deliverable — **confirmed still roadmap, not a bug:** John's live test showed Alex format the hypothesis-test text card with no chart, which is expected today (`MI-03`: "chart generation from live queries remains roadmap," pre-built static charts only). `S-APPLE-04c` (Demo Reset mechanism) folds in here per John's 2026-07-04 call.
 
 **Then, deferred behind all of the above per this re-sequencing:** Structural Enforcement Track — `S-ARCH-ENFORCE-03` (Agent Field Enforcement) still first within that track when it resumes (real production crash behind it), then `04` → `01` → `02` → `05` → `06`.
 
