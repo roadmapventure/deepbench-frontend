@@ -303,6 +303,8 @@ style={{
 
 ## 10. Left Sidebar Nav Pattern (Personnel File)
 
+**Second usage locked 2026-07-07 (`S-BENCH-FILTER-01`):** `RosterScreen.jsx` (`/bench`) reuses this exact pattern for its category filter nav (All/Market Intel/Platform Wide/NIGP Experts/Special Interests), at the same `180px` width. Confirms this is a reusable screen-level pattern, not Personnel-File-specific — any future screen needing a left filter/tab rail should reuse these same style objects rather than inventing a variant.
+
 ```jsx
 // Active tab
 style={{
@@ -535,6 +537,7 @@ One shared mapping (name TBD by the coding session, lives in `MarketIntelligence
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-07 | S-BENCH-FILTER-01-design | Section 10 note added — Left Sidebar Nav Pattern confirmed reusable beyond Personnel File: `RosterScreen.jsx` adopts it for the new RO-10 category filter nav, same 180px width. |
 | 2026-07-07 | S-MI-15-design | Section 19 added — Data Type/Confidence Tier display-label relabel locked: `inferred`/non-baseline-`synthesized` → "Analysis" (with Human/AI who-tag from `source`), baseline-`synthesized` → "Source Simulation", `sourced`/`learned` unchanged. Display-only — zero backend/schema change. |
 | 2026-06-08 | S-MIGRATE-UX | Treasury palette locked, left nav pattern locked |
 | 2026-06-08 | S-MIGRATE-01a | AgentAvatar, illustrated SVG avatars in SharedUI |
