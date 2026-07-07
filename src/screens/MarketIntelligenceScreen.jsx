@@ -1,3 +1,4 @@
+// DeepBench v6.0.36 | MarketIntelligenceScreen.jsx | MI-17 — Learned Context drawer, Column 3
 // DeepBench v6.0.25 | MarketIntelligenceScreen.jsx | S-MI-14 — full terminology rename sweep
 // (AI - Hypothesis Test branding, generalized human-operator term); no mechanism/behavior change.
 // DeepBench v6.0.24 | MarketIntelligenceScreen.jsx | S-MI-13 — EvidenceColumn consumes the
@@ -18,8 +19,8 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer } from "../components/SharedUI.jsx";
-import { useAgents } from "../hooks/useAgents.js";
+import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
+import { useAgents, useLearnedContext } from "../hooks/useAgents.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
 import { AI_PAT } from "../aiPatterns.js";
 
@@ -65,7 +66,11 @@ function shapeForLog(text, maxLen = 140) {
   const s = (text || "").trim();
   if (!s) return "";
   const firstSentence = s.match(/^[^.!?]*[.!?]/);
-  if (firstSentence && firstSentence[0].trim().length <= maxLen) {
+  // Guard: a genuine sentence boundary in the free-text agent output this shapes (reasoning,
+  // critiques, opinions) is rarely under ~20 chars -- a shorter match is almost always a decimal
+  // point or abbreviation (e.g. "14.57%", "U.S.", "e.g.") false-triggering the regex, not a real
+  // sentence end. Fall through to hard truncation instead of returning a nonsense short fragment.
+  if (firstSentence && firstSentence[0].trim().length >= 20 && firstSentence[0].trim().length <= maxLen) {
     return firstSentence[0].trim();
   }
   if (s.length <= maxLen) return s;
@@ -574,11 +579,13 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
 function AuditColumn({ events }) {
   const agents = useAgents();
+  const learned = useLearnedContext();
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
+      <FeatureBadge id="MI-17"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Pipeline Log</div>
@@ -612,6 +619,30 @@ function AuditColumn({ events }) {
           );
         })}
       </div>
+      <Drawer title="Learned Context" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
+        {learned.length === 0 ? (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
+            No patterns synthesized yet. When a correction or opinion is confirmed, it's written here as reusable reasoning.
+          </div>
+        ) : learned.map(entry => {
+          const author = agentById(entry.agent_id);
+          return (
+            <div key={entry.id} style={{borderLeft:`3px solid ${T.brass}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {author && <AgentAvatar who={author.id} size={20}/>}
+                <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{author ? author.name : entry.agent_id}</span>
+                {entry.confidence && (
+                  <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{entry.confidence} confidence</span>
+                )}
+              </div>
+              {entry.source_question && (
+                <div style={{fontFamily:mono,fontSize:9,color:T.muted,fontStyle:"italic"}}>&ldquo;{shapeForLog(entry.source_question, 100)}&rdquo;</div>
+              )}
+              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{shapeForLog(entry.content, 220)}</div>
+            </div>
+          );
+        })}
+      </Drawer>
     </div>
   );
 }

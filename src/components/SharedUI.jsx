@@ -1,5 +1,6 @@
 // DeepBench v6.0.23 | SharedUI.jsx | S-ARCH-VIZ-01 — generic ChartRenderer + CHART_RENDERERS
 // registry (ARCHITECTURE.md §19g), first type bar_pair, capability-agnostic
+// DeepBench v6.0.36 | SharedUI.jsx | MI-17 — generic Drawer component
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
@@ -277,6 +278,33 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
             <div style={{fontSize:10,color:T.moss,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:mono}}>💡 Recommended Action</div>
             <div style={{fontSize:12.5,color:T.mutedDeep,lineHeight:1.5,fontFamily:body}}>{recommendation}</div>
           </div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// FEATURE: MI-17 — generic collapsible drawer, same toggle interaction FlagCard already uses.
+// First Column 3 (Audit) drawer with real open/close state — Pipeline Log stays a static
+// always-expanded box, unchanged, out of scope this session. Reusable by any future Column 3
+// item (MI-06/07/09/15/16/18) — never rebuild this per-drawer.
+export const Drawer = ({ title, count, children, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer"}}>
+        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>{title}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {count!=null && (
+            <span style={{fontFamily:mono,fontSize:9,color:T.muted,background:T.paperDeep,padding:"2px 7px",borderRadius:10,border:`1px solid ${T.lineSoft}`}}>{count}</span>
+          )}
+          <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{open?"▲":"▼"}</span>
+        </div>
+      </div>
+      {open && (
+        <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10}}>
+          {children}
         </div>
       )}
     </div>
