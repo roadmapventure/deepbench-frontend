@@ -6,7 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None from this window — `S-MI-15` closed out below.
+- `S-ARCH-DURABLE-LOOP-01` (v6.1.0, `AA-138`, worktree `session/durable-loop-poc`) — checkpoint/resume POC for delegate-hop durability, spawned as its own architecture line separate from MI's `v6.0.x` MVP (John's explicit call, 2026-07-07). Found live via a real production failure (`ci-answer-display-intent` chain silently killed mid-flight by the shared-Lambda `maxDuration` ceiling — see `AA-138`). POC-first, decision-gated: the interim time-budget fix and per-hop overhead trimming are deliberately deferred pending this POC's findings, not bundled in.
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
