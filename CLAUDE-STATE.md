@@ -1,14 +1,14 @@
 # DeepBench — Current State
 > Updated at the close of every session. **Keep this file short.** Only the current version, the next session, and the last 3 sessions (one line each) belong here. Full session history lives in `docs/SESSIONS.md` — read it only when you need version history or root-cause context from a past session, never by default.
 
-**Version in dev:** v6.1.1
+**Version in dev:** v6.1.2
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None from this window — `S-ARCH-DURABLE-LOOP-02a` closed out below.
+- `S-ARCH-DURABLE-LOOP-02b` (v6.1.2, `AA-139`, worktree `session/durable-loop-frontend`) — frontend continuation wiring, sub-session `b` of 2, John's go-ahead 2026-07-07. One shared `resolveInProgress()` helper wired into both `callCapability()` (9 call sites) and `resolveConfirmation()` (1 call site) — the session that actually closes the original live incident (Marcus's Japan-GEO chat failure) for real users, not just at the harness level.
 
-**Next session:** `S-ARCH-DURABLE-LOOP-02b` — frontend continuation wiring, `MarketIntelligenceScreen.jsx`'s `callCapability()` handling an `in_progress`/`job_id` response by continuing the chain instead of treating it as final. This is the sub-session that actually reaches real users — `02a` alone does not fix what a browser sees; unblocked now (`action: 'continue'` dispatch shipped and QA-verified below). `AI-46` (`trace_id`/request grouping for a full-interaction latency rollup in AI Audit, bigger scope — schema migration + UI) queued right behind it. Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
+**Next session (queued behind this one):** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit, bigger scope — schema migration + UI. Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
 **After that (MI Loop — Solid & Fast track, new):**
 1. `AA-121` — gate Knowledge Skill Profiles by `intent_slug` so RAG doesn't fire on hand-off-only intents that never use it (cheap, cuts real wasted latency/cost). Design required.
