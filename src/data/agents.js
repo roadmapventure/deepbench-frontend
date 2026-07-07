@@ -184,7 +184,7 @@ export const AGENTS = [
     salary: 110000, value: 130000, hourly: 57, reportHrs: 2, reportCost: 114,
     docs: 0, classes: 0, chunks: 0, skill: 80, situational: 42,
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
-    quip: `"A theory that survives stress testing earns the name forecast."`,
+    quip: `"A theory that survives a hypothesis test earns the name forecast."`,
     color: T.moss,
     isAppleChannel: true,
   },
