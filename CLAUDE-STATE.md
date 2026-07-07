@@ -6,7 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None from this window — `S-ARCH-QG-SCHEMA-01` closed out below.
+- `S-MI-18` (v6.0.40) — kickoff written 2026-07-07 (`docs/kickoffs/v6.0.40-S-MI-18-agent-activity-drawer.md`), Column 3 Agents drawer. Merges the two previously-overlapping, never-reconciled `MI-06`/`MI-18` backlog entries into one drawer (identity + live usage per agent). Redesigned per John's direction: no `AI-38`/`isAppleChannel` taxonomy field — each screen hardcodes its own `proposedAgentIds`, Active/Potential status derived live from `ai_activity_log` presence via a new `useAgentActivitySummary()` hook (deliberately independent of `useAIActivity()`'s capped-500-row `byAgent`, which can't satisfy "never forgets an agent was used"). 3 files, 4 tasks. `AI-38`'s remaining scope narrowed to the global AI Audit screen's By Agent grouping only.
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
