@@ -161,6 +161,18 @@ A pulsing brass dot `●` appears in the header when any AI call is active. Impl
 - Shown: during active AI call
 - Hidden (removed, not just opacity 0): when call resolves
 
+**Known drift (flagged 2026-07-07, `SH-17`, not yet resolved):** the header's actual dot implementation is a hand-rolled `<span>` + its own `aiBlink` keyframe (`AppShell.jsx`), not `AIDiamond` — this doc's claim above is stale. Two more duplicate components exist as dead code (`AIStatusDot` in `ui.jsx`, `AiStatusDot` in `SharedUI.jsx`), never imported anywhere. Do not copy either pattern in new work — new AI-active indicators use real `<AIDiamond/>` (see §5a below for the first one built this way).
+
+### 5a. Agent Working Status — `AgentWorkingIndicator` (Locked 2026-07-07, `S-MI-20-design`)
+
+Chat-embedded "agent is working" indicator — one line, live `m:ss` counting timer, appears in the Market Intelligence Interact column in place of the (now MI-suppressed) header dot. Only one agent ever runs at a time on this platform today (confirmed no concurrent dispatch anywhere in the codebase) — this is a single line that swaps message and resets its timer each time control passes to a new agent, never multiple simultaneous lines. Any future capability/screen needing a live "agent is working, here's how long" indicator reuses this pattern rather than inventing a new one.
+
+- **Composition:** `<AIDiamond size="7px" color={T.brass}/>` + message text + live timer text, `display: flex, gap: 8, marginBottom: 12`.
+- **Message text:** `fontFamily: mono, fontSize: 11, color: T.muted, fontStyle: italic` — same styling as the plain-text status lines it replaces.
+- **Timer text:** `fontFamily: mono, fontSize: 10, color: T.brassDeep`, format `m:ss` (e.g. `0:07`, `1:04`), ticking every 1s.
+- **Reset semantics:** the component is mounted with `key={startedAt}` at its call site — a new turn means a new `startedAt`, which forces a full remount rather than trying to reset internal tick state. This is the correct pattern for any future "resets per turn" timer, not a bespoke effect-dependency trick.
+- **Ownership:** the parent screen holds a single `{ message, startedAt } | null` state value (not a stack/list) and sets it fresh at the same `t0` boundary it already uses for its own event/audit logging — the display and the logging read the same seam, so they never drift out of sync.
+
 ---
 
 ## 6. FeatureBadge
