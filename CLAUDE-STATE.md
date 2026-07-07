@@ -1,14 +1,14 @@
 # DeepBench — Current State
 > Updated at the close of every session. **Keep this file short.** Only the current version, the next session, and the last 3 sessions (one line each) belong here. Full session history lives in `docs/SESSIONS.md` — read it only when you need version history or root-cause context from a past session, never by default.
 
-**Version in dev:** v6.1.0
+**Version in dev:** v6.1.1
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
 **In flight now:**
-- None from this window — `S-ARCH-DURABLE-LOOP-01` closed out below.
+- `S-ARCH-DURABLE-LOOP-02a` (v6.1.1, `AA-139`, worktree `session/durable-loop-retrofit`) — harness retrofit, sub-session `a` of 2. John confirmed (2026-07-07): hybrid budget-aware checkpoint (stays synchronous/fast by default, only checkpoints when a hop risks the shared `maxDuration` ceiling), and the a/b split (harness now, frontend continuation wiring as session `b`, not yet kicked off). Promotes `AA-138`'s proven POC into the real `runCapability()` loop, retiring the POC's duplicate loop copy per `ARCHITECTURE.md` §19b.
 
-**Decision needed (not yet a design session):** `AA-138`'s POC succeeded (see below) — checkpoint/resume across genuinely separate invocations proven on the real `ci-answer-display-intent` path. **The live production bug is NOT yet fixed** — `runCapability()`'s shared-Lambda loop is unchanged; tonight's exact failure can still recur until a real retrofit ships. John's call needed: commit to the full `execute.js`/`request-receivable.js` retrofit now (own design session, large blast radius — both are §19b/19d LOCKED shared harness files), or hold at POC-proven and prioritize elsewhere first.
+**Next session (queued, not yet kicked off):** `S-ARCH-DURABLE-LOOP-02b` — frontend continuation wiring, `MarketIntelligenceScreen.jsx`'s `callCapability()` handling an `in_progress`/`job_id` response by continuing the chain instead of treating it as final. This is the sub-session that actually reaches real users — `02a` alone does not fix what a browser sees. Blocked on `02a` shipping first (needs its `action: 'continue'` dispatch to exist).
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` regenerate-chain investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff (confirmed still separate from `AA-131`'s field-length trim, not touched by it).
 
