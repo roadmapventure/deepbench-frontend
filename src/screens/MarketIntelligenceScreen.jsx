@@ -56,6 +56,22 @@ const SERVICE_LABEL = {
   "pipeline-triage": { name: "Pipeline Triage", patterns: "Structured Output, Agent Delegation" },
 };
 
+// FEATURE: AA-125 — shared free-text shaping so every event type that embeds a raw
+// model-authored string (reasoning/critique/notes) gets the same "short, readable log
+// line" treatment instead of each switch case deciding independently. Prefers the
+// first full sentence (reads as real reasoning, not a mid-word chop); falls back to a
+// hard character cap only when no sentence boundary exists within range.
+function shapeForLog(text, maxLen = 140) {
+  const s = (text || "").trim();
+  if (!s) return "";
+  const firstSentence = s.match(/^[^.!?]*[.!?]/);
+  if (firstSentence && firstSentence[0].trim().length <= maxLen) {
+    return firstSentence[0].trim();
+  }
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen).trim()}…`;
+}
+
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
 // never scripted text. Color: T.moss = pass/clean, T.brass = flagged/revise, T.flag = blocked.
 function describePipelineEvent(evt) {
@@ -70,24 +86,24 @@ function describePipelineEvent(evt) {
         return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated} — escalated to Sam`, color: T.flag };
       }
       const retriedNote = evt.data.final_answer ? " (Owen retried via Marcus)" : "";
-      return { capability: "quality-gate", summary: `Guardrail: pass${retriedNote} · Eval: ${e.result}${e.result === "revise" ? ` — ${e.critique}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
+      return { capability: "quality-gate", summary: `Guardrail: pass${retriedNote} · Eval: ${e.result}${e.result === "revise" ? ` — ${shapeForLog(e.critique)}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
     }
     case "failure_triage":
-      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Recommends escalating: ${evt.data.suggested_research_request || ""}` : "Escalating would not help here", color: T.brass };
+      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Recommends escalating: ${shapeForLog(evt.data.suggested_research_request)}` : "Escalating would not help here", color: T.brass };
     case "hypothesis_test":
       return { capability: "hypothesis-evaluation", summary: `Hypothesis test complete · confidence: ${evt.data.confidence}`, color: T.moss };
     case "memory_consolidation":
-      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? `Consolidated: ${(evt.data.content || "").slice(0, 90)}${(evt.data.content || "").length > 90 ? "…" : ""}` : "No pattern worth consolidating (no_action)", color: evt.data.action === "consolidate" ? T.moss : T.muted };
+      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? `Consolidated: ${shapeForLog(evt.data.content)}` : "No pattern worth consolidating (no_action)", color: evt.data.action === "consolidate" ? T.moss : T.muted };
     case "patch_proposed":
-      return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : ""}`, color: T.brass };
+      return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${shapeForLog(evt.data.proposed_action.version_note)}` : ""}`, color: T.brass };
     case "patch_resolved":
-      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${evt.data.result?.content?.confirmation_note || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by user`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
+      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${shapeForLog(evt.data.result?.content?.confirmation_note) || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by user`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
     // FEATURE: S-ARCH-DISPLAY-LOOP-01 — the two connected hand-off entries proving the real
     // request_help -> Michelle -> delegate_to_agent(is_final:true) round trip: Marcus asking for
     // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
     // to the chosen Display agent.
     case "agent_selection":
-      return { capability: "channel-intelligence", summary: `${evt.data.reasoning}`, color: T.moss };
+      return { capability: "channel-intelligence", summary: shapeForLog(evt.data.reasoning), color: T.moss };
     case "display_format":
       return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${evt.data.confidence_tier}`, color: T.moss };
     default:
