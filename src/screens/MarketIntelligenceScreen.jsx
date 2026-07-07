@@ -1,3 +1,4 @@
+// DeepBench v6.1.6 | MarketIntelligenceScreen.jsx | S-MI-24/MI-24 — Column 3 drawer rename (Pipeline Log -> Agent Routing, Learned Context -> Agent Reasoning)
 // DeepBench v6.1.5 | MarketIntelligenceScreen.jsx | S-MI-23 — chat-embedded AgentWorkingIndicator replaces header dot + Theory Evidence duplicate lines
 // v6.1.5 — S-MI-23 workingStatus wiring, all 6 turns
 // DeepBench v6.1.3 | MarketIntelligenceScreen.jsx | S-MI-21/MI-21 — Pipeline Log converted to a Drawer, default open
@@ -817,7 +818,7 @@ function AuditColumn({ events }) {
       <FeatureBadge id="MI-21"/>
       <FeatureBadge id="MI-22"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
-      <Drawer title="Pipeline Log" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
+      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
@@ -849,7 +850,7 @@ function AuditColumn({ events }) {
           );
         })}
       </Drawer>
-      <Drawer title="Learned Context" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
+      <Drawer title="Agent Reasoning" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
         {learned.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
             No patterns synthesized yet. When a correction or opinion is confirmed, it's written here as reusable reasoning.
