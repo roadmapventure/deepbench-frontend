@@ -243,6 +243,7 @@ export async function runCapability({
       const result = await sendRequest({
         prompt_request: enriched, agent_id, capability_slug, tenant_id,
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
+        turn_started_at: turnStart,
       });
       return { ...result, display_agent_card, display_agent_id: display_agent_id || null };
     }

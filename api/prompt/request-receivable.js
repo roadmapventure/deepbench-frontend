@@ -185,7 +185,7 @@ function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = false) {
   ];
 }
 
-export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false }) {
+export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -219,7 +219,17 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     throw Object.assign(new Error(`Handler "${handlerSlug}" not implemented`), { status: 501 });
   }
 
-  const startTime = Date.now();
+  // FEATURE: AI-43 -- when execute.js's loop already ran the real callModel() call
+  // (precomputed_turn path), turn_started_at carries that call's actual start time so
+  // latency_ms below reflects the real model-call-through-dispatch cost for this row,
+  // instead of restarting the clock here and silently excluding the model call itself --
+  // the exact gap AI-43 found (a quality-gate smoke test logged latency_ms: 49, physically
+  // too fast for any real Anthropic round trip; reconfirmed live 2026-07-07 on Priya's real
+  // 27.5s hypothesis-test call, wrapper row logged latency_ms: 116 for the same call).
+  // Callers that never pass this param (api/plan.js, confirmation.js's resolve path,
+  // sendRequest()'s own non-precomputed callers) are unaffected -- Date.now() fallback,
+  // byte-identical to today.
+  const startTime = turn_started_at || Date.now();
   const model = llm?.model || 'claude-sonnet-4-6';
   const max_tokens = llm?.max_tokens || 2048;
   const isJson = format_contract.output_type === 'json';
