@@ -5,7 +5,8 @@
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — this pulls every backlog item that actually touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed during this design session: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen).
 
-**In flight now:** None (from this session — other concurrent sessions may have their own entries not reflected here if this file was updated after they last synced).
+**In flight now:**
+- `S-ARCH-PM-BROKER-03` (`AA-128`) — kickoff written 2026-07-07 (`docs/kickoffs/v6.0.35-S-ARCH-PM-BROKER-03-agent-selection-schema-trim.md`). Live-diagnosed while investigating a "Marcus/Owen slowed down" report: `agent-selection-intent`'s own schema has no `maxLength` on `reasoning`/`fit_summary` — the same uncapped-free-text-field bug class as `AA-113`/`AA-120`/`AA-124`, just never applied to Michelle's own structured schema. Confirmed via full history query this intent has always ranged 6.6s-15.2s (not a new regression from today's other fixes). Supabase-only, zero code files. Running in its own worktree (`session/agent-selection-trim-01`) per the concurrent-sessions protocol.
 
 **Next session:** `AI-46` — `trace_id`/request grouping for a full-interaction latency rollup in AI Audit. Bigger scope (schema migration + UI). Owen's `qg-review-intent` investigation also still open, unscheduled — needs its own diagnosis of what's trimmable in Marcus's regeneration path before it can become a kickoff.
 
