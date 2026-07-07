@@ -26,7 +26,7 @@ const REQUEST_HELP_TOOL = {
       skill_needed: { type: 'string', description: 'Plain-language description of the capability or expertise needed' },
       task_description: { type: 'string', description: 'The specific task that needs to be done' },
       context: { type: 'string', description: 'Any relevant context for whoever picks this up' },
-      reasoning: { type: 'string', description: 'Why you are asking for help rather than completing this yourself' },
+      reasoning: { type: 'string', maxLength: 300, description: 'Why you are asking for help rather than completing this yourself -- 1-2 concise sentences, not an analysis' },
     },
   },
 };
@@ -45,7 +45,7 @@ const DELEGATE_TO_AGENT_TOOL = {
       capability_slug: { type: 'string' },
       intent_slug: { type: ['string', 'null'] },
       task: { type: 'string', description: 'The task for the chosen agent to perform' },
-      reasoning: { type: 'string', description: 'Why you chose this candidate' },
+      reasoning: { type: 'string', maxLength: 300, description: 'Why you chose this candidate -- 1-2 concise sentences, not an analysis' },
       is_final: { type: 'boolean', description: 'Set true only when this delegation fully completes your task and no further judgment from you is needed -- the delegate\'s own output becomes the final result, credited to them. Omit or set false when you need to see the delegate\'s result before finishing your own turn (e.g. reviewing a regenerated answer before deciding whether it now passes).' },
     },
   },

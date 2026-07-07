@@ -24,6 +24,34 @@ function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
 }
 
+// FEATURE: AA-120 -- fire-and-forget latency logging for every callModel() turn inside this
+// loop. AA-118 (S-ARCH-LOOP-LATENCY-01) fixed null latency_ms on the three explicit hop-wrapper
+// functions (librarian/agent-directory/guardrails-check) but never touched the delegating
+// agent's own reasoning turns -- the callModel() calls right here in this loop -- which produced
+// zero row at all, not even null. Confirmed live 2026-07-07: a full ci-answer-display-intent call
+// completing in 33.4s had two entirely unlogged gaps (Marcus's own two turns) accounting for
+// ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
+// never touched." Generic to every capability's own turns, not capability-specific.
+async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call }) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) return;
+  fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
+    method: 'POST',
+    headers: getSupabaseHeaders(supabaseKey),
+    body: JSON.stringify({
+      tenant_id: tenant_id || 'global',
+      agent_id: agent_id || null,
+      ai_type: 'agent-turn',
+      feature: `${capability_slug || 'unknown'}:${intent_slug || 'none'}:depth${depth}`,
+      model: model || null,
+      latency_ms,
+      patterns_used: is_delegate_call ? ['agent-delegation'] : [],
+      created_at: new Date().toISOString(),
+    }),
+  }).catch(() => {});
+}
+
 // FEATURE: AA-87 -- live resolver, replaces the removed executing_agent_id/critique_agent
 // fields. A Skill Profile may only name a capability_slug; the harness resolves who currently
 // holds it at the moment of dispatch, never a static agent reference. Single-holder assumption
@@ -166,6 +194,7 @@ export async function runCapability({
   const hopCounter = _hop_counter || { n: 0 };
 
   for (let depth = 0; ; depth++) {
+    const turnStart = Date.now();
     const turn = await callModel({
       systemPrompt: enriched.system_prompt,
       model: enriched.llm.model,
@@ -173,6 +202,11 @@ export async function runCapability({
       format_contract: enriched.format_contract,
       canRequestHelp,
       conversation_history: conversationHistory,
+    });
+    logAgentTurn({
+      capability_slug, intent_slug, agent_id, tenant_id,
+      model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
+      is_delegate_call: turn.is_delegate_call,
     });
 
     if (!turn.is_delegate_call) {
