@@ -50,7 +50,7 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 ## Step 1 — Orient (read these, in order, stop when you have enough)
 
-**Before any of these three: the shared checkout is not kept in sync with `origin/dev` (see `CLAUDE.md`'s shared-checkout staleness rule) — `git -C "C:/Projects/deepbench-frontend" fetch origin dev` first, then read via `git show origin/dev:<path>` rather than the raw working-tree file, until your own worktree exists.**
+**Before any of these three: run `CLAUDE.md`'s read-only bootstrap check** (`git fetch origin dev`, compare against `git show origin/dev:<path>`) — the shared checkout's disk copy isn't kept in sync with `origin/dev`, so these three files may be stale until your own worktree exists.
 
 1. `CLAUDE-STATE.md` — current version, next session, open blockers
 2. `docs/FEATURES.md` — feature backlog and session queue
