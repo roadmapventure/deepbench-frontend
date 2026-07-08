@@ -3,14 +3,16 @@
 **Before reading anything else, ask:**
 > "Design session or coding session? If coding, paste the kickoff doc path."
 
+> **Hard rule (added 2026-07-07 — shared-checkout staleness):** The shared checkout at `C:/Projects/deepbench-frontend` is NOT kept in sync with `origin/dev` — every session now works in its own worktree and pushes straight to the remote, so nothing ever runs `git pull` against the shared checkout itself. Confirmed live twice: a session mid-day found the shared checkout's `CLAUDE-STATE.md` frozen 54 commits behind `origin/dev` (stuck on a version from hours/sessions earlier); a design session later that same day independently hit the identical staleness reading it fresh. **Before Step 1 below, do not read `CLAUDE-STATE.md`/`CLAUDE-DESIGN.md`/`docs/FEATURES.md` as raw files from the shared checkout — they may be silently stale.** Instead: `git -C "C:/Projects/deepbench-frontend" fetch origin dev` (no worktree needed yet, this is read-only), then read each via `git -C "C:/Projects/deepbench-frontend" show origin/dev:<path>` (e.g. `origin/dev:CLAUDE-STATE.md`) so "current version"/"next session" is always the real current tip, never whatever the shared checkout happened to have checked out last. Only switch to reading real files once your own worktree exists (branched from that same fresh `origin/dev`, per the concurrent-sessions rule below) — a worktree is always current as of its own branch point, unlike the shared checkout.
+
 ---
 
 ## If DESIGN session:
-1. Read `CLAUDE-STATE.md` (current version + blockers)
-2. Read `CLAUDE-DESIGN.md` (design workflow for Claude Code)
+1. Read `CLAUDE-STATE.md` (current version + blockers) — via `git show origin/dev:CLAUDE-STATE.md` per the shared-checkout staleness rule above, not the raw file, until your worktree exists
+2. Read `CLAUDE-DESIGN.md` (design workflow for Claude Code) — same caveat
 
 ## If CODING session (kickoff doc provided):
-1. Read `CLAUDE-STATE.md`
+1. Read `CLAUDE-STATE.md` — via `git show origin/dev:CLAUDE-STATE.md`, same caveat
 2. Read the kickoff doc — it contains everything needed for the session
 3. Read `CLAUDE-RULES.md` only if you hit a pattern or rule question mid-session
 

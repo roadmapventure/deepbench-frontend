@@ -50,12 +50,14 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 ## Step 1 — Orient (read these, in order, stop when you have enough)
 
+**Before any of these three: the shared checkout is not kept in sync with `origin/dev` (see `CLAUDE.md`'s shared-checkout staleness rule) — `git -C "C:/Projects/deepbench-frontend" fetch origin dev` first, then read via `git show origin/dev:<path>` rather than the raw working-tree file, until your own worktree exists.**
+
 1. `CLAUDE-STATE.md` — current version, next session, open blockers
 2. `docs/FEATURES.md` — feature backlog and session queue
 3. `docs/SESSIONS.md` — session log (only if you need version history)
 
 Report back after Step 1:
-- Current version in dev
+- Current version in dev (state it as the `origin/dev` version you just fetched, not whatever the shared checkout's file said before that fetch)
 - Next scheduled session
 - Any open blocking questions
 - "What would you like to work on?"
