@@ -7,6 +7,7 @@
 
 **In flight now:**
 - `S-ARCH-DATA-ROOM-TAG-01` (v6.1.18, `AA-110`, worktree `session/aa110-data-room-tag`) — hallucinated `data_room_tag` reaches a real `the_library`/`the_reasoning` write with no ground-truth check, crashing on the `data_rooms` FK after a wasted OpenAI embed call. Fix adds `isValidDataRoomTag()` in both write paths (the live bug in `lib/librarian.js`, plus the same dormant shape in `lib/search-harness.js`), and tightens `STANDARDS.md` Category L loop-closure guidance. Kickoff committed, coding session spawning now.
+- `S-ARCH-SCHEMA-GUARD-01` (v6.1.19, `AA-147`, worktree `session/schema-guard-a8249f13`) — `tool_choice:'auto'` (forced whenever `can_request_help`+schema combine) lets a model call its own schema tool with missing required fields, silently writing an empty/partial deliverable; live Supabase query confirmed 8 unprotected intents including `ci-answer-intent` and `qg-review-intent`. Fix adds a required-field presence check to `parseModelTurn()`, reusing the existing retry-once-then-throw path. Kickoff committed, coding session spawning now.
 
 **Next session (queued behind this one):** John's confirmed priority: `AA-121` (RAG gating waste) next, then a decision conversation on `AA-124` (structural latency fix vs. trim). `AI-46` (trace_id/request grouping for AI Audit) queued behind that. New, unscheduled: `AA-146` (attribution byline missing on string-content-fallback cards).
 
@@ -27,7 +28,7 @@ Full history (all sessions before this window): `docs/SESSIONS.md` (S-MI-27 [ful
 ### MI Loop — Solid & Fast Track [opened 2026-07-07 re-sequencing, current priority]
 > Goal: "MI page agent loop + harness solid and fast, with charts" (John's explicit call) — pulled ahead of Structural Enforcement below, which touches neither the MI loop nor its display.
 1. `AA-121` — gate Knowledge Skill Profiles by `intent_slug` so RAG doesn't fire on hand-off-only intents that never use it (cheap, cuts real wasted latency/cost). Design required.
-2. `task_a8249f13` — harness `tool_choice: 'auto'` lets schema calls silently return `{}`; found live in `S-MARKET-INTEL-01a`, already spawned as its own task, still needs a scoped harness-fix session.
+2. `AA-147` (formerly `task_a8249f13`) — 🔶 Design done (v6.1.19, `S-ARCH-SCHEMA-GUARD-01`, 2026-07-08): kickoff written for the `parseModelTurn()` required-field presence check; coding session spawning now.
 3. **Decision needed, not just a design session:** Owen's `qg-review-intent` retry-to-Marcus delegation can chain ~50s of real LLM work inside one 60s-budgeted request. Confirmed generalizable, not Owen-specific — `AA-124` live-measured the same pattern on Priya/Michelle/Alex's hypothesis-test format hand-off: ~44s of pure delegation/routing overhead on top of 27.5s of real analytical work. Recommend one structural-fix-vs-trim decision with John covering both, not two capability patches.
 4. `AA-112` — ✅ Done (v6.1.16, `S-ARCH-ROUTING-RUBRIC-01`, 2026-07-07): `ci-routing-intent` discriminating rubric added, live-verified 15/15 `qa`.
 5. `AA-110` — 🔶 Design done (v6.1.18, `S-ARCH-DATA-ROOM-TAG-01`, 2026-07-08): kickoff written for `isValidDataRoomTag()` ground-truth check in both `lib/librarian.js` and `lib/search-harness.js`; coding session spawning now.
