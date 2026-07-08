@@ -1,3 +1,4 @@
+// DeepBench v6.1.23 | useAgents.js | S-MI-30 — "html-display" added to CAPABILITY_WRAPPER_TYPES (Riley Torres wrapper/agent-turn dedup); useAgentActivitySummary() gains optional tenantId param (default 'global') so callers can scope to a different tenant (e.g. 'speed-baseline-test', MI-31)
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
 // DeepBench v6.0.40 | useAgents.js | MI-18 — Agent Activity drawer data hook
@@ -103,6 +104,7 @@ const PAGE_SIZE = 1000;
 const CAPABILITY_WRAPPER_TYPES = new Set([
   "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
   "memory-consolidation", "data-analysis", "project-manager", "screen-controls",
+  "html-display",
 ]);
 const PAIR_WINDOW_MS = 2000;
 
@@ -124,7 +126,7 @@ function classifyRow(row, turnTimestampsByAgent) {
   return { kind: row.ai_type, include: true };
 }
 
-export function useAgentActivitySummary(agentIds, scope) {
+export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
   const [summary, setSummary] = useState({});
 
   useEffect(() => {
@@ -138,7 +140,7 @@ export function useAgentActivitySummary(agentIds, scope) {
         const { data, error } = await supabase
           .from('ai_activity_log')
           .select('agent_id,ai_type,feature,latency_ms,cost_usd,created_at')
-          .eq('tenant_id', 'global')
+          .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .range(from, from + PAGE_SIZE - 1);
         if (error || !data) return null;

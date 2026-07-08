@@ -1,3 +1,4 @@
+// DeepBench v6.1.23 | MarketIntelligenceScreen.jsx | S-MI-30/MI-30+MI-31 — Agents drawer: added "riley" to PROPOSED_MI_AGENT_IDS + html-display to MI_LOOP_SCOPE (Riley Torres visibility fix); added a "Baseline" rollup row (rollupBaseline(), speed-baseline-test tenant) as the first entry in each agent's byKind breakdown
 // DeepBench v6.1.21 | MarketIntelligenceScreen.jsx | S-MI-29/MI-29 — three silent-reset async catch blocks (enterHypothesisFlow/onSelectHypothesis/onCommit) now surface the real e.message as a chat error bubble and a Pipeline Log "error" row (T.flag), matching the pattern onSend's catch already used
 // DeepBench v6.1.11 | MarketIntelligenceScreen.jsx | S-MI-27/MI-27+MI-28 — Submitted Hypothesis card gets a "Submitted by You" attribution row (UserAvatar); AI - Hypothesis Test header swapped to actor-first order (Priya Nair · AI - Hypothesis Test), matching the Q&A card's existing order
 // DeepBench v6.1.10 | MarketIntelligenceScreen.jsx | S-MI-26/MI-26 — Data Sources drawer: section headers (Sourced/Simulation/category) bumped to 12.5px matching row title size, DataSourceRow title dropped to fontWeight:400
@@ -776,7 +777,7 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
 // confirmed live via ai_activity_log this design session, not hypothetical (Michelle alone: 595
 // all-time calls). Still page-local, not stored on agents.js — same platform-wide-roster
 // principle as the original MI-18 design.
-const PROPOSED_MI_AGENT_IDS = ["marcus", "priya", "nadia", "owen", "sam", "elena", "michelle", "alex", "dan", "eleanor"];
+const PROPOSED_MI_AGENT_IDS = ["marcus", "priya", "nadia", "owen", "sam", "elena", "michelle", "alex", "dan", "eleanor", "riley"];
 
 // FEATURE: S-MI-18b — this page's own loop-access scope, passed to useAgentActivitySummary() so
 // the drawer's metrics reflect real Market Intelligence activity, not a shared broker/utility
@@ -793,11 +794,13 @@ const MI_LOOP_SCOPE = {
     "librarian", "librarian-write", "data-room-custody",
     "reflect", "synthesis",
     "guardrails-check",
+    "html-display",
   ],
   featurePrefixes: [
     "channel-intelligence:", "hypothesis-evaluation:", "quality-gate:", "pipeline-triage:",
     "project-manager:agent-selection-intent:",
     "screen-controls:qa-answer-format:", "screen-controls:intelligence-review-format:",
+    "html-display:",
   ],
 };
 
@@ -820,6 +823,22 @@ function formatKindLabel(kind) {
   return kind.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+// FEATURE: MI-31 — rolls a per-agent speed-baseline-test summary (already deduped by
+// useAgentActivitySummary()'s classifyRow(), same as any other byKind data) into a single blended
+// number for the "Baseline" row. Reuses stats.byKind rather than averaging raw rows so the
+// wrapper/agent-turn dedup fix (MI-30/Task 2) applies here too. Returns null when there is no
+// baseline data at all (e.g. Dan Bingham) so the caller can omit the row entirely.
+function rollupBaseline(stats) {
+  if (!stats?.byKind) return null;
+  const kinds = Object.values(stats.byKind).filter(k => k.latencyCount > 0);
+  if (kinds.length === 0) return null;
+  const totalLatency = kinds.reduce((sum, k) => sum + k.totalLatency, 0);
+  const latencyCount = kinds.reduce((sum, k) => sum + k.latencyCount, 0);
+  const maxLatency = Math.max(...kinds.map(k => k.maxLatency));
+  const calls = kinds.reduce((sum, k) => sum + k.calls, 0);
+  return { avgLatency: Math.round(totalLatency / latencyCount), maxLatency, calls };
+}
+
 // FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
 // Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
@@ -828,6 +847,10 @@ function AuditColumn({ events }) {
   const learned = useLearnedContext();
   const dataSources = useDataSources();
   const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
+  // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
+  // 'speed-baseline-test' tenant, unfiltered by MI_LOOP_SCOPE (scope: null) since those rows are
+  // already fully isolated deliberate test data, not production MI-loop traffic.
+  const baselineActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, null, 'speed-baseline-test');
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
   const activeIds = PROPOSED_MI_AGENT_IDS
@@ -849,6 +872,8 @@ function AuditColumn({ events }) {
       <FeatureBadge id="MI-15"/>
       <FeatureBadge id="MI-21"/>
       <FeatureBadge id="MI-22"/>
+      <FeatureBadge id="MI-30"/>
+      <FeatureBadge id="MI-31"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
         {ordered.length === 0 ? (
@@ -911,6 +936,7 @@ function AuditColumn({ events }) {
           const agent = agentById(id);
           if (!agent) return null;
           const stats = agentActivity[id];
+          const baseline = rollupBaseline(baselineActivity[id]);
           return (
             <div key={id} style={{display:"flex",flexDirection:"column",gap:6,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -929,9 +955,17 @@ function AuditColumn({ events }) {
                 <StatCell val={stats?.calls ?? 0} label="Calls"/>
                 <StatCell val={stats?.avgCost != null ? `$${stats.avgCost.toFixed(2)}` : "—"} label="Avg Cost"/>
               </div>
-              {stats?.byKind && Object.keys(stats.byKind).length > 0 && (
+              {(baseline || (stats?.byKind && Object.keys(stats.byKind).length > 0)) && (
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                  {Object.entries(stats.byKind)
+                  {baseline && (
+                    <div style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
+                      <span>Baseline</span>
+                      <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
+                        {(baseline.avgLatency/1000).toFixed(1)}s avg ({baseline.calls} call{baseline.calls === 1 ? "" : "s"}, max {(baseline.maxLatency/1000).toFixed(1)}s)
+                      </span>
+                    </div>
+                  )}
+                  {stats?.byKind && Object.entries(stats.byKind)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
                     .map(([kind, k]) => (
                       <div key={kind} style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
