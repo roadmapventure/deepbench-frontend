@@ -5,9 +5,10 @@
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
-**In flight now:** none.
+**In flight now:**
+- `S-ARCH-ROUTING-RUBRIC-01` (v6.1.16, `AA-112`, worktree `session/mi-loop-reliability`) — `ci-routing-intent` has no rule distinguishing qa/theory/forecast on established-fact phrasing; adding a discriminating rubric to its `method` field (Supabase content only, no code). Kickoff committed, coding session spawning now.
 
-**Next session (queued behind this one):** John's confirmed priority after `AA-144`/`AA-141`/`AA-145`: `AA-112` (needs_review/routing misclassification) next, then `AA-121` (RAG gating waste), then a decision conversation on `AA-124` (structural latency fix vs. trim). `AI-46` (trace_id/request grouping for AI Audit) queued behind that.
+**Next session (queued behind this one):** John's confirmed priority after `AA-112`: `AA-121` (RAG gating waste) next, then a decision conversation on `AA-124` (structural latency fix vs. trim). `AI-46` (trace_id/request grouping for AI Audit) queued behind that.
 
 **Last 3 sessions:**
 - S-ARCH-DURABLE-RESUME-01 (v6.1.15, 1eb2f57, 2026-07-07) — `AA-141`+`AA-145` ✅ Done: one root cause, found via direct Supabase evidence — the durable-loop resume path dropped `task_context` and mishandled a nested checkpoint inside an `is_final` delegate hop, causing both Alex's confused responses and the transient `continue` 500s. Fixed together: `task_context` now persists across resume, nested in-progress no longer crashes, failed jobs are marked failed instead of orphaned. Full detail: `docs/FEATURES-ARCHIVE.md`.
