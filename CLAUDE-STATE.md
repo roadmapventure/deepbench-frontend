@@ -5,7 +5,8 @@
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
-**In flight now:** none.
+**In flight now:**
+- `S-MI-29` (v6.1.21) — coding session executing kickoff `v6.1.21-S-MI-29-mi-async-error-visibility.md` (worktree `charts-column2-0708`).
 
 **Next session (queued behind this one):** Live speed investigation (2026-07-08) found `AA-149` (model-tier/prompt-trim on the heaviest Sonnet hops) is the evidenced top Speed priority — supersedes `AA-121` (RAG gating waste), which is now secondary but still worth doing. `AA-124` (structural latency fix vs. trim decision) still needs its own conversation with John. `AA-150` (Owen `qg-review-intent` parse-failure-on-repeat, Continuity, not yet root-caused) is new and unscheduled. `AI-46` (trace_id/request grouping for AI Audit) queued behind that. Also unscheduled: `AA-146` (attribution byline missing on string-content-fallback cards).
 
