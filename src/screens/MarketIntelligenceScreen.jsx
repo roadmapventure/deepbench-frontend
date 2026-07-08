@@ -968,11 +968,29 @@ function AuditColumn({ events }) {
                   {stats?.byKind && Object.entries(stats.byKind)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
                     .map(([kind, k]) => (
-                      <div key={kind} style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
-                        <span>{formatKindLabel(kind)}</span>
-                        <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
-                          {k.avgLatency != null ? `${(k.avgLatency/1000).toFixed(1)}s avg` : "—"} ({k.calls} call{k.calls === 1 ? "" : "s"}{k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})
-                        </span>
+                      <div key={kind} style={{display:"flex",flexDirection:"column",gap:2}}>
+                        <div style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
+                          <span>{formatKindLabel(kind)}</span>
+                          <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
+                            {k.avgLatency != null ? `${(k.avgLatency/1000).toFixed(1)}s avg` : "—"} ({k.calls} call{k.calls === 1 ? "" : "s"}{k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})
+                          </span>
+                        </div>
+                        {/* FEATURE: AA-149 -- per-model sub-rows, shown only when a kind has genuinely used more
+                            than one model (true today only for ci-answer-intent post-Haiku-switch during any
+                            overlap window, and for any future model experiment on any intent). Every other kind
+                            in the drawer today has exactly one model and renders with zero visual change. */}
+                        {k.byModel && Object.keys(k.byModel).length > 1 &&
+                          Object.entries(k.byModel)
+                            .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
+                            .map(([model, km]) => (
+                              <div key={model} style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:8,color:T.mutedDeep,paddingLeft:10}}>
+                                <span>&#8618; {model}</span>
+                                <span style={{flexShrink:0}}>
+                                  {km.avgLatency != null ? `${(km.avgLatency/1000).toFixed(1)}s avg` : "—"} ({km.calls} call{km.calls === 1 ? "" : "s"})
+                                </span>
+                              </div>
+                            ))
+                        }
                       </div>
                     ))}
                 </div>

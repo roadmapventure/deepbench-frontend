@@ -126,6 +126,51 @@ function classifyRow(row, turnTimestampsByAgent) {
   return { kind: row.ai_type, include: true };
 }
 
+// FEATURE: AA-149 -- extracted from the fetchAll().then() callback so the aggregation math
+// (now including per-model breakdown) is unit-testable without mocking Supabase/React. Same
+// classifyRow()-driven kind bucketing as before, byte-identical output for every existing
+// caller -- this only adds a new byModel sub-bucket inside each kind, never removes anything.
+export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
+  const map = {};
+  for (const row of scopedRows) {
+    if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
+    const d = map[row.agent_id];
+    d.calls++;
+    if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
+
+    const { kind, include } = classifyRow(row, turnTimestampsByAgent);
+    if (!include) continue;
+    if (!d.byKind[kind]) d.byKind[kind] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null, byModel: {} };
+    const k = d.byKind[kind];
+    k.calls++;
+    if (row.latency_ms) {
+      k.totalLatency += row.latency_ms;
+      k.latencyCount++;
+      k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
+    }
+
+    const modelKey = row.model || 'unknown';
+    if (!k.byModel[modelKey]) k.byModel[modelKey] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
+    const km = k.byModel[modelKey];
+    km.calls++;
+    if (row.latency_ms) {
+      km.totalLatency += row.latency_ms;
+      km.latencyCount++;
+      km.maxLatency = km.maxLatency == null ? row.latency_ms : Math.max(km.maxLatency, row.latency_ms);
+    }
+  }
+  Object.values(map).forEach(d => {
+    d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
+    Object.values(d.byKind).forEach(k => {
+      k.avgLatency = k.latencyCount ? Math.round(k.totalLatency / k.latencyCount) : null;
+      Object.values(k.byModel).forEach(km => {
+        km.avgLatency = km.latencyCount ? Math.round(km.totalLatency / km.latencyCount) : null;
+      });
+    });
+  });
+  return map;
+}
+
 export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
   const [summary, setSummary] = useState({});
 
@@ -139,7 +184,7 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
       while (true) {
         const { data, error } = await supabase
           .from('ai_activity_log')
-          .select('agent_id,ai_type,feature,latency_ms,cost_usd,created_at')
+          .select('agent_id,ai_type,feature,model,latency_ms,cost_usd,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .range(from, from + PAGE_SIZE - 1);
@@ -169,30 +214,7 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
         turnTimestampsByAgent.get(row.agent_id).push(new Date(row.created_at).getTime());
       }
 
-      const map = {};
-      for (const row of scoped) {
-        if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
-        const d = map[row.agent_id];
-        d.calls++;
-        if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
-
-        const { kind, include } = classifyRow(row, turnTimestampsByAgent);
-        if (!include) continue;
-        if (!d.byKind[kind]) d.byKind[kind] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
-        const k = d.byKind[kind];
-        k.calls++;
-        if (row.latency_ms) {
-          k.totalLatency += row.latency_ms;
-          k.latencyCount++;
-          k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
-        }
-      }
-      Object.values(map).forEach(d => {
-        d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
-        Object.values(d.byKind).forEach(k => {
-          k.avgLatency = k.latencyCount ? Math.round(k.totalLatency / k.latencyCount) : null;
-        });
-      });
+      const map = buildActivitySummary(scoped, turnTimestampsByAgent);
       setSummary(map);
     });
 
