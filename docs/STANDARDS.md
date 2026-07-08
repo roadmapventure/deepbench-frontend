@@ -266,6 +266,8 @@ Complete every item before committing. This is the canonical "standing checklist
 - [ ] Payload integrity: no `mergeStatus`/`pendingArchive` in `stepsContext`
 - [ ] `task.steps` for `stepsContext` is `mergedToSet.active` after Update Plan
 
+**Added 2026-07-07 (John's explicit call — a coding session's own live testing ran to ~22 minutes this way, a real cost against the real Anthropic/Supabase backend, not overhead):** run each live scenario **once** by default. Only repeat a scenario when the session's actual goal is measuring an intermittent-failure rate (state that goal explicitly in the kickoff/report) — not as generic extra assurance after a first pass already succeeded. If a first pass fails on a transient, already-tracked issue (e.g. a known flaky backend call), report it honestly and move on; don't loop retrying to manufacture more confidence than the one real data point provides.
+
 ---
 
 ## Section 6: Browser Test Checklist
