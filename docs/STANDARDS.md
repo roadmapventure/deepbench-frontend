@@ -297,11 +297,12 @@ Rules:
 **If any QA item FAILS — mandatory root cause protocol (do not skip):**
 
 Before writing a patch kickoff doc, perform a full root cause analysis:
-1. Read the actual error message in full — not just the status code
-2. Read every file in the execution path (browser → frontend call site → API handler → package.json → runtime environment)
-3. Compare against the working reference implementation (NIGP or equivalent) line by line
-4. Identify the deepest root cause — not the closest symptom
-5. Confirm the fix addresses the root cause, not just the surface error
+1. Check `https://status.claude.com/api/v2/summary.json` for an incident on Claude API / Claude Sonnet / Claude Code overlapping the failure's timestamp (added 2026-07-07 — Anthropic-side incidents can masquerade as DeepBench bugs; if a matching incident overlaps, log it as the cause and stop — do not root-cause an upstream outage as if it were a code defect)
+2. Read the actual error message in full — not just the status code
+3. Read every file in the execution path (browser → frontend call site → API handler → package.json → runtime environment)
+4. Compare against the working reference implementation (NIGP or equivalent) line by line
+5. Identify the deepest root cause — not the closest symptom
+6. Confirm the fix addresses the root cause, not just the surface error
 
 Do not patch the call site before checking the server. Do not check the server before checking its dependencies. Do not assume the bug is in the last file you touched.
 
@@ -365,6 +366,7 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-06-24 | Section 12 added — canonical model ID standard (BUG-20) and SERVICE_CATALOG roadmap update rule (BUG-22). Root cause: short-form model IDs in logAICall() call sites split model rows in AI Audit; services shipped without updating roadmap field left live services listed in Platform Roadmap. |
 | 2026-07-02 | Section 1 strengthened — version must strictly increment every session, never be reused. Root cause: 4 consecutive sessions (`S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, `S-ARCH-LOOP-PATCH-01`) all stamped `v6.0.0` because the kickoff-doc checklist only said to confirm the current version, not increment it. `CLAUDE-DESIGN.md` Step 4 now has an explicit version-assignment step. |
 | 2026-07-02 | Category L scoping breadth guidance added — full live round trips required for genuinely novel mechanism paths, not one-for-one for every data row reapplying an already-proven mechanism to a structurally identical shape. Root cause: `S-ARCH-AGENT-LOOP-03` ran 4 full live tests (25 min, repeated 55s-timeout retries) for a 4-row data-only session where 3 rows re-exercised a mechanism already proven live twice by prior sessions — only 1 row (`qg-review-intent`'s `delegate_to_agent`-from-`task_context` path) was actually novel. |
+| 2026-07-07 | Mandatory root cause protocol gains Step 1 (renumbering the rest) — check `https://status.claude.com/api/v2/summary.json` for an Anthropic-side incident (Claude API / Claude Sonnet / Claude Code) overlapping the failure's timestamp before doing any code-level root-causing. Root cause: John gets Claude status-page incident emails and had no standing step connecting them to QA-failure diagnosis — an upstream incident could otherwise get root-caused as a DeepBench code defect. |
 
 ---
 
