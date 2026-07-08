@@ -7,6 +7,7 @@
 
 **In flight now:**
 - `S-MI-29` (v6.1.21) — coding session executing kickoff `v6.1.21-S-MI-29-mi-async-error-visibility.md` (worktree `charts-column2-0708`).
+- `S-ARCH-DELEGATION-REQUIRED-03` (`AA-152`, v6.1.22) — auto-resolving delegation-required hand-offs to `agent-selection-intent`'s own recommendation, skipping the redundant second requester turn (worktree `michelle-skill-reasoning-01`).
 
 **Next session (queued behind this one):** Live speed investigation (2026-07-08) found `AA-149` (model-tier/prompt-trim on the heaviest Sonnet hops) is the evidenced top Speed priority — supersedes `AA-121` (RAG gating waste), which is now secondary but still worth doing. `AA-124` (structural latency fix vs. trim decision) still needs its own conversation with John. `AA-150` (Owen `qg-review-intent` parse-failure-on-repeat, Continuity, not yet root-caused) is new and unscheduled. `AI-46` (trace_id/request grouping for AI Audit) queued behind that. Also unscheduled: `AA-146` (attribution byline missing on string-content-fallback cards).
 
