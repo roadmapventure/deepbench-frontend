@@ -363,13 +363,22 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   // rendering an empty card and silently discarding the model's own message. Falls back to showing
   // that text directly. Also closes AA-135 (display_format's confidence_tier: undefined in the
   // Pipeline Log was this same string-not-object case).
-  if (typeof display === "string") {
+  // FEATURE: S-ARCH-STRING-CONTENT-01 (AA-135) — extends the AA-137 string fallback above to a
+  // second cause: display is a genuine object (display_agent_card/display_agent_id ARE present)
+  // but its real content is a string (e.g. Riley's html-display-format output, which has no schema
+  // tool and terminates via plain-text model response) rather than the expected headline/body
+  // object. Post-Task-1 fix, buildFinalDelegationResult() no longer spreads that string's
+  // characters as numeric junk, so headline/body are genuinely absent here — same blank-card risk
+  // as the pure-decline case, different cause, so the copy below is kept cause-neutral.
+  if (typeof display === "string" || typeof display.content === "string") {
+    const rawText = typeof display === "string" ? display : display.content;
     return {
       kind: "qa",
-      headline: null, body: [{ text: display }], key_data_points: null,
+      headline: null, body: [{ text: rawText }], key_data_points: null,
       citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier,
-      needs_review: true, review_reason: "Display agent declined to format — see message.",
-      displayAgentCard: null, displayAgentId: null,
+      needs_review: true, review_reason: "Display agent output couldn't be rendered in the expected format — see message below.",
+      displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
+      displayAgentId: typeof display === "string" ? null : display.display_agent_id,
     };
   }
   return {
@@ -442,8 +451,14 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // MessageBubble's hypothesis_test case only ever renders st.headline/st.supports/.complicates/
   // .consider — a plain-text decline needs somewhere to land; headline is the only field it
   // unconditionally renders when present (line 330), so that's where the raw text goes.
+  // FEATURE: S-ARCH-STRING-CONTENT-01 (AA-135) — mirrors runQaWithQualityGate()'s extended
+  // fallback above: display can be a genuine object whose real content is a string (Riley's
+  // html-display-format shape) rather than the pure-decline string-only case AA-137 already
+  // handled.
   return typeof display === "string"
     ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null }
+    : typeof display.content === "string"
+    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection }
     : display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
 }
 

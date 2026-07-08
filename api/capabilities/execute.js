@@ -195,13 +195,14 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
 // whenever `result.status` is set, so an added `content` key is additive, never breaking).
 export function buildFinalDelegationResult({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, finalPatterns, displayAgentCard, lastHelpSelection }) {
   const content = delegateResult.content;
-  if (!content || Object.keys(content).length === 0) {
+  if (!content || (typeof content === 'object' && Object.keys(content).length === 0)) {
     throw new Error(`delegate_to_agent: ${targetAgentId}/${targetCapabilitySlug}${targetIntentSlug ? '/' + targetIntentSlug : ''} returned no content for a final delegation (violations: ${JSON.stringify(delegateResult.violations || [])})`);
   }
+  const isPlainObject = typeof content === 'object' && content !== null;
   return {
     status: 'final_delegation',
     content,
-    ...content,
+    ...(isPlainObject ? content : {}),
     patterns_used: finalPatterns,
     display_agent_card: displayAgentCard,
     display_agent_id: targetAgentId,
