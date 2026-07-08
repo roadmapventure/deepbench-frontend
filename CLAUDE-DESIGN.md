@@ -42,9 +42,11 @@ Applies from S-APPLE-01a-design (v5.3.0) onward.
 
 ## Standing Rule — Backlog Capture
 
-**Any feature, agent, or requirement named during a design session must be written to `docs/FEATURES.md` immediately — not deferred to session close-out.**
+**Any feature, agent, or requirement named during a design session must be written to the right feature-inventory file immediately — not deferred to session close-out.**
 
-This applies to items mentioned casually in conversation, not just items with a full spec. A one-line placeholder with ❌ Missing status is enough. Do not let the session end without the entry existing in FEATURES.md.
+This applies to items mentioned casually in conversation, not just items with a full spec. A one-line placeholder with ❌ Missing status is enough. Do not let the session end without the entry existing.
+
+**(added 2026-07-07 — 3-file split)** The feature inventory is split across three files by John's priority rule: "anything for the MI page to work, from backend to frontend, that is speed, loop, harness, and charts goes to now. Anything MI outside of that is next, and anything not related to making MI successful goes to later." — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md` (other MI), `docs/FEATURES-LATER.md` (everything else). Classify a new item into the right file when you add it; when genuinely unsure between now/next, ask John rather than guessing.
 
 ---
 
@@ -53,7 +55,7 @@ This applies to items mentioned casually in conversation, not just items with a 
 **Before any of these three: run `CLAUDE.md`'s read-only bootstrap check** (`git fetch origin dev`, compare against `git show origin/dev:<path>`) — the shared checkout's disk copy isn't kept in sync with `origin/dev`, so these three files may be stale until your own worktree exists.
 
 1. `CLAUDE-STATE.md` — current version, next session, open blockers
-2. `docs/FEATURES.md` — feature backlog and session queue
+2. `docs/FEATURES.md` — **now** feature backlog (MI speed/loop/harness/charts) and session queue. Read `docs/FEATURES-NEXT.md` (other MI backlog) or `docs/FEATURES-LATER.md` (everything else) only when the session's actual scope is there.
 3. `docs/SESSIONS.md` — session log (only if you need version history)
 
 Report back after Step 1:
@@ -91,7 +93,7 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 
 ## Step 4 — How to Generate a Kickoff Doc
 
-1. Read `docs/FEATURES.md` — confirm feature ID, status, dependencies
+1. Read `docs/FEATURES.md` — confirm feature ID, status, dependencies. If the feature isn't there, check `docs/FEATURES-NEXT.md`/`docs/FEATURES-LATER.md` before assuming it's undocumented — it may simply live in a different priority tier.
 2. Read `docs/STANDARDS.md` — confirm relevant test categories
 3. Read `docs/SESSIONS.md` — confirm current version and next session
 4. For UI work: read `docs/PRD.md` + `docs/MOCK-NOTES.md` + `docs/STYLE-GUIDE.md`
@@ -123,7 +125,7 @@ Every kickoff doc for any `api/` route must explicitly spec:
 If wiring these would push the session over 4 tasks or 3 files — split into `a` (build) and `b` (audit wiring). Never defer audit wiring to an unscheduled future session. Applies to deterministic routes too (`ai_type: 'deterministic'`).
 
 **Mandatory close-out steps (do not skip):**
-9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs (the old "session order table" at the bottom of this file was moved to `docs/SESSIONS.md` 2026-07-01 — update the session queue in `CLAUDE-STATE.md` instead, next step)
+9. Update the feature inventory file(s) that own the rows this session touched — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md`, or `docs/FEATURES-LATER.md`, whichever the feature ID actually lives in. Mark designed features, add new feature IDs to the correct now/next/later file (also update the session queue in `CLAUDE-STATE.md`, next step). The old "session order table" at the bottom of `FEATURES.md` was moved to `docs/SESSIONS.md` 2026-07-01.
 10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" as a **one-line** entry (session, version, commit, one clause on what/why), and write the session's full detail directly to `docs/SESSIONS.md` in that same commit — do not leave the full paragraph sitting in `CLAUDE-STATE.md` for a future close-out to migrate "when it's about to fall off"; that deferred-migration step is what let `CLAUDE-STATE.md` balloon past its 4.6 KB baseline before (found and fixed 2026-07-07, doc-cleanup session). Also clear resolved blockers, and delete your own bullet from "In flight now" (`CLAUDE.md` concurrent-sessions rule §8).
 11. If UI work: update `docs/STYLE-GUIDE.md` with any rules locked this session
 12. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev`
@@ -145,9 +147,9 @@ Take the Manual QA Checklist from Section 11 of the kickoff doc and verify each 
 ⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until this verification is actually done — self-verification is not a rubber stamp, it carries the same weight the John-confirmed gate used to.
 
 ### 5c — Act on QA results
-- **All PASS** → Move the feature ID's row from `docs/FEATURES.md` to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in `FEATURES.md` — that's what caused it to balloon to 127.8 KB before the 2026-07-01 cleanup), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all three to dev.
+- **All PASS** → Move the feature ID's row from whichever of `docs/FEATURES.md`/`docs/FEATURES-NEXT.md`/`docs/FEATURES-LATER.md` it actually lives in to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in any of the 3 active files — that's what caused `FEATURES.md` to balloon to 127.8 KB before the 2026-07-01 cleanup, and to 122 KB again before the 2026-07-07 now/next/later split), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all touched files to dev.
 - **Any FAIL** → Full root cause analysis first. Read complete execution path. Compare against NIGP reference. A bug that fails QA once must not fail QA twice. Generate a patch kickoff doc.
-- **New requirement found** → Add to `docs/FEATURES.md` as ❌ Missing. Commit and push.
+- **New requirement found** → Add to the correct now/next/later file as ❌ Missing (see Backlog Capture rule above). Commit and push.
 - **Either way — report the full outcome to John** before ending the session: what shipped, test results, QA results, PASS/FAIL per item.
 
 ---

@@ -71,5 +71,5 @@ Full history (all sessions before this window): `docs/SESSIONS.md` (S-ARCH-DELEG
 ### Standard Track
 > All items ✅ done (`S-MIGRATE-02` through `S-AI-ATTR-01`). Full detail: `docs/SESSIONS.md`.
 
-Full session queue and feature backlog: `docs/FEATURES.md`
+Full session queue and feature backlog: `docs/FEATURES.md` (now — MI speed/loop/harness/charts), `docs/FEATURES-NEXT.md` (other MI), `docs/FEATURES-LATER.md` (everything else)
 Full architecture decisions: `docs/ARCHITECTURE.md`
