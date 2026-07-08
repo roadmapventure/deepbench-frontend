@@ -81,7 +81,7 @@ function getSupabaseHeaders(key) {
 // completing in 33.4s had two entirely unlogged gaps (Marcus's own two turns) accounting for
 // ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
 // never touched." Generic to every capability's own turns, not capability-specific.
-async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl || !supabaseKey) return;
@@ -95,6 +95,8 @@ async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id,
       feature: `${capability_slug || 'unknown'}:${intent_slug || 'none'}:depth${depth}${api_retry_count ? `:apiRetry${api_retry_count}` : ''}`,
       model: model || null,
       latency_ms,
+      input_tokens: input_tokens ?? null,
+      output_tokens: output_tokens ?? null,
       patterns_used: is_delegate_call ? ['agent-delegation'] : [],
       created_at: new Date().toISOString(),
     }),
@@ -315,6 +317,8 @@ async function runLoop({
       capability_slug, intent_slug, agent_id, tenant_id,
       model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
       is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
+      input_tokens: turn.usage?.input_tokens ?? null,
+      output_tokens: turn.usage?.output_tokens ?? null,
     });
 
     if (!turn.is_delegate_call) {
