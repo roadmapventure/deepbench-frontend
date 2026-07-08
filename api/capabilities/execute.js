@@ -1,4 +1,4 @@
-// DeepBench v6.1.14 | api/capabilities/execute.js | AA-144 -- normalize final_delegation shape to always carry .content
+// DeepBench v6.1.15 | api/capabilities/execute.js | AA-141/AA-145 -- persist task_context across resume, handle nested checkpoint
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -23,6 +23,18 @@
 // under a `.content` key on every final_delegation result, in addition to the existing flat
 // spread, so the shape is self-describing/consistent at any recursion depth -- the same invariant
 // the ordinary sendRequest() shape already provides.
+// FEATURE: S-ARCH-DURABLE-RESUME-01 -- one root cause, two gaps, both in runLoop()/resumeCapability()
+// and the durable_hops table (AA-141 + AA-145). (1) resumeCapability() hardcoded task_context: null
+// on every resume -- durable_hops never persisted it (new jsonb column this session) -- so a
+// resumed chain's delegate hop got only a free-text task paraphrase, losing real structured data
+// (AA-145, live-confirmed: Alex's stored response literally "I don't see the raw answer data").
+// (2) runLoop()'s is_final branch had no check for a NESTED delegateResult.status === 'in_progress'
+// (the delegate's own budget ran out first) -- it fell through into buildFinalDelegationResult(),
+// which threw on missing .content, surfacing as a generic 500 and orphaning the outer durable_hops
+// row at 'in_progress' forever (AA-141's real mechanism). checkpointAndReturn() is now a shared
+// helper used at both the original top-of-loop site and this new nested-checkpoint site; resumed
+// jobs that genuinely throw are now marked 'status: failed' with a real error instead of sitting
+// orphaned -- DB bookkeeping only, the HTTP error contract is unchanged.
 
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
@@ -197,6 +209,29 @@ export function buildFinalDelegationResult({ delegateResult, targetAgentId, targ
   };
 }
 
+// FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141/AA-145) -- extracted from runLoop()'s inline top-of-loop
+// checkpoint block so a second call site (the nested is_final delegate check, below) can reuse the
+// exact same create/patch-row logic instead of duplicating it. Also the fix for AA-145: now accepts
+// and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
+// can forward the real structured task_context to a delegate instead of falling back to task-string-
+// only forwarding.
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection }) {
+  let row_id = job_id;
+  if (!row_id) {
+    const row = await createDurableHopRow({
+      tenant_id, capability_slug, intent_slug, agent_id, task_context,
+      system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
+      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens }, can_request_help: canRequestHelp,
+    });
+    row_id = row.id;
+  }
+  await patchDurableHopRow(row_id, {
+    conversation_history: conversationHistory, hop_counter: depth,
+    delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
+  });
+  return { status: 'in_progress', job_id: row_id };
+}
+
 // FEATURE: AA-139 -- the shared loop body, extracted unchanged in behavior from runCapability()'s
 // former in-place `for` loop, plus the new hybrid budget check. Takes fully explicit state, never
 // reads closure variables, so both a fresh call (runCapability(), conversationHistory: [],
@@ -220,20 +255,10 @@ async function runLoop({
     // branch can be forced deterministically; it is null (inert) in every real request.
     const remainingMs = __testBudgetMs !== null ? __testBudgetMs : (deadline - Date.now());
     if (remainingMs < HOP_BUDGET_RESERVE_MS) {
-      let row_id = job_id;
-      if (!row_id) {
-        const row = await createDurableHopRow({
-          tenant_id, capability_slug, intent_slug, agent_id,
-          system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
-          llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens }, can_request_help: canRequestHelp,
-        });
-        row_id = row.id;
-      }
-      await patchDurableHopRow(row_id, {
-        conversation_history: conversationHistory, hop_counter: depth,
-        delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
+      return checkpointAndReturn({
+        job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp,
+        task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
       });
-      return { status: 'in_progress', job_id: row_id };
     }
 
     const turnStart = Date.now();
@@ -387,6 +412,24 @@ async function runLoop({
         _deadline: deadline,
       });
 
+      // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- the real fix: a nested delegate call may
+      // itself have checkpointed (its own budget ran out inside this same request). Before this
+      // fix, an in-progress nested result fell straight into the is_final branch below, which read
+      // delegateResult.content (undefined on an in-progress shape) and threw -- the outer
+      // durable_hops row was never written, so the job was lost, not just delayed, and the frontend
+      // saw a generic 500 ("Something went wrong reaching Marcus"). Checkpointing the OUTER call
+      // here instead means the next `continue` (via resumeCapability()) resumes the outer call's
+      // own reasoning turn from persisted state -- it re-invokes the delegate fresh rather than
+      // trying to resume the nested call's own partial state, acceptable per the kickoff's own
+      // measured delegate-turn latencies (1-9s) vs. the budget-exhausting turns (~25-35s) that
+      // actually trigger this.
+      if (delegateResult.status === 'in_progress') {
+        return checkpointAndReturn({
+          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp,
+          task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
+        });
+      }
+
       // FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- is_final terminates the loop here,
       // returning the delegate's own output as the final result, attributed to them, instead of
       // feeding back for the delegator's own next turn. selection is null (never fabricated) when
@@ -534,25 +577,36 @@ export async function resumeCapability({ job_id }) {
   };
   const deadline = Date.now() + 60000 - SAFETY_MARGIN_MS;
 
-  return runLoop({
-    capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
-    // FEATURE: AA-126 -- durable_hops does not persist the original task_context (AA-138's schema,
-    // unchanged). A delegate_to_agent hop that fires *after* a resume falls back to task-string-only
-    // forwarding -- the pre-existing behavior, not a regression -- same accepted-gap class as the
-    // requiresHumanConfirmation/critique/display fields already left unpersisted by AA-139.
-    task_context: null,
-    enriched, canRequestHelp: row.can_request_help,
-    // FEATURE: AA-142 -- durable_hops does not persist delegationRequired (same accepted-gap
-    // class as task_context/requiresHumanConfirmation/critique/display fields left unpersisted by
-    // AA-126/AA-139). A resumed chain's post-checkpoint hop runs without this guard -- pre-existing
-    // behavior, not a regression; real need to persist it can be its own future session.
-    delegationRequired: false,
-    requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
-    display_agent_id: null, display_agent_card: null,
-    conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
-    lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
-    deadline, job_id: row.id,
-  });
+  try {
+    return await runLoop({
+      capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+      // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-145) -- durable_hops now persists the original
+      // task_context (this session's migration adds the column, and Task 2/3 thread it into every
+      // createDurableHopRow() call). A delegate_to_agent hop that fires after a resume now forwards
+      // the real structured task_context instead of falling back to task-string-only forwarding --
+      // fixes the live-confirmed AA-145 data-loss bug (Alex's "I don't see the raw answer data").
+      task_context: row.task_context ?? null,
+      enriched, canRequestHelp: row.can_request_help,
+      // FEATURE: AA-142 -- durable_hops does not persist delegationRequired (same accepted-gap
+      // class as requiresHumanConfirmation/critique/display fields left unpersisted by AA-139).
+      // A resumed chain's post-checkpoint hop runs without this guard -- pre-existing behavior, not
+      // a regression; real need to persist it can be its own future session.
+      delegationRequired: false,
+      requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
+      display_agent_id: null, display_agent_card: null,
+      conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
+      lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
+      deadline, job_id: row.id,
+    });
+  } catch (e) {
+    // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- DB bookkeeping only: a genuinely-failed resumed
+    // job previously sat at status 'in_progress' forever (orphaned), even though the schema's own
+    // check constraint already includes 'failed'. This does not change the existing HTTP error
+    // contract/500 response -- the error is re-thrown unchanged, only the row is marked so it stops
+    // looking like a live, resumable job.
+    await patchDurableHopRow(job_id, { status: 'failed', error: e.message });
+    throw e;
+  }
 }
 
 // FEATURE: AA-103 -- accept resolution, exported separately so the Node.js test can call it
