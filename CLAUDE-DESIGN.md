@@ -52,7 +52,7 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 ## Step 1 — Orient (read these, in order, stop when you have enough)
 
-**Before any of these three: run `CLAUDE.md`'s read-only bootstrap check** (`git fetch origin dev`, compare against `git show origin/dev:<path>`) — the shared checkout's disk copy isn't kept in sync with `origin/dev`, so these three files may be stale until your own worktree exists.
+**Before any of these three: run `CLAUDE.md`'s read-only bootstrap check** (`git fetch origin dev`, then read `git show origin/dev:<path>` directly — don't diff it against the local file, CRLF/LF line-ending differences make a literal diff show "changed" even with zero real drift) — the shared checkout's disk copy isn't kept in sync with `origin/dev`, so these three files may be stale until your own worktree exists.
 
 1. `CLAUDE-STATE.md` — current version, next session, open blockers
 2. `docs/FEATURES.md` — **now** feature backlog (MI speed/loop/harness/charts) and session queue. Read `docs/FEATURES-NEXT.md` (other MI backlog) or `docs/FEATURES-LATER.md` (everything else) only when the session's actual scope is there.
