@@ -774,6 +774,13 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   } catch (e) {
     console.error('[execute] error:', e);
-    return res.status(e.status || 500).json({ error: e.message });
+    // FEATURE: AA-158 -- mirror request-receivable.js's own handler (line ~494), which already
+    // does this correctly. execute.js imports callModel()/sendRequest() from request-receivable.js
+    // directly (function calls, not HTTP) and every MI-screen capability call routes exclusively
+    // through THIS handler, never through request-receivable.js's own -- so any error thrown with a
+    // .detail field anywhere in the runCapability() call graph (AA-157's retry-rejection detail,
+    // AA-147's schema-validation errors, any future .detail-carrying throw) was silently dropped on
+    // the only response path that matters, since before .detail existed anywhere in this codebase.
+    return res.status(e.status || 500).json({ error: e.message, ...(e.detail ? { detail: e.detail } : {}) });
   }
 }
