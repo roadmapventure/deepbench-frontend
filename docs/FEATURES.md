@@ -36,6 +36,14 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 
 ---
 
+## OVERNIGHT ROOT-CAUSE SESSION — 2026-07-08/09 (John's explicit go-ahead, autonomous)
+
+| ID | Type | Feature | Status | Session |
+|----|------|---------|--------|---------|
+| AA-170 | Speed | **2-minute ship-target latency verdict.** After landing `AA-151`/`AA-167`/`AA-168`/`AA-166`/`AA-155` (this session), ran the actual 3 Apple demo seed questions (`EXAMPLE_QUESTIONS`, `MarketIntelligenceScreen.jsx:44-47` — Japan GEO, EMEA co-op, Vietnam reseller) through a faithful replica of the real client call sequence (`ci-routing-intent` → `ci-answer-intent` → `qg-review-intent` → `ci-answer-display-intent`, including Michelle's/Alex's internal hops), 6 total attempts across all 3 questions. **Result: 5/6 clean completions in 35-76 seconds each, real headline/body/citations, correct confidence tiers — comfortably under the 2-minute target with margin to spare.** The 1/6 non-completion was `qg-review-intent` correctly blocking a genuinely flawed regenerated answer (this is `AA-155`'s failure mode, now separately fixed) — not a hang, not a crash, still returned to the user in 76s. **Verdict: no harness/architecture rewrite is needed to hit the 2-minute target.** `AA-124`'s "~50s of real LLM work inside a 60s-budgeted request" finding is real but describes a single serverless function's internal execution budget, not end-to-end user-visible latency — the existing durable-checkpoint/resume mechanism (`AA-138`/`AA-141`/`AA-145`) already exists to span a hop chain across multiple function invocations when needed, and none of these 6 live runs even triggered an `in_progress` checkpoint. `AA-159`'s finding (Michelle's `agent-selection-intent` + Owen's `qg-review-intent` as the #3/#4 platform-wide time sinks by call volume) remains a legitimate cost/efficiency optimization for later, but is not currently blocking ship-readiness — every hop already completes fast enough that removing them would save seconds, not minutes. The dominant lever really was reliability (silent schema-validation failures forcing retries/hangs), exactly as this session's fixes targeted — not request-budget architecture. Recommend `AA-124`/`AA-159` stay queued as post-ship efficiency work, not urgent pre-demo blockers. | ✅ Verdict reached, measured | Overnight session 2026-07-08/09 |
+
+---
+
 ## MARKET INTELLIGENCE — MI (now: charts)
 > Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md` (supersedes v1/v2/v3-spec — retired)
 > Third AppShell tab, default landing route after splash. Center-screen content per `market-intelligence-v4.html` (its simulated top/bottom nav is not used — real DeepBench nav applies).
