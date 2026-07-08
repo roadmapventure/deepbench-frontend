@@ -197,7 +197,18 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
       if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
       llmData = await retryRes.json();
       usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
-      turn = parseModelTurn(llmData, hasSchemaTool, schemaTool);
+      // FEATURE: AA-151 -- the retry HTTP call can now succeed (AA-150's tool_result fix) while the
+      // model's retried response still fails validation itself (e.g. omits a required schema field
+      // again). This second parseModelTurn() call was previously unguarded, so that failure propagated
+      // uncaught as a raw error (an unhandled 500) instead of the graceful "retry also failed" 422 this
+      // whole block exists to produce. Confirmed live: agent-selection-intent missing
+      // recommended_agent_id, intelligence-review-format missing key_data_points/override_warning, both
+      // on the retried attempt, ~40-60% of Priya's hyp-hypothesis-test-display-intent calls.
+      try {
+        turn = parseModelTurn(llmData, hasSchemaTool, schemaTool);
+      } catch (retryParseErr) {
+        throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryParseErr.message });
+      }
     } else {
       throw Object.assign(new Error('Parse failed'), { status: 422, detail: parseErr.message });
     }
