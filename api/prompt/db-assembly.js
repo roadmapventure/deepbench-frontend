@@ -1,4 +1,4 @@
-// DeepBench v6.0.34 | api/prompt/db-assembly.js | AA-127 — global VOICE section
+// DeepBench v6.1.13 | api/prompt/db-assembly.js | AA-142 — delegationRequired passthrough
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
@@ -33,6 +33,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
   let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
   let llm = { ...DEFAULT_LLM };
   let canRequestHelp = false;
+  let delegationRequired = false;
   let requiresHumanConfirmation = false;
   let critiqueCapabilitySlug = null;
   let critiqueIntentSlug = null;
@@ -142,6 +143,14 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
         if (traits.can_request_help === true) {
           canRequestHelp = true;
         }
+        // FEATURE: AA-142 -- delegation_required passthrough, same shape as can_request_help
+        // directly above. Marks an intent whose entire job is completing a hand-off via
+        // request_help/delegate_to_agent -- never a legitimate direct-text answer (unlike e.g.
+        // hyp-stress-test-intent, which can validly answer in text). Read by execute.js's runLoop()
+        // to catch the model narrating its hand-off instead of completing it.
+        if (traits.delegation_required === true) {
+          delegationRequired = true;
+        }
         if (traits.requires_human_confirmation === true) {
           requiresHumanConfirmation = true;
           critiqueCapabilitySlug = traits.critique_capability_slug || null;
@@ -238,7 +247,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
-  return { sections, formatContract, synthesis, llm, canRequestHelp, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug };
+  return { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug };
 }
 
 function buildLabel(typeSlug, name) {
@@ -275,6 +284,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       synthesis: DEFAULT_SYNTHESIS,
       llm: DEFAULT_LLM,
       canRequestHelp: false,
+      delegationRequired: false,
       requiresHumanConfirmation: false,
       critiqueCapabilitySlug: null,
       critiqueIntentSlug: null,
@@ -394,7 +404,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, canRequestHelp, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used
@@ -501,6 +511,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     synthesis,
     llm,
     canRequestHelp,
+    delegationRequired,
     requiresHumanConfirmation,
     critiqueCapabilitySlug,
     critiqueIntentSlug,

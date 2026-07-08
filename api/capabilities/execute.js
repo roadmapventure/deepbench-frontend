@@ -1,4 +1,4 @@
-// DeepBench v6.1.7 | api/capabilities/execute.js | S-ARCH-DELEGATION-FIDELITY-01 — forward real task_context through delegate_to_agent, fail loudly on empty final delegation
+// DeepBench v6.1.13 | api/capabilities/execute.js | AA-142 — delegation_required retry-once-then-fail-loudly guard
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -169,11 +169,13 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
 // job_id: row.id) share this one implementation. No second copy of the loop logic anywhere.
 async function runLoop({
   capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+  delegationRequired,
   requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
   display_agent_id, display_agent_card,
   conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
   job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
 }) {
+  let delegationRetried = false;
   for (let depth = hopCounter.n; ; depth++) {
     // FEATURE: AA-139 -- the hybrid trigger. Checked before every hop, not just once: a chain
     // that's already spent most of its budget on earlier hops checkpoints here instead of risking
@@ -215,6 +217,31 @@ async function runLoop({
     });
 
     if (!turn.is_delegate_call) {
+      // FEATURE: AA-142 -- delegationRequired intents (ci-answer-display-intent,
+      // hyp-hypothesis-test-display-intent) must always complete via request_help/delegate_to_agent
+      // -- their entire job is handing off, never answering directly. tool_choice:'auto' (harness
+      // tools present) + AA-97's legitimate text-completion path (for intents that CAN validly
+      // answer in text, e.g. hyp-stress-test-intent) together let the model narrate its intended
+      // hand-off in prose instead of completing it -- previously accepted as an ordinary final
+      // answer with no distinction. Retry once with a direct correction (same one-retry shape as
+      // AA-113's transient-API-error retry, different failure class); fail loudly on a second
+      // occurrence rather than silently presenting narration as a real answer, same "fail safe,
+      // never fake" principle as AA-108/AA-126. Deliberately inert for any capability that never
+      // declares delegation_required -- a capability that can legitimately answer in text (no
+      // schema, can_request_help, delegation_required NOT set) is completely unaffected.
+      if (delegationRequired && !delegationRetried) {
+        delegationRetried = true;
+        conversationHistory = [
+          ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
+          { role: 'assistant', content: turn.raw_content },
+          { role: 'user', content: 'You responded with plain text describing your intended hand-off instead of actually completing it. This task must always be completed by calling request_help, then delegate_to_agent -- call the appropriate tool now, do not describe your plan in words.' },
+        ];
+        continue;
+      }
+      if (delegationRequired && delegationRetried) {
+        throw new Error(`${capability_slug}/${intent_slug}: agent ended its turn with a text response instead of completing a required delegation, twice in a row (depth ${depth})`);
+      }
+
       // FEATURE: AA-87 -- consequential-action gate now lives on the capability's own final
       // output (its own Intent Skill Profile traits), not the deleted delegate-object shape.
       // Critique dispatch resolves live via resolveCapabilityHolder(), same as request_help
@@ -435,6 +462,7 @@ export async function runCapability({
   // (db-assembly's raw output), never from `enriched` -- same reason the old `delegates` field
   // bypassed it: ai-enrichment.js rebuilds its own return object and drops unknown fields.
   const canRequestHelp = promptRequest.canRequestHelp === true;
+  const delegationRequired = promptRequest.delegationRequired === true;
   const requiresHumanConfirmation = promptRequest.requiresHumanConfirmation === true;
   const critiqueCapabilitySlug = promptRequest.critiqueCapabilitySlug || null;
   const critiqueIntentSlug = promptRequest.critiqueIntentSlug || null;
@@ -446,6 +474,7 @@ export async function runCapability({
 
   return runLoop({
     capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+    delegationRequired,
     requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
     display_agent_id, display_agent_card,
     conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
@@ -485,6 +514,11 @@ export async function resumeCapability({ job_id }) {
     // requiresHumanConfirmation/critique/display fields already left unpersisted by AA-139.
     task_context: null,
     enriched, canRequestHelp: row.can_request_help,
+    // FEATURE: AA-142 -- durable_hops does not persist delegationRequired (same accepted-gap
+    // class as task_context/requiresHumanConfirmation/critique/display fields left unpersisted by
+    // AA-126/AA-139). A resumed chain's post-checkpoint hop runs without this guard -- pre-existing
+    // behavior, not a regression; real need to persist it can be its own future session.
+    delegationRequired: false,
     requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
     display_agent_id: null, display_agent_card: null,
     conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
