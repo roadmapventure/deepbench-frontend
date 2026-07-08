@@ -142,6 +142,8 @@ Mandatory M tests:
 
 **Scoping breadth for Category L when a session applies an already-proven mechanism to more data of the same shape (added 2026-07-02, `S-ARCH-AGENT-LOOP-03`):** a full live multi-turn round trip is required for whatever's genuinely novel in the session — a mechanism path, tool combination, or schema interaction not yet exercised live before. It is not required, one-for-one, for every additional data row that reapplies a mechanism already proven live by a prior session on a structurally identical shape. `S-ARCH-AGENT-LOOP-03` ran 4 full live L-tests (25 min, repeated 55s-timeout retries) when 3 of the 4 (`ci-routing-intent`, `intake-commit-intent`, `intake-failure-intent`) re-exercised the exact `can_request_help`/`request_help` path already proven live twice by `S-ARCH-AGENT-LOOP-02`/`S-ARCH-LOOP-PATCH-02` on the same schema shape — only the 4th (`qg-review-intent`'s novel `delegate_to_agent`-from-`task_context` path) carried real incremental risk. Category F (schema/data alignment, cheap and deterministic) still applies to every row regardless; reserve the expensive full live round trip for the case(s) actually establishing new behavior.
 
+**Loop-closure proof specificity (added 2026-07-08, found during `AA-110`'s investigation into `S-APPLE-05`'s Category L test):** when a live test's pass condition is "does the downstream agent's output reflect a new write," the proof must be uniquely traceable to that specific write — not a generic keyword or theme also reachable from pre-existing seeded content. Root cause: `S-APPLE-05`'s loop-closure check searched Marcus's answer for the word "enablement" as proof his response depended on Elena's new `the_reasoning` write — but "enablement" is an existing theme in the seeded Data Room, so Marcus can (and does) say it from pre-existing content alone, with zero dependency on the new write. A tighter proof checks for content verbatim or near-verbatim to the specific new entry, or a direct citation to that entry's row id (`the_reasoning.id` / `the_library.id`), not a generic subject-matter keyword.
+
 How to run: `node --env-file=.env.local test-[session-id]-api.mjs`
 Requires `ANTHROPIC_API_KEY` in `.env.local`. Delete before committing.
 
@@ -259,6 +261,7 @@ Complete every item before committing. This is the canonical "standing checklist
 ### Category L — Live API Integration
 - [ ] Live API test file written and run before commit
 - [ ] `test-[session]-api.mjs` deleted before commit
+- [ ] Loop-closure/round-trip live tests check for content uniquely tied to the new write (verbatim phrasing or a direct row-id citation) — not a generic keyword also reachable from pre-existing seeded data
 - [ ] `PLAN API: PASS` confirmed in test output
 - [ ] `TITLE API: PASS` confirmed (if title.js involved)
 - [ ] Retry logic tested: empty → retry → success path confirmed
@@ -369,6 +372,7 @@ Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps
 | 2026-07-02 | Section 1 strengthened — version must strictly increment every session, never be reused. Root cause: 4 consecutive sessions (`S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, `S-ARCH-LOOP-PATCH-01`) all stamped `v6.0.0` because the kickoff-doc checklist only said to confirm the current version, not increment it. `CLAUDE-DESIGN.md` Step 4 now has an explicit version-assignment step. |
 | 2026-07-02 | Category L scoping breadth guidance added — full live round trips required for genuinely novel mechanism paths, not one-for-one for every data row reapplying an already-proven mechanism to a structurally identical shape. Root cause: `S-ARCH-AGENT-LOOP-03` ran 4 full live tests (25 min, repeated 55s-timeout retries) for a 4-row data-only session where 3 rows re-exercised a mechanism already proven live twice by prior sessions — only 1 row (`qg-review-intent`'s `delegate_to_agent`-from-`task_context` path) was actually novel. |
 | 2026-07-07 | Mandatory root cause protocol gains Step 1 (renumbering the rest) — check `https://status.claude.com/api/v2/summary.json` for an Anthropic-side incident (Claude API / Claude Sonnet / Claude Code) overlapping the failure's timestamp before doing any code-level root-causing. Root cause: John gets Claude status-page incident emails and had no standing step connecting them to QA-failure diagnosis — an upstream incident could otherwise get root-caused as a DeepBench code defect. |
+| 2026-07-08 | Category L strengthened — loop-closure proof specificity requirement. Root cause: `AA-110`/`S-APPLE-05`'s "enablement" keyword check was satisfiable from pre-existing seeded content, not uniquely tied to the new write being tested. |
 
 ---
 
