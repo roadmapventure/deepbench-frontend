@@ -177,9 +177,21 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   } catch (parseErr) {
     if (tools.length > 0) {
       retryCount = 1;
+      // FEATURE: AA-150/AA-151 -- Anthropic's API requires a tool_result block immediately after any
+      // assistant turn containing a tool_use block. The prior corrective message was always plain text,
+      // which Anthropic rejects with a 400 whenever the failed turn included a tool_use -- true for
+      // effectively every JSON/schema intent and any canRequestHelp intent, making this "retry once"
+      // safety net a silent no-op in the majority of real cases (confirmed live: 10% of Owen's
+      // qg-review-intent calls, 80% of Priya's hyp-hypothesis-test-display-intent calls). Reuses the
+      // exact tool_result shape execute.js:543 already uses for delegate-hop resume, not a new pattern.
+      const correctionText = 'Your response did not conform to the required schema. Please try again and return the structured output exactly as specified.';
+      const failedToolUse = llmData.content?.find(b => b.type === 'tool_use');
+      const correctionMessage = failedToolUse
+        ? { role: 'user', content: [{ type: 'tool_result', tool_use_id: failedToolUse.id, content: correctionText, is_error: true }] }
+        : { role: 'user', content: correctionText };
       const retryBody = {
         ...callBody,
-        messages: [...callBody.messages, { role: 'assistant', content: llmData.content }, { role: 'user', content: 'Your response did not conform to the required schema. Please try again and return the structured output exactly as specified.' }],
+        messages: [...callBody.messages, { role: 'assistant', content: llmData.content }, correctionMessage],
       };
       const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(55000) });
       if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
