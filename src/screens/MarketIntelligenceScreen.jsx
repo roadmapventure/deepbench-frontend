@@ -1,3 +1,4 @@
+// DeepBench v6.1.21 | MarketIntelligenceScreen.jsx | S-MI-29/MI-29 — three silent-reset async catch blocks (enterHypothesisFlow/onSelectHypothesis/onCommit) now surface the real e.message as a chat error bubble and a Pipeline Log "error" row (T.flag), matching the pattern onSend's catch already used
 // DeepBench v6.1.11 | MarketIntelligenceScreen.jsx | S-MI-27/MI-27+MI-28 — Submitted Hypothesis card gets a "Submitted by You" attribution row (UserAvatar); AI - Hypothesis Test header swapped to actor-first order (Priya Nair · AI - Hypothesis Test), matching the Q&A card's existing order
 // DeepBench v6.1.10 | MarketIntelligenceScreen.jsx | S-MI-26/MI-26 — Data Sources drawer: section headers (Sourced/Simulation/category) bumped to 12.5px matching row title size, DataSourceRow title dropped to fontWeight:400
 // DeepBench v6.1.9 | MarketIntelligenceScreen.jsx | S-MI-25/MI-25 — Data Sources drawer: section headers (Sourced/Simulation/category) swapped to T.ink, DataSourceRow title swapped to T.muted
@@ -229,6 +230,11 @@ function describePipelineEvent(evt) {
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
       return { capability: "hypothesis-evaluation", summary: `Generated ${evt.data.candidates?.length ?? 0} hypothesis candidate${evt.data.candidates?.length === 1 ? "" : "s"}`, color: T.moss };
+    // FEATURE: MI-29 -- surfaces the real caught error (e.message) in the existing Pipeline Log
+    // instead of it only ever reaching a devtools-only console.error. Reuses T.flag, the same
+    // alert color already used for guardrail "block" results above -- no new color introduced.
+    case "error":
+      return { capability: evt.data.step || null, summary: `Failed: ${evt.data.message}`, color: T.flag };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -1128,7 +1134,10 @@ export default function MarketIntelligenceScreen() {
       logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates }, durationMs: Date.now() - t0 });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
     } catch (e) {
+      // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
+      logEvent({ type: "error", agentId: "priya", data: { step: "hypothesis_generation", message: e.message }, durationMs: Date.now() - t0 });
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong generating hypotheses — try again.", kind: "error" }]);
       setHypFlow(null);
     } finally {
       setWorkingStatus(null);
@@ -1192,7 +1201,10 @@ export default function MarketIntelligenceScreen() {
       setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id }]);
       setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
     } catch (e) {
+      // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
+      logEvent({ type: "error", agentId: "priya", data: { step: "hypothesis_test_display", message: e.message }, durationMs: Date.now() - t0 });
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong running that hypothesis test — try again.", kind: "error" }]);
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
     } finally {
       setWorkingStatus(null);
@@ -1212,13 +1224,15 @@ export default function MarketIntelligenceScreen() {
     if (!hypFlow) return;
     const { flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
     setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
+    // FEATURE: MI-29 -- t0/step hoisted above try so the catch block can log which agent was running
+    let t0 = Date.now();
+    let step = "memory_consolidation";
     try {
       const disputedChunkId = Array.isArray(citations) && citations.length === 1 ? citations[0] : null;
       const hypothesisTestText = hypothesisTest
         ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
 
-      let t0 = Date.now();
       setWorkingStatus({ message: "Elena is consolidating this into memory…", startedAt: t0 });
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
@@ -1230,6 +1244,7 @@ export default function MarketIntelligenceScreen() {
       });
       logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
 
+      step = "patch_proposed";
       t0 = Date.now();
       setWorkingStatus({ message: "Nadia is drafting a data patch…", startedAt: t0 });
       const nadiaResult = await callCapability({
@@ -1252,7 +1267,10 @@ export default function MarketIntelligenceScreen() {
         },
       }));
     } catch (e) {
+      // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
+      logEvent({ type: "error", agentId: step === "memory_consolidation" ? "elena" : "nadia", data: { step, message: e.message }, durationMs: Date.now() - t0 });
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong committing that — try again.", kind: "error" }]);
       setHypFlow(prev => prev && ({ ...prev, stage: "result" }));
     } finally {
       setWorkingStatus(null);
