@@ -1,4 +1,4 @@
-// DeepBench v6.1.13 | api/capabilities/execute.js | AA-142 — delegation_required retry-once-then-fail-loudly guard
+// DeepBench v6.1.14 | api/capabilities/execute.js | AA-144 -- normalize final_delegation shape to always carry .content
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -15,6 +15,14 @@
 // checkpoint state to durable_hops and return control to the caller instead of recursing
 // further. lib/durable-loop-poc.js (AA-138's isolated proof copy) is retired by this session —
 // ARCHITECTURE.md §19b bans two live copies of shared pipeline loop logic.
+// FEATURE: AA-144 -- fixes AA-126's empty-content guard misfiring on a NESTED final_delegation.
+// delegateResult may itself be a flat final_delegation-shaped object (no `.content` key) when an
+// is_final hand-off recurses into a second is_final hand-off -- the guard read `undefined` and
+// threw "returned no content" even though the nested call produced perfectly good content, just
+// spread flat instead of nested. buildFinalDelegationResult() now always mirrors the real content
+// under a `.content` key on every final_delegation result, in addition to the existing flat
+// spread, so the shape is self-describing/consistent at any recursion depth -- the same invariant
+// the ordinary sendRequest() shape already provides.
 
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
@@ -160,6 +168,33 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
   const displayAgentCard = display_agent_id ? await fetchAgentCard(display_agent_id, headers, supabaseUrl) : null;
 
   return { formatContract, formatSection, displayAgentCard };
+}
+
+// FEATURE: AA-144 -- extracted from runLoop()'s inline is_final block so the shape-normalization
+// fix below is unit-testable without hitting Supabase/Anthropic. Fixes AA-126's empty-content
+// guard misfiring on a NESTED final_delegation: delegateResult may itself be a flat
+// final_delegation-shaped object (no `.content` key) when an is_final hand-off recurses into a
+// second is_final hand-off. The single-line fix: always mirror the real content under a `.content`
+// key on every final_delegation result, in addition to the existing flat spread -- this makes the
+// shape self-describing/consistent at any recursion depth, so a nested guard check (or any future
+// reader) can rely on `.content` being populated whenever real content exists, same invariant the
+// ordinary sendRequest() shape already provides. The flat spread is unchanged -- byte-identical to
+// today for the frontend (MarketIntelligenceScreen.jsx's callCapability() returns `result` verbatim
+// whenever `result.status` is set, so an added `content` key is additive, never breaking).
+export function buildFinalDelegationResult({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, finalPatterns, displayAgentCard, lastHelpSelection }) {
+  const content = delegateResult.content;
+  if (!content || Object.keys(content).length === 0) {
+    throw new Error(`delegate_to_agent: ${targetAgentId}/${targetCapabilitySlug}${targetIntentSlug ? '/' + targetIntentSlug : ''} returned no content for a final delegation (violations: ${JSON.stringify(delegateResult.violations || [])})`);
+  }
+  return {
+    status: 'final_delegation',
+    content,
+    ...content,
+    patterns_used: finalPatterns,
+    display_agent_card: displayAgentCard,
+    display_agent_id: targetAgentId,
+    selection: lastHelpSelection,
+  };
 }
 
 // FEATURE: AA-139 -- the shared loop body, extracted unchanged in behavior from runCapability()'s
@@ -368,13 +403,6 @@ async function runLoop({
         // for the frontend to tell an empty card from a legitimate response. Same "fail safe, never
         // fake" principle as AA-108's assemblePrompt() guard -- a genuine platform fault, not
         // something the calling agent is expected to gracefully recover from.
-        if (!delegateResult.content || Object.keys(delegateResult.content).length === 0) {
-          throw new Error(`delegate_to_agent: ${targetAgentId}/${targetCapabilitySlug}${targetIntentSlug ? '/' + targetIntentSlug : ''} returned no content for a final delegation (violations: ${JSON.stringify(delegateResult.violations || [])})`);
-        }
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-        const headers = getSupabaseHeaders(supabaseKey);
-        const card = await fetchAgentCard(targetAgentId, headers, supabaseUrl);
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own
         // structured output (e.g. qa-answer-format's headline/body/citations/...); spread at the
         // top level here, same place callers already read it after callCapability()'s existing
@@ -387,14 +415,14 @@ async function runLoop({
         // (delegationOccurred is already true in this loop's own scope), regardless of whether the
         // delegate itself further delegated.
         const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
-        const finalResult = {
-          status: 'final_delegation',
-          ...delegateResult.content,
-          patterns_used: finalPatterns,
-          display_agent_card: card,
-          display_agent_id: targetAgentId,
-          selection: lastHelpSelection,
-        };
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        const headers = getSupabaseHeaders(supabaseKey);
+        const finalResult = buildFinalDelegationResult({
+          delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug,
+          finalPatterns, displayAgentCard: await fetchAgentCard(targetAgentId, headers, supabaseUrl),
+          lastHelpSelection,
+        });
         if (job_id) {
           await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
         }
