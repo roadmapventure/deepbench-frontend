@@ -170,6 +170,7 @@ use different LLMs and different budgets.
 | `llm_model` | `skill_profiles.llm_model` | 'claude-haiku-4-5' · 'claude-sonnet-4-6' · etc. |
 | `max_tokens` | `skill_profiles.max_tokens` | Token budget ceiling for this Skill's LLM call |
 | `api_key_source` | `skill_profiles.api_key_source` | 'platform' · 'byok' |
+| `temperature` | `skill_profiles.temperature` | Optional, `null` by default (Anthropic's own default applies, omitted from the call body entirely when unset). Added `AA-154`/`S-ARCH-TEMPERATURE-01` (v6.1.26) — set explicitly (e.g. `0`) on structured/analytical calls where sampling diversity is undesirable, same opt-in pattern as `llm_model`/`max_tokens`. |
 
 **DeepBench default** (when no Skill Profile specifies an LLM):
 - Provider: Anthropic
@@ -763,6 +764,7 @@ tools:       [format_contract.schema as tool def]
 tool_choice: { type: "any" }   ← only when output_type is json/dashboard
 max_tokens:  builder_output.llm.max_tokens
 model:       builder_output.llm.model
+temperature: builder_output.llm.temperature   ← omitted entirely when unset (Anthropic default applies)
 stream:      resolved streaming flag (after auto-override)
 ```
 
