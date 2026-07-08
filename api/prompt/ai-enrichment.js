@@ -1,4 +1,4 @@
-// DeepBench v6.0.12 | api/prompt/ai-enrichment.js | AA-107 -- the_library + the_reasoning both route through lib/search-harness.js
+// DeepBench v6.1.32 | api/prompt/ai-enrichment.js | AA-107 -- the_library + the_reasoning both route through lib/search-harness.js
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
@@ -35,7 +35,7 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
       // branch for either value -- same "exactly one path" posture AG-30 established for the_library.
       const result = fi.source === "roster"
         ? await fetchWithTimeout(getRosterCandidates({ requestingAgentId }), RAG_TIMEOUT_MS)
-        : (fi.source === "the_library" || fi.source === "the_reasoning")
+        : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog")
         ? await fetchWithTimeout(
             queryContent({
               requestingAgentId,
@@ -61,7 +61,7 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
-        _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
+        _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
         _librarian_tier: result._librarian?.tier || result._access?.tier || null,
       };
     } catch (e) {
