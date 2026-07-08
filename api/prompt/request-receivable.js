@@ -87,10 +87,28 @@ function buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRe
 // S-ARCH-AGENT-LOOP-02 (Priya's hyp-stress-test-intent, first real profile to combine
 // can_request_help with no schema). No ARCHITECTURE.md change -- §19d never required a schema
 // alongside can_request_help, this is a parser gap, not a design change. ARCHITECTURE.md §19d.
-export function parseModelTurn(responseData, hasSchemaTool) {
+// FEATURE: AA-147 -- validates a schema-tool call's required fields before accepting it. Needed
+// because tool_choice is 'auto' (not forced) whenever harness tools are also offered (buildCallBody(),
+// ~line 75) -- the model can technically satisfy "call a tool" by calling its own schema tool with an
+// empty or partial input object, which previously passed straight through to sendRequest() and got
+// written to a deliverable with missing/undefined content, no error surfaced anywhere (confirmed live
+// in S-MARKET-INTEL-01a). Reuses callModel()'s existing retry-once-then-throw path below by throwing
+// the same class of error as "No tool_use block in response" -- no new retry logic. Presence-only
+// check (does the key exist on the input object) -- does not reject a legitimately empty string/array
+// on a required field, only a field missing entirely. request_help/delegate_to_agent calls are exempt
+// -- their own required-field completeness is a separate, pre-existing concern, out of this session's
+// scope.
+export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
   const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
   if (toolUseBlock) {
     const isHarnessTool = toolUseBlock.name === 'request_help' || toolUseBlock.name === 'delegate_to_agent';
+    if (!isHarnessTool && schemaTool && toolUseBlock.name === schemaTool.name) {
+      const required = schemaTool.input_schema?.required || [];
+      const missing = required.filter(key => !(key in (toolUseBlock.input || {})));
+      if (missing.length > 0) {
+        throw new Error(`Schema tool "${schemaTool.name}" called with missing required field(s): ${missing.join(', ')}`);
+      }
+    }
     return {
       is_delegate_call: isHarnessTool,
       tool_name: toolUseBlock.name,
@@ -155,7 +173,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   let turn;
 
   try {
-    turn = parseModelTurn(llmData, hasSchemaTool);
+    turn = parseModelTurn(llmData, hasSchemaTool, schemaTool);
   } catch (parseErr) {
     if (tools.length > 0) {
       retryCount = 1;
@@ -167,7 +185,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
       if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
       llmData = await retryRes.json();
       usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
-      turn = parseModelTurn(llmData, hasSchemaTool);
+      turn = parseModelTurn(llmData, hasSchemaTool, schemaTool);
     } else {
       throw Object.assign(new Error('Parse failed'), { status: 422, detail: parseErr.message });
     }
