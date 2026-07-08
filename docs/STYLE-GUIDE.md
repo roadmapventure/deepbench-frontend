@@ -533,10 +533,19 @@ One shared mapping (name TBD by the coding session, lives in `MarketIntelligence
 
 ---
 
+## Section 20 — Chat Card Conventions: Actor-First Headers + Human Attribution (Locked 2026-07-07 · S-MI-27-design)
+
+**AI-generated card headers are actor-first, always.** Any Market Intelligence chat card attributing content to a specific agent renders `<Agent Name> · <Capability/Label>` — name before label — so the header reads like a real chat participant, not a capability log line. Locked after `MI-28` corrected the Hypothesis Test card's header (`AI - Hypothesis Test · Priya Nair`) to match the Q&A card's pre-existing order (`Marcus Webb · Channel Intelligence`). Any future AI-card header on this screen follows this order; the Q&A card's shape is the reference, not the exception.
+
+**`UserAvatar` (`SharedUI.jsx`) is the canonical human/non-agent attribution component — deliberately outside Section 17's scope.** Section 17's avatar-mandatory rule requires `AgentAvatar` for any *agent* attribution; it does not apply to content the human themselves authored (e.g. a submitted hypothesis). `UserAvatar` is a plain navy circle + simple silhouette — never an illustrated `AgentAvatar` portrait, and never backed by `AVATAR_CFG`/a roster entry — so it reads unmistakably as "not an agent" at a glance. Use it for any future human-authored chat content that needs attribution; do not extend `AgentAvatar`/`AVATAR_CFG` with a fake "you" entry to solve this instead.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-07 | S-MI-27-design | Section 20 added — AI-card headers locked actor-first (name before capability label); `UserAvatar` locked as the canonical human-attribution component, explicitly outside Section 17's agent-only scope. |
 | 2026-07-07 | S-BENCH-FILTER-01-design | Section 10 note added — Left Sidebar Nav Pattern confirmed reusable beyond Personnel File: `RosterScreen.jsx` adopts it for the new RO-10 category filter nav, same 180px width. |
 | 2026-07-07 | S-MI-15-design | Section 19 added — Data Type/Confidence Tier display-label relabel locked: `inferred`/non-baseline-`synthesized` → "Analysis" (with Human/AI who-tag from `source`), baseline-`synthesized` → "Source Simulation", `sourced`/`learned` unchanged. Display-only — zero backend/schema change. |
 | 2026-06-08 | S-MIGRATE-UX | Treasury palette locked, left nav pattern locked |
