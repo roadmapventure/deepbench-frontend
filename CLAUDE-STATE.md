@@ -5,7 +5,8 @@
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
-**In flight now:** none.
+**In flight now:**
+- `S-ARCH-DELEGATION-REQUIRED-02` (`AA-148`, v6.1.20) — fixing the live-reproduced Q&A narration-leak bug John reported 2026-07-08 (worktree `aa142-display-hop-final-01`).
 
 **Next session (queued behind this one):** John's confirmed priority: `AA-121` (RAG gating waste) next, then a decision conversation on `AA-124` (structural latency fix vs. trim). `AI-46` (trace_id/request grouping for AI Audit) queued behind that. New, unscheduled: `AA-146` (attribution byline missing on string-content-fallback cards).
 
