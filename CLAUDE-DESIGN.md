@@ -48,6 +48,8 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 **(added 2026-07-07 — 3-file split)** The feature inventory is split across three files by John's priority rule: "anything for the MI page to work, from backend to frontend, that is speed, loop, harness, and charts goes to now. Anything MI outside of that is next, and anything not related to making MI successful goes to later." — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md` (other MI), `docs/FEATURES-LATER.md` (everything else). Classify a new item into the right file when you add it; when genuinely unsure between now/next, ask John rather than guessing.
 
+**(added 2026-07-08 — Type tag, John's explicit call)** Every row in `docs/FEATURES.md` and `docs/FEATURES-NEXT.md` also gets a `Type` tag (Continuity/Speed/Architecture/Feature/Tech Debt/Data/Observability — full definitions in `docs/FEATURES.md`'s "Type Taxonomy" section). Assign the type that actually fits when logging a new item; if none of the existing types genuinely fit, add a new one to the taxonomy rather than forcing a close-but-wrong tag. Do not apply this retroactively to `docs/FEATURES-LATER.md` or `docs/FEATURES-ARCHIVE.md` unless a session is already touching a row there for another reason.
+
 ---
 
 ## Step 1 — Orient (read these, in order, stop when you have enough)
