@@ -216,13 +216,14 @@ export function buildFinalDelegationResult({ delegateResult, targetAgentId, targ
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
       tenant_id, capability_slug, intent_slug, agent_id, task_context,
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
       llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens }, can_request_help: canRequestHelp,
+      delegation_required: delegationRequired === true,
     });
     row_id = row.id;
   }
@@ -257,7 +258,7 @@ async function runLoop({
     const remainingMs = __testBudgetMs !== null ? __testBudgetMs : (deadline - Date.now());
     if (remainingMs < HOP_BUDGET_RESERVE_MS) {
       return checkpointAndReturn({
-        job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp,
+        job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
       });
     }
@@ -426,7 +427,7 @@ async function runLoop({
       // actually trigger this.
       if (delegateResult.status === 'in_progress') {
         return checkpointAndReturn({
-          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp,
+          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
           task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         });
       }
@@ -438,7 +439,16 @@ async function runLoop({
       // shape per the tool's own description (task_context-supplied candidates), same as Owen's
       // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
       // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
-      if (turn.tool_input.is_final === true) {
+      // FEATURE: AA-148 -- delegationRequired capabilities have no legitimate is_final:false case
+      // (their entire job is handing off, AA-142's own definition) -- both live intents' method
+      // text confirm a Format Skill "never changes the facts/citations/review status you hand it,"
+      // so there is nothing for the delegator to review or act on afterward. Forcing this branch
+      // removes the superfluous wrap-up turn that produced narration instead of relaying the
+      // delegate's real content (see kickoff CONTEXT, Gap 1). Every other delegate_to_agent caller
+      // that never declares delegationRequired (Owen's retry, Priya's Escalate) is unaffected --
+      // this only changes behavior when the capability's own trait already says the hand-off is
+      // its whole job.
+      if (delegationRequired || turn.tool_input.is_final === true) {
         // FEATURE: AA-126 -- fail loudly instead of silently returning a hollow card. Before this
         // guard, a delegate that couldn't produce its schema-required output (insufficient
         // task_context, a guardrail block, a decline -- exact sub-mode not distinguished here,
@@ -588,11 +598,12 @@ export async function resumeCapability({ job_id }) {
       // fixes the live-confirmed AA-145 data-loss bug (Alex's "I don't see the raw answer data").
       task_context: row.task_context ?? null,
       enriched, canRequestHelp: row.can_request_help,
-      // FEATURE: AA-142 -- durable_hops does not persist delegationRequired (same accepted-gap
-      // class as requiresHumanConfirmation/critique/display fields left unpersisted by AA-139).
-      // A resumed chain's post-checkpoint hop runs without this guard -- pre-existing behavior, not
-      // a regression; real need to persist it can be its own future session.
-      delegationRequired: false,
+      // FEATURE: AA-148 -- durable_hops now persists delegation_required (this session's
+      // migration, Task 1); a resumed chain re-reads the real value instead of silently losing
+      // AA-142's guard. Closes the accepted gap AA-142 deferred ("real need to persist it can be
+      // its own future session") -- proven live-exploitable by this session's own reproduction
+      // (see kickoff CONTEXT, Gap 2).
+      delegationRequired: row.delegation_required === true,
       requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
       display_agent_id: null, display_agent_card: null,
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,

@@ -10,14 +10,14 @@ function headers(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
 }
 
-export async function createDurableHopRow({ tenant_id, capability_slug, intent_slug, agent_id, task_context, system_prompt, format_contract, llm, can_request_help }) {
+export async function createDurableHopRow({ tenant_id, capability_slug, intent_slug, agent_id, task_context, system_prompt, format_contract, llm, can_request_help, delegation_required }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   const res = await fetch(`${supabaseUrl}/rest/v1/durable_hops`, {
     method: 'POST', headers: { ...headers(supabaseKey), Prefer: 'return=representation' },
     body: JSON.stringify({
       tenant_id, capability_slug, intent_slug, agent_id, task_context,
-      system_prompt, format_contract, llm, can_request_help, status: 'in_progress',
+      system_prompt, format_contract, llm, can_request_help, delegation_required, status: 'in_progress',
     }),
   });
   if (!res.ok) throw new Error(`Failed to create durable_hops row: ${res.status}`);
