@@ -210,6 +210,44 @@ export function buildFinalDelegationResult({ delegateResult, targetAgentId, targ
   };
 }
 
+// FEATURE: AA-152 -- extracted from the delegate_to_agent branch's is_final block so the new
+// delegationRequired auto-resolve path (Task 3, in the request_help branch) reuses the exact same
+// finalize-and-checkpoint logic instead of a second copy -- same "extract when a second real call
+// site needs it" discipline checkpointAndReturn() itself was built under (AA-139's own comment).
+// FEATURE: AA-126 -- fail loudly instead of silently returning a hollow card. Before this guard (now
+// inside buildFinalDelegationResult()), a delegate that couldn't produce its schema-required output
+// (insufficient task_context, a guardrail block, a decline -- exact sub-mode not distinguished here,
+// deliberately: any of them means something real went wrong) resulted in `...delegateResult.content`
+// spreading nothing into finalResult, no error surfaced, no way for the frontend to tell an empty
+// card from a legitimate response. Same "fail safe, never fake" principle as AA-108's assemblePrompt()
+// guard -- a genuine platform fault, not something the calling agent is expected to gracefully recover
+// from.
+// FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own structured
+// output (e.g. qa-answer-format's headline/body/citations/...); spread at the top level, same place
+// callers already read it after callCapability()'s existing `.content` unwrap for the ordinary
+// terminal-dispatch shape. `status: 'final_delegation'` reuses callCapability()'s existing generic
+// `if (result.status) return result;` passthrough (already built for pending_confirmation/
+// depth_exceeded) so this flat shape survives the frontend unwrap unchanged -- no capability-specific
+// branch added to callCapability() itself. patterns_used: start from the delegate's own patterns
+// (e.g. Alex's structured-output), then guarantee 'agent-delegation' is present -- this hop, by
+// definition, just delegated (delegationOccurred is already true by the time either call site here
+// is reached), regardless of whether the delegate itself further delegated.
+async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) {
+  const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  const headers = getSupabaseHeaders(supabaseKey);
+  const finalResult = buildFinalDelegationResult({
+    delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug,
+    finalPatterns, displayAgentCard: await fetchAgentCard(targetAgentId, headers, supabaseUrl),
+    lastHelpSelection,
+  });
+  if (job_id) {
+    await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
+  }
+  return finalResult;
+}
+
 // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141/AA-145) -- extracted from runLoop()'s inline top-of-loop
 // checkpoint block so a second call site (the nested is_final delegate check, below) can reuse the
 // exact same create/patch-row logic instead of duplicating it. Also the fix for AA-145: now accepts
@@ -384,6 +422,52 @@ async function runLoop({
         reasoning: delegateResult?.content?.reasoning ?? null,
         candidates_considered: delegateResult?.content?.candidates ?? null,
       };
+
+      // FEATURE: AA-152 -- when the REQUESTING capability declares delegationRequired, AA-142/AA-148
+      // already established there is no legitimate case where more of the requester's own judgment is
+      // needed after a hand-off -- this extends that one step further: no legitimate case where the
+      // requester needs a second model turn to re-choose WHO, either, once agent-selection-intent has
+      // already produced a real, reasoned recommendation. Skips straight to the same terminal-delegation
+      // path a manual delegate_to_agent(is_final:true) call would have taken. Scoped exclusively to
+      // delegationRequired capabilities (today: ci-answer-display-intent, hyp-hypothesis-test-display-
+      // intent) -- every other request_help caller is completely unaffected, falls through to the
+      // existing two-step behavior unchanged. Never a static agent/capability name: recommended_agent_id/
+      // recommended_capability_slug come from agent-selection-intent's own live reasoning, validated
+      // against its own candidates array below, never asserted directly (ARCHITECTURE.md §19d).
+      if (delegationRequired) {
+        const rec = delegateResult?.content;
+        const matchedCandidate = rec?.candidates?.find(
+          c => c.agent_id === rec.recommended_agent_id && c.capability_slug === rec.recommended_capability_slug
+        );
+        if (!rec?.recommended_agent_id || !matchedCandidate) {
+          // FEATURE: AA-152 -- fail loudly rather than silently falling through to a requester turn
+          // that would just re-litigate what delegationRequired already says is resolved. Same "fail
+          // safe, never fake" posture as AA-108/AA-126 -- a mismatched/missing recommendation here is a
+          // genuine platform fault, not something to paper over.
+          throw new Error(`request_help: delegationRequired capability's agent-selection-intent response had no valid recommended_agent_id matching a real candidate (capability_slug: ${capability_slug}/${intent_slug})`);
+        }
+        const delegateTaskContext = (task_context && typeof task_context === 'object')
+          ? { ...task_context, delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed }
+          : { delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed };
+        const autoResolvedResult = await runCapability({
+          capability_slug: rec.recommended_capability_slug,
+          intent_slug: matchedCandidate.intent_slug || null,
+          agent_id: rec.recommended_agent_id,
+          task_context: delegateTaskContext,
+          tenant_id, _hop_counter: hopCounter, _deadline: deadline,
+        });
+        if (autoResolvedResult.status === 'in_progress') {
+          return checkpointAndReturn({
+            job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+            task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
+          });
+        }
+        return await finalizeDelegation({
+          delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id,
+          targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null,
+          lastHelpSelection, job_id,
+        });
+      }
     } else if (turn.tool_name === 'delegate_to_agent') {
       // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
       // call here: the model is choosing an agent_id it was just handed as a candidate (via
@@ -449,38 +533,7 @@ async function runLoop({
       // this only changes behavior when the capability's own trait already says the hand-off is
       // its whole job.
       if (delegationRequired || turn.tool_input.is_final === true) {
-        // FEATURE: AA-126 -- fail loudly instead of silently returning a hollow card. Before this
-        // guard, a delegate that couldn't produce its schema-required output (insufficient
-        // task_context, a guardrail block, a decline -- exact sub-mode not distinguished here,
-        // deliberately: any of them means something real went wrong) resulted in
-        // `...delegateResult.content` spreading nothing into finalResult, no error surfaced, no way
-        // for the frontend to tell an empty card from a legitimate response. Same "fail safe, never
-        // fake" principle as AA-108's assemblePrompt() guard -- a genuine platform fault, not
-        // something the calling agent is expected to gracefully recover from.
-        // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- delegateResult.content holds the delegate's own
-        // structured output (e.g. qa-answer-format's headline/body/citations/...); spread at the
-        // top level here, same place callers already read it after callCapability()'s existing
-        // `.content` unwrap for the ordinary terminal-dispatch shape. `status: 'final_delegation'`
-        // reuses callCapability()'s existing generic `if (result.status) return result;` passthrough
-        // (already built for pending_confirmation/depth_exceeded) so this flat shape survives the
-        // frontend unwrap unchanged -- no capability-specific branch added to callCapability() itself.
-        // patterns_used: start from the delegate's own patterns (e.g. Alex's structured-output),
-        // then guarantee 'agent-delegation' is present -- this hop, by definition, just delegated
-        // (delegationOccurred is already true in this loop's own scope), regardless of whether the
-        // delegate itself further delegated.
-        const finalPatterns = Array.from(new Set([...(delegateResult.patterns_used || []), 'agent-delegation']));
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-        const headers = getSupabaseHeaders(supabaseKey);
-        const finalResult = buildFinalDelegationResult({
-          delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug,
-          finalPatterns, displayAgentCard: await fetchAgentCard(targetAgentId, headers, supabaseUrl),
-          lastHelpSelection,
-        });
-        if (job_id) {
-          await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
-        }
-        return finalResult;
+        return await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id });
       }
     }
 
