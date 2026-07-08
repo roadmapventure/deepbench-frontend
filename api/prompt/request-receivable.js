@@ -111,7 +111,10 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
       const required = schemaTool.input_schema?.required || [];
       const missing = required.filter(key => !(key in (toolUseBlock.input || {})));
       if (missing.length > 0) {
-        throw new Error(`Schema tool "${schemaTool.name}" called with missing required field(s): ${missing.join(', ')}`);
+        throw Object.assign(
+          new Error(`Schema tool "${schemaTool.name}" called with missing required field(s): ${missing.join(', ')}`),
+          { rawInput: toolUseBlock.input }
+        );
       }
     }
     return {
@@ -229,7 +232,10 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
       try {
         turn = parseModelTurn(llmData, hasSchemaTool, schemaTool);
       } catch (retryParseErr) {
-        throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryParseErr.message });
+        const detail = retryParseErr.rawInput
+          ? `${retryParseErr.message} | raw_input: ${JSON.stringify(retryParseErr.rawInput)}`
+          : retryParseErr.message;
+        throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail });
       }
     } else {
       throw Object.assign(new Error('Parse failed'), { status: 422, detail: parseErr.message });
