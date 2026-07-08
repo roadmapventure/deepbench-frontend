@@ -199,7 +199,24 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
         messages: [...callBody.messages, { role: 'assistant', content: llmData.content }, correctionMessage],
       };
       const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(55000) });
-      if (!retryRes.ok) throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: parseErr.message });
+      // FEATURE: AA-157 -- surface the retry's OWN rejection reason (this distinct HTTP call's real
+      // status/body), not the ORIGINAL parse error that triggered the retry. Before this fix, every
+      // occurrence of this 422 reported parseErr.message as `detail` -- why the FIRST call failed to
+      // parse, never why the SECOND call was rejected. Confirmed live 2026-07-08: a residual ~40%
+      // failure rate on hyp-hypothesis-test-display-intent's recursive delegate hops (agent-selection-
+      // intent, intelligence-review-format) persisted even after AA-150's tool_result fix, distinct from
+      // AA-151/S-ARCH-RETRY-CATCH-01's separate uncaught-second-parse-throw bug (that one is always
+      // HTTP 500 with a raw validation message; this one is always HTTP 422 with this exact
+      // "Parse failed and retry also failed" text) -- with zero forensic trace anywhere in this codebase
+      // of what Anthropic actually rejected. console.error here (same [request-receivable]-prefixed
+      // pattern this file already uses for guardrails/activity-log failures, Vercel-captured) plus the
+      // corrected `detail` field (visible directly in the API response, no Vercel access needed) is the
+      // fix -- no new Supabase column/table invented.
+      if (!retryRes.ok) {
+        const retryDetail = await retryRes.text().catch(() => '(failed to read retry response body)');
+        console.error(`[request-receivable] callModel retry rejected: status=${retryRes.status} firstFailure="${parseErr.message}" retryBody=${retryDetail.slice(0, 1000)}`);
+        throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryDetail });
+      }
       llmData = await retryRes.json();
       usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
       // FEATURE: AA-151 -- the retry HTTP call can now succeed (AA-150's tool_result fix) while the
