@@ -55,7 +55,10 @@ const DELEGATE_TO_AGENT_TOOL = {
 // array. Byte-identical output to pre-v6.0.0 when canRequestHelp=false and
 // conversation_history=[]: no `system` field, systemPrompt as the first user message,
 // tool_choice forced to the schema tool. ARCHITECTURE.md §19d.
-function buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp = false, conversation_history = [] }) {
+// FEATURE: AA-154 -- optional temperature param, included in both returned shapes only when
+// defined. Omitting the key for every unset caller preserves Anthropic's own default (1.0) --
+// no behavior change for any capability that doesn't set it.
+function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
@@ -66,12 +69,14 @@ function buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRe
   if (tools.length === 0) {
     return {
       model, max_tokens, system: systemPrompt,
+      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
       messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: 'Please complete the task as instructed.' }],
     };
   }
 
   return {
     model, max_tokens, tools,
+    ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
     tool_choice: harnessTools.length > 0 ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
     messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: systemPrompt }],
   };
@@ -151,7 +156,7 @@ async function postToAnthropicWithRetry(body, headers) {
 // FEATURE: AA-80 — callModel(): pure extraction of sendRequest()'s prior Step 1 (call + retry-
 // once-on-parse-failure), now shared by sendRequest() itself and execute.js's loop. Never runs
 // guardrails/handler/logging -- that stays exclusively in sendRequest(). ARCHITECTURE.md §19d.
-export async function callModel({ systemPrompt, model, max_tokens, format_contract, canRequestHelp = false, conversation_history = [] }) {
+export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, conversation_history = [] }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const anthropicHeaders = { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' };
@@ -164,7 +169,7 @@ export async function callModel({ systemPrompt, model, max_tokens, format_contra
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
   const hasSchemaTool = !!schemaTool;
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, canRequestHelp, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, conversation_history });
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders);
   let llmData = await llmRes.json();
@@ -273,6 +278,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   const startTime = turn_started_at || Date.now();
   const model = llm?.model || 'claude-sonnet-4-6';
   const max_tokens = llm?.max_tokens || 2048;
+  const temperature = llm?.temperature;
   const isJson = format_contract.output_type === 'json';
 
   // Use pre-assembled system_prompt from ai-enrichment if present; otherwise build from sections array
@@ -295,7 +301,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
   } else {
-    const turn = await callModel({ systemPrompt, model, max_tokens, format_contract, conversation_history: [] });
+    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, conversation_history: [] });
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;

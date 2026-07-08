@@ -125,6 +125,13 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
             api_key_source: sp.api_key_source || DEFAULT_LLM.api_key_source,
           };
         }
+        // FEATURE: AA-154 -- data-driven temperature, deliberately a separate `if`, not folded
+        // into the llm_provider || llm_model gate above -- a Skill Profile may want to set only
+        // temperature without also overriding model/max_tokens. Omitted entirely (not defaulted)
+        // when unset, so every capability that doesn't opt in is byte-identical to today.
+        if (sp.temperature !== null && sp.temperature !== undefined) {
+          llm = { ...llm, temperature: sp.temperature };
+        }
         if (traits.schema) {
           formatContract = {
             output_type: "json",
@@ -181,6 +188,11 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
           max_tokens: sp.max_tokens || DEFAULT_LLM.max_tokens,
           api_key_source: sp.api_key_source || DEFAULT_LLM.api_key_source,
         };
+      }
+      // FEATURE: AA-154 -- data-driven temperature, same separate-`if` pattern as the Intent
+      // branch above.
+      if (sp.temperature !== null && sp.temperature !== undefined) {
+        llm = { ...llm, temperature: sp.temperature };
       }
 
     } else if (typeSlug === "guardrails") {

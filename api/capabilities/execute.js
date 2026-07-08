@@ -260,7 +260,7 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
     const row = await createDurableHopRow({
       tenant_id, capability_slug, intent_slug, agent_id, task_context,
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
-      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens }, can_request_help: canRequestHelp,
+      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature }, can_request_help: canRequestHelp,
       delegation_required: delegationRequired === true,
     });
     row_id = row.id;
@@ -306,6 +306,7 @@ async function runLoop({
       systemPrompt: enriched.system_prompt,
       model: enriched.llm.model,
       max_tokens: enriched.llm.max_tokens,
+      temperature: enriched.llm.temperature,
       format_contract: enriched.format_contract,
       canRequestHelp,
       conversation_history: conversationHistory,
