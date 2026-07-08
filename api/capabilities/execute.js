@@ -1,4 +1,4 @@
-// DeepBench v6.1.15 | api/capabilities/execute.js | AA-141/AA-145 -- persist task_context across resume, handle nested checkpoint
+// DeepBench v6.1.35 | api/capabilities/execute.js | AA-164 -- thread lastHelpSelection into the normal (non-checkpointed) terminal return
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
 // assemblePrompt() (AA-75). A new capability requires zero changes to this file — only new
@@ -383,7 +383,7 @@ async function runLoop({
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
         turn_started_at: turnStart,
       });
-      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null };
+      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection };
       if (job_id) {
         await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
       }

@@ -1,3 +1,4 @@
+// DeepBench v6.1.35 | MarketIntelligenceScreen.jsx | AA-164 — runQaWithQualityGate() emits an agent_selection Pipeline Log event when Marcus's ci-answer-intent turn threads a real internal request_help hop (qa.last_help_selection), reusing the existing generic agent_selection case unchanged
 // DeepBench v6.1.23 | MarketIntelligenceScreen.jsx | S-MI-30/MI-30+MI-31 — Agents drawer: added "riley" to PROPOSED_MI_AGENT_IDS + html-display to MI_LOOP_SCOPE (Riley Torres visibility fix); added a "Baseline" rollup row (rollupBaseline(), speed-baseline-test tenant) as the first entry in each agent's byKind breakdown
 // DeepBench v6.1.21 | MarketIntelligenceScreen.jsx | S-MI-29/MI-29 — three silent-reset async catch blocks (enterHypothesisFlow/onSelectHypothesis/onCommit) now surface the real e.message as a chat error bubble and a Pipeline Log "error" row (T.flag), matching the pattern onSend's catch already used
 // DeepBench v6.1.11 | MarketIntelligenceScreen.jsx | S-MI-27/MI-27+MI-28 — Submitted Hypothesis card gets a "Submitted by You" attribution row (UserAvatar); AI - Hypothesis Test header swapped to actor-first order (Priya Nair · AI - Hypothesis Test), matching the Q&A card's existing order
@@ -323,6 +324,13 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
     task_context: { goal: message }, runtime_context: conversationContext,
   });
   onEvent({ type: "qa_answer", agentId: "marcus", data: qa, durationMs: Date.now() - t0 });
+  // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
+  // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
+  // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
+  // shape, same execute.js code path -- not a new event type).
+  if (qa.last_help_selection) {
+    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: qa.last_help_selection.selected_by_agent_id, data: qa.last_help_selection, durationMs: 0 });
+  }
 
   t0 = Date.now();
   const gate = await callCapability({
