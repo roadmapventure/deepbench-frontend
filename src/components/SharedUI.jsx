@@ -1,3 +1,6 @@
+// DeepBench v6.1.41 | SharedUI.jsx | S-MI-34/MI-34 — Drawer gets an optional maxHeight prop (opt-in,
+// no behavior change for any drawer that doesn't pass it) so a single drawer can cap its height with
+// an internal scroll instead of growing to full natural height
 // DeepBench v6.1.11 | SharedUI.jsx | MI-27 — UserAvatar, generic non-agent "You" attribution avatar
 // DeepBench v6.0.23 | SharedUI.jsx | S-ARCH-VIZ-01 — generic ChartRenderer + CHART_RENDERERS
 // registry (ARCHITECTURE.md §19g), first type bar_pair, capability-agnostic
@@ -310,7 +313,7 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
 // First Column 3 (Audit) drawer with real open/close state — Pipeline Log stays a static
 // always-expanded box, unchanged, out of scope this session. Reusable by any future Column 3
 // item (MI-06/07/09/15/16/18) — never rebuild this per-drawer.
-export const Drawer = ({ title, count, children, defaultOpen = false }) => {
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
@@ -325,7 +328,7 @@ export const Drawer = ({ title, count, children, defaultOpen = false }) => {
         </div>
       </div>
       {open && (
-        <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10, ...(maxHeight ? {maxHeight, overflowY:"auto"} : {})}}>
           {children}
         </div>
       )}

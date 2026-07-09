@@ -1,3 +1,9 @@
+// DeepBench v6.1.41 | MarketIntelligenceScreen.jsx | S-MI-34 — MI-32/33 scroll-fix completion (3-column
+// grid alignItems:"start" removed, restoring default stretch so InteractColumn's own overflow chain gets
+// a real bounded height); Column 3 drawer height cap (MI-34, Drawer's new maxHeight prop, Agent Routing
+// only) + reorder (MI-39, Agent Reasoning moved to last); 3 copy fixes (MI-37/38/40); expected-time
+// indicator + timer reformat (MI-35, formatElapsed now "Xm Ys"/"Xs", new expectation field on
+// workingStatus with a two-stage ceiling→chain-based estimate)
 // DeepBench v6.1.35 | MarketIntelligenceScreen.jsx | AA-164 — runQaWithQualityGate() emits an agent_selection Pipeline Log event when Marcus's ci-answer-intent turn threads a real internal request_help hop (qa.last_help_selection), reusing the existing generic agent_selection case unchanged
 // DeepBench v6.1.23 | MarketIntelligenceScreen.jsx | S-MI-30/MI-30+MI-31 — Agents drawer: added "riley" to PROPOSED_MI_AGENT_IDS + html-display to MI_LOOP_SCOPE (Riley Torres visibility fix); added a "Baseline" rollup row (rollupBaseline(), speed-baseline-test tenant) as the first entry in each agent's byKind breakdown
 // DeepBench v6.1.21 | MarketIntelligenceScreen.jsx | S-MI-29/MI-29 — three silent-reset async catch blocks (enterHypothesisFlow/onSelectHypothesis/onCommit) now surface the real e.message as a chat error bubble and a Pipeline Log "error" row (T.flag), matching the pattern onSend's catch already used
@@ -106,12 +112,50 @@ function formatDuration(ms) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
-// FEATURE: MI-23 — live m:ss elapsed timer for the chat-embedded working-status indicator
+// FEATURE: MI-23 — live elapsed timer for the chat-embedded working-status indicator
+// FEATURE: MI-35 — reformatted from "m:ss" (e.g. "1:04") to "Xm Ys"/"Xs" for consistency with the
+// new expected-time estimate rendered next to it (formatExpectation, below) — same unit style,
+// same font, read as one continuous phrase.
 function formatElapsed(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+// FEATURE: MI-35 — known intent chains per user-facing action that has one. Only chains this
+// session can ground in real, already-logged data get an entry — do not invent chains for
+// working-status triggers not listed here (patch resolution, memory consolidation, etc.); those
+// pass expectation: null and render no estimate, out of scope this session.
+const INTENT_CHAINS = {
+  qa: [["marcus","ci-routing-intent"], ["marcus","ci-answer-intent"], ["owen","qg-review-intent"], ["marcus","ci-answer-display-intent"]],
+  escalate: [["marcus","ci-routing-intent"]],
+  hypothesis_generation: [["priya","hyp-generation-intent"]],
+  hypothesis_test: [["priya","hyp-hypothesis-test-intent"], ["priya","hyp-hypothesis-test-display-intent"]],
+};
+
+// FEATURE: MI-35 — sums known per-intent avgLatency (ms) across a chain of [agentId, intentSlug]
+// pairs, reading the same agentActivity.byKind data the Agents drawer already renders. Returns
+// null if any hop has no historical data yet — caller falls back to the generic ceiling rather
+// than showing a partial/misleading sum.
+function estimateChainMs(chain, agentActivity) {
+  let total = 0;
+  for (const [agentId, kind] of chain) {
+    const latency = agentActivity?.[agentId]?.byKind?.[kind]?.avgLatency;
+    if (latency == null) return null;
+    total += latency;
+  }
+  return total;
+}
+
+// FEATURE: MI-35 — "expect > Xs" (<60s) or "expect > Xm Ys" (>=60s). Rounds up to the nearest 5s
+// so the floor framing ("expect greater than") stays honest against small variance in the
+// historical average it's built from.
+function formatExpectation(ms) {
+  const roundedSec = Math.ceil(ms / 1000 / 5) * 5;
+  const m = Math.floor(roundedSec / 60);
+  const s = roundedSec % 60;
+  return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
 }
 
 // FEATURE: MI-23 — replaces the header's global AI status dot for this screen; one line, swaps
@@ -120,7 +164,7 @@ function formatElapsed(ms) {
 // execute.js harness loop — see kickoff CONTEXT). Keyed by startedAt at the call site (not here)
 // so React fully remounts this component on every new turn instead of trying to reset internal
 // tick state — the simplest correct way to guarantee the timer starts at 0:00 every time.
-function AgentWorkingIndicator({ message, startedAt }) {
+function AgentWorkingIndicator({ message, startedAt, expectation }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -131,6 +175,7 @@ function AgentWorkingIndicator({ message, startedAt }) {
       <AIDiamond size="7px" color={T.brass}/>
       <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic"}}>{message}</span>
       <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+      {expectation && <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>- {expectation}</span>}
     </div>
   );
 }
@@ -656,7 +701,7 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
         <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,position:"relative"}}>
           <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:12}}>
-            Data Room charts ship in S-MARKET-INTEL-03. Run a Theory, Forecast, or Correct to see live Theory Evidence here.
+            Interact with the Data
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {layers.map(l => (
@@ -850,11 +895,10 @@ function rollupBaseline(stats) {
 // FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
 // Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
 // Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
-function AuditColumn({ events }) {
+function AuditColumn({ events, agentActivity }) {
   const agents = useAgents();
   const learned = useLearnedContext();
   const dataSources = useDataSources();
-  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
   // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
   // 'speed-baseline-test' tenant, unfiltered by MI_LOOP_SCOPE (scope: null) since those rows are
   // already fully isolated deliberate test data, not production MI-loop traffic.
@@ -883,7 +927,7 @@ function AuditColumn({ events }) {
       <FeatureBadge id="MI-30"/>
       <FeatureBadge id="MI-31"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
-      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true}>
+      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280}>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
@@ -911,30 +955,6 @@ function AuditColumn({ events }) {
               </div>
               {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
               <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
-            </div>
-          );
-        })}
-      </Drawer>
-      <Drawer title="Agent Reasoning" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
-        {learned.length === 0 ? (
-          <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
-            No patterns synthesized yet. When a correction or opinion is confirmed, it's written here as reusable reasoning.
-          </div>
-        ) : learned.map(entry => {
-          const author = agentById(entry.agent_id);
-          return (
-            <div key={entry.id} style={{borderLeft:`3px solid ${T.brass}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                {author && <AgentAvatar who={author.id} size={20}/>}
-                <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{author ? author.name : entry.agent_id}</span>
-                {entry.confidence && (
-                  <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{entry.confidence} confidence</span>
-                )}
-              </div>
-              {entry.source_question && (
-                <div style={{fontFamily:mono,fontSize:9,color:T.muted,fontStyle:"italic"}}>&ldquo;{shapeForLog(entry.source_question, 100)}&rdquo;</div>
-              )}
-              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{shapeForLog(entry.content, 220)}</div>
             </div>
           );
         })}
@@ -1066,6 +1086,30 @@ function AuditColumn({ events }) {
           </div>
         ) : analysis.map(row => <DataSourceRow key={row.id} row={row}/>)}
       </Drawer>
+      <Drawer title="Agent Reasoning" count={`${learned.length} pattern${learned.length === 1 ? "" : "s"}`}>
+        {learned.length === 0 ? (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>
+            No patterns synthesized yet. When a correction or opinion is confirmed, it's written here as reusable reasoning.
+          </div>
+        ) : learned.map(entry => {
+          const author = agentById(entry.agent_id);
+          return (
+            <div key={entry.id} style={{borderLeft:`3px solid ${T.brass}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {author && <AgentAvatar who={author.id} size={20}/>}
+                <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{author ? author.name : entry.agent_id}</span>
+                {entry.confidence && (
+                  <span style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase"}}>{entry.confidence} confidence</span>
+                )}
+              </div>
+              {entry.source_question && (
+                <div style={{fontFamily:mono,fontSize:9,color:T.muted,fontStyle:"italic"}}>&ldquo;{shapeForLog(entry.source_question, 100)}&rdquo;</div>
+              )}
+              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{shapeForLog(entry.content, 220)}</div>
+            </div>
+          );
+        })}
+      </Drawer>
     </div>
   );
 }
@@ -1121,7 +1165,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
           <div>
             <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{marcus ? marcus.name : "GEO CSO Expert"}</div>
-            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Channel Intelligence · Q/A · Theory · Forecast · Correct · Escalate</div>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Channel Intelligence · Q&A · Theory · Forecast · Correct · Escalate</div>
           </div>
         </div>
 
@@ -1145,7 +1189,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }
           ) : (
             messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
           )}
-          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt}/>}
+          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} expectation={workingStatus.expectation}/>}
         </div>
 
         <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
@@ -1172,7 +1216,10 @@ export default function MarketIntelligenceScreen() {
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
-  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt } | null
+  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, expectation } | null
+  // FEATURE: MI-35 — lifted from AuditColumn so it's available at every setWorkingStatus( call
+  // site below, not just inside AuditColumn.
+  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
 
   const logEvent = (evt) => setPipelineEvents(prev => [...prev, { ...evt, id: prev.length }]);
 
@@ -1188,7 +1235,10 @@ export default function MarketIntelligenceScreen() {
     setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
       flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
     const t0 = Date.now();
-    setWorkingStatus({ message: "Priya is generating hypotheses…", startedAt: t0 });
+    {
+      const est = estimateChainMs(INTENT_CHAINS.hypothesis_generation, agentActivity);
+      setWorkingStatus({ message: "Priya is generating hypotheses…", startedAt: t0, expectation: est != null ? formatExpectation(est) : null });
+    }
     try {
       const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
       logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates }, durationMs: Date.now() - t0 });
@@ -1209,9 +1259,21 @@ export default function MarketIntelligenceScreen() {
     if (!clean || loading) return;
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
-    setWorkingStatus({ message: "Marcus is thinking…", startedAt: Date.now() });
+    setWorkingStatus({ message: "Marcus is thinking…", startedAt: Date.now(), expectation: "expect < 2m" });
     try {
-      const result = await runIntentPipeline(clean, conversationContext(), logEvent);
+      // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
+      // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
+      // the chain runs), upgrade the ceiling estimate to the real routing-chain-based figure.
+      const result = await runIntentPipeline(clean, conversationContext(), (evt) => {
+        logEvent(evt);
+        if (evt.type === "intent_routing" && evt.data.intent === "qa") {
+          setWorkingStatus(prev => {
+            if (!prev) return prev;
+            const est = estimateChainMs(INTENT_CHAINS.qa, agentActivity);
+            return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
+          });
+        }
+      });
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — msg.text stays a plain-text join of the formatted body
         // (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep working
@@ -1254,7 +1316,10 @@ export default function MarketIntelligenceScreen() {
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
     const t0 = Date.now();
-    setWorkingStatus({ message: "Priya is running a hypothesis test…", startedAt: t0 });
+    {
+      const est = estimateChainMs(INTENT_CHAINS.hypothesis_test, agentActivity);
+      setWorkingStatus({ message: "Priya is running a hypothesis test…", startedAt: t0, expectation: est != null ? formatExpectation(est) : null });
+    }
     try {
       const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent });
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
@@ -1293,7 +1358,7 @@ export default function MarketIntelligenceScreen() {
         ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
 
-      setWorkingStatus({ message: "Elena is consolidating this into memory…", startedAt: t0 });
+      setWorkingStatus({ message: "Elena is consolidating this into memory…", startedAt: t0, expectation: null });
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
         task_context: {
@@ -1306,7 +1371,7 @@ export default function MarketIntelligenceScreen() {
 
       step = "patch_proposed";
       t0 = Date.now();
-      setWorkingStatus({ message: "Nadia is drafting a data patch…", startedAt: t0 });
+      setWorkingStatus({ message: "Nadia is drafting a data patch…", startedAt: t0, expectation: null });
       const nadiaResult = await callCapability({
         capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
         task_context: {
@@ -1344,7 +1409,7 @@ export default function MarketIntelligenceScreen() {
       ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
       : null;
     const t0 = Date.now();
-    setWorkingStatus({ message: "Nadia is processing your response…", startedAt: t0 });
+    setWorkingStatus({ message: "Nadia is processing your response…", startedAt: t0, expectation: null });
     try {
       const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
@@ -1372,13 +1437,13 @@ export default function MarketIntelligenceScreen() {
         <FeatureBadge id="MI-01"/>
         <div style={{marginBottom:18}}>
           <div style={{fontFamily:display,fontSize:24,fontWeight:700,color:T.navy}}>Market Intelligence</div>
-          <div style={{fontFamily:body,fontSize:13,color:T.muted,marginTop:2}}>Channel performance, agent-orchestrated — GEO CSO Expert and team</div>
+          <div style={{fontFamily:body,fontSize:13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
         </div>
-        <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0,alignItems:"start"}}>
+        <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
           <FeatureBadge id="MI-02"/>
           <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}/>
           <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
-          <AuditColumn events={pipelineEvents}/>
+          <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
         </div>
       </div>
     </AppShell>

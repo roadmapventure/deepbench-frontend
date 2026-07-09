@@ -167,11 +167,12 @@ A pulsing brass dot `●` appears in the header when any AI call is active. Impl
 
 Chat-embedded "agent is working" indicator — one line, live `m:ss` counting timer, appears in the Market Intelligence Interact column in place of the (now MI-suppressed) header dot. Only one agent ever runs at a time on this platform today (confirmed no concurrent dispatch anywhere in the codebase) — this is a single line that swaps message and resets its timer each time control passes to a new agent, never multiple simultaneous lines. Any future capability/screen needing a live "agent is working, here's how long" indicator reuses this pattern rather than inventing a new one.
 
-- **Composition:** `<AIDiamond size="7px" color={T.brass}/>` + message text + live timer text, `display: flex, gap: 8, marginBottom: 12`.
+- **Composition:** `<AIDiamond size="7px" color={T.brass}/>` + message text + live timer text + optional expectation text, `display: flex, gap: 8, marginBottom: 12`.
 - **Message text:** `fontFamily: mono, fontSize: 11, color: T.muted, fontStyle: italic` — same styling as the plain-text status lines it replaces.
-- **Timer text:** `fontFamily: mono, fontSize: 10, color: T.brassDeep`, format `m:ss` (e.g. `0:07`, `1:04`), ticking every 1s.
+- **Timer text:** `fontFamily: mono, fontSize: 10, color: T.brassDeep`, format `Xm Ys`/`Xs` (e.g. `7s`, `1m 4s`, was `m:ss` e.g. `0:07`/`1:04` prior to `S-MI-34`/`MI-35`), ticking every 1s.
+- **Expectation text (added `S-MI-34`/`MI-35`, 2026-07-09):** `fontFamily: mono, fontSize: 10, color: T.brassDeep` — exactly matches the timer's styling, rendered immediately after it with a `" - "` separator so the two read as one continuous phrase. Two-stage estimate: a generic ceiling shown immediately (`- expect < 2m`) before the routing decision is known, upgraded to a real routing-chain-based figure (`- expect > 14s` below 60s, `- expect > 1m 30s` at/above 60s) once the chain resolves. Only rendered when a non-null `expectation` is present on `workingStatus` — triggers with no known chain (patch resolution, memory consolidation, etc.) pass `expectation: null` and show no estimate, just the timer.
 - **Reset semantics:** the component is mounted with `key={startedAt}` at its call site — a new turn means a new `startedAt`, which forces a full remount rather than trying to reset internal tick state. This is the correct pattern for any future "resets per turn" timer, not a bespoke effect-dependency trick.
-- **Ownership:** the parent screen holds a single `{ message, startedAt } | null` state value (not a stack/list) and sets it fresh at the same `t0` boundary it already uses for its own event/audit logging — the display and the logging read the same seam, so they never drift out of sync.
+- **Ownership:** the parent screen holds a single `{ message, startedAt, expectation } | null` state value (not a stack/list) and sets it fresh at the same `t0` boundary it already uses for its own event/audit logging — the display and the logging read the same seam, so they never drift out of sync.
 
 ---
 
