@@ -1,3 +1,4 @@
+// DeepBench v6.1.43 | api/capabilities/execute.js | S-MI-42 -- _onEvent plumbing, live delegation/delegation_return events at all 5 real dispatch points; v6.1.43 -- S-MI-42 opt-in stream:true SSE transport, all handler branches
 // DeepBench v6.1.35 | api/capabilities/execute.js | AA-164 -- thread lastHelpSelection into the normal (non-checkpointed) terminal return
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
 // logic lives here, ever — model/max_tokens/schema come entirely from Skill Profile data via
@@ -286,6 +287,7 @@ async function runLoop({
   display_agent_id, display_agent_card,
   conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
   job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
+  onEvent, // FEATURE: MI-42 -- always a real function by the time this fires; runCapability()/resumeCapability() already default it to a no-op
 }) {
   let delegationRetried = false;
   for (let depth = hopCounter.n; ; depth++) {
@@ -359,6 +361,9 @@ async function runLoop({
           }
           hopCounter.n++;
           const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
+          // FEATURE: MI-42 -- fires the instant the target is resolved, before the nested call's own
+          // latency -- never speculative, the critique agent is always real by the time this fires.
+          onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: critiqueAgentId, toCapabilitySlug: critiqueCapabilitySlug, toIntentSlug: critiqueIntentSlug, viaTool: 'critique' });
           critique = await runCapability({
             capability_slug: critiqueCapabilitySlug,
             intent_slug: critiqueIntentSlug,
@@ -367,6 +372,7 @@ async function runLoop({
             tenant_id,
             _hop_counter: hopCounter,
             _deadline: deadline,
+            _onEvent: onEvent,
           });
         }
         const confirmation_id = await insertPendingConfirmation({
@@ -400,6 +406,8 @@ async function runLoop({
     delegationOccurred = true;
 
     let delegateResult;
+    let returningFromAgentId = null;
+    let returningFromCapabilitySlug = null;
     if (turn.tool_name === 'request_help') {
       // FEATURE: AA-87 -- every unresolved skill need routes to whoever currently holds
       // project-manager. This capability_slug/intent_slug pair is a platform-level constant
@@ -408,6 +416,9 @@ async function runLoop({
       // the literal string "michelle". No fast path exists -- every request_help call reasons
       // through here, even when the roster's current state makes the outcome predictable.
       const pmAgentId = await resolveCapabilityHolder('project-manager');
+      // FEATURE: MI-42 -- the PM broker's identity is real, resolved data (who currently holds
+      // project-manager), not the reasoning itself -- honest to emit before her call runs.
+      onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
       delegateResult = await runCapability({
         capability_slug: 'project-manager',
         intent_slug: 'agent-selection-intent',
@@ -416,6 +427,7 @@ async function runLoop({
         tenant_id,
         _hop_counter: hopCounter,
         _deadline: deadline,
+        _onEvent: onEvent,
       });
       // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- thread Michelle's real selection forward instead of
       // discarding it. Generic to any request_help hop, not Display-agent-specific: captures
@@ -454,12 +466,17 @@ async function runLoop({
         const delegateTaskContext = (task_context && typeof task_context === 'object')
           ? { ...task_context, delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed }
           : { delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed };
+        // FEATURE: MI-42 -- Michelle's own reasoning has already produced rec.recommended_agent_id
+        // by this point (validated against her real candidates above) -- this is the live "who got
+        // picked" moment the drawer only shows after the fact today.
+        onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null });
         const autoResolvedResult = await runCapability({
           capability_slug: rec.recommended_capability_slug,
           intent_slug: matchedCandidate.intent_slug || null,
           agent_id: rec.recommended_agent_id,
           task_context: delegateTaskContext,
           tenant_id, _hop_counter: hopCounter, _deadline: deadline,
+          _onEvent: onEvent,
         });
         if (autoResolvedResult.status === 'in_progress') {
           return checkpointAndReturn({
@@ -473,6 +490,11 @@ async function runLoop({
           lastHelpSelection, job_id,
         });
       }
+      // FEATURE: MI-42 -- non-delegationRequired request_help fall-through: control returns to the
+      // requester for another turn once Michelle has responded. Marks the "loop continues" boundary
+      // for the shared delegation_return emission below (1h).
+      returningFromAgentId = pmAgentId;
+      returningFromCapabilitySlug = 'project-manager';
     } else if (turn.tool_name === 'delegate_to_agent') {
       // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
       // call here: the model is choosing an agent_id it was just handed as a candidate (via
@@ -493,6 +515,8 @@ async function runLoop({
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: task }
         : { delegation_task: task };
+      // FEATURE: MI-42 -- the model's own tool-call argument names the target; never speculative.
+      onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
       delegateResult = await runCapability({
         capability_slug: targetCapabilitySlug,
         intent_slug: targetIntentSlug || null,
@@ -501,6 +525,7 @@ async function runLoop({
         tenant_id,
         _hop_counter: hopCounter,
         _deadline: deadline,
+        _onEvent: onEvent,
       });
 
       // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- the real fix: a nested delegate call may
@@ -540,6 +565,18 @@ async function runLoop({
       if (delegationRequired || turn.tool_input.is_final === true) {
         return await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id });
       }
+      // FEATURE: MI-42 -- non-terminal delegate_to_agent fall-through (is_final not set), e.g.
+      // Owen's retry-via-Marcus. Marks the "loop continues" boundary for the shared
+      // delegation_return emission below (1h).
+      returningFromAgentId = targetAgentId;
+      returningFromCapabilitySlug = targetCapabilitySlug;
+    }
+
+    // FEATURE: MI-42 -- fires only on the "loop continues" path (every other outcome above already
+    // returned) -- honest by construction, never fires for a delegationRequired hand-off (always
+    // terminal, nothing legitimately "returns") or a checkpoint (already returned before reaching here).
+    if (returningFromAgentId) {
+      onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug });
     }
 
     conversationHistory = [
@@ -569,10 +606,16 @@ export async function runCapability({
   display_agent_id = null,
   _hop_counter = null,
   _deadline = null,
+  _onEvent = null,
 }) {
   if (!capability_slug) throw new Error('capability_slug required');
   if (!agent_id) throw new Error('agent_id required');
   if (!task_context) throw new Error('task_context required');
+  // FEATURE: MI-42 -- defaults to a no-op so every existing/future caller that never passes
+  // _onEvent is completely unaffected (byte-identical behavior, zero overhead). Threaded to
+  // runLoop() exactly like _hop_counter/_deadline already are -- explicit param, never closure
+  // state, so it survives arbitrarily deep nested runCapability() recursion unchanged.
+  const onEvent = _onEvent || (() => {});
 
   const promptRequest = await assemblePrompt({
     capability_slug,
@@ -619,6 +662,7 @@ export async function runCapability({
     display_agent_id, display_agent_card,
     conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
     hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
+    onEvent,
   });
 }
 
@@ -631,7 +675,7 @@ export async function runCapability({
 // chain runs without the consequential-action gate and without a display-card override, matching
 // AA-138's proven scope; no live path today reaches the gate via a chain that also risks the
 // budget ceiling (kickoff SCOPE RULES).
-export async function resumeCapability({ job_id }) {
+export async function resumeCapability({ job_id, _onEvent = null }) {
   if (!job_id) throw new Error('job_id required');
   const row = await loadDurableHopRow(job_id);
 
@@ -645,6 +689,8 @@ export async function resumeCapability({ job_id }) {
     llm: row.llm,
   };
   const deadline = Date.now() + 60000 - SAFETY_MARGIN_MS;
+  // FEATURE: MI-42 -- same no-op-default pattern as runCapability() above.
+  const onEvent = _onEvent || (() => {});
 
   try {
     return await runLoop({
@@ -667,6 +713,7 @@ export async function resumeCapability({ job_id }) {
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
       deadline, job_id: row.id,
+      onEvent,
     });
   } catch (e) {
     // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- DB bookkeeping only: a genuinely-failed resumed
@@ -687,7 +734,7 @@ export async function resumeCapability({ job_id }) {
 // human's OK before acting actually go act on it afterward, via the same request_help loop every
 // other cross-agent hand-off uses -- never a direct call to whichever agent ends up executing it.
 // ARCHITECTURE.md §19b/§19d, PLATFORM-AGENT-RULEBOOK.md AR-2.2/2.3/3.1.
-export async function resolveAccept({ confirmation_id }) {
+export async function resolveAccept({ confirmation_id, _onEvent = null }) {
   const row = await getPendingConfirmation(confirmation_id);
   if (!row) throw Object.assign(new Error('confirmation not found'), { status: 404 });
   if (row.status !== 'pending') throw Object.assign(new Error(`confirmation already ${row.status}`), { status: 409 });
@@ -703,9 +750,29 @@ export async function resolveAccept({ confirmation_id }) {
     agent_id: row.agent_id,
     task_context: row.proposed_action,
     tenant_id: row.tenant_id,
+    _onEvent,
   });
   await markAcceptedDelegated(confirmation_id, result);
   return result;
+}
+
+// FEATURE: MI-42 -- reuses api/plan.js's own proven SSE idiom (text/event-stream, `data: <json>\n\n`
+// lines, `data: [DONE]` sentinel) verbatim -- not a new transport. Once streaming starts, the HTTP
+// status is locked at 200 (headers already sent), so a mid-chain throw becomes a terminal `error`
+// event inside the stream instead of an HTTP 500 -- callCapability()'s stream reader (Task 3) checks
+// for this event type explicitly rather than relying on res.ok/res.status for a streamed request.
+async function streamResult(res, run) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  try {
+    const result = await run((evt) => res.write(`data: ${JSON.stringify(evt)}\n\n`));
+    res.write(`data: ${JSON.stringify({ type: 'result', result })}\n\n`);
+  } catch (e) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: e.message, status: e.status || 500, ...(e.detail ? { detail: e.detail } : {}) })}\n\n`);
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
 }
 
 export default async function handler(req, res) {
@@ -733,6 +800,13 @@ export default async function handler(req, res) {
         if (row.status !== 'pending') return res.status(409).json({ error: `confirmation already ${row.status}` });
         if (!edited_task_context) return res.status(400).json({ error: 'edited_task_context required for edit' });
         await markEdited(confirmation_id);
+        if (body.stream === true) {
+          return streamResult(res, (emit) => runCapability({
+            capability_slug: row.capability_slug, intent_slug: row.intent_slug,
+            agent_id: row.agent_id, task_context: edited_task_context, tenant_id: row.tenant_id,
+            _onEvent: emit,
+          }));
+        }
         const result = await runCapability({
           capability_slug: row.capability_slug, intent_slug: row.intent_slug,
           agent_id: row.agent_id, task_context: edited_task_context, tenant_id: row.tenant_id,
@@ -744,6 +818,9 @@ export default async function handler(req, res) {
       // to resolvePendingConfirmation() when the confirmed intent has no on_accept_intent_slug
       // (byte-identical old behavior for reject, and for any accept without one declared).
       if (resolution === 'accept') {
+        if (body.stream === true) {
+          return streamResult(res, (emit) => resolveAccept({ confirmation_id, _onEvent: emit }));
+        }
         const result = await resolveAccept({ confirmation_id });
         return res.status(200).json(result);
       }
@@ -761,6 +838,9 @@ export default async function handler(req, res) {
     if (body.action === 'continue') {
       const { job_id } = body;
       if (!job_id) return res.status(400).json({ error: 'job_id required' });
+      if (body.stream === true) {
+        return streamResult(res, (emit) => resumeCapability({ job_id, _onEvent: emit }));
+      }
       const result = await resumeCapability({ job_id });
       return res.status(200).json(result);
     }
@@ -769,8 +849,15 @@ export default async function handler(req, res) {
     // _hop_counter so no external caller can seed or override the platform's hop ceiling.
     const {
       capability_slug, intent_slug, agent_id, task_context, runtime_context,
-      tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+      tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id, stream,
     } = req.body || {};
+    if (stream === true) {
+      return streamResult(res, (emit) => runCapability({
+        capability_slug, intent_slug, agent_id, task_context, runtime_context,
+        tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+        _onEvent: emit,
+      }));
+    }
     const result = await runCapability({
       capability_slug, intent_slug, agent_id, task_context, runtime_context,
       tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,

@@ -1,3 +1,4 @@
+// DeepBench v6.1.43 | MarketIntelligenceScreen.jsx / useAIActivity.js | S-MI-42 -- two-tone indicator, final-timeline caption, streaming/agent-delegation catalog fixes
 // DeepBench v6.0.21 | useAIActivity.js | S-MARKET-INTEL-01d — agent-delegation pattern catalog fix (replaces stale agent-orchestration), quality-gate/pipeline-triage/data-analysis patterns retrofit
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
 // FEATURE: AI-16 — logAICall Supabase persistence
@@ -41,11 +42,16 @@ export const SERVICE_CATALOG = [
   // FEATURE: AG-27 — The Librarian (Eleanor Voss) Data Room broker service catalog entry
   { slug: 'librarian',               name: 'The Librarian',             serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
   // FEATURE: MI-10/MI-11 — Channel Intelligence (Marcus/CI-01): Intent Routing + Q&A Answer
-  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning'],          roadmap: 'now'  },
+  // FEATURE: MI-42 — Agent Delegation added (pre-existing gap: Marcus's own ci-answer-intent/
+  // ci-answer-display-intent already use it via AA-164/S-ARCH-DISPLAY-LOOP-01, the catalog just
+  // never reflected it) + Streaming (this session wires opt-in SSE streaming into every capability
+  // this service exposes).
+  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning', 'Agent Delegation', 'Streaming'],          roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
   // FEATURE: MI-01d — Agent Delegation added: Owen's own delegate_to_agent retry (Task 3) is this
   // service's first live delegating caller.
-  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Agent Delegation'], roadmap: 'now'  },
+  // FEATURE: MI-42 — Streaming added (opt-in SSE streaming wired into every capability this service exposes).
+  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Agent Delegation', 'Streaming'], roadmap: 'now'  },
   // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
   // RAG listed at capability level even though this specific call's design doc technical_services
   // don't name it — hyp-knowledge fires a RAG fetch unconditionally, same accepted behavior as
@@ -59,7 +65,8 @@ export const SERVICE_CATALOG = [
   // channel-intelligence/quality-gate/hypothesis-evaluation.
   // FEATURE: MI-01d — Agent Delegation added: Sam's intake-failure-intent gets its first live
   // caller this session (Task 2).
-  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation'], roadmap: 'now' },
+  // FEATURE: MI-42 — Streaming added (opt-in SSE streaming wired into every capability this service exposes).
+  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation', 'Streaming'], roadmap: 'now' },
   // FEATURE: AA-86 -- Michelle's roster broker (lib/project-manager.js). Deterministic read, no
   // LLM call of its own -- mirrors db-assembly's shape, not librarian's (no RAG/embedding step).
   { slug: 'agent-directory', name: 'Agent Directory', serviceType: 'logic', patterns: [], roadmap: 'now' },
@@ -108,7 +115,7 @@ export const PATTERN_CATALOG = [
   { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
   // FEATURE: BUG-15 — reflection is live since S-PROMPT-ARCH-01; flip active: false → true
   { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
-  { slug: 'streaming',          name: 'Streaming',          desc: 'Token-by-token output delivery via SSE — response arrives progressively where UX latency matters',                                    active: true,  patternType: 'structural' },
+  { slug: 'streaming',          name: 'Streaming',          desc: 'Progressive output delivery via SSE — token deltas or discrete structured events, arriving as they happen instead of one final blob, where UX latency matters',                                    active: true,  patternType: 'structural' },
   { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true,  patternType: 'structural' },
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
   { slug: 'browser-automation', name: 'Browser Automation', desc: 'Playwright-controlled browser execution — agent drives a real browser instance on Railway infrastructure',                            active: true,  patternType: 'structural' },

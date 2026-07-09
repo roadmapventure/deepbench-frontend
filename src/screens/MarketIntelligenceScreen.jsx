@@ -1,3 +1,4 @@
+// DeepBench v6.1.43 | MarketIntelligenceScreen.jsx | S-MI-42 -- live SSE delegation events + MI-41 macro-hop swap, all 3 agent flows
 // DeepBench v6.1.41 | MarketIntelligenceScreen.jsx | S-MI-34 — MI-32/33 scroll-fix completion (3-column
 // grid alignItems:"start" removed, restoring default stretch so InteractColumn's own overflow chain gets
 // a real bounded height); Column 3 drawer height cap (MI-34, Drawer's new maxHeight prop, Agent Routing
@@ -112,6 +113,39 @@ function formatDuration(ms) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
+// FEATURE: MI-42 -- mirrors CreateWorkOrderScreen.jsx's own proven reader (res.body.getReader() +
+// TextDecoder, data: <json> lines, data: [DONE] sentinel) -- same idiom, not a new one. Buffers a
+// trailing partial line across chunk boundaries (chunks don't align to \n\n boundaries). `type:
+// 'result'` resolves the promise; `type: 'error'` throws (this is how a streamed request's failure
+// surfaces now that the HTTP status is locked at 200 once streaming starts -- see execute.js
+// streamResult()); every other type is forwarded to onProgress as a live delegation event.
+async function readSSEResult(res, onProgress) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let final;
+  let gotResult = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(data); } catch { continue; }
+      if (evt.type === 'result') { final = evt.result; gotResult = true; }
+      else if (evt.type === 'error') { throw Object.assign(new Error(evt.message), { status: evt.status, detail: evt.detail }); }
+      else { onProgress(evt); }
+    }
+  }
+  if (!gotResult) throw new Error('Stream ended without a result event');
+  return final;
+}
+
 // FEATURE: MI-23 — live elapsed timer for the chat-embedded working-status indicator
 // FEATURE: MI-35 — reformatted from "m:ss" (e.g. "1:04") to "Xm Ys"/"Xs" for consistency with the
 // new expected-time estimate rendered next to it (formatExpectation, below) — same unit style,
@@ -164,16 +198,17 @@ function formatExpectation(ms) {
 // execute.js harness loop — see kickoff CONTEXT). Keyed by startedAt at the call site (not here)
 // so React fully remounts this component on every new turn instead of trying to reset internal
 // tick state — the simplest correct way to guarantee the timer starts at 0:00 every time.
-function AgentWorkingIndicator({ message, startedAt, expectation }) {
+function AgentWorkingIndicator({ message, startedAt, expectation, kind }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  const isOrchestration = kind === 'orchestration'; // FEATURE: MI-42
   return (
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-      <AIDiamond size="7px" color={T.brass}/>
-      <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic"}}>{message}</span>
+      <AIDiamond size="7px" color={isOrchestration ? T.navy : T.brass}/>
+      <span style={{fontFamily:mono,fontSize:11,color:isOrchestration ? T.ink : T.muted,fontStyle:isOrchestration ? "normal" : "italic",fontWeight:isOrchestration ? 600 : 400}}>{message}</span>
       <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
       {expectation && <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>- {expectation}</span>}
     </div>
@@ -287,6 +322,27 @@ function describePipelineEvent(evt) {
   }
 }
 
+// FEATURE: MI-42 -- generic across every agent pair, no hardcoded names or capability-specific
+// branches (matches ARCHITECTURE.md §19d's own anti-hardcoding discipline) -- copy is derived
+// entirely from the event's own fromAgentId/toAgentId, resolved against the real roster.
+function describeDelegationEvent(evt, agents) {
+  const agentById = (id) => agents.find(a => a.id === id);
+  const fromName = agentById(evt.fromAgentId)?.name || evt.fromAgentId;
+  const toName = agentById(evt.toAgentId)?.name || evt.toAgentId;
+  if (evt.type === 'delegation_return') {
+    return `${toName} is back — wrapping up…`;
+  }
+  switch (evt.viaTool) {
+    case 'request_help':
+      return `${fromName} is asking ${toName} who should help…`;
+    case 'critique':
+      return `${toName} is reviewing ${fromName}'s proposal…`;
+    case 'delegate_to_agent':
+    default:
+      return `${fromName} is routing this to ${toName}…`;
+  }
+}
+
 // FEATURE: MI-02 — generalized to accept any capability/agent/task_context (was hardcoded to
 // channel-intelligence/marcus/{goal:message}) — same contract execute.js already exposes, now
 // used by Marcus's channel-intelligence calls, Priya's hypothesis-evaluation calls, Owen's
@@ -310,7 +366,7 @@ const MAX_CONTINUE_ITERATIONS = 10; // client-side safety cap -- generous headro
 // status, so every existing caller keeps its current contract unchanged -- none of them ever need
 // to know a checkpoint happened. Shared by callCapability() and resolveConfirmation() -- one
 // implementation, not two copies of the same loop.
-async function resolveInProgress(result) {
+async function resolveInProgress(result, onProgress = null) {
   let iterations = 0;
   while (result.status === "in_progress") {
     if (++iterations > MAX_CONTINUE_ITERATIONS) {
@@ -319,15 +375,15 @@ async function resolveInProgress(result) {
     const res = await fetch("/api/capabilities/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "continue", job_id: result.job_id }),
+      body: JSON.stringify({ action: "continue", job_id: result.job_id, stream: !!onProgress }),
     });
     if (!res.ok) throw new Error(`continue (job_id: ${result.job_id}) failed: ${res.status}`);
-    result = await res.json();
+    result = onProgress ? await readSSEResult(res, onProgress) : await res.json();
   }
   return result;
 }
 
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null }) {
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -335,24 +391,29 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
       capability_slug, intent_slug, agent_id, task_context, runtime_context,
       format_skill_profile_slug, display_agent_id,
       tenant_id: TENANT_ID,
+      stream: !!onProgress,
     }),
   });
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
-  const result = await resolveInProgress(await res.json());
+  const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
+  const result = await resolveInProgress(first, onProgress);
   if (result.status) return result;
   return result.content || {};
 }
 
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
 // capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
-async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null }) {
+// FEATURE: MI-42 — gains the identical onProgress/stream treatment for consistency (Nadia's
+// confirmation-resolve path); no live call site opts in this session (see Task 3g), future-proofing.
+async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null, onProgress = null }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "resolve", confirmation_id, resolution, edited_task_context }),
+    body: JSON.stringify({ action: "resolve", confirmation_id, resolution, edited_task_context, stream: !!onProgress }),
   });
   if (!res.ok) throw new Error(`resolve ${resolution} failed: ${res.status}`);
-  return resolveInProgress(await res.json());
+  const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
+  return resolveInProgress(first, onProgress);
 }
 
 // FEATURE: MI-01d — Owen's own delegate_to_agent call replaces the screen-scripted retry
@@ -362,11 +423,11 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // his own final output (final_answer) carries the delegated result forward, since nothing outside
 // his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
 // data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
-async function runQaWithQualityGate(message, conversationContext, onEvent) {
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress) {
   let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext,
+    task_context: { goal: message }, runtime_context: conversationContext, onProgress,
   });
   onEvent({ type: "qa_answer", agentId: "marcus", data: qa, durationMs: Date.now() - t0 });
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
@@ -378,21 +439,25 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   }
 
   t0 = Date.now();
+  setStatus("Owen is reviewing…"); // FEATURE: MI-42 (was MI-41) -- macro-hop swap, was invisible before
   const gate = await callCapability({
     capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
     task_context: {
       question: message, candidate_answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations,
       agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
     },
+    onProgress,
   });
   const retried = !!gate.final_answer;
   onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate, durationMs: Date.now() - t0 });
 
   if (gate.guardrail?.result === "block") {
     const t0 = Date.now();
+    setStatus("Sam is triaging the block…"); // FEATURE: MI-42 (was MI-41)
     const triage = await callCapability({
       capability_slug: "pipeline-triage", intent_slug: "intake-failure-intent", agent_id: "sam",
       task_context: { guardrail_failure: gate.guardrail, original_question: message },
+      onProgress,
     });
     onEvent({ type: "failure_triage", agentId: "sam", data: triage, durationMs: Date.now() - t0 });
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, triage) };
@@ -408,9 +473,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   // Proofreader gate/retry sequence resolves, on finalAnswer (whichever of qa/gate.final_answer
   // won) — Owen's own evaluation semantics above are completely unchanged by this step.
   t0 = Date.now();
+  setStatus("Marcus is preparing the response…"); // FEATURE: MI-42 (was MI-41)
   const display = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
+    onProgress,
   });
   if (display.selection) {
     onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
@@ -450,11 +517,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent) {
   };
 }
 
-async function runIntentPipeline(message, conversationContext, onEvent) {
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress) {
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext,
+    task_context: { goal: message }, runtime_context: conversationContext, onProgress,
   });
   onEvent({ type: "intent_routing", agentId: "marcus", data: routing, durationMs: Date.now() - t0 });
   if (routing.intent === "escalate") {
@@ -463,7 +530,7 @@ async function runIntentPipeline(message, conversationContext, onEvent) {
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress);
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -487,7 +554,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
 // -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
 // candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
 // format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress }) {
   const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
@@ -495,12 +562,14 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
       flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
       prior_hypothesis_test: priorHypothesisTest || null,
     },
+    onProgress,
   });
 
   const t0 = Date.now();
   const display = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-display-intent", agent_id: "priya",
     task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
+    onProgress,
   });
   if (display.selection) {
     onEvent({ type: "agent_selection", agentId: "priya", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
@@ -578,6 +647,13 @@ function MessageBubble({ msg, onReview }) {
             </div>
           )}
         </div>
+        {/* FEATURE: MI-42 -- same final-timeline caption as the qa bubble, msg.totalElapsedMs set
+            by onSelectHypothesis(). */}
+        {msg.totalElapsedMs != null && (
+          <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
+            Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
+          </div>
+        )}
       </div>
     );
   }
@@ -633,6 +709,16 @@ function MessageBubble({ msg, onReview }) {
             </div>
           )}
         </div>
+        {/* FEATURE: MI-42 -- final-timeline caption, reuses formatElapsed() unchanged (already
+            produces "47s"/"1m 30s"-style output). msg.totalElapsedMs is a simple end-start diff,
+            set at the submit()/onSelectHypothesis() call sites -- mathematically identical to
+            summing each displayed segment's duration since hops are strictly sequential with zero
+            gaps, computed the simpler way. */}
+        {msg.totalElapsedMs != null && (
+          <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
+            Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
+          </div>
+        )}
         {msg.needs_review && (
           <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
             <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
@@ -1189,7 +1275,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }
           ) : (
             messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
           )}
-          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} expectation={workingStatus.expectation}/>}
+          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} expectation={workingStatus.expectation} kind={workingStatus.kind}/>}
         </div>
 
         <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
@@ -1216,10 +1302,19 @@ export default function MarketIntelligenceScreen() {
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
-  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, expectation } | null
+  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, expectation, kind } | null
   // FEATURE: MI-35 — lifted from AuditColumn so it's available at every setWorkingStatus( call
   // site below, not just inside AuditColumn.
   const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
+  const agents = useAgents(); // FEATURE: MI-42 -- needed here for describeDelegationEvent()'s name resolution
+
+  // FEATURE: MI-42 -- one shared status-setter for both MI-41's macro-hop swaps (explicit calls
+  // below) and this session's live micro-hop delegation events (via onDelegationProgress, forwarded
+  // into every callCapability() call as onProgress) -- both write the same workingStatus, so they
+  // can never drift into two different timers.
+  const setStatus = (message, { expectation = null, kind = 'scripted' } = {}) =>
+    setWorkingStatus({ message, startedAt: Date.now(), expectation, kind });
+  const onDelegationProgress = (evt) => setStatus(describeDelegationEvent(evt, agents), { kind: 'orchestration' });
 
   const logEvent = (evt) => setPipelineEvents(prev => [...prev, { ...evt, id: prev.length }]);
 
@@ -1237,7 +1332,7 @@ export default function MarketIntelligenceScreen() {
     const t0 = Date.now();
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_generation, agentActivity);
-      setWorkingStatus({ message: "Priya is generating hypotheses…", startedAt: t0, expectation: est != null ? formatExpectation(est) : null });
+      setStatus("Priya is generating hypotheses…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
       const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
@@ -1259,7 +1354,8 @@ export default function MarketIntelligenceScreen() {
     if (!clean || loading) return;
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
-    setWorkingStatus({ message: "Marcus is thinking…", startedAt: Date.now(), expectation: "expect < 2m" });
+    const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
+    setStatus("Marcus is thinking…", { expectation: "expect < 2m" });
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
@@ -1273,7 +1369,7 @@ export default function MarketIntelligenceScreen() {
             return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
           });
         }
-      });
+      }, setStatus, onDelegationProgress);
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — msg.text stays a plain-text join of the formatted body
         // (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep working
@@ -1286,6 +1382,7 @@ export default function MarketIntelligenceScreen() {
           displayAgentCard: result.displayAgentCard, displayAgentId: result.displayAgentId,
           needs_review: !!result.needs_review, review_reason: result.review_reason,
           question: clean, citations: result.citations || [],
+          totalElapsedMs: Date.now() - turnStart, // FEATURE: MI-42 -- Task 4's caption reads this
         }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
@@ -1316,14 +1413,15 @@ export default function MarketIntelligenceScreen() {
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
     const t0 = Date.now();
+    const turnStart = t0; // FEATURE: MI-42 -- Task 4's caption reads this
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_test, agentActivity);
-      setWorkingStatus({ message: "Priya is running a hypothesis test…", startedAt: t0, expectation: est != null ? formatExpectation(est) : null });
+      setStatus("Priya is running a hypothesis test…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent });
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress: onDelegationProgress });
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id }]);
+      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id, totalElapsedMs: Date.now() - turnStart }]);
       setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
@@ -1358,7 +1456,7 @@ export default function MarketIntelligenceScreen() {
         ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
 
-      setWorkingStatus({ message: "Elena is consolidating this into memory…", startedAt: t0, expectation: null });
+      setStatus("Elena is consolidating this into memory…");
       const elenaResult = await callCapability({
         capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
         task_context: {
@@ -1366,18 +1464,20 @@ export default function MarketIntelligenceScreen() {
           committed_hypothesis: chosenText, intent, hypothesis_test: hypothesisTestText,
           was_override: !!hypothesisTest?.override_warning,
         },
+        onProgress: onDelegationProgress,
       });
       logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
 
       step = "patch_proposed";
       t0 = Date.now();
-      setWorkingStatus({ message: "Nadia is drafting a data patch…", startedAt: t0, expectation: null });
+      setStatus("Nadia is drafting a data patch…");
       const nadiaResult = await callCapability({
         capability_slug: "data-analysis", intent_slug: "data-patch-intent", agent_id: "nadia",
         task_context: {
           disputed_chunk_id: disputedChunkId, correction: chosenText,
           user_reasoning: hypothesisTestText || chosenText,
         },
+        onProgress: onDelegationProgress,
       });
       logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult, durationMs: Date.now() - t0 });
 
@@ -1409,7 +1509,7 @@ export default function MarketIntelligenceScreen() {
       ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
       : null;
     const t0 = Date.now();
-    setWorkingStatus({ message: "Nadia is processing your response…", startedAt: t0, expectation: null });
+    setStatus("Nadia is processing your response…");
     try {
       const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
