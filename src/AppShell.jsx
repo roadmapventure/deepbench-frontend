@@ -1,3 +1,4 @@
+// DeepBench v6.1.40 | AppShell.jsx | S-MI-32 — root height fix (MI-32/33, minHeight→height so the flex/scroll chain gets a real viewport-bounded size) + Work/Bench nav restructure with Work dropdown (MI-36)
 // DeepBench v6.1.3 | AppShell.jsx | S-MI-21/SH-16 — Market Intelligence nav tab moved to 1st position
 // DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
 // DeepBench v6.1.5 | AppShell.jsx | S-MI-23 — header AI status dot suppressed on MI route
@@ -7,7 +8,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
-import { Toast, FeatureBadge } from "./components/SharedUI.jsx";
+import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
 import AIDiamond from "./components/AIDiamond.jsx";
@@ -82,6 +83,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
   const { status, cleanup } = useAIStatus();
   const [aboutHovered, setAboutHovered] = useState(false);
   const [auditTipShow, setAuditTipShow] = useState(false);
+  const [workMenuOpen, setWorkMenuOpen] = useState(false);
 
   useEffect(() => () => cleanup(), [cleanup]);
 
@@ -102,27 +104,38 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </div>
       </div>
 
-      {/* Market Intelligence / Work / Bench nav tabs — centered absolutely */}
+      {/* FEATURE: MI-36 — Work/Bench nav, Work opens a dropdown (Market Intelligence / Project
+          Management / Spend Analysis). MI-32/33's scroll-height fix (same session) is what makes the
+          header behave as pinned/static now that the root has a definite height. */}
       <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
-        {/* FEATURE: SH-15 — Market Intelligence tab, default landing route. SH-16 — moved to 1st position, John's explicit call, 2026-07-07 */}
         <span style={{position:"relative",display:"flex"}}>
-          <FeatureBadge id="SH-15"/>
-          <FeatureBadge id="SH-16"/>
           <NavTab
-            isActive={isMI}
-            onClick={()=>navigate("/")}
-            icon="◈"
-            label="Market Intelligence"
+            isActive={isWork || isMI}
+            onClick={()=>setWorkMenuOpen(o=>!o)}
+            icon="📋"
+            label="Work"
             hasBorderLeft={true}
           />
+          {workMenuOpen && (
+            <>
+              {/* click-outside-to-close backdrop */}
+              <div onClick={()=>setWorkMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:998}}/>
+              <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
+                {[
+                  {label:"Market Intelligence", icon:"◈", path:"/"},
+                  {label:"Project Management", icon:"📋", path:"/work"},
+                  {label:"Spend Analysis", icon:"💰", path:"/work/1/analyze"},
+                ].map(item => (
+                  <button key={item.path}
+                    onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer"}}>
+                    <span>{item.icon}</span>{item.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </span>
-        <NavTab
-          isActive={isWork}
-          onClick={()=>navigate("/work")}
-          icon="📋"
-          label="Work"
-          hasBorderLeft={false}
-        />
         <NavTab
           isActive={isBench}
           onClick={()=>navigate("/bench")}
@@ -233,7 +246,7 @@ export function AppShell({ children, headerProps = {}, toast }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   return (
-    <div style={{minHeight:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
+    <div style={{height:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
       <AppHeader {...headerProps} onHelp={()=>setAboutOpen(true)} onAIPanel={()=>setAiPanelOpen(o=>!o)}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
         {children}
