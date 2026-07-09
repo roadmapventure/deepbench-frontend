@@ -1,3 +1,4 @@
+// DeepBench v6.1.45 | AppShell.jsx | S-MI-44 — Work dropdown click-interception fix (MI-44): nav wrapper needed its own zIndex (transform creates a new stacking context, the backdrop's zIndex:998 was painting above it regardless of the dropdown's own zIndex:999) + subtle gold down-arrow dropdown hint
 // DeepBench v6.1.40 | AppShell.jsx | S-MI-32 — root height fix (MI-32/33, minHeight→height so the flex/scroll chain gets a real viewport-bounded size) + Work/Bench nav restructure with Work dropdown (MI-36)
 // DeepBench v6.1.3 | AppShell.jsx | S-MI-21/SH-16 — Market Intelligence nav tab moved to 1st position
 // DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
@@ -107,7 +108,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       {/* FEATURE: MI-36 — Work/Bench nav, Work opens a dropdown (Market Intelligence / Project
           Management / Spend Analysis). MI-32/33's scroll-height fix (same session) is what makes the
           header behave as pinned/static now that the root has a definite height. */}
-      <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
+      <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch",zIndex:1000}}>
         <span style={{position:"relative",display:"flex"}}>
           <NavTab
             isActive={isWork || isMI}
@@ -116,6 +117,8 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
             label="Work"
             hasBorderLeft={true}
           />
+          {/* FEATURE: MI-44 -- small gold down-arrow hint, subtle, signals Work opens a dropdown */}
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:7,color:T.brassLight,pointerEvents:"none"}}>▼</span>
           {workMenuOpen && (
             <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
               {[
