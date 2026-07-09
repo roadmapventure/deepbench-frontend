@@ -117,23 +117,19 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
             hasBorderLeft={true}
           />
           {workMenuOpen && (
-            <>
-              {/* click-outside-to-close backdrop */}
-              <div onClick={()=>setWorkMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:998}}/>
-              <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
-                {[
-                  {label:"Market Intelligence", icon:"◈", path:"/"},
-                  {label:"Project Management", icon:"📋", path:"/work"},
-                  {label:"Spend Analysis", icon:"💰", path:"/work/1/analyze"},
-                ].map(item => (
-                  <button key={item.path}
-                    onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
-                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer"}}>
-                    <span>{item.icon}</span>{item.label}
-                  </button>
-                ))}
-              </div>
-            </>
+            <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
+              {[
+                {label:"Market Intelligence", icon:"◈", path:"/"},
+                {label:"Project Management", icon:"📋", path:"/work"},
+                {label:"Spend Analysis", icon:"💰", path:"/work/1/analyze"},
+              ].map(item => (
+                <button key={item.path}
+                  onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
+                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer"}}>
+                  <span>{item.icon}</span>{item.label}
+                </button>
+              ))}
+            </div>
           )}
         </span>
         <NavTab
@@ -144,6 +140,13 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           hasBorderLeft={false}
         />
       </div>
+      {/* click-outside-to-close backdrop — rendered as a sibling of the transformed nav wrapper above,
+          not nested inside it: `transform` on an ancestor creates a new containing block for
+          position:fixed descendants, which shrank this backdrop's fixed:inset(0) down to that
+          ancestor's own box instead of the full viewport (found via live QA, S-MI-32). */}
+      {workMenuOpen && (
+        <div onClick={()=>setWorkMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:998}}/>
+      )}
 
       <div style={{flex:1}}/>
 
