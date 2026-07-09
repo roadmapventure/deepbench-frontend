@@ -98,12 +98,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ---
 
-## ROSTER / BENCH — RO
-
-| ID | Feature | Status | Session |
-|----|---------|--------|---------|
-| RO-11 | Bench filter label rename — left sidebar "NIGP Experts" filter (`RO-10`) renamed to "Spend Analysis" (display label only, `id: "nigp"` unchanged, no filter-logic change). John's explicit call (2026-07-09); `STYLE-GUIDE.md` §10 cross-reference updated in the same session for consistency. Known naming overlap with the unrelated top-nav "Spend Analysis" dropdown item (`MI-36`, routes to `/work/1/analyze`) explicitly accepted by John — different screen, different destination, context disambiguates. | ❌ Missing | S-RO-11 (v6.1.42) |
-
 **WK-XX — Test My Team (future, not yet scheduled):**
 Batch-run all bench agents against a sample dataset to compare output quality side-by-side. Entry point: button on Roster screen header. Scope: Work session chain. Do NOT implement in S-MIGRATE-01 or S-MIGRATE-02.
 

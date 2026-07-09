@@ -117,6 +117,7 @@
 | RO-08 | AiBadge on brass/gold backgrounds — badge stays inside button; navy-tinted chip on brass bg, white-tinted chip on moss bg | ✅ Done | S-BENCH-UX-02 (8717106) |
 | RO-09 | Bench roster sort by usage count — agents sorted by AI call count DESC, alpha first name on tie; zero-count agents at bottom sorted alpha | ✅ Done | S-RO-09 (4c4bdb2) |
 | RO-10 | Bench screen left-nav category filters (All/Market Intel/Platform Wide/NIGP Experts/Special Interests), reuses PersonnelScreen's locked left-sidebar nav pattern. Agents can belong to multiple groups. | ✅ Done | S-BENCH-FILTER-01 (21d261f) |
+| RO-11 | Bench filter label rename — left sidebar "NIGP Experts" filter (`RO-10`) renamed to "Spend Analysis" (display label only, `id: "nigp"` unchanged, no filter-logic change). John's explicit call (2026-07-09); `STYLE-GUIDE.md` §10 cross-reference and `RosterScreen.jsx`'s `RO-10` comment updated in the same session for consistency. Known naming overlap with the unrelated top-nav "Spend Analysis" dropdown item (`MI-36`, routes to `/work/1/analyze`) explicitly accepted by John — different screen, different destination, context disambiguates. Live-verified: label + count badge render correctly, filter behavior unchanged, no console errors. | ✅ Done | S-RO-11 (420a3c4) |
 ## PERSONNEL FILE — PE
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
