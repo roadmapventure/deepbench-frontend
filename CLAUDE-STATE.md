@@ -1,7 +1,7 @@
 # DeepBench — Current State
 > Updated at the close of every session. **Keep this file short.** Only the current version, the next session, and the last 3 sessions (one line each) belong here. Write each entry's full detail directly to `docs/SESSIONS.md` the moment it's added — do not let a paragraph accumulate here waiting to "fall off" later, that step keeps getting skipped. Read `docs/SESSIONS.md` only when you need version history or root-cause context from a past session, never by default.
 
-**Version in dev:** v6.1.39
+**Version in dev:** v6.1.40 (`S-MI-32` — AppShell scroll-height fix + nav restructure, MI-36/MI-33 done, MI-32 partial — full symptom fix pending `S-MI-34`/`v6.1.41`, in flight now)
 
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
