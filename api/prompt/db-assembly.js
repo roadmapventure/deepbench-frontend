@@ -1,3 +1,4 @@
+// DeepBench v6.1.40 | api/prompt/db-assembly.js | AA-121 — Knowledge Skill Profile intent_allowlist gate
 // DeepBench v6.1.13 | api/prompt/db-assembly.js | AA-142 — delegationRequired passthrough
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
@@ -48,6 +49,21 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
     let fetchInstruction = null;
 
     if (typeSlug === "knowledge") {
+      // FEATURE: AA-121 -- optional intent_allowlist gate. Knowledge Skill Profiles attach to a
+      // capability, not an intent, so historically fired RAG unconditionally on every call for that
+      // capability -- including lightweight, non-analytical intents that never reference retrieved
+      // content (e.g. channel-intelligence's ci-routing-intent classification call, or
+      // ci-answer-display-intent's pure hand-off routing). Confirmed live: ci-routing-intent was
+      // pulling ~4.3K tokens of RAG context to decide a 5-way classification with a 95-token output.
+      // Opt-in via traits.intent_allowlist (array of intent_slugs) -- when set, this section (and its
+      // RAG fetch) is skipped entirely unless the current call's intent_slug is in the list. Unset
+      // (every existing Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is
+      // byte-identical to today -- fires on every call, same as before.
+      if (Array.isArray(traits.intent_allowlist) && traits.intent_allowlist.length > 0) {
+        if (!intentSlug || !traits.intent_allowlist.includes(intentSlug)) {
+          continue;
+        }
+      }
       sectionType = "rag";
       fetchInstruction = {
         method: "rag",
