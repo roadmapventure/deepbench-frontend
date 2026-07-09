@@ -1,3 +1,4 @@
+// DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
 // DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
 // DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
 // FEATURE: SH-03 — Agent roster data
@@ -259,7 +260,7 @@ export const AGENTS = [
 export const BENCH_FILTERS = [
   { id: "mi",       label: "Market Intel"      },
   { id: "platform", label: "Platform Wide"     },
-  { id: "nigp",     label: "NIGP Experts"      },
+  { id: "nigp",     label: "Spend Analysis"    }, // FEATURE: RO-11 — relabeled, was the old NIGP label
   { id: "special",  label: "Special Interests" },
 ];
 

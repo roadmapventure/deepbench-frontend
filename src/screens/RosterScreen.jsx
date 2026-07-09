@@ -154,7 +154,7 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
 }
 
 // FEATURE: RO-01 — All 7 agents
-// FEATURE: RO-10 — Bench screen category filter (All/Market Intel/Platform Wide/NIGP Experts/Special Interests)
+// FEATURE: RO-10 — Bench screen category filter (All/Market Intel/Platform Wide/Spend Analysis/Special Interests)
 export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();

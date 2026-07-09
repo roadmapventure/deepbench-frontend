@@ -304,7 +304,7 @@ style={{
 
 ## 10. Left Sidebar Nav Pattern (Personnel File)
 
-**Second usage locked 2026-07-07 (`S-BENCH-FILTER-01`):** `RosterScreen.jsx` (`/bench`) reuses this exact pattern for its category filter nav (All/Market Intel/Platform Wide/NIGP Experts/Special Interests), at the same `180px` width. Confirms this is a reusable screen-level pattern, not Personnel-File-specific — any future screen needing a left filter/tab rail should reuse these same style objects rather than inventing a variant.
+**Second usage locked 2026-07-07 (`S-BENCH-FILTER-01`):** `RosterScreen.jsx` (`/bench`) reuses this exact pattern for its category filter nav (All/Market Intel/Platform Wide/Spend Analysis/Special Interests), at the same `180px` width. Confirms this is a reusable screen-level pattern, not Personnel-File-specific — any future screen needing a left filter/tab rail should reuse these same style objects rather than inventing a variant.
 
 ```jsx
 // Active tab
