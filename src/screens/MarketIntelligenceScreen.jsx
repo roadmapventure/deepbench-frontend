@@ -1,3 +1,7 @@
+// DeepBench v6.1.44 | MarketIntelligenceScreen.jsx | S-MI-43 — Agents drawer latency rows: new shared
+// LatencyStatRow component replaces the old justifyContent:"space-between" full-string right-justify
+// with a fixed-width label column (ellipsis-truncated) + fixed-width right-aligned leading number, so
+// the decimal point/units digit lines up across rows regardless of label length or 1-vs-2-digit values
 // DeepBench v6.1.43 | MarketIntelligenceScreen.jsx | S-MI-42 -- live SSE delegation events + MI-41 macro-hop swap, all 3 agent flows
 // DeepBench v6.1.41 | MarketIntelligenceScreen.jsx | S-MI-34 — MI-32/33 scroll-fix completion (3-column
 // grid alignItems:"start" removed, restoring default stretch so InteractColumn's own overflow chain gets
@@ -962,6 +966,24 @@ function formatKindLabel(kind) {
   return kind.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+// FEATURE: MI-43 — shared row renderer for the Agents drawer's per-agent latency stats
+// (Baseline, byKind, AA-149 byModel sub-rows). Fixed-width label column (ellipsis-truncated)
+// + fixed-width right-aligned leading number is what makes the decimal point/units digit land
+// in the same horizontal position across rows, regardless of label length or 1-vs-2-digit
+// seconds values — replaces the old justifyContent:"space-between" full-string right-justify,
+// which right-aligned the whole string and never actually lined up the numbers (John, 2026-07-09).
+function LatencyStatRow({ label, valueNumber, restText, indent, fontSize }) {
+  return (
+    <div style={{display:"flex",gap:6,fontFamily:mono,fontSize:fontSize ?? 9,color:indent?T.mutedDeep:T.muted,paddingLeft:indent?10:0}}>
+      <span style={{width:110,flexShrink:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>
+      <span style={{display:"flex",color:T.navy,fontWeight:700}}>
+        <span style={{display:"inline-block",minWidth:34,textAlign:"right",flexShrink:0}}>{valueNumber}</span>
+        <span>{restText}</span>
+      </span>
+    </div>
+  );
+}
+
 // FEATURE: MI-31 — rolls a per-agent speed-baseline-test summary (already deduped by
 // useAgentActivitySummary()'s classifyRow(), same as any other byKind data) into a single blended
 // number for the "Baseline" row. Reuses stats.byKind rather than averaging raw rows so the
@@ -1072,23 +1094,21 @@ function AuditColumn({ events, agentActivity }) {
               {(baseline || (stats?.byKind && Object.keys(stats.byKind).length > 0)) && (
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   {baseline && (
-                    <div style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
-                      <span>Baseline</span>
-                      <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
-                        {(baseline.avgLatency/1000).toFixed(1)}s avg ({baseline.calls} call{baseline.calls === 1 ? "" : "s"}, max {(baseline.maxLatency/1000).toFixed(1)}s)
-                      </span>
-                    </div>
+                    <LatencyStatRow
+                      label="Baseline"
+                      valueNumber={(baseline.avgLatency/1000).toFixed(1)}
+                      restText={`s avg (${baseline.calls} call${baseline.calls === 1 ? "" : "s"}, max ${(baseline.maxLatency/1000).toFixed(1)}s)`}
+                    />
                   )}
                   {stats?.byKind && Object.entries(stats.byKind)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
                     .map(([kind, k]) => (
                       <div key={kind} style={{display:"flex",flexDirection:"column",gap:2}}>
-                        <div style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:9,color:T.muted}}>
-                          <span>{formatKindLabel(kind)}</span>
-                          <span style={{color:T.navy,fontWeight:700,flexShrink:0}}>
-                            {k.avgLatency != null ? `${(k.avgLatency/1000).toFixed(1)}s avg` : "—"} ({k.calls} call{k.calls === 1 ? "" : "s"}{k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})
-                          </span>
-                        </div>
+                        <LatencyStatRow
+                          label={formatKindLabel(kind)}
+                          valueNumber={k.avgLatency != null ? (k.avgLatency/1000).toFixed(1) : "—"}
+                          restText={`${k.avgLatency != null ? "s avg" : ""} (${k.calls} call${k.calls === 1 ? "" : "s"}${k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})`}
+                        />
                         {/* FEATURE: AA-149 -- per-model sub-rows, shown only when a kind has genuinely used more
                             than one model (true today only for ci-answer-intent post-Haiku-switch during any
                             overlap window, and for any future model experiment on any intent). Every other kind
@@ -1097,12 +1117,14 @@ function AuditColumn({ events, agentActivity }) {
                           Object.entries(k.byModel)
                             .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
                             .map(([model, km]) => (
-                              <div key={model} style={{display:"flex",justifyContent:"space-between",gap:8,fontFamily:mono,fontSize:8,color:T.mutedDeep,paddingLeft:10}}>
-                                <span>&#8618; {model}</span>
-                                <span style={{flexShrink:0}}>
-                                  {km.avgLatency != null ? `${(km.avgLatency/1000).toFixed(1)}s avg` : "—"} ({km.calls} call{km.calls === 1 ? "" : "s"})
-                                </span>
-                              </div>
+                              <LatencyStatRow
+                                key={model}
+                                label={`↪ ${model}`}
+                                valueNumber={km.avgLatency != null ? (km.avgLatency/1000).toFixed(1) : "—"}
+                                restText={`${km.avgLatency != null ? "s avg" : ""} (${km.calls} call${km.calls === 1 ? "" : "s"})`}
+                                indent={true}
+                                fontSize={8}
+                              />
                             ))
                         }
                       </div>

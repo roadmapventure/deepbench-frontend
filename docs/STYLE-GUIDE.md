@@ -336,6 +336,23 @@ style={{ fontFamily: mono, fontSize: 8, color: T.muted, textTransform: "uppercas
 
 ---
 
+## 10a. Fixed-Label + Right-Aligned Number Pattern (Locked 2026-07-09 · `S-MI-43-design`)
+
+Reusable for any numeric list row where values need to line up on the decimal point/units digit regardless of label length — right-justifying the whole value string (old `justifyContent:"space-between"`) does not achieve this, since different-length value strings don't share a leading-digit position even when flush against the same edge. Instead: a fixed-width label column (ellipsis-truncated, does not wrap or push the value column) immediately followed by a flex value block containing a fixed-`minWidth`, right-aligned number box, then free-flowing suffix text. Reference implementation: `LatencyStatRow` (`MarketIntelligenceScreen.jsx`, Column 3 "Agents" drawer's Baseline/byKind/`AA-149` byModel rows).
+
+```jsx
+// Label column
+<span style={{ width: 110, flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+
+// Value block: fixed-width right-aligned number + free-flowing suffix text
+<span style={{ display: "flex", color: T.navy, fontWeight: 700 }}>
+  <span style={{ display: "inline-block", minWidth: 34, textAlign: "right", flexShrink: 0 }}>{valueNumber}</span>
+  <span>{restText}</span>
+</span>
+```
+
+---
+
 ## 11. Page Header Pattern
 
 ```jsx
