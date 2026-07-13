@@ -1,14 +1,19 @@
+// DeepBench v6.1.46 | WelcomeSplash.jsx | S-MI-45 — mobile sizing: panel branches on useIsMobile()
+// to a 75vw × 75vh panelMobile (vs. desktop's 80vw/max960/88vh), same overlay/dismiss mechanic and
+// copy, zero behavior change. FEATURE: MI-45 — see STYLE-GUIDE.md §23
 // DeepBench v5.2.41 | WelcomeSplash.jsx | S-SPLASH-01 welcome splash modal
 // FEATURE: SH-14 — Welcome splash modal
 // DeepBench v6.1.12 | WelcomeSplash.jsx | S-SPLASH-02/SH-18 — stat counters replaced with static capability strip
 
 import { useState, useEffect } from "react";
 import { T, display, mono } from "../tokens.js";
+import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 
 const STORAGE_KEY = "db_splash_dismissed";
 
 export default function WelcomeSplash() {
   const [visible, setVisible] = useState(false);
+  const isMobile = useIsMobile(); // FEATURE: MI-45
 
   useEffect(() => {
     if (sessionStorage.getItem(STORAGE_KEY)) return;
@@ -24,7 +29,7 @@ export default function WelcomeSplash() {
 
   return (
     <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
-      <div style={panel}>
+      <div style={isMobile ? panelMobile : panel}>
         {/* FEATURE: SH-14 — close button */}
         <button style={closeBtn} onClick={dismiss} aria-label="Close">×</button>
 
@@ -104,6 +109,16 @@ const panel = {
   border: `1.5px solid ${T.brass}`,
   borderRadius: 6,
   boxShadow: "0 24px 64px rgba(18,36,60,0.38)",
+};
+
+// FEATURE: MI-45 — mobile panel sizing (STYLE-GUIDE.md §23): 75vw × 75vh, no maxWidth cap
+// (unnecessary at mobile widths — 75vw of a phone viewport is always well under 960px).
+const panelMobile = {
+  ...panel,
+  width: "75vw",
+  maxWidth: "none",
+  height: "75vh",
+  maxHeight: "75vh",
 };
 
 const closeBtn = {

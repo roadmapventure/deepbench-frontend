@@ -1,3 +1,10 @@
+// DeepBench v6.1.46 | MarketIntelligenceScreen.jsx | S-MI-45 — mobile-responsive composition: new
+// isMobile branch (useIsMobile()) renders MobileBody (chat flex:3 + pinned Agent Routing feed
+// flex:1, Evidence/Activity full-screen overlays) below MOBILE_BREAKPOINT (768px); desktop's
+// existing 3-column grid is completely unchanged. RoutingEventRow (Agent Routing event row) and
+// AuditDrawersBody (Agents/Data Sources/Analysis/Agent Reasoning drawers) extracted out of
+// AuditColumn so both desktop and mobile render the exact same shared JSX (Category M).
+// FEATURE: MI-45 — see STYLE-GUIDE.md §21-23
 // DeepBench v6.1.44 | MarketIntelligenceScreen.jsx | S-MI-43 — Agents drawer latency rows: new shared
 // LatencyStatRow component replaces the old justifyContent:"space-between" full-string right-justify
 // with a fixed-width label column (ellipsis-truncated) + fixed-width right-aligned leading number, so
@@ -49,6 +56,7 @@ import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
 import { AI_PAT } from "../aiPatterns.js";
 
@@ -1000,11 +1008,46 @@ function rollupBaseline(stats) {
   return { avgLatency: Math.round(totalLatency / latencyCount), maxLatency, calls };
 }
 
-// FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
-// Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
-// Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
-function AuditColumn({ events, agentActivity }) {
-  const agents = useAgents();
+// FEATURE: MI-45 — extracted from AuditColumn's former inline .map() block so the exact same
+// per-event row renders in both desktop's Agent Routing Drawer and mobile's pinned Agent Routing
+// feed (STYLE-GUIDE.md §21) — one render path, two shells around it (Category M).
+function RoutingEventRow({ evt, agentById }) {
+  const { capability, summary, color } = describePipelineEvent(evt);
+  const svc = SERVICE_LABEL[capability];
+  const primary = agentById(evt.agentId);
+  const secondary = evt.secondaryAgentId ? agentById(evt.secondaryAgentId) : null;
+  return (
+    <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
+        {primary && <AgentAvatar who={primary.id} size={20}/>}
+        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? primary.name : evt.agentId}</span>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
+        {secondary && (
+          <>
+            <span style={{fontFamily:mono,fontSize:10,color:T.muted}}>→</span>
+            <AgentAvatar who={secondary.id} size={20}/>
+            <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{secondary.name}</span>
+            <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{secondary.role}</span>
+          </>
+        )}
+      </div>
+      {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
+      <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
+    </div>
+  );
+}
+
+// FEATURE: MI-45 — extracted from AuditColumn's former inline body: the four non-routing drawers
+// (Agents, Data Sources, Analysis, Agent Reasoning) now render from one shared function, called by
+// desktop's AuditColumn (right after its own Agent Routing Drawer) and mobile's Activity overlay
+// (STYLE-GUIDE.md §21, "Activity" carries Audit's other four drawers) — byte-identical drawer
+// content, sourced from the same function, per the kickoff's Task 2b requirement. learned/
+// dataSources/baselineActivity are computed here via the same hooks AuditColumn used to call
+// directly, so both call sites need only pass the two values (agents, agentActivity) that
+// genuinely differ per caller, rather than threading three additional hook results through props
+// for a single shared consumer.
+function AuditDrawersBody({ agents, agentActivity }) {
   const learned = useLearnedContext();
   const dataSources = useDataSources();
   // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
@@ -1012,7 +1055,6 @@ function AuditColumn({ events, agentActivity }) {
   // already fully isolated deliberate test data, not production MI-loop traffic.
   const baselineActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, null, 'speed-baseline-test');
   const agentById = (id) => agents.find(a => a.id === id);
-  const ordered = [...events].reverse(); // newest event on top, confirmed with John
   const activeIds = PROPOSED_MI_AGENT_IDS
     .filter(id => agentActivity[id]?.calls > 0)
     .sort((a, b) => (agentActivity[b]?.calls || 0) - (agentActivity[a]?.calls || 0));
@@ -1025,48 +1067,7 @@ function AuditColumn({ events, agentActivity }) {
   const simulationTotal = simulationCategories.reduce((n, cat) => n + simulationByCategory[cat].length, 0);
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
-      <FeatureBadge id="MI-17"/>
-      <FeatureBadge id="MI-06"/>
-      <FeatureBadge id="MI-18"/>
-      <FeatureBadge id="MI-15"/>
-      <FeatureBadge id="MI-21"/>
-      <FeatureBadge id="MI-22"/>
-      <FeatureBadge id="MI-30"/>
-      <FeatureBadge id="MI-31"/>
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
-      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280}>
-        {ordered.length === 0 ? (
-          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-            Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
-          </div>
-        ) : ordered.map(evt => {
-          const { capability, summary, color } = describePipelineEvent(evt);
-          const svc = SERVICE_LABEL[capability];
-          const primary = agentById(evt.agentId);
-          const secondary = evt.secondaryAgentId ? agentById(evt.secondaryAgentId) : null;
-          return (
-            <div key={evt.id} style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
-              <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
-                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
-                {primary && <AgentAvatar who={primary.id} size={20}/>}
-                <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? primary.name : evt.agentId}</span>
-                <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
-                {secondary && (
-                  <>
-                    <span style={{fontFamily:mono,fontSize:10,color:T.muted}}>→</span>
-                    <AgentAvatar who={secondary.id} size={20}/>
-                    <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{secondary.name}</span>
-                    <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{secondary.role}</span>
-                  </>
-                )}
-              </div>
-              {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
-              <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
-            </div>
-          );
-        })}
-      </Drawer>
+    <>
       <Drawer title="Agents" count={`${activeIds.length} active · ${potentialIds.length} potential`}>
         {activeIds.map(id => {
           const agent = agentById(id);
@@ -1218,6 +1219,40 @@ function AuditColumn({ events, agentActivity }) {
           );
         })}
       </Drawer>
+    </>
+  );
+}
+
+// FEATURE: MI-04/MI-01d — Pipeline Log: real event log driven by actual agent calls (Intent
+// Routing, Q&A Answer, Proofreader pass/block/revise incl. real retry hand-off, AI - Hypothesis Test,
+// Memory Consolidation, Data Integrity Patch proposal/resolution, Failure Triage).
+// FEATURE: MI-45 — slimmed to the Agent Routing drawer only (RoutingEventRow, shared with mobile's
+// pinned feed) plus AuditDrawersBody for the remaining four drawers — net-zero visual change,
+// extraction only (STYLE-GUIDE.md §21).
+function AuditColumn({ events, agentActivity }) {
+  const agents = useAgents();
+  const agentById = (id) => agents.find(a => a.id === id);
+  const ordered = [...events].reverse(); // newest event on top, confirmed with John
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
+      <FeatureBadge id="MI-17"/>
+      <FeatureBadge id="MI-06"/>
+      <FeatureBadge id="MI-18"/>
+      <FeatureBadge id="MI-15"/>
+      <FeatureBadge id="MI-21"/>
+      <FeatureBadge id="MI-22"/>
+      <FeatureBadge id="MI-30"/>
+      <FeatureBadge id="MI-31"/>
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
+      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280}>
+        {ordered.length === 0 ? (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
+            Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
+          </div>
+        ) : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
+      </Drawer>
+      <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
     </div>
   );
 }
@@ -1251,7 +1286,14 @@ function DataSourceRow({ row }) {
   );
 }
 
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }) {
+// FEATURE: MI-45 — noMinHeight is an additive, default-false prop; desktop's call site never
+// passes it, so minHeight stays exactly 420 there (zero desktop change). MobileBody passes
+// noMinHeight so InteractColumn's chat card can shrink below 420px on a short mobile viewport
+// instead of squeezing the pinned Agent Routing feed toward zero height — live-verified at a real
+// 390x700 viewport that minHeight:420 (unmodified) forces the routing pane nearly off-screen; this
+// is the one documented, expected deviation from the kickoff's "reused unmodified" guidance
+// (kickoff Task 2d).
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, noMinHeight }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -1267,7 +1309,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1}}>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.brass}}>Interact</div>
-      <div style={{background:"#fffdf8",border:`1px solid ${T.line}`,borderRadius:3,position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight:420}}>
+      <div style={{background:"#fffdf8",border:`1px solid ${T.line}`,borderRadius:3,position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight: noMinHeight ? 0 : 420}}>
         <Corners/>
         <div style={{padding:"13px 16px",borderBottom:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
@@ -1319,7 +1361,83 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview }
   );
 }
 
+// FEATURE: MI-45 — mobile composition (STYLE-GUIDE.md §21): chat (InteractColumn, reused
+// unmodified) at flex:3, a pinned condensed Agent Routing feed at flex:1 directly below it, no
+// page-level scroll. Evidence/Activity render as full-screen overlays (same convention AppShell.jsx
+// already uses for AboutPanel/AIActivityPanel), dismissed via an explicit "← Back to Chat" control
+// only — no tap-outside-to-close (deliberate).
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity }) {
+  const [showEvidence, setShowEvidence] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const agents = useAgents();
+  const agentById = (id) => agents.find(a => a.id === id);
+  const evidenceLive = !!hypFlow; // FEATURE: MI-45 — badge shows only while a Theory/Forecast/Correct flow is active
+  const ordered = [...events].reverse();
+
+  const paneBtn = (active) => ({
+    fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",
+    padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,
+    cursor:"pointer",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,position:"relative",
+  });
+  const overlayHeadStyle = {flexShrink:0,background:T.navy,color:T.card,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`3px solid ${T.brass}`};
+  const backBtnStyle = {fontFamily:mono,fontSize:10,letterSpacing:"0.04em",textTransform:"uppercase",color:T.brassLight,border:"1px solid rgba(228,199,134,.4)",background:"transparent",padding:"5px 10px",cursor:"pointer"};
+
+  return (
+    <div style={{position:"relative",flex:1,minHeight:0,display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:6,flexShrink:0}}>
+        <button onClick={()=>setShowEvidence(true)} style={paneBtn()}>
+          Evidence
+          {evidenceLive && <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>}
+        </button>
+        <button onClick={()=>setShowActivity(true)} style={paneBtn()}>Activity</button>
+      </div>
+
+      <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{flex:3,minHeight:0,display:"flex",flexDirection:"column"}}>
+          <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={onSubmit} onReview={onReview} noMinHeight/>
+        </div>
+        <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
+          <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
+            <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
+            <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
+          </div>
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
+            {ordered.length === 0
+              ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
+              : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
+          </div>
+        </div>
+      </div>
+
+      {showEvidence && (
+        <div style={{position:"absolute",inset:0,background:T.paperDeep,zIndex:5,display:"flex",flexDirection:"column"}}>
+          <div style={overlayHeadStyle}>
+            <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Evidence</span>
+            <button onClick={()=>setShowEvidence(false)} style={backBtnStyle}>← Back to Chat</button>
+          </div>
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
+            <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
+          </div>
+        </div>
+      )}
+
+      {showActivity && (
+        <div style={{position:"absolute",inset:0,background:T.paperDeep,zIndex:5,display:"flex",flexDirection:"column"}}>
+          <div style={overlayHeadStyle}>
+            <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Activity</span>
+            <button onClick={()=>setShowActivity(false)} style={backBtnStyle}>← Back to Chat</button>
+          </div>
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14,display:"flex",flexDirection:"column",gap:8}}>
+            <AuditDrawersBody agentActivity={agentActivity} agents={agents}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MarketIntelligenceScreen() {
+  const isMobile = useIsMobile(); // FEATURE: MI-45
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
@@ -1555,18 +1673,26 @@ export default function MarketIntelligenceScreen() {
 
   return (
     <AppShell>
-      <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding:"20px 28px 28px"}}>
+      <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding: isMobile ? "14px 14px 16px" : "20px 28px 28px"}}>
         <FeatureBadge id="MI-01"/>
-        <div style={{marginBottom:18}}>
-          <div style={{fontFamily:display,fontSize:24,fontWeight:700,color:T.navy}}>Market Intelligence</div>
-          <div style={{fontFamily:body,fontSize:13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
+        <div style={{marginBottom: isMobile ? 12 : 18}}>
+          <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Market Intelligence</div>
+          <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
         </div>
-        <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
-          <FeatureBadge id="MI-02"/>
-          <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}/>
-          <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
-          <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
-        </div>
+        {isMobile ? (
+          <MobileBody
+            messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}
+            hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
+            events={pipelineEvents} agentActivity={agentActivity}
+          />
+        ) : (
+          <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
+            <FeatureBadge id="MI-02"/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}/>
+            <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
+            <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
+          </div>
+        )}
       </div>
     </AppShell>
   );
