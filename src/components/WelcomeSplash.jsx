@@ -1,3 +1,5 @@
+// DeepBench v6.2.0 | WelcomeSplash.jsx | S-MOBILE-NAV-01 — rename (MI-46): capability strip
+// "Market Intelligence" → "Channel Sales Intelligence", display-text only, see STYLE-GUIDE.md §25.
 // DeepBench v6.1.46 | WelcomeSplash.jsx | S-MI-45 — mobile sizing: panel branches on useIsMobile()
 // to a 75vw × 75vh panelMobile (vs. desktop's 80vw/max960/88vh), same overlay/dismiss mechanic and
 // copy, zero behavior change. FEATURE: MI-45 — see STYLE-GUIDE.md §23
@@ -73,7 +75,7 @@ export default function WelcomeSplash() {
           <div style={pulseStrip}>
             <div style={pulseLabel}>Automate</div>
             <div style={capabilityRow}>
-              <span style={capabilityItem}>Market Intelligence</span>
+              <span style={capabilityItem}>Channel Sales Intelligence</span>
               <div style={divider} />
               <span style={capabilityItem}>Data Analysis</span>
               <div style={divider} />

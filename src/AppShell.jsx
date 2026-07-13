@@ -1,3 +1,4 @@
+// DeepBench v6.2.0 | AppShell.jsx | S-MOBILE-NAV-01 — mobile header collapse (SH-19): logo + shrunk subtitle + hamburger opening an 82%-width right-side drawer (Work/Bench/Platform nav groups); Work dropdown's "Market Intelligence" item renamed "Channel Sales Intelligence" (MI-46)
 // DeepBench v6.1.45 | AppShell.jsx | S-MI-44 — Work dropdown click-interception fix (MI-44): nav wrapper needed its own zIndex (transform creates a new stacking context, the backdrop's zIndex:998 was painting above it regardless of the dropdown's own zIndex:999) + subtle gold down-arrow dropdown hint
 // DeepBench v6.1.40 | AppShell.jsx | S-MI-32 — root height fix (MI-32/33, minHeight→height so the flex/scroll chain gets a real viewport-bounded size) + Work/Bench nav restructure with Work dropdown (MI-36)
 // DeepBench v6.1.3 | AppShell.jsx | S-MI-21/SH-16 — Market Intelligence nav tab moved to 1st position
@@ -9,6 +10,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
+import { useIsMobile } from "./hooks/useIsMobile.js";
 import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
@@ -78,19 +80,100 @@ function NavTab({ isActive, onClick, icon, label, hasBorderLeft }) {
 
 // ── App Header ────────────────────────────────────────────────────────────────
 // FEATURE: SH-05 — App header (logo, Work Dashboard / Bench Dashboard nav tabs, AI status dot, AI panel trigger, about button)
+// FEATURE: SH-19 — mobile header collapse (hamburger → 82%-width right-side drawer), gated by useIsMobile()
 export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{}, showAIPanel = true }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, cleanup } = useAIStatus();
+  const isMobile = useIsMobile();
   const [aboutHovered, setAboutHovered] = useState(false);
   const [auditTipShow, setAuditTipShow] = useState(false);
-  const [workMenuOpen, setWorkMenuOpen] = useState(false);
+  const [workMenuOpen, setWorkMenuOpen] = useState(false);      // desktop Work dropdown — unchanged
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);  // NEW — mobile hamburger drawer
 
   useEffect(() => () => cleanup(), [cleanup]);
 
   const isWork  = location.pathname.startsWith("/work");
   const isBench = location.pathname.startsWith("/bench");
   const isMI    = location.pathname === "/";
+  const isSpend = location.pathname.startsWith("/work/1/analyze");
+
+  if (isMobile) {
+    const NAV_GROUPS = [
+      { label: "Work", items: [
+        { label: "Channel Sales Intelligence", icon: "◈", path: "/", active: isMI },
+        { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend },
+        { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend },
+      ]},
+      { label: "Bench", items: [
+        { label: "Agent Roster", icon: "👥", path: "/bench", active: isBench },
+      ]},
+    ];
+
+    return (
+      <div style={{background:T.navy,color:T.card,padding:"0 14px",display:"flex",alignItems:"center",height:52,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:9,position:"relative"}}>
+        <div onClick={()=>navigate("/")} style={{width:30,height:30,borderRadius:"50%",background:T.brass,color:T.navy,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontWeight:700,fontSize:13,border:`2px solid ${T.card}`,flexShrink:0,cursor:"pointer"}}>
+          DB
+        </div>
+        <div>
+          <div style={{fontFamily:display,fontSize:13,fontWeight:600,letterSpacing:.2,lineHeight:1}}>DeepBench</div>
+          <div style={{fontFamily:body,fontSize:5.5,color:"#b8c5d8",letterSpacing:1,textTransform:"uppercase",marginTop:1}}>AI Workforce Platform</div>
+        </div>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setMobileMenuOpen(true)} aria-label="Open menu" style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>
+          <span style={{display:"block",width:18,height:2,background:T.brassLight,borderRadius:1,position:"relative"}}>
+            <span style={{position:"absolute",left:0,top:-6,width:18,height:2,background:T.brassLight,borderRadius:1}}/>
+            <span style={{position:"absolute",left:0,top:6,width:18,height:2,background:T.brassLight,borderRadius:1}}/>
+          </span>
+        </button>
+
+        {mobileMenuOpen && (
+          <div style={{position:"fixed",inset:0,zIndex:2000}}>
+            <div onClick={()=>setMobileMenuOpen(false)} style={{position:"absolute",inset:0,background:"rgba(18,36,60,.5)"}}/>
+            <div style={{position:"absolute",top:0,right:0,bottom:0,width:"82%",maxWidth:340,background:T.paperDeep,boxShadow:"-10px 0 28px rgba(18,36,60,.28)",display:"flex",flexDirection:"column"}}>
+              <div style={{flexShrink:0,background:T.navy,color:T.card,padding:"0 14px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`3px solid ${T.brass}`}}>
+                <span style={{fontFamily:display,fontSize:14,fontWeight:600}}>Menu</span>
+                <button onClick={()=>setMobileMenuOpen(false)} style={{background:"none",border:"none",fontSize:20,lineHeight:1,color:T.card,cursor:"pointer",padding:"2px 8px"}}>×</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"6px 0"}}>
+                {NAV_GROUPS.map(group => (
+                  <div key={group.label}>
+                    <div style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"12px 16px 4px"}}>{group.label}</div>
+                    {group.items.map(item => (
+                      <button key={item.path}
+                        onClick={()=>{ setMobileMenuOpen(false); navigate(item.path); }}
+                        style={{display:"flex",alignItems:"center",gap:10,width:"100%",
+                          padding: item.active ? "11px 16px 11px 13px" : "11px 16px",
+                          fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",
+                          borderBottom:`1px solid ${T.lineSoft}`,
+                          borderLeft: item.active ? `3px solid ${T.brass}` : "3px solid transparent",
+                          background: item.active ? "rgba(182,135,58,.09)" : "transparent",
+                          color: item.active ? T.navy : T.ink, fontWeight: item.active ? 600 : 400}}>
+                        <span style={{width:18,textAlign:"center",flexShrink:0}}>{item.icon}</span>{item.label}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <div style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"12px 16px 4px"}}>Platform</div>
+                {showAIPanel && (
+                  <button onClick={()=>{ setMobileMenuOpen(false); onAIPanel(); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 16px",fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",borderBottom:`1px solid ${T.lineSoft}`,background:"transparent",color:T.ink}}>
+                    <span style={{width:18,textAlign:"center",flexShrink:0}}>◆</span>AI Audit
+                  </button>
+                )}
+                {showHelp && (
+                  <button onClick={()=>{ setMobileMenuOpen(false); onHelp(); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 16px",fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",borderBottom:`1px solid ${T.lineSoft}`,background:"transparent",color:T.ink}}>
+                    <span style={{width:18,textAlign:"center",flexShrink:0}}>ⓘ</span>About DeepBench
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{background:T.navy,color:T.card,padding:"0 28px",display:"flex",alignItems:"center",height:60,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:12,position:"relative"}}>
@@ -122,7 +205,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           {workMenuOpen && (
             <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
               {[
-                {label:"Market Intelligence", icon:"◈", path:"/"},
+                {label:"Channel Sales Intelligence", icon:"◈", path:"/"},
                 {label:"Project Management", icon:"📋", path:"/work"},
                 {label:"Spend Analysis", icon:"💰", path:"/work/1/analyze"},
               ].map(item => (

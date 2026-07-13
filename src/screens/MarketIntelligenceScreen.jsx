@@ -1,3 +1,6 @@
+// DeepBench v6.2.0 | MarketIntelligenceScreen.jsx | S-MOBILE-NAV-01 — rename (MI-46): page title +
+// Agent Routing empty-state copy "Market Intelligence" → "Channel Sales Intelligence", display-text
+// only, see STYLE-GUIDE.md §25.
 // DeepBench v6.1.46 | MarketIntelligenceScreen.jsx | S-MI-45 — mobile-responsive composition: new
 // isMobile branch (useIsMobile()) renders MobileBody (chat flex:3 + pinned Agent Routing feed
 // flex:1, Evidence/Activity full-screen overlays) below MOBILE_BREAKPOINT (768px); desktop's
@@ -1248,7 +1251,7 @@ function AuditColumn({ events, agentActivity }) {
       <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280}>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-            Real agent-call events appear here as the conversation runs. About Market Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
+            Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
           </div>
         ) : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
       </Drawer>
@@ -1676,7 +1679,7 @@ export default function MarketIntelligenceScreen() {
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding: isMobile ? "14px 14px 16px" : "20px 28px 28px"}}>
         <FeatureBadge id="MI-01"/>
         <div style={{marginBottom: isMobile ? 12 : 18}}>
-          <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Market Intelligence</div>
+          <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence</div>
           <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
         </div>
         {isMobile ? (

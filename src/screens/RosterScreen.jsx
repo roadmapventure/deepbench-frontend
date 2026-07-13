@@ -1,3 +1,5 @@
+// DeepBench v6.2.0 | RosterScreen.jsx | S-MOBILE-NAV-01 — rename (RO-12): headline "Your bench." →
+// "Your agent roster.", display-text only (screen name, not the top-level nav tab), see STYLE-GUIDE.md §25.
 // DeepBench v5.2.37 | RosterScreen.jsx | RO-09 — sort agents by usage count
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
@@ -235,7 +237,7 @@ export default function RosterScreen() {
           {/* Masthead */}
           <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
             <div>
-              <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your bench.</div>
+              <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your agent roster.</div>
               <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,maxWidth:560,lineHeight:1.5}}>
                 These are your agents. Click any team member to view their profile, assign them work, or add to their training. Ready to grow your bench? Add a new player and start building their expertise.
               </div>
