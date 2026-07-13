@@ -562,10 +562,32 @@ One shared mapping (name TBD by the coding session, lives in `MarketIntelligence
 
 ---
 
+## Section 21 — Mobile Composition: Chat-Primary Split View (Locked 2026-07-13 · S-MI-45-design)
+
+Below `MOBILE_BREAKPOINT` (768px, `useIsMobile()` — Section 22), `MarketIntelligenceScreen.jsx` renders a **different composition of the same three columns' content**, not a CSS reflow of the desktop grid. Desktop (`>= 768px`) renders the existing `InteractColumn` / `EvidenceColumn` / `AuditColumn` 3-column grid completely unchanged — this rule governs the mobile branch only, by construction (the mobile check gates which composition renders; desktop's own code path is untouched).
+
+- **Chat is primary, fixed to viewport.** `InteractColumn`'s content renders in a `flex: 3` pane; a condensed **Agent Routing** feed (same event data as desktop's Agent Routing `Drawer`, no drawer chrome, always visible, own internal scroll) renders in a `flex: 1` pane directly below it — roughly a 75/25 split. No page-level scroll; only the two panes scroll internally, extending the same bounded-height/internal-overflow pattern `MI-32`/`MI-33`/`MI-34` already established for `InteractColumn` on desktop.
+- **Evidence and the rest of Audit are full-screen overlays, not stacked content.** Two buttons next to the page title ("Evidence", "Activity") each open a full-frame overlay panel covering chat + the routing pane — same interaction convention `AppShell.jsx` already uses for `AboutPanel`/`AIActivityPanel` (not a new pattern). Each overlay dismisses via an explicit "← Back to Chat" control only — no tap-outside-to-close (deliberate, avoids accidental dismissal while scrolling overlay content).
+- **"Activity" carries Audit's other four drawers** (Agents, Data Sources, Analysis, Agent Reasoning) unchanged — Agent Routing is excluded since it's already permanently visible in the pinned pane below chat.
+- **Evidence button gets a live badge** (small brass dot, reuses the existing pulse treatment already used for `AgentWorkingIndicator`) when `hypFlow` is non-null — Evidence is otherwise just an empty-state legend and is easy to miss behind a tap exactly when it matters most (an active Theory/Forecast/Correct flow).
+- **Routing feed carries the same full, unfiltered event data as desktop's Agent Routing drawer** — condensed shell only, never a trimmed/summarized subset. No mobile-only data divergence.
+- **Header/nav mobile treatment is explicitly out of scope for this rule** — `AppShell.jsx`'s Work-dropdown nav gets its own design session; this section governs `MarketIntelligenceScreen.jsx`'s body content only.
+
+## Section 22 — `useIsMobile()` / Responsive Breakpoint (Locked 2026-07-13 · S-MI-45-design)
+
+`src/hooks/useIsMobile.js` is the platform's single breakpoint source — `MOBILE_BREAKPOINT = 768`, a `matchMedia`-backed hook returning a boolean, re-evaluated on resize/orientation change. Any future responsive branch imports this hook; never re-derive a breakpoint constant or a second `window.innerWidth`/`matchMedia` check inline in a screen file — one source, cross-referenced everywhere it's used (Category M).
+
+## Section 23 — Splash Modal: Mobile Sizing (Locked 2026-07-13 · S-MI-45-design)
+
+`WelcomeSplash.jsx`'s overlay/panel mechanic (navy blur backdrop, brass-bordered panel, dismiss-on-backdrop-click + × button, `sessionStorage` gate) is unchanged on mobile — same component, same copy, same dismiss logic, zero behavior change. Only the panel's sizing branches on `useIsMobile()`: desktop keeps `width: 80vw, maxWidth: 960, maxHeight: 88vh`; mobile uses `width: 75vw, height: 75vh` (no `maxWidth` cap needed — 75vw of a phone viewport is always well under 960px). Internal padding and the headline's `clamp()` type scale reduce proportionally on mobile so hero content doesn't overflow the smaller panel; content and structure are otherwise identical to desktop.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-13 | S-MI-45-design | Sections 21-23 added — Mobile Composition for `MarketIntelligenceScreen.jsx` locked: chat-primary flex 3:1 split with a pinned, full-data Agent Routing feed; Evidence/Activity as full-screen overlays (reusing `AboutPanel`/`AIActivityPanel`'s existing convention, back-button-only dismiss); Evidence live badge when `hypFlow` active. `useIsMobile()` (`src/hooks/useIsMobile.js`, `MOBILE_BREAKPOINT=768`) locked as the platform's single breakpoint source. `WelcomeSplash.jsx` mobile sizing locked (`75vw × 75vh` vs. desktop's `80vw/max960/88vh`, same mechanic/copy). Desktop composition confirmed untouched by construction — mock reviewed and approved by John (interactive HTML mock, iterated live). Kickoff: `docs/kickoffs/v6.1.46-S-MI-45-mobile-responsive-mi-splash.md`. |
 | 2026-07-07 | S-MI-27-design | Section 20 added — AI-card headers locked actor-first (name before capability label); `UserAvatar` locked as the canonical human-attribution component, explicitly outside Section 17's agent-only scope. |
 | 2026-07-07 | S-BENCH-FILTER-01-design | Section 10 note added — Left Sidebar Nav Pattern confirmed reusable beyond Personnel File: `RosterScreen.jsx` adopts it for the new RO-10 category filter nav, same 180px width. |
 | 2026-07-07 | S-MI-15-design | Section 19 added — Data Type/Confidence Tier display-label relabel locked: `inferred`/non-baseline-`synthesized` → "Analysis" (with Human/AI who-tag from `source`), baseline-`synthesized` → "Source Simulation", `sourced`/`learned` unchanged. Display-only — zero backend/schema change. |
