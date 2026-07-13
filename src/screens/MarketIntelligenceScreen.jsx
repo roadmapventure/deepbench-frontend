@@ -300,7 +300,7 @@ function describePipelineEvent(evt) {
     case "proofreader": {
       const g = evt.data.guardrail || {}, e = evt.data.eval || {};
       if (g.result === "block") {
-        return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated} — escalated to Sam`, color: T.flag };
+        return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated}`, color: T.flag };
       }
       const retriedNote = evt.data.final_answer ? " (Owen retried via Marcus)" : "";
       return { capability: "quality-gate", summary: `Guardrail: pass${retriedNote} · Eval: ${e.result}${e.result === "revise" ? ` — ${shapeForLog(e.critique)}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
@@ -467,15 +467,19 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate, durationMs: Date.now() - t0 });
 
   if (gate.guardrail?.result === "block") {
-    const t0 = Date.now();
-    setStatus("Sam is triaging the block…"); // FEATURE: MI-42 (was MI-41)
-    const triage = await callCapability({
-      capability_slug: "pipeline-triage", intent_slug: "intake-failure-intent", agent_id: "sam",
-      task_context: { guardrail_failure: gate.guardrail, original_question: message },
-      onProgress,
-    });
-    onEvent({ type: "failure_triage", agentId: "sam", data: triage, durationMs: Date.now() - t0 });
-    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, triage) };
+    // FEATURE: AA-171 fix (S-ARCH-QG-ESCALATION-01) -- Owen's own qg-review-intent turn now
+    // performs the escalation hand-off itself (request_help -> Michelle's real recommendation ->
+    // delegate_to_agent, non-final) when a block isn't fixable by his own retry. This screen no
+    // longer inspects gate.guardrail and picks the next call on Owen's behalf -- that was the
+    // AA-171 Rule #1 violation ARCHITECTURE.md §19d exists to prevent. gate.triage carries
+    // whatever the real delegate returned, copied verbatim by Owen; gate.last_help_selection
+    // carries Michelle's own real reasoning for the pick, surfaced the same way AA-164 already
+    // surfaces Marcus's own request_help hop above (qa.last_help_selection).
+    if (gate.last_help_selection) {
+      onEvent({ type: "agent_selection", agentId: "owen", secondaryAgentId: gate.last_help_selection.selected_by_agent_id, data: gate.last_help_selection, durationMs: 0 });
+    }
+    onEvent({ type: "failure_triage", agentId: gate.last_help_selection?.selected_by_agent_id || "owen", data: gate.triage, durationMs: 0 });
+    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
   }
 
   const finalAnswer = retried ? gate.final_answer : qa;
