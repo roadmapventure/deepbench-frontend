@@ -583,10 +583,31 @@ Below `MOBILE_BREAKPOINT` (768px, `useIsMobile()` — Section 22), `MarketIntell
 
 ---
 
+## Section 24 — Mobile Header: Hamburger Drawer (Locked 2026-07-13 · S-MOBILE-NAV-01-design)
+
+Below `MOBILE_BREAKPOINT` (Section 22), `AppShell.jsx`'s header collapses to **logo + shrunk subtitle + a single hamburger trigger**, replacing the desktop Work-dropdown/Bench-tab/AI-Audit-button/About-button row entirely (that row is unchanged on desktop — this rule governs the mobile branch only, gated by `useIsMobile()`, same construction as Section 21).
+
+- **Subtitle shrinks, does not drop.** "AI Workforce Platform" stays under the "DeepBench" wordmark at a much smaller size (~5.5px) rather than being removed — confirmed by John over dropping it.
+- **The hamburger opens a right-side drawer, not a full-screen takeover.** This is a deliberate departure from Section 21's Evidence/Activity convention: `width: 82%`, slides from the right, with a dimmed (`rgba(18,36,60,.5)`) tappable backdrop covering the remaining viewport. **Dismiss allows both** the explicit × button **and tap-on-backdrop** — also a deliberate departure from Section 21 (back-button-only), because a navigation menu is lower-stakes than a content overlay a user might be mid-scroll through.
+- **One unified list, grouped by the desktop nav's existing structure** — "Work" (Channel Sales Intelligence, Project Management, Spend Analysis — the same 3 destinations as the desktop Work dropdown), "Bench" (Agent Roster — the desktop Bench tab's single destination), "Platform" (AI Audit, About DeepBench). Current route highlighted (brass left border, matches the existing Left Sidebar Nav Pattern's active-state treatment, Section 10).
+- **The "AI is thinking…" status dot is dropped entirely on mobile**, no replacement indicator. It's already suppressed on the MI route in favor of MI's own chat-embedded working-status UI (Section 21); other routes simply lose the signal on mobile for now.
+- **`rightContent`/`onBack` are not rendered on mobile at all.** John's call: these don't belong in shared header chrome to begin with — they're a control that belongs in the calling screen's own body. This is **not yet fixed** for screens that rely on them (e.g. Analyzer's "← Column Mapping"); tracked as `SH-20`, a real gap, not a silent regression. Do not add a mobile-only exception back into `AppShell.jsx` to route around this — the fix belongs in the calling screen.
+
+## Section 25 — Terminology: "Channel Sales Intelligence" / "Agent Roster" (Locked 2026-07-13 · S-MOBILE-NAV-01-design)
+
+Display-text-only rename, same pattern as `S-RENAME-01`: only what a user reads changes. `MarketIntelligenceScreen.jsx`'s filename, the `/` route, every `MI-*`/`RO-*` feature ID, every `S-MI-*` session name, and every internal variable/constant (`MI_LOOP_SCOPE`, `SERVICE_LABEL`, etc.) are **unchanged** — this is not a backend or architecture rename.
+
+- "Market Intelligence" → **"Channel Sales Intelligence"** everywhere a user reads it: the Work dropdown/mobile menu item, `MarketIntelligenceScreen.jsx`'s own page title, its Agent Routing empty-state copy, and `WelcomeSplash.jsx`'s capability strip.
+- "Bench" → **"Agent Roster"** everywhere it names the *screen*: `RosterScreen.jsx`'s own headline ("Your bench." → "Your agent roster."), and the Bench item inside the new mobile menu. The **top-level nav tab stays "Bench"** (both desktop `NavTab` and the mobile menu's group label) — John's explicit call, the primary navigation label and the screen's own name are treated as two different things.
+- `AboutPanel.jsx`'s two "Bench" mentions are **out of scope for this session** — one plausibly should rename ("Bench Dashboard" describing the module), one plausibly shouldn't (an instructional step telling the user to click the "Bench" nav tab, which isn't renaming). Deliberately deferred rather than guessed — do not touch `AboutPanel.jsx` in this session.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-13 | S-MOBILE-NAV-01-design | Sections 24-25 added — `AppShell.jsx` mobile header locked: hamburger opens an 82%-width right-side drawer (not a full-screen takeover, deliberate departure from Section 21), dismiss allows both × and tap-outside (also a departure), subtitle shrinks not drops, AI status dot dropped on mobile, `rightContent`/`onBack` not rendered on mobile at all (tracked gap, `SH-20`). Terminology locked: "Market Intelligence" → "Channel Sales Intelligence" and "Bench" → "Agent Roster" (screen name only — top-level nav tab stays "Bench"), display-text-only per the `S-RENAME-01` pattern. `AboutPanel.jsx` explicitly excluded, deferred. Kickoff: `docs/kickoffs/v6.2.0-S-MOBILE-NAV-01-hamburger-menu-and-renames.md`. |
 | 2026-07-13 | S-MI-45-design | Sections 21-23 added — Mobile Composition for `MarketIntelligenceScreen.jsx` locked: chat-primary flex 3:1 split with a pinned, full-data Agent Routing feed; Evidence/Activity as full-screen overlays (reusing `AboutPanel`/`AIActivityPanel`'s existing convention, back-button-only dismiss); Evidence live badge when `hypFlow` active. `useIsMobile()` (`src/hooks/useIsMobile.js`, `MOBILE_BREAKPOINT=768`) locked as the platform's single breakpoint source. `WelcomeSplash.jsx` mobile sizing locked (`75vw × 75vh` vs. desktop's `80vw/max960/88vh`, same mechanic/copy). Desktop composition confirmed untouched by construction — mock reviewed and approved by John (interactive HTML mock, iterated live). Kickoff: `docs/kickoffs/v6.1.46-S-MI-45-mobile-responsive-mi-splash.md`. |
 | 2026-07-07 | S-MI-27-design | Section 20 added — AI-card headers locked actor-first (name before capability label); `UserAvatar` locked as the canonical human-attribution component, explicitly outside Section 17's agent-only scope. |
 | 2026-07-07 | S-BENCH-FILTER-01-design | Section 10 note added — Left Sidebar Nav Pattern confirmed reusable beyond Personnel File: `RosterScreen.jsx` adopts it for the new RO-10 category filter nav, same 180px width. |
