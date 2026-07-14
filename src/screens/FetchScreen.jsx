@@ -1,4 +1,4 @@
-// DeepBench v5.1.2 | FetchScreen.jsx | Fetch screen + CSV Storage save
+// DeepBench v6.2.10 | FetchScreen.jsx | Fetch screen + CSV Storage save | AZ-21 title rename
 
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -29,7 +29,7 @@ function ConfigureScreen({ taskId }) {
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:24}}>
           <div>
             <div style={{fontFamily:mono,fontSize:10,letterSpacing:3,textTransform:"uppercase",color:T.brass,fontWeight:500,marginBottom:10}}>Roadmap Venture · Procurement Intelligence</div>
-            <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,lineHeight:1.15,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
+            <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,lineHeight:1.15,letterSpacing:"-.5px"}}>Spend Analyzer</div>
           </div>
           <button onClick={()=>navigate(`/work/${taskId}/analyze`)} style={{fontFamily:mono,fontSize:9,textTransform:"uppercase",letterSpacing:1.5,color:T.muted,background:"none",border:`1px solid ${T.line}`,padding:"7px 14px",cursor:"pointer",marginTop:4}}>← Cancel</button>
         </div>

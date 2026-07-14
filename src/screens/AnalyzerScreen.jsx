@@ -1,4 +1,4 @@
-// DeepBench v6.2.4 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage | S-MOBILE-SPEND-01
+// DeepBench v6.2.10 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage | AZ-21 title rename
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -122,7 +122,7 @@ function DataSourceScreen({ taskId }) {
     <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px",position:"relative"}}>
       <FeatureBadge id="SH-07" />
       <div style={{fontFamily:mono,fontSize:10,letterSpacing:3,textTransform:"uppercase",color:T.brass,marginBottom:10}}>Roadmap Venture · Procurement Intelligence</div>
-      <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
+      <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Spend Analyzer</div>
       <p style={{fontSize:13.5,color:T.muted,lineHeight:1.65,maxWidth:580,marginBottom:28}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>
 
       {/* Workflow strip */}
@@ -229,7 +229,7 @@ function MobileAnalyzerHome({ taskId }) {
   return (
     <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"18px 16px 40px"}}>
       <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,textTransform:"uppercase",color:T.brass,marginBottom:8}}>Roadmap Venture · Procurement Intelligence</div>
-      <div style={{fontFamily:display,fontSize:22,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
+      <div style={{fontFamily:display,fontSize:22,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Spend Analyzer</div>
       <p style={{fontSize:12.5,color:T.muted,lineHeight:1.6,marginBottom:16}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>
 
       {/* Workflow strip — horizontal scroll instead of the desktop 5-col grid */}
