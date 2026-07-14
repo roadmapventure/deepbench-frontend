@@ -177,7 +177,7 @@ const MCP_SURFACES = [
 ];
 
 export default function AIActivityPanel({ onClose }) {
-  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, patternsActiveCount, patternsCatalogTotal, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, servicesCatalogTotal, patternsActiveCount, patternsCatalogTotal, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
@@ -216,7 +216,7 @@ export default function AIActivityPanel({ onClose }) {
           {[
             ["Total Calls",    totalCalls],
             ["Total Cost",     fmt$(totalCost)],
-            ["Services Active",`${servicesActive}/14`],
+            ["Services Active",`${servicesActive}/${servicesCatalogTotal}`],
             ["Patterns Active",`${patternsActiveCount}/${patternsCatalogTotal}`],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(

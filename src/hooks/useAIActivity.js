@@ -8,6 +8,16 @@
 import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
 
+// FEATURE: AI-51 — moved from useAgents.js (S-MI-20 origin) so this canonical shared cost/pattern
+// module can also reuse the same nearby-timestamp pairing check for cost/pattern-count dedup, not
+// just latency. Byte-identical values; useAgents.js now imports these instead of defining them.
+export const CAPABILITY_WRAPPER_TYPES = new Set([
+  "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
+  "memory-consolidation", "data-analysis", "project-manager", "screen-controls",
+  "html-display",
+]);
+export const PAIR_WINDOW_MS = 2000;
+
 // FEATURE: AI-23 — AI Services catalog (14 services, client-side until S-INFRA-01 creates ai_services table)
 export const SERVICE_CATALOG = [
   // FEATURE: BUG-22 — prompt-assembly is live; move off roadmap
@@ -170,6 +180,37 @@ export function computeByPattern(log) {
     }
   }
   return byPattern;
+}
+
+// FEATURE: AI-51 -- agent-turn rows are written for EVERY turn in the delegation loop
+// (logAgentTurn()); sendRequest() ALSO writes a second row for the SAME turn when it's
+// terminal (non-delegating) -- both carry identical tokens/patterns_used, describing the
+// same real call from two logging vantage points. A pure delegating turn has no such
+// sibling and is the sole record of that spend/pattern-use -- must not be zeroed. Reuses
+// the exact same nearby-timestamp pairing check useAgents.js's classifyRow() already
+// proved live for LATENCY dedup (S-MI-20), applied here to cost + pattern-count instead.
+// Returns the Set of row `id`s for every agent-turn row that has a same-agent capability-
+// wrapper row (feature === 'request-receivable') within PAIR_WINDOW_MS -- callers should
+// treat those specific rows as already-counted via their paired sibling.
+export function pairedAgentTurnIds(rows) {
+  const wrapperTimesByAgent = new Map();
+  for (const row of rows) {
+    if (CAPABILITY_WRAPPER_TYPES.has(row.ai_type) && row.feature === 'request-receivable') {
+      const t = new Date(row.created_at).getTime();
+      if (!wrapperTimesByAgent.has(row.agent_id)) wrapperTimesByAgent.set(row.agent_id, []);
+      wrapperTimesByAgent.get(row.agent_id).push(t);
+    }
+  }
+  const paired = new Set();
+  for (const row of rows) {
+    if (row.ai_type !== 'agent-turn') continue;
+    const rowTime = new Date(row.created_at).getTime();
+    const wrapperTimes = wrapperTimesByAgent.get(row.agent_id) || [];
+    if (wrapperTimes.some(t => Math.abs(t - rowTime) < PAIR_WINDOW_MS)) {
+      paired.add(row.id);
+    }
+  }
+  return paired;
 }
 
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
@@ -346,6 +387,10 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     from += PAGE_SIZE;
   }
 
+  // FEATURE: AI-51 — dedup agent-turn rows paired with a same-agent capability-wrapper row
+  // (see pairedAgentTurnIds()'s own comment) before mapping cost/patternsUsed.
+  const paired = pairedAgentTurnIds(rows);
+
   // Replace store entirely with DB state — DB is authoritative on every panel open
   _log = rows.map(row => ({
     id:        row.id,
@@ -356,10 +401,10 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     tier:      row.knowledge_tier || null,
     location:  row.feature || '—',
     agentId:   row.agent_id || null,
-    cost:      row.cost_usd != null
+    cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
-      : computeCallCost(row.model, row.input_tokens, row.output_tokens),
-    patternsUsed: row.patterns_used || [],
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens)),
+    patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
     ts:        row.created_at,
     _fromDB:   true,
   }));
@@ -462,7 +507,7 @@ export function useAIActivity() {
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, patternsActiveCount, patternsCatalogTotal: PATTERN_CATALOG.length, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsActiveCount, patternsCatalogTotal: PATTERN_CATALOG.length, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
 }
 
 export { MODEL_PROVIDER };

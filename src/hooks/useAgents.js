@@ -20,7 +20,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AGENTS } from "../data/agents.js";
 import { supabase } from '../lib/supabase.js';
-import { computeCallCost } from './useAIActivity.js';
+import { computeCallCost, pairedAgentTurnIds, CAPABILITY_WRAPPER_TYPES, PAIR_WINDOW_MS } from './useAIActivity.js';
 
 // FEATURE: RO-09 — per-agent usage count from ai_activity_log
 export function useAgentUsageCounts() {
@@ -109,12 +109,9 @@ const PAGE_SIZE = 1000;
 // the sole record of a simpler, single-shot dispatch that never entered execute.js's turn loop.
 // A blanket "always skip" or "always keep" rule would misrepresent one case or the other; each
 // row is checked individually against nearby agent-turn timestamps instead (see classifyRow).
-const CAPABILITY_WRAPPER_TYPES = new Set([
-  "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
-  "memory-consolidation", "data-analysis", "project-manager", "screen-controls",
-  "html-display",
-]);
-const PAIR_WINDOW_MS = 2000;
+// FEATURE: AI-51 — CAPABILITY_WRAPPER_TYPES/PAIR_WINDOW_MS moved to useAIActivity.js (now the
+// canonical shared module for this pairing check, reused there for cost/pattern-count dedup too);
+// imported above instead of defined here. Byte-identical values, no behavior change.
 
 // FEATURE: MI-58 — bounds the activity summary to the last 30 days so both the Agents drawer's
 // existing avg/max figures and this session's new per-depth estimate track current agent/model
@@ -160,15 +157,19 @@ function classifyRow(row, turnTimestampsByAgent) {
 // classifyRow()-driven kind bucketing as before, byte-identical output for every existing
 // caller -- this only adds a new byModel sub-bucket inside each kind, never removes anything.
 export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
+  // FEATURE: AI-51 — dedup agent-turn rows paired with a same-agent capability-wrapper row
+  // (see pairedAgentTurnIds()'s own comment in useAIActivity.js) before summing cost. Only
+  // d.totalCost/d.costCount change below — classifyRow()'s own latency dedup is untouched.
+  const paired = pairedAgentTurnIds(scopedRows);
   const map = {};
   for (const row of scopedRows) {
     if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
     const d = map[row.agent_id];
     d.calls++;
-    const rowCost = row.cost_usd != null
+    const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
-      : computeCallCost(row.model, row.input_tokens, row.output_tokens);
-    if (rowCost != null) { d.totalCost += rowCost; d.costCount++; }
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens));
+    if (rowCost != null && !paired.has(row.id)) { d.totalCost += rowCost; d.costCount++; }
 
     const { kind, include } = classifyRow(row, turnTimestampsByAgent);
     if (!include) continue;
@@ -233,7 +234,10 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
       while (true) {
         const { data, error } = await supabase
           .from('ai_activity_log')
-          .select('agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
+          // FEATURE: AI-51 — 'id' added so pairedAgentTurnIds() can key its Set by real per-row
+          // id instead of every row sharing `undefined` (which would falsely pair every row in
+          // the batch as soon as any single agent-turn row paired).
+          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))
