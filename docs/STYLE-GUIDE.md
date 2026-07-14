@@ -566,7 +566,7 @@ One shared mapping (name TBD by the coding session, lives in `MarketIntelligence
 
 **Why this split exists (don't re-litigate without re-reading this):** "Analysis" is deliberately the *only* type with a who-tag — Sourced's trust comes from the external citation regardless of who entered it, Source Simulation is inherently a one-time demo-seeding action, and Learned is always the Reasoner's own automatic write. Analysis is the one type a human's own judgment and an AI's own judgment can both produce (confirmed live: the two seeded `inferred` rows have `source: 'user'`, i.e. human-authored analysis already exists today), so it's the one place the distinction changes how much a user should trust it.
 
-**Existing render sites this rule already applies to** (found during `S-MI-15-design`'s Architect Review — do not add a second, inconsistent mapping): the Evidence column's static layer legend, the Pipeline Log's `confidence_tier` summary text (previously raw, e.g. `confidence_tier: inferred`), and the new Data Sources drawer (`MI-15`).
+**Existing render sites this rule already applies to** (found during `S-MI-15-design`'s Architect Review — do not add a second, inconsistent mapping): the Pipeline Log's `confidence_tier` summary text (previously raw, e.g. `confidence_tier: inferred`), and the Data Sources drawer (`MI-15`). **(`MI-59`, 2026-07-14: the Evidence column's own static layer legend — the 3rd former render site — was removed outright, a dummy display with no click handler or flow tie; `describeDataType()` itself is unchanged, still used by the 2 remaining sites above.)**
 
 ---
 

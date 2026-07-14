@@ -1,3 +1,14 @@
+// DeepBench v6.2.30 | MarketIntelligenceScreen.jsx | MI-59 — EvidenceColumn's !hypFlow branch
+// becomes purely informational ("Once your chat has analysis data for you to interact with, it
+// will appear here"), the 4 dummy data-type pills (Sourced/Analysis/Source Simulation/Learned —
+// no click handler, no flow tie) removed outright, not just hidden. Populated branch's header
+// unified to "Evidence" (was "Theory Evidence") and gains a new intent-prefixed sentence (e.g.
+// "Theory — Data for you to interact with your chat..."), placed directly under the header. Both
+// strings come from one new getEvidencePanelSentence(hypFlow) helper so they can't drift apart.
+// describeDataType() itself is unchanged, still used by its other 2 call sites (Data Sources
+// drawer, Pipeline Log confidence_tier summary) — see STYLE-GUIDE.md §19's MI-59 amendment.
+// FEATURE: MI-59
+//
 // DeepBench v6.2.29 | MarketIntelligenceScreen.jsx | MI-58 — estimateChainMs() rewritten to a
 // depth-weighted expected-value-per-call model: depth0's p75 (always paid) plus each further
 // depth's p75 weighted by how often that depth is actually reached relative to depth0's call
@@ -962,6 +973,15 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
 // (was auto-fired on selection); honest verdict rendering (Supports/Complicates/Consider always shown,
 // chart/key-data-points only when present); 2-outcome decision (Info Only/Store as Forecast, was 3);
 // reframed confirmation intro line naming Nadia.
+
+// FEATURE: MI-59 — one shared sentence source for both EvidenceColumn states, so the
+// empty-state and populated-state copy can't drift apart as separate hardcoded strings.
+function getEvidencePanelSentence(hypFlow) {
+  if (!hypFlow) return "Once your chat has analysis data for you to interact with, it will appear here";
+  const label = INTENT_LABEL[hypFlow.intent] || hypFlow.intent;
+  return `${label} — Data for you to interact with your chat...`;
+}
+
 function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
@@ -973,28 +993,19 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
   }, [hypFlow && hypFlow.prefillText]);
 
   if (!hypFlow) {
-    // FEATURE: MI-15 — legend now routes through describeDataType() instead of 4 hardcoded
-    // {label,color} pairs, so it stays in sync with the locked taxonomy (STYLE-GUIDE.md §19).
-    // Context-free static legend — no who-tag shown here, it isn't tied to a specific row.
-    const layers = [
-      describeDataType('sourced'),
-      describeDataType('inferred'),
-      describeDataType('synthesized', { isBaseline: true }),
-      describeDataType('learned'),
-    ];
+    // FEATURE: MI-59 — informational-only empty state; the 4 dummy data-type pills that used
+    // to render here (Sourced/Analysis/Source Simulation/Learned) had no click handler and no
+    // tie to any flow or action (confirmed live) — removed outright, not just hidden for this
+    // state. STYLE-GUIDE.md §19's shared taxonomy still has 2 other real render sites
+    // (Pipeline Log confidence_tier summary, Data Sources drawer) — describeDataType() itself
+    // is unchanged and still imported/used there.
     return (
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
+        <FeatureBadge id="MI-59"/>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
-        <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,position:"relative"}}>
-          <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:12}}>
-            Interact with the Data
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {layers.map(l => (
-              <span key={l.label} style={{fontFamily:mono,fontSize:9,padding:"3px 8px",border:`1px solid ${l.color}`,color:l.color}}>
-                {l.label}
-              </span>
-            ))}
+        <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
+          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
+            {getEvidencePanelSentence(hypFlow)}
           </div>
         </div>
       </div>
@@ -1008,10 +1019,21 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
     // InteractColumn's existing pattern (flex:1/minHeight:0 outer, overflow:hidden card,
     // overflowY:"auto" inner content div) -- action buttons/ConfirmationCard now scroll into view
     // inside the card instead of growing the whole page past the fold.
-    <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1}}>
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Theory Evidence</div>
+    <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1,position:"relative"}}>
+      <FeatureBadge id="MI-59"/>
+      {/* FEATURE: MI-59 — header stays "Evidence" in both states, never switches to "Theory Evidence" */}
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden"}}>
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
+
+        {/* FEATURE: MI-59 — shared sentence, intent-prefixed. The MI-59 kickoff doc specced this as
+            rendering "above the intent-toggle buttons," but MI-51 already removed that button row
+            entirely (onIntentChange is kept only for call-site parity, no longer invoked here — see
+            the MI-51 comment just below) — there is no toggle row left to anchor to, so this renders
+            directly under the header instead, in the same position the toggle row used to occupy. */}
+        <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
+          {getEvidencePanelSentence(hypFlow)}
+        </div>
 
         {/* FEATURE: MI-51 — Theory/Forecast/Correct switcher REMOVED. hypFlow.intent is still set at
             entry (enterHypothesisFlow, direct-typed classification via runIntentPipeline) and still
