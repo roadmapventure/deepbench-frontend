@@ -1,3 +1,8 @@
+// DeepBench v6.2.24 | SharedUI.jsx | MI-55 — Drawer gains an opt-in `resizable` prop (Agent Routing
+// only): drag-to-resize grip handle, floor locked at the passed maxHeight, ceiling clamped to
+// min(80vh, real content scrollHeight) via the new exported clampDrawerHeight() pure helper. Not
+// persisted — plain component state, resets to the default on every reload. Every other Drawer call
+// site (Agents/Data Sources/Analysis/Agent Reasoning) doesn't pass `resizable` — byte-unaffected.
 // DeepBench v6.2.22 | SharedUI.jsx | MI-53 REVERTED 2026-07-14 — the data-patch-display-intent hop
 // this file's ConfirmationCard change depended on let Michelle's agent-selection route an unconfirmed
 // correction to a write-capable agent (Eleanor Voss/library-write-intent), which executed a real
@@ -316,12 +321,49 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
   );
 };
 
+// FEATURE: MI-55 — pure, testable clamp helper for Drawer's drag-resize. Extracted out of render/
+// drag-handler logic specifically so it can be unit-tested without a real DOM (matches the existing
+// groupDataSources()/buildActivitySummary() pattern). Floor is always the drawer's own default
+// maxHeight (never shrinkable below it); ceiling is min(real content height, 80% of viewport) — never
+// empty padding space, never past 80vh.
+export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, viewportHeight) {
+  const ceiling = Math.min(contentHeight, viewportHeight * 0.8);
+  return Math.max(floorHeight, Math.min(candidateHeight, ceiling));
+}
+
 // FEATURE: MI-17 — generic collapsible drawer, same toggle interaction FlagCard already uses.
 // First Column 3 (Audit) drawer with real open/close state — Pipeline Log stays a static
 // always-expanded box, unchanged, out of scope this session. Reusable by any future Column 3
 // item (MI-06/07/09/15/16/18) — never rebuild this per-drawer.
-export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight }) => {
+// FEATURE: MI-55 — new opt-in `resizable` prop (default false, backward-compatible — every existing
+// call site that doesn't pass it is byte-unaffected). When true and open, renders a drag handle at
+// the bottom of the content wrapper that lets the user grow the drawer past its default maxHeight,
+// clamped via clampDrawerHeight() above. Not persisted — dragHeight is plain component state, resets
+// to null (→ default maxHeight) on every remount/reload.
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false }) => {
   const [open, setOpen] = useState(defaultOpen);
+  const [dragHeight, setDragHeight] = useState(null);
+  const contentRef = useRef(null);
+
+  const effectiveHeight = dragHeight == null
+    ? maxHeight
+    : clampDrawerHeight(dragHeight, maxHeight, contentRef.current?.scrollHeight ?? maxHeight, window.innerHeight);
+
+  const handleDragStart = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = effectiveHeight;
+    const onMouseMove = (moveEvent) => {
+      setDragHeight(startHeight + (moveEvent.clientY - startY));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
   return (
     <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
       <div onClick={()=>setOpen(o=>!o)}
@@ -335,9 +377,20 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight 
         </div>
       </div>
       {open && (
-        <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10, ...(maxHeight ? {maxHeight, overflowY:"auto"} : {})}}>
-          {children}
-        </div>
+        <>
+          <div ref={contentRef}
+            style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10, ...(maxHeight ? {maxHeight:effectiveHeight, overflowY:"auto"} : {})}}>
+            {children}
+          </div>
+          {resizable && (
+            <div
+              onMouseDown={handleDragStart}
+              style={{height:6,width:"100%",cursor:"ns-resize",background:"transparent"}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background = T.brass;}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent";}}
+            />
+          )}
+        </>
       )}
     </div>
   );

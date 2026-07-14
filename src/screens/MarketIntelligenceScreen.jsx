@@ -1,3 +1,8 @@
+// DeepBench v6.2.24 | MarketIntelligenceScreen.jsx | MI-55 — AuditColumn's Agent Routing Drawer
+// (desktop only) opts into SharedUI.jsx's new `resizable` prop alongside its existing maxHeight={280}
+// — drag-to-resize taller, floor locked at 280, ceiling min(80vh, real content height), not persisted.
+// The other 4 drawers (Agents/Data Sources/Analysis/Agent Reasoning) are unchanged.
+// FEATURE: MI-55
 // DeepBench v6.2.22 | MarketIntelligenceScreen.jsx | MI-54 — EvidenceColumn (desktop Column 2)
 // bounded to the grid row height with an internal scroll region, matching InteractColumn's existing
 // pattern (action buttons/ConfirmationCard now scroll into view inside the card instead of growing
@@ -1435,7 +1440,8 @@ function AuditColumn({ events, agentActivity }) {
       <FeatureBadge id="MI-30"/>
       <FeatureBadge id="MI-31"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
-      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280}>
+      {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
+      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
