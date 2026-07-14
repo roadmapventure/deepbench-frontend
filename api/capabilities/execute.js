@@ -1,3 +1,4 @@
+// DeepBench v6.2.31 | api/capabilities/execute.js | S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- pre-dispatch budget check + pending_delegation checkpoint; dispatchDelegation() extracted so a resume dispatches an already-decided delegation directly instead of re-asking the model
 // DeepBench v6.1.43 | api/capabilities/execute.js | S-MI-42 -- _onEvent plumbing, live delegation/delegation_return events at all 5 real dispatch points; v6.1.43 -- S-MI-42 opt-in stream:true SSE transport, all handler branches
 // DeepBench v6.1.35 | api/capabilities/execute.js | AA-164 -- thread lastHelpSelection into the normal (non-checkpointed) terminal return
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
@@ -68,6 +69,14 @@ const HOP_BUDGET_RESERVE_MS = MAX_ESTIMATED_HOP_MS + SAFETY_MARGIN_MS;
 let __testBudgetMs = null;
 export function __setTestBudgetMs(ms) {
   __testBudgetMs = ms;
+}
+
+// FEATURE: S-ARCH-DURABLE-RESUME-02 -- mirrors __testBudgetMs exactly (same inert-by-default
+// pattern). Gates the NEW pre-dispatch budget check independently of the existing top-of-loop
+// check, so a test can force either branch deterministically without the other interfering.
+let __testPreDispatchBudgetMs = null;
+export function __setTestPreDispatchBudgetMs(ms) {
+  __testPreDispatchBudgetMs = ms;
 }
 
 function getSupabaseHeaders(key) {
@@ -260,7 +269,7 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -274,8 +283,88 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
   await patchDurableHopRow(row_id, {
     conversation_history: conversationHistory, hop_counter: depth,
     delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
+    pending_delegation: pendingDelegation ?? null,
   });
   return { status: 'in_progress', job_id: row_id };
+}
+
+// FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- extracted verbatim from runLoop()'s former
+// inline request_help/delegate_to_agent dispatch blocks, parameterized by via_tool/tool_input
+// instead of reading turn.tool_name/turn.tool_input directly, so it can be called either inline
+// (live, right after the model decides) or from resumeCapability() (a checkpoint's persisted
+// pending_delegation, no `turn` object at all). Does not append the assistant's own decision turn
+// to conversationHistory -- the caller does that once, immediately after callModel() returns a
+// delegate call, before the new pre-dispatch budget check, so it is already present in
+// conversationHistory whether this hop dispatches live or checkpoints pending.
+async function dispatchDelegation({
+  via_tool, tool_input, tool_use_id, agent_id, capability_slug, intent_slug, tenant_id, task_context,
+  delegationRequired, conversationHistory, hopCounter, deadline, job_id, delegationOccurred,
+  lastHelpSelection, onEvent,
+}) {
+  let delegateResult;
+  let returningFromAgentId = null;
+  let returningFromCapabilitySlug = null;
+
+  if (via_tool === 'request_help') {
+    const pmAgentId = await resolveCapabilityHolder('project-manager');
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
+    delegateResult = await runCapability({
+      capability_slug: 'project-manager', intent_slug: 'agent-selection-intent', agent_id: pmAgentId,
+      task_context: JSON.stringify(tool_input), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+    });
+    lastHelpSelection = {
+      selected_by_agent_id: pmAgentId,
+      reasoning: delegateResult?.content?.reasoning ?? null,
+      candidates_considered: delegateResult?.content?.candidates ?? null,
+    };
+
+    if (delegationRequired) {
+      const rec = delegateResult?.content;
+      const matchedCandidate = rec?.candidates?.find(c => c.agent_id === rec.recommended_agent_id && c.capability_slug === rec.recommended_capability_slug);
+      if (!rec?.recommended_agent_id || !matchedCandidate) {
+        throw new Error(`request_help: delegationRequired capability's agent-selection-intent response had no valid recommended_agent_id matching a real candidate (capability_slug: ${capability_slug}/${intent_slug})`);
+      }
+      const delegateTaskContext = (task_context && typeof task_context === 'object')
+        ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
+        : { delegation_task: tool_input.task_description || tool_input.skill_needed };
+      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null });
+      const autoResolvedResult = await runCapability({
+        capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
+        agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+      });
+      if (autoResolvedResult.status === 'in_progress') {
+        return { outcome: 'nested_checkpoint', lastHelpSelection };
+      }
+      return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
+    }
+    returningFromAgentId = pmAgentId;
+    returningFromCapabilitySlug = 'project-manager';
+  } else if (via_tool === 'delegate_to_agent') {
+    const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = tool_input;
+    const delegateTaskContext = (task_context && typeof task_context === 'object') ? { ...task_context, delegation_task: task } : { delegation_task: task };
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
+    delegateResult = await runCapability({
+      capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
+      task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+    });
+    if (delegateResult.status === 'in_progress') {
+      return { outcome: 'nested_checkpoint', lastHelpSelection };
+    }
+    if (delegationRequired || tool_input.is_final === true) {
+      return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
+    }
+    returningFromAgentId = targetAgentId;
+    returningFromCapabilitySlug = targetCapabilitySlug;
+  }
+
+  if (returningFromAgentId) {
+    onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug });
+  }
+  conversationHistory = [
+    ...conversationHistory,
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id, content: JSON.stringify(delegateResult) }] },
+  ];
+  return { outcome: 'continue', conversationHistory, lastHelpSelection };
 }
 
 // FEATURE: AA-139 -- the shared loop body, extracted unchanged in behavior from runCapability()'s
@@ -305,6 +394,7 @@ async function runLoop({
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
+        pendingDelegation: null,
       });
     }
 
@@ -409,185 +499,51 @@ async function runLoop({
     hopCounter.n++;
     delegationOccurred = true;
 
-    let delegateResult;
-    let returningFromAgentId = null;
-    let returningFromCapabilitySlug = null;
-    if (turn.tool_name === 'request_help') {
-      // FEATURE: AA-87 -- every unresolved skill need routes to whoever currently holds
-      // project-manager. This capability_slug/intent_slug pair is a platform-level constant
-      // (same category as MAX_LOOP_DEPTH) -- structurally there is exactly one such broker
-      // today (ARCHITECTURE.md §19e); the agent_id who holds it is still resolved live, never
-      // the literal string "michelle". No fast path exists -- every request_help call reasons
-      // through here, even when the roster's current state makes the outcome predictable.
-      const pmAgentId = await resolveCapabilityHolder('project-manager');
-      // FEATURE: MI-42 -- the PM broker's identity is real, resolved data (who currently holds
-      // project-manager), not the reasoning itself -- honest to emit before her call runs.
-      onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
-      delegateResult = await runCapability({
-        capability_slug: 'project-manager',
-        intent_slug: 'agent-selection-intent',
-        agent_id: pmAgentId,
-        task_context: JSON.stringify(turn.tool_input),
-        tenant_id,
-        _hop_counter: hopCounter,
-        _deadline: deadline,
-        _onEvent: onEvent,
-      });
-      // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- thread Michelle's real selection forward instead of
-      // discarding it. Generic to any request_help hop, not Display-agent-specific: captures
-      // whatever agent-selection-intent's own schema returned (reasoning/candidates), reading it
-      // from delegateResult.content since sendRequest()'s handler (store) does not spread the
-      // model's structured fields onto the top-level result.
-      lastHelpSelection = {
-        selected_by_agent_id: pmAgentId,
-        reasoning: delegateResult?.content?.reasoning ?? null,
-        candidates_considered: delegateResult?.content?.candidates ?? null,
-      };
-
-      // FEATURE: AA-152 -- when the REQUESTING capability declares delegationRequired, AA-142/AA-148
-      // already established there is no legitimate case where more of the requester's own judgment is
-      // needed after a hand-off -- this extends that one step further: no legitimate case where the
-      // requester needs a second model turn to re-choose WHO, either, once agent-selection-intent has
-      // already produced a real, reasoned recommendation. Skips straight to the same terminal-delegation
-      // path a manual delegate_to_agent(is_final:true) call would have taken. Scoped exclusively to
-      // delegationRequired capabilities (today: ci-answer-display-intent, hyp-hypothesis-test-display-
-      // intent) -- every other request_help caller is completely unaffected, falls through to the
-      // existing two-step behavior unchanged. Never a static agent/capability name: recommended_agent_id/
-      // recommended_capability_slug come from agent-selection-intent's own live reasoning, validated
-      // against its own candidates array below, never asserted directly (ARCHITECTURE.md §19d).
-      if (delegationRequired) {
-        const rec = delegateResult?.content;
-        const matchedCandidate = rec?.candidates?.find(
-          c => c.agent_id === rec.recommended_agent_id && c.capability_slug === rec.recommended_capability_slug
-        );
-        if (!rec?.recommended_agent_id || !matchedCandidate) {
-          // FEATURE: AA-152 -- fail loudly rather than silently falling through to a requester turn
-          // that would just re-litigate what delegationRequired already says is resolved. Same "fail
-          // safe, never fake" posture as AA-108/AA-126 -- a mismatched/missing recommendation here is a
-          // genuine platform fault, not something to paper over.
-          throw new Error(`request_help: delegationRequired capability's agent-selection-intent response had no valid recommended_agent_id matching a real candidate (capability_slug: ${capability_slug}/${intent_slug})`);
-        }
-        const delegateTaskContext = (task_context && typeof task_context === 'object')
-          ? { ...task_context, delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed }
-          : { delegation_task: turn.tool_input.task_description || turn.tool_input.skill_needed };
-        // FEATURE: MI-42 -- Michelle's own reasoning has already produced rec.recommended_agent_id
-        // by this point (validated against her real candidates above) -- this is the live "who got
-        // picked" moment the drawer only shows after the fact today.
-        onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null });
-        const autoResolvedResult = await runCapability({
-          capability_slug: rec.recommended_capability_slug,
-          intent_slug: matchedCandidate.intent_slug || null,
-          agent_id: rec.recommended_agent_id,
-          task_context: delegateTaskContext,
-          tenant_id, _hop_counter: hopCounter, _deadline: deadline,
-          _onEvent: onEvent,
-        });
-        if (autoResolvedResult.status === 'in_progress') {
-          return checkpointAndReturn({
-            job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
-            task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
-          });
-        }
-        return await finalizeDelegation({
-          delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id,
-          targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null,
-          lastHelpSelection, job_id,
-        });
-      }
-      // FEATURE: MI-42 -- non-delegationRequired request_help fall-through: control returns to the
-      // requester for another turn once Michelle has responded. Marks the "loop continues" boundary
-      // for the shared delegation_return emission below (1h).
-      returningFromAgentId = pmAgentId;
-      returningFromCapabilitySlug = 'project-manager';
-    } else if (turn.tool_name === 'delegate_to_agent') {
-      // FEATURE: AA-87 -- dispatches straight off the model's own tool-call input. No resolver
-      // call here: the model is choosing an agent_id it was just handed as a candidate (via
-      // request_help above), not asserting one unprompted. This is the only place in the whole
-      // mechanism an agent_id may appear, and it is always the requester's own tool-call
-      // argument, never a static field.
-      const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = turn.tool_input;
-      // FEATURE: AA-126 -- forward the delegator's own real task_context (whatever structured data
-      // THIS agent's own call was given -- e.g. Priya's supports/complicates/consider with real
-      // citations) to the delegate, not just the delegator's own free-text `task` paraphrase. Root
-      // cause: `task` is a plain string by design (generic across every delegate_to_agent use), so a
-      // delegating agent has to paraphrase structured content into it -- a format skill that requires
-      // every claim to trace back to real given text (e.g. Alex's intelligence-review-format) can't
-      // produce a valid response from a paraphrase with no real citation IDs, and silently returns
-      // little or nothing. Merging keeps the delegator's own framing (as `delegation_task`) while
-      // guaranteeing the real underlying data travels intact. Generic to every delegate_to_agent call
-      // -- no capability/agent name involved, no branch on which capability is being called.
-      const delegateTaskContext = (task_context && typeof task_context === 'object')
-        ? { ...task_context, delegation_task: task }
-        : { delegation_task: task };
-      // FEATURE: MI-42 -- the model's own tool-call argument names the target; never speculative.
-      onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
-      delegateResult = await runCapability({
-        capability_slug: targetCapabilitySlug,
-        intent_slug: targetIntentSlug || null,
-        agent_id: targetAgentId,
-        task_context: delegateTaskContext,
-        tenant_id,
-        _hop_counter: hopCounter,
-        _deadline: deadline,
-        _onEvent: onEvent,
-      });
-
-      // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- the real fix: a nested delegate call may
-      // itself have checkpointed (its own budget ran out inside this same request). Before this
-      // fix, an in-progress nested result fell straight into the is_final branch below, which read
-      // delegateResult.content (undefined on an in-progress shape) and threw -- the outer
-      // durable_hops row was never written, so the job was lost, not just delayed, and the frontend
-      // saw a generic 500 ("Something went wrong reaching Marcus"). Checkpointing the OUTER call
-      // here instead means the next `continue` (via resumeCapability()) resumes the outer call's
-      // own reasoning turn from persisted state -- it re-invokes the delegate fresh rather than
-      // trying to resume the nested call's own partial state, acceptable per the kickoff's own
-      // measured delegate-turn latencies (1-9s) vs. the budget-exhausting turns (~25-35s) that
-      // actually trigger this.
-      if (delegateResult.status === 'in_progress') {
-        return checkpointAndReturn({
-          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
-          task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
-        });
-      }
-
-      // FEATURE: AA-114/AA-115 (S-ARCH-DISPLAY-LOOP-01) -- is_final terminates the loop here,
-      // returning the delegate's own output as the final result, attributed to them, instead of
-      // feeding back for the delegator's own next turn. selection is null (never fabricated) when
-      // no request_help hop preceded this delegate_to_agent call in this same loop -- a legitimate
-      // shape per the tool's own description (task_context-supplied candidates), same as Owen's
-      // existing retry. Every existing caller that never sets is_final (Owen's retry, Priya's
-      // Escalate) is unaffected -- this branch only fires when the model explicitly sets it true.
-      // FEATURE: AA-148 -- delegationRequired capabilities have no legitimate is_final:false case
-      // (their entire job is handing off, AA-142's own definition) -- both live intents' method
-      // text confirm a Format Skill "never changes the facts/citations/review status you hand it,"
-      // so there is nothing for the delegator to review or act on afterward. Forcing this branch
-      // removes the superfluous wrap-up turn that produced narration instead of relaying the
-      // delegate's real content (see kickoff CONTEXT, Gap 1). Every other delegate_to_agent caller
-      // that never declares delegationRequired (Owen's retry, Priya's Escalate) is unaffected --
-      // this only changes behavior when the capability's own trait already says the hand-off is
-      // its whole job.
-      if (delegationRequired || turn.tool_input.is_final === true) {
-        return await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id });
-      }
-      // FEATURE: MI-42 -- non-terminal delegate_to_agent fall-through (is_final not set), e.g.
-      // Owen's retry-via-Marcus. Marks the "loop continues" boundary for the shared
-      // delegation_return emission below (1h).
-      returningFromAgentId = targetAgentId;
-      returningFromCapabilitySlug = targetCapabilitySlug;
-    }
-
-    // FEATURE: MI-42 -- fires only on the "loop continues" path (every other outcome above already
-    // returned) -- honest by construction, never fires for a delegationRequired hand-off (always
-    // terminal, nothing legitimately "returns") or a checkpoint (already returned before reaching here).
-    if (returningFromAgentId) {
-      onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug });
-    }
-
+    // FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- the assistant's own decision turn is
+    // appended to conversationHistory exactly once, here, immediately after callModel() returns a
+    // delegate call and BEFORE the new pre-dispatch budget check below -- so it is already present
+    // in conversationHistory whether this hop dispatches live or checkpoints pending.
     conversationHistory = [
       ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
       { role: 'assistant', content: turn.raw_content },
-      { role: 'user', content: [{ type: 'tool_result', tool_use_id: turn.tool_use_id, content: JSON.stringify(delegateResult) }] },
     ];
+
+    // FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- the fix: check budget BEFORE dispatch,
+    // not after. Before this, onEvent fired and the nested runCapability() call started immediately
+    // after the model decided to delegate, with no check that there was enough remaining budget for
+    // that nested call to finish. If it checkpointed mid-flight, the outer call also checkpointed
+    // (AA-141), and on resume, resumeCapability() re-entered runLoop() from persisted
+    // conversation_history -- re-asking the model for a turn it already answered (AA-185's duplicate
+    // "routing to X" event) while the nested call's own partial work was simply abandoned, never
+    // resumed (AA-187's orphaned durable_hops rows). Checkpointing HERE instead -- before onEvent
+    // fires, before the nested call starts -- persists the already-decided delegation
+    // (pendingDelegation) so the resume can dispatch it directly with a fresh full budget: no
+    // re-asking the model, no re-firing onEvent, no partial nested work ever started until there's a
+    // real budget to finish it.
+    const preDispatchRemainingMs = __testPreDispatchBudgetMs !== null ? __testPreDispatchBudgetMs : (deadline - Date.now());
+    if (preDispatchRemainingMs < HOP_BUDGET_RESERVE_MS) {
+      return checkpointAndReturn({
+        job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+        task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
+        pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
+      });
+    }
+
+    const dispatchOutcome = await dispatchDelegation({
+      via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id,
+      agent_id, capability_slug, intent_slug, tenant_id, task_context, delegationRequired,
+      conversationHistory, hopCounter, deadline, job_id, delegationOccurred, lastHelpSelection, onEvent,
+    });
+    if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
+    if (dispatchOutcome.outcome === 'nested_checkpoint') {
+      return checkpointAndReturn({
+        job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+        task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
+        pendingDelegation: null,
+      });
+    }
+    conversationHistory = dispatchOutcome.conversationHistory;
+    lastHelpSelection = dispatchOutcome.lastHelpSelection;
   }
 }
 
@@ -697,13 +653,40 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
   const onEvent = _onEvent || (() => {});
 
   try {
+    // FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- if the checkpoint that produced this row
+    // captured an already-decided-but-undispatched delegation, dispatch it directly with this fresh
+    // full budget instead of re-entering runLoop() from persisted conversation_history, which would
+    // re-ask the model for a turn it already answered (AA-185) and never resume the nested call's own
+    // partial work (AA-187). This is the one and only place pending_delegation is read.
+    if (row.pending_delegation) {
+      const dispatchOutcome = await dispatchDelegation({
+        via_tool: row.pending_delegation.via_tool, tool_input: row.pending_delegation.tool_input, tool_use_id: row.pending_delegation.tool_use_id,
+        agent_id: row.agent_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, tenant_id: row.tenant_id,
+        task_context: row.task_context ?? null, delegationRequired: row.delegation_required === true,
+        conversationHistory: row.conversation_history || [], hopCounter: { n: row.hop_counter || 0 }, deadline,
+        job_id: row.id, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null, onEvent,
+      });
+      if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
+      if (dispatchOutcome.outcome === 'nested_checkpoint') {
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: null });
+      }
+      return await runLoop({
+        capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+        task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
+        delegationRequired: row.delegation_required === true, requiresHumanConfirmation: false,
+        critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
+        conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
+        lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
+        deadline, job_id: row.id, onEvent,
+      });
+    }
     return await runLoop({
-      capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
       // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-145) -- durable_hops now persists the original
       // task_context (this session's migration adds the column, and Task 2/3 thread it into every
       // createDurableHopRow() call). A delegate_to_agent hop that fires after a resume now forwards
       // the real structured task_context instead of falling back to task-string-only forwarding --
       // fixes the live-confirmed AA-145 data-loss bug (Alex's "I don't see the raw answer data").
+      capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
       task_context: row.task_context ?? null,
       enriched, canRequestHelp: row.can_request_help,
       // FEATURE: AA-148 -- durable_hops now persists delegation_required (this session's
