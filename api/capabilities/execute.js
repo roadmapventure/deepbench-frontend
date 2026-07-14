@@ -82,7 +82,7 @@ function getSupabaseHeaders(key) {
 // completing in 33.4s had two entirely unlogged gaps (Marcus's own two turns) accounting for
 // ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
 // never touched." Generic to every capability's own turns, not capability-specific.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [] }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl || !supabaseKey) return;
@@ -98,7 +98,10 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
       latency_ms,
       input_tokens: input_tokens ?? null,
       output_tokens: output_tokens ?? null,
-      patterns_used: is_delegate_call ? ['agent-delegation'] : [],
+      patterns_used: Array.from(new Set([
+        ...(is_delegate_call ? ['agent-delegation'] : []),
+        ...intent_technical_services,
+      ])),
       created_at: new Date().toISOString(),
     }),
   }).catch(() => {});
@@ -321,6 +324,7 @@ async function runLoop({
       is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
       input_tokens: turn.usage?.input_tokens ?? null,
       output_tokens: turn.usage?.output_tokens ?? null,
+      intent_technical_services: enriched.intent_technical_services || [],
     });
 
     if (!turn.is_delegate_call) {
