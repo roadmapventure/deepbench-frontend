@@ -1,3 +1,13 @@
+// DeepBench v6.2.20 | MarketIntelligenceScreen.jsx | MI-52 — Agent Routing log normalization: one
+// agent per row (arrow/secondary-avatar block removed from RoutingEventRow; firstName helper
+// extracted to module scope, shared by describeDelegationEvent() and RoutingEventRow), agent_selection/
+// display_format re-pointed so the row's one visible agent is whoever the row is actually about
+// (picker vs. formatter, not the requester), duplicated/fabricated durationMs fixed (agent_selection
+// shows null, never a copy of display_format's real number or a hardcoded 0), and in-flight
+// delegation/delegation_return rows are now replaced in place by their real completion event instead
+// of sitting duplicated forever (logEvent's new additive `{ replaces }` call shape). See kickoff
+// docs/kickoffs/v6.2.20-MI-52-agent-routing-log-normalization.md.
+// FEATURE: MI-52 — see STYLE-GUIDE.md §5 (2026-07-14 amendment, reverses S-MI-49's drawer-scope note)
 // DeepBench v6.2.18 | MarketIntelligenceScreen.jsx | S-MI-51 — guided review->theory->decide journey:
 // every qa answer ends with an explicit "Good, thanks / Have Priya generate theories" choice (not just
 // internally-flagged ones); mobile Chat/Evidence become a permanent tab bar (Evidence disabled until a
@@ -374,16 +384,25 @@ function describePipelineEvent(evt) {
   }
 }
 
+// FEATURE: MI-52 — shared module-scope "first name only" resolver. Previously a local const
+// duplicated inside describeDelegationEvent (MI-49); RoutingEventRow now needs the identical
+// behavior (Task 1: drawer row headers switch from full name to first-name-only, matching the
+// chat status line), so this is the one implementation both call, not a second copy.
+function firstNameFor(id, agentById) {
+  return (agentById(id)?.name || id).split(" ")[0];
+}
+
 // FEATURE: MI-42 -- generic across every agent pair, no hardcoded names or capability-specific
 // branches (matches ARCHITECTURE.md §19d's own anti-hardcoding discipline) -- copy is derived
 // entirely from the event's own fromAgentId/toAgentId, resolved against the real roster.
-// FEATURE: MI-49 -- first name only (saves room on the chat status line); the Agent Routing
-// drawer's own row headers are explicitly out of scope, still show full names via agentById(...).name.
+// FEATURE: MI-52 -- was MI-49's first-name-only treatment, scoped to this function only with the
+// Agent Routing drawer's own row headers explicitly out of scope (still full names). MI-52 reverses
+// that scope note per John's direct instruction this session: RoutingEventRow now also renders
+// first name only (see below), via the same firstNameFor() helper this function calls.
 function describeDelegationEvent(evt, agents) {
   const agentById = (id) => agents.find(a => a.id === id);
-  const firstName = (id) => (agentById(id)?.name || id).split(" ")[0];
-  const fromName = firstName(evt.fromAgentId);
-  const toName = firstName(evt.toAgentId);
+  const fromName = firstNameFor(evt.fromAgentId, agentById);
+  const toName = firstNameFor(evt.toAgentId, agentById);
   if (evt.type === 'delegation_return') {
     return `${fromName} is back — wrapping up…`; // FEATURE: MI-48 -- was toName (named who control
     // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
@@ -492,7 +511,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
   // shape, same execute.js code path -- not a new event type).
   if (qa.last_help_selection) {
-    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: qa.last_help_selection.selected_by_agent_id, data: qa.last_help_selection, durationMs: 0 });
+    // FEATURE: MI-52 -- agentId re-pointed to the picker (Michelle) whose own reasoning is the row's
+    // summary text, not the requester (Marcus) -- secondaryAgentId dropped, RoutingEventRow no longer
+    // renders a second agent. durationMs: null (was a fabricated 0) -- not separately measurable from
+    // the client, this hop shares its one real round trip with qa_answer above.
+    onEvent({ type: "agent_selection", agentId: qa.last_help_selection.selected_by_agent_id, data: qa.last_help_selection, durationMs: null });
   }
 
   t0 = Date.now();
@@ -506,7 +529,9 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     onProgress,
   });
   const retried = !!gate.final_answer;
-  onEvent({ type: "proofreader", agentId: "owen", secondaryAgentId: retried ? "marcus" : null, data: gate, durationMs: Date.now() - t0 });
+  // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
+  // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
+  onEvent({ type: "proofreader", agentId: "owen", data: gate, durationMs: Date.now() - t0 });
 
   if (gate.guardrail?.result === "block") {
     // FEATURE: AA-171 fix (S-ARCH-QG-ESCALATION-01) -- Owen's own qg-review-intent turn now
@@ -518,7 +543,10 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // carries Michelle's own real reasoning for the pick, surfaced the same way AA-164 already
     // surfaces Marcus's own request_help hop above (qa.last_help_selection).
     if (gate.last_help_selection) {
-      onEvent({ type: "agent_selection", agentId: "owen", secondaryAgentId: gate.last_help_selection.selected_by_agent_id, data: gate.last_help_selection, durationMs: 0 });
+      // FEATURE: MI-52 -- same re-pointing as the request_help hop above: agentId is the picker
+      // (Michelle), not the requester (Owen); secondaryAgentId dropped; durationMs: null (was a
+      // fabricated 0) -- not separately measurable from the client.
+      onEvent({ type: "agent_selection", agentId: gate.last_help_selection.selected_by_agent_id, data: gate.last_help_selection, durationMs: null });
     }
     onEvent({ type: "failure_triage", agentId: gate.last_help_selection?.selected_by_agent_id || "owen", data: gate.triage, durationMs: 0 });
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
@@ -540,10 +568,17 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
     onProgress,
   });
+  // FEATURE: MI-52 -- agent_selection (the picker's reasoning) and display_format (the formatter's
+  // completion) describe two sub-phases of one un-separable server round trip -- one callCapability()
+  // call, one client-observable elapsed time. agent_selection's agentId is now the picker (Michelle),
+  // not the requester (Marcus); durationMs: null there (not a fabricated duplicate of the real
+  // number below). display_format's agentId is now the actual formatter (display.display_agent_id),
+  // not the picker with a requester fallback; it keeps the one real, actually-measured durationMs.
+  // secondaryAgentId dropped from both -- RoutingEventRow no longer renders a second agent.
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: "marcus", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
+    onEvent({ type: "agent_selection", agentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: null });
   }
-  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "marcus", secondaryAgentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
+  onEvent({ type: "display_format", agentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
 
   // FEATURE: AA-137 — callCapability() returns a raw string when the display/format hand-off
   // declines its tool call and responds with plain text instead (e.g. it recognizes a real problem
@@ -632,10 +667,14 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
     onProgress,
   });
+  // FEATURE: MI-52 -- same treatment as runQaWithQualityGate()'s Display-agent hand-off above:
+  // agent_selection's agentId is the picker (Michelle), durationMs: null (not a fabricated duplicate);
+  // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
+  // secondaryAgentId dropped from both.
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: "priya", secondaryAgentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: Date.now() - t0 });
+    onEvent({ type: "agent_selection", agentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: null });
   }
-  onEvent({ type: "display_format", agentId: display.selection?.selected_by_agent_id || "priya", secondaryAgentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
+  onEvent({ type: "display_format", agentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
 
   // FEATURE: AA-137 — same string-fallback case as runQaWithQualityGate() above, Priya's path.
   // MessageBubble's hypothesis_test case only ever renders st.headline/st.supports/.complicates/
@@ -1151,26 +1190,21 @@ function rollupBaseline(stats) {
 // FEATURE: MI-45 — extracted from AuditColumn's former inline .map() block so the exact same
 // per-event row renders in both desktop's Agent Routing Drawer and mobile's pinned Agent Routing
 // feed (STYLE-GUIDE.md §21) — one render path, two shells around it (Category M).
+// FEATURE: MI-52 — secondary/arrow/AgentAvatar-for-secondary block removed entirely (Task 1, Design
+// Rule: "every visible row names exactly one agent"). primary.name swapped to firstNameFor() so the
+// header matches the chat status line's existing first-name-only treatment (describeDelegationEvent,
+// above); primary.role stays unchanged.
 function RoutingEventRow({ evt, agentById }) {
   const { capability, summary, color } = describePipelineEvent(evt);
   const svc = SERVICE_LABEL[capability];
   const primary = agentById(evt.agentId);
-  const secondary = evt.secondaryAgentId ? agentById(evt.secondaryAgentId) : null;
   return (
     <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
         {primary && <AgentAvatar who={primary.id} size={20}/>}
-        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? primary.name : evt.agentId}</span>
+        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(evt.agentId, agentById) : evt.agentId}</span>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
-        {secondary && (
-          <>
-            <span style={{fontFamily:mono,fontSize:10,color:T.muted}}>→</span>
-            <AgentAvatar who={secondary.id} size={20}/>
-            <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{secondary.name}</span>
-            <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{secondary.role}</span>
-          </>
-        )}
       </div>
       {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
       <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
@@ -1707,21 +1741,61 @@ export default function MarketIntelligenceScreen() {
       expectation: expectation !== undefined ? expectation : (prev?.expectation ?? null),
       kind,
     }));
-  const logEvent = (evt) => setPipelineEvents(prev => [...prev, { ...evt, id: prev.length }]);
+  // FEATURE: MI-52 -- tracks still-pending in-flight delegation/delegation_return rows, keyed by the
+  // agent expected to produce the real completion event (correlation's own awaitingAgentId). Map<
+  // awaitingAgentId, { id, key } >. Not React state -- purely an internal bookkeeping side-table for
+  // logEvent's own replace-in-place check below, never read for rendering.
+  const pendingDelegationsRef = useRef(new Map());
+
+  // FEATURE: MI-52 -- logEvent gained a second, additive call shape: logEvent(evt, { replaces }),
+  // where replaces = { key, awaitingAgentId }. When supplied (only onDelegationProgress does this,
+  // below), the pushed row is registered as still-pending under that key instead of being final.
+  // Every other, pre-existing call site keeps calling logEvent(evt) with no options -- unchanged --
+  // but that plain path now also checks whether its own evt.agentId satisfies a still-pending row's
+  // awaitingAgentId; if so, it splices/updates that row in place (same array index, same id) instead
+  // of appending a new one, and clears the pending marker. A pending row that's never claimed (e.g.
+  // an error path with no follow-up for that agent) simply stays in the array forever, unmodified --
+  // never silently removed, per this task's design rule.
+  const logEvent = (evt, { replaces } = {}) => {
+    if (replaces) {
+      setPipelineEvents(prev => {
+        const id = prev.length;
+        pendingDelegationsRef.current.set(replaces.awaitingAgentId, { id, key: replaces.key });
+        return [...prev, { ...evt, id }];
+      });
+      return;
+    }
+    setPipelineEvents(prev => {
+      const pending = pendingDelegationsRef.current.get(evt.agentId);
+      if (pending) {
+        pendingDelegationsRef.current.delete(evt.agentId);
+        return prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
+      }
+      return [...prev, { ...evt, id: prev.length }];
+    });
+  };
 
   // FEATURE: MI-47 -- also logs every live handoff as its own permanent Agent Routing drawer row
   // (describePipelineEvent's new "delegation"/"delegation_return" cases), alongside the pre-existing
   // coarse checkpoint events -- additive only, does not replace/dedupe any existing event type.
+  // FEATURE: MI-52 -- that row is no longer permanent once a real outcome lands: it's logged via
+  // logEvent's new { replaces } shape, keyed on evt.toAgentId (the agent who will produce the real
+  // completion -- for 'delegation' that's who the hand-off is going TO; for 'delegation_return',
+  // per api/capabilities/execute.js's non-terminal loop-continuation path, it's the agent whose turn
+  // resumes next, e.g. Owen after Marcus's retry-via-Marcus hop). The next event logged for that
+  // agentId (any ordinary logEvent(evt) call, unmodified elsewhere in this file) replaces this row
+  // in place instead of sitting duplicated above it.
   const onDelegationProgress = (evt) => {
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
+    const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
     logEvent({
       type: evt.type, // 'delegation' | 'delegation_return'
       agentId: evt.fromAgentId,
       secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null,
       data: { message, viaTool: evt.viaTool || null },
       durationMs: null, // in-flight signal, not a completed duration -- RoutingEventRow already guards on != null
-    });
+    }, { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   const conversationContext = () =>
