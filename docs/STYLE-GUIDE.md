@@ -621,6 +621,19 @@ Below `MOBILE_BREAKPOINT` (Section 22), a right-side slide-over panel triggered 
 
 ---
 
+## Section 27 — Card-Grid Screen Mobile Composition (Locked 2026-07-13 · S-MOBILE-ROSTER-01-design)
+
+Below `MOBILE_BREAKPOINT` (Section 22), a screen built around a **left sidebar filter nav + multi-column card grid** (`RosterScreen.jsx` is the first application; any future roster/catalog-style screen with the same shape is a candidate) recomposes as follows — a distinct branch, not a CSS reflow, same construction as Section 21/24/26:
+
+- **Left sidebar filter nav → horizontal scroll chip row**, inserted inline in the content flow (directly below the page's masthead divider, not as a separate column). Same active-state logic as the existing Left Sidebar Nav Pattern (Section 10) — brass tint background + brass accent border — but the border axis rotates from left (vertical list) to bottom (horizontal row), since a left border reads correctly only in a vertical layout.
+- **A stat strip with more values than comfortably fit one row drops to a fixed-column grid** (3 columns for 5 stats, wrapping 3+2) directly below the chip row, same "reflow, don't shrink-to-illegible" principle as Section 26's tab-bar rule. Any strip-level secondary action (e.g. an "Add" button) moves to a full-width control below the grid rather than staying inline.
+- **Low-priority strip metadata (e.g. a workspace/tenant label) is dropped on mobile entirely**, not shrunk or relocated — judged per-item on whether it's load-bearing for a phone-sized read, same judgment call as Section 24's AI-status-dot removal.
+- **Multi-column card grid → single column, full width.** The card component itself is reused completely unchanged — do not fork or trim card content for mobile; if a card renders correctly at its desktop column width (roughly phone-width already, e.g. ~330-380px), it needs no mobile-specific treatment of its own.
+- **Page scroll stays a single continuous column** (chip row + stat grid + every card), no pagination/truncation of list contents and no internal double-scroll region — this pattern does not use Section 21's fixed-viewport/pinned-pane composition, since a browsable list (unlike a live chat) has no state that scrolling away would lose.
+- Desktop rendering is unchanged by construction — every branch above is gated by `useIsMobile()`.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
