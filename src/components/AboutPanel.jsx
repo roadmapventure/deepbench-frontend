@@ -1,6 +1,7 @@
-// DeepBench v6.2.6 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel
+// DeepBench v6.2.10 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel + scroll hint
 // FEATURE: SH-05 — About panel replacing Help modal
 // FEATURE: SH-21 — mobile-responsive layout (82% drawer width, scrollable tab bar, grid column drops)
+// FEATURE: SH-21 — mobile tab-bar scroll hint (fade gradient + chevron, John's follow-up request)
 
 import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
@@ -510,27 +511,36 @@ export default function AboutPanel({ onClose }) {
           </div>
         </div>
 
-        {/* Tab bar — FEATURE: SH-21 — horizontal scroll on mobile instead of flex:1 squeeze */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.line}`, flexShrink: 0, background: T.cardAlt, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                flex: isMobile ? "0 0 auto" : 1, minWidth: 0,
-                padding: isMobile ? "9px 13px" : "9px 4px",
-                fontFamily: mono, fontSize: isMobile ? 9 : 8, textTransform: "uppercase", letterSpacing: 0.8,
-                border: "none", background: t.id === tab ? T.card : T.cardAlt,
-                cursor: "pointer", color: t.id === tab ? T.navy : T.muted,
-                fontWeight: t.id === tab ? 700 : 400,
-                borderBottom: `2px solid ${t.id === tab ? T.brass : "transparent"}`,
-                marginBottom: -1, whiteSpace: "nowrap",
-                overflow: isMobile ? "visible" : "hidden", textOverflow: isMobile ? "clip" : "ellipsis",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Tab bar — FEATURE: SH-21 — horizontal scroll on mobile instead of flex:1 squeeze.
+            FEATURE: SH-21 — mobile scroll hint: fade gradient + chevron on the trailing edge,
+            static (not scroll-position-aware), same treatment as MI-44's Work-dropdown arrow hint. */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ display: "flex", borderBottom: `1px solid ${T.line}`, background: T.cardAlt, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  flex: isMobile ? "0 0 auto" : 1, minWidth: 0,
+                  padding: isMobile ? "9px 13px" : "9px 4px",
+                  fontFamily: mono, fontSize: isMobile ? 9 : 8, textTransform: "uppercase", letterSpacing: 0.8,
+                  border: "none", background: t.id === tab ? T.card : T.cardAlt,
+                  cursor: "pointer", color: t.id === tab ? T.navy : T.muted,
+                  fontWeight: t.id === tab ? 700 : 400,
+                  borderBottom: `2px solid ${t.id === tab ? T.brass : "transparent"}`,
+                  marginBottom: -1, whiteSpace: "nowrap",
+                  overflow: isMobile ? "visible" : "hidden", textOverflow: isMobile ? "clip" : "ellipsis",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {isMobile && (
+            <div style={{ position: "absolute", top: 0, bottom: 1, right: 0, width: 28, background: `linear-gradient(to right, transparent, ${T.cardAlt} 70%)`, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 3, pointerEvents: "none" }}>
+              <span style={{ fontFamily: mono, fontSize: 10, color: T.brass }}>›</span>
+            </div>
+          )}
         </div>
 
         {/* Content */}
