@@ -1,3 +1,9 @@
+// DeepBench v6.2.22 | SharedUI.jsx | MI-53 — ConfirmationCard gains an optional `formatted` prop
+// (Display agent's headline/body output, same shape MessageBubble's `qa` card uses) rendered with a
+// "Formatted by [agent] [role]" byline when present; falls back to the original generic
+// Object.entries(proposedAction) label:value dump, unchanged, when absent. See kickoff
+// docs/kickoffs/v6.2.22-MI-53-MI-54-confirmation-format-column2-scroll.md.
+// FEATURE: MI-53 — see STYLE-GUIDE.md §16 (2026-07-14 amendment)
 // DeepBench v6.1.41 | SharedUI.jsx | S-MI-34/MI-34 — Drawer gets an optional maxHeight prop (opt-in,
 // no behavior change for any drawer that doesn't pass it) so a single drawer can cap its height with
 // an internal scroll instead of growing to full natural height
@@ -342,7 +348,11 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight 
 // never a bespoke layout per agent. First frontend implementation of this gate anywhere on the
 // platform (confirmed by grep this design session: zero prior pending_confirmation/confirmation_id
 // UI exists) — lives here, not in a screen file, so it is reusable platform-wide going forward.
-export function ConfirmationCard({ agent, proposedAction, critique, onResolve }) {
+// FEATURE: MI-53 — optional `formatted` prop (Display agent's headline/body output, same shape
+// MessageBubble's `qa` card renders) takes over when present; falls back to the original generic
+// Object.entries dump, unchanged, when absent -- so any future requires_human_confirmation
+// capability without a paired display hop still works with this component unmodified.
+export function ConfirmationCard({ agent, proposedAction, critique, formatted, onResolve }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -365,12 +375,32 @@ export function ConfirmationCard({ agent, proposedAction, critique, onResolve })
         <span style={{marginLeft:"auto",fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase"}}>Needs Your Decision</span>
       </div>
       <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:8}}>
-        {Object.entries(proposedAction || {}).filter(([, v]) => v !== null && v !== "").map(([k, v]) => (
-          <div key={k} style={{fontFamily:body,fontSize:12,lineHeight:1.5,color:T.ink}}>
-            <span style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em",marginRight:6}}>{k.replace(/_/g," ")}:</span>
-            {typeof v === "object" ? JSON.stringify(v) : String(v)}
-          </div>
-        ))}
+        {formatted?.body ? (
+          <>
+            {formatted.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{formatted.headline}</div>}
+            {formatted.body.map((b, i) => (
+              <div key={i}>
+                {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
+                <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
+              </div>
+            ))}
+            {formatted.displayAgentCard && (
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+                <AgentAvatar who={formatted.displayAgentId} size={16} ring={false}/>
+                <span style={{fontFamily:"Inter, sans-serif",fontSize:11,color:"#888",letterSpacing:"0.02em"}}>Formatted by</span>
+                <span style={{fontFamily:"Inter, sans-serif",fontSize:11,fontWeight:600,color:"#b6873a",letterSpacing:"0.02em"}}>{formatted.displayAgentCard.name}</span>
+                <span style={{fontFamily:"Inter, sans-serif",fontSize:10,color:"#777"}}>{formatted.displayAgentCard.role}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          Object.entries(proposedAction || {}).filter(([, v]) => v !== null && v !== "").map(([k, v]) => (
+            <div key={k} style={{fontFamily:body,fontSize:12,lineHeight:1.5,color:T.ink}}>
+              <span style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em",marginRight:6}}>{k.replace(/_/g," ")}:</span>
+              {typeof v === "object" ? JSON.stringify(v) : String(v)}
+            </div>
+          ))
+        )}
         {critique && (
           <div style={{padding:"8px 10px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11.5,color:T.mutedDeep}}>
             {typeof critique === "object" ? JSON.stringify(critique) : critique}
