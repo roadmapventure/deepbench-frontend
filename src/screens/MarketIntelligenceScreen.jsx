@@ -1,8 +1,16 @@
+// DeepBench v6.2.25 | MarketIntelligenceScreen.jsx | MI-56 — mobile MI's permanent Question box/Send/
+// Clear strip merged from two stacked rows into one: input (flex:1) — Send — thin T.lineSoft divider
+// — Clear. Was a mobile shell bug (Clear rendered orphaned on its own near-empty row underneath).
+// Pure layout merge, no handler/behavior change. See STYLE-GUIDE.md §21's 2026-07-14 MI-56 amendment
+// and kickoff docs/kickoffs/v6.2.25-MI-56-mobile-chat-input-clear-row-merge.md.
+// FEATURE: MI-56
+//
 // DeepBench v6.2.24 | MarketIntelligenceScreen.jsx | MI-55 — AuditColumn's Agent Routing Drawer
 // (desktop only) opts into SharedUI.jsx's new `resizable` prop alongside its existing maxHeight={280}
 // — drag-to-resize taller, floor locked at 280, ceiling min(80vh, real content height), not persisted.
 // The other 4 drawers (Agents/Data Sources/Analysis/Agent Reasoning) are unchanged.
 // FEATURE: MI-55
+//
 // DeepBench v6.2.22 | MarketIntelligenceScreen.jsx | MI-54 — EvidenceColumn (desktop Column 2)
 // bounded to the grid row height with an internal scroll region, matching InteractColumn's existing
 // pattern (action buttons/ConfirmationCard now scroll into view inside the card instead of growing
@@ -1681,17 +1689,20 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         </div>
       )}
 
-      <div style={{flexShrink:0,padding:"9px 14px 0",display:"flex",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
+      {/* FEATURE: MI-56 — merged input+Send+Clear into one row (was two stacked rows, Clear read as a
+          stray orphaned element on its own near-empty row underneath). See STYLE-GUIDE.md §21's
+          2026-07-14 MI-56 amendment: divider does double duty as visual grouping + accidental-tap
+          mitigation for the no-confirm-dialog Clear action (that S-MI-51 decision unchanged here). */}
+      <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
         <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
           onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; } }}
           style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:13,background:T.card,color:T.ink}}/>
         <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; }} disabled={loading}
-          style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer"}}>
+          style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
           Send
         </button>
-      </div>
-      <div style={{flexShrink:0,padding:"4px 14px 7px",background:T.card,display:"flex",justifyContent:"flex-end"}}>
-        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10.5,textTransform:"uppercase",letterSpacing:"0.05em",cursor:"pointer"}}>
+        <div style={{width:1,alignSelf:"stretch",background:T.lineSoft,flexShrink:0}}/>
+        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"0 2px"}}>
           Clear
         </button>
       </div>
