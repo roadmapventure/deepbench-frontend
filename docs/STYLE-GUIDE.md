@@ -654,9 +654,17 @@ Any UI moment that invites a specific agent to perform a specific next step — 
 
 **Does not apply to transient status-strip ticks** — `AgentWorkingIndicator`'s live "Priya is testing…" message stays first-name-only, no role (Section 5a already locks this; adding a role there would be noise on a line that already ticks every second, not a new introduction moment).
 
-**Does not apply to the Agent Routing drawer's own row headers** — those already show full names per existing convention (Section 5a's own carve-out), unchanged by this rule.
+**Does not apply to the Agent Routing drawer's own row headers** — first-name-only, no role (Section 5, `MI-52`). **Correction (`MI-55`, 2026-07-14):** this section originally said the drawer showed full names, per the carve-out that stood at the time this section was written — `MI-52` (shipped later the same day) reversed that convention; this note was stale from the moment `MI-52` landed and is corrected here.
 
 First application: `MI-51`'s guided review→theory→decide flow (two Priya CTAs, one Nadia confirmation intro, one Nadia recall-pointer message). Any future screen inviting a specific agent to do specific work reuses this same first-name+role pairing rather than inventing a new convention.
+
+---
+
+## Section 29 — Resizable Drawer (Locked 2026-07-14 · S-MI-55-design)
+
+The shared `Drawer` component (`SharedUI.jsx`) supports an opt-in `resizable` prop — a plain brass/treasury grip bar at the bottom edge of the drawer's content area (only rendered when open), drag cursor `ns-resize`. Dragging never shrinks below the drawer's own passed `maxHeight` (the floor) and never grows past `min(80vh, the drawer's real content height)` (the ceiling — refuses empty padding space, refuses to exceed 80% of the viewport). Not persisted — always resets to the default height on reload. Default off; every consumer that doesn't pass `resizable` is byte-unaffected.
+
+First (and, as of this session, only) application: `AuditColumn`'s Agent Routing drawer, desktop only — growing it pushes Column 3's other four drawers (Agents/Data Sources/Analysis/Agent Reasoning) down in normal page flow, intentionally past the viewport fold when dragged tall enough (`AuditColumn` has no outer height cap of its own — see `MI-41`, a separate, still-open finding about the other four drawers' *unintended* version of the same growth). Mobile's pinned Agent Routing feed is a different render path (`MobileBody`), not this component — out of scope by construction. Any future Column 3 drawer that wants the same drag-resize behavior reuses this prop rather than rebuilding the handle.
 
 ---
 
