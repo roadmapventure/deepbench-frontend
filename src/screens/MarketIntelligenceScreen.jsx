@@ -1,3 +1,15 @@
+// DeepBench v6.2.18 | MarketIntelligenceScreen.jsx | S-MI-51 — guided review->theory->decide journey:
+// every qa answer ends with an explicit "Good, thanks / Have Priya generate theories" choice (not just
+// internally-flagged ones); mobile Chat/Evidence become a permanent tab bar (Evidence disabled until a
+// theory flow is active, symmetric flash on unseen content) replacing the old hidden-overlay pattern;
+// elapsed/expect/status becomes a permanent strip (fixes 30s dead-air behind the old Evidence overlay);
+// theory testing requires an explicit "Have Priya test this theory ->" click, no longer auto-fired on
+// selection; end decision collapses from 3 buttons (Discard/Track as Assumption/Make Permanent) to 2
+// (Info Only/Store as Forecast); confirmation card gets a plain-language intro line naming Nadia; the
+// Theory/Forecast/Correct switcher UI is removed from EvidenceColumn (underlying intent routing
+// unchanged). "Agent & Data Info" (renamed from "Activity") relocates to the page-title row, mobile-only.
+// Also corrects MI-50's stale FEATURES.md/CLAUDE-STATE.md tracking (code was already live, see kickoff).
+// FEATURE: MI-51 — see STYLE-GUIDE.md §21 (2026-07-14 amendment)
 // DeepBench v6.2.15 | MarketIntelligenceScreen.jsx | S-MI-50 — mobile MobileBody: bottom-edge scroll
 // affordance (fade gradient + bouncing chevron, reuses dbounce keyframe) on the pinned Agent Routing
 // feed, shown only when there's real unscrolled content below (dynamic, re-checked on scroll and on
@@ -47,8 +59,9 @@
 // generic ChartRenderer (ARCHITECTURE.md §19g) via st.visualization, replaces the retired
 // st.projected_state plain-text block
 // FEATURE: MI-01 — Market Intelligence screen, three-column layout per market-intelligence-v4.html
-// FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + Discard + commit
-// actions (Track as Assumption / Make Permanent) are explicit human controls, all live as of 01d
+// FEATURE: MI-02 — deterministic human-decision layer: hypothesis pick/write + commit actions are
+// explicit human controls, all live as of 01d. FEATURE: MI-51 — commit actions relabeled/collapsed
+// from 3 buttons (Discard/Track as Assumption/Make Permanent) to 2 (Info Only/Store as Forecast).
 // FEATURE: MI-03 — Theory Evidence swap-on-hypothesis-select (live); Data Room default charts still roadmap
 // FEATURE: AI-39 — two-layer needs_review OR-gate (Marcus self-flag OR Owen/Proofreader eval.result
 // ==='revise'), plus real retry-once-on-block via Owen's own delegate_to_agent call (01d correction —
@@ -61,11 +74,13 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, AiBadge, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
+import { Card, Corners, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
-import { AI_PAT } from "../aiPatterns.js";
+// FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
+// (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
+// below, which now renders on every qa message regardless of needs_review — no remaining call site.
 
 const EXAMPLE_QUESTIONS = [
   { id: "clean",  label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
@@ -637,7 +652,9 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     : display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
 }
 
-function MessageBubble({ msg, onReview }) {
+// FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
+// (Good, thanks / exploring / undecided), threaded through from the parent's messages array.
+function MessageBubble({ msg, index, onReview, onGoodThanks }) {
   const isUser = msg.role === "user";
 
   if (msg.kind === "hyp_submitted") {
@@ -765,19 +782,34 @@ function MessageBubble({ msg, onReview }) {
             Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
           </div>
         )}
+        {/* FEATURE: MI-51 — universal guided prompt, rendered on every qa message regardless of
+            needs_review (was a plain "Review This Answer ->" link, shown only when self/gate-flagged).
+            The flag itself is now informational only, no longer the sole gate for the choice below. */}
         {msg.needs_review && (
-          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
-            <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
-              ⚑ NEEDS REVIEW — {msg.review_reason || "flagged for review"}
-            </div>
-            <button onClick={() => onReview(msg)}
-              style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontFamily:body,fontSize:11.5,padding:"5px 10px",borderRadius:2,cursor:"pointer"}}>
-              Review This Answer →
-            </button>
+          <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3,marginTop:6}}>
+            ⚑ Marcus flagged this — {msg.review_reason || "flagged for review"}
           </div>
         )}
-        {!msg.needs_review && (
-          <div style={{marginTop:4}}><AiBadge label={AI_PAT.AGENT_ROUTING}/></div>
+        {msg.reviewChoice === "good" && (
+          <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
+        )}
+        {msg.reviewChoice === "exploring" && (
+          <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
+        )}
+        {!msg.reviewChoice && (
+          <div style={{marginTop:6,padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <button onClick={() => onGoodThanks(index)}
+                style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                Good, thanks
+              </button>
+              <button onClick={() => onReview(index)}
+                style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                Have Priya (Forecast/Theory/Performance Expert) generate a few theories →
+              </button>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -794,28 +826,57 @@ function MessageBubble({ msg, onReview }) {
       }}>
         {msg.text}
       </div>
+      {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
+          non-qa needs_review case (no message today reaches this with needs_review true, but this
+          keeps the treatment consistent should a future non-qa kind carry the flag). */}
       {!isUser && msg.needs_review && (
         <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
           <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
-            ⚑ NEEDS REVIEW — {msg.review_reason || "flagged for review"}
+            ⚑ Marcus flagged this — {msg.review_reason || "flagged for review"}
           </div>
-          <button onClick={() => onReview(msg)}
-            style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontFamily:body,fontSize:11.5,padding:"5px 10px",borderRadius:2,cursor:"pointer"}}>
-            Review This Answer →
-          </button>
+          {msg.reviewChoice === "good" && (
+            <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
+          )}
+          {msg.reviewChoice === "exploring" && (
+            <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
+          )}
+          {!msg.reviewChoice && (
+            <div style={{padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <button onClick={() => onGoodThanks(index)}
+                  style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                  Good, thanks
+                </button>
+                <button onClick={() => onReview(index)}
+                  style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                  Have Priya (Forecast/Theory/Performance Expert) generate a few theories →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// FEATURE: MI-51 — Theory/Forecast/Correct switcher UI removed (onIntentChange kept as a prop for
+// call-site parity, no longer invoked from inside this component — hypFlow.intent is still set at
+// entry via enterHypothesisFlow()/runIntentPipeline() classification and passed through unchanged to
+// onSelectHypothesis/onCommit, see CONTEXT item 13); guided theory selection (soft-link reveals a
+// write-your-own textarea only on click, was always-visible); explicit "test this theory" invocation
+// (was auto-fired on selection); honest verdict rendering (Supports/Complicates/Consider always shown,
+// chart/key-data-points only when present); 2-outcome decision (Info Only/Store as Forecast, was 3);
+// reframed confirmation intro line naming Nadia.
 function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
   const [customText, setCustomText] = useState("");
+  const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
   const nadia = agents.find(a => a.id === "nadia");
 
   useEffect(() => {
-    if (hypFlow && hypFlow.prefillText) setCustomText(hypFlow.prefillText);
+    if (hypFlow && hypFlow.prefillText) { setCustomText(hypFlow.prefillText); setShowOwnTheory(true); }
   }, [hypFlow && hypFlow.prefillText]);
 
   if (!hypFlow) {
@@ -854,43 +915,69 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Theory Evidence</div>
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16,display:"flex",flexDirection:"column",gap:14}}>
 
-        <div style={{display:"flex",gap:6}}>
-          {["theory","forecast","correct"].map(i => (
-            <button key={i} onClick={() => onIntentChange(i)}
-              style={{flex:1,padding:"8px 6px",fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",
-                background: hypFlow.intent === i ? T.brass : "transparent",
-                color: hypFlow.intent === i ? T.card : T.muted,
-                border:`1px solid ${T.brass}`,cursor:"pointer"}}>
-              {INTENT_LABEL[i] || i}
-            </button>
-          ))}
-        </div>
+        {/* FEATURE: MI-51 — Theory/Forecast/Correct switcher REMOVED. hypFlow.intent is still set at
+            entry (enterHypothesisFlow, direct-typed classification via runIntentPipeline) and still
+            passed through unchanged to onSelectHypothesis/onCommit; it is simply no longer a visible,
+            switchable control. */}
 
-        {hypFlow.candidates && hypFlow.candidates.length > 0 && hypFlow.stage !== "generating" && (
+        {hypFlow.stage === "generating" && (
+          <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
+            Priya is generating theories from the Data Room. Live progress is shown below.
+          </div>
+        )}
+
+        {hypFlow.stage === "choosing" && hypFlow.candidates && (
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Select or write a hypothesis</div>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Review or Select a theory to include in the analysis</div>
             {hypFlow.candidates.map(h => (
-              <div key={h.id} onClick={() => onSelectHypothesis(h.text)}
-                style={{padding:"9px 11px",background:T.card,border:`1px solid ${hypFlow.chosenText===h.text?T.brass:T.lineSoft}`,
-                  fontFamily:body,fontSize:12,color:T.ink,cursor:"pointer",display:"flex",gap:8}}>
+              <div key={h.id} onClick={() => { setShowOwnTheory(false); onSelectHypothesis(h.text); }}
+                style={{padding:"9px 11px",background:T.card,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,color:T.ink,cursor:"pointer",display:"flex",gap:8}}>
                 <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{h.id}</span>
                 <span>{h.text}</span>
               </div>
             ))}
+            {showOwnTheory ? (
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <textarea rows={2} value={customText} onChange={e => setCustomText(e.target.value)}
+                  placeholder="Write your own explanation"
+                  style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={() => { if (customText.trim()) { onSelectHypothesis(customText.trim()); setCustomText(""); setShowOwnTheory(false); } }}
+                    disabled={!customText.trim()}
+                    style={{padding:"6px 12px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11.5,cursor:customText.trim()?"pointer":"default"}}>
+                    Save
+                  </button>
+                  <button onClick={() => { setShowOwnTheory(false); setCustomText(""); }}
+                    style={{padding:"6px 12px",background:"transparent",color:T.muted,border:`1px solid ${T.line}`,fontFamily:body,fontSize:11.5,cursor:"pointer"}}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowOwnTheory(true)}
+                style={{alignSelf:"flex-start",background:"none",border:"none",padding:0,fontFamily:body,fontSize:11.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}}>
+                ...or write your own explanation
+              </button>
+            )}
           </div>
         )}
 
-        {hypFlow.stage !== "generating" && (
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {!hypFlow.candidates && <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Write your hypothesis</div>}
-            <textarea rows={2} value={customText} onChange={e => setCustomText(e.target.value)}
-              placeholder="...or write your own explanation"
-              style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
-            <button onClick={() => { if (customText.trim()) { onSelectHypothesis(customText.trim()); setCustomText(""); } }}
-              disabled={!customText.trim()}
-              style={{alignSelf:"flex-start",padding:"6px 12px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11.5,cursor:customText.trim()?"pointer":"default"}}>
-              Use this hypothesis
+        {hypFlow.stage === "ready" && hypFlow.chosenText && (
+          <>
+            <div style={{background:T.card,borderLeft:`3px solid ${T.brass}`,padding:"9px 12px"}}>
+              <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:4}}>Theory selected</div>
+              <p style={{margin:0,fontFamily:body,fontSize:12,lineHeight:1.5,color:T.ink,fontStyle:"italic"}}>{hypFlow.chosenText}</p>
+            </div>
+            <button onClick={() => onSelectHypothesis(hypFlow.chosenText, { startTest:true })}
+              style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:12,padding:"9px 12px",cursor:"pointer"}}>
+              Have Priya (Forecast/Theory/Performance Expert) test this theory →
             </button>
+          </>
+        )}
+
+        {hypFlow.stage === "testing" && (
+          <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
+            Priya is testing this theory against the evidence. Live progress is shown below.
           </div>
         )}
 
@@ -898,20 +985,28 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
           <>
             {st.override_warning && (
               <div style={{padding:"9px 11px",background:"#f3e6cc",border:`1px solid ${T.brass}`,fontFamily:body,fontSize:11,color:T.brassDeep}}>
-                ⚑ AI flagged a complicating factor not fully resolved by this hypothesis. Committing will log this as an override.
+                ⚑ AI flagged a complicating factor not fully resolved by this theory. Committing will log this as an override.
               </div>
             )}
+
+            {/* FEATURE: MI-51 — honest verdict: Supports/Complicates/Consider always render when
+                present (mirrors MessageBubble's existing hypothesis_test rendering); chart/key data
+                points below render only when present, captioned as agent-judgment-dependent. */}
+            <div style={{display:"flex",flexDirection:"column",gap:9}}>
+              {st.supports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.supports.text || st.supports}</p></div>)}
+              {st.complicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.complicates.text || st.complicates}</p></div>)}
+              {st.consider && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>→ Consider also</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.consider.text || st.consider}</p></div>)}
+            </div>
 
             {st.visualization && (
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected</div>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected <span style={{textTransform:"none",fontStyle:"italic",fontWeight:400}}>— shown when Priya judges it useful, not every time</span></div>
                 <ChartRenderer type={st.visualization.chart_type} data={st.visualization.chart_data} caption={st.visualization.caption}/>
               </div>
             )}
-
             {Array.isArray(st.key_data_points) && st.key_data_points.length > 0 && (
               <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points</div>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points <span style={{textTransform:"none",fontStyle:"italic",fontWeight:400}}>— shown when Priya judges it useful, not every time</span></div>
                 {st.key_data_points.map((d, i) => (
                   <div key={i} style={{fontFamily:body,fontSize:11,color:T.ink}}>
                     <b>{d.label}:</b> {d.value} <span style={{color:T.muted,fontFamily:mono,fontSize:9.5}}>· {d.source} · {d.confidence}</span>
@@ -919,33 +1014,44 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
                 ))}
               </div>
             )}
+
+            {/* FEATURE: MI-51 — end decision collapses from 3 outcomes (Discard/Track as Assumption/
+                Make Permanent) to 2 (Info Only/Store as Forecast); both backend calls (Elena's
+                reasoner-intent, unconditional; Nadia's data-patch-intent, always confirmation-gated)
+                are unchanged underneath, see onCommit()/onDiscard() below. */}
+            {!hypFlow.confirmation && (
+              <>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Info only, or store this as a forecast?</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={onDiscard}
+                    style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+                    Info Only
+                  </button>
+                  <button onClick={() => onCommit()}
+                    style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+                    Store as Forecast
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
 
-        {hypFlow.stage === "result" && !hypFlow.confirmation && (
-          <div style={{display:"flex",gap:6,marginTop:4}}>
-            <button onClick={onDiscard}
-              style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-              Discard
-            </button>
-            <button onClick={() => onCommit("forecast")}
-              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-              Track as Assumption
-            </button>
-            <button onClick={() => onCommit("correct")}
-              style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-              Make Permanent
-            </button>
-          </div>
-        )}
-
         {hypFlow.confirmation && (
-          <ConfirmationCard
-            agent={nadia}
-            proposedAction={hypFlow.confirmation.proposed_action}
-            critique={hypFlow.confirmation.critique}
-            onResolve={onResolveConfirmation}
-          />
+          <>
+            {/* FEATURE: MI-51 — plain intro line above the unchanged ConfirmationCard, so this reads
+                as reviewing the actual save (Nadia's real data-patch-intent draft), not a surprise
+                second decision. */}
+            <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
+              Nadia (Data Expert) drafted this Data Room entry — review it before it's saved:
+            </div>
+            <ConfirmationCard
+              agent={nadia}
+              proposedAction={hypFlow.confirmation.proposed_action}
+              critique={hypFlow.confirmation.critique}
+              onResolve={onResolveConfirmation}
+            />
+          </>
         )}
       </div>
     </div>
@@ -1321,13 +1427,17 @@ function DataSourceRow({ row }) {
 }
 
 // FEATURE: MI-45 — noMinHeight is an additive, default-false prop; desktop's call site never
-// passes it, so minHeight stays exactly 420 there (zero desktop change). MobileBody passes
-// noMinHeight so InteractColumn's chat card can shrink below 420px on a short mobile viewport
-// instead of squeezing the pinned Agent Routing feed toward zero height — live-verified at a real
-// 390x700 viewport that minHeight:420 (unmodified) forces the routing pane nearly off-screen; this
-// is the one documented, expected deviation from the kickoff's "reused unmodified" guidance
-// (kickoff Task 2d).
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, noMinHeight }) {
+// passes it, so minHeight stays exactly 420 there (zero desktop change). Originally passed by
+// MobileBody's non-bare InteractColumn call so the chat card could shrink below 420px on a short
+// mobile viewport instead of squeezing the pinned Agent Routing feed toward zero height.
+// FEATURE: MI-51 — MobileBody now calls InteractColumn with `bare` instead (Task 1d), which never
+// applies the 420px minHeight in the first place — noMinHeight is unused by any call site as of
+// this session, kept on the signature for any future non-bare-but-height-constrained caller.
+// FEATURE: MI-51 — bare prop added: when true (mobile's Chat tab), renders only the message-scroll
+// region + its own input row, no outer bordered card/avatar-name-caption header/AgentWorkingIndicator
+// (MobileBody renders the permanent status strip and input/Clear separately, tab-independent). When
+// bare is falsy (every pre-existing call site — desktop's grid), behavior is byte-identical to before.
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, noMinHeight, bare }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -1339,6 +1449,45 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
     setInput("");
     onSubmit(clean);
   };
+
+  const messageList = (
+    <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>
+      {messages.length === 0 ? (
+        <div>
+          <div style={{fontFamily:body,fontSize:13,color:T.ink,lineHeight:1.6,marginBottom:16}}>
+            Ask a question, run a theory, forecast a trend, correct the record, or escalate for deeper
+            research — five ways to work with the Data Room. Start with a real question below, or try one
+            of these:
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {EXAMPLE_QUESTIONS.map(q => (
+              <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
+                style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
+                {q.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks}/>)
+      )}
+      {!bare && workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
+    </div>
+  );
+
+  // FEATURE: MI-51 — bare mode renders ONLY the message list, no embedded input row: the question
+  // box/Send is now a single permanent element owned by MobileBody (Task 1d), shown regardless of
+  // active tab, not duplicated per-tab. (Live-verified this session: rendering an input row here too
+  // produced two stacked "Ask about channel performance…" boxes on the Chat tab — fixed by dropping
+  // it here entirely; `input`/`setInput`/`submit` above are unused in this branch as a result, kept
+  // on the component for the non-bare branch below.)
+  if (bare) {
+    return (
+      <div style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
+        {messageList}
+      </div>
+    );
+  }
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1}}>
@@ -1352,30 +1501,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Channel Intelligence · Q&A · Theory · Forecast · Correct · Escalate</div>
           </div>
         </div>
-
-        <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>
-          {messages.length === 0 ? (
-            <div>
-              <div style={{fontFamily:body,fontSize:13,color:T.ink,lineHeight:1.6,marginBottom:16}}>
-                Ask a question, run a theory, forecast a trend, correct the record, or escalate for deeper
-                research — five ways to work with the Data Room. Start with a real question below, or try one
-                of these:
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {EXAMPLE_QUESTIONS.map(q => (
-                  <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
-                    style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
-                    {q.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
-          )}
-          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
-        </div>
-
+        {messageList}
         <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
           <input
             value={input}
@@ -1395,22 +1521,61 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
   );
 }
 
-// FEATURE: MI-45 — mobile composition (STYLE-GUIDE.md §21): chat (InteractColumn, reused
-// unmodified) at flex:3, a pinned condensed Agent Routing feed at flex:1 directly below it, no
-// page-level scroll. Evidence/Activity render as full-screen overlays (same convention AppShell.jsx
-// already uses for AboutPanel/AIActivityPanel), dismissed via an explicit "← Back to Chat" control
-// only — no tap-outside-to-close (deliberate).
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity }) {
-  const [showEvidence, setShowEvidence] = useState(false);
-  const [showActivity, setShowActivity] = useState(false);
+// FEATURE: MI-51 — mobile composition (STYLE-GUIDE.md §21, superseding S-MI-45's overlay pattern):
+// Chat and Evidence are a permanent tab bar (Evidence disabled until a theory flow is active, then
+// flashes on unseen content — symmetric with Chat flashing when a new answer lands while on Evidence).
+// Elapsed/expect/agent-status is a permanent strip under either tab (fixes the 30s dead-air bug: the
+// one progress indicator that existed lived inside chat's scrollback, invisible the instant the old
+// Evidence overlay covered it). Question box/Send/Clear are permanent, reachable regardless of tab.
+// Agent Routing feed stays pinned/bottom, unchanged content/behavior (MI-50's scroll-hint relocated,
+// not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
+// showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
+// there instead of inside this component.
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo }) {
+  const [mobileTab, setMobileTab] = useState("chat");
+  const [chatUnseen, setChatUnseen] = useState(false);
+  const [evidenceUnseen, setEvidenceUnseen] = useState(false);
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
-  const evidenceLive = !!hypFlow; // FEATURE: MI-45 — badge shows only while a Theory/Forecast/Correct flow is active
+  const hasActiveFlow = !!hypFlow;
   const ordered = [...events].reverse();
 
+  const prevMsgCount = useRef(messages.length);
+  useEffect(() => {
+    if (messages.length > prevMsgCount.current && mobileTab !== "chat") setChatUnseen(true);
+    prevMsgCount.current = messages.length;
+  }, [messages.length, mobileTab]);
+
+  const prevStage = useRef(hypFlow?.stage);
+  useEffect(() => {
+    if (hypFlow && hypFlow.stage !== prevStage.current && mobileTab !== "evidence") setEvidenceUnseen(true);
+    prevStage.current = hypFlow?.stage;
+  }, [hypFlow?.stage, mobileTab]);
+
+  // FEATURE: MI-51 — Evidence auto-activates (switches to the active tab) the moment a theory flow
+  // starts (hasActiveFlow false -> true, i.e. right when the user clicks "Have Priya... generate a
+  // few theories ->"), so the live elapsed/expect status strip is immediately visible without an
+  // extra manual tap. This is a one-time switch at flow start, not on every stage change — the user
+  // can freely navigate back to Chat mid-generation (status strip stays visible either way, Evidence
+  // flashes via the effect above once new content is ready).
+  const prevHasFlow = useRef(hasActiveFlow);
+  useEffect(() => {
+    if (hasActiveFlow && !prevHasFlow.current) {
+      setMobileTab("evidence");
+      setEvidenceUnseen(false);
+    }
+    prevHasFlow.current = hasActiveFlow;
+  }, [hasActiveFlow]);
+
+  const selectTab = (tab) => {
+    if (tab === "evidence" && !hasActiveFlow) return;
+    setMobileTab(tab);
+    if (tab === "chat") setChatUnseen(false);
+    if (tab === "evidence") setEvidenceUnseen(false);
+  };
+
   // FEATURE: MI-50 — bottom-edge scroll affordance for the pinned Agent Routing feed.
-  // Dynamic (unlike SH-21's static tab-bar hint) because this panel's content is variable —
-  // a static hint would show even with 0-2 events that already fit without scrolling.
+  // UNCHANGED from current dev — do not re-implement, only relocate within the new shell.
   const [routingCanScrollMore, setRoutingCanScrollMore] = useState(false);
   const routingFeedRef = useRef(null);
   const checkRoutingScroll = () => {
@@ -1420,66 +1585,85 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, hypF
   };
   useEffect(() => { checkRoutingScroll(); }, [ordered.length]);
 
-  const paneBtn = (active) => ({
-    fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",
-    padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,
-    cursor:"pointer",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,position:"relative",
+  const tabStyle = (active, disabled) => ({
+    flex:1, padding:"9px 6px", fontFamily:mono, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em",
+    background: active ? "rgba(182,135,58,.07)" : "transparent",
+    color: disabled ? T.line : (active ? T.navy : T.muted),
+    border:"none", borderBottom:`2.5px solid ${active ? T.brass : "transparent"}`,
+    cursor: disabled ? "not-allowed" : "pointer",
+    display:"flex", alignItems:"center", justifyContent:"center", gap:6,
   });
+  const flashDot = { width:5, height:5, borderRadius:"50%", background:T.brass, animation:"aiBlink 1.3s ease-in-out infinite" };
   const overlayHeadStyle = {flexShrink:0,background:T.navy,color:T.card,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`3px solid ${T.brass}`};
   const backBtnStyle = {fontFamily:mono,fontSize:10,letterSpacing:"0.04em",textTransform:"uppercase",color:T.brassLight,border:"1px solid rgba(228,199,134,.4)",background:"transparent",padding:"5px 10px",cursor:"pointer"};
 
   return (
     <div style={{position:"relative",flex:1,minHeight:0,display:"flex",flexDirection:"column",gap:8}}>
-      <div style={{display:"flex",justifyContent:"flex-end",gap:6,flexShrink:0}}>
-        <button onClick={()=>setShowEvidence(true)} style={paneBtn()}>
-          Evidence
-          {evidenceLive && <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>}
+
+      <div style={{display:"flex",flexShrink:0,background:T.card,borderBottom:`1px solid ${T.line}`}}>
+        <button onClick={() => selectTab("chat")} style={tabStyle(mobileTab==="chat", false)}>
+          Chat {chatUnseen && mobileTab!=="chat" && <span style={flashDot}/>}
         </button>
-        <button onClick={()=>setShowActivity(true)} style={paneBtn()}>Activity</button>
+        <button onClick={() => selectTab("evidence")} style={tabStyle(mobileTab==="evidence", !hasActiveFlow)}>
+          Evidence {hasActiveFlow && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
+        </button>
       </div>
 
-      <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{flex:3,minHeight:0,display:"flex",flexDirection:"column"}}>
-          <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={onSubmit} onReview={onReview} noMinHeight/>
-        </div>
-        <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,position:"relative"}}>
-          <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
-            <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
-            <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
-          </div>
-          <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
-            {ordered.length === 0
-              ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
-              : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
-          </div>
-          {/* FEATURE: MI-50 — bottom fade + bouncing chevron, only when there's real content below */}
-          {routingCanScrollMore && (
-            <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
-              <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showEvidence && (
-        <div style={{position:"absolute",inset:0,background:T.paperDeep,zIndex:5,display:"flex",flexDirection:"column"}}>
-          <div style={overlayHeadStyle}>
-            <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Evidence</span>
-            <button onClick={()=>setShowEvidence(false)} style={backBtnStyle}>← Back to Chat</button>
-          </div>
+      <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
+        {mobileTab === "chat" ? (
+          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} bare/>
+        ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
             <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
           </div>
+        )}
+      </div>
+
+      {workingStatus && (
+        <div style={{flexShrink:0,padding:"8px 14px",background:"#fbf6ea",borderTop:`1px solid ${T.lineSoft}`}}>
+          <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>
         </div>
       )}
 
-      {showActivity && (
+      <div style={{flexShrink:0,padding:"9px 14px 0",display:"flex",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
+        <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
+          onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; } }}
+          style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:13,background:T.card,color:T.ink}}/>
+        <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; }} disabled={loading}
+          style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer"}}>
+          Send
+        </button>
+      </div>
+      <div style={{flexShrink:0,padding:"4px 14px 7px",background:T.card,display:"flex",justifyContent:"flex-end"}}>
+        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10.5,textTransform:"uppercase",letterSpacing:"0.05em",cursor:"pointer"}}>
+          Clear
+        </button>
+      </div>
+
+      <div style={{flexShrink:0,height:118,background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",position:"relative"}}>
+        <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
+          <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
+          <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
+        </div>
+        <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
+          {ordered.length === 0
+            ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
+            : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
+        </div>
+        {routingCanScrollMore && (
+          <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
+            <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
+          </div>
+        )}
+      </div>
+
+      {showAgentInfo && (
         <div style={{position:"absolute",inset:0,background:T.paperDeep,zIndex:5,display:"flex",flexDirection:"column"}}>
           <div style={overlayHeadStyle}>
-            <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Activity</span>
-            <button onClick={()=>setShowActivity(false)} style={backBtnStyle}>← Back to Chat</button>
+            <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Agent &amp; Data Info</span>
+            <button onClick={()=>setShowAgentInfo(false)} style={backBtnStyle}>← Back to Chat</button>
           </div>
-          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
             <AuditDrawersBody agentActivity={agentActivity} agents={agents}/>
           </div>
         </div>
@@ -1495,10 +1679,21 @@ export default function MarketIntelligenceScreen() {
   const [hypFlow, setHypFlow] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
   const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
+  // FEATURE: MI-51 — showAgentInfo lifted here (was MobileBody-local showActivity) so the trigger
+  // button can live in the shared page-title block (Task 1b) instead of inside MobileBody.
+  const [showAgentInfo, setShowAgentInfo] = useState(false);
   // FEATURE: MI-35 — lifted from AuditColumn so it's available at every setWorkingStatus( call
   // site below, not just inside AuditColumn.
   const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
   const agents = useAgents(); // FEATURE: MI-42 -- needed here for describeDelegationEvent()'s name resolution
+
+  // FEATURE: MI-51 — Clear resets chat + any active flow back to the seed-question empty state,
+  // same end state as a page refresh, no confirm dialog (this session's explicit design decision).
+  const onClear = () => {
+    setMessages([]);
+    setHypFlow(null);
+    setWorkingStatus(null);
+  };
 
   // FEATURE: MI-42 -- one shared status-setter for both MI-41's macro-hop swaps (explicit calls
   // below) and this session's live micro-hop delegation events (via onDelegationProgress, forwarded
@@ -1594,6 +1789,7 @@ export default function MarketIntelligenceScreen() {
           needs_review: !!result.needs_review, review_reason: result.review_reason,
           question: clean, citations: result.citations || [],
           totalElapsedMs: Date.now() - turnStart, // FEATURE: MI-42 -- Task 4's caption reads this
+          reviewChoice: null, // FEATURE: MI-51 -- explicit, not relying on undefined (undecided/good/exploring)
         }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
@@ -1612,14 +1808,32 @@ export default function MarketIntelligenceScreen() {
     }
   };
 
-  const onReview = (msg) => {
+  // FEATURE: MI-51 — onReview/onGoodThanks are now index-based (were msg-object-based) so a
+  // specific message's reviewChoice can be set, driving the universal 3-state guided prompt
+  // (undecided/good/exploring) on every qa message, not just internally-flagged ones.
+  const onGoodThanks = (msgIndex) => {
+    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, reviewChoice: "good" } : m));
+  };
+
+  const onReview = (msgIndex) => {
+    const msg = messages[msgIndex];
+    if (!msg) return;
+    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, reviewChoice: "exploring" } : m));
     enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: msg.question, flaggedAnswer: msg.text, citations: msg.citations || [], reviewReason: msg.review_reason });
   };
 
   const onIntentChange = (intent) => setHypFlow(prev => prev && ({ ...prev, intent }));
 
-  const onSelectHypothesis = async (text) => {
+  // FEATURE: MI-51 — theory testing is no longer auto-fired on selection. Choosing a theory (no
+  // second argument, or { startTest: false }) lands on the new "ready" stage showing the chosen
+  // theory + an explicit "Have Priya test this theory ->" button; only that button's click passes
+  // { startTest: true }, which is when runHypothesisTest() actually runs.
+  const onSelectHypothesis = async (text, { startTest } = {}) => {
     if (!hypFlow) return;
+    if (!startTest) {
+      setHypFlow(prev => prev && ({ ...prev, stage:"ready", chosenText: text }));
+      return;
+    }
     const { intent, flaggedQuestion, flaggedAnswer, hypothesisTest } = hypFlow;
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
@@ -1646,7 +1860,9 @@ export default function MarketIntelligenceScreen() {
   };
 
   const onDiscard = () => {
-    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_discard", text: "Theory discarded — not written to the Data Room." }]);
+    // FEATURE: MI-51 — "Info Only" copy (was "Theory discarded — not written to the Data Room.",
+    // the old "Discard" button's text) — same no-op outcome, reworded for the 2-outcome decision.
+    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_discard", text: "Kept as info only — nothing stored in the Data Room." }]);
     setHypFlow(null);
   };
 
@@ -1654,9 +1870,12 @@ export default function MarketIntelligenceScreen() {
   // unconditional, self-gated, no confirmation) and Nadia (data-analysis, unconditional, always
   // pending_confirmation) directly — no Intake Assistant involvement, no delegation, no nesting
   // (see kickoff CONTEXT for why intake-commit-intent's route_to fan-out is deliberately unused).
-  const onCommit = async (intent) => {
+  // FEATURE: MI-51 — intent parameter dropped (was onCommit("forecast")/onCommit("correct") for the
+  // old 2-of-3 buttons that shared this call) — single "Store as Forecast" outcome now, hypFlow's own
+  // intent (set at flow entry, unchanged) is used below instead of a per-button override.
+  const onCommit = async () => {
     if (!hypFlow) return;
-    const { flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
+    const { intent, flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
     setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
     // FEATURE: MI-29 -- t0/step hoisted above try so the catch block can log which agent was running
     let t0 = Date.now();
@@ -1734,8 +1953,11 @@ export default function MarketIntelligenceScreen() {
       }
 
       logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
+      // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
+      // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
+      // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.
       setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
-        text: resolution === "accept" ? (result.content?.confirmation_note || "Recorded.") : "Nadia's proposal was rejected — not recorded." }]);
+        text: resolution === "accept" ? "Saved — Nadia (Data Expert) logged this. Find it anytime under Agent & Data Info → Analysis." : "Nadia's proposal was rejected — not recorded." }]);
       setHypFlow(null);
     } finally {
       setWorkingStatus(null);
@@ -1746,20 +1968,29 @@ export default function MarketIntelligenceScreen() {
     <AppShell>
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding: isMobile ? "14px 14px 16px" : "20px 28px 28px"}}>
         <FeatureBadge id="MI-01"/>
-        <div style={{marginBottom: isMobile ? 12 : 18}}>
-          <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence</div>
-          <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
+        {/* FEATURE: MI-51 — "Agent & Data Info" (renamed from "Activity") relocates here, next to the
+            page title, mobile-only — was a small button inside MobileBody's own pane-button row. */}
+        <div style={{marginBottom: isMobile ? 12 : 18, display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:10}}>
+          <div>
+            <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence</div>
+            <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
+          </div>
+          {isMobile && (
+            <button onClick={() => setShowAgentInfo(true)} style={{flexShrink:0,fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,cursor:"pointer",whiteSpace:"nowrap"}}>
+            Agent &amp; Data Info
+            </button>
+          )}
         </div>
         {isMobile ? (
           <MobileBody
-            messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}
+            messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}
             hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
-            events={pipelineEvents} agentActivity={agentActivity}
+            events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview}/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks}/>
             <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
           </div>
