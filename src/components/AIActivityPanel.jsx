@@ -1,12 +1,14 @@
-// DeepBench v5.2.37 | AIActivityPanel.jsx | BUG-21 — replace AGENT_NAMES with AGENTS-derived lookup
+// DeepBench v6.2.9 | AIActivityPanel.jsx | AI-48 mobile-responsive AI Audit panel
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
+// FEATURE: AI-48 — mobile-responsive layout (82% drawer width, backdrop-dismiss, STYLE-GUIDE.md §26)
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { useAIActivity, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
 import { AGENTS } from "../data/agents.js";
 import { Corners } from "./SharedUI.jsx";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 // FEATURE: BUG-21 — self-maintaining agent lookup derived from AGENTS; never hand-maintained again
 const _agentById   = Object.fromEntries(AGENTS.map(a => [a.id,                    { name: a.name, code: a.code }]));
@@ -182,6 +184,8 @@ export default function AIActivityPanel({ onClose }) {
   const [zeroClosed, setZeroClosed] = useState(true);
   const [inactivePtnClosed, setInactivePtnClosed] = useState(true);
   const toggle = (key) => setSections(s => ({ ...s, [key]: !s[key] }));
+  // FEATURE: AI-48 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
+  const isMobile = useIsMobile();
 
   // FEATURE: AI-10 — Hydrate lifetime totals from Supabase once on mount
   useEffect(() => {
@@ -189,18 +193,26 @@ export default function AIActivityPanel({ onClose }) {
   }, []);
 
   return (
-    <div style={{position:"fixed",top:0,right:0,bottom:0,width:650,background:T.card,borderLeft:`2px solid ${T.brass}`,zIndex:1000,display:"flex",flexDirection:"column",boxShadow:"-8px 0 32px rgba(0,0,0,.18)"}}>
+    <>
+      {/* FEATURE: AI-48 — mobile-only backdrop, tap to dismiss; desktop has no backdrop (unchanged) */}
+      {isMobile && (
+        <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(18,36,60,.5)",zIndex:999}}/>
+      )}
+      <div style={{position:"fixed",top:0,right:0,bottom:0,
+        width: isMobile ? "82%" : 650,
+        maxWidth: isMobile ? 340 : undefined,
+        background:T.card,borderLeft:`2px solid ${T.brass}`,zIndex:1000,display:"flex",flexDirection:"column",boxShadow:"-8px 0 32px rgba(0,0,0,.18)"}}>
       {/* Header */}
-      <div style={{background:`linear-gradient(135deg,${T.navy},${T.navyMid})`,padding:"14px 20px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
+      <div style={{background:`linear-gradient(135deg,${T.navy},${T.navyMid})`,padding: isMobile ? "11px 15px" : "14px 20px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontFamily:mono,fontSize:9,color:T.brassLight,letterSpacing:2,textTransform:"uppercase",marginBottom:3}}>AI Transparency · DeepBench</div>
-            <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:T.card}}>AI Audit</div>
+            <div style={{fontFamily:display,fontSize: isMobile ? 15 : 18,fontWeight:600,color:T.card}}>AI Audit</div>
           </div>
           <button onClick={onClose} style={{background:"transparent",border:`1px solid rgba(255,255,255,.2)`,color:"rgba(255,255,255,.6)",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
-        {/* Total strip */}
-        <div style={{display:"flex",gap:16,marginTop:10}}>
+        {/* Total strip — FEATURE: AI-48 — wraps on mobile instead of overflowing, no stat dropped */}
+        <div style={{display:"flex",gap:16,marginTop:10,flexWrap: isMobile ? "wrap" : "nowrap",rowGap: isMobile ? 6 : 0}}>
           {[
             ["Total Calls",    totalCalls],
             ["Total Cost",     fmt$(totalCost)],
@@ -216,18 +228,18 @@ export default function AIActivityPanel({ onClose }) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — FEATURE: AI-48 — flex:1 kept on mobile, 3 tabs judged to fit at 340px without scroll */}
       <div style={{display:"flex",borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
         {[["activity","Activity Log"],["mcp","MCP Roadmap"],["checklist","Architect Checklist"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
-            style={{flex:1,padding:"9px",fontFamily:mono,fontSize:9,textTransform:"uppercase",letterSpacing:1,border:"none",background:"transparent",cursor:"pointer",color:tab===id?T.navy:T.muted,fontWeight:tab===id?700:400,borderBottom:`2px solid ${tab===id?T.brass:"transparent"}`,marginBottom:-1}}>
+            style={{flex:1,padding: isMobile ? "8px 3px" : "9px",fontFamily:mono,fontSize: isMobile ? 8 : 9,textTransform:"uppercase",letterSpacing:1,border:"none",background:"transparent",cursor:"pointer",color:tab===id?T.navy:T.muted,fontWeight:tab===id?700:400,borderBottom:`2px solid ${tab===id?T.brass:"transparent"}`,marginBottom:-1}}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
+      {/* Content — FEATURE: AI-48 — mobile padding delta only, all content/data unchanged */}
+      <div style={{flex:1,overflowY:"auto",padding: isMobile ? "12px 14px" : "14px 16px"}}>
         {tab === "activity" && (
           <>
             {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
@@ -452,6 +464,7 @@ export default function AIActivityPanel({ onClose }) {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
