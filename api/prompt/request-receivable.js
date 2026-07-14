@@ -246,7 +246,7 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
 }
 
 // FEATURE: AA-44 — patterns_used array built from call shape and guardrails state
-function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = false) {
+export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = false) {
   return [
     ...(isJson ? ['structured-output', 'tool-use'] : []),
     ...(guardrailsRan ? ['prompt-chaining', 'guardrails'] : []),
@@ -276,7 +276,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   };
 
   // Accept both raw db-assembly output (sections array) and enriched ai-enrichment output (system_prompt string)
-  const { task_id, sections, system_prompt, format_contract, llm } = prompt_request || {};
+  const { task_id, sections, system_prompt, format_contract, llm, intent_technical_services = [] } = prompt_request || {};
 
   if (!format_contract) {
     throw new Error('format_contract required');
@@ -432,7 +432,10 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   deliverable_id = result.deliverable_id;
 
   // ── STEP 4: Server-side ai_activity_log write ────────────────────────────────
-  const patternsUsed = buildPatternsUsed(isJson, guardrailsRan, delegation_occurred);
+  const patternsUsed = Array.from(new Set([
+    ...buildPatternsUsed(isJson, guardrailsRan, delegation_occurred),
+    ...intent_technical_services,
+  ]));
   const latency_ms = Date.now() - startTime;
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs

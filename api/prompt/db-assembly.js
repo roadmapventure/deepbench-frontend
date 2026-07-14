@@ -25,7 +25,7 @@ function getSupabaseHeaders(key) {
   };
 }
 
-function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlug) {
+export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlug) {
   const sections = [];
   let reflectSection = null;
   let synthesisEnabled = false;
@@ -38,6 +38,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
   let requiresHumanConfirmation = false;
   let critiqueCapabilitySlug = null;
   let critiqueIntentSlug = null;
+  let intentTechnicalServices = [];
 
   for (const sp of skillProfiles) {
     const typeSlug = sp.skill_type_slug;
@@ -133,6 +134,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
       // downgraded project-manager's Work Order flow from sonnet-4-6 to haiku-4-5 before the
       // gate was added). Byte-identical for every caller that doesn't pass intent_slug.
       if (intentSlug && sp.slug === intentSlug) {
+        intentTechnicalServices = Array.isArray(sp.technical_services) ? sp.technical_services : [];
         if (sp.llm_provider || sp.llm_model) {
           llm = {
             provider: sp.llm_provider || DEFAULT_LLM.provider,
@@ -275,7 +277,7 @@ function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlu
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
-  return { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug };
+  return { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices };
 }
 
 function buildLabel(typeSlug, name) {
@@ -432,7 +434,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used
@@ -543,6 +545,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     requiresHumanConfirmation,
     critiqueCapabilitySlug,
     critiqueIntentSlug,
+    intent_technical_services: intentTechnicalServices,
   };
 }
 

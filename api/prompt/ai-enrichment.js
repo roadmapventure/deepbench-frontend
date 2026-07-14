@@ -98,7 +98,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-  const { sections = [], task_context = "", tenant_id = "global", format_contract, synthesis, llm, agent_id: pr_agent_id, capability_slug: pr_capability_slug } = promptRequest;
+  const { sections = [], task_context = "", tenant_id = "global", format_contract, synthesis, llm, agent_id: pr_agent_id, capability_slug: pr_capability_slug, intent_technical_services = [] } = promptRequest;
   // FEATURE: AA-57 — task_context may be an object {goal, deliverable_type}; extract string for RAG + Reflect
   const taskContextStr = typeof task_context === 'object' && task_context !== null
     ? (task_context.goal || JSON.stringify(task_context))
@@ -115,6 +115,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
       llm: llm || { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" },
       agent_id: effectiveAgentId,
       capability_slug: effectiveCapabilitySlug,
+      intent_technical_services,
       debug: {
         sections_assembled: 0,
         sections_omitted: [],
@@ -321,6 +322,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
     llm: llm || { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" },
     agent_id: effectiveAgentId,
     capability_slug: effectiveCapabilitySlug,
+    intent_technical_services,
     debug: {
       sections_assembled: Object.keys(renderedMap).length,
       sections_omitted: omitted,
