@@ -190,13 +190,22 @@ export const AI_TYPES = {
   hitl_review_rate:   { label:"Human Review Rate",            desc:"% of HITL steps that required an override — tracks agent autonomy over time",                                        model:"TBD",                   location:"Planned",                        phase:2 },
 };
 
-// Cost estimates per 1K tokens
-// FEATURE: BUG-13 — correct model IDs for cost lookup (old short-form keys kept for safety)
-const COST_PER_1K = {
-  "claude-haiku-4-5": 0.00025,
-  "claude-haiku-4-5-20251001": 0.00025,
+// FEATURE: AA-181 -- real Anthropic per-model input/output rates (verified 2026-07-14
+// against published Claude pricing: Haiku 4.5 $1/$5 per 1M tokens, Sonnet 4.6 $3/$15 per
+// 1M). Split input/output replaces the old single blended rate, which understated Haiku
+// cost 4x and ignored Sonnet's 5x output premium entirely.
+const COST_PER_1K_INPUT = {
+  "claude-haiku-4-5": 0.001,
+  "claude-haiku-4-5-20251001": 0.001,
   "claude-sonnet-4-5": 0.003,
   "claude-sonnet-4-6": 0.003,
+  "text-embedding-3-small": 0.00002,
+};
+const COST_PER_1K_OUTPUT = {
+  "claude-haiku-4-5": 0.005,
+  "claude-haiku-4-5-20251001": 0.005,
+  "claude-sonnet-4-5": 0.015,
+  "claude-sonnet-4-6": 0.015,
   "text-embedding-3-small": 0.00002,
 };
 
@@ -221,6 +230,21 @@ const MODEL_ID_NORMALIZE = {
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
 };
 
+// FEATURE: AA-181 -- single source of truth for call cost, used at both write time
+// (logAICall(), for the legacy client-driven AI types) and read time
+// (hydrateFromSupabase() below, and useAgents.js's buildActivitySummary()). Root cause
+// this closes: every server-side ai_activity_log insert (execute.js, request-receivable.js,
+// ai-enrichment.js) writes input_tokens/output_tokens but never a cost_usd value, so
+// 99.5% of real rows had no dollar figure. Deriving cost from tokens at read time prices
+// every existing and future row with no backfill migration.
+export function computeCallCost(model, inputTokens, outputTokens) {
+  const resolvedModel = MODEL_ID_NORMALIZE[model] || model;
+  const inRate = COST_PER_1K_INPUT[resolvedModel] ?? COST_PER_1K_INPUT[model];
+  const outRate = COST_PER_1K_OUTPUT[resolvedModel] ?? COST_PER_1K_OUTPUT[model];
+  if (inRate == null && outRate == null) return null;
+  return ((inputTokens || 0) / 1000) * (inRate || 0) + ((outputTokens || 0) / 1000) * (outRate || 0);
+}
+
 // FEATURE: AI-16 — logAICall Supabase persistence
 // FEATURE: AA-44 — logAICall gains optional patterns_used param
 export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null, location = null, agentId = null, taskId = null, patterns_used = [] }) {
@@ -235,7 +259,7 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
     tier,
     location:  location || AI_TYPES[type]?.location || "—",
     agentId,
-    cost:      tokens > 0 ? (tokens / 1000) * (COST_PER_1K[resolvedModel] || COST_PER_1K["claude-haiku-4-5"]) : null,
+    cost:      computeCallCost(resolvedModel, 0, tokens),
     ts:        new Date().toISOString(),
   };
   _log = [entry, ..._log].slice(0, 500); // cap at 500
@@ -285,7 +309,9 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     tier:      row.knowledge_tier || null,
     location:  row.feature || '—',
     agentId:   row.agent_id || null,
-    cost:      row.cost_usd ? parseFloat(row.cost_usd) : null,
+    cost:      row.cost_usd != null
+      ? parseFloat(row.cost_usd)
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens),
     ts:        row.created_at,
     _fromDB:   true,
   }));

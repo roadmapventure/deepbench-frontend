@@ -13,6 +13,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AGENTS } from "../data/agents.js";
 import { supabase } from '../lib/supabase.js';
+import { computeCallCost } from './useAIActivity.js';
 
 // FEATURE: RO-09 — per-agent usage count from ai_activity_log
 export function useAgentUsageCounts() {
@@ -136,7 +137,10 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
     if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
     const d = map[row.agent_id];
     d.calls++;
-    if (row.cost_usd) { d.totalCost += parseFloat(row.cost_usd); d.costCount++; }
+    const rowCost = row.cost_usd != null
+      ? parseFloat(row.cost_usd)
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens);
+    if (rowCost != null) { d.totalCost += rowCost; d.costCount++; }
 
     const { kind, include } = classifyRow(row, turnTimestampsByAgent);
     if (!include) continue;
@@ -184,7 +188,7 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
       while (true) {
         const { data, error } = await supabase
           .from('ai_activity_log')
-          .select('agent_id,ai_type,feature,model,latency_ms,cost_usd,created_at')
+          .select('agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .range(from, from + PAGE_SIZE - 1);
