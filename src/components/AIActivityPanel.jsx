@@ -31,7 +31,7 @@ const CHECKLIST = [
   ["Structured output",  "Tool use / response_format for all structured data. Never parse free-text JSON."],
 ];
 
-const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(3)}`;
+const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(2)}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
 
 // FEATURE: AI-23 — Service row: type badge + name + patterns + stats (no expand)

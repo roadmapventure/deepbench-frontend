@@ -285,22 +285,37 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
   return entry;
 }
 
+// FEATURE: AA-184 -- page through the full result set instead of capping at 500, so
+// Total Cost and every by-type/by-service/by-pattern/by-LLM rollup reflect true history
+// instead of just the most recent 500 rows. AA-183 fixed HOW cost is computed per row;
+// this fixes HOW MANY rows are read -- confirmed live the two are independent bugs
+// (last-500-rows total was $3.56 vs $42.18 across the real ~9,300-row history). Same
+// PAGE_SIZE/.range() loop already proven in useAgents.js's fetchAll() -- not a new pattern.
+const PAGE_SIZE = 1000;
+
 // FEATURE: AI-16 — Hydrate in-memory store from Supabase on panel mount
 export async function hydrateFromSupabase(tenantId = 'global') {
-  const { data, error } = await supabase
-    .from('ai_activity_log')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const rows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('ai_activity_log')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (error) {
-    console.warn('[AI log] Hydration failed:', error.message);
-    return;
+    if (error) {
+      console.warn('[AI log] Hydration failed:', error.message);
+      return;
+    }
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
 
   // Replace store entirely with DB state — DB is authoritative on every panel open
-  _log = (data || []).map(row => ({
+  _log = rows.map(row => ({
     id:        row.id,
     type:      row.ai_type,
     model:     row.model || 'claude-haiku-4-5',
