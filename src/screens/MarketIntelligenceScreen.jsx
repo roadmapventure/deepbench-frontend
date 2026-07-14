@@ -1,3 +1,7 @@
+// DeepBench v6.2.15 | MarketIntelligenceScreen.jsx | S-MI-50 — mobile MobileBody: bottom-edge scroll
+// affordance (fade gradient + bouncing chevron, reuses dbounce keyframe) on the pinned Agent Routing
+// feed, shown only when there's real unscrolled content below (dynamic, re-checked on scroll and on
+// event-list growth). See STYLE-GUIDE.md §21's 2026-07-14 amendment. FEATURE: MI-50.
 // DeepBench v6.2.0 | MarketIntelligenceScreen.jsx | S-MOBILE-NAV-01 — rename (MI-46): page title +
 // Agent Routing empty-state copy "Market Intelligence" → "Channel Sales Intelligence", display-text
 // only, see STYLE-GUIDE.md §25.
@@ -1404,6 +1408,18 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, hypF
   const evidenceLive = !!hypFlow; // FEATURE: MI-45 — badge shows only while a Theory/Forecast/Correct flow is active
   const ordered = [...events].reverse();
 
+  // FEATURE: MI-50 — bottom-edge scroll affordance for the pinned Agent Routing feed.
+  // Dynamic (unlike SH-21's static tab-bar hint) because this panel's content is variable —
+  // a static hint would show even with 0-2 events that already fit without scrolling.
+  const [routingCanScrollMore, setRoutingCanScrollMore] = useState(false);
+  const routingFeedRef = useRef(null);
+  const checkRoutingScroll = () => {
+    const el = routingFeedRef.current;
+    if (!el) return;
+    setRoutingCanScrollMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  };
+  useEffect(() => { checkRoutingScroll(); }, [ordered.length]);
+
   const paneBtn = (active) => ({
     fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",
     padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,
@@ -1426,16 +1442,22 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, hypF
         <div style={{flex:3,minHeight:0,display:"flex",flexDirection:"column"}}>
           <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={onSubmit} onReview={onReview} noMinHeight/>
         </div>
-        <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
+        <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,position:"relative"}}>
           <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
             <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
             <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
           </div>
-          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
+          <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
             {ordered.length === 0
               ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
               : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
           </div>
+          {/* FEATURE: MI-50 — bottom fade + bouncing chevron, only when there's real content below */}
+          {routingCanScrollMore && (
+            <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
+              <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
+            </div>
+          )}
         </div>
       </div>
 
