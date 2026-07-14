@@ -70,7 +70,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | TI-07 | Chat transcript in task | ❌ Missing | S-future |
 | TI-14 | Start button — triggers step execution | ❌ Missing | S11 (deferred) |
 | TI-15 | Per-step execution running state | ❌ Missing | S11 (deferred) |
-| TI-16 | Step output storage to Supabase JSONB | ❌ Missing | S11 (deferred, Q5 needed) |
 | TI-17 | Pat execution via Railway | ❌ Missing | S11b (deferred) |
 | TI-18 | HITL step gate — full runtime execution contract: (1) execution pauses when a HITL step is reached, (2) signal emitted to notify human (UI state change + future notification), (3) human provides input via the step's comment/approval interface, (4) input injected into the next agent step's context, (5) execution resumes. Activates PAT-10 HITL in AI Audit By Pattern — triggers "Gates Triggered" counter + records human response time. Design session required before coding — needs: pause signal architecture, notification mechanism, resume-with-context handoff spec. | ❌ Missing | S-future (design required) |
 
@@ -85,6 +84,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AZ-05 | CSV load from Supabase Storage on return | ❌ Missing | S-future (SH-07) |
 | AZ-15 | Tab: AI Review (3-stage, RAG-augmented) | 🔶 Partial | — |
 | AZ-18 | Demo task pre-loaded: Austin FY2025 | 🔶 Partial | Blocked by SH-07 |
+| AZ-20 | **New, found live-verifying `AZ-19` (✅ Done, moved to `docs/FEATURES-ARCHIVE.md`) against the real deployed dev URL.** On the mobile column-mapping page, selecting a new file updates the "Now Analyzing" label (`fileName`, context state) immediately, but tapping "← Back" before completing mapping/`Run Analysis` returns to Page 1 showing that new filename label next to the *previous* file's KPI/chart numbers (`data` doesn't recompute until analysis actually runs) — label and figures can go out of sync. No crash; edge case only. First live-reachable on mobile because `AZ-19`'s "← Back" is the first control that lets a user return to the dashboard without completing analysis on the newly-selected file — no desktop equivalent existed to expose this before. **Moved here from `FEATURES.md`'s now tier 2026-07-14 (doc-hygiene pass)** — Spend Analyzer scope, not MI loop/speed/harness/charts. | ❌ Missing | S-future |
 
 ---
 
