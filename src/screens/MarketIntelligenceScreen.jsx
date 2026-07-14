@@ -353,7 +353,9 @@ function describeDelegationEvent(evt, agents) {
   const fromName = agentById(evt.fromAgentId)?.name || evt.fromAgentId;
   const toName = agentById(evt.toAgentId)?.name || evt.toAgentId;
   if (evt.type === 'delegation_return') {
-    return `${toName} is back — wrapping up…`;
+    return `${fromName} is back — wrapping up…`; // FEATURE: MI-48 -- was toName (named who control
+    // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
+    // payload: fromAgentId is the sub-agent who was helping, toAgentId is who receives control back.
   }
   switch (evt.viaTool) {
     case 'request_help':
