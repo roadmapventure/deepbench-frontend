@@ -1,9 +1,11 @@
-// DeepBench v5.2.40 | AboutPanel.jsx | S-ABOUT-ARCH-01 Architecture tab refresh
+// DeepBench v6.2.6 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel
 // FEATURE: SH-05 — About panel replacing Help modal
+// FEATURE: SH-21 — mobile-responsive layout (82% drawer width, scrollable tab bar, grid column drops)
 
 import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { APP_VERSION } from "../config.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 // ── Tab definitions ─────────────────────────────────────────────────────────────
 const TABS = [
@@ -216,6 +218,7 @@ function PurposeTab() {
 }
 
 function ArchitectureTab() {
+  const isMobile = useIsMobile();
   return (
     <>
       <SH mt={0}>The DEEP / BENCH Model</SH>
@@ -262,7 +265,8 @@ function ArchitectureTab() {
 
       <Divider />
       <SH>By the Numbers</SH>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+      {/* FEATURE: SH-21 — stat grid drops 3→2 columns on mobile */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
         {[["40","Source files"],["~19,000","Lines of code"],["12","API routes"],["11","DB tables (154 cols)"],["23","Arch docs"],["61","Session specs"],["20","AI Patterns"],["19","AI Services"],["13","Bench agents"]].map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
@@ -357,6 +361,7 @@ function RevenueTab() {
 }
 
 function RoadmapTab() {
+  const isMobile = useIsMobile();
   const accentColor = (label) => {
     if (label.startsWith("Now"))   return T.moss;
     if (label.startsWith("Next"))  return T.brass;
@@ -369,7 +374,8 @@ function RoadmapTab() {
   ];
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+      {/* FEATURE: SH-21 — Now/Next/Later comparison grid drops 3→1 column on mobile */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
         {cols.map(c => (
           <div key={c.label} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderTop: `3px solid ${accentColor(c.label)}`, padding: 11 }}>
             <div style={{ fontFamily: mono, fontSize: 8, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, color: accentColor(c.label), marginBottom: 4 }}>{c.label}</div>
@@ -475,25 +481,27 @@ function JohnTab() {
 // ── Main panel ───────────────────────────────────────────────────────────────────
 export default function AboutPanel({ onClose }) {
   const [tab, setTab] = useState("purpose");
+  // FEATURE: SH-21 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
+  const isMobile = useIsMobile();
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — unchanged */}
       <div
         onClick={onClose}
         style={{ position: "fixed", inset: 0, background: "rgba(18,36,60,0.75)", backdropFilter: "blur(4px)", zIndex: 2000, animation: "hModalFadeIn 0.2s ease" }}
       />
-      {/* Panel */}
-      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "75vw", background: T.card, borderLeft: `2px solid ${T.brass}`, zIndex: 2001, display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,.22)" }}>
+      {/* Panel — FEATURE: SH-21 — width reuses STYLE-GUIDE.md §24's 82%/maxWidth:340 drawer convention on mobile */}
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: isMobile ? "82%" : "75vw", maxWidth: isMobile ? 340 : undefined, background: T.card, borderLeft: `2px solid ${T.brass}`, zIndex: 2001, display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,.22)" }}>
 
         {/* Header */}
-        <div style={{ background: `linear-gradient(135deg,${T.navy},${T.navyMid})`, padding: "13px 20px", borderBottom: `2px solid ${T.brass}`, flexShrink: 0 }}>
+        <div style={{ background: `linear-gradient(135deg,${T.navy},${T.navyMid})`, padding: isMobile ? "11px 16px" : "13px 20px", borderBottom: `2px solid ${T.brass}`, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontFamily: mono, fontSize: 8, color: T.brassLight, letterSpacing: 2, textTransform: "uppercase", marginBottom: 3 }}>
                 Portfolio · DeepBench v{APP_VERSION}
               </div>
-              <div style={{ fontFamily: display, fontSize: 18, fontWeight: 600, color: T.card }}>About DeepBench</div>
+              <div style={{ fontFamily: display, fontSize: isMobile ? 15 : 18, fontWeight: 600, color: T.card }}>About DeepBench</div>
             </div>
             <button
               onClick={onClose}
@@ -502,20 +510,22 @@ export default function AboutPanel({ onClose }) {
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.line}`, flexShrink: 0, background: T.cardAlt }}>
+        {/* Tab bar — FEATURE: SH-21 — horizontal scroll on mobile instead of flex:1 squeeze */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${T.line}`, flexShrink: 0, background: T.cardAlt, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               style={{
-                flex: 1, minWidth: 0, padding: "9px 4px",
-                fontFamily: mono, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.8,
+                flex: isMobile ? "0 0 auto" : 1, minWidth: 0,
+                padding: isMobile ? "9px 13px" : "9px 4px",
+                fontFamily: mono, fontSize: isMobile ? 9 : 8, textTransform: "uppercase", letterSpacing: 0.8,
                 border: "none", background: t.id === tab ? T.card : T.cardAlt,
                 cursor: "pointer", color: t.id === tab ? T.navy : T.muted,
                 fontWeight: t.id === tab ? 700 : 400,
                 borderBottom: `2px solid ${t.id === tab ? T.brass : "transparent"}`,
-                marginBottom: -1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                marginBottom: -1, whiteSpace: "nowrap",
+                overflow: isMobile ? "visible" : "hidden", textOverflow: isMobile ? "clip" : "ellipsis",
               }}
             >
               {t.label}
@@ -524,7 +534,7 @@ export default function AboutPanel({ onClose }) {
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 16px" : "16px 24px", minHeight: 0 }}>
           {tab === "purpose"      && <PurposeTab />}
           {tab === "architecture" && <ArchitectureTab />}
           {tab === "quickstart"   && <QuickStartTab />}
