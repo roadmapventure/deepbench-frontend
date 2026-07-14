@@ -98,6 +98,7 @@
 | AZ-14 | Tab: Vendor Diversity / HHI | ✅ Done | DONE |
 | AZ-16 | Tab: Cleanup | ✅ Done | DONE |
 | AZ-17 | Tab: Full Table | ✅ Done | DONE |
+| AZ-19 | Mobile-responsive Spend Analyzer, scoped to 2 pages (not the full 12-tab desktop screen): `MobileAnalyzerHome` combines the landing intro/workflow-strip with the Dashboard tab's KPI grid (2-col) + stacked Categories/Spend-Distribution charts, covering both pre-load and loaded states in one view — real Austin FY2025 data via the existing `AZ-18` auto-load. `MappingScreen` mobile-stacks fields and grows its own "← Back" control, closing `SH-20` for Analyzer's specific instance. "Load your data" is upload-only (Demo/Fetch untouched, deferred). Desktop untouched (gated by `useIsMobile()`). Live-verified against the real deployed dev URL at true 1280×800 and 390×844 — desktop pixel-parity, mobile auto-load/KPI-grid/stacked-charts/upload→mapping→analyze round trip all confirmed. One minor gap found and logged separately (`AZ-20`): "← Back" before completing analysis on a newly-selected file leaves the "Now Analyzing" label out of sync with the still-previous KPI/chart data until Run Analysis completes. | ✅ Done | S-MOBILE-SPEND-01 (v6.2.4, 6683b98) |
 ## FETCH — FT
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
