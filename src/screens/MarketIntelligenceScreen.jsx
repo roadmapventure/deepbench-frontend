@@ -197,14 +197,17 @@ function estimateChainMs(chain, agentActivity) {
   return total;
 }
 
-// FEATURE: MI-35 — "question > Xs" (<60s) or "question > Xm Ys" (>=60s). Rounds up to the nearest
+// FEATURE: MI-35 — "expect > Xs" (<60s) or "expect > Xm Ys" (>=60s). Rounds up to the nearest
 // 5s so the floor framing ("greater than") stays honest against small variance in the historical
 // average it's built from. FEATURE: MI-47 — label renamed from "expect" to "question".
+// FEATURE: MI-49 — reverted back to "expect": now that this renders on its own line directly under
+// the user's question bubble, it reads unambiguously without needing to distinguish itself from the
+// per-agent timer on the same line (that need no longer exists post-MI-49's two-line layout).
 function formatExpectation(ms) {
   const roundedSec = Math.ceil(ms / 1000 / 5) * 5;
   const m = Math.floor(roundedSec / 60);
   const s = roundedSec % 60;
-  return m > 0 ? `question > ${m}m ${s}s` : `question > ${s}s`;
+  return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
 }
 
 // FEATURE: MI-23 — replaces the header's global AI status dot for this screen; one line, swaps
@@ -213,6 +216,10 @@ function formatExpectation(ms) {
 // execute.js harness loop — see kickoff CONTEXT). Keyed by startedAt at the call site (not here)
 // so React fully remounts this component on every new turn instead of trying to reset internal
 // tick state — the simplest correct way to guarantee the timer starts at 0:00 every time.
+// FEATURE: MI-49 — two-line layout (John's live review of MI-47's shipped one-line layout): line 1
+// is the total elapsed + estimate on its own row, no diamond; line 2 is the diamond + activity
+// message + bare per-agent time (drops the old "(...this Agent)" parenthetical, no label — line 1
+// already carries the explicit "elapsed"/"expect" labels).
 function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -220,14 +227,17 @@ function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation 
     return () => clearInterval(id);
   }, []);
   return (
-    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,position:"relative"}}>
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,position:"relative"}}>
       <FeatureBadge id="MI-47"/>
-      <AIDiamond size="7px" color={T.brass}/>
-      <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
+      <FeatureBadge id="MI-49"/>
       <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>
-        {formatElapsed(now - turnStartedAt)} ({formatElapsed(now - startedAt)} this Agent)
+        elapsed {formatElapsed(now - turnStartedAt)}{expectation ? ` | ${expectation}` : ""}
       </span>
-      {expectation && <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>- {expectation}</span>}
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <AIDiamond size="7px" color={T.brass}/>
+        <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
+        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+      </div>
     </div>
   );
 }
@@ -348,10 +358,13 @@ function describePipelineEvent(evt) {
 // FEATURE: MI-42 -- generic across every agent pair, no hardcoded names or capability-specific
 // branches (matches ARCHITECTURE.md §19d's own anti-hardcoding discipline) -- copy is derived
 // entirely from the event's own fromAgentId/toAgentId, resolved against the real roster.
+// FEATURE: MI-49 -- first name only (saves room on the chat status line); the Agent Routing
+// drawer's own row headers are explicitly out of scope, still show full names via agentById(...).name.
 function describeDelegationEvent(evt, agents) {
   const agentById = (id) => agents.find(a => a.id === id);
-  const fromName = agentById(evt.fromAgentId)?.name || evt.fromAgentId;
-  const toName = agentById(evt.toAgentId)?.name || evt.toAgentId;
+  const firstName = (id) => (agentById(id)?.name || id).split(" ")[0];
+  const fromName = firstName(evt.fromAgentId);
+  const toName = firstName(evt.toAgentId);
   if (evt.type === 'delegation_return') {
     return `${fromName} is back — wrapping up…`; // FEATURE: MI-48 -- was toName (named who control
     // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
@@ -1531,7 +1544,7 @@ export default function MarketIntelligenceScreen() {
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
     const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
-    setStatus("Marcus is thinking…", { expectation: "question < 2m" });
+    setStatus("Marcus is thinking…", { expectation: "expect < 2m" }); // FEATURE: MI-49 -- reverted from "question < 2m"
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
