@@ -1,14 +1,13 @@
-// DeepBench v6.2.22 | MarketIntelligenceScreen.jsx | MI-53/MI-54 — real Display-Agent hop for
-// Nadia's pending_confirmation proposal (new formatDataPatchProposal() helper, called from onCommit()
-// after nadiaResult and from onResolveConfirmation()'s edit-resubmit branch; wires the same
-// request_help -> Michelle -> delegate_to_agent(is_final:true) hand-off ci-answer-intent/
-// hyp-hypothesis-test-intent already have onto data-patch-intent's confirmation flow via new
-// data-patch-display-intent (Nadia)/data-patch-review-format (Alex Reeves) Skill Profiles) +
-// EvidenceColumn (desktop Column 2) bounded to the grid row height with an internal scroll region,
-// matching InteractColumn's existing pattern (action buttons/ConfirmationCard now scroll into view
-// inside the card instead of growing the whole page past the fold). See kickoff
-// docs/kickoffs/v6.2.22-MI-53-MI-54-confirmation-format-column2-scroll.md.
-// FEATURE: MI-53/MI-54
+// DeepBench v6.2.22 | MarketIntelligenceScreen.jsx | MI-54 — EvidenceColumn (desktop Column 2)
+// bounded to the grid row height with an internal scroll region, matching InteractColumn's existing
+// pattern (action buttons/ConfirmationCard now scroll into view inside the card instead of growing
+// the whole page past the fold). MI-53 (real Display-Agent hop for Nadia's pending_confirmation
+// proposal) REVERTED 2026-07-14, same commit -- the new data-patch-display-intent hop let Michelle's
+// agent-selection route an unconfirmed correction to a write-capable agent (Eleanor Voss/
+// library-write-intent), which executed a real the_library INSERT before any human confirmation.
+// Reverted at John's explicit direction pending a proper fix to delegate_to_agent's target-capability
+// restriction (task_773e8b06). See kickoff docs/kickoffs/v6.2.22-MI-53-MI-54-confirmation-format-column2-scroll.md.
+// FEATURE: MI-54
 // DeepBench v6.2.20 | MarketIntelligenceScreen.jsx | MI-52 — Agent Routing log normalization: one
 // agent per row (arrow/secondary-avatar block removed from RoutingEventRow; firstName helper
 // extracted to module scope, shared by describeDelegationEvent() and RoutingEventRow), agent_selection/
@@ -702,35 +701,6 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     : display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
 }
 
-// FEATURE: MI-53 — real Display-Agent hop for Nadia's pending_confirmation proposal, same
-// request_help -> Michelle -> delegate_to_agent(is_final:true) pattern as ci-answer-display-intent/
-// hyp-hypothesis-test-display-intent. Mirrors those two call sites' AA-137 string-decline fallback
-// exactly -- a real "I won't format this" decline must still render, never a blank card.
-async function formatDataPatchProposal(proposedAction, onProgress) {
-  const display = await callCapability({
-    capability_slug: "data-analysis", intent_slug: "data-patch-display-intent", agent_id: "nadia",
-    task_context: {
-      action: proposedAction?.action ?? null,
-      content: proposedAction?.content ?? null,
-      confidence: proposedAction?.confidence ?? null,
-      version_note: proposedAction?.version_note ?? null,
-    },
-    onProgress,
-  });
-  if (typeof display === "string" || typeof display.content === "string") {
-    const rawText = typeof display === "string" ? display : display.content;
-    return {
-      headline: null, body: [{ text: rawText }],
-      displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
-      displayAgentId: typeof display === "string" ? null : display.display_agent_id,
-    };
-  }
-  return {
-    headline: display.headline, body: display.body,
-    displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
-  };
-}
-
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
 // (Good, thanks / exploring / undecided), threaded through from the parent's messages array.
 function MessageBubble({ msg, index, onReview, onGoodThanks }) {
@@ -1133,7 +1103,6 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
               agent={nadia}
               proposedAction={hypFlow.confirmation.proposed_action}
               critique={hypFlow.confirmation.critique}
-              formatted={hypFlow.confirmation.formatted}
               onResolve={onResolveConfirmation}
             />
           </>
@@ -2032,19 +2001,12 @@ export default function MarketIntelligenceScreen() {
       });
       logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult, durationMs: Date.now() - t0 });
 
-      step = "patch_display";
-      t0 = Date.now();
-      setStatus("Formatting Nadia's proposal…");
-      const formatted = await formatDataPatchProposal(nadiaResult.proposed_action, onDelegationProgress);
-      logEvent({ type: "display_format", agentId: formatted.displayAgentId || "nadia", data: formatted, durationMs: Date.now() - t0 });
-
       setHypFlow(prev => prev && ({
         ...prev, stage: "result",
         confirmation: {
           confirmation_id: nadiaResult.confirmation_id,
           proposed_action: nadiaResult.proposed_action,
           critique: nadiaResult.critique,
-          formatted,
           disputed_chunk_id: disputedChunkId,
           user_reasoning: hypothesisTestText || chosenText,
         },
@@ -2072,11 +2034,10 @@ export default function MarketIntelligenceScreen() {
       const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
 
       if (resolution === "edit") {
-        const formatted = await formatDataPatchProposal(result.proposed_action, onDelegationProgress);
         logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
         setHypFlow(prev => prev && ({
           ...prev,
-          confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique, formatted },
+          confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique },
         }));
         return;
       }
