@@ -80,6 +80,12 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       // RAG search (queryLibrary()'s uber_access branch requires an explicit tag, denies without one).
       // Generic: reads a new optional trait, not gated on any agent identity.
       if (traits.data_room_tag) fetchInstruction.data_room_tag = traits.data_room_tag;
+      // FEATURE: AA-173 -- optional per-profile retrieval-breadth override. Unset (every existing
+      // Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is byte-identical
+      // to today -- match_count stays 5.
+      if (Number.isInteger(traits.match_count) && traits.match_count > 0) {
+        fetchInstruction.match_count = traits.match_count;
+      }
 
     } else if (typeSlug === "identity") {
       // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile
