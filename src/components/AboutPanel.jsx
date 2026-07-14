@@ -1,4 +1,4 @@
-// DeepBench v6.2.10 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel + scroll hint
+// DeepBench v6.2.13 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel + scroll hint
 // FEATURE: SH-05 — About panel replacing Help modal
 // FEATURE: SH-21 — mobile-responsive layout (82% drawer width, scrollable tab bar, grid column drops)
 // FEATURE: SH-21 — mobile tab-bar scroll hint (fade gradient + chevron, John's follow-up request)
