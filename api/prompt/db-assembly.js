@@ -405,6 +405,16 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       throw new Error(`assemblePrompt: intent_slug "${intent_slug}" does not match any Intent Skill Profile for capability "${capability_slug}"`);
     }
     skillProfiles = skillProfiles.filter(sp => sp.skill_type_slug !== 'intent' || sp.slug === intent_slug);
+  } else {
+    // FEATURE: AA-188 -- intent_slug is null when the routing agent legitimately couldn't map
+    // the request to one specific intent (project-manager.js's own roster prompt explicitly
+    // instructs this rather than risk a hallucinated guess, per AA-108's postmortem). Stacking
+    // every intent-type Skill Profile's objective/method/analysis_instructions together would
+    // produce a contradictory, garbled prompt (confirmed live: Nadia's data-analysis capability
+    // received all 4 of her intents' instructions at once, no schema, no can_request_help).
+    // Skip all intent-type profiles entirely instead -- same coherent baseline mode a capability
+    // with zero declared intents already runs in, just Identity/Behavior/Knowledge/Guardrails.
+    skillProfiles = skillProfiles.filter(sp => sp.skill_type_slug !== 'intent');
   }
 
   // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)
