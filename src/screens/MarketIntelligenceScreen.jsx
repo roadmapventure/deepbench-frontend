@@ -1,3 +1,10 @@
+// DeepBench v6.2.35 | MarketIntelligenceScreen.jsx | MI-61 — Evidence column's empty-state
+// sentence (MI-59's getEvidencePanelSentence(), !hypFlow branch) tightened per John's direct
+// copy request: "Once your chat has analysis data for you to interact with, it will appear
+// here" -> "Once your chat has analysis data for interaction, it will appear here...". Copy-only,
+// single string; populated-state branch untouched.
+// FEATURE: MI-61
+//
 // DeepBench v6.2.30 | MarketIntelligenceScreen.jsx | MI-59 — EvidenceColumn's !hypFlow branch
 // becomes purely informational ("Once your chat has analysis data for you to interact with, it
 // will appear here"), the 4 dummy data-type pills (Sourced/Analysis/Source Simulation/Learned —
@@ -977,7 +984,8 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
 // FEATURE: MI-59 — one shared sentence source for both EvidenceColumn states, so the
 // empty-state and populated-state copy can't drift apart as separate hardcoded strings.
 function getEvidencePanelSentence(hypFlow) {
-  if (!hypFlow) return "Once your chat has analysis data for you to interact with, it will appear here";
+  // FEATURE: MI-61 — empty-state sentence tightened, trailing ellipsis added (copy-only).
+  if (!hypFlow) return "Once your chat has analysis data for interaction, it will appear here...";
   const label = INTENT_LABEL[hypFlow.intent] || hypFlow.intent;
   return `${label} — Data for you to interact with your chat...`;
 }
