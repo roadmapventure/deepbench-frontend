@@ -1,3 +1,4 @@
+// DeepBench v6.2.17 | RosterScreen.jsx | RO-15 — mobile filter chip row gets a scroll-hint fade + chevron (SH-21 pattern reuse)
 // DeepBench v6.2.12 | RosterScreen.jsx | RO-14 — filter-name comment updated: "Market Intel" → "Channel Sales Intel"
 // DeepBench v6.2.5 | RosterScreen.jsx | S-MOBILE-ROSTER-01 — mobile-responsive layout (RO-13):
 // filter chips replace sidebar, 3-col stat grid + full-width button, single-column card grid.
@@ -255,32 +256,39 @@ export default function RosterScreen() {
           <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
           {/* FEATURE: RO-13 — mobile filter chip row, horizontal adaptation of the Left Sidebar Nav
-              Pattern (STYLE-GUIDE.md §10): same brass-highlight logic, border axis left→bottom. */}
+              Pattern (STYLE-GUIDE.md §10): same brass-highlight logic, border axis left→bottom.
+              FEATURE: RO-15 — mobile scroll hint: fade gradient + chevron on the trailing edge,
+              static (not scroll-position-aware), same treatment as SH-21's About panel tab bar. */}
           {isMobile && (
-            <div style={{display:"flex",overflowX:"auto",gap:6,paddingBottom:10,marginBottom:12,borderBottom:`1px dashed ${T.lineSoft}`}}>
-              {navItems.map(item => {
-                const isActive = activeFilter === item.id;
-                return (
-                  <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
-                    flexShrink:0, textAlign:"left", padding:"8px 14px",
-                    fontFamily:body, fontSize:12,
-                    fontWeight: isActive ? 600 : 400,
-                    color: isActive ? T.navy : T.mutedDeep,
-                    background: isActive ? `${T.brass}24` : "transparent",
-                    border:"none",
-                    borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
-                    cursor:"pointer", display:"flex", alignItems:"center", gap:6,
-                  }}>
-                    <span>{item.label}</span>
-                    <span style={{
-                      fontFamily:mono, fontSize:9, padding:"1px 6px",
-                      ...(isActive
-                        ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
-                        : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
-                    }}>{item.count}</span>
-                  </button>
-                );
-              })}
+            <div style={{position:"relative"}}>
+              <div style={{display:"flex",overflowX:"auto",gap:6,paddingBottom:10,marginBottom:12,borderBottom:`1px dashed ${T.lineSoft}`}}>
+                {navItems.map(item => {
+                  const isActive = activeFilter === item.id;
+                  return (
+                    <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
+                      flexShrink:0, textAlign:"left", padding:"8px 14px",
+                      fontFamily:body, fontSize:12,
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? T.navy : T.mutedDeep,
+                      background: isActive ? `${T.brass}24` : "transparent",
+                      border:"none",
+                      borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                      cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                    }}>
+                      <span>{item.label}</span>
+                      <span style={{
+                        fontFamily:mono, fontSize:9, padding:"1px 6px",
+                        ...(isActive
+                          ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
+                          : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
+                      }}>{item.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{position:"absolute",top:0,bottom:11,right:0,width:28,background:`linear-gradient(to right, transparent, ${T.paperDeep} 70%)`,display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:3,pointerEvents:"none"}}>
+                <span style={{fontFamily:mono,fontSize:10,color:T.brass}}>›</span>
+              </div>
             </div>
           )}
 
