@@ -1,3 +1,10 @@
+// DeepBench v6.2.27 | MarketIntelligenceScreen.jsx | MI-57 — desktop's InteractColumn (non-bare
+// branch) now accepts onClear and renders a Clear control in its input row, after Send — reuses
+// MobileBody's existing Clear link style verbatim (MI-51/MI-56). Mobile (bare) branch unchanged;
+// onClear's own reset semantics (~line 1759) unchanged. See kickoff
+// docs/kickoffs/v6.2.27-MI-57-desktop-clear-button.md.
+// FEATURE: MI-57
+//
 // DeepBench v6.2.25 | MarketIntelligenceScreen.jsx | MI-56 — mobile MI's permanent Question box/Send/
 // Clear strip merged from two stacked rows into one: input (flex:1) — Send — thin T.lineSoft divider
 // — Clear. Was a mobile shell bug (Clear rendered orphaned on its own near-empty row underneath).
@@ -1501,7 +1508,7 @@ function DataSourceRow({ row }) {
 // region + its own input row, no outer bordered card/avatar-name-caption header/AgentWorkingIndicator
 // (MobileBody renders the permanent status strip and input/Clear separately, tab-independent). When
 // bare is falsy (every pre-existing call site — desktop's grid), behavior is byte-identical to before.
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, noMinHeight, bare }) {
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -1566,7 +1573,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           </div>
         </div>
         {messageList}
-        <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
+        <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:8}}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -1578,6 +1585,13 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           <button onClick={() => submit(input)} disabled={loading || !input.trim()}
             style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer"}}>
             Send
+          </button>
+          {/* FEATURE: MI-57 — desktop Clear control, style reused verbatim from MobileBody's Clear
+              link (~line 1705, MI-51/MI-56) — same font/size/color/casing/cursor, no new visual
+              pattern. Wired to the same onClear handler MobileBody already uses; reset semantics
+              (messages/hypFlow/workingStatus, no confirm dialog) unchanged. */}
+          <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"0 2px"}}>
+            Clear
           </button>
         </div>
       </div>
@@ -2097,7 +2111,7 @@ export default function MarketIntelligenceScreen() {
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks}/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}/>
             <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
           </div>
