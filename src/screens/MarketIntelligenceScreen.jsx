@@ -197,14 +197,14 @@ function estimateChainMs(chain, agentActivity) {
   return total;
 }
 
-// FEATURE: MI-35 — "expect > Xs" (<60s) or "expect > Xm Ys" (>=60s). Rounds up to the nearest 5s
-// so the floor framing ("expect greater than") stays honest against small variance in the
-// historical average it's built from.
+// FEATURE: MI-35 — "question > Xs" (<60s) or "question > Xm Ys" (>=60s). Rounds up to the nearest
+// 5s so the floor framing ("greater than") stays honest against small variance in the historical
+// average it's built from. FEATURE: MI-47 — label renamed from "expect" to "question".
 function formatExpectation(ms) {
   const roundedSec = Math.ceil(ms / 1000 / 5) * 5;
   const m = Math.floor(roundedSec / 60);
   const s = roundedSec % 60;
-  return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
+  return m > 0 ? `question > ${m}m ${s}s` : `question > ${s}s`;
 }
 
 // FEATURE: MI-23 — replaces the header's global AI status dot for this screen; one line, swaps
@@ -213,18 +213,20 @@ function formatExpectation(ms) {
 // execute.js harness loop — see kickoff CONTEXT). Keyed by startedAt at the call site (not here)
 // so React fully remounts this component on every new turn instead of trying to reset internal
 // tick state — the simplest correct way to guarantee the timer starts at 0:00 every time.
-function AgentWorkingIndicator({ message, startedAt, expectation, kind }) {
+function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  const isOrchestration = kind === 'orchestration'; // FEATURE: MI-42
   return (
-    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-      <AIDiamond size="7px" color={isOrchestration ? T.navy : T.brass}/>
-      <span style={{fontFamily:mono,fontSize:11,color:isOrchestration ? T.ink : T.muted,fontStyle:isOrchestration ? "normal" : "italic",fontWeight:isOrchestration ? 600 : 400}}>{message}</span>
-      <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,position:"relative"}}>
+      <FeatureBadge id="MI-47"/>
+      <AIDiamond size="7px" color={T.brass}/>
+      <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
+      <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>
+        {formatElapsed(now - turnStartedAt)} ({formatElapsed(now - startedAt)} this Agent)
+      </span>
       {expectation && <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>- {expectation}</span>}
     </div>
   );
@@ -332,6 +334,12 @@ function describePipelineEvent(evt) {
     // alert color already used for guardrail "block" results above -- no new color introduced.
     case "error":
       return { capability: evt.data.step || null, summary: `Failed: ${evt.data.message}`, color: T.flag };
+    // FEATURE: MI-47 -- permanent drawer rows for every live handoff shown in the chat status line
+    // (onDelegationProgress), alongside the pre-existing coarse checkpoint events above.
+    case "delegation":
+      return { capability: null, summary: evt.data.message, color: T.navyMid };
+    case "delegation_return":
+      return { capability: null, summary: evt.data.message, color: T.moss };
     default:
       return { capability: null, summary: "", color: T.muted };
   }
@@ -1346,7 +1354,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           ) : (
             messages.map((m, i) => <MessageBubble key={i} msg={m} onReview={onReview}/>)
           )}
-          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} expectation={workingStatus.expectation} kind={workingStatus.kind}/>}
+          {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
         </div>
 
         <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,display:"flex",gap:8}}>
@@ -1449,7 +1457,7 @@ export default function MarketIntelligenceScreen() {
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
-  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, expectation, kind } | null
+  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
   // FEATURE: MI-35 — lifted from AuditColumn so it's available at every setWorkingStatus( call
   // site below, not just inside AuditColumn.
   const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
@@ -1459,11 +1467,30 @@ export default function MarketIntelligenceScreen() {
   // below) and this session's live micro-hop delegation events (via onDelegationProgress, forwarded
   // into every callCapability() call as onProgress) -- both write the same workingStatus, so they
   // can never drift into two different timers.
-  const setStatus = (message, { expectation = null, kind = 'scripted' } = {}) =>
-    setWorkingStatus({ message, startedAt: Date.now(), expectation, kind });
-  const onDelegationProgress = (evt) => setStatus(describeDelegationEvent(evt, agents), { kind: 'orchestration' });
-
+  const setStatus = (message, { expectation, kind = 'scripted' } = {}) =>
+    setWorkingStatus(prev => ({
+      message,
+      startedAt: Date.now(),
+      turnStartedAt: prev?.turnStartedAt ?? Date.now(),
+      expectation: expectation !== undefined ? expectation : (prev?.expectation ?? null),
+      kind,
+    }));
   const logEvent = (evt) => setPipelineEvents(prev => [...prev, { ...evt, id: prev.length }]);
+
+  // FEATURE: MI-47 -- also logs every live handoff as its own permanent Agent Routing drawer row
+  // (describePipelineEvent's new "delegation"/"delegation_return" cases), alongside the pre-existing
+  // coarse checkpoint events -- additive only, does not replace/dedupe any existing event type.
+  const onDelegationProgress = (evt) => {
+    const message = describeDelegationEvent(evt, agents);
+    setStatus(message, { kind: 'orchestration' });
+    logEvent({
+      type: evt.type, // 'delegation' | 'delegation_return'
+      agentId: evt.fromAgentId,
+      secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null,
+      data: { message, viaTool: evt.viaTool || null },
+      durationMs: null, // in-flight signal, not a completed duration -- RoutingEventRow already guards on != null
+    });
+  };
 
   const conversationContext = () =>
     messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
@@ -1502,7 +1529,7 @@ export default function MarketIntelligenceScreen() {
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
     const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
-    setStatus("Marcus is thinking…", { expectation: "expect < 2m" });
+    setStatus("Marcus is thinking…", { expectation: "question < 2m" });
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
