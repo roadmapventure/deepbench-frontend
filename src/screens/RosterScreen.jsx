@@ -1,3 +1,4 @@
+// DeepBench v6.2.12 | RosterScreen.jsx | RO-14 — filter-name comment updated: "Market Intel" → "Channel Sales Intel"
 // DeepBench v6.2.5 | RosterScreen.jsx | S-MOBILE-ROSTER-01 — mobile-responsive layout (RO-13):
 // filter chips replace sidebar, 3-col stat grid + full-width button, single-column card grid.
 // DeepBench v6.2.0 | RosterScreen.jsx | S-MOBILE-NAV-01 — rename (RO-12): headline "Your bench." →
@@ -159,7 +160,7 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
 }
 
 // FEATURE: RO-01 — All 7 agents
-// FEATURE: RO-10 — Bench screen category filter (All/Market Intel/Platform Wide/Spend Analysis/Special Interests)
+// FEATURE: RO-10 — Bench screen category filter (All/Channel Sales Intel/Platform Wide/Spend Analysis/Special Interests)
 export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();

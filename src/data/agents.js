@@ -1,3 +1,4 @@
+// DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
 // DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
 // DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
 // DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
@@ -257,8 +258,9 @@ export const AGENTS = [
 
 // FEATURE: RO-10 — Bench screen category filter definitions. "all" is not
 // listed here — it is the unfiltered view, not a stored group.
+// FEATURE: RO-14 — old Market Intel label relabeled to Channel Sales Intel
 export const BENCH_FILTERS = [
-  { id: "mi",       label: "Market Intel"      },
+  { id: "mi",       label: "Channel Sales Intel" },
   { id: "platform", label: "Platform Wide"     },
   { id: "nigp",     label: "Spend Analysis"    }, // FEATURE: RO-11 — relabeled, was the old NIGP label
   { id: "special",  label: "Special Interests" },
