@@ -1,3 +1,11 @@
+// DeepBench v6.2.29 | MarketIntelligenceScreen.jsx | MI-58 — estimateChainMs() rewritten to a
+// depth-weighted expected-value-per-call model: depth0's p75 (always paid) plus each further
+// depth's p75 weighted by how often that depth is actually reached relative to depth0's call
+// count, reading the new byKind[kind].byDepth data from useAgents.js. formatExpectation() and all
+// 3 call sites unchanged (same ms-in/string-out contract). See kickoff
+// docs/kickoffs/v6.2.29-MI-58-expected-time-estimate-fix.md.
+// FEATURE: MI-58
+//
 // DeepBench v6.2.27 | MarketIntelligenceScreen.jsx | MI-57 — desktop's InteractColumn (non-bare
 // branch) now accepts onClear and renders a Clear control in its input row, after Send — reuses
 // MobileBody's existing Clear link style verbatim (MI-51/MI-56). Mobile (bare) branch unchanged;
@@ -246,16 +254,28 @@ const INTENT_CHAINS = {
   hypothesis_test: [["priya","hyp-hypothesis-test-intent"], ["priya","hyp-hypothesis-test-display-intent"]],
 };
 
-// FEATURE: MI-35 — sums known per-intent avgLatency (ms) across a chain of [agentId, intentSlug]
-// pairs, reading the same agentActivity.byKind data the Agents drawer already renders. Returns
-// null if any hop has no historical data yet — caller falls back to the generic ceiling rather
-// than showing a partial/misleading sum.
+// FEATURE: MI-58 — was: sum one blended avgLatency per intent, treating each as a single LLM
+// turn. Real data (ai_activity_log's :depthN tag) shows the heaviest intents in this chain loop
+// through multiple real turns before returning to the frontend far more often than not (e.g.
+// ci-answer-intent reaches depth1 on ~69% of calls) — a single blended average understates the
+// true per-call cost. Now: depth0's p75 (the call always pays this) plus each further depth's p75
+// weighted by how often that depth is actually reached (relative to depth0's call count) — an
+// expected-value-per-call model instead of expected-value-per-turn. Returns null (unchanged
+// contract) whenever depth0 has no historical data yet, same "fall back to the generic ceiling"
+// behavior as before.
 function estimateChainMs(chain, agentActivity) {
   let total = 0;
   for (const [agentId, kind] of chain) {
-    const latency = agentActivity?.[agentId]?.byKind?.[kind]?.avgLatency;
-    if (latency == null) return null;
-    total += latency;
+    const byDepth = agentActivity?.[agentId]?.byKind?.[kind]?.byDepth;
+    const depth0 = byDepth?.depth0;
+    if (!depth0?.p75 || !depth0.calls) return null;
+    let hopTotal = depth0.p75;
+    for (let i = 1; ; i++) {
+      const d = byDepth[`depth${i}`];
+      if (!d) break;
+      hopTotal += d.p75 * (d.calls / depth0.calls);
+    }
+    total += hopTotal;
   }
   return total;
 }

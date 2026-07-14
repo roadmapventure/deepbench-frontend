@@ -1,3 +1,10 @@
+// DeepBench v6.2.29 | useAgents.js | MI-58 — additive 30-day recency window on the ai_activity_log
+// query + per-depth p75 latency buckets (byKind[kind].byDepth) so estimateChainMs() can compute a
+// depth-weighted expected-value-per-call estimate instead of summing a single blended avgLatency.
+// Every existing byKind field (avgLatency/maxLatency/calls/byModel) stays byte-identical. See
+// kickoff docs/kickoffs/v6.2.29-MI-58-expected-time-estimate-fix.md.
+// FEATURE: MI-58
+//
 // DeepBench v6.1.23 | useAgents.js | S-MI-30 — "html-display" added to CAPABILITY_WRAPPER_TYPES (Riley Torres wrapper/agent-turn dedup); useAgentActivitySummary() gains optional tenantId param (default 'global') so callers can scope to a different tenant (e.g. 'speed-baseline-test', MI-31)
 // DeepBench v5.2.37 | useAgents.js | Agent roster hook — wraps AGENTS data array
 // DeepBench v6.0.36 | useAgents.js | MI-17 — Learned Context drawer data hook
@@ -109,6 +116,27 @@ const CAPABILITY_WRAPPER_TYPES = new Set([
 ]);
 const PAIR_WINDOW_MS = 2000;
 
+// FEATURE: MI-58 — bounds the activity summary to the last 30 days so both the Agents drawer's
+// existing avg/max figures and this session's new per-depth estimate track current agent/model
+// behavior instead of being diluted by arbitrarily old history. No visible effect today (confirmed
+// live: all 4 qa-chain intents' data only goes back to 2026-07-07) — this is forward cover as
+// history accumulates, not a fix for today's numbers.
+const RECENCY_WINDOW_DAYS = 30;
+export function recencyCutoffIso(days, nowMs = Date.now()) {
+  return new Date(nowMs - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+// FEATURE: MI-58 — percentile_cont-equivalent linear interpolation, matches the Postgres
+// percentile_cont() semantics used to verify this fix's numbers against real data.
+export function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = p * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
 // FEATURE: S-MI-20 — classifies one ai_activity_log row into a display "kind" for the by-kind
 // latency breakdown, and whether it should be counted there at all. turnTimestampsByAgent is a
 // Map<agent_id, number[]> of every 'agent-turn' row's own created_at (ms) for that agent, built
@@ -153,6 +181,19 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
       k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
     }
 
+    // FEATURE: MI-58 — per-depth latency tracking for estimateChainMs()'s depth-weighted estimate.
+    // Only agent-turn rows carry a real :depthN segment (logAgentTurn()'s own feature format);
+    // additive sibling to the existing blended byKind aggregation above, does not replace it.
+    if (row.ai_type === 'agent-turn') {
+      const depthSeg = row.feature ? row.feature.split(':')[2] : null;
+      if (depthSeg && /^depth\d+$/.test(depthSeg) && row.latency_ms) {
+        if (!k.byDepth) k.byDepth = {};
+        if (!k.byDepth[depthSeg]) k.byDepth[depthSeg] = { calls: 0, latencies: [] };
+        k.byDepth[depthSeg].calls++;
+        k.byDepth[depthSeg].latencies.push(row.latency_ms);
+      }
+    }
+
     const modelKey = row.model || 'unknown';
     if (!k.byModel[modelKey]) k.byModel[modelKey] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
     const km = k.byModel[modelKey];
@@ -169,6 +210,10 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
       k.avgLatency = k.latencyCount ? Math.round(k.totalLatency / k.latencyCount) : null;
       Object.values(k.byModel).forEach(km => {
         km.avgLatency = km.latencyCount ? Math.round(km.totalLatency / km.latencyCount) : null;
+      });
+      Object.values(k.byDepth || {}).forEach(bd => {
+        bd.p75 = percentile(bd.latencies, 0.75);
+        delete bd.latencies; // don't carry raw arrays into React state — every other field here is a computed aggregate, not a raw list
       });
     });
   });
@@ -191,6 +236,7 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
           .select('agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
+          .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))
           .range(from, from + PAGE_SIZE - 1);
         if (error || !data) return null;
         rows.push(...data);
