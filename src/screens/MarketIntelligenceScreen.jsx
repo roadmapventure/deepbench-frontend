@@ -5,6 +5,18 @@
 // single string; populated-state branch untouched.
 // FEATURE: MI-61
 //
+// DeepBench v6.2.33 | MarketIntelligenceScreen.jsx | MI-60 — InteractColumn's empty state (shown
+// only before the first message) gains a 4th seed box beneath the existing 3 EXAMPLE_QUESTIONS
+// buttons: a collapsed Drawer (SharedUI.jsx, reused unmodified) titled "Browse 20 more example
+// questions" with a (20) count badge and maxHeight:220 internal scroll, revealing the 20 realistic
+// VP-of-Channel-Sales questions (MORE_EXAMPLE_QUESTIONS, drafted/pipeline-tested by the 2026-07-08/09
+// overnight AA-172/AA-173 session). Clicking any of the 20 auto-sends via the same submit() as the
+// existing 3 (no populate-then-review). Because messageList (and this whole empty-state block) is
+// shared by both InteractColumn's bare (mobile) and non-bare (desktop) branches, this ships on both
+// by construction — no useIsMobile() branch, no changes to Drawer or EXAMPLE_QUESTIONS. See kickoff
+// docs/kickoffs/v6.2.33-MI-60-seed-question-drawer.md.
+// FEATURE: MI-60
+//
 // DeepBench v6.2.30 | MarketIntelligenceScreen.jsx | MI-59 — EvidenceColumn's !hypFlow branch
 // becomes purely informational ("Once your chat has analysis data for you to interact with, it
 // will appear here"), the 4 dummy data-type pills (Sourced/Analysis/Source Simulation/Learned —
@@ -153,6 +165,31 @@ const EXAMPLE_QUESTIONS = [
   { id: "clean",  label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
   { id: "review", label: "Why is our EMEA retail partner's co-op budget utilization so low this quarter?" },
   { id: "fail",   label: "How is our authorized reseller network performing in Vietnam?" },
+];
+
+// FEATURE: MI-60 — the 20 VP-of-Channel-Sales questions drafted/pipeline-tested by the
+// 2026-07-08/09 overnight session (AA-172/AA-173). Same {id, label} shape as EXAMPLE_QUESTIONS.
+const MORE_EXAMPLE_QUESTIONS = [
+  { id: 1,  label: "Why is co-op budget utilization so low for our EMEA large-format retail partner this quarter?" },
+  { id: 2,  label: "What made Crest Wireless's recent upgrade promotion successful, and can we replicate it with other US partners?" },
+  { id: 3,  label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
+  { id: 4,  label: "How is Jinhua Digital recovering after its sales decline in Greater China?" },
+  { id: 5,  label: "What risks should we watch as Elevate Mobility rapidly expands in India?" },
+  { id: 6,  label: "What is Nippo Carrier in Japan doing that makes them our top performer, and how do we scale it to other partners?" },
+  { id: 7,  label: "How is the installment plan program performing with Altiplano Móvil in Mexico?" },
+  { id: 8,  label: "What's the training compliance gap at Vitrine Tech in Brazil, and what's the risk to their certification?" },
+  { id: 9,  label: "Why is Horizon Store in Vietnam so much more ready for our new product introduction than Signal Mobile in Thailand and Indonesia?" },
+  { id: 10, label: "What is our channel strategy outlook for EMEA Emerging markets — India, Middle East, and Africa?" },
+  { id: 11, label: "What is our channel strategy outlook for Latin America this year?" },
+  { id: 12, label: "What is our channel strategy outlook for Southeast Asia?" },
+  { id: 13, label: "How does our co-op/MDF utilization compare to industry benchmarks?" },
+  { id: 14, label: "How does our partner training and turnover rate compare to industry benchmarks?" },
+  { id: 15, label: "What is the smartphone growth trajectory in emerging markets, and how should that shape our channel investment?" },
+  { id: 16, label: "How has our GEO revenue trended from 2023 to 2025, and which regions are growing fastest?" },
+  { id: 17, label: "What are the public requirements for a partner to become an Apple Authorized Reseller?" },
+  { id: 18, label: "How do smartphone upgrade cycles vary by country, and what does that mean for our channel replenishment planning?" },
+  { id: 19, label: "Across all our channel partners globally, which ones are the biggest at-risk accounts this quarter, and why?" },
+  { id: 20, label: "What is our co-op utilization rate for our partner in South Korea?" },
 ];
 
 const ESCALATE_PLACEHOLDER =
@@ -1598,6 +1635,19 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
                 {q.label}
               </button>
             ))}
+          </div>
+          <div style={{marginTop:8}}>
+            {/* FEATURE: MI-60 — 4th seed box, collapsed by default, capped/scrolling internally */}
+            <Drawer title="Browse 20 more example questions" count={MORE_EXAMPLE_QUESTIONS.length} maxHeight={220}>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {MORE_EXAMPLE_QUESTIONS.map(q => (
+                  <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
+                    style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </Drawer>
           </div>
         </div>
       ) : (
