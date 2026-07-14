@@ -1,4 +1,4 @@
-// DeepBench v5.2.11 | PersonnelScreen.jsx | SK-01–SK-06 Skills & Capabilities schema + Capabilities card + SkillHoverCard
+// DeepBench v6.2.16 | PersonnelScreen.jsx | PE-17 — mobile shell (merged persona header, tab bar) + Profile tab reflow
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -7,6 +7,7 @@ import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
@@ -320,7 +321,7 @@ function SkillRow({ sp, chip }) {
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
   const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   const rc            = readinessColor;
   const fmt           = fmt$;
@@ -343,12 +344,13 @@ function ProfileTab({ agent, entries, layers, capabilities }) {
 
   return (
     <>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,alignItems:"start"}}>
+    <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:18,alignItems:"start"}}>
 
       {/* ── Left column: ID Badge + Compensation ── */}
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
-        {/* ID Badge card */}
+        {/* ID Badge card — FEATURE: PE-17 — redundant with the mobile persona block, desktop-only */}
+        {!isMobile && (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
           <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
@@ -366,6 +368,7 @@ function ProfileTab({ agent, entries, layers, capabilities }) {
             "{agent.quip}"
           </div>
         </div>
+        )}
 
         {/* FEATURE: SK-06 — Capabilities card */}
         <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
@@ -464,7 +467,8 @@ function ProfileTab({ agent, entries, layers, capabilities }) {
           <Corners/>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Intelligence Configuration</div>
           <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:10}}>How {agent.name.split(" ")[0]}'s prompt is assembled</div>
-          <div style={{display:"flex",alignItems:"stretch",marginBottom:10}}>
+          {/* FEATURE: PE-17 — mobile: 3-col wrap grid instead of a squeezed flex row */}
+          <div style={{...(isMobile ? {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6} : {display:"flex",alignItems:"stretch"}),marginBottom:10}}>
             {layers.map((l,i)=>(
               <div key={l.num} style={{flex:1,textAlign:"center",padding:"8px 4px",background:`${rc(l.s)}12`,border:`1px solid ${rc(l.s)}35`,borderRight:i<layers.length-1?"none":undefined}}>
                 <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:rc(l.s),marginBottom:2}}>{l.num}</div>
@@ -1457,6 +1461,7 @@ export default function PersonnelScreen() {
   const [searchParams] = useSearchParams();
   const agents      = useAgents();
   const agent       = agents.find(a => a.id === agentId) || agents[0];
+  const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
@@ -1519,6 +1524,8 @@ export default function PersonnelScreen() {
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
         {/* ── Left sidebar nav ── */}
+        {/* FEATURE: PE-17 — desktop-only; mobile renders a merged persona header + horizontal tab bar instead */}
+        {!isMobile && (
         <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
 
           {/* Agent identity strip */}
@@ -1561,54 +1568,117 @@ export default function PersonnelScreen() {
             </div>
           ))}
         </div>
+        )}
 
         {/* ── Right content area ── */}
         <div style={{ display:"flex", flex:1, overflow:"hidden", flexDirection:"column" }}>
 
-          {/* Page header */}
-          <div style={{background:T.cardAlt,padding:"16px 24px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
-            {/* Breadcrumb — FEATURE: PE-09 */}
-            <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
-              Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeLabel}
-            </div>
-            {/* Title row */}
-            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
-              <div>
-                <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
-                  The personnel file of {agent.name}.
+          {isMobile ? (
+            <>
+              {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
+              <div style={{background:T.card,padding:"16px 18px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0,textAlign:"center"}}>
+                <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster</div>
+                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence · {agent.code}</div>
+                <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
+                  <AgentAvatar who={agent.id} size={56} ring={true} />
                 </div>
-                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
-                  Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
+                <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
+                <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
+                  <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
+                  {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
-              </div>
-              {/* Stat badges */}
-              <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                  "{agent.quip}"
                 </div>
-                <div style={{width:1,height:30,background:T.lineSoft}}/>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                    {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
                   </div>
                 </div>
-                <div style={{width:1,height:30,background:T.lineSoft}}/>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                  <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                    {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+              </div>
+
+              {/* Mobile tab bar — FEATURE: PE-17 — reuses RO-13's horizontal chip pattern (STYLE-GUIDE.md §27); persists across all 4 tabs */}
+              <div style={{display:"flex",overflowX:"auto",gap:6,padding:"8px 12px",background:T.cardAlt,borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
+                {NAV_GROUPS.flatMap(g => g.tabs).map(t => {
+                  const isActive = activeTab === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+                      flexShrink:0, textAlign:"left", padding:"8px 14px",
+                      fontFamily:body, fontSize:12,
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? T.navy : T.mutedDeep,
+                      background: isActive ? `${T.brass}24` : "transparent",
+                      border:"none",
+                      borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                      cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                    }}>
+                      <span style={{ fontFamily:mono, fontSize:10, color: isActive ? T.brassDeep : T.muted }}>{t.icon}</span>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* Page header — desktop only */
+            <div style={{background:T.cardAlt,padding:"16px 24px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
+              {/* Breadcrumb — FEATURE: PE-09 */}
+              <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
+                Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeLabel}
+              </div>
+              {/* Title row */}
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
+                    The personnel file of {agent.name}.
+                  </div>
+                  <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
+                    Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
+                  </div>
+                </div>
+                {/* Stat badges */}
+                <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
