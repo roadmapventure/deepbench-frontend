@@ -7,6 +7,7 @@
 
 **In flight now:**
 - (`task_773e8b06` — fixing `delegate_to_agent`'s missing target-capability restriction, the safety gap `S-MI-53` found and reverted, below — is running in a separate, independently-started background session, not tracked here per this file's scope.)
+- Design session (worktree `design-mi-theory-audit-0714`) — walking through the new MI Evidence/Audit UX Track (`MI-62`/`MI-63`/`MI-64`/`MI-65`/`MI-66`/`MI-67`/`MI-68`, see Session Queue below) one item at a time with John, starting with `MI-67`. No kickoff doc yet for any item — other sessions may claim any lower-priority item from that track's list.
 
 **Safety finding, 2026-07-14 (`S-MI-53`, reverted same session):** `data-patch-display-intent`'s new Display-Agent hop let Michelle's `agent-selection-intent` route an unconfirmed correction to a write-capable agent (Eleanor Voss/`library-write-intent`), which executed a real `the_library` INSERT before any human confirmation — confirmed live twice. Full mechanism/code reverted at John's direction; underlying `execute.js`/`delegate_to_agent` gap spawned separately as `task_773e8b06`. **Any future Display-Agent hop work must confirm that gap is closed first** — see `STYLE-GUIDE.md` §16.
 
@@ -47,6 +48,16 @@ Full history (all sessions before this window): `docs/SESSIONS.md` (S-AI-51-desi
 
 ### MI Page — Charts & Display Track [opened 2026-07-07 re-sequencing]
 - `S-MARKET-INTEL-03` — Data Room default charts (`MI-03`), Available Data panel full, Apple AI Audit section (`MI-06`). **`MI-06`/`MI-18` (Column 3 Agents drawer) ✅ Done** — shipped by `S-MI-18` (v6.0.40) and corrected/completed by `S-MI-18b` (v6.0.43, full 10-agent loop roster + page-scoped metrics); no longer part of this session's scope. **Blocker cleared 2026-07-07:** `AA-126` (the Priya→Michelle→Alex hand-off returning zero card content) fixed and live-verified by `S-ARCH-DELEGATION-FIDELITY-01` (v6.1.7) — the real production path now returns a full card and a real chart. This session can proceed on a working foundation. `S-APPLE-04c` (Demo Reset mechanism) folds in here per John's 2026-07-04 call.
+
+### MI Evidence/Audit UX Track [opened 2026-07-14, design session with John, `docs/FEATURES.md` MI section]
+> Found via John's live screenshots + code/Supabase investigation, one design session. **Each item is its own kickoff** (branch-discipline cap: one feature/max 3 files/max 4 tasks per coding session) — priority order below, agreed with John before any kickoff is written. Any concurrent session may claim the next un-claimed item in this order; note your claim in "In flight now" above when you pick one up.
+1. `MI-67` (Architecture) — Agent Routing log's AI-pattern tags aren't reliably real per-call data (`case-based-reasoning`/`llm-as-judge` can never be real on this screen; `ci-routing-intent`/`qg-review-intent` shown with patterns they don't use). Trust/integrity fix on the AI Audit differentiator — top priority.
+2. `MI-64` (UI) — Desktop chat has no auto-scroll and its elapsed-timer indicator is invisible without manual scrolling; mobile already solved this (`MI-51`), desktop never got the equivalent. High-frequency UX bug.
+3. `MI-68` (UI) — Agent Routing row clarity: Michelle's reasoning-text rows read as confusing next to action-verb rows, sequential same-agent rows look like self-delegation, `confidence_tier` legend was removed by `MI-59` with no replacement. Do after `MI-67`.
+4. `MI-66` (UI) — Key Data Points section should render above the thesis, not after it. Small, contained.
+5. `MI-62` (UI) — Evidence panel's "generating…from the Data Room" / "testing…against the evidence" stage copy has the Data Room-usage labeling backwards from what each stage's skill profile actually does.
+6. `MI-63` (Architecture) — `key_data_points.source` renders a raw citation UUID on the Q&A path but a human-readable label on the hypothesis-test path — same UI template, two Format Skill Profiles with no `description` on the schema field.
+7. `MI-65` (UI) — Chat vs. Evidence-column hypothesis-test duplication is deliberate, not a bug, but needs its own design session on IA/purpose differentiation. Largest open question — scheduled last since it may reshape `MI-62`/`MI-63`/`MI-66`'s column.
 
 **Then, deferred behind both tracks above per this re-sequencing:** Structural Enforcement Track (below) — `S-ARCH-ENFORCE-03` (Agent Field Enforcement) still first within that track when it resumes (real production crash behind it), then `04` → `01` → `02` → `05` → `06`.
 
