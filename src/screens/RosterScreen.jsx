@@ -1,3 +1,5 @@
+// DeepBench v6.2.5 | RosterScreen.jsx | S-MOBILE-ROSTER-01 — mobile-responsive layout (RO-13):
+// filter chips replace sidebar, 3-col stat grid + full-width button, single-column card grid.
 // DeepBench v6.2.0 | RosterScreen.jsx | S-MOBILE-NAV-01 — rename (RO-12): headline "Your bench." →
 // "Your agent roster.", display-text only (screen name, not the top-level nav tab), see STYLE-GUIDE.md §25.
 // DeepBench v5.2.37 | RosterScreen.jsx | RO-09 — sort agents by usage count
@@ -15,6 +17,7 @@ import { useAgentUsageCounts } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { BENCH_FILTERS } from "../data/agents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
@@ -161,6 +164,8 @@ export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();
   const usageCounts = useAgentUsageCounts();
+  // FEATURE: RO-13 — platform's single responsive breakpoint source, see STYLE-GUIDE.md §22
+  const isMobile = useIsMobile();
 
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -205,31 +210,34 @@ export default function RosterScreen() {
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
         {/* ── Left sidebar filter nav — FEATURE: RO-10, pattern locked in STYLE-GUIDE.md §10 ── */}
-        <div style={{width:180,flexShrink:0,background:T.card,borderRight:`1px solid ${T.line}`,display:"flex",flexDirection:"column",overflowY:"auto"}}>
-          {navItems.map(item => {
-            const isActive = activeFilter === item.id;
-            return (
-              <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
-                width:"100%", textAlign:"left", padding:"8px 14px",
-                fontFamily:body, fontSize:12,
-                fontWeight: isActive ? 600 : 400,
-                color: isActive ? T.navy : T.mutedDeep,
-                background: isActive ? `${T.brass}14` : "transparent",
-                border:"none",
-                borderLeft: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
-                cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between",
-              }}>
-                <span>{item.label}</span>
-                <span style={{
-                  fontFamily:mono, fontSize:9, padding:"1px 6px",
-                  ...(isActive
-                    ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
-                    : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
-                }}>{item.count}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* FEATURE: RO-13 — desktop-only, mobile renders a horizontal chip row inline below instead */}
+        {!isMobile && (
+          <div style={{width:180,flexShrink:0,background:T.card,borderRight:`1px solid ${T.line}`,display:"flex",flexDirection:"column",overflowY:"auto"}}>
+            {navItems.map(item => {
+              const isActive = activeFilter === item.id;
+              return (
+                <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
+                  width:"100%", textAlign:"left", padding:"8px 14px",
+                  fontFamily:body, fontSize:12,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? T.navy : T.mutedDeep,
+                  background: isActive ? `${T.brass}14` : "transparent",
+                  border:"none",
+                  borderLeft: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between",
+                }}>
+                  <span>{item.label}</span>
+                  <span style={{
+                    fontFamily:mono, fontSize:9, padding:"1px 6px",
+                    ...(isActive
+                      ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
+                      : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
+                  }}>{item.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Right content area ── */}
         <div style={{flex:1,overflowY:"auto",padding:"24px 28px 48px",background:T.paperDeep}}>
@@ -245,29 +253,86 @@ export default function RosterScreen() {
           </div>
           <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
+          {/* FEATURE: RO-13 — mobile filter chip row, horizontal adaptation of the Left Sidebar Nav
+              Pattern (STYLE-GUIDE.md §10): same brass-highlight logic, border axis left→bottom. */}
+          {isMobile && (
+            <div style={{display:"flex",overflowX:"auto",gap:6,paddingBottom:10,marginBottom:12,borderBottom:`1px dashed ${T.lineSoft}`}}>
+              {navItems.map(item => {
+                const isActive = activeFilter === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
+                    flexShrink:0, textAlign:"left", padding:"8px 14px",
+                    fontFamily:body, fontSize:12,
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? T.navy : T.mutedDeep,
+                    background: isActive ? `${T.brass}24` : "transparent",
+                    border:"none",
+                    borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                    cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                  }}>
+                    <span>{item.label}</span>
+                    <span style={{
+                      fontFamily:mono, fontSize:9, padding:"1px 6px",
+                      ...(isActive
+                        ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
+                        : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
+                    }}>{item.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Bench stats strip */}
           {/* FEATURE: RO-02 */}
-          <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,border:`1px solid rgba(182,135,58,.3)`,position:"relative"}}>
+          {/* FEATURE: RO-13 — mobile: 3-col stat grid + full-width button, workspace tag dropped */}
+          <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:isMobile?"block":"flex",alignItems:"center",gap:28,border:`1px solid rgba(182,135,58,.3)`,position:"relative"}}>
             <Corners color={T.brass}/>
-            {[
-              ["Bench Size",        stats.size,                  T.card],
-              ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
-              ["Annual Value",      fmt$(stats.value),           T.mossLight],
-              ["Reports / Mo",      stats.reportsPerMonth,       T.card],
-              ["Trainable Agents",  stats.trainable,             T.brassLight],
-            ].map(([k,v,c])=>(
-              <div key={k}>
-                <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
-                <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
-              </div>
-            ))}
-            <div style={{flex:1}}/>
-            <button
-              onClick={() => navigate("/bench/new")}
-              style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:"5px 14px", cursor:"pointer", letterSpacing:.5 }}>
-              + Add a Player
-            </button>
-            <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
+            {isMobile ? (
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {[
+                    ["Bench Size",        stats.size,                  T.card],
+                    ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
+                    ["Annual Value",      fmt$(stats.value),           T.mossLight],
+                    ["Reports / Mo",      stats.reportsPerMonth,       T.card],
+                    ["Trainable Agents",  stats.trainable,             T.brassLight],
+                  ].map(([k,v,c])=>(
+                    <div key={k}>
+                      <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
+                      <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => navigate("/bench/new")}
+                  style={{ width:"100%", marginTop:10, fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:6, cursor:"pointer", letterSpacing:.5 }}>
+                  + Add a Player
+                </button>
+              </>
+            ) : (
+              <>
+                {[
+                  ["Bench Size",        stats.size,                  T.card],
+                  ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
+                  ["Annual Value",      fmt$(stats.value),           T.mossLight],
+                  ["Reports / Mo",      stats.reportsPerMonth,       T.card],
+                  ["Trainable Agents",  stats.trainable,             T.brassLight],
+                ].map(([k,v,c])=>(
+                  <div key={k}>
+                    <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+                  </div>
+                ))}
+                <div style={{flex:1}}/>
+                <button
+                  onClick={() => navigate("/bench/new")}
+                  style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:"5px 14px", cursor:"pointer", letterSpacing:.5 }}>
+                  + Add a Player
+                </button>
+                <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
+              </>
+            )}
           </div>
 
           {/* Agent grid — FEATURE: RO-10 empty state if the active filter has no agents */}
@@ -276,7 +341,8 @@ export default function RosterScreen() {
               <div style={{fontFamily:body,fontStyle:"italic",color:T.muted}}>No agents in this group yet.</div>
             </div>
           ) : null}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+          {/* FEATURE: RO-13 — mobile: single-column card grid, same AgentCard/vacancy tile */}
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
             {filteredAgents.map(a=>(
               <AgentCard key={a.id} agent={a}
                 onViewProfile={a=>navigate(`/bench/${a.id}`)}
