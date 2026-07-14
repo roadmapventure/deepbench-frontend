@@ -114,7 +114,11 @@ export const PATTERN_CATALOG = [
   { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true,  patternType: 'reasoning'  },
   { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
   // FEATURE: BUG-15 — reflection is live since S-PROMPT-ARCH-01; flip active: false → true
-  { slug: 'reflection',         name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
+  // FEATURE: AI-50c — slug renamed 'reflection' -> 'reflect' to match the real technical_services/
+  // patterns_used value (confirmed in ARCHITECTURE.md's REFLECT row and api/plan.js's 's.type === 'reflect'' check)
+  { slug: 'reflect',            name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
+  // FEATURE: AI-50c — new entry, real value confirmed in ARCHITECTURE.md's "Intelligent Synthesis" row
+  { slug: 'intelligent-synthesis', name: 'Intelligent Synthesis', desc: 'Haiku full-prompt rewrite pass — rewrites the complete assembled prompt against the token budget after REFLECT runs; a rewrite, not a filter', active: true, patternType: 'reasoning' },
   { slug: 'streaming',          name: 'Streaming',          desc: 'Progressive output delivery via SSE — token deltas or discrete structured events, arriving as they happen instead of one final blob, where UX latency matters',                                    active: true,  patternType: 'structural' },
   { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true,  patternType: 'structural' },
   { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
@@ -140,6 +144,33 @@ export const PATTERN_CATALOG = [
   { slug: 'hyde',                     name: 'HyDE',                         desc: 'Before retrieving from the knowledge base, generate a hypothetical ideal answer to the query, embed that hypothetical, and use the resulting vector for retrieval — significantly improves RAG quality for domain-specific terminology.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'One-model change inside SVC-02 Knowledge Retrieval — no schema changes required' },
   { slug: 'adaptive-rag',             name: 'Adaptive RAG',                 desc: 'Dynamically adjusts retrieval depth and strategy based on query complexity. Simple queries: shallow retrieval (3 chunks). Complex analysis: deep retrieval (20+ chunks) with keyword fallback. Prevents over-retrieval cost waste.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'Complexity classifier inside SVC-02 Knowledge Retrieval — no schema changes required' },
 ];
+
+// FEATURE: AI-50c — real per-call pattern attribution, replacing the old SERVICE_CATALOG static
+// rollup (which summed a call's FULL cost into every one of that service's declared patterns,
+// causing ~3x over-counting). Splits each call's cost EVENLY across however many real patterns
+// that specific call exercised (patternsUsed), so bucket sums reconcile exactly to Total Cost —
+// John's confirmed design. `total` (call count) is NOT split — a call legitimately counts once
+// toward each pattern it used; only cost needs to reconcile to the whole. Entries with no
+// patternsUsed (pre-AI-50a rows, or a slug not yet in PATTERN_CATALOG) contribute nothing to any
+// bucket — invisible rather than mis-attributed, matching what real data is actually available.
+export function computeByPattern(log) {
+  const byPattern = {};
+  for (const pat of PATTERN_CATALOG) {
+    byPattern[pat.slug] = { ...pat, total: 0, cost: 0 };
+  }
+  for (const e of log) {
+    const used = Array.isArray(e.patternsUsed) ? e.patternsUsed : [];
+    if (used.length === 0) continue;
+    const splitCost = (e.cost || 0) / used.length;
+    for (const slug of used) {
+      if (byPattern[slug]) {
+        byPattern[slug].total += 1;
+        byPattern[slug].cost += splitCost;
+      }
+    }
+  }
+  return byPattern;
+}
 
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
 export const AI_TYPE_TO_SERVICE = {
@@ -260,6 +291,7 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
     location:  location || AI_TYPES[type]?.location || "—",
     agentId,
     cost:      computeCallCost(resolvedModel, 0, tokens),
+    patternsUsed: patterns_used,
     ts:        new Date().toISOString(),
   };
   _log = [entry, ..._log].slice(0, 500); // cap at 500
@@ -327,6 +359,7 @@ export async function hydrateFromSupabase(tenantId = 'global') {
     cost:      row.cost_usd != null
       ? parseFloat(row.cost_usd)
       : computeCallCost(row.model, row.input_tokens, row.output_tokens),
+    patternsUsed: row.patterns_used || [],
     ts:        row.created_at,
     _fromDB:   true,
   }));
@@ -401,14 +434,8 @@ export function useAIActivity() {
     };
   }
 
-  // FEATURE: AI-23 — Aggregate by Pattern (roll up from services that declare the pattern)
-  const byPattern = {};
-  for (const pat of PATTERN_CATALOG) {
-    const svcsUsingPattern = new Set(SERVICE_CATALOG.filter(s => s.patterns.includes(pat.name)).map(s => s.slug));
-    const entries = log.filter(e => svcsUsingPattern.has(AI_TYPE_TO_SERVICE[e.type] || e.type));
-    const cost    = entries.reduce((s,e) => s + (e.cost||0), 0);
-    byPattern[pat.slug] = { ...pat, total: entries.length, cost };
-  }
+  // FEATURE: AI-50c — real per-call pattern attribution (see computeByPattern's own comment)
+  const byPattern = computeByPattern(log);
 
   const servicesActive      = Object.values(byService).filter(s => s.total > 0).length;
   const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length;

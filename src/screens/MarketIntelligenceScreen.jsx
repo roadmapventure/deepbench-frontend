@@ -118,6 +118,7 @@ import { Card, Corners, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard,
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
+import { PATTERN_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -160,6 +161,9 @@ const SERVICE_LABEL = {
   "data-analysis": { name: "Data Analysis", patterns: "Structured Output, Agent Delegation" },
   "pipeline-triage": { name: "Pipeline Triage", patterns: "Structured Output, Agent Delegation" },
 };
+
+// FEATURE: AI-50c — slug -> human label, built from the same PATTERN_CATALOG useAIActivity.js owns
+const PATTERN_NAME = Object.fromEntries(PATTERN_CATALOG.map(p => [p.slug, p.name]));
 
 // FEATURE: AA-125 — shared free-text shaping so every event type that embeds a raw
 // model-authored string (reasoning/critique/notes) gets the same "short, readable log
@@ -1233,6 +1237,13 @@ function rollupBaseline(stats) {
 function RoutingEventRow({ evt, agentById }) {
   const { capability, summary, color } = describePipelineEvent(evt);
   const svc = SERVICE_LABEL[capability];
+  // FEATURE: AI-50c — prefer real evt.data.patterns_used over the static SERVICE_LABEL string;
+  // fall back to the static string only when no real value is present (event types with no
+  // capability response at all — delegation/delegation_return placeholders, error).
+  const realPatterns = Array.isArray(evt.data?.patterns_used) ? evt.data.patterns_used : null;
+  const patternLabel = realPatterns && realPatterns.length > 0
+    ? realPatterns.map(slug => PATTERN_NAME[slug] || slug).join(', ')
+    : svc?.patterns;
   const primary = agentById(evt.agentId);
   return (
     <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
@@ -1242,7 +1253,7 @@ function RoutingEventRow({ evt, agentById }) {
         <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(evt.agentId, agentById) : evt.agentId}</span>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
       </div>
-      {svc && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc.name} · {svc.patterns}</div>}
+      {(svc || patternLabel) && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc?.name}{svc?.name && patternLabel ? ' · ' : ''}{patternLabel}</div>}
       <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
     </div>
   );
