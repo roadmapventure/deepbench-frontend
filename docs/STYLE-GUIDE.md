@@ -455,6 +455,13 @@ The Create Work Order screen uses a strict two-column layout: all user entry con
 - Goal textarea border: `T.brass` when pre-populated (signals AI involvement)
 - Do NOT show the suggestion bar if no deliverable is selected
 
+### Mobile Addendum (Locked 2026-07-13, WO-07/AW-30, S-MOBILE-WO-01)
+- Below `MOBILE_BREAKPOINT` (768px, `useIsMobile()`): grid collapses from `"42% 1fr"` to `"1fr"` — one JSX tree, conditional style values only, no duplicated mobile branch. Left column (Steps 1-3 + Generate Plan) renders first, right column (Step 4 output) directly below once a plan exists — same top-to-bottom order the desktop grid already implies.
+- Divider (the 1px `borderRight` between columns) is omitted on mobile — nothing left to divide with a single column.
+- Deliverable-tile grid (Step 01/roadmap) drops from `'1fr 1fr'` to `'1fr'` on mobile — 2-up tiles were compressing to ~78px, illegibly narrow.
+- PM picker cards (Step 02) need no structural change — already `flex-wrap`, the fixed `minWidth:200` stops overflowing once its column is full-width instead of ~164px.
+- **Single-PM "FYI" label (`AW-30`, desktop and mobile both):** when exactly one agent has a "Project Manager" role, Step 2's label reads `"Step 2 — FYI, Your project manager is:"` instead of `"Step 2 — Select a Project Manager"`. Condition is `pmAgents.length === 1`, evaluated live from the roster — never hardcoded to an agent name, reverts automatically once a second PM agent exists. Label text only; the card stays exactly as clickable as always.
+
 ---
 
 ## 16. ConfirmationCard — Generic `pending_confirmation` Gate (Locked 2026-07-04, S-MARKET-INTEL-01d-design)

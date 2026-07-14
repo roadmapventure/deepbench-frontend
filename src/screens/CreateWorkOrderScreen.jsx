@@ -1,8 +1,10 @@
-// DeepBench v5.2.33 | src/screens/CreateWorkOrderScreen.jsx | AA-70 Alex attribution + BUG-14 double-count fix
+// DeepBench v6.2.14 | src/screens/CreateWorkOrderScreen.jsx | AA-70 Alex attribution + BUG-14 double-count fix
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
 // FEATURE: AW-26 — DB-driven deliverable tiles from Format Skill traits
 // FEATURE: AW-27 — Streaming RAG goal suggestion
+// FEATURE: WO-07 — Mobile single-column reflow
+// FEATURE: AW-30 — Single-PM "FYI" label fix
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -12,6 +14,7 @@ import { AppShell } from "../AppShell.jsx";
 import { Corners, AgentAvatar, AiBadge, Toast, FeatureBadge } from "../components/SharedUI.jsx";
 import PromptEvolutionModal from "../components/PromptEvolutionModal.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
@@ -190,6 +193,8 @@ export default function CreateWorkOrderScreen() {
   const navigate   = useNavigate();
   const [params]   = useSearchParams();
   const agents     = useAgents();
+  const isMobile = useIsMobile();
+  const pmAgents = agents.filter(a => a.role?.toLowerCase().includes('project manager')); // NEW — WO-07/AW-30, computed once, reused by both the Step 2 label and the picker map below
 
   const prefillAgent = params.get("agent");
   const rawQ         = params.get("q") ? decodeURIComponent(params.get("q")) : "";
@@ -312,10 +317,10 @@ export default function CreateWorkOrderScreen() {
   // Auto-select first PM agent and load solutions on mount
   useEffect(() => {
     if (agents.length > 0 && !selectedPMAgent) {
-      const pmAgent = agents.find(a => a.role?.toLowerCase().includes('project manager'));
+      const pmAgent = pmAgents[0];
       if (pmAgent) { setSelectedPMAgent(pmAgent); loadDeliverables(pmAgent); }
     }
-  }, [agents.length]);
+  }, [agents.length, pmAgents.length]);
 
   // FEATURE: AW-27 — auto-fire streaming goal suggestion on deliverable selection
   const handleDeliverableSelect = (deliverable) => {
@@ -603,10 +608,11 @@ export default function CreateWorkOrderScreen() {
         )}
 
         {/* Two-column: left (solution + pm + goal + questions), right (instructions) */}
-        <div style={{display:"grid",gridTemplateColumns:"42% 1fr",alignItems:"start"}}>
+        {/* FEATURE: WO-07 — mobile single-column reflow */}
+        <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "42% 1fr",alignItems:"start"}}>
 
           {/* LEFT */}
-          <div style={{paddingRight:24,borderRight:`1px solid ${T.line}`}}>
+          <div style={{paddingRight: isMobile ? 0 : 24, borderRight: isMobile ? "none" : `1px solid ${T.line}`}}>
 
             {/* FEATURE: AW-29 — Step 1: Victoria Chen solution catalog */}
             {deliverables.length > 0 && (
@@ -626,7 +632,7 @@ export default function CreateWorkOrderScreen() {
                 )}
 
                 <p style={{fontFamily:body,fontSize:12,color:T.ink,marginBottom:12}}>Here's what we can help you with right now:</p>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:roadmapDeliverables.length>0?14:0}}>
+                <div style={{display:'grid',gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',gap:10,marginBottom:roadmapDeliverables.length>0?14:0}}>
                   {deliverables.map(sol => (
                     <button key={sol.id} onClick={()=>handleDeliverableSelect(sol)}
                       style={{textAlign:'left',padding:'12px 14px',borderRadius:6,cursor:'pointer',
@@ -646,7 +652,7 @@ export default function CreateWorkOrderScreen() {
                       <span>{roadmapOpen?'▴':'▾'}</span>
                     </button>
                     {roadmapOpen && (
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10}}>
+                      <div style={{display:'grid',gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',gap:10,marginTop:10}}>
                         {roadmapDeliverables.map(sol => (
                           <div key={sol.id}
                             style={{textAlign:'left',padding:'12px 14px',borderRadius:6,border:`1px solid ${T.lineSoft}`,background:T.paper,opacity:0.55,cursor:'not-allowed',position:'relative'}}>
@@ -663,12 +669,13 @@ export default function CreateWorkOrderScreen() {
             )}
 
             {/* FEATURE: AW-25 — Step 2: PM agent picker */}
+            {/* FEATURE: AW-30 — single-PM "FYI" label fix */}
             <div style={{marginBottom:20}}>
               <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600,marginBottom:8}}>
-                Step 2 — Select a Project Manager
+                {pmAgents.length === 1 ? "Step 2 — FYI, Your project manager is:" : "Step 2 — Select a Project Manager"}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {agents.filter(a=>a.role?.toLowerCase().includes('project manager')).map(agent=>(
+                {pmAgents.map(agent=>(
                   <div key={agent.id}
                     onClick={()=>{setSelectedPMAgent(agent);loadDeliverables(agent);setSelectedDeliverable(null);setGoal('');setPlanGenerated(false);}}
                     style={{background:selectedPMAgent?.id===agent.id?`${T.brass}10`:T.card,border:`1.5px solid ${selectedPMAgent?.id===agent.id?T.brass:T.line}`,padding:'9px 12px',display:'flex',alignItems:'center',gap:8,cursor:'pointer',borderRadius:2,minWidth:200,position:'relative'}}>
@@ -787,7 +794,7 @@ export default function CreateWorkOrderScreen() {
           </div>
 
           {/* RIGHT: Instructions */}
-          <div style={{minWidth:0,paddingLeft:24}}>
+          <div style={{minWidth:0,paddingLeft: isMobile ? 0 : 24, marginTop: isMobile ? 24 : 0}}>
             <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>STEP 4 — INSTRUCTIONS <AiBadge label={AI_PAT.TASK_PLANNING}/></div>
 
             {(generating || planGenerated) && (
