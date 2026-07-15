@@ -1,7 +1,7 @@
 # DeepBench v5.1 — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Last updated: 2026-06-24 | Section 11 added — agent build completeness standard
+> Last updated: 2026-07-15 | Section 7 corrected — self-verify flow (was stale since 2026-07-02's Automated Design→Code→Verify Loop)
 
 ---
 
@@ -292,14 +292,14 @@ After every Vercel deploy:
 
 ## Section 7: Manual QA Checklist Rules
 
-John runs these after every deploy. Session does not close until all items pass.
+**Updated 2026-07-15 — this section was stale since before the 2026-07-02 Automated Design→Code→Verify Loop rule (`CLAUDE-DESIGN.md`) and still said John runs these himself; that hasn't been true for the default flow in weeks.** Default flow: the design session runs this checklist itself, directly against live systems (Supabase, `git status`/`git log`, the dev URL, preview tools for UI), and confirms PASS/FAIL — John is not expected to run it and shouldn't be asked to. Session does not close until all items pass, same as before — it's who runs them that changed, not the gate itself. Only if John starts a coding session manually and pastes a completion report himself does the original "John runs these" path apply.
 
-Rules:
+Rules for writing the checklist itself (unchanged):
 - Steps in logical user flow order
 - Each step = single observable action with clear PASS/FAIL answer
 - Include regression steps for any screen touched
 - Maximum 12 steps per session
-- Always end with: *"Report back PASS/FAIL/NEW REQUIREMENT for each item"*
+- Whoever runs it (design session by default) ends with: *"PASS/FAIL/NEW REQUIREMENT for each item"* in the close-out report
 
 **If any QA item FAILS — mandatory root cause protocol (do not skip):**
 
