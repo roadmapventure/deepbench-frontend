@@ -3,6 +3,7 @@
 // FEATURE: MI-12 — both branches now call logDeterministic() (AI Audit §13.3 gap closed — deterministic routes must log too)
 
 import { Buffer } from "buffer";
+import { logActivity } from '../lib/activity-log.js';
 
 export const config = {
   api: {
@@ -11,27 +12,6 @@ export const config = {
     },
   },
 };
-
-function getSupabaseHeaders(key) {
-  return { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` };
-}
-
-function logDeterministic({ supabaseUrl, supabaseKey, tenantId, feature, latencyMs }) {
-  if (!supabaseUrl || !supabaseKey) return;
-  fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-    method: 'POST',
-    headers: { ...getSupabaseHeaders(supabaseKey), Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      tenant_id: tenantId || 'global',
-      ai_type: 'deterministic',
-      feature,
-      model: null,
-      agent_id: null,
-      latency_ms: latencyMs,
-      created_at: new Date().toISOString(),
-    }),
-  }).catch(e => console.warn('[extract] activity log failed:', e.message));
-}
 
 async function handleExtract(req, res, startTime) {
   const { fileData, fileType, fileName, tenantId } = req.body;
@@ -130,11 +110,9 @@ async function handleExtract(req, res, startTime) {
   const words = cleaned.split(/\s+/).filter(w => w.length > 0);
   wordCount = words.length;
 
-  logDeterministic({
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseKey: process.env.SUPABASE_SERVICE_KEY,
-    tenantId: tenantId || null,
-    feature: 'document-extraction',
+  logActivity({
+    tenantId: tenantId || 'global',
+    aiType: 'deterministic', feature: 'document-extraction',
     latencyMs: Date.now() - startTime,
   });
 
@@ -201,11 +179,8 @@ async function handleUploadCsv(req, res, startTime) {
     return res.status(500).json({ error: "Task csv_path update failed: " + err.slice(0, 200) });
   }
 
-  logDeterministic({
-    supabaseUrl,
-    supabaseKey,
-    tenantId,
-    feature: 'csv-upload',
+  logActivity({
+    tenantId, aiType: 'deterministic', feature: 'csv-upload',
     latencyMs: Date.now() - startTime,
   });
 
