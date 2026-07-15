@@ -568,7 +568,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| LA-01 | Landing screen | ❌ Missing | DECISION NEEDED (/ = landing or dashboard?) |
+| LA-01 | **Home Screen — the decision this row was waiting on is resolved 2026-07-15 (John, screen-inventory design conversation).** `/` is a real, distinct future screen — splash, announcements, and overall dashboard metrics — not a rename of what's currently there. `MarketIntelligenceScreen.jsx` ("Channel Intelligence," itself renamed from "Market Intelligence"/MI-46 the same conversation) is squatting on `/` temporarily and needs to move to its own route once Home exists; not fixed here, just unblocked for scoping. Also surfaced the same session: the platform's nav is a real two-level hierarchy — **Home** / **Work** (a family of per-work-type dashboards: Channel Intelligence, Project Management, Spend Analysis, room to grow) / **Bench** (Agent Roster + its own children: Add Agent, Personnel File → Teach) / **Platform** (AI Audit, About) — not a flat screen list. Full draft inventory and the naming decisions behind it: this conversation, not yet written to a dedicated doc. | ❌ Missing | S-future (design required — scope Home Screen's own content, and Channel Intelligence's move off `/`, as separate sessions) |
 
 ---
 
