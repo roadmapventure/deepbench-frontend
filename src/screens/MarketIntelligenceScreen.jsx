@@ -1,14 +1,13 @@
-// DeepBench v6.2.42 | MarketIntelligenceScreen.jsx | MI-63 — key_data_points.source rendered a raw
-// the_library citation UUID on the Q&A path but a human-readable label on the hypothesis-test path
-// (neither Format Skill Profile's schema had a source description distinguishing the two). Fix:
-// added data_type/is_baseline (and reasoned_from_section on the hypothesis-test profile) to both
-// qa-answer-format/intelligence-review-format Skill Profiles (Supabase content only), then split
-// the old single ambiguous inline list into two real <table> components — Actual Data Points from
-// the Library (Sourced/Source Simulation) and Theorized Data Points from Analysis (Analysis) — via
-// groupKeyDataPoints(), reusing describeDataType() verbatim. Wired into both existing render sites
-// (Q&A chat bubble, EvidenceColumn's hypothesis-test result); old per-point confidence field and
-// ambiguous source string dropped from both display sites.
-// FEATURE: MI-63
+// DeepBench v6.2.43 | MarketIntelligenceScreen.jsx | MI-66 — EvidenceColumn's result section
+// reordered: the Info Only/Store as Forecast decision control (the real HITL gate on this screen,
+// distinct from the later ConfirmationCard) now leads, with new instructional copy ("Review the
+// theory evidence below, then select an option.") and the override warning grouped with it. Real
+// behavior change confirmed with John: override_warning now shares the buttons' !hypFlow.confirmation
+// gate, so it hides once the ConfirmationCard replaces the buttons during Nadia's draft-review stage,
+// instead of staying visible for the rest of the flow. Below the decision block: ActualDataPointsTable/
+// TheorizedDataPointsTable (MI-63) → chart → Supports/Complicates/Consider thesis (MI-51). Pure JSX
+// reorder plus one new copy string; onCommit()/onDiscard()/was_override logging unchanged.
+// FEATURE: MI-66
 //
 // DeepBench v6.2.41 | MarketIntelligenceScreen.jsx | MI-65 — chat's hypothesis-test card was
 // pushed at test-completion time (before any decision), so it looked finished but wasn't; the
@@ -1300,37 +1299,21 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
 
         {st && hypFlow.stage === "result" && (
           <>
-            {st.override_warning && (
-              <div style={{padding:"9px 11px",background:"#f3e6cc",border:`1px solid ${T.brass}`,fontFamily:body,fontSize:11,color:T.brassDeep}}>
-                ⚑ AI flagged a complicating factor not fully resolved by this theory. Committing will log this as an override.
-              </div>
-            )}
-
-            {/* FEATURE: MI-51 — honest verdict: Supports/Complicates/Consider always render when
-                present (mirrors MessageBubble's existing hypothesis_test rendering); chart/key data
-                points below render only when present, captioned as agent-judgment-dependent. */}
-            <div style={{display:"flex",flexDirection:"column",gap:9}}>
-              {st.supports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.supports.text || st.supports}</p></div>)}
-              {st.complicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.complicates.text || st.complicates}</p></div>)}
-              {st.consider && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>→ Consider also</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.consider.text || st.consider}</p></div>)}
-            </div>
-
-            {st.visualization && (
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected <span style={{textTransform:"none",fontStyle:"italic",fontWeight:400}}>— shown when Priya judges it useful, not every time</span></div>
-                <ChartRenderer type={st.visualization.chart_type} data={st.visualization.chart_data} caption={st.visualization.caption}/>
-              </div>
-            )}
-            <ActualDataPointsTable rows={stActualPoints}/>
-            <TheorizedDataPointsTable rows={stTheorizedPoints}/>
-
-            {/* FEATURE: MI-51 — end decision collapses from 3 outcomes (Discard/Track as Assumption/
-                Make Permanent) to 2 (Info Only/Store as Forecast); both backend calls (Elena's
-                reasoner-intent, unconditional; Nadia's data-patch-intent, always confirmation-gated)
-                are unchanged underneath, see onCommit()/onDiscard() below. */}
+            {/* FEATURE: MI-66 — decision control (override warning + instructional copy + Info Only/Store
+                as Forecast buttons) moved to the top: this is the real human decision point (HITL control)
+                on this screen, distinct from the later ConfirmationCard gate below, and it previously
+                rendered last, after a full read of the supporting evidence. override_warning now shares
+                the buttons' !hypFlow.confirmation gate -- a deliberate behavior change confirmed with
+                John: it no longer stays visible once the buttons are replaced by the ConfirmationCard
+                during Nadia's draft-review stage; it belongs to the decision moment, not the whole flow. */}
             {!hypFlow.confirmation && (
               <>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Info only, or store this as a forecast?</div>
+                {st.override_warning && (
+                  <div style={{padding:"9px 11px",background:"#f3e6cc",border:`1px solid ${T.brass}`,fontFamily:body,fontSize:11,color:T.brassDeep}}>
+                    ⚑ AI flagged a complicating factor not fully resolved by this theory. Committing will log this as an override.
+                  </div>
+                )}
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Review the theory evidence below, then select an option.</div>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={onDiscard}
                     style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
@@ -1343,6 +1326,25 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
                 </div>
               </>
             )}
+
+            <ActualDataPointsTable rows={stActualPoints}/>
+            <TheorizedDataPointsTable rows={stTheorizedPoints}/>
+
+            {st.visualization && (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current vs. Projected <span style={{textTransform:"none",fontStyle:"italic",fontWeight:400}}>— shown when Priya judges it useful, not every time</span></div>
+                <ChartRenderer type={st.visualization.chart_type} data={st.visualization.chart_data} caption={st.visualization.caption}/>
+              </div>
+            )}
+
+            {/* FEATURE: MI-51 — honest verdict: Supports/Complicates/Consider always render when
+                present (mirrors MessageBubble's existing hypothesis_test rendering). Reordered below the
+                decision control and evidence tables/chart per MI-66. */}
+            <div style={{display:"flex",flexDirection:"column",gap:9}}>
+              {st.supports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.supports.text || st.supports}</p></div>)}
+              {st.complicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.complicates.text || st.complicates}</p></div>)}
+              {st.consider && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>→ Consider also</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.consider.text || st.consider}</p></div>)}
+            </div>
           </>
         )}
 
