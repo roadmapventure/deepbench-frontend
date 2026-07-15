@@ -35,6 +35,14 @@
 
 ---
 
+## AGENT ROSTER / BENCH — AGR (next: Bench-screen backlog, first row under the new screen-code format)
+
+| ID | Type | Feature | Status | Session |
+|----|------|---------|--------|---------|
+| AGR-01 | Architecture | **New, found 2026-07-15 (AI Audit attribution investigation, John).** `ARCHITECTURE.md` §19e (LOCKED) already registers "Writes to an agent's own personnel file (training stats, skill/situational scores, docs/classes/chunks counts)" as owned exclusively by The Trainer (Susan Smith, TR-08), broker "*new — none exists yet*," Status ❌ Not built. Confirmed live against Supabase: Susan has **zero** rows in `agent_capability_assignments`, and no capability in the whole `capabilities` table represents training/reinforcement/embedding at all — the Skills → Capabilities → harness pipeline the rest of the platform uses to resolve "who does this" has nothing to read for this action. The Bench screen's "Training tab — Add Courses" flow (`PersonnelScreen.jsx`, `TeachScreen.jsx`) bypasses the real capability harness (`api/capabilities/execute.js`) entirely — it calls document-extraction and embedding functions directly. Result: extraction calls are still hardcoded client-side to `agentId: "susan"` (untouched, pre-existing); reinforcement/embedding calls (`AA-190h`, `lib/knowledge-write.js`) now attribute to whichever agent's page the training was added on, not Susan — a real regression in AI Audit "By Agent" attribution, found because John does that work more than the numbers implied. **John's explicit standing rule (2026-07-15): no hardcoded agent name anywhere in code, ever, for this or any pattern-attribution case — the harness/loop must resolve the executing agent from real Skill/Capability data, the same way every other capability-driven attribution on the platform already works.** Fix requires building, not configuring: (1) a real training/reinforcement Capability + Skill Profile, (2) assigned to Susan via `agent_capability_assignments`, (3) `PersonnelScreen.jsx`/`TeachScreen.jsx`'s Add Courses flow rewired to route through `api/capabilities/execute.js` instead of calling extraction/embedding directly, so attribution falls out of the harness's own skill-based resolution — closing §19e's registry row for real. | ❌ Missing | S-future (design session required — Bench screen, next bucket per John 2026-07-15) |
+
+---
+
 ## AGENT ARCHITECTURE — AA (next: MI-adjacent enhancements, not core loop/harness)
 > Full spec: docs/AGENT-ARCHITECTURE.md. Core loop/harness/delegation-reliability items live in `docs/FEATURES.md` (now). Everything platform-wide (Phase 1–5 roadmap, MCP, marketplace, revenue, BYOA, JL-01) lives in `docs/FEATURES-LATER.md`.
 
