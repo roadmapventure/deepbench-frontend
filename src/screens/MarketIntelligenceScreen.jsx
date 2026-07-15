@@ -1,3 +1,10 @@
+// DeepBench v6.2.38 | MarketIntelligenceScreen.jsx | MI-64 — Desktop InteractColumn's message
+// list now auto-scrolls to bottom on new message/workingStatus change (reusing FetchContext.jsx's
+// existing scroll-to-bottom-with-user-override pattern, replicated locally, not imported) and
+// EvidenceColumn now threads workingStatus through to render a duplicate AgentWorkingIndicator
+// near the top of both its empty and populated states.
+// FEATURE: MI-64
+//
 // DeepBench v6.2.35 | MarketIntelligenceScreen.jsx | MI-61 — Evidence column's empty-state
 // sentence (MI-59's getEvidencePanelSentence(), !hypFlow branch) tightened per John's direct
 // copy request: "Once your chat has analysis data for you to interact with, it will appear
@@ -1027,7 +1034,7 @@ function getEvidencePanelSentence(hypFlow) {
   return `${label} — Data for you to interact with your chat...`;
 }
 
-function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
+function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1048,6 +1055,9 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
       <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
         <FeatureBadge id="MI-59"/>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
+        {/* FEATURE: MI-64 — duplicate compact status indicator so someone watching Evidence sees
+            progress without needing to look at chat; same AgentWorkingIndicator component, unmodified. */}
+        {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
         <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             {getEvidencePanelSentence(hypFlow)}
@@ -1068,6 +1078,8 @@ function EvidenceColumn({ hypFlow, onIntentChange, onSelectHypothesis, onDiscard
       <FeatureBadge id="MI-59"/>
       {/* FEATURE: MI-59 — header stays "Evidence" in both states, never switches to "Theory Evidence" */}
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
+      {/* FEATURE: MI-64 — duplicate compact status indicator, same component as InteractColumn's */}
+      {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden"}}>
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
 
@@ -1612,6 +1624,24 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
   const [input, setInput] = useState("");
   const scrollRef = useRef(null);
 
+  // FEATURE: MI-64 — tracks whether the user has manually scrolled away from the bottom, same
+  // pattern as FetchContext.jsx's fetchUserScrolledRef/scrollToLatest (Agent Fetch feed) — auto-scroll
+  // below respects this so a user reading earlier history isn't yanked back down.
+  const userScrolledRef = useRef(false);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    userScrolledRef.current = !atBottom;
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || userScrolledRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, workingStatus]);
+
   const submit = (text) => {
     const clean = (text || "").trim();
     if (!clean || loading || !marcus) return;
@@ -1620,7 +1650,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
   };
 
   const messageList = (
-    <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>
+    <div ref={scrollRef} onScroll={handleScroll} style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>
       {messages.length === 0 ? (
         <div>
           <div style={{fontFamily:body,fontSize:13,color:T.ink,lineHeight:1.6,marginBottom:16}}>
@@ -1676,6 +1706,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.brass}}>Interact</div>
       <div style={{background:"#fffdf8",border:`1px solid ${T.line}`,borderRadius:3,position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight: noMinHeight ? 0 : 420}}>
         <Corners/>
+        <FeatureBadge id="MI-64"/>
         <div style={{padding:"13px 16px",borderBottom:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
           <div>
@@ -2223,7 +2254,7 @@ export default function MarketIntelligenceScreen() {
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}/>
-            <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
+            <EvidenceColumn hypFlow={hypFlow} workingStatus={workingStatus} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
           </div>
         )}
