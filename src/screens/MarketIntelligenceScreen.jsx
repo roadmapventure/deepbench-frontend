@@ -1,3 +1,13 @@
+// DeepBench v6.2.45 | MarketIntelligenceScreen.jsx | MI-68 — Agent Routing log rewritten to plain
+// activity-narration copy (describePipelineEvent()'s summary strings), dropping confidence_tier/
+// self-flag jargon and per-event outcome content; real load-bearing detail (agent_selection's
+// reasoning, error's message, proofreader/failure_triage/patch_proposed's substantive text) still
+// trails each activity label. RoutingEventRow gains sameAgentAsPrevious: consecutive same-agent rows
+// suppress their repeated avatar/name/role header (both drawer and mobile pinned-feed call sites now
+// compute this per-list). Pure display-layer change — no evt.data shape, callCapability(), or
+// backend/Skill Profile touched. See STYLE-GUIDE.md §31.
+// FEATURE: MI-68
+//
 // DeepBench v6.2.44 | MarketIntelligenceScreen.jsx | AA-189 — onResolveConfirmation() had no catch
 // at all, so any resolve failure (this session's source_chunk_ids UUID crash, or any future reason)
 // was silently swallowed — ConfirmationCard just sat there with zero feedback. Added a catch
@@ -581,48 +591,57 @@ function TheorizedDataPointsTable({ rows }) {
 
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
 // never scripted text. Color: T.moss = pass/clean, T.brass = flagged/revise, T.flag = blocked.
+// FEATURE: MI-68 — every case rewritten to describe the activity being performed ("what is the
+// agent accomplishing"), not the outcome content (answer text, confidence tier, eval detail,
+// version notes) or raw field names (confidence_tier, self-flag). Real per-event data (reasoning,
+// error message, patterns_used) still flows through unchanged where it was already load-bearing
+// (agent_selection, error) — only the surrounding label text and the cases that used to surface
+// secondary result detail (proofreader retry/critique, failure_triage recommendation text,
+// patch_proposed version_note) are simplified to match every other case's activity-only style.
+// Event-type dispatch (which case fires) is unchanged — still one hardcoded string per call site,
+// assigned by the frontend immediately after each callCapability() call, never agent-reported.
 function describePipelineEvent(evt) {
   switch (evt.type) {
     case "intent_routing":
-      return { capability: "channel-intelligence", summary: `Classified intent: ${evt.data.intent} (confidence: ${evt.data.confidence})`, color: T.navyMid };
+      return { capability: "channel-intelligence", summary: "Reading the question, deciding how to route it", color: T.navyMid };
     case "qa_answer":
-      // FEATURE: MI-15 — confidence_tier routed through describeDataType() instead of the raw enum string
-      return { capability: "channel-intelligence", summary: `Answered · confidence_tier: ${describeDataType(evt.data.confidence_tier).label} · self-flag: ${evt.data.needs_review ? "yes" : "no"}`, color: evt.data.needs_review ? T.brass : T.moss };
+      return { capability: "channel-intelligence", summary: "Reviewing found data, putting together an answer", color: evt.data.needs_review ? T.brass : T.moss };
     case "proofreader": {
       const g = evt.data.guardrail || {}, e = evt.data.eval || {};
       if (g.result === "block") {
-        return { capability: "quality-gate", summary: `Guardrail: block — ${g.rule_violated}`, color: T.flag };
+        return { capability: "quality-gate", summary: "Blocking this answer — a policy issue was found", color: T.flag };
       }
-      const retriedNote = evt.data.final_answer ? " (Owen retried via Marcus)" : "";
-      return { capability: "quality-gate", summary: `Guardrail: pass${retriedNote} · Eval: ${e.result}${e.result === "revise" ? ` — ${shapeForLog(e.critique)}` : ""}`, color: e.result === "revise" ? T.brass : T.moss };
+      const revised = e.result === "revise" ? ` — asked for a revision: ${shapeForLog(e.critique)}` : "";
+      return { capability: "quality-gate", summary: `Reviewing the answer for accuracy and policy issues${revised}`, color: e.result === "revise" ? T.brass : T.moss };
     }
     case "failure_triage":
-      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Recommends escalating: ${shapeForLog(evt.data.suggested_research_request)}` : "Escalating would not help here", color: T.brass };
+      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Deciding whether more research would help — recommends: ${shapeForLog(evt.data.suggested_research_request)}` : "Deciding whether more research would help — more research wouldn't help here", color: T.brass };
     case "hypothesis_test":
-      return { capability: "hypothesis-evaluation", summary: `Hypothesis test complete · confidence: ${evt.data.confidence}`, color: T.moss };
+      return { capability: "hypothesis-evaluation", summary: "Validating selected theory, reviewing for challenges", color: T.moss };
     case "memory_consolidation":
-      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? `Consolidated: ${shapeForLog(evt.data.content)}` : "No pattern worth consolidating (no_action)", color: evt.data.action === "consolidate" ? T.moss : T.muted };
-    case "patch_proposed":
-      return { capability: "data-analysis", summary: `Proposed: ${evt.data.proposed_action?.action || "?"}${evt.data.proposed_action?.version_note ? ` — ${shapeForLog(evt.data.proposed_action.version_note)}` : ""}`, color: T.brass };
+      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? "Saving a new insight for future use" : "Reviewing for a reusable insight — none found", color: evt.data.action === "consolidate" ? T.moss : T.muted };
+    case "patch_proposed": {
+      const note = evt.data.proposed_action?.version_note ? ` — ${shapeForLog(evt.data.proposed_action.version_note)}` : "";
+      return { capability: "data-analysis", summary: `Drafting a proposed correction to the data${note}`, color: T.brass };
+    }
     case "patch_resolved":
-      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? `Accepted: ${shapeForLog(evt.data.result?.content?.confirmation_note) || "recorded"}` : `${evt.data.resolution === "reject" ? "Rejected" : "Edited"} by user`, color: evt.data.resolution === "accept" ? T.moss : T.muted };
+      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? "Saving new found data" : evt.data.resolution === "reject" ? "Discarding the proposed correction" : "Saving an edited correction", color: evt.data.resolution === "accept" ? T.moss : T.muted };
     // FEATURE: S-ARCH-DISPLAY-LOOP-01 — the two connected hand-off entries proving the real
     // request_help -> Michelle -> delegate_to_agent(is_final:true) round trip: Marcus asking for
     // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
     // to the chosen Display agent.
     case "agent_selection":
-      return { capability: "channel-intelligence", summary: shapeForLog(evt.data.reasoning), color: T.moss };
+      return { capability: "channel-intelligence", summary: `Deciding who should handle this next — ${shapeForLog(evt.data.reasoning)}`, color: T.moss };
     case "display_format":
-      // FEATURE: MI-15 — confidence_tier routed through describeDataType() instead of the raw enum string
-      return { capability: "channel-intelligence", summary: `Formatted for on-screen display · confidence_tier: ${describeDataType(evt.data.confidence_tier).label}`, color: T.moss };
+      return { capability: "channel-intelligence", summary: "Formatting data for display", color: T.moss };
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
-      return { capability: "hypothesis-evaluation", summary: `Generated ${evt.data.candidates?.length ?? 0} hypothesis candidate${evt.data.candidates?.length === 1 ? "" : "s"}`, color: T.moss };
+      return { capability: "hypothesis-evaluation", summary: "Reviewing found data, putting together a theory", color: T.moss };
     // FEATURE: MI-29 -- surfaces the real caught error (e.message) in the existing Pipeline Log
     // instead of it only ever reaching a devtools-only console.error. Reuses T.flag, the same
     // alert color already used for guardrail "block" results above -- no new color introduced.
     case "error":
-      return { capability: evt.data.step || null, summary: `Failed: ${evt.data.message}`, color: T.flag };
+      return { capability: evt.data.step || null, summary: `Ran into a problem partway through — ${evt.data.message}`, color: T.flag };
     // FEATURE: MI-47 -- permanent drawer rows for every live handoff shown in the chat status line
     // (onDelegationProgress), alongside the pre-existing coarse checkpoint events above.
     case "delegation":
@@ -1475,7 +1494,12 @@ function rollupBaseline(stats) {
 // Rule: "every visible row names exactly one agent"). primary.name swapped to firstNameFor() so the
 // header matches the chat status line's existing first-name-only treatment (describeDelegationEvent,
 // above); primary.role stays unchanged.
-function RoutingEventRow({ evt, agentById }) {
+// FEATURE: MI-68 — sameAgentAsPrevious (John's explicit call: "just place a second line under the
+// first, so it just looks like the agent did more work") suppresses the repeated avatar/name/role
+// header on consecutive same-agent rows; only the row index still renders so rows stay distinguishable.
+// A genuine hand-off (different agentId) always gets the full header — computed once per list by
+// both call sites below, not derived inside this component (it has no view of neighboring events).
+function RoutingEventRow({ evt, agentById, sameAgentAsPrevious = false }) {
   const { capability, summary, color } = describePipelineEvent(evt);
   const svc = SERVICE_LABEL[capability];
   // FEATURE: MI-67 — real patterns_used only; the static-string fallback this replaced could
@@ -1489,12 +1513,16 @@ function RoutingEventRow({ evt, agentById }) {
   const primary = agentById(evt.agentId);
   return (
     <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
+      {sameAgentAsPrevious ? (
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
-        {primary && <AgentAvatar who={primary.id} size={20}/>}
-        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(evt.agentId, agentById) : evt.agentId}</span>
-        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
-      </div>
+      ) : (
+        <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
+          <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
+          {primary && <AgentAvatar who={primary.id} size={20}/>}
+          <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(evt.agentId, agentById) : evt.agentId}</span>
+          <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
+        </div>
+      )}
       {(svc || patternLabel) && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc?.name}{svc?.name && patternLabel ? ' · ' : ''}{patternLabel}</div>}
       <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
     </div>
@@ -1714,7 +1742,7 @@ function AuditColumn({ events, agentActivity }) {
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
           </div>
-        ) : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
+        ) : ordered.map((evt, i) => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById} sameAgentAsPrevious={i > 0 && ordered[i - 1].agentId === evt.agentId}/>)}
       </Drawer>
       <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
     </div>
@@ -2014,7 +2042,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
           {ordered.length === 0
             ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
-            : ordered.map(evt => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById}/>)}
+            : ordered.map((evt, i) => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById} sameAgentAsPrevious={i > 0 && ordered[i - 1].agentId === evt.agentId}/>)}
         </div>
         {routingCanScrollMore && (
           <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
