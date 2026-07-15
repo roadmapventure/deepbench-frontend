@@ -672,8 +672,6 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || "Save failed", "⚠"); setAddState("ready"); return; }
-        // FEATURE: AI-18 — fix type key (was "knowledge-reinforcement", must be "reinforcement"); susan owns this capability
-        logAICall({ type: "reinforcement", model: "text-embedding-3-small", location: "Training tab — Add Courses ingest", agentId: "susan" });
         const newEntry = {
           id:            Date.now(),
           title:         addForm.title,
