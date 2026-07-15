@@ -4,6 +4,7 @@
 import { queryRAG } from "../../lib/rag.js";
 import { queryContent } from "../../lib/search-harness.js";
 import { getRosterCandidates } from "../../lib/project-manager.js";
+import { logActivity } from '../../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -94,10 +95,6 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
     throw new Error("Prompt Request body required");
   }
 
-  // FEATURE: BUG-12 — server-side ai_activity_log writes for enrichment LLM calls
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
   const { sections = [], task_context = "", tenant_id = "global", format_contract, synthesis, llm, agent_id: pr_agent_id, capability_slug: pr_capability_slug, intent_technical_services = [] } = promptRequest;
   // FEATURE: AA-57 — task_context may be an object {goal, deliverable_type}; extract string for RAG + Reflect
   const taskContextStr = typeof task_context === 'object' && task_context !== null
@@ -164,6 +161,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   let reflectRan = false;
   let reflectTokensUsed = 0;
   let reflectModel = null;
+  let reflectUsage = null;
 
   if (reflectSection) {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -196,6 +194,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
         if (reflectRes.ok) {
           const reflectData = await reflectRes.json();
           const executionPlan = reflectData.content?.[0]?.text || "";
+          reflectUsage = reflectData.usage || null;
           reflectTokensUsed = (reflectData.usage?.input_tokens || 0) + (reflectData.usage?.output_tokens || 0);
           reflectModel = fi.model || "claude-haiku-4-5-20251001";
 
@@ -227,6 +226,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   let synthesisRan = false;
   let synthesisTokensUsed = 0;
   let synthesisModel = null;
+  let synthesisUsage = null;
   const tokenEstimatePreSynthesis = Math.round(assembledPrompt.length / 4);
 
   if (synthesis?.enabled) {
@@ -257,6 +257,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
         if (synthRes.ok) {
           const synthData = await synthRes.json();
           const rewritten = synthData.content?.[0]?.text || "";
+          synthesisUsage = synthData.usage || null;
           synthesisTokensUsed = (synthData.usage?.input_tokens || 0) + (synthData.usage?.output_tokens || 0);
           synthesisModel = synthesis.model || "claude-haiku-4-5-20251001";
           if (rewritten) {
@@ -270,49 +271,29 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
     }
   }
 
-  // FEATURE: BUG-12 — log REFLECT and Synthesis to ai_activity_log (fire-and-forget)
-  if (supabaseUrl && supabaseKey) {
-    const sbHeaders = {
-      "Content-Type": "application/json",
-      "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
-      "Prefer": "return=minimal",
-    };
-    const nowIso = new Date().toISOString();
-    if (reflectRan && reflectTokensUsed > 0) {
-      fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-        method: "POST",
-        headers: sbHeaders,
-        body: JSON.stringify({
-          tenant_id: 'global',   // FEATURE: BUG-12p — was missing; hydrateFromSupabase filters by tenant_id='global'
-          agent_id: 'dan',
-          ai_type: 'reflect',
-          model: reflectModel,
-          input_tokens: reflectTokensUsed,
-          output_tokens: 0,
-          feature: 'ai-enrichment',      // FEATURE: BUG-18 — was 'location' (column does not exist); correct column is 'feature'
-          patterns_used: ['reflection'],
-          created_at: nowIso,
-        }),
-      }).catch(e => console.warn('[ai-enrichment] reflect log failed:', e.message));
-    }
-    if (synthesisRan && synthesisTokensUsed > 0) {
-      fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-        method: "POST",
-        headers: sbHeaders,
-        body: JSON.stringify({
-          tenant_id: 'global',   // FEATURE: BUG-12p — was missing; hydrateFromSupabase filters by tenant_id='global'
-          agent_id: 'dan',
-          ai_type: 'synthesis',
-          model: synthesisModel,
-          input_tokens: synthesisTokensUsed,
-          output_tokens: 0,
-          feature: 'ai-enrichment',      // FEATURE: BUG-18 — was 'location' (column does not exist); correct column is 'feature'
-          patterns_used: ['prompt-chaining'],
-          created_at: nowIso,
-        }),
-      }).catch(e => console.warn('[ai-enrichment] synthesis log failed:', e.message));
-    }
+  // FEATURE: AA-190c -- migrated onto the shared logActivity() service (AA-190 site 1);
+  // fixed the stale 'reflection' slug (AI-50c renamed the catalog to 'reflect' 2026-07-14,
+  // this write site was never updated -- 18 real calls were invisible), the wrong
+  // 'prompt-chaining' tag on synthesis (correct slug is 'intelligent-synthesis', confirmed
+  // AA-190 site 2), and the summed-into-input_tokens/output_tokens:0 mispricing bug (real
+  // split usage was already being computed and then discarded -- now passed through).
+  if (reflectRan && reflectTokensUsed > 0) {
+    logActivity({
+      agentId: 'dan', aiType: 'reflect', feature: 'ai-enrichment',
+      model: reflectModel,
+      inputTokens: reflectUsage?.input_tokens ?? null,
+      outputTokens: reflectUsage?.output_tokens ?? null,
+      patternsUsed: ['reflect'],
+    });
+  }
+  if (synthesisRan && synthesisTokensUsed > 0) {
+    logActivity({
+      agentId: 'dan', aiType: 'synthesis', feature: 'ai-enrichment',
+      model: synthesisModel,
+      inputTokens: synthesisUsage?.input_tokens ?? null,
+      outputTokens: synthesisUsage?.output_tokens ?? null,
+      patternsUsed: ['intelligent-synthesis'],
+    });
   }
 
   return {
