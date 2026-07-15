@@ -7,6 +7,8 @@
 //   POST                                          — save what the agent learned after a run
 
 import { assembleContext } from "../lib/agent-run.js";
+import { embedContent } from "../lib/vector-search.js";
+import { logActivity } from "../lib/activity-log.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -188,25 +190,13 @@ Structure your response as valid JSON only:
           : null,
       ].filter(Boolean).join("\n");
 
-      // Generate embedding (same pattern as ingest.js)
-      const embedRes = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: `${learning.title}\n\n${content}`,
-        }),
-      });
+      const embedStartTime = Date.now();
 
-      if (!embedRes.ok) {
+      // Generate embedding — reuses the shared primitive (AA-190/AA-193)
+      const { embedding, usage } = await embedContent(`${learning.title}\n\n${content}`, openaiKey);
+      if (!embedding) {
         return res.status(500).json({ error: "Embedding failed" });
       }
-
-      const embedData = await embedRes.json();
-      const embedding = embedData.data?.[0]?.embedding;
 
       // Save to knowledge_entries — same structure as ingest.js
       const payload = {
@@ -245,6 +235,15 @@ Structure your response as valid JSON only:
       }
 
       const saved = await upsertRes.json();
+
+      logActivity({
+        tenantId: 'global', agentId: 'brent',
+        aiType: 'reinforcement', feature: 'web-memory',
+        model: 'text-embedding-3-small',
+        inputTokens: usage?.total_tokens ?? null,
+        latencyMs: Date.now() - embedStartTime,
+        patternsUsed: ['embeddings'],
+      });
 
       return res.status(200).json({
         success: true,
