@@ -9,7 +9,7 @@ A tripwire, not an audit. The 2026-07-01 cleanup fixed the root causes of doc bl
 
 ## What to check
 
-Run these against `C:\Projects\deepbench-frontend`. Use size/grep tools, not the Read tool, for steps 1–3 — the whole point is these checks cost near-nothing.
+Run these against your session's own worktree path (`C:\Projects\deepbench-frontend\.claude\worktrees\<your-session-name>\`), never the shared checkout at `C:\Projects\deepbench-frontend` directly — per `CLAUDE.md`'s router, that worktree should already exist and be freshly branched from `origin/dev` before this skill ever runs, so it's the correct, current copy. Use size/grep tools, not the Read tool, for steps 1–3 — the whole point is these checks cost near-nothing.
 
 **1. `CLAUDE-STATE.md` size.**
 Flag if it exceeds ~10 KB (the post-cleanup baseline is ~4.6 KB). Growth past that usually means the rolling-window close-out step isn't happening — check whether `CLAUDE-DESIGN.md` Step 5c / `DeepBench-Session-Init.md` Step 10c actually ran at the end of the last few sessions.
