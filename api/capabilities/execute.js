@@ -43,6 +43,7 @@ import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow } from '../_lib/handlers/durable-loop.js';
+import { logActivity } from '../../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -92,28 +93,20 @@ function getSupabaseHeaders(key) {
 // ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
 // never touched." Generic to every capability's own turns, not capability-specific.
 export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [] }) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) return;
-  fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-    method: 'POST',
-    headers: getSupabaseHeaders(supabaseKey),
-    body: JSON.stringify({
-      tenant_id: tenant_id || 'global',
-      agent_id: agent_id || null,
-      ai_type: 'agent-turn',
-      feature: `${capability_slug || 'unknown'}:${intent_slug || 'none'}:depth${depth}${api_retry_count ? `:apiRetry${api_retry_count}` : ''}`,
-      model: model || null,
-      latency_ms,
-      input_tokens: input_tokens ?? null,
-      output_tokens: output_tokens ?? null,
-      patterns_used: Array.from(new Set([
-        ...(is_delegate_call ? ['agent-delegation'] : []),
-        ...intent_technical_services,
-      ])),
-      created_at: new Date().toISOString(),
-    }),
-  }).catch(() => {});
+  logActivity({
+    tenantId: tenant_id || 'global',
+    agentId: agent_id || null,
+    aiType: 'agent-turn',
+    feature: `${capability_slug || 'unknown'}:${intent_slug || 'none'}:depth${depth}${api_retry_count ? `:apiRetry${api_retry_count}` : ''}`,
+    model: model || null,
+    latencyMs: latency_ms,
+    inputTokens: input_tokens ?? null,
+    outputTokens: output_tokens ?? null,
+    patternsUsed: Array.from(new Set([
+      ...(is_delegate_call ? ['agent-delegation'] : []),
+      ...intent_technical_services,
+    ])),
+  });
 }
 
 // FEATURE: AA-87 -- live resolver, replaces the removed executing_agent_id/critique_agent
