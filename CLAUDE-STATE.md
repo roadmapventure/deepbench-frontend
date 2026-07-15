@@ -6,6 +6,7 @@
 **Queue re-sequenced 2026-07-07 (John's explicit call):** goal is "MI page agent loop + harness solid and fast, with charts" — pulls every backlog item that touches the MI loop's reliability/latency or its display ahead of the Structural Enforcement Track, which touches neither (confirmed: none of SE-01/02/04/05/06 read/write anything in the MI loop or screen). Full breakdown lives in the `Session Queue` below (`MI Loop — Solid & Fast` / `MI Page — Charts & Display` tracks) — this note is a pointer, not a second copy.
 
 **In flight now:**
+- `S-AA-190-design` (worktree `ai-audit-full-review-0715`) — building shared server-side `lib/activity-log.js` (`AA-190`), Librarian as first consumer, coding session about to spawn. 8 more write sites queued behind it, see `docs/FEATURES.md`'s `AA-190` row.
 - (`task_773e8b06` — fixing `delegate_to_agent`'s missing target-capability restriction, the safety gap `S-MI-53` found and reverted, below — is running in a separate, independently-started background session, not tracked here per this file's scope.)
 - All of the MI Evidence/Audit UX Track's original items now closed (`MI-62`/`MI-63`/`MI-64`/`MI-65`/`MI-66`/`MI-67`/`MI-67b`/`MI-68`, see "Version in dev" above). Worktree `design-mi-theory-audit-0714` (from an earlier session) is done — `MI-67`/`MI-67b` both shipped and live-QA'd, no further work claimed there. Worktree `design-mi65-ia-0714` is done — `MI-65` shipped and live-QA'd. Worktree `design-mi66-keydata-0714` is done — `MI-66` shipped and live-QA'd, no further work claimed there.
 
