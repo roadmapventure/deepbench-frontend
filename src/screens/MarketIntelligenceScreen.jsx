@@ -5,6 +5,11 @@
 // near the top of both its empty and populated states.
 // FEATURE: MI-64
 //
+// DeepBench v6.2.37 | MarketIntelligenceScreen.jsx | MI-67 — Agent Routing log now shows real
+// per-call patterns_used (callCapability() no longer discards it on unwrap) instead of a static
+// fabricated fallback string; SERVICE_LABEL's decorative `.patterns` sub-field removed.
+// FEATURE: MI-67
+//
 // DeepBench v6.2.35 | MarketIntelligenceScreen.jsx | MI-61 — Evidence column's empty-state
 // sentence (MI-59's getEvidencePanelSentence(), !hypFlow branch) tightened per John's direct
 // copy request: "Once your chat has analysis data for you to interact with, it will appear
@@ -223,13 +228,15 @@ function buildFailureText(guardrail, triage) {
 
 // FEATURE: MI-04 — capability display metadata, sourced from the same SERVICE_CATALOG entries
 // already live in useAIActivity.js (not duplicated data — just the slugs this screen calls)
+// FEATURE: MI-67 — dropped the decorative/fabricated `.patterns` sub-field; `.name` (capability
+// display label) is real and unaffected.
 const SERVICE_LABEL = {
-  "channel-intelligence": { name: "Channel Intelligence", patterns: "Structured Output, RAG, Case-Based Reasoning" },
-  "quality-gate": { name: "Quality Gate", patterns: "Structured Output, Guardrails / Output Filtering, LLM-as-Judge / Verifier, Agent Delegation" },
-  "hypothesis-evaluation": { name: "Hypothesis Evaluation", patterns: "Structured Output, RAG, Case-Based Reasoning" },
-  "memory-consolidation": { name: "Memory Consolidation", patterns: "Structured Output, Memory Consolidation, Transfer Learning" },
-  "data-analysis": { name: "Data Analysis", patterns: "Structured Output, Agent Delegation" },
-  "pipeline-triage": { name: "Pipeline Triage", patterns: "Structured Output, Agent Delegation" },
+  "channel-intelligence": { name: "Channel Intelligence" },
+  "quality-gate": { name: "Quality Gate" },
+  "hypothesis-evaluation": { name: "Hypothesis Evaluation" },
+  "memory-consolidation": { name: "Memory Consolidation" },
+  "data-analysis": { name: "Data Analysis" },
+  "pipeline-triage": { name: "Pipeline Triage" },
 };
 
 // FEATURE: AI-50c — slug -> human label, built from the same PATTERN_CATALOG useAIActivity.js owns
@@ -590,7 +597,10 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
   const result = await resolveInProgress(first, onProgress);
   if (result.status) return result;
-  return result.content || {};
+  // FEATURE: MI-67 — patterns_used was a real, already-computed sibling field on `result` that
+  // this unwrap discarded; every event built from this return needs it for an accurate Agent
+  // Routing log.
+  return { ...(result.content || {}), patterns_used: result.patterns_used || [] };
 }
 
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
@@ -1336,13 +1346,14 @@ function rollupBaseline(stats) {
 function RoutingEventRow({ evt, agentById }) {
   const { capability, summary, color } = describePipelineEvent(evt);
   const svc = SERVICE_LABEL[capability];
-  // FEATURE: AI-50c — prefer real evt.data.patterns_used over the static SERVICE_LABEL string;
-  // fall back to the static string only when no real value is present (event types with no
-  // capability response at all — delegation/delegation_return placeholders, error).
+  // FEATURE: MI-67 — real patterns_used only; the static-string fallback this replaced could
+  // show patterns (Case-Based Reasoning, LLM-as-Judge, RAG on non-RAG intents) that never
+  // actually ran. An event with no real patterns_used now shows no pattern line at all, rather
+  // than a fabricated one.
   const realPatterns = Array.isArray(evt.data?.patterns_used) ? evt.data.patterns_used : null;
   const patternLabel = realPatterns && realPatterns.length > 0
     ? realPatterns.map(slug => PATTERN_NAME[slug] || slug).join(', ')
-    : svc?.patterns;
+    : null;
   const primary = agentById(evt.agentId);
   return (
     <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
