@@ -4,6 +4,7 @@
 import { handle as storeHandle } from '../_lib/handlers/store.js';
 import { handle as libraryWriteHandle } from '../_lib/handlers/library-write.js';
 import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write.js';
+import { logActivity } from '../../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
@@ -389,24 +390,20 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
         }
         guardrailsRan = true;
 
-        // FEATURE: AA-44 — guardrails logged as separate ai_activity_log row
-        const gTokens = (gData.usage?.input_tokens || 0) + (gData.usage?.output_tokens || 0);
+        // FEATURE: AA-190e -- migrated onto logActivity(); fixed missing output_tokens (gTokens
+        // previously summed input+output into a single value written only to input_tokens, with
+        // no output_tokens field in the payload at all -- the real split was already sitting in
+        // gData.usage and discarded).
         const guardrailsLatency = Date.now() - guardrailsStart;
-        await fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-          method: 'POST',
-          headers: supabaseHeaders,
-          body: JSON.stringify({
-            tenant_id: tenant_id || 'global',
-            ai_type: 'guardrails-check',
-            feature: 'request-receivable',
-            model: guardrailsModel,
-            agent_id: agent_id || null,
-            task_id: task_id || null,
-            input_tokens: gTokens || null,
-            latency_ms: guardrailsLatency,
-            patterns_used: ['guardrails', 'prompt-chaining'],
-          }),
-        }).catch(e => console.warn('[request-receivable] guardrails log failed:', e.message));
+        logActivity({
+          tenantId: tenant_id || 'global',
+          aiType: 'guardrails-check', feature: 'request-receivable',
+          model: guardrailsModel, agentId: agent_id || null, taskId: task_id || null,
+          inputTokens: gData.usage?.input_tokens ?? null,
+          outputTokens: gData.usage?.output_tokens ?? null,
+          latencyMs: guardrailsLatency,
+          patternsUsed: ['guardrails', 'prompt-chaining'],
+        });
       }
     } catch (err) {
       console.warn('[request-receivable] guardrails check failed:', err.message);
@@ -443,22 +440,16 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   // for either) instead of the hardcoded 'request-receivable' literal, which previously collapsed
   // every capability's calls into one undifferentiated AI Audit bucket. Fallback preserved for the
   // unreachable case where capability_slug is somehow absent.
-  await fetch(`${supabaseUrl}/rest/v1/ai_activity_log`, {
-    method: 'POST',
-    headers: supabaseHeaders,
-    body: JSON.stringify({
-      tenant_id: tenant_id || 'global',
-      ai_type: capability_slug || 'request-receivable',
-      feature: 'request-receivable',
-      model,
-      agent_id: agent_id || null,
-      task_id: task_id || null,
-      input_tokens: usage.input_tokens ?? null,
-      output_tokens: usage.output_tokens ?? null,
-      latency_ms,
-      patterns_used: patternsUsed.length > 0 ? patternsUsed : null,
-    }),
-  }).catch(e => console.warn('[request-receivable] activity log failed:', e.message));
+  logActivity({
+    tenantId: tenant_id || 'global',
+    aiType: capability_slug || 'request-receivable',
+    feature: 'request-receivable',
+    model, agentId: agent_id || null, taskId: task_id || null,
+    inputTokens: usage.input_tokens ?? null,
+    outputTokens: usage.output_tokens ?? null,
+    latencyMs: latency_ms,
+    patternsUsed,
+  });
 
   // ── STEP 5: Return response ──────────────────────────────────────────────────
   // FEATURE: SK-20 — content returned in response for frontend plan rendering
