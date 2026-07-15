@@ -1,3 +1,11 @@
+// DeepBench v6.2.44 | MarketIntelligenceScreen.jsx | AA-189 — onResolveConfirmation() had no catch
+// at all, so any resolve failure (this session's source_chunk_ids UUID crash, or any future reason)
+// was silently swallowed — ConfirmationCard just sat there with zero feedback. Added a catch
+// symmetric to onCommit()'s existing one (chat error message + logEvent), but deliberately does
+// NOT reset hypFlow (John's explicit "leave open" call) — the drafted confirmation is still valid,
+// only the resolve action failed, so the user can retry Accept/Reject without regenerating it.
+// FEATURE: AA-189
+//
 // DeepBench v6.2.43 | MarketIntelligenceScreen.jsx | MI-66 — EvidenceColumn's result section
 // reordered: the Info Only/Store as Forecast decision control (the real HITL gate on this screen,
 // distinct from the later ConfirmationCard) now leads, with new instructional copy ("Review the
@@ -2380,6 +2388,15 @@ export default function MarketIntelligenceScreen() {
         }]);
       }
       setHypFlow(null);
+    } catch (e) {
+      // FEATURE: AA-189 — this catch was previously missing entirely; any resolve failure (this
+      // bug or a future one) silently stuck ConfirmationCard open with zero feedback. Symmetric to
+      // onCommit()'s existing catch, but deliberately does NOT reset hypFlow (John's explicit call,
+      // S-AA-189-design) — the drafted confirmation is still valid, only the resolve action failed,
+      // so the user can retry Accept/Reject on the same card instead of losing the draft.
+      console.error("[MarketIntelligenceScreen] onResolveConfirmation", e.message);
+      logEvent({ type: "error", agentId: "nadia", data: { step: "resolve_confirmation", resolution, message: e.message }, durationMs: Date.now() - t0 });
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong resolving that — try again.", kind: "error" }]);
     } finally {
       setWorkingStatus(null);
     }
