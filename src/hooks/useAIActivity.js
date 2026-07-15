@@ -7,6 +7,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
+import { PATTERN_CATALOG } from '../../shared/ai-patterns.js';
+export { PATTERN_CATALOG };
 
 // FEATURE: AI-51 — moved from useAgents.js (S-MI-20 origin) so this canonical shared cost/pattern
 // module can also reuse the same nearby-timestamp pairing check for cost/pattern-count dedup, not
@@ -25,7 +27,7 @@ export const SERVICE_CATALOG = [
   // FEATURE: AA-43 — ai-enrichment service catalog entry (logAICall wired in S-PM-04)
   // FEATURE: BUG-17 — Reflection is live (BUG-15 active:true); surface it in AI Audit By Service view
   // FEATURE: BUG-22 — ai-enrichment is live (16 calls); move off roadmap
-  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection'],                                roadmap: 'now'  },
+  { slug: 'ai-enrichment',           name: 'AI Enrichment',            serviceType: 'hybrid', patterns: ['RAG','Prompt Chaining','Reflection','Prompt Compression'],                                roadmap: 'now'  },
   // FEATURE: AA-44 — request-receivable SERVICE_CATALOG entry
   // FEATURE: BUG-22 — request-receivable shipped in S-PM-04b
   { slug: 'request-receivable',      name: 'Request & Receivable',     serviceType: 'ai',     patterns: ['Structured Output','Tool Use','Streaming','Prompt Chaining','Guardrails / Output Filtering'], roadmap: 'now'  },
@@ -56,12 +58,12 @@ export const SERVICE_CATALOG = [
   // ci-answer-display-intent already use it via AA-164/S-ARCH-DISPLAY-LOOP-01, the catalog just
   // never reflected it) + Streaming (this session wires opt-in SSE streaming into every capability
   // this service exposes).
-  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning', 'Agent Delegation', 'Streaming'],          roadmap: 'now'  },
+  { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning', 'Orchestrator-Workers', 'Streaming'],          roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
   // FEATURE: MI-01d — Agent Delegation added: Owen's own delegate_to_agent retry (Task 3) is this
   // service's first live delegating caller.
   // FEATURE: MI-42 — Streaming added (opt-in SSE streaming wired into every capability this service exposes).
-  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Agent Delegation', 'Streaming'], roadmap: 'now'  },
+  { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Orchestrator-Workers', 'Streaming'], roadmap: 'now'  },
   // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
   // RAG listed at capability level even though this specific call's design doc technical_services
   // don't name it — hyp-knowledge fires a RAG fetch unconditionally, same accepted behavior as
@@ -76,7 +78,7 @@ export const SERVICE_CATALOG = [
   // FEATURE: MI-01d — Agent Delegation added: Sam's intake-failure-intent gets its first live
   // caller this session (Task 2).
   // FEATURE: MI-42 — Streaming added (opt-in SSE streaming wired into every capability this service exposes).
-  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation', 'Streaming'], roadmap: 'now' },
+  { slug: 'pipeline-triage', name: 'Pipeline Triage', serviceType: 'ai', patterns: ['Structured Output', 'Orchestrator-Workers', 'Streaming'], roadmap: 'now' },
   // FEATURE: AA-86 -- Michelle's roster broker (lib/project-manager.js). Deterministic read, no
   // LLM call of its own -- mirrors db-assembly's shape, not librarian's (no RAG/embedding step).
   { slug: 'agent-directory', name: 'Agent Directory', serviceType: 'logic', patterns: [], roadmap: 'now' },
@@ -86,7 +88,7 @@ export const SERVICE_CATALOG = [
   // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage.
   // FEATURE: MI-01d — Agent Delegation added: live since S-APPLE-04b (Escalate delegates via
   // request_help/delegate_to_agent) but never retrofitted onto this catalog entry until now.
-  { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output', 'Agent Delegation'], roadmap: 'now' },
+  { slug: 'data-analysis', name: 'Data Analysis', serviceType: 'ai', patterns: ['Structured Output', 'Orchestrator-Workers'], roadmap: 'now' },
   // FEATURE: AG-33 -- data-room-custody capability (Eleanor Voss, The Librarian, LB-01). The only
   // capability whose execution performs a real the_library write, via the existing writeLibrary()
   // broker -- not a new access path, the same one S-LIBRARIAN-02 already built. patterns gained
@@ -104,7 +106,7 @@ export const SERVICE_CATALOG = [
   // AI_TYPE_TO_SERVICE entry needed: ai_type will equal capability_slug ('memory-consolidation')
   // exactly, resolved by the existing `|| e.type` fallback -- same pattern as
   // channel-intelligence/quality-gate/hypothesis-evaluation/pipeline-triage/data-analysis.
-  { slug: 'memory-consolidation', name: 'Memory Consolidation (Elena Cho)', serviceType: 'ai', patterns: ['Structured Output', 'Memory Consolidation', 'Transfer Learning'], roadmap: 'now' },
+  { slug: 'memory-consolidation', name: 'Memory Consolidation (Elena Cho)', serviceType: 'ai', patterns: ['Structured Output', 'Memory Consolidation', 'Case Retention'], roadmap: 'now' },
   // FEATURE: AA-122 -- Agent Turn (Delegation Loop Reasoning) service catalog entry. Logged by
   // AA-120's logAgentTurn() (execute.js) for every delegation-loop callModel() turn, any capability
   // -- generic and agent-agnostic, not Marcus-specific. No AI_TYPE_TO_SERVICE entry needed: ai_type
@@ -112,47 +114,7 @@ export const SERVICE_CATALOG = [
   // same pattern as pipeline-triage/agent-directory/data-analysis/screen-controls/etc. above. Carries
   // no cost_usd/input_tokens by design (the real billed cost is already attributed to the capability-
   // level row sendRequest() writes separately) -- real call count + avg latency, $0 cost, as intended.
-  { slug: 'agent-turn', name: 'Agent Turn (Delegation Loop Reasoning)', serviceType: 'ai', patterns: ['Tool Use', 'Agent Delegation'], roadmap: 'now' },
-];
-
-// FEATURE: AI-23 — AI Patterns catalog (10 industry patterns)
-// FEATURE: AI-30 — PATTERN_CATALOG expanded to 20 entries (PAT-11–20); hitlSpecial + partial flags added
-// FEATURE: AI-36 — patternType: structural | reasoning on every PATTERN_CATALOG entry
-export const PATTERN_CATALOG = [
-  { slug: 'rag',                name: 'RAG',                desc: 'Retrieval-Augmented Generation — embed query, search vector store, inject retrieved chunks into context before LLM call',             active: true,  patternType: 'structural' },
-  { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true,  patternType: 'reasoning'  },
-  { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true,  patternType: 'reasoning'  },
-  { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
-  // FEATURE: BUG-15 — reflection is live since S-PROMPT-ARCH-01; flip active: false → true
-  // FEATURE: AI-50c — slug renamed 'reflection' -> 'reflect' to match the real technical_services/
-  // patterns_used value (confirmed in ARCHITECTURE.md's REFLECT row and api/plan.js's 's.type === 'reflect'' check)
-  { slug: 'reflect',            name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
-  // FEATURE: AI-50c — new entry, real value confirmed in ARCHITECTURE.md's "Intelligent Synthesis" row
-  { slug: 'intelligent-synthesis', name: 'Intelligent Synthesis', desc: 'Haiku full-prompt rewrite pass — rewrites the complete assembled prompt against the token budget after REFLECT runs; a rewrite, not a filter', active: true, patternType: 'reasoning' },
-  { slug: 'streaming',          name: 'Streaming',          desc: 'Progressive output delivery via SSE — token deltas or discrete structured events, arriving as they happen instead of one final blob, where UX latency matters',                                    active: true,  patternType: 'structural' },
-  { slug: 'structured-output',  name: 'Structured Output',  desc: 'Constrained generation — response conforms to a declared schema; no free-text JSON parsing required',                                 active: true,  patternType: 'structural' },
-  { slug: 'embeddings',         name: 'Embeddings',         desc: 'Vector generation — text converted to dense vector for similarity search or storage in pgvector',                                     active: true,  patternType: 'structural' },
-  { slug: 'browser-automation', name: 'Browser Automation', desc: 'Playwright-controlled browser execution — agent drives a real browser instance on Railway infrastructure',                            active: true,  patternType: 'structural' },
-  { slug: 'hitl',               name: 'HITL',               desc: 'Human-in-the-Loop — agent pauses at a defined step gate and waits for human input before continuing',                                 active: false, patternType: 'reasoning',  hitlSpecial: true, roadmap: 'later', roadmapNote: 'Requires step execution (S11) to ship first, then HITL step gate (TI-18, unscheduled)' },
-  // FEATURE: MI-01d — replaces the stale agent-orchestration placeholder (written before the real
-  // mechanism existed, never activated). The live mechanism shipped as S-ARCH-LOOP-PATCH-01's
-  // request_help/delegate_to_agent tools (2026-07-02) and has been firing in production since,
-  // with zero catalog backing until this fix. Same slot in the array — not a duplicate entry.
-  { slug: 'agent-delegation', name: 'Agent Delegation', desc: 'Orchestrator-workers pattern (Anthropic, "Building Effective Agents") -- an agent delegates a subtask to another agent via request_help/delegate_to_agent and synthesizes the delegated result into its own final output. Distinct from agent routing (pre-call selection): delegation happens inside a running multi-turn loop. ARCHITECTURE.md §19d.', active: true, patternType: 'reasoning' },
-  { slug: 'few-shot-prompting',       name: 'Few-Shot Prompting',           desc: 'Providing worked examples inside the prompt to guide output format, style, and reasoning before the model generates its response. In use implicitly inside system prompts — not yet a named, tracked service call.', active: false, patternType: 'reasoning',  roadmap: 'next',  roadmapNote: 'Formal tracking when Prompt Assembly extracted as discrete service (S-INFRA-01)' },
-  // FEATURE: AA-44 — PAT-13 Guardrails active: true (runtime enforcement ships S-PM-04b)
-  { slug: 'guardrails',               name: 'Guardrails / Output Filtering', desc: 'Post-generation safety and quality enforcement — checking model output against declared rules (always/never constraints, topic boundaries, format requirements) before returning to caller. Data concept exists in Playbook tab.', active: true,  patternType: 'structural' },
-  { slug: 'memory-consolidation', name: 'Memory Consolidation', desc: 'An agent turns one human-confirmed decision into durable, structured reasoning -- the write half of closing a correction loop.', active: true, patternType: 'reasoning' },
-  { slug: 'transfer-learning', name: 'Transfer Learning', desc: 'Generalizing a specific correction into a pattern applicable to a class of future, related questions -- not just fixing the one answer.', active: true, patternType: 'reasoning' },
-  { slug: 'case-based-reasoning', name: 'Case-Based Reasoning', desc: 'Retrieving a previously consolidated case/pattern to inform a new, related question -- the read half of closing a correction loop.', active: true, patternType: 'reasoning' },
-  { slug: 'parallelization',          name: 'Parallelization',              desc: 'Multiple LLM calls executed simultaneously; results combined or compared. Test Team (TT-01/02) runs two agents on the same query in parallel and displays results side-by-side with a diff metric dashboard.', active: false, patternType: 'structural', partial: true, roadmap: 'next',  roadmapNote: 'Test Team (TT-01/02) is partial implementation; full wiring deferred to AW-17 (multi-agent step assignment)' },
-  // FEATURE: MI-12 — llm-as-judge active: true (Quality Gate ships this session)
-  { slug: 'llm-as-judge',             name: 'LLM-as-Judge / Verifier',      desc: 'A second model evaluates the quality, accuracy, or compliance of a first model\'s output. Distinct from Reflection (self-critique): the judge is a separate call, often a different model or persona.', active: true,  patternType: 'reasoning' },
-  { slug: 'multi-agent-debate',       name: 'Multi-Agent Debate',           desc: 'Two agents take opposing positions and argue against each other\'s output; a synthesis agent reads both arguments and produces a reconciled final answer. Agents are adversarially aware — each sees the other\'s response.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Extends Test Team (TT-01/02); adds critique pass + synthesis agent. TT-03 design session required.' },
-  { slug: 'chain-of-verification',    name: 'Chain-of-Verification (CoVe)', desc: 'After generating an answer, the model generates a checklist of verification questions about its own factual claims, answers each independently, then revises the original answer. Targets factual accuracy claim by claim.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'High compliance relevance for government procurement deliverables. No implementation planned yet.' },
-  { slug: 'episodic-memory',          name: 'Episodic Memory',              desc: 'Agents recall the context of prior interactions with a specific user, task, or organization — separate from factual knowledge in RAG. RAG retrieves facts; episodic memory retrieves experience.', active: false, patternType: 'reasoning',  roadmap: 'later', roadmapNote: 'Differentiates AI workforce (colleagues with history) from AI tools (stateless responders). Phase 3+.' },
-  { slug: 'hyde',                     name: 'HyDE',                         desc: 'Before retrieving from the knowledge base, generate a hypothetical ideal answer to the query, embed that hypothetical, and use the resulting vector for retrieval — significantly improves RAG quality for domain-specific terminology.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'One-model change inside SVC-02 Knowledge Retrieval — no schema changes required' },
-  { slug: 'adaptive-rag',             name: 'Adaptive RAG',                 desc: 'Dynamically adjusts retrieval depth and strategy based on query complexity. Simple queries: shallow retrieval (3 chunks). Complex analysis: deep retrieval (20+ chunks) with keyword fallback. Prevents over-retrieval cost waste.', active: false, patternType: 'structural', roadmap: 'next',  roadmapNote: 'Complexity classifier inside SVC-02 Knowledge Retrieval — no schema changes required' },
+  { slug: 'agent-turn', name: 'Agent Turn (Delegation Loop Reasoning)', serviceType: 'ai', patterns: ['Tool Use', 'Orchestrator-Workers'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-50c — real per-call pattern attribution, replacing the old SERVICE_CATALOG static
