@@ -65,7 +65,59 @@ Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-
 | `LOG` | **AI Audit / activity log** — logging, tracing, `SERVICE_CATALOG`/`PATTERN_CATALOG` naming | `AI` | Every row checked was `Observability`-typed: trace-ID grouping, `patterns_used` tracking, service-naming collisions. |
 | `MCP` | **MCP protocol exposure** — services exposed as MCP tools | Part of `SV` | The one real `SV` row about this: `deepbench/{intent}/{format}` tool path exposure. |
 | `MKT` | **Service Marketplace** — catalog, service profile pages, browse/purchase flow (Phase 4 roadmap, currently 100% unbuilt) | Part of `SV` | The other three `SV` rows: service catalog registry, profile view, marketplace listing. |
+| `DAT` | **Data model, Supabase schema/migration work, and seeding** — added 2026-07-15. Scoped to the *data* layer (`the_library`, `data_rooms`, `deliverables`, `ai_activity_log` schema) — **not** Skill Profile/Capability content (`skill_profiles.objective`/`.output_desc` edits stay Competency Model even though both are mechanically Supabase writes; the distinction is subject matter, not mechanism). | New, was scattered across `AA` (Continuity/Data types) | e.g. a stray test-debris row archived in `the_library`; a real RPC migration adding a missing column to `match_the_library`'s `RETURNS TABLE`. |
 
 `AA` had 192 rows total (by far the largest bucket) before this split — confirms `HAR`/`LOO` were doing real, distinct work under one name, not a false distinction.
 
 **Not decided here — deferred to a separate, already-in-progress session** (`S-ARCH-COMPETENCY-MODEL-design`, `docs/AGENT-COMPETENCY-MODEL.md`, DRAFT as of 2026-07-15): `AG` (Agent Identity), `SK` (Skills & Capabilities), `IN` (Intent), `FM` (Format). That session is reconciling these directly against the locked `ARCHITECTURE.md` §2 hierarchy (Technical Services → Skills → Skill Profiles → Capabilities → Competencies → Agents) with real per-agent completeness data — don't guess a replacement naming here before that lands.
+
+---
+
+## Applied: every row currently in `docs/FEATURES.md`, translated
+
+**Snapshot as of 2026-07-15, 42 rows.** Read individually, not prefix-mapped — old prefix didn't reliably predict the new bucket (several `AA` rows turned out to be Competency Model content, not harness/loop). **This will drift as `FEATURES.md` changes** — treat as a starting point for conversation, re-verify a specific row's classification before treating it as certain if it's been a while since 2026-07-15, don't blindly trust it forever.
+
+| Old ID | Type | New bucket |
+|---|---|---|
+| `MI-03` | Feature | `CHI` |
+| `MI-41` | UI | `CHI` |
+| `MI-53` | Architecture | `CHI` *(blocked on `AA-191`/`LOO`)* |
+| `MI-69` | Architecture | `CHI` |
+| `AA-153` | Continuity | `CHI` |
+| `TI-16` | Feature | `PRO` |
+| `AA-178` | Architecture | `LOO` |
+| `AA-179` | Architecture | `LOO` |
+| `AA-90` | Architecture | `LOO` |
+| `AA-99` | Architecture | `LOO` |
+| `AA-140` | Continuity | `LOO` |
+| `AA-151` | Continuity | `LOO` |
+| `AA-151b` | Continuity | `LOO` |
+| `AA-159` | Speed | `LOO` |
+| `AA-185` | Continuity | `LOO` |
+| `AA-187` | Continuity | `LOO` |
+| `AA-191` | Architecture | `LOO` |
+| `AA-175` | Observability | `HAR` |
+| `AA-170` | Speed | `HAR` |
+| `AA-121` | Speed | `HAR` |
+| `AA-146` | Continuity | `HAR` |
+| `AA-169` | Architecture | `HAR` |
+| `AA-156` | Continuity | `HAR` |
+| `AA-177` | Architecture | `LOG` |
+| `AA-190` / `AA-192` | Observability | `LOG` *(code lives in harness files, purpose is logging — boundary case, see table above)* |
+| `AI-46` | Observability | `LOG` *(its own proposed fix includes a schema migration — `DAT` overlap once built)* |
+| `AI-52` | Observability | `LOG` |
+| `AI-53` | Observability | `LOG` |
+| `AA-172` | Data | `DAT` |
+| `AA-155` | Continuity | `DAT` *(real RPC migration — moved here after the DAT scope clarification)* |
+| `AA-181` | Architecture | Competency Model (deferred) |
+| `AA-182` | Continuity | Competency Model (deferred) |
+| `AA-180` | Architecture | Competency Model (deferred) |
+| `AA-174` | Continuity | Competency Model (deferred) |
+| `AA-133` | Speed | Competency Model (deferred) |
+| `AA-167` | Continuity | Competency Model (deferred) |
+| `AA-186` | Architecture | Competency Model (deferred) |
+| `AA-161` | Continuity | Competency Model (deferred) |
+| `AI-45` | Continuity | Competency Model (deferred) |
+| `AA-173` | Continuity | **Unclassified** — a broad test/verification session spanning multiple buckets, not itself one thing |
+| `AA-168` | Continuity | **Unclassified** — two distinct bugs in one row, one Competency-Model-shaped, one `HAR`-shaped |
+| `AA-160` | Continuity | **Unclassified** — not yet root-caused, can't classify what isn't diagnosed |
