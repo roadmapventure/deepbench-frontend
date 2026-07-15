@@ -1,3 +1,12 @@
+// DeepBench v6.2.40 | MarketIntelligenceScreen.jsx | MI-67b — generateHypotheses()/
+// runHypothesisTest() were discarding/misattributing patterns_used one layer above
+// callCapability()'s own MI-67 fix. generateHypotheses() now returns { hypotheses, patterns_used }
+// instead of a bare array (caller destructures both, candidates' own shape unchanged everywhere
+// else it's used). runHypothesisTest()'s return now overrides patterns_used to the ANALYSIS step's
+// real value (hyp-hypothesis-test-intent) on every branch, not the DISPLAY step's
+// (hyp-hypothesis-test-display-intent, already correct on its own separate display_format event).
+// FEATURE: MI-67b
+//
 // DeepBench v6.2.39 | MarketIntelligenceScreen.jsx | MI-62 — Evidence panel's hypothesis-flow
 // stage copy corrected against the real skill_profiles content: the "generating" stage
 // (hyp-generation-intent) no longer claims Data Room usage (its real method is
@@ -774,7 +783,10 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
       review_reason: reviewReason || "user-initiated, no explicit claim extracted",
     },
   });
-  return gen.hypotheses || [];
+  // FEATURE: MI-67b — patterns_used was being discarded here, one layer above callCapability()'s
+  // own MI-67 fix; the caller needs both the hypotheses array (unchanged shape/contract) and the
+  // real patterns for its Agent Routing log event.
+  return { hypotheses: gen.hypotheses || [], patterns_used: gen.patterns_used || [] };
 }
 
 // FEATURE: S-ARCH-DISPLAY-LOOP-02 (AA-116) — real Display-agent hand-off for AI - Hypothesis
@@ -818,11 +830,16 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // fallback above: display can be a genuine object whose real content is a string (Riley's
   // html-display-format shape) rather than the pure-decline string-only case AA-137 already
   // handled.
+  // FEATURE: MI-67b — this function's return value (`st`) becomes the "hypothesis_test" event's
+  // data — it must carry the ANALYSIS step's real patterns (this function's own hyp-hypothesis-
+  // test-intent call), not the DISPLAY step's (hyp-hypothesis-test-display-intent, already
+  // correctly attributed to the separate display_format event two lines above). Every branch below
+  // explicitly sets patterns_used from `analysis`, overriding whatever `display` itself carries.
   return typeof display === "string"
-    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null }
+    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [] }
     : typeof display.content === "string"
-    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection }
-    : display; // final_delegation shape: {...intelligence-review-format's fields, display_agent_card, display_agent_id, selection}
+    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [] }
+    : { ...display, patterns_used: analysis.patterns_used || [] }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
 }
 
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
@@ -2025,8 +2042,8 @@ export default function MarketIntelligenceScreen() {
       setStatus("Priya is generating hypotheses…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const candidates = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
-      logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates }, durationMs: Date.now() - t0 });
+      const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
+      logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates, patterns_used }, durationMs: Date.now() - t0 });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
