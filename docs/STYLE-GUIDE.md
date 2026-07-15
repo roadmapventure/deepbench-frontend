@@ -670,10 +670,19 @@ First (and, as of this session, only) application: `AuditColumn`'s Agent Routing
 
 ---
 
+## Section 30 — Stage-Status Copy Accuracy (Locked 2026-07-14 · S-MI-62-design)
+
+Any stage-transition or working-status copy that names a specific mechanism or data source (e.g. "…from the Data Room") must be verified against the underlying Skill Profile's real `method` text before being written — never inferred from stage order, proximity, or what "sounds right" for that point in the flow. A claim that isn't backed by the real method text is a trust bug on the same footing as a fabricated AI-pattern tag (`MI-67`).
+
+First application: `EvidenceColumn`'s hypothesis generating/testing stage sentences (`MI-62`) — the "generating" stage (`hyp-generation-intent`) doesn't mandate a Data Room query (plausibility-grounded only) and lost its Data Room claim; the "testing" stage (`hyp-hypothesis-test-intent`) does query the Data Room fresh and gained the claim it was previously missing.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-14 | S-MI-62-design | Section 30 added — Stage-Status Copy Accuracy locked: any stage/status copy naming a specific mechanism or data source must be verified against the real Skill Profile `method` text first. First application: `EvidenceColumn`'s generating/testing stage sentences swapped which one claims Data Room usage, to match `hyp-generation-intent`/`hyp-hypothesis-test-intent`'s actual methods. Kickoff: `docs/kickoffs/v6.2.39-MI-62-evidence-stage-copy-accuracy.md`. |
 | 2026-07-14 | S-MI-56-design | Section 21 amended — permanent Question box/Send/Clear strip (`S-MI-51-design`) was rendering as two stacked rows on mobile, Clear left orphaned alone on a near-empty second row; John's live screenshot report. Merged to one row: input — Send — thin divider — Clear, divider doubling as accidental-tap mitigation for the no-confirm-dialog Clear action. Layout only, no behavior change. Kickoff: `docs/kickoffs/v6.2.25-MI-56-mobile-chat-input-clear-row-merge.md`. |
 | 2026-07-14 | S-MI-51-design | Section 21 rewritten — Chat/Evidence permanent tab bar replaces the full-screen-overlay composition (`S-MI-45-design`, superseded): Evidence disabled until active + symmetric flash, permanent status/input/Clear strip (fixes the chat-overlay dead-air bug), Agent Routing unchanged at the bottom. Section 28 added — Guided Agent-Attributed Action (first name + real role at any agent-invocation CTA, not on status ticks or routing-drawer rows). Also corrects `MI-50`'s tracking: its code and this section's prior scroll-hint amendment were already live/locked, but `FEATURES.md` still read "Kickoff written" and no kickoff file was ever actually committed — see `FEATURES.md`'s `MI-50` row and `CLAUDE-STATE.md` for the correction. Kickoff: `docs/kickoffs/v6.2.18-MI-51-guided-review-theory-flow.md`. |
 | 2026-07-14 | S-MI-50-design | Section 21 amended — pinned Agent Routing feed (mobile MI) gets a visible scroll affordance: bottom-edge fade gradient + bouncing chevron, shown only when there's real unscrolled content below, reuses the existing `dbounce` keyframe. Scoped to this one panel. Kickoff: `docs/kickoffs/v6.2.15-MI-50-routing-feed-scroll-affordance.md`. |
