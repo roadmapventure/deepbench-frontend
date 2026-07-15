@@ -1,8 +1,10 @@
-# DeepBench — Screen Inventory
+# DeepBench — Screen & Platform-Layer Inventory
 
-> Draft, confirmed with John 2026-07-15 in a design conversation (not a coding session — no code changed to produce this doc). Source of truth for "what screens exist and what do we call them" going forward. Built directly from `src/main.jsx` (routes) and `src/AppShell.jsx` (nav), not from the existing `FEATURES.md`/`FEATURES-ARCHIVE.md` area-prefix legend — that legend mixes real screens with backend/platform layers (see "Not screens" at the bottom) and has known naming mismatches this doc exists to resolve.
-
-> **This does not replace the area-prefix legend yet.** That's a separate, not-yet-made decision (feature-ID format redesign — this inventory is the taxonomy it would build on, if John goes that direction). Until then, `FEATURES.md`'s existing `[AREA]-[NUMBER]` IDs are still what's actually used.
+> Confirmed with John 2026-07-15 across two design conversations (not coding sessions — no code changed to produce this doc). Source of truth for the new feature-ID taxonomy: **Screens** (this file's first half, Product Area → Screen → Child Screen, built from `src/main.jsx`/`src/AppShell.jsx`) plus **Platform Layers** (the second half — backend/architectural concerns that cut across every screen, not tied to any one of them).
+>
+> **This is now the active ID format, not a draft.** New feature/bug IDs use `[SCREEN-CODE]-[NUMBER]` or `[PLATFORM-LAYER-CODE]-[NUMBER]` from here on. **Applies prospectively only** — the ~250 existing `[AREA]-[NUMBER]` IDs (`MI-71`, `AA-191`, etc.) are not renamed; they keep meaning what they've always meant. `docs/FEATURES.md`'s "Feature ID Format" section points here for anything logged from now on.
+>
+> **Type stays a separate column, deliberately not baked into the ID.** Screen/layer is a stable fact; Type is a judgment call that can shift mid-investigation — baking it into a permanent ID creates exactly the rename-and-broken-cross-reference risk this whole redesign exists to avoid (see the `dev_version_counter` fix for the same lesson applied to version numbers).
 
 ---
 
@@ -50,6 +52,20 @@ More dashboards expected here over time as new work-types are built — this lis
 - **`Fetch`** (`/work/:taskId/fetch`, `FetchScreen.jsx`) — placed under Spend Analysis above on route-pattern inference (matches Task Instructions'/Spend Analysis's own `/work/:taskId/...` shape), but John flagged this as a probable NIGP leftover not fully incorporated — not a confirmed placement.
 - **Home Screen** itself and **Channel Intelligence's move off `/`** both need their own scoping/design sessions — tracked at `LA-01`, `docs/FEATURES-LATER.md`.
 
-## Not screens — current area prefixes that don't map to anything in this inventory
+---
 
-`AI` (AI Infrastructure), `AG` (Agent Identity), `SK` (Skills & Capabilities), `SV`/`FM`/`IN` (Service/Format/Intent), `AA` (Agent Architecture) are backend/platform layers that cut across every screen above, not a place on this map. If a future ID scheme goes "by screen," these need their own non-screen bucket — forcing them into a screen they don't belong to would misrepresent them the same way the old `DB`=Dashboard / actual-name-Project-Management mismatch did.
+## Platform Layers — not screens, cut across all of them
+
+Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`/`FEATURES-ARCHIVE.md` (checked before naming anything, not guessed from the old legend's one-line descriptions).
+
+| Code | Layer | Was | Real content (spot-checked) |
+|---|---|---|---|
+| `HAR` | **Harness** — the shared generic execution pipeline itself (`execute.js`, `db-assembly.js`, `ai-enrichment.js`, `request-receivable.js`) | Part of `AA` | e.g. `AA-190`: consolidating scattered `ai_activity_log` write sites into one shared service. |
+| `LOO` | **Loop** — the agent-to-agent delegation mechanism specifically (`request_help`/`delegate_to_agent`, `durable_hops` checkpoint/resume) | Part of `AA` | e.g. `AA-191` (write-bypass gap), `AA-185`/`AA-187` (duplicate/orphaned delegation events). |
+| `LOG` | **AI Audit / activity log** — logging, tracing, `SERVICE_CATALOG`/`PATTERN_CATALOG` naming | `AI` | Every row checked was `Observability`-typed: trace-ID grouping, `patterns_used` tracking, service-naming collisions. |
+| `MCP` | **MCP protocol exposure** — services exposed as MCP tools | Part of `SV` | The one real `SV` row about this: `deepbench/{intent}/{format}` tool path exposure. |
+| `MKT` | **Service Marketplace** — catalog, service profile pages, browse/purchase flow (Phase 4 roadmap, currently 100% unbuilt) | Part of `SV` | The other three `SV` rows: service catalog registry, profile view, marketplace listing. |
+
+`AA` had 192 rows total (by far the largest bucket) before this split — confirms `HAR`/`LOO` were doing real, distinct work under one name, not a false distinction.
+
+**Not decided here — deferred to a separate, already-in-progress session** (`S-ARCH-COMPETENCY-MODEL-design`, `docs/AGENT-COMPETENCY-MODEL.md`, DRAFT as of 2026-07-15): `AG` (Agent Identity), `SK` (Skills & Capabilities), `IN` (Intent), `FM` (Format). That session is reconciling these directly against the locked `ARCHITECTURE.md` §2 hierarchy (Technical Services → Skills → Skill Profiles → Capabilities → Competencies → Agents) with real per-agent completeness data — don't guess a replacement naming here before that lands.
