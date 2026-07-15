@@ -1,3 +1,11 @@
+// DeepBench v6.2.39 | MarketIntelligenceScreen.jsx | MI-62 — Evidence panel's hypothesis-flow
+// stage copy corrected against the real skill_profiles content: the "generating" stage
+// (hyp-generation-intent) no longer claims Data Room usage (its real method is
+// plausibility-grounded, not a mandated fresh query); the "testing" stage
+// (hyp-hypothesis-test-intent) now names the Data Room (its real method does query it fresh).
+// Copy-only reword, two literal sentences, no JSX structure/styling/stage-transition change.
+// FEATURE: MI-62
+//
 // DeepBench v6.2.38 | MarketIntelligenceScreen.jsx | MI-64 — Desktop InteractColumn's message
 // list now auto-scrolls to bottom on new message/workingStatus change (reusing FetchContext.jsx's
 // existing scroll-to-bottom-with-user-override pattern, replicated locally, not imported) and
@@ -1108,8 +1116,9 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
             switchable control. */}
 
         {hypFlow.stage === "generating" && (
+          /* FEATURE: MI-62 */
           <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
-            Priya is generating theories from the Data Room. Live progress is shown below.
+            Priya is generating candidate theories. Live progress is shown below.
           </div>
         )}
 
@@ -1163,8 +1172,9 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
         )}
 
         {hypFlow.stage === "testing" && (
+          /* FEATURE: MI-62 */
           <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
-            Priya is testing this theory against the evidence. Live progress is shown below.
+            Priya is testing this theory against a fresh Data Room query. Live progress is shown below.
           </div>
         )}
 
