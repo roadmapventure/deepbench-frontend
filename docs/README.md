@@ -12,6 +12,7 @@ This `/docs` folder contains the permanent reference documentation for the DeepB
 | `docs/ARCHITECTURE.md` | Full technical architecture: routing, database schema, external services, AI architecture, locked decisions. | Claude Code (referenced in kickoff docs) |
 | `docs/STANDARDS.md` | Complete coding and testing standards: session scope rules, kickoff doc structure, Node.js test categories, verification checklist, browser checklist, manual QA rules. | Claude Code (referenced in kickoff docs) |
 | `docs/FEATURES.md` | Full feature inventory: all features by area, status, assigned session, open questions. Live, git-tracked — this file itself is the source of truth, not a snapshot of anything else. | Claude Code + John |
+| `docs/SCREEN-INVENTORY.md` | **New 2026-07-15.** Real Product Area → Screen → Child Screen taxonomy (Home/Work/Bench/Platform), pulled from `main.jsx`/`AppShell.jsx`, not the feature-ID area-prefix legend — resolves several screen-naming mismatches. Read before proposing a feature-ID format redesign or naming any new screen. | Claude Code + John |
 | `docs/SESSIONS.md` | Session log, how-to-start guides for coding and UX review sessions, architectural decisions log. | John + Claude.ai |
 
 ---
