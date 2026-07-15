@@ -1,3 +1,12 @@
+// DeepBench v6.2.41 | MarketIntelligenceScreen.jsx | MI-65 — chat's hypothesis-test card was
+// pushed at test-completion time (before any decision), so it looked finished but wasn't; the
+// real outcome only reached chat later as a thin one-line hyp_discard note. Fix: chat push
+// deferred from onSelectHypothesis to resolution time (onDiscard/onResolveConfirmation), enriched
+// with a color-coded resolution stamp (stored/info_only/rejected) on the same hypothesis_test
+// card instead of a separate disconnected line. All decisions/interactions stay in Evidence only.
+// The now-dead hyp_discard message kind (render case + both push sites) is fully retired.
+// FEATURE: MI-65
+//
 // DeepBench v6.2.40 | MarketIntelligenceScreen.jsx | MI-67b — generateHypotheses()/
 // runHypothesisTest() were discarding/misattributing patterns_used one layer above
 // callCapability()'s own MI-67 fix. generateHypotheses() now returns { hypotheses, patterns_used }
@@ -876,6 +885,11 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
       { key: "complicates", label: "⚠ Complicates",   color: T.flag,      data: st.complicates },
       { key: "consider",    label: "→ Consider also",  color: T.mutedDeep, data: st.consider },
     ];
+    // FEATURE: MI-65 — this card is now only pushed to chat once the Evidence decision resolves
+    // (onDiscard/onResolveConfirmation), so msg.resolution is always the real outcome, never a
+    // guess. Color reuses the S/C/C semantics already established above (moss=positive outcome,
+    // flag=negative outcome, mutedDeep=neutral/no-op) — no new color convention introduced.
+    const resColor = msg.resolution?.status === "stored" ? T.moss : msg.resolution?.status === "rejected" ? T.flag : T.mutedDeep;
     return (
       <div style={{marginBottom:12,maxWidth:"96%"}}>
         <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
@@ -890,6 +904,11 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
                 <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{s.data.text}</p>
               </div>
             ) : null)}
+            {msg.resolution && (
+              <div style={{borderLeft:`3px solid ${resColor}`,paddingLeft:9,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink,fontStyle:"italic"}}>
+                {msg.resolution.note}
+              </div>
+            )}
           </div>
           {msg.displayAgentCard && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
@@ -909,10 +928,6 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
         )}
       </div>
     );
-  }
-
-  if (msg.kind === "hyp_discard") {
-    return <div style={{marginBottom:12,fontFamily:body,fontSize:12,fontStyle:"italic",color:T.muted}}>{msg.text}</div>;
   }
 
   // FEATURE: S-ARCH-DISPLAY-LOOP-01 — Marcus's Q&A answer, formatted by a real Display agent
@@ -2147,8 +2162,10 @@ export default function MarketIntelligenceScreen() {
     try {
       const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress: onDelegationProgress });
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role:"assistant", kind:"hypothesis_test", hypothesisTest: st, displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id, totalElapsedMs: Date.now() - turnStart }]);
-      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null }));
+      // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
+      // until the user resolves it (Info Only / Store as Forecast); testElapsedMs carries onto
+      // hypFlow so the eventual chat card (Task 3/4) can still caption real test time.
+      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: Date.now() - turnStart }));
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
@@ -2163,7 +2180,17 @@ export default function MarketIntelligenceScreen() {
   const onDiscard = () => {
     // FEATURE: MI-51 — "Info Only" copy (was "Theory discarded — not written to the Data Room.",
     // the old "Discard" button's text) — same no-op outcome, reworded for the 2-outcome decision.
-    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_discard", text: "Kept as info only — nothing stored in the Data Room." }]);
+    // FEATURE: MI-65 — the full test-result card lands in chat now, resolved "Info Only" —
+    // replaces the old thin hyp_discard one-liner with the real analysis content. hypFlow is
+    // captured into st before setHypFlow(null) below — the closure's hypFlow reference is still
+    // the pre-null value for the rest of this call, but explicit rather than relying on ordering.
+    const st = hypFlow?.hypothesisTest || {};
+    setMessages(prev => [...prev, {
+      role: "assistant", kind: "hypothesis_test", hypothesisTest: st,
+      displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id,
+      totalElapsedMs: hypFlow?.testElapsedMs ?? null,
+      resolution: { status: "info_only", note: "Kept as info only — nothing stored in the Data Room." },
+    }]);
     setHypFlow(null);
   };
 
@@ -2257,8 +2284,19 @@ export default function MarketIntelligenceScreen() {
       // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
       // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
       // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.
-      setMessages(prev => [...prev, { role: "assistant", kind: "hyp_discard",
-        text: resolution === "accept" ? "Saved — Nadia (Data Expert) logged this. Find it anytime under Agent & Data Info → Analysis." : "Nadia's proposal was rejected — not recorded." }]);
+      // FEATURE: MI-65 — same enriched hypothesis_test card as onDiscard, resolved "stored" or
+      // "rejected" instead of the old thin hyp_discard one-liner.
+      {
+        const st = hypFlow?.hypothesisTest || {};
+        setMessages(prev => [...prev, {
+          role: "assistant", kind: "hypothesis_test", hypothesisTest: st,
+          displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id,
+          totalElapsedMs: hypFlow?.testElapsedMs ?? null,
+          resolution: resolution === "accept"
+            ? { status: "stored", note: "Saved — Nadia (Data Expert) logged this. Find it anytime under Agent & Data Info → Analysis." }
+            : { status: "rejected", note: "Nadia's proposal was rejected — not recorded." },
+        }]);
+      }
       setHypFlow(null);
     } finally {
       setWorkingStatus(null);
