@@ -1,3 +1,15 @@
+// DeepBench v6.2.42 | MarketIntelligenceScreen.jsx | MI-63 — key_data_points.source rendered a raw
+// the_library citation UUID on the Q&A path but a human-readable label on the hypothesis-test path
+// (neither Format Skill Profile's schema had a source description distinguishing the two). Fix:
+// added data_type/is_baseline (and reasoned_from_section on the hypothesis-test profile) to both
+// qa-answer-format/intelligence-review-format Skill Profiles (Supabase content only), then split
+// the old single ambiguous inline list into two real <table> components — Actual Data Points from
+// the Library (Sourced/Source Simulation) and Theorized Data Points from Analysis (Analysis) — via
+// groupKeyDataPoints(), reusing describeDataType() verbatim. Wired into both existing render sites
+// (Q&A chat bubble, EvidenceColumn's hypothesis-test result); old per-point confidence field and
+// ambiguous source string dropped from both display sites.
+// FEATURE: MI-63
+//
 // DeepBench v6.2.41 | MarketIntelligenceScreen.jsx | MI-65 — chat's hypothesis-test card was
 // pushed at test-completion time (before any decision), so it looked finished but wasn't; the
 // real outcome only reached chat later as a thin one-line hyp_discard note. Fix: chat push
@@ -478,6 +490,88 @@ function groupDataSources(rows) {
   return { sourced, simulationByCategory, analysis };
 }
 
+// FEATURE: MI-63 -- buckets a flat key_data_points array into Actual (Sourced/Source Simulation)
+// vs Theorized (Analysis) groups, reusing describeDataType() (STYLE-GUIDE.md §19) -- no new
+// taxonomy. Mirrors groupDataSources()'s existing bucket-by-describeDataType() pattern exactly
+// (Category M -- one mapping, one call site per row).
+function groupKeyDataPoints(points) {
+  const actual = [];
+  const theorized = [];
+  for (const p of (points || [])) {
+    const display = describeDataType(p.data_type, { isBaseline: p.is_baseline });
+    const decorated = { ...p, _display: display };
+    (display.label === "Sourced" || display.label === "Source Simulation" ? actual : theorized).push(decorated);
+  }
+  return { actual, theorized };
+}
+
+// FEATURE: MI-63 -- Title/Amount adjacent columns (John's explicit layout ask) so Amount scans
+// top-to-bottom at a glance; Type badge reuses describeDataType()'s existing color/label exactly.
+function ActualDataPointsTable({ rows }) {
+  if (!rows.length) return null;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Actual Data Points from the Library</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontFamily:body,fontSize:11}}>
+        <thead>
+          <tr style={{borderBottom:`1px solid ${T.lineSoft}`}}>
+            <th style={{textAlign:"left",padding:"3px 6px 3px 0",color:T.muted,fontWeight:500,fontSize:9.5}}>Title</th>
+            <th style={{textAlign:"right",padding:"3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Amount</th>
+            <th style={{textAlign:"left",padding:"3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Data source</th>
+            <th style={{textAlign:"left",padding:"3px 0 3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((d, i) => (
+            <tr key={i} style={i < rows.length - 1 ? {borderBottom:`1px solid ${T.lineSoft}`} : undefined}>
+              <td style={{padding:"5px 6px 5px 0",color:T.ink}}>{d.label}</td>
+              <td style={{padding:"5px 6px",textAlign:"right",fontFamily:mono,color:T.ink}}>{d.value}</td>
+              <td style={{padding:"5px 6px",color:T.muted}}>{d.source}</td>
+              <td style={{padding:"5px 0 5px 6px"}}>
+                <span style={{background:d._display.color,color:T.card,padding:"1px 7px",borderRadius:3,fontSize:9.5,fontFamily:mono}}>{d._display.label}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// FEATURE: MI-63 -- Section column presence is derived from the data itself (some rows carry
+// reasoned_from_section, some don't) -- never a capability_slug/msg.kind check. qa-answer-format
+// never sets this field, so a Q&A card's Theorized table renders 3 columns automatically, no
+// special-case branch needed.
+function TheorizedDataPointsTable({ rows }) {
+  if (!rows.length) return null;
+  const showSection = rows.some(r => r.reasoned_from_section);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Theorized Data Points from Analysis</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontFamily:body,fontSize:11}}>
+        <thead>
+          <tr style={{borderBottom:`1px solid ${T.lineSoft}`}}>
+            <th style={{textAlign:"left",padding:"3px 6px 3px 0",color:T.muted,fontWeight:500,fontSize:9.5}}>Title</th>
+            <th style={{textAlign:"right",padding:"3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Amount</th>
+            <th style={{textAlign:"left",padding:"3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Reasoned from</th>
+            {showSection && <th style={{textAlign:"left",padding:"3px 0 3px 6px",color:T.muted,fontWeight:500,fontSize:9.5}}>Section</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((d, i) => (
+            <tr key={i} style={i < rows.length - 1 ? {borderBottom:`1px solid ${T.lineSoft}`} : undefined}>
+              <td style={{padding:"5px 6px 5px 0",color:T.ink}}>{d.label}</td>
+              <td style={{padding:"5px 6px",textAlign:"right",fontFamily:mono,color:T.ink}}>{d.value}</td>
+              <td style={{padding:"5px 6px",color:T.muted}}>{d.source}</td>
+              {showSection && <td style={{padding:"5px 0 5px 6px",textTransform:"capitalize",color:T.muted}}>{d.reasoned_from_section}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // FEATURE: MI-04 — real event summaries, driven entirely by actual call responses (evt.data),
 // never scripted text. Color: T.moss = pass/clean, T.brass = flagged/revise, T.flag = blocked.
 function describePipelineEvent(evt) {
@@ -937,6 +1031,7 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
   // CreateWorkOrderScreen.jsx's existing "Screen formatted by [Name] [Role]" byline exactly, with
   // AgentAvatar added per Style Guide Section 17 (avatar mandatory, never name-only text).
   if (msg.kind === "qa") {
+    const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(msg.keyDataPoints);
     return (
       <div style={{marginBottom:12,maxWidth:"96%"}}>
         <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
@@ -951,16 +1046,8 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
                 <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
               </div>
             ))}
-            {Array.isArray(msg.keyDataPoints) && msg.keyDataPoints.length > 0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points</div>
-                {msg.keyDataPoints.map((d, i) => (
-                  <div key={i} style={{fontFamily:body,fontSize:11,color:T.ink}}>
-                    <b>{d.label}:</b> {d.value} <span style={{color:T.muted,fontFamily:mono,fontSize:9.5}}>· {d.source} · {d.confidence}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ActualDataPointsTable rows={actualPoints}/>
+            <TheorizedDataPointsTable rows={theorizedPoints}/>
           </div>
           {msg.displayAgentCard && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
@@ -1118,6 +1205,7 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
   }
 
   const st = hypFlow.hypothesisTest;
+  const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
 
   return (
     // FEATURE: MI-54 — bounded to the grid row height with an internal scroll region, matching
@@ -1233,16 +1321,8 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
                 <ChartRenderer type={st.visualization.chart_type} data={st.visualization.chart_data} caption={st.visualization.caption}/>
               </div>
             )}
-            {Array.isArray(st.key_data_points) && st.key_data_points.length > 0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Key Data Points <span style={{textTransform:"none",fontStyle:"italic",fontWeight:400}}>— shown when Priya judges it useful, not every time</span></div>
-                {st.key_data_points.map((d, i) => (
-                  <div key={i} style={{fontFamily:body,fontSize:11,color:T.ink}}>
-                    <b>{d.label}:</b> {d.value} <span style={{color:T.muted,fontFamily:mono,fontSize:9.5}}>· {d.source} · {d.confidence}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ActualDataPointsTable rows={stActualPoints}/>
+            <TheorizedDataPointsTable rows={stTheorizedPoints}/>
 
             {/* FEATURE: MI-51 — end decision collapses from 3 outcomes (Discard/Track as Assumption/
                 Make Permanent) to 2 (Info Only/Store as Forecast); both backend calls (Elena's
