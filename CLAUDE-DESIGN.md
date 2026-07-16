@@ -40,6 +40,19 @@ Applies from S-APPLE-01a-design (v5.3.0) onward.
 
 ---
 
+## Standing Rule — Skill/Capability Disclosure When Updating Agent Competencies (added 2026-07-16, John's explicit call)
+
+**Before proposing or writing any content that creates, edits, or touches a Skill (`skill_profiles` row) or an agent's competency, state the answers to these explicitly — as part of the conversational walkthrough with John, not buried in a kickoff doc:**
+
+- Is this creating a **new** Skill record, or editing an existing one? If new: what are you naming it (slug), and what Skill type (Identity/Behavior/Knowledge/Intent/Format/Guardrails)?
+- What **Capability** (`capability_slug`) is it assigned to — name it.
+- Does that Capability already have other Skills attached? List them.
+- Who (which Agent(s)) is that Capability assigned to (`agent_capability_assignments`) — name them.
+
+**Verify every answer live against Supabase, every time — never from memory, a prior session's finding, or `AGENT-COMPETENCY-MODEL.md`'s own examples.** This is the same discipline as the standing verify-never-assert-from-memory rule (`CLAUDE.md`), applied specifically to Skill/Capability/Agent work because a wrong assumption here silently mis-scopes the edit (e.g. editing a Skill shared across Capabilities/Agents without realizing the blast radius). Applies to every session touching `skill_profiles`/`capability_skill_profiles`/`agent_capability_assignments` — content-authoring sessions (like `AA-194`) and structural/code sessions alike.
+
+---
+
 ## Standing Rule — Backlog Capture
 
 **Any feature, agent, or requirement named during a design session must be written to the right feature-inventory file immediately — not deferred to session close-out.**
