@@ -281,6 +281,36 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
   return { status: 'in_progress', job_id: row_id };
 }
 
+// FEATURE: AA-195 (S-ARCH-FAILURE-DETAIL-01) -- captures the full rejected-request detail
+// postToAnthropicWithRetry() already attaches to a thrown error (.detail, request-receivable.js)
+// but which was previously dropped before reaching durable_hops -- Supabase-only observability,
+// no external log access required (John's explicit call, 2026-07-16: permanent, not temporary).
+// Truncated to 2000 chars, same defensive precedent as AA-157's retryDetail.slice(0, 1000).
+function formatErrorForPersistence(e) {
+  const detail = typeof e.detail === 'string' ? e.detail.slice(0, 2000) : null;
+  return detail ? `${e.message}\n\nDetail: ${detail}` : e.message;
+}
+
+// FEATURE: AA-195 -- also extends persistence to runCapability()'s fresh-call path, which
+// previously had zero failure record at all (only resumeCapability() persisted anything --
+// confirmed by direct read, not assumed). Creates a row first when job_id is null (fresh call),
+// otherwise patches the existing one (resumed call) -- same create-if-absent shape
+// checkpointAndReturn() already uses for the success/checkpoint path.
+async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context }) {
+  let row_id = job_id;
+  if (!row_id) {
+    const row = await createDurableHopRow({
+      tenant_id, capability_slug, intent_slug, agent_id, task_context,
+      system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
+      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature },
+      can_request_help: canRequestHelp, delegation_required: delegationRequired === true,
+    });
+    row_id = row.id;
+  }
+  await patchDurableHopRow(row_id, { status: 'failed', error: formatErrorForPersistence(e) });
+  throw e;
+}
+
 // FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- extracted verbatim from runLoop()'s former
 // inline request_help/delegate_to_agent dispatch blocks, parameterized by via_tool/tool_input
 // instead of reading turn.tool_name/turn.tool_input directly, so it can be called either inline
@@ -608,15 +638,19 @@ export async function runCapability({
   // round trip on whichever hop ultimately triggers it.
   const deadline = _deadline || (Date.now() + 60000 - SAFETY_MARGIN_MS);
 
-  return runLoop({
-    capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
-    delegationRequired,
-    requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
-    display_agent_id, display_agent_card,
-    conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
-    hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
-    onEvent,
-  });
+  try {
+    return await runLoop({
+      capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+      delegationRequired,
+      requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+      display_agent_id, display_agent_card,
+      conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
+      hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
+      onEvent,
+    });
+  } catch (e) {
+    await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context });
+  }
 }
 
 // FEATURE: AA-139 -- resumes a chain runLoop() previously checkpointed. Loads the persisted state
@@ -701,8 +735,10 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     // check constraint already includes 'failed'. This does not change the existing HTTP error
     // contract/500 response -- the error is re-thrown unchanged, only the row is marked so it stops
     // looking like a live, resumable job.
-    await patchDurableHopRow(job_id, { status: 'failed', error: e.message });
-    throw e;
+    // FEATURE: AA-195 (S-ARCH-FAILURE-DETAIL-01) -- now persists the full rejected-request detail
+    // (formatErrorForPersistence()), not just e.message, so Supabase alone has enough evidence to
+    // diagnose a failure like AA-195's without external Vercel log access.
+    await persistFailureAndRethrow(e, { job_id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null });
   }
 }
 
