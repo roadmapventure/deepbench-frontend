@@ -66,10 +66,9 @@ Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-
 | `MCP` | **MCP protocol exposure** — services exposed as MCP tools | Part of `SV` | The one real `SV` row about this: `deepbench/{intent}/{format}` tool path exposure. |
 | `MKT` | **Service Marketplace** — catalog, service profile pages, browse/purchase flow (Phase 4 roadmap, currently 100% unbuilt) | Part of `SV` | The other three `SV` rows: service catalog registry, profile view, marketplace listing. |
 | `DAT` | **Data model, Supabase schema/migration work, and seeding** — added 2026-07-15. Scoped to the *data* layer (`the_library`, `data_rooms`, `deliverables`, `ai_activity_log` schema) — **not** Skill Profile/Capability content (`skill_profiles.objective`/`.output_desc` edits stay Competency Model even though both are mechanically Supabase writes; the distinction is subject matter, not mechanism). | New, was scattered across `AA` (Continuity/Data types) | e.g. a stray test-debris row archived in `the_library`; a real RPC migration adding a missing column to `match_the_library`'s `RETURNS TABLE`. |
+| `AGT` | **Agent Competency Model** — replaces `AG`/`SK`/`IN`/`FM` with one unified code, decided 2026-07-15 in `S-ARCH-COMPETENCY-MODEL-design` (`docs/AGENT-COMPETENCY-MODEL.md`). Deliberate correction, not just a convenience: the four-way split reflected the stale, pre-reconciliation model (`INTENT-MODEL.md`/`FORMAT-MODEL.md`, both superseded) that treated Intent and Format as separate first-class entities. This session established they're two of five (now six, pending confirmation) Skill *types* on one entity — Identity/Behavior/Knowledge/Intent/Format/Guardrails — not separate domains, so one code covering all 6 Agent Competency Model tables (`skill_profiles`, `skill_types`, `capabilities`, `capability_skill_profiles`, `agent_capability_assignments`, `agent_configs`, plus `agents` itself) is the correct reflection of the model, same precedent as `LOO` covering the whole delegation mechanism as one topic rather than several. | `AG`/`SK`/`IN`/`FM` | Confirmed, first rows: `AGT-001` onward. |
 
-`AA` had 192 rows total (by far the largest bucket) before this split — confirms `HAR`/`LOO` were doing real, distinct work under one name, not a false distinction.
-
-| `AGT` | **Agent Competency Model** — replaces `AG`/`SK`/`IN`/`FM` with one unified code, decided 2026-07-15 in `S-ARCH-COMPETENCY-MODEL-design` (`docs/AGENT-COMPETENCY-MODEL.md`). Deliberate correction, not just a convenience: the four-way split reflected the stale, pre-reconciliation model (`INTENT-MODEL.md`/`FORMAT-MODEL.md`, both superseded) that treated Intent and Format as separate first-class entities. This session established they're two of five (now six, pending confirmation) Skill *types* on one entity — Identity/Behavior/Knowledge/Intent/Format/Guardrails — not separate domains, so one code covering all 6 Agent Competency Model tables (`skill_profiles`, `skill_types`, `capabilities`, `capability_skill_profiles`, `agent_capability_assignments`, `agent_configs`, plus `agents` itself) is the correct reflection of the model, same precedent as `LOO` covering the whole delegation mechanism as one topic rather than several. | Confirmed, first rows: `AGT-001` onward. |
+`AA` had 192 rows total (by far the largest bucket) before this split — confirms `HAR`/`LOO` were doing real, distinct work under one name, not a false distinction. **As of 2026-07-15, no code in this taxonomy is still "deferred" — `AGT` was the last open one.**
 
 ---
 
@@ -109,15 +108,17 @@ Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-
 | `AI-53` | Observability | `LOG` |
 | `AA-172` | Data | `DAT` |
 | `AA-155` | Continuity | `DAT` *(real RPC migration — moved here after the DAT scope clarification)* |
-| `AA-181` | Architecture | Competency Model (deferred) |
-| `AA-182` | Continuity | Competency Model (deferred) |
-| `AA-180` | Architecture | Competency Model (deferred) |
-| `AA-174` | Continuity | Competency Model (deferred) |
-| `AA-133` | Speed | Competency Model (deferred) |
-| `AA-167` | Continuity | Competency Model (deferred) |
-| `AA-186` | Architecture | Competency Model (deferred) |
-| `AA-161` | Continuity | Competency Model (deferred) |
-| `AI-45` | Continuity | Competency Model (deferred) |
+| `AA-181` | Architecture | `AGT` *(finalized 2026-07-15 — was "Competency Model, deferred," now confirmed since `S-ARCH-COMPETENCY-MODEL-design` landed `AGT`)* |
+| `AA-182` | Continuity | `AGT` |
+| `AA-180` | Architecture | `AGT` |
+| `AA-174` | Continuity | `AGT` |
+| `AA-133` | Speed | `AGT` |
+| `AA-167` | Continuity | `AGT` |
+| `AA-186` | Architecture | `AGT` |
+| `AA-161` | Continuity | `AGT` |
+| `AI-45` | Continuity | `AGT` |
 | `AA-173` | Continuity | **Unclassified** — a broad test/verification session spanning multiple buckets, not itself one thing |
-| `AA-168` | Continuity | **Unclassified** — two distinct bugs in one row, one Competency-Model-shaped, one `HAR`-shaped |
+| `AA-168` | Continuity | **Unclassified** — two distinct bugs in one row, one `AGT`-shaped, one `HAR`-shaped |
+| `AA-194` | Continuity | **Worth checking with the other session** — new row, logged as `AA-194` (legacy prefix) despite being about `output_desc` authoring across the roster, which reads as `AGT` territory by content. Straddles two categories by its own text (complementary to `AA-191`/`LOO`) — not silently recoding it, flagging for you to confirm with that session. |
+| `AGT-001` | Continuity | Already `AGT` — logged directly in the new format by `S-ARCH-COMPETENCY-MODEL-design` itself. |
 | `AA-160` | Continuity | **Unclassified** — not yet root-caused, can't classify what isn't diagnosed |
