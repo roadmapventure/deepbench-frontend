@@ -1,3 +1,24 @@
+// DeepBench v6.3.22 | MarketIntelligenceScreen.jsx | CHI-03a — Chat/Evidence architecture move:
+// any document/analysis/narrative an agent produces is evidence (Column 2/"Evidence & Interaction"),
+// never chat (John's rule, design walkthrough + mock, S-CHI-03-design). New `qaEvidence` state slot
+// (independent of `hypFlow`) holds the most recent Q&A answer so EvidenceColumn renders it whether
+// or not a hypothesis flow is ever started — fixes a real bug: a plain Q&A the user never escalates
+// used to leave EvidenceColumn permanently empty. `QaEvidenceCard` extracted from the old chat `qa`
+// card (byte-identical visuals), now rendered in Evidence; chat's `qa` bubble shrinks to a fixed
+// pointer sentence + flag/elapsed captions + the review-outcome note (msg.text itself is left as the
+// full plain answer, unchanged, so conversationContext()/onReview's flaggedAnswer keep working — only
+// the displayed copy is now a fixed string, decoupled from msg.text). `onGoodThanks`/`onReview` now
+// operate on `qaEvidence` directly (were message-index-based). `hyp_submitted`/`hypothesis_test`
+// MessageBubble cases deleted — the submitted-theory text moves into EvidenceColumn (uses
+// `hypFlow.chosenText`, already present, no new state); onDiscard()/onResolveConfirmation() push a
+// short static placeholder line to chat instead (interim only — CHI-03b replaces with a real live
+// acknowledgment). Columns rename: "Interact" -> "Chat", "Evidence" -> "Evidence & Interaction".
+// Mobile's Evidence-tab-disabled-until-hypFlow gate is a known, tracked gap for a qaEvidence-only
+// answer (logged against CHI-03c, `docs/FEATURES.md` CHI-03 row) — deliberately not touched here,
+// out of this session's scope (STANDARDS.md Category M / kickoff SCOPE RULES).
+// See STYLE-GUIDE.md §33 (new).
+// FEATURE: CHI-03a
+//
 // DeepBench v6.3.18 | MarketIntelligenceScreen.jsx | CHI-01/CHI-02 — Agent Routing log's per-event
 // rows replaced with turn-grouped cards: groupEventsIntoTurns() collapses consecutive same-agent
 // events into one turn (a hand-off, not an activity, per John's explicit call), RoutingTurnCard
@@ -235,7 +256,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, FeatureBadge, AgentAvatar, UserAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
+import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
@@ -1019,161 +1040,48 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
 
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
 // (Good, thanks / exploring / undecided), threaded through from the parent's messages array.
-function MessageBubble({ msg, index, onReview, onGoodThanks }) {
+// FEATURE: CHI-03a — `hyp_submitted`/`hypothesis_test` cases deleted entirely (moved into
+// EvidenceColumn, Task 3/4); `qaEvidence` added so the shrunk `qa` case's review-outcome note
+// (Good, thanks / Sent to Priya) can still render in chat, sourced from the shared qaEvidence
+// state slot instead of msg.reviewChoice (onGoodThanks/onReview no longer index into messages).
+function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
   const isUser = msg.role === "user";
 
-  if (msg.kind === "hyp_submitted") {
-    return (
-      <div style={{marginBottom:12,maxWidth:"96%"}}>
-        <div style={{background:T.card,border:`1px solid ${T.brassLight}`,borderLeft:`4px solid ${T.brass}`,borderRadius:3}}>
-          <div style={{background:"#f6ecd8",padding:"7px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep}}>Submitted Hypothesis</span>
-            <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase"}}>{INTENT_LABEL[msg.intent] || msg.intent}</span>
-          </div>
-          <div style={{padding:"11px 13px",fontFamily:body,fontSize:12,lineHeight:1.55,color:T.ink}}>{msg.text}</div>
-          {/* FEATURE: MI-27 -- attribution row, same shape as the existing "Formatted by [Agent]"
-              byline on the qa/hypothesis_test cards below, but with UserAvatar instead of
-              AgentAvatar since this is always the human's own submission, never an agent's. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
-            <UserAvatar size={16} />
-            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>Submitted by</span>
-            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>You</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (msg.kind === "hypothesis_test") {
-    const st = msg.hypothesisTest || {};
-    const sections = [
-      { key: "supports",    label: "✓ Supports",      color: T.moss,      data: st.supports },
-      { key: "complicates", label: "⚠ Complicates",   color: T.flag,      data: st.complicates },
-      { key: "consider",    label: "→ Consider also",  color: T.mutedDeep, data: st.consider },
-    ];
-    // FEATURE: MI-65 — this card is now only pushed to chat once the Evidence decision resolves
-    // (onDiscard/onResolveConfirmation), so msg.resolution is always the real outcome, never a
-    // guess. Color reuses the S/C/C semantics already established above (moss=positive outcome,
-    // flag=negative outcome, mutedDeep=neutral/no-op) — no new color convention introduced.
-    const resColor = msg.resolution?.status === "stored" ? T.moss : msg.resolution?.status === "rejected" ? T.flag : T.mutedDeep;
-    return (
-      <div style={{marginBottom:12,maxWidth:"96%"}}>
-        <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
-          <div style={{background:T.cardAlt,padding:"7px 12px"}}>
-            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Priya Nair · AI - Hypothesis Test</span>
-          </div>
-          <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
-            {st.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{st.headline}</div>}
-            {sections.map(s => (s.data && s.data.text) ? (
-              <div key={s.key}>
-                <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:s.color,marginBottom:3}}>{s.label}</div>
-                <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{s.data.text}</p>
-              </div>
-            ) : null)}
-            {msg.resolution && (
-              <div style={{borderLeft:`3px solid ${resColor}`,paddingLeft:9,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink,fontStyle:"italic"}}>
-                {msg.resolution.note}
-              </div>
-            )}
-          </div>
-          {msg.displayAgentCard && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
-              <AgentAvatar who={msg.displayAgentId} size={16} ring={false} />
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>Formatted by</span>
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>{msg.displayAgentCard.name}</span>
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: '#777' }}>{msg.displayAgentCard.role}</span>
-            </div>
-          )}
-        </div>
-        {/* FEATURE: MI-42 -- same final-timeline caption as the qa bubble, msg.totalElapsedMs set
-            by onSelectHypothesis(). */}
-        {msg.totalElapsedMs != null && (
-          <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
-            Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // FEATURE: S-ARCH-DISPLAY-LOOP-01 — Marcus's Q&A answer, formatted by a real Display agent
-  // (request_help -> Michelle -> delegate_to_agent(is_final:true)), never {msg.text} raw markdown.
-  // Reuses the exact hypothesis_test bubble's card treatment (border/header/spacing) — a consistency
-  // requirement, not a new visual pattern (DESIGN RULES). Byline visual treatment matches
-  // CreateWorkOrderScreen.jsx's existing "Screen formatted by [Name] [Role]" byline exactly, with
-  // AgentAvatar added per Style Guide Section 17 (avatar mandatory, never name-only text).
+  // FEATURE: S-ARCH-DISPLAY-LOOP-01 / CHI-03a — Marcus's Q&A answer used to render its full
+  // analysis card (headline/body/tables/byline/review-choice buttons) directly in chat; that
+  // content now lives only in EvidenceColumn's QaEvidenceCard (Task 1/3) — any document, written
+  // analysis, or narrative an agent produces is evidence, never chat (John's rule). Chat keeps only
+  // Marcus's own conversational commentary about the work: a fixed pointer sentence (not {msg.text}
+  // — msg.text is deliberately left as the full plain answer so conversationContext()/onReview's
+  // flaggedAnswer keep working unchanged), the flag/review-reason caption, the elapsed-time caption,
+  // and the review-outcome note once decided.
   if (msg.kind === "qa") {
-    const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(msg.keyDataPoints);
     return (
       <div style={{marginBottom:12,maxWidth:"96%"}}>
-        <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:3}}>
-          <div style={{background:T.cardAlt,padding:"7px 12px"}}>
-            <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
-          </div>
-          <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
-            {msg.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{msg.headline}</div>}
-            {(msg.body || []).map((b, i) => (
-              <div key={i}>
-                {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
-                <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
-              </div>
-            ))}
-            <ActualDataPointsTable rows={actualPoints}/>
-            <TheorizedDataPointsTable rows={theorizedPoints}/>
-          </div>
-          {msg.displayAgentCard && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px 11px 13px' }}>
-              <AgentAvatar who={msg.displayAgentId} size={16} ring={false} />
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#888', letterSpacing: '0.02em' }}>
-                Formatted by
-              </span>
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600, color: '#b6873a', letterSpacing: '0.02em' }}>
-                {msg.displayAgentCard.name}
-              </span>
-              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: '#777' }}>
-                {msg.displayAgentCard.role}
-              </span>
-            </div>
-          )}
+        <div style={{
+          maxWidth:"85%",padding:"10px 14px",fontFamily:body,fontSize:13,lineHeight:1.5,
+          background: msg.needs_review ? "#f3e6cc" : T.card,
+          color: T.ink,
+          border: `1px solid ${msg.needs_review ? T.brass : T.line}`,
+          borderRadius:3,
+        }}>
+          I've pulled together an answer — the full breakdown is in Evidence. Take a look and let me know if you have questions.
         </div>
-        {/* FEATURE: MI-42 -- final-timeline caption, reuses formatElapsed() unchanged (already
-            produces "47s"/"1m 30s"-style output). msg.totalElapsedMs is a simple end-start diff,
-            set at the submit()/onSelectHypothesis() call sites -- mathematically identical to
-            summing each displayed segment's duration since hops are strictly sequential with zero
-            gaps, computed the simpler way. */}
         {msg.totalElapsedMs != null && (
           <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
             Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
           </div>
         )}
-        {/* FEATURE: MI-51 — universal guided prompt, rendered on every qa message regardless of
-            needs_review (was a plain "Review This Answer ->" link, shown only when self/gate-flagged).
-            The flag itself is now informational only, no longer the sole gate for the choice below. */}
         {msg.needs_review && (
           <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3,marginTop:6}}>
             ⚑ Marcus flagged this — {msg.review_reason || "flagged for review"}
           </div>
         )}
-        {msg.reviewChoice === "good" && (
+        {qaEvidence?.reviewChoice === "good" && (
           <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
         )}
-        {msg.reviewChoice === "exploring" && (
+        {qaEvidence?.reviewChoice === "exploring" && (
           <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
-        )}
-        {!msg.reviewChoice && (
-          <div style={{marginTop:6,padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              <button onClick={() => onGoodThanks(index)}
-                style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
-                Good, thanks
-              </button>
-              <button onClick={() => onReview(index)}
-                style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
-                Have Priya (Forecast/Theory/Performance Expert) generate a few theories →
-              </button>
-            </div>
-          </div>
         )}
       </div>
     );
@@ -1225,6 +1133,61 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
   );
 }
 
+// FEATURE: CHI-03a — extracted verbatim from MessageBubble's old `qa` case so EvidenceColumn can
+// render the identical card without duplicating the JSX (Category M). Visual output is byte-identical
+// to the prior chat-rendered card; only the reviewChoice buttons' handler signatures changed (Task 2 —
+// onGoodThanks/onReview no longer take a message index, they operate on qaEvidence directly).
+function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
+  const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(qa.keyDataPoints);
+  return (
+    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0}}>
+      <div style={{background:T.cardAlt,padding:"7px 12px"}}>
+        <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
+      </div>
+      <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
+        {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
+        {(qa.body || []).map((b, i) => (
+          <div key={i}>
+            {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
+            <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
+          </div>
+        ))}
+        <ActualDataPointsTable rows={actualPoints}/>
+        <TheorizedDataPointsTable rows={theorizedPoints}/>
+      </div>
+      {qa.displayAgentCard && (
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'0 13px 11px 13px'}}>
+          <AgentAvatar who={qa.displayAgentId} size={16} ring={false}/>
+          <span style={{fontFamily:'Inter, sans-serif',fontSize:11,color:'#888',letterSpacing:'0.02em'}}>Formatted by</span>
+          <span style={{fontFamily:'Inter, sans-serif',fontSize:11,fontWeight:600,color:'#b6873a',letterSpacing:'0.02em'}}>{qa.displayAgentCard.name}</span>
+          <span style={{fontFamily:'Inter, sans-serif',fontSize:10,color:'#777'}}>{qa.displayAgentCard.role}</span>
+        </div>
+      )}
+      {qa.totalElapsedMs != null && (
+        <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,padding:"0 13px 8px 13px"}}>Full Agent Routing & Answer Given in {formatElapsed(qa.totalElapsedMs)}</div>
+      )}
+      {qa.needs_review && (
+        <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3,padding:"0 13px 8px 13px"}}>⚑ Marcus flagged this — {qa.review_reason || "flagged for review"}</div>
+      )}
+      {qa.reviewChoice === "good" && (
+        <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
+      )}
+      {qa.reviewChoice === "exploring" && (
+        <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories.</div>
+      )}
+      {!qa.reviewChoice && (
+        <div style={{margin:"0 13px 11px 13px",padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <button onClick={onGoodThanks} style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>Good, thanks</button>
+            <button onClick={onReview} style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // FEATURE: MI-51 — Theory/Forecast/Correct switcher UI removed (onIntentChange kept as a prop for
 // call-site parity, no longer invoked from inside this component — hypFlow.intent is still set at
 // entry via enterHypothesisFlow()/runIntentPipeline() classification and passed through unchanged to
@@ -1237,13 +1200,14 @@ function MessageBubble({ msg, index, onReview, onGoodThanks }) {
 // FEATURE: MI-59 — one shared sentence source for both EvidenceColumn states, so the
 // empty-state and populated-state copy can't drift apart as separate hardcoded strings.
 function getEvidencePanelSentence(hypFlow) {
-  // FEATURE: MI-61 — empty-state sentence tightened, trailing ellipsis added (copy-only).
-  if (!hypFlow) return "Once your chat has analysis data for interaction, it will appear here...";
+  // FEATURE: CHI-03a — empty-state copy updated: Evidence now also fills from a plain Q&A
+  // (qaEvidence), not just a hypothesis flow, so the copy no longer promises "interaction" alone.
+  if (!hypFlow) return "Once Marcus has an answer or a theory to test, it'll appear here for you to review and act on.";
   const label = INTENT_LABEL[hypFlow.intent] || hypFlow.intent;
   return `${label} — Data for you to interact with your chat...`;
 }
 
-function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation }) {
+function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1253,7 +1217,16 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
     if (hypFlow && hypFlow.prefillText) { setCustomText(hypFlow.prefillText); setShowOwnTheory(true); }
   }, [hypFlow && hypFlow.prefillText]);
 
-  if (!hypFlow) {
+  // FEATURE: CHI-03a — Task 3's submitted-theory block gate: hypFlow.chosenText already carries
+  // this text (set by onSelectHypothesis's startTest branch) -- no new state. Renders once the test
+  // has actually started (testing/result stages, or confirmation set), stacked below the qa card.
+  const showSubmittedTheory = !!(hypFlow && hypFlow.chosenText && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.confirmation));
+
+  // FEATURE: CHI-03a — true empty state only when NEITHER qaEvidence nor hypFlow exist (was gated
+  // on !hypFlow alone). This is the core bug this session fixes: a plain Q&A the user never
+  // escalates into a hypothesis flow used to leave Evidence stuck in this empty state permanently,
+  // even though qaEvidence had real content to show.
+  if (!qaEvidence && !hypFlow) {
     // FEATURE: MI-59 — informational-only empty state; the 4 dummy data-type pills that used
     // to render here (Sourced/Analysis/Source Simulation/Learned) had no click handler and no
     // tie to any flow or action (confirmed live) — removed outright, not just hidden for this
@@ -1263,20 +1236,22 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
         <FeatureBadge id="MI-59"/>
-        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
+        {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" (Task 4 rename,
+            since review/resolve actions moved here too, not just read-only content). */}
+        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
         {/* FEATURE: MI-64 — duplicate compact status indicator so someone watching Evidence sees
             progress without needing to look at chat; same AgentWorkingIndicator component, unmodified. */}
         {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
         <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-            {getEvidencePanelSentence(hypFlow)}
+            {getEvidencePanelSentence(null)}
           </div>
         </div>
       </div>
     );
   }
 
-  const st = hypFlow.hypothesisTest;
+  const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
 
   return (
@@ -1286,13 +1261,29 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
     // inside the card instead of growing the whole page past the fold.
     <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1,position:"relative"}}>
       <FeatureBadge id="MI-59"/>
-      {/* FEATURE: MI-59 — header stays "Evidence" in both states, never switches to "Theory Evidence" */}
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence</div>
+      {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" in both states. */}
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
       {/* FEATURE: MI-64 — duplicate compact status indicator, same component as InteractColumn's */}
       {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
       <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden"}}>
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
 
+        {/* FEATURE: CHI-03a — Task 1's extracted card, independent of hypFlow: renders the instant
+            Marcus has an answer, whether or not a hypothesis flow is ever started. */}
+        {qaEvidence && <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>}
+
+        {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
+            chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
+            carries this text (onSelectHypothesis's startTest branch). */}
+        {showSubmittedTheory && (
+          <div style={{background:T.card,border:`1px solid ${T.lineSoft}`,padding:"9px 11px"}}>
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.brassDeep,marginBottom:4}}>Submitted theory</div>
+            <div style={{fontSize:12,lineHeight:1.5,color:T.ink}}>{hypFlow.chosenText}</div>
+          </div>
+        )}
+
+        {hypFlow && (
+        <>
         {/* FEATURE: MI-59 — shared sentence, intent-prefixed. The MI-59 kickoff doc specced this as
             rendering "above the intent-toggle buttons," but MI-51 already removed that button row
             entirely (onIntentChange is kept only for call-site parity, no longer invoked here — see
@@ -1436,6 +1427,8 @@ function EvidenceColumn({ hypFlow, workingStatus, onIntentChange, onSelectHypoth
               onResolve={onResolveConfirmation}
             />
           </>
+        )}
+        </>
         )}
         </div>
       </div>
@@ -1873,7 +1866,7 @@ function DataSourceRow({ row }) {
 // region + its own input row, no outer bordered card/avatar-name-caption header/AgentWorkingIndicator
 // (MobileBody renders the permanent status strip and input/Clear separately, tab-independent). When
 // bare is falsy (every pre-existing call site — desktop's grid), behavior is byte-identical to before.
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare }) {
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -1936,7 +1929,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           </div>
         </div>
       ) : (
-        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks}/>)
+        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence}/>)
       )}
       {!bare && workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
     </div>
@@ -1958,7 +1951,8 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1}}>
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.brass}}>Interact</div>
+      {/* FEATURE: CHI-03a — column rename "Interact" -> "Chat" */}
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.brass}}>Chat</div>
       <div style={{background:"#fffdf8",border:`1px solid ${T.line}`,borderRadius:3,position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight: noMinHeight ? 0 : 420}}>
         <Corners/>
         <FeatureBadge id="MI-64"/>
@@ -2006,7 +2000,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo }) {
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo }) {
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -2079,17 +2073,22 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         <button onClick={() => selectTab("chat")} style={tabStyle(mobileTab==="chat", false)}>
           Chat {chatUnseen && mobileTab!=="chat" && <span style={flashDot}/>}
         </button>
+        {/* FEATURE: CHI-03a — column rename "Evidence" -> "Evidence & Interaction". Tab-disabled
+            gate (!hasActiveFlow) and the flash mechanism itself are untouched — a plain Q&A-only
+            qaEvidence answer not enabling this tab on mobile is a known, tracked gap (STYLE-GUIDE.md
+            §21's flash-direction logic, `docs/FEATURES.md` CHI-03 row), deliberately deferred to
+            CHI-03c per this session's kickoff SCOPE RULES, not fixed here. */}
         <button onClick={() => selectTab("evidence")} style={tabStyle(mobileTab==="evidence", !hasActiveFlow)}>
-          Evidence {hasActiveFlow && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
+          Evidence & Interaction {hasActiveFlow && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
         </button>
       </div>
 
       <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
         {mobileTab === "chat" ? (
-          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} bare/>
+          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <EvidenceColumn hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
           </div>
         )}
       </div>
@@ -2156,6 +2155,11 @@ export default function MarketIntelligenceScreen() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hypFlow, setHypFlow] = useState(null);
+  // FEATURE: CHI-03a — holds the most recent Q&A answer's Evidence-displayable content, independent
+  // of hypFlow (a plain Q&A the user never escalates into a hypothesis flow still needs somewhere to
+  // live in Evidence — hypFlow alone can't carry it, since it may never exist). Cleared only by
+  // onClear() below, not replaced by a new hypFlow.
+  const [qaEvidence, setQaEvidence] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
   const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
   // FEATURE: MI-51 — showAgentInfo lifted here (was MobileBody-local showActivity) so the trigger
@@ -2171,6 +2175,7 @@ export default function MarketIntelligenceScreen() {
   const onClear = () => {
     setMessages([]);
     setHypFlow(null);
+    setQaEvidence(null); // FEATURE: CHI-03a
     setWorkingStatus(null);
   };
 
@@ -2296,19 +2301,33 @@ export default function MarketIntelligenceScreen() {
         }
       }, setStatus, onDelegationProgress);
       if (result.kind === "qa") {
-        // FEATURE: S-ARCH-DISPLAY-LOOP-01 — msg.text stays a plain-text join of the formatted body
-        // (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep working
-        // unchanged (both need a plain string, not the structured card shape); rendering itself
-        // reads the structured fields below, never {msg.text}, for kind === "qa" bubbles.
+        // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
+        // body (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep
+        // working unchanged (both need a plain string, not the structured card shape).
         const plainText = [result.headline, ...(result.body || []).map(b => b.text)].filter(Boolean).join("\n\n");
+        const elapsed = Date.now() - turnStart; // FEATURE: MI-42 -- Task 4's caption reads this
+        // FEATURE: CHI-03a — qaEvidence holds the full Q&A payload for EvidenceColumn's
+        // QaEvidenceCard (Task 1), independent of hypFlow. keyDataPoints normalized from result's
+        // snake_case key_data_points -- QaEvidenceCard's groupKeyDataPoints() call expects the
+        // camelCase shape (same convention chat's own message object already used). text/question/
+        // citations/review_reason carried through for onReview()'s flaggedAnswer/flaggedQuestion/
+        // citations/reviewReason use (previously read off the chat message by index — now read off
+        // qaEvidence directly, since onReview/onGoodThanks no longer take a message index).
+        setQaEvidence({
+          ...result,
+          keyDataPoints: result.key_data_points,
+          text: plainText, question: clean, citations: result.citations || [],
+          totalElapsedMs: elapsed,
+          reviewChoice: null,
+        });
+        // FEATURE: CHI-03a — chat's qa bubble shrinks to a fixed pointer sentence (rendered
+        // directly in MessageBubble, not from msg.text); msg.text is deliberately kept as the full
+        // plain answer so conversationContext() (which reads m.text for every message) keeps
+        // seeing real content for follow-up turns, not just the pointer sentence.
         setMessages(prev => [...prev, {
           role:"assistant", text: plainText, kind:"qa",
-          headline: result.headline, body: result.body, keyDataPoints: result.key_data_points,
-          displayAgentCard: result.displayAgentCard, displayAgentId: result.displayAgentId,
           needs_review: !!result.needs_review, review_reason: result.review_reason,
-          question: clean, citations: result.citations || [],
-          totalElapsedMs: Date.now() - turnStart, // FEATURE: MI-42 -- Task 4's caption reads this
-          reviewChoice: null, // FEATURE: MI-51 -- explicit, not relying on undefined (undecided/good/exploring)
+          totalElapsedMs: elapsed,
         }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
@@ -2327,18 +2346,17 @@ export default function MarketIntelligenceScreen() {
     }
   };
 
-  // FEATURE: MI-51 — onReview/onGoodThanks are now index-based (were msg-object-based) so a
-  // specific message's reviewChoice can be set, driving the universal 3-state guided prompt
-  // (undecided/good/exploring) on every qa message, not just internally-flagged ones.
-  const onGoodThanks = (msgIndex) => {
-    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, reviewChoice: "good" } : m));
-  };
+  // FEATURE: CHI-03a — onGoodThanks/onReview now operate on qaEvidence directly (were
+  // message-index-based, MI-51) since the review-choice buttons moved from chat into
+  // EvidenceColumn's QaEvidenceCard, and there is only ever one "most recent" qaEvidence, not an
+  // indexable list.
+  const onGoodThanks = () => setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "good" }));
 
-  const onReview = (msgIndex) => {
-    const msg = messages[msgIndex];
-    if (!msg) return;
-    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, reviewChoice: "exploring" } : m));
-    enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: msg.question, flaggedAnswer: msg.text, citations: msg.citations || [], reviewReason: msg.review_reason });
+  const onReview = () => {
+    if (!qaEvidence) return;
+    const { question, text, citations, review_reason } = qaEvidence;
+    setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "exploring" }));
+    enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: question, flaggedAnswer: text, citations: citations || [], reviewReason: review_reason });
   };
 
   const onIntentChange = (intent) => setHypFlow(prev => prev && ({ ...prev, intent }));
@@ -2355,7 +2373,9 @@ export default function MarketIntelligenceScreen() {
     }
     const { intent, flaggedQuestion, flaggedAnswer, hypothesisTest } = hypFlow;
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
-    setMessages(prev => [...prev, { role:"assistant", kind:"hyp_submitted", text, intent }]);
+    // FEATURE: CHI-03a — no chat push here anymore (was kind:"hyp_submitted"); the submitted
+    // theory text is already carried on hypFlow.chosenText (set above) and renders in
+    // EvidenceColumn's submitted-theory block (Task 3) once testing starts.
     const t0 = Date.now();
     const turnStart = t0; // FEATURE: MI-42 -- Task 4's caption reads this
     {
@@ -2383,17 +2403,12 @@ export default function MarketIntelligenceScreen() {
   const onDiscard = () => {
     // FEATURE: MI-51 — "Info Only" copy (was "Theory discarded — not written to the Data Room.",
     // the old "Discard" button's text) — same no-op outcome, reworded for the 2-outcome decision.
-    // FEATURE: MI-65 — the full test-result card lands in chat now, resolved "Info Only" —
-    // replaces the old thin hyp_discard one-liner with the real analysis content. hypFlow is
-    // captured into st before setHypFlow(null) below — the closure's hypFlow reference is still
-    // the pre-null value for the rest of this call, but explicit rather than relying on ordering.
-    const st = hypFlow?.hypothesisTest || {};
-    setMessages(prev => [...prev, {
-      role: "assistant", kind: "hypothesis_test", hypothesisTest: st,
-      displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id,
-      totalElapsedMs: hypFlow?.testElapsedMs ?? null,
-      resolution: { status: "info_only", note: "Kept as info only — nothing stored in the Data Room." },
-    }]);
+    // FEATURE: CHI-03a — the old rich hypothesis_test chat card (MessageBubble, now deleted) is
+    // replaced by a short static placeholder line — interim only, CHI-03b replaces this with a
+    // real Marcus-authored live acknowledgment. The full result stays visible in Evidence via
+    // hypFlow.hypothesisTest/Task 3's submitted-theory block until setHypFlow(null) below actually
+    // clears it.
+    setMessages(prev => [...prev, { role: "assistant", text: "Got it — noted as info only, not stored. See Evidence for the full result.", kind: "non_qa" }]);
     setHypFlow(null);
   };
 
@@ -2487,19 +2502,17 @@ export default function MarketIntelligenceScreen() {
       // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
       // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
       // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.
-      // FEATURE: MI-65 — same enriched hypothesis_test card as onDiscard, resolved "stored" or
-      // "rejected" instead of the old thin hyp_discard one-liner.
-      {
-        const st = hypFlow?.hypothesisTest || {};
-        setMessages(prev => [...prev, {
-          role: "assistant", kind: "hypothesis_test", hypothesisTest: st,
-          displayAgentCard: st.display_agent_card, displayAgentId: st.display_agent_id,
-          totalElapsedMs: hypFlow?.testElapsedMs ?? null,
-          resolution: resolution === "accept"
-            ? { status: "stored", note: "Saved — Nadia (Data Expert) logged this. Find it anytime under Agent & Data Info → Analysis." }
-            : { status: "rejected", note: "Nadia's proposal was rejected — not recorded." },
-        }]);
-      }
+      // FEATURE: CHI-03a — same static-placeholder treatment as onDiscard (interim only, CHI-03b
+      // replaces with a live acknowledgment) — replaces the old rich hypothesis_test chat card
+      // (MessageBubble, now deleted). Full result stays visible in Evidence throughout, until
+      // setHypFlow(null) below actually clears it.
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: resolution === "accept"
+          ? "Got it — that's been stored as a forecast. See Evidence for the full result."
+          : "Got it — that proposal was rejected, nothing was stored.",
+        kind: "non_qa",
+      }]);
       setHypFlow(null);
     } catch (e) {
       // FEATURE: AA-189 — this catch was previously missing entirely; any resolve failure (this
@@ -2535,14 +2548,14 @@ export default function MarketIntelligenceScreen() {
         {isMobile ? (
           <MobileBody
             messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}
-            hypFlow={hypFlow} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
+            hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
             events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}/>
-            <EvidenceColumn hypFlow={hypFlow} workingStatus={workingStatus} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} workingStatus={workingStatus} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
           </div>
         )}
