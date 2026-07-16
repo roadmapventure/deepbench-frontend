@@ -1,3 +1,20 @@
+// DeepBench v6.3.29 | MarketIntelligenceScreen.jsx | CHI-04 — Clear now fully resets Agent Routing
+// state: onClear() also clears pipelineEvents/pendingDelegationsRef (Column 3 used to survive Clear
+// untouched). New clearGenerationRef cancellation counter, threaded as an `isStale` predicate through
+// the whole callCapability/resolveInProgress/resolveConfirmation/runIntentPipeline/
+// runQaWithQualityGate/generateHypotheses/runHypothesisTest call graph and every top-level entry
+// point (submit/enterHypothesisFlow/onSelectHypothesis/onCommit/onResolveConfirmation) — an in-flight
+// request whose Clear fired mid-way now stops making further calls and never touches state once it
+// (partially) resolves, fixing a real bug where an abandoned request could silently repopulate a
+// just-cleared screen. Frontend-only by design (every continuation hop is a separate client-issued
+// fetch(), so a client-side guard is sufficient) — killing the one hop already executing server-side
+// at the instant of Clear is a separate harness-level gap, logged as HAR-03, deliberately out of
+// scope here. groupEventsIntoTurns() gains a `question_boundary` marker case (a synthetic event,
+// always its own turn, excluded from hop numbering) and a new QuestionDivider component renders it in
+// the Agent Routing drawer, so a follow-up question asked without Clear gets a visible "New question
+// · HH:MM:SS" boundary instead of reading as one unbroken sequence. See STYLE-GUIDE.md §34 (new).
+// FEATURE: CHI-04
+//
 // DeepBench v6.3.22 | MarketIntelligenceScreen.jsx | CHI-03a — Chat/Evidence architecture move:
 // any document/analysis/narrative an agent produces is evidence (Column 2/"Evidence & Interaction"),
 // never chat (John's rule, design walkthrough + mock, S-CHI-03-design). New `qaEvidence` state slot
@@ -454,6 +471,11 @@ function formatExpectation(ms) {
   return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
 }
 
+// FEATURE: CHI-04 — caption for the question-boundary divider (QuestionDivider, below).
+function formatClockTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 // FEATURE: MI-23 — replaces the header's global AI status dot for this screen; one line, swaps
 // message + resets its timer each time control passes to a new agent (only one agent ever runs
 // at a time on this platform today, confirmed no concurrent dispatch anywhere in this file or the
@@ -706,18 +728,30 @@ function describePipelineEvent(evt) {
 // raw events (John's explicit call, 2026-07-16: "a new line should mean a hand-off happened,
 // not an activity"). `ordered` is newest-first (existing convention, unchanged) — turn
 // numbering stays oldest=1 ascending, same direction today's per-event numbering already used.
+// FEATURE: CHI-04 — a `question_boundary` marker event always starts its own entry (never merges
+// into an adjacent turn regardless of agentId) and is excluded from hop numbering below — it's a
+// visual divider (QuestionDivider, rendered by AuditColumn), not a real agent turn.
 function groupEventsIntoTurns(ordered) {
   const turns = [];
   for (const evt of ordered) {
     const last = turns[turns.length - 1];
-    if (last && last.agentId === evt.agentId) {
+    if (evt.type === "question_boundary") {
+      turns.push({ agentId: evt.agentId, events: [evt], isBoundary: true });
+      continue;
+    }
+    if (last && !last.isBoundary && last.agentId === evt.agentId) {
       last.events.push(evt);
     } else {
       turns.push({ agentId: evt.agentId, events: [evt] });
     }
   }
-  const total = turns.length;
-  return turns.map((t, i) => ({ ...t, turnNumber: total - i }));
+  const total = turns.filter(t => !t.isBoundary).length;
+  let seen = 0;
+  return turns.map(t => {
+    if (t.isBoundary) return t;
+    seen += 1;
+    return { ...t, turnNumber: total - (seen - 1) };
+  });
 }
 
 // FEATURE: MI-52 — shared module-scope "first name only" resolver. Previously a local const
@@ -778,9 +812,14 @@ const MAX_CONTINUE_ITERATIONS = 10; // client-side safety cap -- generous headro
 // status, so every existing caller keeps its current contract unchanged -- none of them ever need
 // to know a checkpoint happened. Shared by callCapability() and resolveConfirmation() -- one
 // implementation, not two copies of the same loop.
-async function resolveInProgress(result, onProgress = null) {
+// FEATURE: CHI-04 — isStale is a zero-arg cancellation predicate (default () => false for callers
+// that don't care), checked before firing the next continuation fetch. When true, bails out
+// immediately with whatever result is on hand rather than continuing a chain the caller has already
+// abandoned (Clear fired mid-way) — see clearGenerationRef, below.
+async function resolveInProgress(result, onProgress = null, isStale = () => false) {
   let iterations = 0;
   while (result.status === "in_progress") {
+    if (isStale()) return result; // FEATURE: CHI-04 — Clear fired mid-chain; caller already bails on this via its own isStale() check
     if (++iterations > MAX_CONTINUE_ITERATIONS) {
       throw new Error(`Chain did not complete after ${MAX_CONTINUE_ITERATIONS} continuations (job_id: ${result.job_id})`);
     }
@@ -795,7 +834,7 @@ async function resolveInProgress(result, onProgress = null) {
   return result;
 }
 
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null }) {
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -808,7 +847,7 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   });
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
-  const result = await resolveInProgress(first, onProgress);
+  const result = await resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
   if (result.status) return result;
   // FEATURE: MI-67 — patterns_used was a real, already-computed sibling field on `result` that
   // this unwrap discarded; every event built from this return needs it for an accurate Agent
@@ -820,7 +859,7 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
 // capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
 // FEATURE: MI-42 — gains the identical onProgress/stream treatment for consistency (Nadia's
 // confirmation-resolve path); no live call site opts in this session (see Task 3g), future-proofing.
-async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null, onProgress = null }) {
+async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null, onProgress = null, isStale = () => false }) {
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -828,7 +867,7 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
   });
   if (!res.ok) throw new Error(`resolve ${resolution} failed: ${res.status}`);
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
-  return resolveInProgress(first, onProgress);
+  return resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
 }
 
 // FEATURE: MI-01d — Owen's own delegate_to_agent call replaces the screen-scripted retry
@@ -838,12 +877,13 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // his own final output (final_answer) carries the delegated result forward, since nothing outside
 // his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
 // data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress) {
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
   let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext, onProgress,
+    task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
   });
+  if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
   onEvent({ type: "qa_answer", agentId: "marcus", data: qa, durationMs: Date.now() - t0 });
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
   // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
@@ -865,8 +905,9 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       question: message, candidate_answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations,
       agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
     },
-    onProgress,
+    onProgress, isStale,
   });
+  if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
   const retried = !!gate.final_answer;
   // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
   // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
@@ -905,8 +946,9 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   const display = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
-    onProgress,
+    onProgress, isStale,
   });
+  if (isStale()) return display; // FEATURE: CHI-04
   // FEATURE: MI-52 -- agent_selection (the picker's reasoning) and display_format (the formatter's
   // completion) describe two sub-phases of one un-separable server round trip -- one callCapability()
   // call, one client-observable elapsed time. agent_selection's agentId is now the picker (Michelle),
@@ -952,12 +994,13 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   };
 }
 
-async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress) {
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext, onProgress,
+    task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
   });
+  if (isStale()) return { kind: "non_qa", text: "" }; // FEATURE: CHI-04 — discarded by submit()'s own isStale() check regardless; value here is never rendered
   onEvent({ type: "intent_routing", agentId: "marcus", data: routing, durationMs: Date.now() - t0 });
   if (routing.intent === "escalate") {
     return { kind: "non_qa", text: ESCALATE_PLACEHOLDER };
@@ -965,12 +1008,12 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale);
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
 // the picker, pre-filled, when the user already wrote their own claim.
-async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason }) {
+async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale = () => false }) {
   const gen = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
     task_context: {
@@ -978,6 +1021,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
       flagged_answer: flaggedAnswer || "",
       review_reason: reviewReason || "user-initiated, no explicit claim extracted",
     },
+    isStale,
   });
   // FEATURE: MI-67b — patterns_used was being discarded here, one layer above callCapability()'s
   // own MI-67 fix; the caller needs both the hypotheses array (unchanged shape/contract) and the
@@ -992,7 +1036,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
 // -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
 // candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
 // format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false }) {
   const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
@@ -1000,15 +1044,17 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
       flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
       prior_hypothesis_test: priorHypothesisTest || null,
     },
-    onProgress,
+    onProgress, isStale,
   });
+  if (isStale()) return analysis; // FEATURE: CHI-04 — stop before the display hand-off hop
 
   const t0 = Date.now();
   const display = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-display-intent", agent_id: "priya",
     task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
-    onProgress,
+    onProgress, isStale,
   });
+  if (isStale()) return display; // FEATURE: CHI-04
   // FEATURE: MI-52 -- same treatment as runQaWithQualityGate()'s Display-agent hand-off above:
   // agent_selection's agentId is the picker (Michelle), durationMs: null (not a fabricated duplicate);
   // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
@@ -1539,6 +1585,20 @@ function rollupBaseline(stats) {
 // completely than sameAgentAsPrevious's header-only suppression did. Card border-left uses the
 // LAST activity's color in the turn (the most recent/most decision-relevant outcome, e.g. a
 // late "blocking this answer" should read as red even if the turn opened on a neutral action).
+// FEATURE: CHI-04 — visual boundary between one question's Agent Routing hops and the next, shown
+// only when the user asks a follow-up without hitting Clear (Clear already wipes the whole panel,
+// Task 1 — nothing to divide there). Rendered in place of a RoutingTurnCard wherever
+// groupEventsIntoTurns() marks a turn isBoundary.
+function QuestionDivider({ evt }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0"}}>
+      <div style={{flex:1,height:1,background:T.line}}/>
+      <span style={{fontFamily:mono,fontSize:9,color:T.muted,whiteSpace:"nowrap"}}>New question · {formatClockTime(evt.data.timestamp)}</span>
+      <div style={{flex:1,height:1,background:T.line}}/>
+    </div>
+  );
+}
+
 function RoutingTurnCard({ turn, agentById }) {
   const primary = agentById(turn.agentId);
   const lastColor = describePipelineEvent(turn.events[turn.events.length - 1]).color;
@@ -1799,6 +1859,8 @@ function AuditColumn({ events, agentActivity }) {
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
+  const turns = groupEventsIntoTurns(ordered); // FEATURE: CHI-04 — compute once, reuse for count + render
+  const realTurnCount = turns.filter(t => !t.isBoundary).length; // FEATURE: CHI-04 — drawer count badge excludes boundary rows
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
@@ -1814,12 +1876,16 @@ function AuditColumn({ events, agentActivity }) {
       {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
       {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N turns" (John's explicit
           call: a new line should mean a hand-off, not an activity). */}
-      <Drawer title="Agent Routing" count={`${groupEventsIntoTurns(ordered).length} turn${groupEventsIntoTurns(ordered).length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
+      <Drawer title="Agent Routing" count={`${realTurnCount} turn${realTurnCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
           </div>
-        ) : groupEventsIntoTurns(ordered).map(turn => <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>)}
+        ) : turns.map(turn =>
+            turn.isBoundary
+              ? <QuestionDivider key={turn.events[0].id} evt={turn.events[0]}/>
+              : <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>
+          )}
       </Drawer>
       <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
     </div>
@@ -2173,10 +2239,13 @@ export default function MarketIntelligenceScreen() {
   // FEATURE: MI-51 — Clear resets chat + any active flow back to the seed-question empty state,
   // same end state as a page refresh, no confirm dialog (this session's explicit design decision).
   const onClear = () => {
+    clearGenerationRef.current += 1; // FEATURE: CHI-04 — invalidates every in-flight request's result
     setMessages([]);
     setHypFlow(null);
     setQaEvidence(null); // FEATURE: CHI-03a
     setWorkingStatus(null);
+    setPipelineEvents([]); // FEATURE: CHI-04 — Agent Routing (Column 3) now resets with everything else
+    pendingDelegationsRef.current = new Map(); // FEATURE: CHI-04 — stale pending-delegation markers would otherwise mis-target a future event once ids restart from 0
   };
 
   // FEATURE: MI-42 -- one shared status-setter for both MI-41's macro-hop swaps (explicit calls
@@ -2196,6 +2265,12 @@ export default function MarketIntelligenceScreen() {
   // awaitingAgentId, { id, key } >. Not React state -- purely an internal bookkeeping side-table for
   // logEvent's own replace-in-place check below, never read for rendering.
   const pendingDelegationsRef = useRef(new Map());
+
+  // FEATURE: CHI-04 — bumped by onClear() above; every in-flight async call captures the value at
+  // its own start and checks it again after each await ("isStale()", below) to detect a Clear that
+  // fired while it was running. Not React state — never read for rendering, purely a cancellation
+  // token, same pattern pendingDelegationsRef already uses for non-rendering bookkeeping.
+  const clearGenerationRef = useRef(0);
 
   // FEATURE: MI-52 -- logEvent gained a second, additive call shape: logEvent(evt, { replaces }),
   // where replaces = { key, awaitingAgentId }. When supplied (only onDelegationProgress does this,
@@ -2252,6 +2327,9 @@ export default function MarketIntelligenceScreen() {
     messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
 
   const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, citations, reviewReason }) => {
+    const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
+    const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
+    const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     if (extractedHypothesis) {
       setHypFlow({ stage:"choosing", intent, candidates:null, prefillText:extractedHypothesis, chosenText:null,
         flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
@@ -2265,7 +2343,8 @@ export default function MarketIntelligenceScreen() {
       setStatus("Priya is generating hypotheses…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason });
+      const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
+      if (isStale()) return; // FEATURE: CHI-04
       logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates, patterns_used }, durationMs: Date.now() - t0 });
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
     } catch (e) {
@@ -2284,13 +2363,22 @@ export default function MarketIntelligenceScreen() {
     if (!clean || loading) return;
     setMessages(prev => [...prev, { role:"user", text: clean }]);
     setLoading(true);
+    const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
+    const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
+    const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
+    // FEATURE: CHI-04 — only when pipelineEvents is non-empty: skipped on the very first question of a
+    // fresh session, and naturally skipped right after Clear too (pipelineEvents is already []).
+    if (pipelineEvents.length > 0) {
+      logEvent({ type: "question_boundary", agentId: null, data: { timestamp: turnStart }, durationMs: null });
+    }
     setStatus("Marcus is thinking…", { expectation: "expect < 2m" }); // FEATURE: MI-49 -- reverted from "question < 2m"
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
       // the chain runs), upgrade the ceiling estimate to the real routing-chain-based figure.
       const result = await runIntentPipeline(clean, conversationContext(), (evt) => {
+        if (isStale()) return; // FEATURE: CHI-04
         logEvent(evt);
         if (evt.type === "intent_routing" && evt.data.intent === "qa") {
           setWorkingStatus(prev => {
@@ -2299,7 +2387,8 @@ export default function MarketIntelligenceScreen() {
             return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
           });
         }
-      }, setStatus, onDelegationProgress);
+      }, setStatus, onProgress, isStale);
+      if (isStale()) return; // FEATURE: CHI-04 — Clear fired while this question was in flight; discard silently (finally still runs, harmlessly re-sets already-null loading/workingStatus)
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
         // body (headline + paragraphs) so conversationContext()/onReview's flaggedAnswer keep
@@ -2371,6 +2460,9 @@ export default function MarketIntelligenceScreen() {
       setHypFlow(prev => prev && ({ ...prev, stage:"ready", chosenText: text }));
       return;
     }
+    const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
+    const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
+    const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const { intent, flaggedQuestion, flaggedAnswer, hypothesisTest } = hypFlow;
     setHypFlow(prev => ({ ...prev, stage:"testing", chosenText: text }));
     // FEATURE: CHI-03a — no chat push here anymore (was kind:"hyp_submitted"); the submitted
@@ -2396,7 +2488,8 @@ export default function MarketIntelligenceScreen() {
       setStatus("Priya is running a hypothesis test…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress: onDelegationProgress });
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale });
+      if (isStale()) return; // FEATURE: CHI-04
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
       // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
       // until the user resolves it (Info Only / Store as Forecast); testElapsedMs carries onto
@@ -2444,6 +2537,9 @@ export default function MarketIntelligenceScreen() {
   // intent (set at flow entry, unchanged) is used below instead of a per-button override.
   const onCommit = async () => {
     if (!hypFlow) return;
+    const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
+    const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
+    const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const { intent, flaggedQuestion, flaggedAnswer, citations, chosenText, hypothesisTest } = hypFlow;
     setHypFlow(prev => prev && ({ ...prev, stage: "committing" }));
     // FEATURE: MI-29 -- t0/step hoisted above try so the catch block can log which agent was running
@@ -2463,8 +2559,9 @@ export default function MarketIntelligenceScreen() {
           committed_hypothesis: chosenText, intent, hypothesis_test: hypothesisTestText,
           was_override: !!hypothesisTest?.override_warning,
         },
-        onProgress: onDelegationProgress,
+        onProgress, isStale,
       });
+      if (isStale()) return; // FEATURE: CHI-04
       logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
 
       step = "patch_proposed";
@@ -2476,8 +2573,9 @@ export default function MarketIntelligenceScreen() {
           disputed_chunk_id: disputedChunkId, correction: chosenText,
           user_reasoning: hypothesisTestText || chosenText,
         },
-        onProgress: onDelegationProgress,
+        onProgress, isStale,
       });
+      if (isStale()) return; // FEATURE: CHI-04
       logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult, durationMs: Date.now() - t0 });
 
       setHypFlow(prev => prev && ({
@@ -2503,6 +2601,9 @@ export default function MarketIntelligenceScreen() {
 
   const onResolveConfirmation = async (resolution, editedText = null) => {
     if (!hypFlow?.confirmation) return;
+    const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
+    const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
+    const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const { confirmation_id, disputed_chunk_id } = hypFlow.confirmation;
     const edited_task_context = resolution === "edit"
       ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
@@ -2510,7 +2611,8 @@ export default function MarketIntelligenceScreen() {
     const t0 = Date.now();
     setStatus("Nadia is processing your response…");
     try {
-      const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context });
+      const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context, isStale });
+      if (isStale()) return; // FEATURE: CHI-04
 
       if (resolution === "edit") {
         logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
