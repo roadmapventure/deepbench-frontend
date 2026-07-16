@@ -255,11 +255,18 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
 }
 
 // FEATURE: AA-44 — patterns_used array built from call shape and guardrails state
-export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = false) {
+// FEATURE: LOG-16 -- ragRetrieved is ai-enrichment.js's own real debug.rag_retrieved boolean
+// (Object.keys(ragChunksBySection).length > 0 -- a genuine check that real chunks came back for
+// THIS call), not a copy of a declared Intent Skill Profile field. Replaces the old
+// intent_technical_services blanket-spread, which stamped 'rag' on every call of an intent
+// regardless of whether that specific call actually retrieved anything (confirmed live 2026-07-16,
+// John's platform-rules objection: a pattern must never require a profile declaration to be logged).
+export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = false, ragRetrieved = false) {
   return [
     ...(isJson ? ['structured-output', 'tool-use'] : []),
     ...(guardrailsRan ? ['prompt-chaining', 'guardrails'] : []),
     ...(delegationOccurred ? ['agent-delegation'] : []),
+    ...(ragRetrieved ? ['rag'] : []),
   ];
 }
 
@@ -285,7 +292,12 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   };
 
   // Accept both raw db-assembly output (sections array) and enriched ai-enrichment output (system_prompt string)
-  const { task_id, sections, system_prompt, format_contract, llm, intent_technical_services = [] } = prompt_request || {};
+  // FEATURE: LOG-16 -- enrichDebug carries ai-enrichment.js's real per-call rag_retrieved/reflect_ran/
+  // synthesis_ran booleans (named to avoid shadowing this function's own local `debug` object built
+  // below, Section 5/STEP 5). intent_technical_services is still destructured (harmless, currently
+  // unused downstream after this session -- db-assembly.js's own separate technical_services read,
+  // used to trigger REFLECT inclusion, is untouched and unaffected).
+  const { task_id, sections, system_prompt, format_contract, llm, intent_technical_services = [], debug: enrichDebug = {} } = prompt_request || {};
 
   if (!format_contract) {
     throw new Error('format_contract required');
@@ -437,9 +449,15 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   deliverable_id = result.deliverable_id;
 
   // ── STEP 4: Server-side ai_activity_log write ────────────────────────────────
+  // FEATURE: LOG-16 -- reflect_ran/synthesis_ran are real per-call facts (declaring REFLECT/
+  // Prompt Compression is what makes them run, per ARCHITECTURE.md's existing "must be declared"
+  // rule for those two specifically -- legitimate bucket-2 usage, unchanged) -- logged because they
+  // actually ran this call, not because they're declared. No other declared pattern is spread in
+  // anymore; a pattern not covered by a real per-call fact here simply isn't logged, honestly.
   const patternsUsed = Array.from(new Set([
-    ...buildPatternsUsed(isJson, guardrailsRan, delegation_occurred),
-    ...intent_technical_services,
+    ...buildPatternsUsed(isJson, guardrailsRan, delegation_occurred, enrichDebug.rag_retrieved === true),
+    ...(enrichDebug.reflect_ran ? ['reflect'] : []),
+    ...(enrichDebug.synthesis_ran ? ['intelligent-synthesis'] : []),
   ]));
   const latency_ms = Date.now() - startTime;
 

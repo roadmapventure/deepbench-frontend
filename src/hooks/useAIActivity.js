@@ -130,6 +130,27 @@ export const SERVICE_CATALOG = [
 // toward each pattern it used; only cost needs to reconcile to the whole. Entries with no
 // patternsUsed (pre-AI-50a rows, or a slug not yet in PATTERN_CATALOG) contribute nothing to any
 // bucket — invisible rather than mis-attributed, matching what real data is actually available.
+// FEATURE: LOG-16 -- historical pattern-display trust boundary. Before this session,
+// rag/streaming/reflect/intelligent-synthesis on any ai_type other than librarian/librarian-write
+// were spread from a declared Intent Skill Profile field onto every call of that intent, regardless
+// of whether that specific call actually exercised it -- confirmed live 2026-07-16, 659 real rows
+// carry this risk (see kickoff CONTEXT). This session's request-receivable.js fix makes these
+// patterns genuinely per-call real going forward, but a pre-fix row's declared-but-unverified
+// pattern can never be retroactively confirmed. Per John's explicit rule: if it can't be verified,
+// don't show it; if it can, show it. PATTERN_VERIFICATION_CUTOFF must be set to this fix's real
+// production deploy timestamp before the final push (Section 9/Manual QA) -- not an approximate or
+// pre-emptive value, since any row before the real fix is actually live could still carry the old
+// unverified spread.
+const UNVERIFIED_BEFORE_CUTOFF = new Set(['rag', 'streaming', 'reflect', 'intelligent-synthesis']);
+const ALWAYS_TRUSTED_AI_TYPES = new Set(['librarian', 'librarian-write']);
+export const PATTERN_VERIFICATION_CUTOFF = '2026-07-16T18:44:00Z'; // LOG-16 real push-time cutoff (S-LOG-16, set immediately before final push)
+
+function isPatternTrusted(slug, aiType, ts) {
+  if (!UNVERIFIED_BEFORE_CUTOFF.has(slug)) return true; // mechanical/always-real patterns
+  if (ALWAYS_TRUSTED_AI_TYPES.has(aiType)) return true; // hardcoded-at-real-occurrence, any age
+  return new Date(ts).getTime() >= new Date(PATTERN_VERIFICATION_CUTOFF).getTime();
+}
+
 export function computeByPattern(log) {
   const byPattern = {};
   for (const pat of PATTERN_CATALOG) {
@@ -137,9 +158,14 @@ export function computeByPattern(log) {
   }
   for (const e of log) {
     const used = Array.isArray(e.patternsUsed) ? e.patternsUsed : [];
-    if (used.length === 0) continue;
-    const splitCost = (e.cost || 0) / used.length;
-    for (const slug of used) {
+    // FEATURE: LOG-16 -- filter to only patterns this row can actually stand behind before
+    // splitting cost, so the displayed sum reconciles honestly across only what's shown (the
+    // stripped share redistributes to this same call's remaining trusted patterns, rather than
+    // silently vanishing from every bucket's total).
+    const trustedUsed = used.filter(slug => isPatternTrusted(slug, e.type, e.ts));
+    if (trustedUsed.length === 0) continue;
+    const splitCost = (e.cost || 0) / trustedUsed.length;
+    for (const slug of trustedUsed) {
       // FEATURE: LOG-14 — self-maintaining fallback: a real pattern slug the harness logged that
       // isn't yet in PATTERN_CATALOG gets its own auto-labeled bucket instead of being silently
       // dropped ("invisible rather than mis-attributed" no longer means invisible forever).
