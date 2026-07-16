@@ -53,6 +53,9 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 ---
 
 ## MARKET INTELLIGENCE — MI (now: charts)
+
+> **New Market Intelligence screen bugs use `CHI-[NUMBER]` now, not `MI-`** (`docs/SCREEN-INVENTORY.md`'s Applied mapping table — every checked `MI-` row maps to `CHI`, the Channel Intelligence screen this screen was renamed to). This section's existing `MI-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md` (supersedes v1/v2/v3-spec — retired)
 > Third AppShell tab, default landing route after splash. Center-screen content per `market-intelligence-v4.html` (its simulated top/bottom nav is not used — real DeepBench nav applies).
 > Design session: Apple v5 Redesign (2026-06-30).
@@ -66,6 +69,9 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 ---
 
 ## MOBILE & TERMINOLOGY — SH / RO (new track, opened 2026-07-13)
+
+> **New Roster/Bench bugs use `AGR-[NUMBER]` now, not `RO-`** (`RO` → `AGR`, confirmed by `docs/SCREEN-INVENTORY.md`'s Bench entry — "Bench" locked as `RO-12`, now the `AGR` screen code). **`SH` (shell-wide) bugs have no single mapping yet** — `AppShell.jsx` is cross-screen, not one Screen or listed Platform Layer — flag for a design session before assigning a new ID; a mobile bug scoped to one specific screen should use that screen's own code instead.
+
 > `AppShell.jsx` is shared by every screen — one fix here applies platform-wide, no per-screen repeat work.
 
 | ID | Type | Feature | Status | Session |
@@ -73,6 +79,8 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 ---
 
 ## AI INFRASTRUCTURE — AI (now: MI harness/speed bugs)
+
+> **New AI Audit / activity-log bugs use `LOG-[NUMBER]` now, not `AI-`** (`docs/SCREEN-INVENTORY.md`'s platform-layer table — this exact category maps to `LOG`, confirmed precedent: `AIA-01` was recoded to `LOG-01` for the same reason). This section's existing `AI-` rows are legacy and stay as-is; do not add new ones here.
 
 | ID | Type | Feature | Status | Session |
 |----|------|---------|--------|---------|
@@ -84,6 +92,9 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 ---
 
 ## AGENT ARCHITECTURE — AA (now: MI loop/harness/delegation reliability)
+
+> **New Agent Architecture bugs split across `HAR-`/`LOO-` now, not `AA-`** (`docs/SCREEN-INVENTORY.md`'s platform-layer table and Applied mapping — this now-tier's own rows land mostly on `HAR` (harness) or `LOO` (delegation/loop) depending on content; not uniform, check the specific row before assigning). This section's existing `AA-` rows are legacy and stay as-is.
+
 > Full spec: docs/AGENT-ARCHITECTURE.md (created S-AGENT-ARCH-01). `ARCHITECTURE.md` §19d/§19e (LOCKED) govern the Agent Loop and Resource Ownership Broker mechanisms these rows all touch — full track history and the many already-✅-Done items in this area live in `docs/FEATURES-ARCHIVE.md`/`docs/SESSIONS.md`. Everything else under the `AA` prefix (Phase 1–5 roadmap, MCP exposure, marketplace, revenue, BYOA, JL-01) is platform-wide, not MI-specific — see `docs/FEATURES-LATER.md`.
 
 | ID | Type | Feature | Status | Session |
@@ -117,6 +128,9 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 ---
 
 ## TASK INSTRUCTIONS — TI (promoted to now 2026-07-14, John's explicit call)
+
+> **New Task Instructions screen bugs use `PRO-[NUMBER]` now, not `TI-`** (`docs/SCREEN-INVENTORY.md`'s Applied mapping table — `TI-16` maps to `PRO`, the Project Management screen Task Instructions is a child of). This section's existing `TI-` rows are legacy and stay as-is; do not add new ones here.
+
 > `TI-14`/`TI-15` (Start button, per-step running state) stay in `docs/FEATURES-LATER.md` — only this row was gated on Q5, which is why John pulled it forward. Deliverables-table design already exists (`docs/FEATURES-LATER.md`'s DL section) — this is unblocked, not net-new design work.
 
 | ID | Type | Feature | Status | Session |

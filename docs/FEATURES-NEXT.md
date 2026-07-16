@@ -12,6 +12,9 @@
 ---
 
 ## MARKET INTELLIGENCE — MI (next: non-loop/harness/chart backlog)
+
+> **New Market Intelligence screen bugs use `CHI-[NUMBER]` now, not `MI-`** (`docs/SCREEN-INVENTORY.md`'s Applied mapping table — every checked `MI-` row maps to `CHI`, the Channel Intelligence screen this screen was renamed to). This section's existing `MI-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full design: `docs/APPLE-AGENT-1-v5-DESIGN.md` (supersedes v1/v2/v3-spec — retired)
 
 | ID | Type | Feature | Status | Session |
@@ -32,6 +35,8 @@
 ---
 
 ## AGENT IDENTITY — AG (next: MI agent roadmap)
+
+> **New Agent Identity bugs use `AGT-[NUMBER]` now, not `AG-`** (`docs/SCREEN-INVENTORY.md` — `AGT` replaces `AG`/`SK`/`IN`/`FM` with one unified Agent Competency Model code, confirmed 2026-07-15, `AGT-001` onward already logged directly in the new format). This section's existing `AG-` rows are legacy and stay as-is; do not add new ones here.
 
 | ID | Type | Feature | Status | Session |
 |----|------|---------|--------|---------|
@@ -64,6 +69,9 @@
 ---
 
 ## AGENT ARCHITECTURE — AA (next: MI-adjacent enhancements, not core loop/harness)
+
+> **New Agent Architecture bugs use whichever new code actually fits, not `AA-`** — this tier's rows split across `HAR`/`LOO`/`LOG`/`DAT`/`AGT` (or a Screen code like `CHI`) depending on content, not uniformly; check `docs/SCREEN-INVENTORY.md`'s Applied mapping table before assigning. This section's existing `AA-` rows are legacy and stay as-is.
+
 > Full spec: docs/AGENT-ARCHITECTURE.md. Core loop/harness/delegation-reliability items live in `docs/FEATURES.md` (now). Everything platform-wide (Phase 1–5 roadmap, MCP, marketplace, revenue, BYOA, JL-01) lives in `docs/FEATURES-LATER.md`.
 
 | ID | Type | Feature | Status | Session |

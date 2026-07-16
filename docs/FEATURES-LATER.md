@@ -20,6 +20,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ## SHELL & INFRASTRUCTURE — SH
 
+> **`SH` (shell-wide) bugs have no single mapping in the new taxonomy** — `AppShell.jsx` is cross-screen, not one Screen or listed Platform Layer in `docs/SCREEN-INVENTORY.md` — flag for a design session before assigning a new ID; a bug scoped to one specific screen should use that screen's own code instead. This section's existing `SH-` rows are legacy and stay as-is.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | SH-13 | About panel: GitHub Action auto-update stats.json on push to dev | ❌ Missing | S-ABOUT-STATS-01 (future, separate session) |
@@ -47,6 +49,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ## DASHBOARD — DB
 
+> **New Dashboard bugs use `PRO-[NUMBER]` now, not `DB-`** (`docs/SCREEN-INVENTORY.md` — Dashboard is `DashboardScreen.jsx`, the Project Management screen, code `PRO`). This section's existing `DB-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | DB-01 | Task list — active tasks, status, priority, HITL | 🔶 Partial (mock data) | — |
@@ -61,6 +65,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 ---
 
 ## ASSIGN WORK — AW
+
+> **New Assign Work bugs use `PRO-[NUMBER]` now, not `AW-`** (`docs/SCREEN-INVENTORY.md` — Create Work Order is always a child of the Project Management screen, code `PRO`). This section's existing `AW-` rows are legacy and stay as-is; do not add new ones here.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
@@ -78,6 +84,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ## TASK INSTRUCTIONS — TI
 
+> **New Task Instructions bugs use `PRO-[NUMBER]` now, not `TI-`** (`docs/SCREEN-INVENTORY.md`'s Applied mapping table — `TI-16` maps to `PRO`, the Project Management screen Task Instructions is a child of). This section's existing `TI-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | TI-02 | HITL step opens relevant screen | 🔶 Partial | S-future |
@@ -92,6 +100,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ## NIGP ANALYZER — AZ
 
+> **New Spend Analysis bugs use `SPA-[NUMBER]` now, not `AZ-`** (`docs/SCREEN-INVENTORY.md` — `AnalyzerScreen.jsx`'s `AZ` prefix reflects its NIGP-analyzer heritage; the current screen is Spend Analysis, code `SPA`). This section's existing `AZ-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | AZ-03 | Column mapping saved to task record | ❌ Missing | Blocked by SH-06 |
@@ -104,6 +114,8 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 ---
 
 ## FETCH — FT
+
+> **Fetch's new-taxonomy code is unconfirmed** — `docs/SCREEN-INVENTORY.md`'s Open Items note it's placed under Spend Analysis (`SPA`) only by route-pattern inference, but John flagged it as a probable NIGP leftover not fully incorporated; verify placement before assigning a new ID rather than assuming `SPA`. This section's existing `FT-` rows are legacy and stay as-is.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
@@ -119,6 +131,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## PERSONNEL FILE — PE
+
+> **New Personnel File bugs use `AGR-[NUMBER]` now, not `PE-`** (`docs/SCREEN-INVENTORY.md` — Personnel File is always a child of the Agent Roster screen, code `AGR`). This section's existing `PE-` rows are legacy and stay as-is; do not add new ones here.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
@@ -178,6 +192,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## TEACH — TC
 
+> **New Teach bugs use `AGR-[NUMBER]` now, not `TC-`** (`docs/SCREEN-INVENTORY.md` — Teach is a child of Personnel File, itself a child of Agent Roster, code `AGR`). This section's existing `TC-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | TC-02 | Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log | ❌ Missing | S-future |
@@ -193,6 +209,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## TEST TEAM — TT
 
+> **Test My Team's new-taxonomy code is `TMT`, but placement is itself unconfirmed** — `docs/SCREEN-INVENTORY.md` flags Test My Team as "placement uncertain," sitting directly under Bench (not nested) "for now"; verify current placement before assigning `TMT-[NUMBER]`. This section's existing `TT-` rows are legacy and stay as-is.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | TT-03 | Multi-Agent Debate upgrade — after parallel run, feed each agent the other's output for a critique pass; add synthesis agent that reads both critiques and produces a reconciled final answer (PAT-16 Multi-Agent Debate). Extends TT-01/02 foundation. Design session required. | ❌ Missing | S-future (design required) |
@@ -201,6 +219,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## AI INFRASTRUCTURE — AI
+
+> **New AI Audit / activity-log bugs use `LOG-[NUMBER]` now, not `AI-`** (`docs/SCREEN-INVENTORY.md`'s platform-layer table — this exact category maps to `LOG`, confirmed precedent: `AIA-01` was recoded to `LOG-01` for the same reason). This section's existing `AI-` rows are legacy and stay as-is; do not add new ones here. **Added 2026-07-16 after `AI-54`/`AI-55`/`AI-56` were mistakenly assigned here post-taxonomy and had to be renamed to `LOG-02`/`LOG-03`/`LOG-04` at close-out** — the top-of-file "Feature ID Format" legend was correct but easy to miss when landing on this section directly.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
@@ -264,6 +284,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## AGENT IDENTITY & CONFIGURATION — AG
 
+> **New Agent Identity/Configuration bugs use `AGT-[NUMBER]` now, not `AG-`** (`docs/SCREEN-INVENTORY.md` — `AGT` replaces `AG`/`SK`/`IN`/`FM` with one unified Agent Competency Model code, confirmed 2026-07-15). This section's existing `AG-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | AG-01 | Michelle static identity in agents.js | ❌ Missing | S-BENCH-01 |
@@ -297,6 +319,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## DELIVERABLES — DL
+
+> **New Deliverables bugs split by content, not `DL-`** — schema/data-model rows map to `DAT`, marketplace/sharing rows (e.g. old `DL-08`/`DL-09`) map to `MKT`, per-screen UI rows (e.g. old `DL-02`'s Deliverables Card) map to whichever screen they appear on — not uniform, check `docs/SCREEN-INVENTORY.md` before assigning. This section's existing `DL-` rows are legacy and stay as-is.
 
 > **Q5 RESOLVED 2026-06-13:** Step outputs and task deliverables are two tiers of the same first-class object. Step deliverables (`step_id` set) are intermediate; task deliverables (`is_final: true`, no `step_id`) are the assembled final output. Both live in the `deliverables` table. User can inspect any step deliverable and approve or request a change. Change requests go back to the assigned agent and update the final task deliverable when resolved. Every deliverable links to `agent_id` → surfaces on the agent's Projects tab (PE-06) and feeds the adaptive learning loop (change requests = training signal).
 
@@ -344,6 +368,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## AGENT ARCHITECTURE — AA
+
+> **New Agent Architecture bugs use whichever new code actually fits, not `AA-`** — this platform-wide-roadmap tier splits by content: marketplace/revenue (Phase 3-4) rows trend `MKT`, agent character/competency rows trend `AGT`, harness/loop/ownership-broker rows trend `HAR`/`LOO`, screen-specific items use that screen's code — not uniform, check `docs/SCREEN-INVENTORY.md` before assigning. This section's existing `AA-` rows are legacy and stay as-is.
+
 > Full spec: docs/AGENT-ARCHITECTURE.md (created S-AGENT-ARCH-01)
 > MI-relevant loop/harness items (`docs/FEATURES.md`) and MI-adjacent enhancements (`docs/FEATURES-NEXT.md`) have been extracted from this area's active rows — this file holds the platform-wide roadmap (Phases 1–5, marketplace, revenue, BYOA, JL-01, MCP) plus non-MI Resource Ownership Broker Track items.
 
@@ -479,6 +506,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## MCP PLATFORM EXPOSURE — MC
+
+> **New MCP exposure bugs use `MCP-[NUMBER]` now, not `MC-`** (`docs/SCREEN-INVENTORY.md`'s platform-layer table — `MCP` covers "services exposed as MCP tools," was part of `SV`, now its own code). This section's existing `MC-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full spec: `docs/AI-SERVICES.md` Section 7
 > All items Phase 4+. Design session required before any MCP surface is built: S-MCP-01 (not yet scheduled).
 
@@ -497,6 +527,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## WORK ORDER — WO
+
+> **New Work Order bugs use `PRO-[NUMBER]` now, not `WO-`** (`docs/SCREEN-INVENTORY.md` — Create Work Order is always a child of the Project Management screen, code `PRO`). This section's existing `WO-` rows are legacy and stay as-is; do not add new ones here.
+
 > Replaces "Task" app-wide. Full model: `docs/WORK-ORDER-MODEL.md`
 > S-RENAME-01 is a pre-requisite before any WO coding session.
 
@@ -511,6 +544,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## INTENT — IN
+
+> **New Intent bugs use `AGT-[NUMBER]` now, not `IN-`** (`docs/SCREEN-INVENTORY.md` — `AGT` replaces `AG`/`SK`/`IN`/`FM`; `INTENT-MODEL.md` itself is superseded, folded into the Agent Competency Model's Intent-type Skill, confirmed 2026-07-15). This section's existing `IN-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full model: `docs/INTENT-MODEL.md`
 > Design session (S-INTENT-01) required before any coding.
 
@@ -528,6 +564,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## FORMAT — FM
+
+> **New Format bugs use `AGT-[NUMBER]` now, not `FM-`** (`docs/SCREEN-INVENTORY.md` — `AGT` replaces `AG`/`SK`/`IN`/`FM`; `FORMAT-MODEL.md` itself is superseded, folded into the Agent Competency Model's Format-type Skill, confirmed 2026-07-15). This section's existing `FM-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full model: `docs/FORMAT-MODEL.md`
 > Design session (S-FORMAT-01) required before any coding.
 
@@ -544,6 +583,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## SKILLS & CAPABILITIES — SK
+
+> **New Skills & Capabilities bugs use `AGT-[NUMBER]` now, not `SK-`** (`docs/SCREEN-INVENTORY.md` — `AGT` replaces `AG`/`SK`/`IN`/`FM` with one unified Agent Competency Model code, confirmed 2026-07-15). This section's existing `SK-` rows are legacy and stay as-is; do not add new ones here.
+
 > Full model: `docs/SKILL-PROFILE-MODEL.md` — Traits, Capability assembly, Technical Services invocation, domain-agnostic principle, sprint template.
 > S-SK-01 complete (a447e49, 2026-06-18). All 12 Manual QA items PASS.
 
@@ -567,6 +609,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## SERVICE — SV
+
+> **New Service bugs split, not `SV-`** — catalog/profile/marketplace rows (like old `SV-01`/`02`/`04`) map to `MKT`; the MCP-tool-path exposure row (old `SV-03`) maps to `MCP` (`docs/SCREEN-INVENTORY.md`'s platform-layer table). Not uniform, check content before assigning. This section's existing `SV-` rows are legacy and stay as-is.
+
 > A Service is a packaged Intent + Format combination — named, priced, MCP-exposed.
 > Design session (S-SERVICE-01) required before any coding.
 
@@ -581,6 +626,8 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ## LANDING — LA
 
+> **New Landing bugs use `HOM-[NUMBER]` now, not `LA-`** (`docs/SCREEN-INVENTORY.md` — the Home Screen this section is about is Screen code `HOM`; `LA-01` itself is the confirmed example already tracked here). This section's existing `LA-` rows are legacy and stay as-is; do not add new ones here.
+
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
 | LA-01 | **Home Screen — the decision this row was waiting on is resolved 2026-07-15 (John, screen-inventory design conversation).** `/` is a real, distinct future screen — splash, announcements, and overall dashboard metrics — not a rename of what's currently there. `MarketIntelligenceScreen.jsx` ("Channel Intelligence," itself renamed from "Market Intelligence"/MI-46 the same conversation) is squatting on `/` temporarily and needs to move to its own route once Home exists; not fixed here, just unblocked for scoping. Also surfaced the same session: the platform's nav is a real two-level hierarchy — **Home** / **Work** (a family of per-work-type dashboards: Channel Intelligence, Project Management, Spend Analysis, room to grow) / **Bench** (Agent Roster + its own children: Add Agent, Personnel File → Teach) / **Platform** (AI Audit, About) — not a flat screen list. Full draft inventory and the naming decisions behind it: this conversation, not yet written to a dedicated doc. | ❌ Missing | S-future (design required — scope Home Screen's own content, and Channel Intelligence's move off `/`, as separate sessions) |
@@ -588,6 +635,9 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 ---
 
 ## STRUCTURAL ENFORCEMENT — SE
+
+> **`SE` has no single mapping in the new taxonomy** — it's an audit/enforcement concern cutting across every screen and platform layer, not itself a Screen or a listed Platform Layer in `docs/SCREEN-INVENTORY.md`; flag for a design session on whether it becomes its own new platform-layer code or splits per rule's actual owning area before assigning a new ID here. This section's existing `SE-` rows are legacy and stay as-is.
+
 > New prefix, opened by `S-ARCH-AUDIT-01-design` (2026-07-02). Groups every `ARCHITECTURE.md`/`STANDARDS.md` rule found stated in prose but not backed by any code/schema check — the audit's finding, not a build gap. Each row below turns a discipline-only rule into a repeatable, automatable check. See `S-ARCH-AUDIT-01-design` in `CLAUDE-STATE.md`/`docs/SESSIONS.md` for the full walk of every LOCKED section (most were already fine — either genuinely discipline-only with no automatable form, or already structurally enforced, e.g. `logAICall()` via the Generic Capability Executor). **Deliberately deferred behind the MI Loop/Charts work** (see `CLAUDE-STATE.md`'s Session Queue) — no SE- item blocks that work.
 
 | ID | Feature | Status | Session |
