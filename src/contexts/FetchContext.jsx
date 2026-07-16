@@ -7,6 +7,7 @@
 import { createContext, useContext, useState, useRef, useCallback } from "react";
 import { FETCH_API_BASE } from "../config.js";
 import { FETCH_STATES } from "../data/agents.js";
+import { logAICall } from "../hooks/useAIActivity.js";
 
 const FetchContext = createContext(null);
 
