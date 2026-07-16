@@ -15,7 +15,6 @@ import { Corners, AgentAvatar, AiBadge, Toast, FeatureBadge } from "../component
 import PromptEvolutionModal from "../components/PromptEvolutionModal.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
-import { logAICall } from "../hooks/useAIActivity.js";
 import { supabase } from "../lib/supabase.js";
 import { mergeSteps } from "../utils/mergeSteps.js";
 import { AI_PAT, AGENT_PATTERNS } from "../aiPatterns.js";
@@ -360,7 +359,6 @@ export default function CreateWorkOrderScreen() {
           clearTimeout(timeoutId);
           setGoalStreaming(false);
           if (!accumulated) setGoalSuggestFailed(true);
-          logAICall({ type: 'goal_suggestion', model: 'claude-haiku-4-5-20251001', latencyMs: Date.now() - streamStart, tokens: 0, location: 'Create Work Order', agentId: selectedPMAgent?.id || 'michelle' });
           return;
         }
         const chunk = decoder.decode(value);
@@ -370,7 +368,6 @@ export default function CreateWorkOrderScreen() {
             clearTimeout(timeoutId);
             setGoalStreaming(false);
             if (!accumulated) setGoalSuggestFailed(true);
-            logAICall({ type: 'goal_suggestion', model: 'claude-haiku-4-5-20251001', latencyMs: Date.now() - streamStart, tokens: 0, location: 'Create Work Order', agentId: selectedPMAgent?.id || 'michelle' });
             return;
           }
           if (line.startsWith('data: ')) {

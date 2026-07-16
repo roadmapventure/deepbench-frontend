@@ -6,6 +6,7 @@ import { assemblePrompt } from './prompt/db-assembly.js';
 import { enrichPrompt } from './prompt/ai-enrichment.js';
 import { sendRequest } from './prompt/request-receivable.js';
 import { queryRAG } from '../lib/rag.js';
+import { logActivity } from '../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -84,6 +85,10 @@ export default async function handler(req, res) {
         return res.end();
       }
 
+      let inputTokens = null;
+      let outputTokens = null;
+      const streamStart = Date.now();
+
       const reader = anthropicRes.body.getReader();
       const decoder = new TextDecoder();
 
@@ -100,11 +105,24 @@ export default async function handler(req, res) {
               const parsed = JSON.parse(data);
               if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                 res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+              } else if (parsed.type === 'message_start') {
+                inputTokens = parsed.message?.usage?.input_tokens ?? null;
+              } else if (parsed.type === 'message_delta') {
+                outputTokens = parsed.usage?.output_tokens ?? outputTokens;
               }
             } catch {}
           }
         }
       }
+
+      logActivity({
+        tenantId: tenant_id, agentId: agent_id || 'michelle',
+        aiType: 'goal_suggestion', feature: 'goal-suggestion',
+        model: 'claude-haiku-4-5-20251001',
+        inputTokens, outputTokens,
+        latencyMs: Date.now() - streamStart,
+        patternsUsed: ragContext ? ['streaming', 'rag'] : ['streaming'],
+      });
 
       res.write('data: [DONE]\n\n');
       return res.end();

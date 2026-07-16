@@ -116,7 +116,7 @@ function AIStackDiagram() {
       {/* Layer 1 — Foundation */}
       <rect x={8} y={248} width={440} height={42} fill="#162840"/>
       <text x={20} y={263} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2460;  FOUNDATION LAYER</text>
-      <text x={20} y={278} fontFamily="monospace" fontSize={9} fill="#3d5060">Models (Claude · GPT-4)  ·  Embeddings  ·  pgvector</text>
+      <text x={20} y={278} fontFamily="monospace" fontSize={9} fill="#3d5060">Models (Claude)  ·  Embeddings  ·  pgvector</text>
 
       {/* DeepBench bracket — layers 4–6, y=8 to y=146 */}
       <line x1={456} y1={8} x2={456} y2={146} stroke="#b6873a" strokeWidth={2}/>
