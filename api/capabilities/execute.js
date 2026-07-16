@@ -110,15 +110,32 @@ function percentile(values, p) {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
 }
 
+// FEATURE: AA-196 patch (S-ARCH-HOP-BUDGET-01-patch) -- a single request's `limit=3000` was
+// silently truncated to 1000 rows by this Supabase project's own PostgREST cap (confirmed live,
+// Content-Range: 0-999/3868 returned for the original request), excluding older-but-still-real
+// samples for infrequently-called capabilities (data-room-custody's 21 real samples, dated
+// 07-08 through 07-14, all fell outside the resulting 1000-row window) -- silently defeating
+// the fix for exactly the capabilities it exists to protect. Paginate instead: the table has
+// ~3900 total agent-turn rows today, small enough to fetch in full. MAX_PAGES is a safety bound
+// (10,000 rows), not a targeted window -- stops when a page returns fewer than PAGE_SIZE rows
+// (no more data) well before that bound in practice.
 async function refreshHopEstimateCache() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/ai_activity_log?ai_type=eq.agent-turn&latency_ms=not.is.null&select=feature,latency_ms&order=created_at.desc&limit=3000`,
-    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
-  );
-  if (!res.ok) throw new Error(`Failed to load ai_activity_log for hop estimates: ${res.status}`);
-  const rows = await res.json();
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  const PAGE_SIZE = 1000; // this project's real per-request PostgREST cap, confirmed live 2026-07-16
+  const MAX_PAGES = 10;
+  let rows = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/ai_activity_log?ai_type=eq.agent-turn&latency_ms=not.is.null&select=feature,latency_ms&order=created_at.desc&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`,
+      { headers }
+    );
+    if (!res.ok) throw new Error(`Failed to load ai_activity_log for hop estimates (page ${page}): ${res.status}`);
+    const pageRows = await res.json();
+    rows = rows.concat(pageRows);
+    if (pageRows.length < PAGE_SIZE) break;
+  }
   const byKey = {};
   for (const row of rows) {
     if (!row.feature) continue;
