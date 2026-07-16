@@ -22,7 +22,7 @@ async function fetchWithTimeout(promise, timeoutMs) {
   }
 }
 
-async function fetchSection(section, taskContext, tenantId, requestingAgentId) {
+async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null) {
   if (section.type === "stored") return { ...section };
 
   if (section.type === "rag") {
@@ -89,7 +89,7 @@ function assembleSystemPrompt(renderedBlocks) {
   return renderedBlocks.filter(Boolean).join("\n\n---\n\n");
 }
 
-export async function enrichPrompt({ prompt_request, agent_id, capability_slug }) {
+export async function enrichPrompt({ prompt_request, agent_id, capability_slug, trace_id = null }) {
   const promptRequest = prompt_request;
   if (!promptRequest || typeof promptRequest !== "object") {
     throw new Error("Prompt Request body required");
@@ -128,7 +128,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
   // STEP 1 — FETCH: run stored pass-through + RAG fetches in parallel
   const nonReflectSections = sections.filter(s => s.type !== "reflect");
   const fetchedSections = await Promise.all(
-    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId))
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id))
   );
 
   // STEP 2 — RENDER: assemble text blocks in section order
@@ -284,6 +284,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
       inputTokens: reflectUsage?.input_tokens ?? null,
       outputTokens: reflectUsage?.output_tokens ?? null,
       patternsUsed: ['reflect'],
+      traceId: trace_id,
     });
   }
   if (synthesisRan && synthesisTokensUsed > 0) {
@@ -293,6 +294,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug }
       inputTokens: synthesisUsage?.input_tokens ?? null,
       outputTokens: synthesisUsage?.output_tokens ?? null,
       patternsUsed: ['intelligent-synthesis'],
+      traceId: trace_id,
     });
   }
 

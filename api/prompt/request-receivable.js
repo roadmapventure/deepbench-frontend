@@ -270,7 +270,7 @@ export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = fa
   ];
 }
 
-export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null }) {
+export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -423,6 +423,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
           outputTokens: gData.usage?.output_tokens ?? null,
           latencyMs: guardrailsLatency,
           patternsUsed: ['guardrails', 'prompt-chaining'],
+          traceId: trace_id,
         });
       }
     } catch (err) {
@@ -475,6 +476,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     outputTokens: usage.output_tokens ?? null,
     latencyMs: latency_ms,
     patternsUsed,
+    traceId: trace_id,
   });
 
   // ── STEP 5: Return response ──────────────────────────────────────────────────
