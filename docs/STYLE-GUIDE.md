@@ -738,10 +738,26 @@ const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); };
 
 ---
 
+## Section 35 — Gradient Action Card: "Needs Your Input" Pattern (Locked 2026-07-16 · S-CHI-05-design)
+
+A distinct visual pattern for any moment that requires an explicit user decision before the flow can continue — first application: `QaEvidenceCard`'s review-choice prompt ("Good with this analysis, or would you prefer deeper theories?"). Deliberately not a variant of the flat-fill card family (Section 3) or `ConfirmationCard` (Section 16) — those stay unchanged for their own use cases; this is a new pattern reserved for genuine action-required moments, not a general card restyle.
+
+- **Card fill:** `linear-gradient(180deg, T.brassGlow 0%, T.white 50%)` — new tokens (`#f0d99a`, `#ffffff`), added specifically for this pattern. `T.white` is the only pure-white surface anywhere in the app; every other "light" surface uses `T.card`/`T.cardAlt` (off-white cream). Do not substitute `T.brassLight` (`#e4c786`) — visually close but not the approved color.
+- **Corners:** sharp, squared (`borderRadius:0`) everywhere in this pattern, including the badge — brass `<Corners/>` bracket ornament (Section 3) still applies, on its own `position:"relative"` wrapper.
+- **Badge:** `● Needs your input` — mono, 9px, uppercase, `letterSpacing:0.05em`, solid `T.brass` fill, `T.navy` text (reuses the same brass-fill/navy-text pairing as Section 7's Primary CTA), squared.
+- **Question text:** `body` font (Inter), 14px, weight 700, `T.navy` — bold and dark, not the italic/muted treatment used for ordinary status copy elsewhere.
+- **Secondary action ("Good, thanks"):** white box (`T.white` fill), 1px `T.line` border — deliberately styled to read like the chat input field's own box treatment, not a ghost button.
+- **Primary action:** solid `T.navy` fill, `T.card` text, bold, squared — **scoped exception to Section 7's locked brass-gradient Primary CTA rule.** This exception applies only to this "needs your input" pattern; every other Primary CTA in the app stays brass-gradient per Section 7, unchanged.
+
+First application: `QaEvidenceCard`'s and `MessageBubble`'s (dormant) review-choice blocks, `MarketIntelligenceScreen.jsx` (`CHI-05`). Any future "you must decide before continuing" moment reuses this pattern rather than inventing a fourth card variant.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-16 | S-CHI-05-design | Section 35 added — Gradient Action Card "needs your input" pattern locked: new `T.brassGlow`/`T.white` tokens, gold-to-white gradient fill, sharp corners + brass Corners bracket, solid-brass/navy badge, bold navy question text, navy primary CTA (scoped exception to Section 7). First application: `QaEvidenceCard`/`MessageBubble`'s review-choice prompt. Kickoff: `docs/kickoffs/v6.3.32-CHI-05-evidence-review-choice-action-styling.md`. |
 | 2026-07-16 | S-CHI-04-design / CHI-04 | Section 34 added — Clear now resets `pipelineEvents`/`pendingDelegationsRef` (Column 3 used to survive Clear untouched); stale-generation guard (`clearGenerationRef`/`isStale`) locked as the durable cancellation pattern for any future async call this screen adds; question-boundary divider (`question_boundary` marker event + `QuestionDivider`) marks where one question's Agent Routing hops end and the next begin when Clear isn't used in between. Kickoff: `docs/kickoffs/v6.3.29-CHI-04-clear-reset-stale-guard-question-divider.md`. |
 | 2026-07-16 | S-CHI-03-design / CHI-03a | Section 33 added — Chat vs. Evidence content split locked: any document/analysis/narrative is evidence (Column 2), conversational commentary about it stays in chat. New `qaEvidence` state slot (independent of `hypFlow`) fixes a real bug where a plain Q&A never escalated left Evidence permanently empty. Columns renamed "Interact"→"Chat", "Evidence"→"Evidence & Interaction". Kickoff: `docs/kickoffs/v6.3.22-CHI-03a-chat-evidence-architecture-move.md`. |
 | 2026-07-16 | S-CHI-AUDIT-GROUPING-01-design | Section 31 amended — same-agent consecutive rows now merge into one turn-numbered card (was header-suppression only). Section 32 added — long log text clamps visually (3 lines) with click-to-expand, replacing hard string truncation. |
