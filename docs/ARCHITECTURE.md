@@ -143,9 +143,9 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 
 > The Platform Model is the core conceptual and data model of DeepBench. Every product feature wraps around this model. All vocabulary defined here is canonical — use it in code comments, UI labels, kickoff docs, and design sessions.
 >
-> **Updated 2026-06-18 (Architecture Model Redesign):** Supersedes the prior Agent Profile Model (three Competencies). Skills are now the atomic unit of the platform. The hierarchy runs: Technical Services → Skills → Skill Profiles → Capabilities → Competencies → Agents → Deliverables. Intent and Format are now Skill types (no longer standalone entities). AI Patterns and Deterministic logic are now Technical Services — the platform-facing execution engine, not user-facing Skills.
+> **Rewritten 2026-07-15 (John's explicit correction, `S-ARCH-COMPETENCY-MODEL-design` follow-up):** the prior version of this section (2026-06-18) was wrong and had caused the same misunderstanding roughly 20 times across a month of sessions — it described "Skill" and "Skill Profile" as two separate layers (Skill = generic type, Skill Profile = configured instance), plus an invented "Competency" layer with no table of its own. **Skill is the atomic unit, full stop — there is no separate Skill/Skill Profile split.** Verified directly against the live schema before this rewrite: `skill_profiles` is the one and only table for the atomic unit; `skill_type_slug` is a plain FK into a small tag lookup (`skill_types`); there is no `skills` table and no `competencies` table. This section now states that directly instead of the old 5-layer hierarchy.
 >
-> **Important:** Skill Profiles within each Skill type are listed as examples only. Each Skill type requires a dedicated design and modeling session before any Skill Profile inside it is built. We can build a single Skill Profile in one sprint without touching anything else in the model.
+> **Important:** Skills within each type are listed as examples only. Each Skill type requires a dedicated design and modeling session before any new Skill of that type is built. We can build a single Skill in one sprint without touching anything else in the model.
 
 ---
 
@@ -154,22 +154,21 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 | Term | Definition |
 |------|-----------|
 | **Technical Service** | An AI Pattern or Deterministic engine that executes a Skill. Platform-facing — never user-facing as a concept. |
-| **Skill** | A type of ability the platform supports. Five types: Identity, Behavior, Knowledge, Intent, Format. |
-| **Skill Profile** | A configured instance of a Skill type. Where proprietary IP and novel value live. Created by users or platform admins. |
-| **Capability** | A grouped set of Skill Profiles with its own Profile. Novel and configurable. |
-| **Competency** | An assembled set of Skill Profiles and/or Capabilities. Can be packaged and exposed with or without a persona. |
-| **Agent** | A Competency with a persona — name, avatar, role, quip. The human-facing workforce member. |
-| **Work Order** | The unit of work assigned to a Competency. Contains Steps. |
+| **Skill** | The atomic unit of the platform — a configured, ownable, proprietary unit where IP and novel value live. Every Skill carries a `type` tag from a fixed lookup (6 today — see below). Created by users or platform admins. Stored as one row in `skill_profiles`; "Skill" and "Skill Profile" are the same thing — do not treat them as two layers. |
+| **Capability** | A grouped set of Skills with its own Profile. Novel and configurable. Many-to-many with Skill (a Skill can belong to multiple Capabilities; a Capability groups multiple Skills). |
+| **Competency** | The same real-time construct as an Agent, named without a persona — not a stored row of its own. A Capability-set that hasn't been given a persona is a sellable, MCP-accessible Competency; give it a name/avatar/role/quip and it's an Agent. |
+| **Agent** | A Competency with a persona — name, avatar, role, quip. The human-facing workforce member. Many-to-many with Capability (an Agent can hold multiple Capabilities; a Capability can be assigned to multiple Agents). |
+| **Work Order** | The unit of work assigned to an Agent/Competency. Contains Steps. |
 | **Step** | A discrete unit of execution within a Work Order. May consume prior Deliverables as input context. |
 | **Deliverable** | An output object produced when a Skill, Capability, Step, or Work Order completes execution. First-class entity. |
 | **Deliverable Handoff** | A Step property declaring which prior Deliverable(s) it consumes as input context. |
-| **Profile** | The configured state of any entity — Skill, Capability, Competency, or Agent. |
-| **Level** | Depth and quality grade of a Skill Profile. L1–L4. Determines quality, pricing, and routing. |
-| **Grade** | The act of assessing and assigning a Level to a Skill Profile. |
-| **Seniority** | Authorizing an Agent to use a Skill Profile or Capability at a specific Level. |
-| **Model Score** | Rolled-up score across all Skill Profile Levels held by a Competency. |
+| **Profile** | The configured state of any entity — Skill, Capability, or Agent. |
+| **Level** | Depth and quality grade of a Skill. L1–L4. Determines quality, pricing, and routing. |
+| **Grade** | The act of assessing and assigning a Level to a Skill. |
+| **Seniority** | Authorizing an Agent to use a Skill or Capability at a specific Level. |
+| **Model Score** | Rolled-up score across all Skill Levels held by an Agent/Competency. |
 
-> **Reserved term:** "Assignment" means work assigned to a Competency — a Work Order or Step. Never use it to describe Seniority or Skill Profile authorization.
+> **Reserved term:** "Assignment" means work assigned to an Agent/Competency — a Work Order or Step. Never use it to describe Seniority or Skill authorization.
 
 ---
 
@@ -178,22 +177,22 @@ Design Layers 1–3 so this layer can wrap them without rewriting them.
 ```
 Technical Services  — AI Patterns + Deterministic (platform-facing execution engine)
   ↓ execute
-Skills              — 5 types: Identity, Behavior, Knowledge, Intent, Format
-  ↓ configured into
-Skill Profiles      — novel, proprietary instances of a Skill (where IP lives)
-  ↓ combine into
-Capabilities        — grouped Skill Profiles with their own Profile
-  ↓ assemble into
-Competencies        — packaged Capability sets (with or without a persona)
-  ↓ persona-bearing Competency =
-Agents              — named, avatared workforce members
+Skills              — the atomic unit; each tagged with one of 6 types (see below);
+                       where proprietary IP and novel value live
+  ↕ many-to-many (capability_skill_profiles)
+Capabilities        — grouped sets of Skills, with their own Profile
+  ↕ many-to-many (agent_capability_assignments)
+Agents              — a Capability-set + persona (name, avatar, role, quip);
+                       without a persona, the same construct is a sellable Competency
   ↓ execute against
 Work Orders         — with Steps that may consume prior Deliverables as input
   ↓ produce
-Deliverables        — output objects attributed to the producing Competency
+Deliverables        — output objects attributed to the producing Agent/Competency
 ```
 
-**Baseline behavior:** A Competency with no defined Skill Profiles still produces output — operating at L1 (General) using generic LLM. The platform model enriches quality and routing precision but never blocks execution. Competencies grow into their profiles one sprint at a time.
+Two many-to-many joins, three real layers. No separate "Skill Profile" layer above Skill, no separate "Competency" table above Agent.
+
+**Baseline behavior:** An Agent with no assigned Skills still produces output — operating at L1 (General) using generic LLM. The platform model enriches quality and routing precision but never blocks execution. Agents grow into their Capabilities one sprint at a time.
 
 ---
 
@@ -201,25 +200,28 @@ Deliverables        — output objects attributed to the producing Competency
 
 | Audience | Vision |
 |----------|--------|
-| **Human** | Load your Skills, configure your Profiles, and be recreated as a Competency — your knowledge, behavior, and identity preserved and operational. |
-| **Machine** | An LLM assembles Skills, Capabilities, and Competencies at runtime to execute any Work Order or Step without human configuration at call time. |
-| **Technical** | Every Skill Profile, Capability, and Agent is configurable, measurable, sharable, revenue-generating, and MCP-accessible at every level of the hierarchy. |
+| **Human** | Load your Skills, configure your Capabilities, and be recreated as an Agent — your knowledge, behavior, and identity preserved and operational. |
+| **Machine** | An LLM assembles Skills and Capabilities at runtime to execute any Work Order or Step without human configuration at call time. |
+| **Technical** | Every Skill, Capability, and Agent is configurable, measurable, sharable, revenue-generating, and MCP-accessible at every level of the hierarchy. |
 
 ---
 
-### Five Skill Types
+### Six Skill Types
 
-Skills are the atomic unit of the platform. Five types are defined. New Skill types can always be added without changing existing ones.
+Skills are the atomic unit of the platform. Six types are defined today. New Skill types can always be added without changing existing ones.
 
-| Skill Type | What it captures | Example Skill Profiles |
+**Known drift (2026-07-15):** the `skill_types` lookup table itself only has 5 seeded rows — `guardrails` is real and already dispatched on in the harness (`api/prompt/db-assembly.js`'s `SKILL_ORDER`), but was never added to the `skill_types` catalog. Needs a one-row seed to close the gap between code and catalog.
+
+| Skill Type | What it captures | Example Skills |
 |-----------|-----------------|----------------------|
 | **Identity** | Who the agent is — mindset, philosophy, personality, ethics | Philosophy, Autonomy, Skeptic Level, Temporal Stance, Epistemology |
 | **Behavior** | How the agent thinks and communicates — style, reasoning, tone | Behavioral Style, Collaboration Role, Learning Stance, Peter Principle |
-| **Knowledge** | What the agent knows — domain facts, Library content, IP | NIGP Domain Knowledge, Legal Procurement Expertise, Austin FY2025 Data |
+| **Knowledge** | Domain and industry-specific background — terminology, risks, signals, and patterns | NIGP Domain Knowledge, Legal Procurement Expertise, Austin FY2025 Data |
 | **Intent** | What type of cognitive work the agent performs | Analysis Report, Research Findings, Review Feedback, Draft Document, Monitor & Alert |
 | **Format** | What output structures the agent produces | HTML Strategy Brief, Executive Brief, NIGP Dashboard, Structured Report |
+| **Guardrails** | Must / must-not rules the agent operates under | Must cite sources, Must not disclose competitor data |
 
-Each Skill type can have unlimited Skill Profile instances — created by users or platform admins. A Skill Profile is where novel, proprietary value lives.
+Each Skill type can have unlimited Skills tagged with it — created by users or platform admins. A Skill is where novel, proprietary value lives.
 
 ---
 
@@ -242,21 +244,21 @@ Full Technical Services catalog: `docs/AI-SERVICES.md`
 
 ---
 
-### Skill Profiles
+### Skills — Universal Properties
 
-A Skill Profile is a configured instance of a Skill type. It is the unit where proprietary value and IP are created and stored.
+A Skill is a configured, ownable unit — the atomic unit where proprietary value and IP are created and stored. Stored as one row in `skill_profiles`.
 
-**Universal properties — apply to every Skill Profile regardless of type:**
+**Universal properties — apply to every Skill regardless of type:**
 
 | Property | Description | Values |
 |----------|-------------|--------|
 | **Level** | Depth and quality grade | L1 General · L2 Trained · L3 Expert · L4 Proprietary |
-| **Availability** | Who can access this Skill Profile | Public · Private |
-| **Exclusivity** | How many Competencies share this Skill Profile | Shared · Exclusive |
+| **Availability** | Who can access this Skill | Public · Private |
+| **Exclusivity** | How many Agents share this Skill | Shared · Exclusive |
 | **Pricing** | Cost to access or use | Free · Priced ($/use) |
-| **Trainability** | Can this Skill Profile be improved | Trainable · Supervised · Locked |
+| **Trainability** | Can this Skill be improved | Trainable · Supervised · Locked |
 | **Confidence** | Calibration level of output | *(scale TBD in design session)* |
-| **LLM Provider** | Which AI provider executes this Skill Profile | Anthropic · OpenAI · *(future: others)* |
+| **LLM Provider** | Which AI provider executes this Skill | Anthropic · OpenAI · *(future: others)* |
 | **LLM Model** | Specific model assigned | Haiku · Sonnet · GPT-4o · *(future: others)* |
 | **Max Tokens** | Token budget ceiling for this Skill's LLM call | Integer — e.g. 1200 · 4000 · 8000 |
 | **API Key Source** | Who provides the API key | Platform · BYOK |
@@ -266,7 +268,7 @@ A Skill Profile is a configured instance of a Skill type. It is the unit where p
 
 ### Capabilities
 
-A Capability is a grouped set of Skill Profiles with its own Profile. Capabilities are novel and configurable — created by users or platform admins.
+A Capability is a grouped set of Skills with its own Profile. Capabilities are novel and configurable — created by users or platform admins. Many-to-many with Skill: a Skill can belong to more than one Capability.
 
 **Rules [LOCKED]:**
 - A Capability is independent of any specific Agent
@@ -279,7 +281,7 @@ A Capability is a grouped set of Skill Profiles with its own Profile. Capabiliti
 
 ### Competencies and Agents
 
-A Competency is an assembled set of Skill Profiles and/or Capabilities. It can be packaged and exposed with or without a persona.
+A Competency is a Capability-set — one or more Capabilities held by the same entity. It can be packaged and exposed with or without a persona; it is not a stored row of its own, it's the same real-time construct as an Agent, viewed without the persona layer.
 
 **Agent = a Competency with a persona.**
 
@@ -288,7 +290,7 @@ A Competency is an assembled set of Skill Profiles and/or Capabilities. It can b
 | **Agent** | Yes — name, avatar, role, quip | Chloe Okafor (JR-01), Mike Alvarez (SR-02) |
 | **Standalone Competency** | No | NIGP Analysis Capability exposed via MCP directly |
 
-An Agent does not own its Skill Profiles or Capabilities — it holds Seniority in them at specific Levels. Two Agents can hold Seniority in the same Skill Profile at different Levels.
+An Agent does not own its Skills or Capabilities — it holds Seniority in them at specific Levels. Two Agents can hold Seniority in the same Skill at different Levels. Many-to-many with Capability: an Agent can hold multiple Capabilities; a Capability can be assigned to multiple Agents.
 
 ---
 
@@ -300,14 +302,14 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 
 | Type | When produced | Example |
 |------|---------------|---------|
-| **Skill Deliverable** | A single Skill Profile executes | RAG retrieval result, extracted document summary |
+| **Skill Deliverable** | A single Skill executes | RAG retrieval result, extracted document summary |
 | **Capability Deliverable** | A Capability completes | NIGP Analysis output |
 | **Step Deliverable** | A Work Order Step completes | Vendor concentration report (intermediate) |
 | **Work Order Deliverable** | The full Work Order completes | Assembled executive brief (final) |
 
-**Deliverable Handoff:** A Step may declare which prior Deliverable(s) it consumes as input context via a `consumes: [deliverable_id]` property. This enables multi-agent workflows where one Competency's output becomes another's input.
+**Deliverable Handoff:** A Step may declare which prior Deliverable(s) it consumes as input context via a `consumes: [deliverable_id]` property. This enables multi-agent workflows where one Agent/Competency's output becomes another's input.
 
-**Attribution:** Every Deliverable is attributed to the Competency that produced it — which may be an Agent (Competency with persona) or a standalone Capability (Competency without persona). Attribution field: `competency_id`.
+**Attribution:** Every Deliverable is attributed to the Agent/Competency that produced it — which may be an Agent (persona-bearing) or a standalone Competency (no persona). Attribution field: `competency_id`.
 
 **Status lifecycle:** draft → approved → change_requested → resolved
 
@@ -315,28 +317,31 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 
 ### Key Rules [LOCKED]
 
-1. **Skills are the atomic unit.** Everything else is composition — Capabilities group Skill Profiles, Competencies assemble Capabilities.
-2. **Skill Profiles are where IP lives.** The Skill type is generic. The Skill Profile is proprietary, configurable, and revenue-generating.
-3. **Technical Services are platform-facing.** Users configure Skill Profiles, not Technical Services. Technical Services are visible only in the AI Audit screen for transparency and governance.
-4. **Capabilities are shared resources.** Built once, assigned to many Agents at different Levels via Seniority.
-5. **Agents hold Seniority, not ownership.** An Agent does not own a Skill Profile or Capability — it is authorized to use one at a specific Level.
-6. **Agent = Competency with persona.** A Competency without a persona is a valid, sellable, MCP-accessible product.
+1. **Skills are the atomic unit.** Everything else is composition — Capabilities group Skills, Agents/Competencies hold Capabilities. No separate "Skill Profile" layer above Skill.
+2. **Skills are where IP lives.** A Skill's `type` is just a tag (6 today). The Skill itself is proprietary, configurable, and revenue-generating.
+3. **Technical Services are platform-facing.** Users configure Skills, not Technical Services. Technical Services are visible only in the AI Audit screen for transparency and governance.
+4. **Capabilities are shared resources.** Built once, assigned to many Agents at different Levels via Seniority — many-to-many, not 1-to-many.
+5. **Agents hold Seniority, not ownership.** An Agent does not own a Skill or Capability — it is authorized to use one at a specific Level.
+6. **Agent = Competency with persona.** A Competency without a persona is a valid, sellable, MCP-accessible product — same construct, no separate table.
 7. **Every level can produce a Deliverable.** A Skill, Capability, Step, or Work Order can produce a Deliverable. No level is output-less by definition.
-8. **Deliverables are attributed to Competencies.** Not specifically to Agents. An Agent is a Competency.
-9. **Baseline is always L1.** A Competency with no Skill Profiles still executes using generic LLM. The model enriches; it never blocks.
-10. **Grade is the verb; Level is the noun.** Levels roll up to Capability Levels, which roll up to the Competency Model Score.
-11. **"Assignment" means work.** Never use it for Seniority or Skill Profile authorization. Assignment = Work Order or Step assigned to a Competency.
-12. **Model Score is always derived.** Never hardcoded. Always rolled up from actual assigned Skill Profile Levels.
+8. **Deliverables are attributed to Agents/Competencies.** An Agent is a Competency with a persona — same attribution field either way.
+9. **Baseline is always L1.** An Agent/Competency with no assigned Skills still executes using generic LLM. The model enriches; it never blocks.
+10. **Grade is the verb; Level is the noun.** Levels roll up to Capability Levels, which roll up to the Agent/Competency's Model Score.
+11. **"Assignment" means work.** Never use it for Seniority or Skill authorization. Assignment = Work Order or Step assigned to an Agent/Competency.
+12. **Model Score is always derived.** Never hardcoded. Always rolled up from actual assigned Skill Levels.
 
 ---
 
 ### DB Architecture — Current State
-**[CORRECTED 2026-07-01, S-APPLE-02a-design]** This section previously read "Target State... do not build before S-INFRA-01." That was stale: `skill_types` (5 rows), `skill_profiles` (13 rows), `capabilities` (8 rows), `capability_skill_profiles` (13 rows), and `agent_capability_assignments` (8 rows) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()` — confirmed by direct schema query during S-APPLE-02a-design. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill-Profile LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The Taxonomy (Layer 1) and Seniority (Layer 2) tables below are live now — new Capabilities and Skill Profiles can be created against them without waiting for S-INFRA-01.
+**[CORRECTED 2026-07-01, S-APPLE-02a-design; prose corrected again 2026-07-15 — see rewrite note at the top of this section]** `skill_types` (5 rows, missing `guardrails` — see "Known drift" above), `skill_profiles` (the Skill rows — the atomic unit, not a separate "instance" layer), `capabilities` (8 rows), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()`. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The two tables below are live now — new Capabilities and Skills can be created against them without waiting for S-INFRA-01.
 
-**Known gap (2026-07-01):** `assemblePrompt()` loads every `skill_profiles` row attached to a `capability_slug` unconditionally — there is no per-call filter when a Capability has more than one Intent-type Skill Profile (e.g. a capability with both a "routing" intent and an "answer" intent would load both into every call). No existing capability has hit this yet; S-APPLE-02b is the first to need it and must add the filter as part of its own scope.
+**Known gap (2026-07-01):** `assemblePrompt()` loads every `skill_profiles` row attached to a `capability_slug` unconditionally — there is no per-call filter when a Capability has more than one Intent-type Skill (e.g. a capability with both a "routing" intent and an "answer" intent would load both into every call). No existing capability has hit this yet; S-APPLE-02b is the first to need it and must add the filter as part of its own scope.
 
-> For the full Skill Profile design guide — Traits, Capabilities assembly, Technical Services invocation,
-> domain-agnostic principle, sprint template — see **docs/SKILL-PROFILE-MODEL.md**.
+> For the full Skill design guide — Traits, Capabilities assembly, Technical Services invocation,
+> domain-agnostic principle, sprint template — see **docs/SKILL-PROFILE-MODEL.md**. **Note (2026-07-15):**
+> that doc predates this section's rewrite and still uses "Skill Profile = configured instance of a
+> Skill type" framing in places — read it for the Traits/assembly mechanics, which are still accurate,
+> but defer to this section for the hierarchy itself.
 
 **Layer 1 — Taxonomy** *(the catalog — rarely changes)*
 ```sql
@@ -380,7 +385,7 @@ capability_skill_profiles (
 )
 ```
 
-**Layer 2 — Seniority** *(per-Agent — 1-to-many)*
+**Layer 2 — Seniority** *(Capability ↔ Agent — many-to-many)*
 ```sql
 -- Agents are assigned to Capabilities — not to individual Skill Profiles
 -- Agents inherit level from capability_skill_profiles.level (no per-agent ceiling yet)
