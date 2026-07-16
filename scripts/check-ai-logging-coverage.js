@@ -83,7 +83,16 @@ function checkServerFile(filePath) {
 }
 
 function checkClientFile(filePath) {
-  const text = fs.readFileSync(filePath, "utf8");
+  const rawText = fs.readFileSync(filePath, "utf8");
+  // Strip // line comments and the function's own definition signature before counting --
+  // a file that defines logAICall (or only mentions it in a comment) isn't "calling it
+  // with no import," and would otherwise self-flag as a permanent false positive
+  // (found live 2026-07-16 on src/hooks/useAIActivity.js, the file that defines it).
+  const text = rawText
+    .split("\n")
+    .filter(line => !line.trim().startsWith("//"))
+    .join("\n")
+    .replace(/export\s+function\s+logAICall\s*\(/g, "");
   const importsLogAICall = /import\s*\{[^}]*logAICall[^}]*\}\s*from/.test(text);
   const logCallCount = countOccurrences(text, "logAICall(");
 
