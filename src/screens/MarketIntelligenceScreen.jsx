@@ -1,3 +1,11 @@
+// DeepBench v6.3.32 | MarketIntelligenceScreen.jsx | CHI-05 — QaEvidenceCard's and MessageBubble's
+// dormant-copy review-choice ("Good with this analysis, or would you prefer deeper theories?") block
+// restyled from a flat T.cardAlt box to a distinct action-needed gradient card (T.brassGlow ->
+// T.white, brass border + Corners bracket, brass status badge, bold navy question, navy
+// primary CTA) so it reads as an action item rather than more read-only prose. Pure visual restyle —
+// zero change to onGoodThanks/onReview handler logic in either location. New FeatureBadge id="CHI-05"
+// on QaEvidenceCard only (one badge per feature ID per file, MessageBubble's copy is unreachable/
+// dormant and shares the same feature ID). New tokens T.brassGlow/T.white added in tokens.js.
 // DeepBench v6.3.29 | MarketIntelligenceScreen.jsx | CHI-04 — Clear now fully resets Agent Routing
 // state: onClear() also clears pipelineEvents/pendingDelegationsRef (Column 3 used to survive Clear
 // untouched). New clearGenerationRef cancellation counter, threaded as an `isStale` predicate through
@@ -1231,16 +1239,19 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           {msg.reviewChoice === "exploring" && (
             <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
           )}
+          {/* FEATURE: CHI-05 */}
           {!msg.reviewChoice && (
-            <div style={{padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{margin:"0 13px 11px 13px",padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
+              <Corners/>
+              <span style={{display:"inline-block",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",background:T.brass,color:T.navy,padding:"3px 10px",borderRadius:0,marginBottom:10}}>● Needs your input</span>
+              <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <button onClick={() => onGoodThanks(index)}
-                  style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                  style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>
                   Good, thanks
                 </button>
                 <button onClick={() => onReview(index)}
-                  style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>
+                  style={{textAlign:"left",background:T.navy,border:"none",color:T.card,fontWeight:700,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>
                   Have Priya (Forecast/Theory/Performance Expert) generate a few theories →
                 </button>
               </div>
@@ -1259,7 +1270,9 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
 function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
   const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(qa.keyDataPoints);
   return (
-    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0}}>
+    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0,position:"relative"}}>
+      {/* FEATURE: CHI-05 */}
+      <FeatureBadge id="CHI-05"/>
       <div style={{background:T.cardAlt,padding:"7px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
         <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
         <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
@@ -1295,12 +1308,15 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
       {qa.reviewChoice === "exploring" && (
         <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories.</div>
       )}
+      {/* FEATURE: CHI-05 */}
       {!qa.reviewChoice && (
-        <div style={{margin:"0 13px 11px 13px",padding:"10px 11px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>Good with this analysis, or would you prefer deeper theories?</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <button onClick={onGoodThanks} style={{textAlign:"left",background:"none",border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>Good, thanks</button>
-            <button onClick={onReview} style={{textAlign:"left",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:11.5,padding:"7px 11px",cursor:"pointer"}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
+        <div style={{margin:"0 13px 11px 13px",padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
+          <Corners/>
+          <span style={{display:"inline-block",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",background:T.brass,color:T.navy,padding:"3px 10px",borderRadius:0,marginBottom:10}}>● Needs your input</span>
+          <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={onGoodThanks} style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Good, thanks</button>
+            <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:"none",color:T.card,fontWeight:700,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
           </div>
         </div>
       )}

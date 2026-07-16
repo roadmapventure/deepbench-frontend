@@ -21,9 +21,11 @@ export const T = {
   brass:      "#b6873a",
   brassDeep:  "#886224",
   brassLight: "#e4c786",
+  brassGlow:  "#f0d99a", // FEATURE: CHI-05 — gold gradient start, "needs your input" card only (not brassLight)
   moss:       "#5a7538",
   mossLight:  "#a6bc82",
   flag:       "#a83319",
+  white:      "#ffffff", // FEATURE: CHI-05 — true-white gradient end, no other token is pure white
 };
 
 // ── Typography ────────────────────────────────────────────────────────────────
