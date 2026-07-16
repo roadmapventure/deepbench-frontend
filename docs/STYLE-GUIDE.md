@@ -686,12 +686,25 @@ First application: `EvidenceColumn`'s hypothesis generating/testing stage senten
 
 **Real per-event detail (a revision critique, an escalation recommendation, a version note, `agent_selection`'s reasoning, `error`'s message) trails its case's activity label after an em dash when there's something substantive to say — it is never dropped silently.** The only exception is purely mechanical plumbing with no user-facing meaning (e.g. `proofreader`'s old "(Owen retried via Marcus)" note) — confirmed with John this is the one piece of detail intentionally cut, everything else real stays. When adding a new case to this switch, follow the same shape: a plain activity line for the common/clean outcome, with real `shapeForLog()`-truncated detail appended only when the underlying data has something worth saying.
 
+**Amended 2026-07-16 (`S-CHI-AUDIT-GROUPING-01-design`, `CHI-01`) — consecutive same-agent rows now merge into one card, not just a suppressed header.** The `sameAgentAsPrevious` header-suppression mechanism described above is superseded: `RoutingTurnCard` now groups every consecutive same-agent event into a single bordered card (one header, N stacked activity lines), and the visible number counts *turns* (hand-offs) instead of raw events — John's explicit call: "a new line should mean a hand-off happened, not an activity." The paragraph above's *intent* (a hand-off always gets a fresh header, same-agent continuation never repeats one) is unchanged; only the visual container changed, from N separate bordered rows to 1 bordered card per turn.
+
+---
+
+## Section 32 — Truncated Log Text: Line-Clamp + Click-to-Expand (Locked 2026-07-16 · S-CHI-AUDIT-GROUPING-01-design)
+
+**Any Agent Routing activity line long enough to need truncation clamps visually (3 lines, CSS `-webkit-line-clamp`) rather than being hard-cut server-side or in a display helper.** The underlying text is never discarded — `describePipelineEvent()`'s summary strings carry the full value through unchanged; only the rendering component (`RoutingActivityLine`) decides how much is visible. Locked after a real case (Michelle's `agent_selection.reasoning`) showed the failure mode of hard-truncating first: the appended `…` had nowhere reliable to land (wrapped alone onto its own line as often as not, depending on where the cut fell relative to word boundaries) and, once cut, there was no way to recover the rest of the text at all.
+
+**A clamped line is clickable ("Read more" / "Show less") whenever its full text exceeds 160 characters** — this is a length heuristic, not a measured overflow check (no `ResizeObserver`), chosen for simplicity; it may occasionally show the toggle on a line that happens to fit in 3 lines at a given viewport width, which is a harmless false positive (clicking "Read more" on an already-fully-visible line is a no-op in appearance). The toggle reuses the existing understated link style already established by `EvidenceColumn`'s "...or write your own explanation" affordance (`T.brassDeep`, italic, underlined, no new visual pattern introduced).
+
+**This convention is generic to any future long-text log line, not specific to `agent_selection`.** When a future case in `describePipelineEvent()` embeds a real, potentially-long field, do not truncate the string before it reaches the row — pass it through in full and let this rendering layer handle length.
+
 ---
 
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-16 | S-CHI-AUDIT-GROUPING-01-design | Section 31 amended — same-agent consecutive rows now merge into one turn-numbered card (was header-suppression only). Section 32 added — long log text clamps visually (3 lines) with click-to-expand, replacing hard string truncation. |
 | 2026-07-14 | S-MI-68-design | Section 31 added — Agent Routing log rewritten to activity-narration copy (drops confidence_tier/self-flag jargon and per-event outcome detail), same-agent consecutive rows collapse to index-only continuation lines. |
 | 2026-07-14 | S-MI-62-design | Section 30 added — Stage-Status Copy Accuracy locked: any stage/status copy naming a specific mechanism or data source must be verified against the real Skill Profile `method` text first. First application: `EvidenceColumn`'s generating/testing stage sentences swapped which one claims Data Room usage, to match `hyp-generation-intent`/`hyp-hypothesis-test-intent`'s actual methods. Kickoff: `docs/kickoffs/v6.2.39-MI-62-evidence-stage-copy-accuracy.md`. |
 | 2026-07-14 | S-MI-56-design | Section 21 amended — permanent Question box/Send/Clear strip (`S-MI-51-design`) was rendering as two stacked rows on mobile, Clear left orphaned alone on a near-empty second row; John's live screenshot report. Merged to one row: input — Send — thin divider — Clear, divider doubling as accidental-tap mitigation for the no-confirm-dialog Clear action. Layout only, no behavior change. Kickoff: `docs/kickoffs/v6.2.25-MI-56-mobile-chat-input-clear-row-merge.md`. |

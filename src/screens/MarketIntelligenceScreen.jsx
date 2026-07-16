@@ -1,3 +1,19 @@
+// DeepBench v6.3.18 | MarketIntelligenceScreen.jsx | CHI-01/CHI-02 — Agent Routing log's per-event
+// rows replaced with turn-grouped cards: groupEventsIntoTurns() collapses consecutive same-agent
+// events into one turn (a hand-off, not an activity, per John's explicit call), RoutingTurnCard
+// renders one bordered card per turn (header once, border-left = last activity's color),
+// RoutingActivityLine renders each stacked activity line with its own color dot. RoutingEventRow
+// fully removed. describePipelineEvent()'s 4 shapeForLog() call sites (proofreader/failure_triage/
+// patch_proposed/agent_selection) now pass raw text through unchanged — hard truncation moves
+// entirely to RoutingActivityLine's CSS line-clamp (3 lines) + click-to-expand ("Read more"/"Show
+// less", threshold >160 chars), so long text (e.g. Michelle's agent_selection reasoning) is never
+// discarded, just visually clamped. shapeForLog() itself and its other 2 call sites (AuditDrawersBody
+// Analysis drawer) are untouched. Drawer count label switches "N events" -> "N turns". Pure
+// display-layer change — no evt.data shape, callCapability(), or backend/Skill Profile touched.
+// See STYLE-GUIDE.md §31 (amended)/§32 (new).
+// FEATURE: CHI-01
+// FEATURE: CHI-02
+//
 // DeepBench v6.2.45 | MarketIntelligenceScreen.jsx | MI-68 — Agent Routing log rewritten to plain
 // activity-narration copy (describePipelineEvent()'s summary strings), dropping confidence_tier/
 // self-flag jargon and per-event outcome content; real load-bearing detail (agent_selection's
@@ -611,17 +627,23 @@ function describePipelineEvent(evt) {
       if (g.result === "block") {
         return { capability: "quality-gate", summary: "Blocking this answer — a policy issue was found", color: T.flag };
       }
-      const revised = e.result === "revise" ? ` — asked for a revision: ${shapeForLog(e.critique)}` : "";
+      // FEATURE: CHI-02 — was shapeForLog(e.critique); truncation moved entirely to the render
+      // layer (RoutingActivityLine) so the full text is never discarded here.
+      const revised = e.result === "revise" ? ` — asked for a revision: ${e.critique}` : "";
       return { capability: "quality-gate", summary: `Reviewing the answer for accuracy and policy issues${revised}`, color: e.result === "revise" ? T.brass : T.moss };
     }
     case "failure_triage":
-      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Deciding whether more research would help — recommends: ${shapeForLog(evt.data.suggested_research_request)}` : "Deciding whether more research would help — more research wouldn't help here", color: T.brass };
+      // FEATURE: CHI-02 — was shapeForLog(evt.data.suggested_research_request); truncation moved
+      // entirely to the render layer (RoutingActivityLine) so the full text is never discarded here.
+      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Deciding whether more research would help — recommends: ${evt.data.suggested_research_request}` : "Deciding whether more research would help — more research wouldn't help here", color: T.brass };
     case "hypothesis_test":
       return { capability: "hypothesis-evaluation", summary: "Validating selected theory, reviewing for challenges", color: T.moss };
     case "memory_consolidation":
       return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? "Saving a new insight for future use" : "Reviewing for a reusable insight — none found", color: evt.data.action === "consolidate" ? T.moss : T.muted };
     case "patch_proposed": {
-      const note = evt.data.proposed_action?.version_note ? ` — ${shapeForLog(evt.data.proposed_action.version_note)}` : "";
+      // FEATURE: CHI-02 — was shapeForLog(evt.data.proposed_action.version_note); truncation moved
+      // entirely to the render layer (RoutingActivityLine) so the full text is never discarded here.
+      const note = evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : "";
       return { capability: "data-analysis", summary: `Drafting a proposed correction to the data${note}`, color: T.brass };
     }
     case "patch_resolved":
@@ -631,7 +653,9 @@ function describePipelineEvent(evt) {
     // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
     // to the chosen Display agent.
     case "agent_selection":
-      return { capability: "channel-intelligence", summary: `Deciding who should handle this next — ${shapeForLog(evt.data.reasoning)}`, color: T.moss };
+      // FEATURE: CHI-02 — was shapeForLog(evt.data.reasoning); truncation moved entirely to the
+      // render layer (RoutingActivityLine) so the full text is never discarded here.
+      return { capability: "channel-intelligence", summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
     case "display_format":
       return { capability: "channel-intelligence", summary: "Formatting data for display", color: T.moss };
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
@@ -651,6 +675,28 @@ function describePipelineEvent(evt) {
     default:
       return { capability: null, summary: "", color: T.muted };
   }
+}
+
+// FEATURE: CHI-01 — groups consecutive same-agent events into "turns" (one card per real
+// hand-off), replacing the flat per-event list S-MI-68-design's sameAgentAsPrevious only
+// partially addressed (it suppressed the repeated header but each event was still its own
+// bordered row). A turn boundary is only a genuine agentId change; consecutive same-agent
+// events collapse into one turn with multiple activity lines. Turn numbers count turns, not
+// raw events (John's explicit call, 2026-07-16: "a new line should mean a hand-off happened,
+// not an activity"). `ordered` is newest-first (existing convention, unchanged) — turn
+// numbering stays oldest=1 ascending, same direction today's per-event numbering already used.
+function groupEventsIntoTurns(ordered) {
+  const turns = [];
+  for (const evt of ordered) {
+    const last = turns[turns.length - 1];
+    if (last && last.agentId === evt.agentId) {
+      last.events.push(evt);
+    } else {
+      turns.push({ agentId: evt.agentId, events: [evt] });
+    }
+  }
+  const total = turns.length;
+  return turns.map((t, i) => ({ ...t, turnNumber: total - i }));
 }
 
 // FEATURE: MI-52 — shared module-scope "first name only" resolver. Previously a local const
@@ -1495,19 +1541,36 @@ function rollupBaseline(stats) {
   return { avgLatency: Math.round(totalLatency / latencyCount), maxLatency, calls };
 }
 
-// FEATURE: MI-45 — extracted from AuditColumn's former inline .map() block so the exact same
-// per-event row renders in both desktop's Agent Routing Drawer and mobile's pinned Agent Routing
-// feed (STYLE-GUIDE.md §21) — one render path, two shells around it (Category M).
-// FEATURE: MI-52 — secondary/arrow/AgentAvatar-for-secondary block removed entirely (Task 1, Design
-// Rule: "every visible row names exactly one agent"). primary.name swapped to firstNameFor() so the
-// header matches the chat status line's existing first-name-only treatment (describeDelegationEvent,
-// above); primary.role stays unchanged.
-// FEATURE: MI-68 — sameAgentAsPrevious (John's explicit call: "just place a second line under the
-// first, so it just looks like the agent did more work") suppresses the repeated avatar/name/role
-// header on consecutive same-agent rows; only the row index still renders so rows stay distinguishable.
-// A genuine hand-off (different agentId) always gets the full header — computed once per list by
-// both call sites below, not derived inside this component (it has no view of neighboring events).
-function RoutingEventRow({ evt, agentById, sameAgentAsPrevious = false }) {
+// FEATURE: CHI-01 — one bordered card per turn (was one per raw event). Card header
+// (avatar/name/role) renders once per turn, matching S-MI-68-design's original intent more
+// completely than sameAgentAsPrevious's header-only suppression did. Card border-left uses the
+// LAST activity's color in the turn (the most recent/most decision-relevant outcome, e.g. a
+// late "blocking this answer" should read as red even if the turn opened on a neutral action).
+function RoutingTurnCard({ turn, agentById }) {
+  const primary = agentById(turn.agentId);
+  const lastColor = describePipelineEvent(turn.events[turn.events.length - 1]).color;
+  return (
+    <div style={{borderLeft:`3px solid ${lastColor}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{turn.turnNumber}</span>
+        {primary && <AgentAvatar who={primary.id} size={20}/>}
+        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(turn.agentId, agentById) : turn.agentId}</span>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {turn.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt}/>)}
+      </div>
+    </div>
+  );
+}
+
+// FEATURE: CHI-01 — one activity line within a turn card (no header — RoutingTurnCard owns
+// that). Replaces the per-row 3px left border with a small 6px color dot per line, since the
+// card itself now carries the border. FEATURE: CHI-02 — summary text is never hard-truncated
+// upstream anymore (see Task 2); this component owns visual truncation via CSS line-clamp (3
+// lines) + a click-to-expand toggle, so the ellipsis lands at the true end of the last visible
+// line instead of wrapping alone, and the full text is always one click away.
+function RoutingActivityLine({ evt }) {
   const { capability, summary, color } = describePipelineEvent(evt);
   const svc = SERVICE_LABEL[capability];
   // FEATURE: MI-67 — real patterns_used only; the static-string fallback this replaced could
@@ -1518,21 +1581,32 @@ function RoutingEventRow({ evt, agentById, sameAgentAsPrevious = false }) {
   const patternLabel = realPatterns && realPatterns.length > 0
     ? realPatterns.map(slug => PATTERN_NAME[slug] || slug).join(', ')
     : null;
-  const primary = agentById(evt.agentId);
+  const [expanded, setExpanded] = useState(false);
+  const fullText = `${summary}${evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}`;
+  const isLong = fullText.length > 160;
   return (
-    <div style={{borderLeft:`3px solid ${color}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:4}}>
-      {sameAgentAsPrevious ? (
-        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
-      ) : (
-        <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
-          <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{evt.id + 1}</span>
-          {primary && <AgentAvatar who={primary.id} size={20}/>}
-          <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(evt.agentId, agentById) : evt.agentId}</span>
-          <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
+    <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+      <span style={{width:6,height:6,borderRadius:"50%",background:color,marginTop:5,flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
+        {(svc || patternLabel) && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc?.name}{svc?.name && patternLabel ? ' · ' : ''}{patternLabel}</div>}
+        <div
+          onClick={() => isLong && setExpanded(e => !e)}
+          style={{
+            fontFamily:body,fontSize:11.5,color:T.ink,cursor:isLong?"pointer":"default",
+            display: expanded ? "block" : "-webkit-box",
+            WebkitLineClamp: expanded ? "unset" : 3,
+            WebkitBoxOrient:"vertical",
+            overflow: expanded ? "visible" : "hidden",
+          }}>
+          {fullText}
         </div>
-      )}
-      {(svc || patternLabel) && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc?.name}{svc?.name && patternLabel ? ' · ' : ''}{patternLabel}</div>}
-      <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{summary}{evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}</div>
+        {isLong && (
+          <button onClick={() => setExpanded(e => !e)}
+            style={{background:"none",border:"none",padding:0,marginTop:2,fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}}>
+            {expanded ? "Show less" : "Read more"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1745,12 +1819,14 @@ function AuditColumn({ events, agentActivity }) {
       <FeatureBadge id="MI-31"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
-      <Drawer title="Agent Routing" count={`${ordered.length} event${ordered.length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
+      {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N turns" (John's explicit
+          call: a new line should mean a hand-off, not an activity). */}
+      <Drawer title="Agent Routing" count={`${groupEventsIntoTurns(ordered).length} turn${groupEventsIntoTurns(ordered).length === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
           </div>
-        ) : ordered.map((evt, i) => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById} sameAgentAsPrevious={i > 0 && ordered[i - 1].agentId === evt.agentId}/>)}
+        ) : groupEventsIntoTurns(ordered).map(turn => <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>)}
       </Drawer>
       <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
     </div>
@@ -2048,9 +2124,10 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
         </div>
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
+          {/* FEATURE: CHI-01 — turn-grouped cards, same shared render path as desktop's AuditColumn. */}
           {ordered.length === 0
             ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
-            : ordered.map((evt, i) => <RoutingEventRow key={evt.id} evt={evt} agentById={agentById} sameAgentAsPrevious={i > 0 && ordered[i - 1].agentId === evt.agentId}/>)}
+            : groupEventsIntoTurns(ordered).map(turn => <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>)}
         </div>
         {routingCanScrollMore && (
           <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
