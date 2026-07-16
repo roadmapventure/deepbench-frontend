@@ -1428,6 +1428,14 @@ const MI_LOOP_SCOPE = {
   ],
   featurePrefixes: [
     "channel-intelligence:", "hypothesis-evaluation:", "quality-gate:", "pipeline-triage:",
+    // FEATURE: LOG-13 -- these 3 were present in aiTypes (below) but missing here, so
+    // data-analysis/memory-consolidation/data-room-custody's own agent-turn rows (Nadia/Elena/
+    // Eleanor's intermediate delegation-loop turns) never matched inScope() and were dropped
+    // entirely from this drawer -- confirmed live 2026-07-16, Nadia's data-analysis:none:depth2
+    // turn (id 11046, real call) absent. Every entry in aiTypes whose real usage on this screen can
+    // produce agent-turn rows (i.e. anything beyond a single-shot dispatch) needs its "<slug>:"
+    // prefix here too, or its intermediate turns silently vanish -- this was the actual root cause.
+    "data-analysis:", "memory-consolidation:", "data-room-custody:",
     "project-manager:agent-selection-intent:",
     "screen-controls:qa-answer-format:", "screen-controls:intelligence-review-format:",
     "html-display:",

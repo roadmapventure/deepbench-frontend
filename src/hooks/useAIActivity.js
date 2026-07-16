@@ -64,6 +64,11 @@ export const SERVICE_CATALOG = [
   // service's first live delegating caller.
   // FEATURE: MI-42 — Streaming added (opt-in SSE streaming wired into every capability this service exposes).
   { slug: 'quality-gate',            name: 'Quality Gate',              serviceType: 'ai',     patterns: ['Structured Output', 'Guardrails / Output Filtering', 'LLM-as-Judge / Verifier', 'Orchestrator-Workers', 'Streaming'], roadmap: 'now'  },
+  // FEATURE: LOG-14 -- guardrails-check had zero SERVICE_CATALOG entry and zero AI_TYPE_TO_SERVICE
+  // mapping, so real guardrail-check calls (Alex's/Michelle's) never appeared in By-Service at all
+  // (confirmed live 2026-07-16, ids 11044/11065). Patterns match the real logged patterns_used
+  // exactly, not a guess.
+  { slug: 'guardrails-check', name: 'Guardrails Check', serviceType: 'ai', patterns: ['Guardrails / Output Filtering', 'Prompt Chaining'], roadmap: 'now' },
   // FEATURE: AG-28 — hypothesis-evaluation capability (Priya Nair, Generate Hypotheses call).
   // RAG listed at capability level even though this specific call's design doc technical_services
   // don't name it — hyp-knowledge fires a RAG fetch unconditionally, same accepted behavior as
@@ -135,10 +140,14 @@ export function computeByPattern(log) {
     if (used.length === 0) continue;
     const splitCost = (e.cost || 0) / used.length;
     for (const slug of used) {
-      if (byPattern[slug]) {
-        byPattern[slug].total += 1;
-        byPattern[slug].cost += splitCost;
+      // FEATURE: LOG-14 — self-maintaining fallback: a real pattern slug the harness logged that
+      // isn't yet in PATTERN_CATALOG gets its own auto-labeled bucket instead of being silently
+      // dropped ("invisible rather than mis-attributed" no longer means invisible forever).
+      if (!byPattern[slug]) {
+        byPattern[slug] = { slug, name: humanizeSlug(slug), desc: 'Auto-detected — not yet catalogued', active: true, patternType: 'unknown', autoDetected: true, total: 0, cost: 0 };
       }
+      byPattern[slug].total += 1;
+      byPattern[slug].cost += splitCost;
     }
   }
   return byPattern;
@@ -205,6 +214,25 @@ export const AI_TYPE_TO_SERVICE = {
   // already equal their SERVICE_CATALOG slugs exactly, resolved by the existing `|| e.type` fallback.
   'project-manager': 'task-planning',
 };
+
+// FEATURE: LOG-12 -- agent-turn rows always carry their real capability as the first ':'-delimited
+// segment of `feature` (logAgentTurn()'s own format, execute.js) -- reading it directly is generic
+// and never goes stale, unlike a maintained list. Fixes byService dumping every non-terminal
+// delegation-loop turn into the generic 'agent-turn' bucket instead of its real capability
+// (found live 2026-07-16: 4 of Owen's 5 real quality-gate review calls were invisible under
+// "Quality Gate," landing in "Agent Turn" instead).
+export function capabilitySlugForRow({ ai_type, feature }) {
+  const rawSlug = (ai_type === 'agent-turn' && feature) ? feature.split(':')[0] : ai_type;
+  return AI_TYPE_TO_SERVICE[rawSlug] || rawSlug;
+}
+
+// FEATURE: LOG-14 -- title-cases a kebab-case slug for an auto-detected catalog fallback label.
+// Same one-line shape as MarketIntelligenceScreen.jsx's local formatKindLabel() (not imported --
+// that function is screen-local and this is a different call site; duplicating one pure one-line
+// formatter is not worth a new shared module for two callers).
+function humanizeSlug(slug) {
+  return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
 export const AI_TYPES = {
@@ -428,15 +456,38 @@ export function useAIActivity() {
   });
 
   // FEATURE: AI-23 — Aggregate by Service (remaps old ai_type to service_slug)
+  // FEATURE: LOG-12 — group by capabilitySlugForRow() (resolves agent-turn rows to their real
+  // capability) instead of the raw ai_type, so non-terminal delegation-loop turns land under the
+  // capability they actually belong to.
   const byService = {};
   for (const svc of SERVICE_CATALOG) {
-    const entries = log.filter(e => (AI_TYPE_TO_SERVICE[e.type] || e.type) === svc.slug);
+    const entries = log.filter(e => capabilitySlugForRow({ ai_type: e.type, feature: e.location }) === svc.slug);
     const cost    = entries.reduce((s,e) => s + (e.cost||0), 0);
     const latencies = entries.filter(e=>e.latencyMs).map(e=>e.latencyMs);
     byService[svc.slug] = {
       ...svc,
       total:      entries.length,
       cost,
+      avgLatency: latencies.length ? Math.round(latencies.reduce((a,b)=>a+b,0)/latencies.length) : null,
+    };
+  }
+  // FEATURE: LOG-14 — self-maintaining fallback: any real resolved slug not yet in SERVICE_CATALOG
+  // still gets its own bucket (auto-labeled from the slug) instead of silently vanishing from
+  // By-Service. A developer can later add a proper named/described SERVICE_CATALOG entry — this
+  // never blocks real data from showing up in the meantime.
+  const knownServiceSlugs = new Set(SERVICE_CATALOG.map(s => s.slug));
+  const autoServiceSlugs = new Set();
+  for (const e of log) {
+    const slug = capabilitySlugForRow({ ai_type: e.type, feature: e.location });
+    if (slug && !knownServiceSlugs.has(slug)) autoServiceSlugs.add(slug);
+  }
+  for (const slug of autoServiceSlugs) {
+    const entries = log.filter(e => capabilitySlugForRow({ ai_type: e.type, feature: e.location }) === slug);
+    const cost = entries.reduce((s,e) => s + (e.cost||0), 0);
+    const latencies = entries.filter(e=>e.latencyMs).map(e=>e.latencyMs);
+    byService[slug] = {
+      slug, name: humanizeSlug(slug), serviceType: 'ai', patterns: [], roadmap: 'now', autoDetected: true,
+      total: entries.length, cost,
       avgLatency: latencies.length ? Math.round(latencies.reduce((a,b)=>a+b,0)/latencies.length) : null,
     };
   }
