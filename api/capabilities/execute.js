@@ -356,7 +356,7 @@ async function dispatchDelegation({
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       });
       if (autoResolvedResult.status === 'in_progress') {
-        return { outcome: 'nested_checkpoint', lastHelpSelection };
+        return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: autoResolvedResult.job_id, toolUseId: tool_use_id };
       }
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
     }
@@ -371,7 +371,7 @@ async function dispatchDelegation({
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
     });
     if (delegateResult.status === 'in_progress') {
-      return { outcome: 'nested_checkpoint', lastHelpSelection };
+      return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
     }
     if (delegationRequired || tool_input.is_final === true) {
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
@@ -562,7 +562,7 @@ async function runLoop({
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
-        pendingDelegation: null,
+        pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
       });
     }
     conversationHistory = dispatchOutcome.conversationHistory;
@@ -685,6 +685,62 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     // full budget instead of re-entering runLoop() from persisted conversation_history, which would
     // re-ask the model for a turn it already answered (AA-185) and never resume the nested call's own
     // partial work (AA-187). This is the one and only place pending_delegation is read.
+    // FEATURE: AA-195 (S-ARCH-NESTED-RESUME-01) -- a previous resume dispatched this delegation,
+    // but the nested target itself checkpointed before returning a result (S-ARCH-DURABLE-RESUME-02's
+    // unfinished second half). Actively resume the nested job so this outer resume drives real
+    // progress down the whole chain in one call -- resumeCapability() is idempotent on an
+    // already-terminal row (the early-return at the top of this function), so calling it
+    // unconditionally here is safe whether the nested job is still running or already done.
+    if (row.pending_delegation?.waiting_on_job_id) {
+      const waitingOnId = row.pending_delegation.waiting_on_job_id;
+      try {
+        await resumeCapability({ job_id: waitingOnId, _onEvent: onEvent });
+      } catch (nestedError) {
+        await patchDurableHopRow(row.id, { status: 'failed', error: `Nested delegation (job ${waitingOnId}) failed: ${nestedError.message}` });
+        throw nestedError;
+      }
+      // Re-read canonical state from the row rather than trusting resumeCapability()'s return
+      // value directly -- its return shape differs between a fresh completion (raw result object)
+      // and an already-terminal early-return ({status, result, error}); the persisted row is
+      // always the same shape either way.
+      const nestedRow = await loadDurableHopRow(waitingOnId);
+      if (nestedRow.status === 'in_progress') {
+        // Still waiting -- re-persist the exact same wait-state, unchanged. The next resume of
+        // THIS job (client's existing resolveInProgress() poll loop, no new client code needed)
+        // will drive the nested job forward again with a fresh full budget.
+        return checkpointAndReturn({
+          job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug,
+          agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true,
+          task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
+          delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
+          pendingDelegation: row.pending_delegation,
+        });
+      }
+      if (nestedRow.status === 'failed') {
+        // The nested delegate never produced a result -- fail this job with a real, honest error
+        // instead of feeding Anthropic a conversation history with an unresolved tool_use block
+        // (the exact defect this session fixes).
+        await patchDurableHopRow(row.id, { status: 'failed', error: `Nested delegation (job ${waitingOnId}) failed: ${nestedRow.error || 'unknown error'}` });
+        throw new Error(`Nested delegation failed: ${nestedRow.error || 'unknown error'}`);
+      }
+      // nestedRow.status === 'complete' -- build the same tool_result shape dispatchDelegation()
+      // already builds on a live 'continue' outcome (execute.js:386-389), then resume the loop
+      // exactly as if dispatch had just succeeded live.
+      const conversationHistory = [
+        ...(row.conversation_history || []),
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: row.pending_delegation.tool_use_id, content: JSON.stringify(nestedRow.result) }] },
+      ];
+      return await runLoop({
+        capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+        task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
+        delegationRequired: row.delegation_required === true, requiresHumanConfirmation: false,
+        critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
+        conversationHistory, delegationOccurred: true,
+        lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
+        deadline, job_id: row.id, onEvent,
+      });
+    }
+
     if (row.pending_delegation) {
       const dispatchOutcome = await dispatchDelegation({
         via_tool: row.pending_delegation.via_tool, tool_input: row.pending_delegation.tool_input, tool_use_id: row.pending_delegation.tool_use_id,
@@ -695,7 +751,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: null });
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId } });
       }
       return await runLoop({
         capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
