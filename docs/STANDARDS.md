@@ -259,6 +259,7 @@ Complete every item before committing. This is the canonical "standing checklist
 - [ ] No now-tier service slug is absent from the codebase (route or inline logic exists)
 - [ ] No slug or constant is defined in more than one place with conflicting values
 - [ ] Any new constant introduced is defined once and imported — not redefined inline
+- [ ] `node scripts/check-ai-logging-coverage.js` run and reviewed for any session adding or touching a real LLM/embedding call site — new CRITICAL findings must be resolved before commit; new WARNING findings must at least be looked at and either fixed or explicitly logged as a follow-up ID, not silently ignored
 
 ### Category L — Live API Integration
 - [ ] Live API test file written and run before commit
