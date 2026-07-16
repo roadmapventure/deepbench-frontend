@@ -183,7 +183,7 @@ function getSupabaseHeaders(key) {
 // completing in 33.4s had two entirely unlogged gaps (Marcus's own two turns) accounting for
 // ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
 // never touched." Generic to every capability's own turns, not capability-specific.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [] }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id }) {
   logActivity({
     tenantId: tenant_id || 'global',
     agentId: agent_id || null,
@@ -197,6 +197,7 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
       ...(is_delegate_call ? ['agent-delegation'] : []),
       ...intent_technical_services,
     ])),
+    traceId: trace_id,
   });
 }
 
@@ -353,7 +354,7 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -361,6 +362,7 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
       llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature }, can_request_help: canRequestHelp,
       delegation_required: delegationRequired === true,
+      trace_id,
     });
     row_id = row.id;
   }
@@ -387,7 +389,7 @@ function formatErrorForPersistence(e) {
 // confirmed by direct read, not assumed). Creates a row first when job_id is null (fresh call),
 // otherwise patches the existing one (resumed call) -- same create-if-absent shape
 // checkpointAndReturn() already uses for the success/checkpoint path.
-async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context }) {
+async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -395,6 +397,7 @@ async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug,
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
       llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature },
       can_request_help: canRequestHelp, delegation_required: delegationRequired === true,
+      trace_id,
     });
     row_id = row.id;
   }
@@ -413,7 +416,7 @@ async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug,
 async function dispatchDelegation({
   via_tool, tool_input, tool_use_id, agent_id, capability_slug, intent_slug, tenant_id, task_context,
   delegationRequired, conversationHistory, hopCounter, deadline, job_id, delegationOccurred,
-  lastHelpSelection, onEvent,
+  lastHelpSelection, onEvent, trace_id,
 }) {
   let delegateResult;
   let returningFromAgentId = null;
@@ -425,6 +428,7 @@ async function dispatchDelegation({
     delegateResult = await runCapability({
       capability_slug: 'project-manager', intent_slug: 'agent-selection-intent', agent_id: pmAgentId,
       task_context: JSON.stringify(tool_input), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+      _trace_id: trace_id,
     });
     lastHelpSelection = {
       selected_by_agent_id: pmAgentId,
@@ -445,6 +449,7 @@ async function dispatchDelegation({
       const autoResolvedResult = await runCapability({
         capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+        _trace_id: trace_id,
       });
       if (autoResolvedResult.status === 'in_progress') {
         return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: autoResolvedResult.job_id, toolUseId: tool_use_id };
@@ -460,6 +465,7 @@ async function dispatchDelegation({
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+      _trace_id: trace_id,
     });
     if (delegateResult.status === 'in_progress') {
       return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
@@ -493,6 +499,7 @@ async function runLoop({
   display_agent_id, display_agent_card,
   conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
   job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
+  trace_id, // FEATURE: AI-46a -- always supplied by both real callers (runCapability()/resumeCapability()); pure passthrough, same category as job_id/hopCounter/deadline
   onEvent, // FEATURE: MI-42 -- always a real function by the time this fires; runCapability()/resumeCapability() already default it to a no-op
 }) {
   let delegationRetried = false;
@@ -510,6 +517,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: null,
+        trace_id,
       });
     }
 
@@ -530,6 +538,7 @@ async function runLoop({
       input_tokens: turn.usage?.input_tokens ?? null,
       output_tokens: turn.usage?.output_tokens ?? null,
       intent_technical_services: enriched.intent_technical_services || [],
+      trace_id,
     });
 
     if (!turn.is_delegate_call) {
@@ -597,6 +606,7 @@ async function runLoop({
         prompt_request: enriched, agent_id, capability_slug, tenant_id,
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
         turn_started_at: turnStart,
+        trace_id,
       });
       const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection };
       if (job_id) {
@@ -649,6 +659,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
+        trace_id,
       });
     }
 
@@ -656,6 +667,7 @@ async function runLoop({
       via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id,
       agent_id, capability_slug, intent_slug, tenant_id, task_context, delegationRequired,
       conversationHistory, hopCounter, deadline, job_id, delegationOccurred, lastHelpSelection, onEvent,
+      trace_id,
     });
     if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
     if (dispatchOutcome.outcome === 'nested_checkpoint') {
@@ -663,6 +675,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
         pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
+        trace_id,
       });
     }
     conversationHistory = dispatchOutcome.conversationHistory;
@@ -690,6 +703,7 @@ export async function runCapability({
   _hop_counter = null,
   _deadline = null,
   _onEvent = null,
+  _trace_id = null,
 }) {
   if (!capability_slug) throw new Error('capability_slug required');
   if (!agent_id) throw new Error('agent_id required');
@@ -699,6 +713,14 @@ export async function runCapability({
   // runLoop() exactly like _hop_counter/_deadline already are -- explicit param, never closure
   // state, so it survives arbitrarily deep nested runCapability() recursion unchanged.
   const onEvent = _onEvent || (() => {});
+
+  // FEATURE: AI-46a -- generated once per genuinely fresh top-level call (mirrors the existing
+  // _deadline || (...) pattern one line above: _trace_id is unset only when this is NOT a nested
+  // dispatch). Every nested runCapability() call (dispatchDelegation()'s 3 call sites) threads the
+  // parent's own traceId through _trace_id, so one interaction keeps one identifier across every
+  // hop and every nested delegate, regardless of how many separate durable_hops rows (job_ids) it
+  // spans.
+  const traceId = _trace_id || crypto.randomUUID();
 
   const promptRequest = await assemblePrompt({
     capability_slug,
@@ -710,7 +732,7 @@ export async function runCapability({
     enrichment_capability_slug,
   });
 
-  const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug });
+  const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug, trace_id: traceId });
 
   let display_agent_card = null;
   if (format_skill_profile_slug) {
@@ -746,10 +768,11 @@ export async function runCapability({
       display_agent_id, display_agent_card,
       conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
       hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
+      trace_id: traceId,
       onEvent,
     });
   } catch (e) {
-    await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context });
+    await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id: traceId });
   }
 }
 
@@ -769,6 +792,10 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
   if (row.status !== 'in_progress') {
     return { status: row.status, job_id, result: row.result, error: row.error };
   }
+
+  // FEATURE: AI-46a -- recovered from the persisted row, never freshly generated on resume, so a
+  // resumed hop keeps the exact same identifier every prior hop in this chain already wrote.
+  const traceId = row.trace_id;
 
   const enriched = {
     system_prompt: row.system_prompt,
@@ -814,6 +841,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
           task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
           delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
           pendingDelegation: row.pending_delegation,
+          trace_id: traceId,
         });
       }
       if (nestedRow.status === 'failed') {
@@ -837,7 +865,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
         conversationHistory, delegationOccurred: true,
         lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
-        deadline, job_id: row.id, onEvent,
+        deadline, job_id: row.id, trace_id: traceId, onEvent,
       });
     }
 
@@ -848,11 +876,18 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         task_context: row.task_context ?? null, delegationRequired: row.delegation_required === true,
         conversationHistory: row.conversation_history || [], hopCounter: { n: row.hop_counter || 0 }, deadline,
         job_id: row.id, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null, onEvent,
+        trace_id: traceId,
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId } });
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId });
       }
+      // FEATURE: AI-46a -- this runLoop() continuation (the post-dispatch "continue" outcome, resumed
+      // chain's own delegate hop having completed live above rather than checkpointing again) is not
+      // one of the two runLoop() call sites the kickoff doc's Task 4g explicitly enumerated, but it is
+      // the same category of continuation as both of those (a resumed loop picking back up after a
+      // dispatch), and skipping it would silently drop trace_id partway through exactly the nested-
+      // checkpoint scenario this feature exists to prove out. Threaded here for that reason.
       return await runLoop({
         capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
         task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
@@ -860,7 +895,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
         conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
         lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
-        deadline, job_id: row.id, onEvent,
+        deadline, job_id: row.id, trace_id: traceId, onEvent,
       });
     }
     return await runLoop({
@@ -882,7 +917,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       display_agent_id: null, display_agent_card: null,
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
-      deadline, job_id: row.id,
+      deadline, job_id: row.id, trace_id: traceId,
       onEvent,
     });
   } catch (e) {
@@ -894,7 +929,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     // FEATURE: AA-195 (S-ARCH-FAILURE-DETAIL-01) -- now persists the full rejected-request detail
     // (formatErrorForPersistence()), not just e.message, so Supabase alone has enough evidence to
     // diagnose a failure like AA-195's without external Vercel log access.
-    await persistFailureAndRethrow(e, { job_id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null });
+    await persistFailureAndRethrow(e, { job_id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, trace_id: traceId });
   }
 }
 
