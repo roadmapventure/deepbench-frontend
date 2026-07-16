@@ -9,11 +9,26 @@
 // just-cleared screen. Frontend-only by design (every continuation hop is a separate client-issued
 // fetch(), so a client-side guard is sufficient) — killing the one hop already executing server-side
 // at the instant of Clear is a separate harness-level gap, logged as HAR-03, deliberately out of
-// scope here. groupEventsIntoTurns() gains a `question_boundary` marker case (a synthetic event,
-// always its own turn, excluded from hop numbering) and a new QuestionDivider component renders it in
+// scope here. groupEventsIntoHops() gains a `question_boundary` marker case (a synthetic event,
+// always its own hop, excluded from hop numbering) and a new QuestionDivider component renders it in
 // the Agent Routing drawer, so a follow-up question asked without Clear gets a visible "New question
 // · HH:MM:SS" boundary instead of reading as one unbroken sequence. See STYLE-GUIDE.md §34 (new).
 // FEATURE: CHI-04
+//
+// DeepBench v6.3.24 | MarketIntelligenceScreen.jsx | CHI-03c — "turn"/"turns" renamed to "hop"/"hops"
+// throughout the Agent Routing mechanism (groupEventsIntoTurns()->groupEventsIntoHops(),
+// RoutingTurnCard->RoutingHopCard, turnNumber->hopNumber): "turn" already means a conversation
+// exchange in AI/chat systems, distinct from what this counts (one internal agent-to-agent
+// delegation); "hop" is the term ARCHITECTURE.md/durable_hops already use. Hop-range cross-reference
+// badges (`Hop N`/`Hops N–M`, new HopBadge/hopBadgeText/currentHopCount helpers) added to
+// QaEvidenceCard, the hypothesis_test result block, the chat pointer sentence, and both CHI-03b ack
+// messages, via a new getHopCount param threaded through runQaWithQualityGate()/runIntentPipeline()/
+// runHypothesisTest() and a pipelineEventsRef mirroring pipelineEvents synchronously so async chains
+// never read a stale hop count. Mobile fix: hasActiveFlow -> hasEvidenceContent (!!qaEvidence ||
+// !!hypFlow, was !!hypFlow alone) so a plain Q&A that never starts a hypothesis flow now correctly
+// enables/flashes the mobile Evidence tab (the gap CHI-03a flagged and deferred). See
+// STYLE-GUIDE.md §21/§31 (amended).
+// FEATURE: CHI-03c
 //
 // DeepBench v6.3.22 | MarketIntelligenceScreen.jsx | CHI-03a — Chat/Evidence architecture move:
 // any document/analysis/narrative an agent produces is evidence (Column 2/"Evidence & Interaction"),
@@ -37,18 +52,22 @@
 // FEATURE: CHI-03a
 //
 // DeepBench v6.3.18 | MarketIntelligenceScreen.jsx | CHI-01/CHI-02 — Agent Routing log's per-event
-// rows replaced with turn-grouped cards: groupEventsIntoTurns() collapses consecutive same-agent
-// events into one turn (a hand-off, not an activity, per John's explicit call), RoutingTurnCard
-// renders one bordered card per turn (header once, border-left = last activity's color),
+// rows replaced with hop-grouped cards: groupEventsIntoHops() collapses consecutive same-agent
+// events into one hop (a hand-off, not an activity, per John's explicit call), RoutingHopCard
+// renders one bordered card per hop (header once, border-left = last activity's color),
 // RoutingActivityLine renders each stacked activity line with its own color dot. RoutingEventRow
 // fully removed. describePipelineEvent()'s 4 shapeForLog() call sites (proofreader/failure_triage/
 // patch_proposed/agent_selection) now pass raw text through unchanged — hard truncation moves
 // entirely to RoutingActivityLine's CSS line-clamp (3 lines) + click-to-expand ("Read more"/"Show
 // less", threshold >160 chars), so long text (e.g. Michelle's agent_selection reasoning) is never
 // discarded, just visually clamped. shapeForLog() itself and its other 2 call sites (AuditDrawersBody
-// Analysis drawer) are untouched. Drawer count label switches "N events" -> "N turns". Pure
+// Analysis drawer) are untouched. Drawer count label switches "N events" -> "N hops". Pure
 // display-layer change — no evt.data shape, callCapability(), or backend/Skill Profile touched.
 // See STYLE-GUIDE.md §31 (amended)/§32 (new).
+// FEATURE: CHI-03c — renamed "turn"/"turns" to "hop"/"hops" throughout this mechanism (John's
+// explicit call: "turn" already means a conversation exchange in AI/chat systems, distinct from
+// what this counts — one internal agent-to-agent delegation; "hop" is the term ARCHITECTURE.md/
+// durable_hops already use). Comment above amended in place to describe the current, renamed code.
 // FEATURE: CHI-01
 // FEATURE: CHI-02
 //
@@ -720,38 +739,67 @@ function describePipelineEvent(evt) {
   }
 }
 
-// FEATURE: CHI-01 — groups consecutive same-agent events into "turns" (one card per real
+// FEATURE: CHI-01 — groups consecutive same-agent events into "hops" (one card per real
 // hand-off), replacing the flat per-event list S-MI-68-design's sameAgentAsPrevious only
 // partially addressed (it suppressed the repeated header but each event was still its own
-// bordered row). A turn boundary is only a genuine agentId change; consecutive same-agent
-// events collapse into one turn with multiple activity lines. Turn numbers count turns, not
+// bordered row). A hop boundary is only a genuine agentId change; consecutive same-agent
+// events collapse into one hop with multiple activity lines. Hop numbers count hops, not
 // raw events (John's explicit call, 2026-07-16: "a new line should mean a hand-off happened,
-// not an activity"). `ordered` is newest-first (existing convention, unchanged) — turn
+// not an activity"). `ordered` is newest-first (existing convention, unchanged) — hop
 // numbering stays oldest=1 ascending, same direction today's per-event numbering already used.
+// FEATURE: CHI-03c — renamed from groupEventsIntoTurns()/turnNumber; "turn" already means a
+// user+assistant conversation exchange in AI/chat systems, distinct from what this counts (one
+// internal agent-to-agent delegation). "Hop" is the term ARCHITECTURE.md/durable_hops already use.
 // FEATURE: CHI-04 — a `question_boundary` marker event always starts its own entry (never merges
-// into an adjacent turn regardless of agentId) and is excluded from hop numbering below — it's a
-// visual divider (QuestionDivider, rendered by AuditColumn), not a real agent turn.
-function groupEventsIntoTurns(ordered) {
-  const turns = [];
+// into an adjacent hop regardless of agentId) and is excluded from hop numbering below — it's a
+// visual divider (QuestionDivider, rendered by AuditColumn), not a real agent hop.
+function groupEventsIntoHops(ordered) {
+  const hops = [];
   for (const evt of ordered) {
-    const last = turns[turns.length - 1];
+    const last = hops[hops.length - 1];
     if (evt.type === "question_boundary") {
-      turns.push({ agentId: evt.agentId, events: [evt], isBoundary: true });
+      hops.push({ agentId: evt.agentId, events: [evt], isBoundary: true });
       continue;
     }
     if (last && !last.isBoundary && last.agentId === evt.agentId) {
       last.events.push(evt);
     } else {
-      turns.push({ agentId: evt.agentId, events: [evt] });
+      hops.push({ agentId: evt.agentId, events: [evt] });
     }
   }
-  const total = turns.filter(t => !t.isBoundary).length;
+  const total = hops.filter(h => !h.isBoundary).length;
   let seen = 0;
-  return turns.map(t => {
-    if (t.isBoundary) return t;
+  return hops.map(h => {
+    if (h.isBoundary) return h;
     seen += 1;
-    return { ...t, turnNumber: total - (seen - 1) };
+    return { ...h, hopNumber: total - (seen - 1) };
   });
+}
+
+// FEATURE: CHI-03c — snapshot the current hop count so a caller can compute the range of hops
+// its own operation produced, once that operation's onEvent/logEvent calls are done. Excludes
+// CHI-04's question_boundary markers, same as groupEventsIntoHops()'s own hopNumber count above —
+// a boundary marker is a visual divider, never a real hop.
+function currentHopCount(ordered) {
+  return groupEventsIntoHops(ordered).filter(h => !h.isBoundary).length;
+}
+
+// FEATURE: CHI-03c — badge copy: "Hop N" when the range collapses to one, else "Hops N–M".
+function hopBadgeText(hopStart, hopEnd) {
+  return hopStart === hopEnd ? `Hop ${hopStart}` : `Hops ${hopStart}–${hopEnd}`;
+}
+
+// FEATURE: CHI-03c — small mono-font cross-reference chip citing the Agent Routing hop range that
+// produced whatever card/message it's attached to. `accent` reuses the caller's own existing
+// borderLeft accent color (no new color introduced). Renders nothing if hopStart/hopEnd are absent
+// (older messages predating this feature, or an operation that didn't wire the capture through).
+function HopBadge({ hopStart, hopEnd, accent }) {
+  if (hopStart == null || hopEnd == null) return null;
+  return (
+    <span style={{fontFamily:mono,fontSize:9,color:accent,border:`1px solid ${accent}`,borderRadius:2,padding:"1px 5px",letterSpacing:"0.02em"}}>
+      {hopBadgeText(hopStart, hopEnd)}
+    </span>
+  );
 }
 
 // FEATURE: MI-52 — shared module-scope "first name only" resolver. Previously a local const
@@ -877,7 +925,12 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // his own final output (final_answer) carries the delegated result forward, since nothing outside
 // his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
 // data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
+// FEATURE: CHI-03c — getHopCount snapshots the live Agent Routing hop count (see
+// currentHopCount() above); hopStart is captured before this operation's first onEvent call,
+// hopEnd immediately after its last, both attached to every returned "qa"/"qa_failed" result so
+// the eventual qaEvidence/chat pointer sentence can render a `Hops N–M` cross-reference badge.
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, getHopCount) {
+  const hopStart = getHopCount() + 1;
   let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
@@ -929,7 +982,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       onEvent({ type: "agent_selection", agentId: gate.last_help_selection.selected_by_agent_id, data: gate.last_help_selection, durationMs: null });
     }
     onEvent({ type: "failure_triage", agentId: gate.last_help_selection?.selected_by_agent_id || "owen", data: gate.triage, durationMs: 0 });
-    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
+    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage), hopStart, hopEnd: getHopCount() };
   }
 
   const finalAnswer = retried ? gate.final_answer : qa;
@@ -983,6 +1036,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       needs_review: true, review_reason: "Display agent output couldn't be rendered in the expected format — see message below.",
       displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
       displayAgentId: typeof display === "string" ? null : display.display_agent_id,
+      hopStart, hopEnd: getHopCount(), // FEATURE: CHI-03c
     };
   }
   return {
@@ -991,10 +1045,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     citations: display.citations, confidence_tier: display.confidence_tier,
     needs_review: display.needs_review, review_reason: display.review_reason,
     displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
+    hopStart, hopEnd: getHopCount(), // FEATURE: CHI-03c
   };
 }
 
-async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, getHopCount) {
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
@@ -1008,7 +1063,7 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, getHopCount);
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -1036,7 +1091,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
 // -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
 // candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
 // format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false, getHopCount }) {
   const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
@@ -1055,6 +1110,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     onProgress, isStale,
   });
   if (isStale()) return display; // FEATURE: CHI-04
+  // FEATURE: CHI-03c — hopStart captured immediately before this function's first onEvent call
+  // (below), so it doesn't include the intent-selection hop(s) any outer caller logged before
+  // invoking this function -- mirrors runQaWithQualityGate()'s identical capture pattern.
+  const hopStart = getHopCount() + 1;
   // FEATURE: MI-52 -- same treatment as runQaWithQualityGate()'s Display-agent hand-off above:
   // agent_selection's agentId is the picker (Michelle), durationMs: null (not a fabricated duplicate);
   // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
@@ -1063,6 +1122,7 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     onEvent({ type: "agent_selection", agentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: null });
   }
   onEvent({ type: "display_format", agentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
+  const hopEnd = getHopCount(); // FEATURE: CHI-03c — after this function's last onEvent call
 
   // FEATURE: AA-137 — same string-fallback case as runQaWithQualityGate() above, Priya's path.
   // MessageBubble's hypothesis_test case only ever renders st.headline/st.supports/.complicates/
@@ -1078,10 +1138,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // correctly attributed to the separate display_format event two lines above). Every branch below
   // explicitly sets patterns_used from `analysis`, overriding whatever `display` itself carries.
   return typeof display === "string"
-    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [] }
+    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }
     : typeof display.content === "string"
-    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [] }
-    : { ...display, patterns_used: analysis.patterns_used || [] }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
+    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }
+    : { ...display, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
 }
 
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
@@ -1112,6 +1172,11 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           borderRadius:3,
         }}>
           I've pulled together an answer — the full breakdown is in Evidence. Take a look and let me know if you have questions.
+        </div>
+        {/* FEATURE: CHI-03c — hop-range badge, same navy accent as QaEvidenceCard's own borderLeft
+            (the Evidence card this pointer sentence refers to). */}
+        <div style={{marginTop:4}}>
+          <HopBadge hopStart={msg.hopStart} hopEnd={msg.hopEnd} accent={T.navy}/>
         </div>
         {msg.totalElapsedMs != null && (
           <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
@@ -1144,6 +1209,14 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
       }}>
         {msg.text}
       </div>
+      {/* FEATURE: CHI-03c — hop-range badge on CHI-03b's Marcus-voiced ack messages only (the only
+          non_qa kind that carries hopStart/hopEnd); T.navy accent matches the qa pointer sentence's
+          own badge above, since both are Marcus-attributed. */}
+      {msg.hopStart != null && (
+        <div style={{marginTop:4}}>
+          <HopBadge hopStart={msg.hopStart} hopEnd={msg.hopEnd} accent={T.navy}/>
+        </div>
+      )}
       {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
           non-qa needs_review case (no message today reaches this with needs_review true, but this
           keeps the treatment consistent should a future non-qa kind carry the flag). */}
@@ -1187,8 +1260,9 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
   const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(qa.keyDataPoints);
   return (
     <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0}}>
-      <div style={{background:T.cardAlt,padding:"7px 12px"}}>
+      <div style={{background:T.cardAlt,padding:"7px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
         <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
+        <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
       </div>
       <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
         {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
@@ -1409,6 +1483,13 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
 
         {st && hypFlow.stage === "result" && (
           <>
+            {/* FEATURE: CHI-03c — hop-range badge citing the Agent Routing hops that produced this
+                theory test result. T.moss accent matches this block's own "Supports" verdict color
+                (no dedicated borderLeft accent exists on this flat section to reuse instead). */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+              <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Theory Evidence</div>
+              <HopBadge hopStart={st.hopStart} hopEnd={st.hopEnd} accent={T.moss}/>
+            </div>
             {/* FEATURE: MI-66 — decision control (override warning + instructional copy + Info Only/Store
                 as Forecast buttons) moved to the top: this is the real human decision point (HITL control)
                 on this screen, distinct from the later ConfirmationCard gate below, and it previously
@@ -1580,15 +1661,16 @@ function rollupBaseline(stats) {
   return { avgLatency: Math.round(totalLatency / latencyCount), maxLatency, calls };
 }
 
-// FEATURE: CHI-01 — one bordered card per turn (was one per raw event). Card header
-// (avatar/name/role) renders once per turn, matching S-MI-68-design's original intent more
+// FEATURE: CHI-01 — one bordered card per hop (was one per raw event). Card header
+// (avatar/name/role) renders once per hop, matching S-MI-68-design's original intent more
 // completely than sameAgentAsPrevious's header-only suppression did. Card border-left uses the
-// LAST activity's color in the turn (the most recent/most decision-relevant outcome, e.g. a
-// late "blocking this answer" should read as red even if the turn opened on a neutral action).
+// LAST activity's color in the hop (the most recent/most decision-relevant outcome, e.g. a
+// late "blocking this answer" should read as red even if the hop opened on a neutral action).
+// FEATURE: CHI-03c — renamed from RoutingTurnCard/turn.turnNumber; see groupEventsIntoHops() above.
 // FEATURE: CHI-04 — visual boundary between one question's Agent Routing hops and the next, shown
 // only when the user asks a follow-up without hitting Clear (Clear already wipes the whole panel,
-// Task 1 — nothing to divide there). Rendered in place of a RoutingTurnCard wherever
-// groupEventsIntoTurns() marks a turn isBoundary.
+// Task 1 — nothing to divide there). Rendered in place of a RoutingHopCard wherever
+// groupEventsIntoHops() marks a hop isBoundary.
 function QuestionDivider({ evt }) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0"}}>
@@ -1599,25 +1681,25 @@ function QuestionDivider({ evt }) {
   );
 }
 
-function RoutingTurnCard({ turn, agentById }) {
-  const primary = agentById(turn.agentId);
-  const lastColor = describePipelineEvent(turn.events[turn.events.length - 1]).color;
+function RoutingHopCard({ hop, agentById }) {
+  const primary = agentById(hop.agentId);
+  const lastColor = describePipelineEvent(hop.events[hop.events.length - 1]).color;
   return (
     <div style={{borderLeft:`3px solid ${lastColor}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:8}}>
       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
-        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{turn.turnNumber}</span>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{hop.hopNumber}</span>
         {primary && <AgentAvatar who={primary.id} size={20}/>}
-        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(turn.agentId, agentById) : turn.agentId}</span>
+        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(hop.agentId, agentById) : hop.agentId}</span>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {turn.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt}/>)}
+        {hop.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt}/>)}
       </div>
     </div>
   );
 }
 
-// FEATURE: CHI-01 — one activity line within a turn card (no header — RoutingTurnCard owns
+// FEATURE: CHI-01 — one activity line within a hop card (no header — RoutingHopCard owns
 // that). Replaces the per-row 3px left border with a small 6px color dot per line, since the
 // card itself now carries the border. FEATURE: CHI-02 — summary text is never hard-truncated
 // upstream anymore (see Task 2); this component owns visual truncation via CSS line-clamp (3
@@ -1859,8 +1941,8 @@ function AuditColumn({ events, agentActivity }) {
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
-  const turns = groupEventsIntoTurns(ordered); // FEATURE: CHI-04 — compute once, reuse for count + render
-  const realTurnCount = turns.filter(t => !t.isBoundary).length; // FEATURE: CHI-04 — drawer count badge excludes boundary rows
+  const hops = groupEventsIntoHops(ordered); // FEATURE: CHI-04 — compute once, reuse for count + render. FEATURE: CHI-03c — was groupEventsIntoTurns()/turns.
+  const realHopCount = hops.filter(h => !h.isBoundary).length; // FEATURE: CHI-04 — drawer count badge excludes boundary rows
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
@@ -1874,17 +1956,18 @@ function AuditColumn({ events, agentActivity }) {
       <FeatureBadge id="MI-31"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
       {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
-      {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N turns" (John's explicit
-          call: a new line should mean a hand-off, not an activity). */}
-      <Drawer title="Agent Routing" count={`${realTurnCount} turn${realTurnCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
+      {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N hops" (John's explicit
+          call: a new line should mean a hand-off, not an activity). FEATURE: CHI-03c — was "turns".
+          FEATURE: CHI-04 — count excludes question_boundary marker rows (realHopCount). */}
+      <Drawer title="Agent Routing" count={`${realHopCount} hop${realHopCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
           </div>
-        ) : turns.map(turn =>
-            turn.isBoundary
-              ? <QuestionDivider key={turn.events[0].id} evt={turn.events[0]}/>
-              : <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>
+        ) : hops.map(hop =>
+            hop.isBoundary
+              ? <QuestionDivider key={hop.events[0].id} evt={hop.events[0]}/>
+              : <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>
           )}
       </Drawer>
       <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
@@ -2072,7 +2155,12 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
-  const hasActiveFlow = !!hypFlow;
+  // FEATURE: CHI-03c — was `hasActiveFlow = !!hypFlow`, blind to CHI-03a's qaEvidence: a plain Q&A
+  // the user never escalates into a hypothesis flow now has real content in Evidence (qaEvidence)
+  // that this gate/flash logic was completely unaware of. Every use of the old hasActiveFlow below
+  // (tab-enabled gate, auto-switch-to-evidence trigger, flash-dot gate, selectTab's own gate) is
+  // renamed to this corrected name.
+  const hasEvidenceContent = !!qaEvidence || !!hypFlow;
   const ordered = [...events].reverse();
 
   const prevMsgCount = useRef(messages.length);
@@ -2081,29 +2169,37 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
     prevMsgCount.current = messages.length;
   }, [messages.length, mobileTab]);
 
+  // FEATURE: CHI-03c — was keyed on hypFlow.stage alone, so a plain Q&A that only ever sets
+  // qaEvidence (never starting a hypothesis flow) never flashed/enabled the Evidence tab. Now also
+  // flags unseen content the moment qaEvidence itself changes (a new answer landing), independent
+  // of whether hypFlow exists at all.
   const prevStage = useRef(hypFlow?.stage);
+  const prevQaEvidence = useRef(qaEvidence);
   useEffect(() => {
-    if (hypFlow && hypFlow.stage !== prevStage.current && mobileTab !== "evidence") setEvidenceUnseen(true);
+    if ((qaEvidence !== prevQaEvidence.current || (hypFlow && hypFlow.stage !== prevStage.current)) && mobileTab !== "evidence") {
+      setEvidenceUnseen(true);
+    }
+    prevQaEvidence.current = qaEvidence;
     prevStage.current = hypFlow?.stage;
-  }, [hypFlow?.stage, mobileTab]);
+  }, [qaEvidence, hypFlow?.stage, mobileTab]);
 
   // FEATURE: MI-51 — Evidence auto-activates (switches to the active tab) the moment a theory flow
-  // starts (hasActiveFlow false -> true, i.e. right when the user clicks "Have Priya... generate a
+  // starts (hasEvidenceContent false -> true, i.e. right when the user clicks "Have Priya... generate a
   // few theories ->"), so the live elapsed/expect status strip is immediately visible without an
   // extra manual tap. This is a one-time switch at flow start, not on every stage change — the user
   // can freely navigate back to Chat mid-generation (status strip stays visible either way, Evidence
   // flashes via the effect above once new content is ready).
-  const prevHasFlow = useRef(hasActiveFlow);
+  const prevHasFlow = useRef(hasEvidenceContent);
   useEffect(() => {
-    if (hasActiveFlow && !prevHasFlow.current) {
+    if (hasEvidenceContent && !prevHasFlow.current) {
       setMobileTab("evidence");
       setEvidenceUnseen(false);
     }
-    prevHasFlow.current = hasActiveFlow;
-  }, [hasActiveFlow]);
+    prevHasFlow.current = hasEvidenceContent;
+  }, [hasEvidenceContent]);
 
   const selectTab = (tab) => {
-    if (tab === "evidence" && !hasActiveFlow) return;
+    if (tab === "evidence" && !hasEvidenceContent) return;
     setMobileTab(tab);
     if (tab === "chat") setChatUnseen(false);
     if (tab === "evidence") setEvidenceUnseen(false);
@@ -2139,13 +2235,13 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         <button onClick={() => selectTab("chat")} style={tabStyle(mobileTab==="chat", false)}>
           Chat {chatUnseen && mobileTab!=="chat" && <span style={flashDot}/>}
         </button>
-        {/* FEATURE: CHI-03a — column rename "Evidence" -> "Evidence & Interaction". Tab-disabled
-            gate (!hasActiveFlow) and the flash mechanism itself are untouched — a plain Q&A-only
-            qaEvidence answer not enabling this tab on mobile is a known, tracked gap (STYLE-GUIDE.md
-            §21's flash-direction logic, `docs/FEATURES.md` CHI-03 row), deliberately deferred to
-            CHI-03c per this session's kickoff SCOPE RULES, not fixed here. */}
-        <button onClick={() => selectTab("evidence")} style={tabStyle(mobileTab==="evidence", !hasActiveFlow)}>
-          Evidence & Interaction {hasActiveFlow && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
+        {/* FEATURE: CHI-03a — column rename "Evidence" -> "Evidence & Interaction".
+            FEATURE: CHI-03c — tab-disabled gate and flash-dot gate now key off hasEvidenceContent
+            (qaEvidence || hypFlow), not hypFlow alone -- this was the real gap: a plain Q&A-only
+            qaEvidence answer left the Evidence tab disabled and never flashing on mobile, even
+            though real content was sitting there. Fixed here, see STYLE-GUIDE.md §21's amendment. */}
+        <button onClick={() => selectTab("evidence")} style={tabStyle(mobileTab==="evidence", !hasEvidenceContent)}>
+          Evidence & Interaction {hasEvidenceContent && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
         </button>
       </div>
 
@@ -2189,10 +2285,10 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
         </div>
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
-          {/* FEATURE: CHI-01 — turn-grouped cards, same shared render path as desktop's AuditColumn. */}
+          {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped". */}
           {ordered.length === 0
             ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
-            : groupEventsIntoTurns(ordered).map(turn => <RoutingTurnCard key={turn.events[0].id} turn={turn} agentById={agentById}/>)}
+            : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>)}
         </div>
         {routingCanScrollMore && (
           <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
@@ -2227,6 +2323,11 @@ export default function MarketIntelligenceScreen() {
   // onClear() below, not replaced by a new hypFlow.
   const [qaEvidence, setQaEvidence] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
+  // FEATURE: CHI-03c — mirrors pipelineEvents synchronously (updated inside logEvent's own
+  // setPipelineEvents updater, same tick) so hopStart/hopEnd capture inside the async
+  // runQaWithQualityGate/runHypothesisTest/ack-call chains always reads the true current count,
+  // never a stale value from the closure captured when that async function started.
+  const pipelineEventsRef = useRef([]);
   const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
   // FEATURE: MI-51 — showAgentInfo lifted here (was MobileBody-local showActivity) so the trigger
   // button can live in the shared page-title block (Task 1b) instead of inside MobileBody.
@@ -2245,6 +2346,7 @@ export default function MarketIntelligenceScreen() {
     setQaEvidence(null); // FEATURE: CHI-03a
     setWorkingStatus(null);
     setPipelineEvents([]); // FEATURE: CHI-04 — Agent Routing (Column 3) now resets with everything else
+    pipelineEventsRef.current = []; // FEATURE: CHI-03c — must reset alongside setPipelineEvents([]) above, or the hop-count ref stays stale and the next question's hop badges start from the wrong number
     pendingDelegationsRef.current = new Map(); // FEATURE: CHI-04 — stale pending-delegation markers would otherwise mis-target a future event once ids restart from 0
   };
 
@@ -2286,17 +2388,23 @@ export default function MarketIntelligenceScreen() {
       setPipelineEvents(prev => {
         const id = prev.length;
         pendingDelegationsRef.current.set(replaces.awaitingAgentId, { id, key: replaces.key });
-        return [...prev, { ...evt, id }];
+        const next = [...prev, { ...evt, id }];
+        pipelineEventsRef.current = next; // FEATURE: CHI-03c — keep hop-count ref in sync
+        return next;
       });
       return;
     }
     setPipelineEvents(prev => {
       const pending = pendingDelegationsRef.current.get(evt.agentId);
+      let next;
       if (pending) {
         pendingDelegationsRef.current.delete(evt.agentId);
-        return prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
+        next = prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
+      } else {
+        next = [...prev, { ...evt, id: prev.length }];
       }
-      return [...prev, { ...evt, id: prev.length }];
+      pipelineEventsRef.current = next; // FEATURE: CHI-03c — keep hop-count ref in sync
+      return next;
     });
   };
 
@@ -2387,7 +2495,7 @@ export default function MarketIntelligenceScreen() {
             return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
           });
         }
-      }, setStatus, onProgress, isStale);
+      }, setStatus, onProgress, isStale, () => currentHopCount(pipelineEventsRef.current)); // FEATURE: CHI-03c getHopCount added
       if (isStale()) return; // FEATURE: CHI-04 — Clear fired while this question was in flight; discard silently (finally still runs, harmlessly re-sets already-null loading/workingStatus)
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
@@ -2417,6 +2525,7 @@ export default function MarketIntelligenceScreen() {
           role:"assistant", text: plainText, kind:"qa",
           needs_review: !!result.needs_review, review_reason: result.review_reason,
           totalElapsedMs: elapsed,
+          hopStart: result.hopStart, hopEnd: result.hopEnd, // FEATURE: CHI-03c
         }]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
@@ -2471,11 +2580,15 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-03b — live, Marcus-voiced acknowledgment, tailored to the submitted theory.
     // Fire-and-forget relative to the hypothesis test itself (runHypothesisTest already starts
     // below in the same function) — this call does not block or gate the test starting.
+    // FEATURE: CHI-03c — this ack call has no onEvent/logEvent of its own (Scope Rules: do not add
+    // one), so hopStart===hopEnd, both the current live hop count -- it shares whatever hop is
+    // "current" at the moment it fires, same as every other single-hop, can_request_help:false ack.
+    const submissionAckHop = currentHopCount(pipelineEventsRef.current) + 1;
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-submission-ack-intent", agent_id: "marcus",
       task_context: { submitted_theory: text },
     }).then(ack => {
-      setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]);
+      setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: submissionAckHop, hopEnd: submissionAckHop }]);
     }).catch(e => {
       console.error("[MarketIntelligenceScreen] ci-submission-ack-intent", e.message);
       // No user-facing error for this one — it's a nice-to-have narration, not load-bearing;
@@ -2488,7 +2601,7 @@ export default function MarketIntelligenceScreen() {
       setStatus("Priya is running a hypothesis test…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale });
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale, getHopCount: () => currentHopCount(pipelineEventsRef.current) }); // FEATURE: CHI-03c — getHopCount added
       if (isStale()) return; // FEATURE: CHI-04
       logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
       // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
@@ -2517,13 +2630,15 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-03b — real Marcus-voiced resolution ack, fire-and-forget relative to this
     // function — narrates after the real state change (setHypFlow(null) below) has already
     // happened, never blocking or gating it. Falls back to CHI-03a's static copy on failure.
+    // FEATURE: CHI-03c — single-hop ack, no logEvent of its own; see submissionAckHop's identical comment above.
+    const infoOnlyAckHop = currentHopCount(pipelineEventsRef.current) + 1;
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
       task_context: { resolution: "info_only", theory: hypFlow?.chosenText || "" },
-    }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+    }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop }]))
       .catch(e => {
         console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-        setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — noted as info only, not stored." }]); // fallback, same copy CHI-03a shipped
+        setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — noted as info only, not stored.", hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop }]); // fallback, same copy CHI-03a shipped
       });
     setHypFlow(null);
   };
@@ -2634,23 +2749,25 @@ export default function MarketIntelligenceScreen() {
       // FEATURE: CHI-03b — real Marcus-voiced resolution ack for both the accept and reject
       // branches, fire-and-forget — narrates after setHypFlow(null) below has already run. Falls
       // back to CHI-03a's static copy per-branch on failure.
+      // FEATURE: CHI-03c — single-hop ack, no logEvent of its own; see submissionAckHop's identical comment above.
+      const resolutionAckHop = currentHopCount(pipelineEventsRef.current) + 1;
       if (resolution === "accept") {
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
-        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]))
           .catch(e => {
             console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that's been stored as a forecast." }]);
+            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that's been stored as a forecast.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]);
           });
       } else {
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
-        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]))
           .catch(e => {
             console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored." }]);
+            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]);
           });
       }
       setHypFlow(null);
