@@ -11,7 +11,6 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
-import { logAICall } from "../hooks/useAIActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -157,13 +156,12 @@ Return ONLY the JSON. No explanation.`;
         agent_id: agentId,
         tenant_id: TENANT_ID,
         skipRag: true,
+        ai_type: "extraction",
       }),
     });
     const data = await res.json();
     const raw = data.content?.[0]?.text || "";
     const clean = raw.replace(/```json|```/g, "").trim();
-    // FEATURE: AI-18 — susan owns document extraction capability
-    logAICall({ type: "extraction", model: "claude-haiku-4-5", location: "Training tab — Add Courses", agentId: "susan" });
     return JSON.parse(clean);
   } catch (e) {
     return null;

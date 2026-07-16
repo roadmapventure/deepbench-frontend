@@ -9,7 +9,6 @@ import { Corners, Toast, AgentAvatar, AiBadge, FeatureBadge } from "../component
 import { useAgents } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
-import { logAICall } from "../hooks/useAIActivity.js";
 import { FETCH_API_BASE } from "../config.js";
 import { supabase } from "../lib/supabase.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -163,16 +162,14 @@ function ChatPanel() {
 
   // ── Routing check (switchboard) — Haiku classifies question vs agent capability
   const checkRouting = async (userMsg, agent) => {
-    const t0 = Date.now();
     try {
       const others = agents.filter(a=>!a.isIntern&&a.id!==agent.id).map(a=>`${a.id}: ${a.name} — ${a.specialty}`).join("\n");
       const prompt = `Current agent: ${agent.name} (${agent.specialty})\nUser question: ${userMsg}\nOther available agents:\n${others}\n\nOnly suggest a different agent if the current agent is CLEARLY the wrong fit — meaning the question is completely outside their specialty. If the current agent can reasonably handle the question, reply isMatch: true even if another agent might be marginally better. Be conservative — most questions should stay with the current agent.\n\nReply JSON only: {"isMatch":true/false,"suggestId":"agent_id_or_null","suggestReason":"reason or null"}`;
       const res = await fetch("/api/brief",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({messages:[{role:"user",content:prompt}],agent_id:"chloe",tenant_id:TENANT_ID,skipRag:true,max_tokens:120})});
+        body:JSON.stringify({messages:[{role:"user",content:prompt}],agent_id:"chloe",tenant_id:TENANT_ID,skipRag:true,max_tokens:120,ai_type:"routing"})});
       const data = await res.json();
       const raw = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
       const parsed = JSON.parse(raw);
-      logAICall({type:"routing",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:data.usage?.output_tokens||0,location:"Chat panel",agentId:agent.id});
       return parsed;
     } catch { return {isMatch:true}; }
   };
@@ -201,7 +198,6 @@ function ChatPanel() {
     }
 
     setAIStatus(`${selectedAgent.name.split(" ")[0]} is thinking…`);
-    const t0 = Date.now();
     try {
       const res = await fetch("/api/brief", {
         method: "POST",
@@ -211,6 +207,7 @@ function ChatPanel() {
           agent_id: selectedAgent.id,
           tenant_id: TENANT_ID,
           ragContext: { queryText: userMsg, jurisdiction: "All", triggers: [] },
+          ai_type: "chat",
         }),
       });
       const json = await res.json();
@@ -218,7 +215,6 @@ function ChatPanel() {
       const ragRetrieved = json._debug?.rag_retrieved;
       const tier = ragRetrieved ? "trained" : json._debug?.similarity > 0.3 ? "trained" : "informed";
       const sourceDocs = json._debug?.rag_entries?.map(e=>e.title).filter(Boolean) || [];
-      logAICall({type:"chat",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:json.usage?.output_tokens||0,tier,agentId:selectedAgent.id,location:"Dashboard chat"});
 
       setMessages(prev => [...prev, {
         role: "assistant",
@@ -240,7 +236,6 @@ function ChatPanel() {
     if (!userMsg || !agent || loading) return;
     setLoading(true);
     setAIStatus(`${agent.name.split(" ")[0]} is thinking…`);
-    const t0 = Date.now();
     try {
       const res = await fetch("/api/brief", {
         method: "POST",
@@ -250,6 +245,7 @@ function ChatPanel() {
           agent_id: agent.id,
           tenant_id: TENANT_ID,
           ragContext: { queryText: userMsg, jurisdiction: "All", triggers: [] },
+          ai_type: "chat",
         }),
       });
       const json = await res.json();
@@ -257,7 +253,6 @@ function ChatPanel() {
       const ragRetrieved = json._debug?.rag_retrieved;
       const tier = ragRetrieved ? "trained" : json._debug?.similarity > 0.3 ? "trained" : "informed";
       const sourceDocs = json._debug?.rag_entries?.map(e=>e.title).filter(Boolean) || [];
-      logAICall({type:"chat",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:json.usage?.output_tokens||0,tier,agentId:agent.id,location:"Dashboard chat"});
       setMessages(prev => [...prev, {
         role: "assistant",
         agentId: agent.id,

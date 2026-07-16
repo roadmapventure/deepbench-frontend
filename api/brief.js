@@ -4,8 +4,17 @@
 // Uses raw fetch only — no @anthropic-ai/sdk, no @supabase/supabase-js
 
 import { assembleContext, callClaude } from "../lib/agent-run.js";
+import { logActivity } from "../lib/activity-log.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
+
+// FEATURE: AA-192a -- ai_type -> SERVICE_CATALOG feature slug for this route's callers.
+// Only types explicitly declared by a caller get logged -- see Task 1c.
+const BRIEF_AI_TYPE_FEATURE = {
+  routing:    "agent-routing",
+  chat:       "chat-response",
+  extraction: "document-extraction",
+};
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -105,6 +114,7 @@ export default async function handler(req, res) {
     );
 
     // ACT — Claude Sonnet with web_search available
+    const callStart = Date.now();
     let result;
     try {
       result = await callClaude(systemPrompt, messages, { max_tokens, model: "claude-sonnet-4-5" });
@@ -116,6 +126,21 @@ export default async function handler(req, res) {
     // Attach debug info and full assembled prompt for test console
     result._debug = debugInfo;
     result._system = systemPrompt;
+
+    const feature = BRIEF_AI_TYPE_FEATURE[req.body.ai_type];
+    if (feature) {
+      logActivity({
+        tenantId: tenant_id,
+        agentId: agent_id,
+        aiType: req.body.ai_type,
+        feature,
+        model: "claude-sonnet-4-5",
+        inputTokens: result.usage?.input_tokens ?? null,
+        outputTokens: result.usage?.output_tokens ?? null,
+        latencyMs: Date.now() - callStart,
+        patternsUsed: debugInfo.rag_retrieved ? ["rag"] : [],
+      });
+    }
 
     return res.status(200).json(result);
 
