@@ -80,6 +80,80 @@ export function __setTestPreDispatchBudgetMs(ms) {
   __testPreDispatchBudgetMs = ms;
 }
 
+// FEATURE: AA-196 -- per-capability/intent hop budget estimate, replacing the flat
+// HOP_BUDGET_RESERVE_MS constant used for every hop type regardless of real latency shape.
+// Real ai_activity_log data (2026-07-16) showed the flat constant is wrong in both
+// directions: routing/selection/review hops (p99 8-22s) over-reserve unnecessarily, while
+// several genuinely slow hops (data-room-custody p99 46.2s, data-escalate-intent p99 40.4s,
+// hyp-hypothesis-test-intent p99 36.1s, html-display p99 34.0s) already exceed the current
+// "worst case" -- a real risk of a hard maxDuration timeout, not just wasted margin. Generic
+// by construction: computed identically for every capability_slug/intent_slug pair from real
+// logged data, zero capability-specific branching. Falls back to the existing constant
+// whenever a pair has too few samples to trust (cold start / brand-new intent) -- zero
+// regression risk for anything unmeasured.
+const HOP_ESTIMATE_CACHE_TTL_MS = 15 * 60 * 1000;
+const HOP_ESTIMATE_MIN_SAMPLES = 10;
+const HOP_ESTIMATE_FLOOR_MS = 10000; // never let the reserve drop below this regardless of how fast a hop type measures -- preserves SAFETY_MARGIN_MS's own checkpoint-write/round-trip purpose
+let _hopEstimateCache = null;
+let _hopEstimateCacheAt = 0;
+
+// FEATURE: AA-196 -- linear-interpolation percentile, matching Postgres's percentile_cont()
+// semantics exactly (same formula already proven against real data by MI-58's client-side
+// percentile() in src/hooks/useAgents.js -- duplicated here, not imported: api/ and src/ are
+// separate layers by ARCHITECTURE.md §6 and must not cross-import).
+function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = p * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+async function refreshHopEstimateCache() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/ai_activity_log?ai_type=eq.agent-turn&latency_ms=not.is.null&select=feature,latency_ms&order=created_at.desc&limit=3000`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  );
+  if (!res.ok) throw new Error(`Failed to load ai_activity_log for hop estimates: ${res.status}`);
+  const rows = await res.json();
+  const byKey = {};
+  for (const row of rows) {
+    if (!row.feature) continue;
+    const key = row.feature.split(':').slice(0, 2).join(':'); // capability_slug:intent_slug, strips :depthN/:apiRetryN
+    (byKey[key] ||= []).push(row.latency_ms);
+  }
+  const estimates = {};
+  for (const [key, latencies] of Object.entries(byKey)) {
+    if (latencies.length < HOP_ESTIMATE_MIN_SAMPLES) continue;
+    estimates[key] = percentile(latencies, 0.99);
+  }
+  _hopEstimateCache = estimates;
+  _hopEstimateCacheAt = Date.now();
+}
+
+// FEATURE: AA-196 -- replaces the flat HOP_BUDGET_RESERVE_MS at both existing check sites in
+// runLoop(). Falls back to the original constant, unchanged, whenever the cache is stale and a
+// refresh fails, or the specific capability_slug/intent_slug pair has too few real samples --
+// exactly today's behavior in either case. Exported (matching the existing __setTestBudgetMs
+// convention) so the Node/Category L test can call it directly against real data.
+export async function getHopBudgetReserveMs(capability_slug, intent_slug) {
+  if (!_hopEstimateCache || Date.now() - _hopEstimateCacheAt > HOP_ESTIMATE_CACHE_TTL_MS) {
+    try {
+      await refreshHopEstimateCache();
+    } catch (e) {
+      console.warn(`[execute.js] hop estimate cache refresh failed, using default: ${e.message}`);
+      return HOP_BUDGET_RESERVE_MS;
+    }
+  }
+  const key = `${capability_slug}:${intent_slug || 'none'}`;
+  const p99 = _hopEstimateCache?.[key];
+  if (p99 == null) return HOP_BUDGET_RESERVE_MS;
+  return Math.max(HOP_ESTIMATE_FLOOR_MS, p99 + SAFETY_MARGIN_MS);
+}
+
 function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
 }
@@ -413,7 +487,8 @@ async function runLoop({
     // life. __testBudgetMs, when set by a test, stands in for the computed remaining time so the
     // branch can be forced deterministically; it is null (inert) in every real request.
     const remainingMs = __testBudgetMs !== null ? __testBudgetMs : (deadline - Date.now());
-    if (remainingMs < HOP_BUDGET_RESERVE_MS) {
+    const hopReserveMs = await getHopBudgetReserveMs(capability_slug, intent_slug);
+    if (remainingMs < hopReserveMs) {
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
@@ -544,7 +619,15 @@ async function runLoop({
     // re-asking the model, no re-firing onEvent, no partial nested work ever started until there's a
     // real budget to finish it.
     const preDispatchRemainingMs = __testPreDispatchBudgetMs !== null ? __testPreDispatchBudgetMs : (deadline - Date.now());
-    if (preDispatchRemainingMs < HOP_BUDGET_RESERVE_MS) {
+    // FEATURE: AA-196 -- estimate the NEXT call's profile, not the current hop's: for
+    // delegate_to_agent the target is already known (turn.tool_input), for request_help the
+    // next call is always project-manager/agent-selection-intent -- the same fixed broker
+    // relationship resolveCapabilityHolder('project-manager') already encodes elsewhere in
+    // this file, not a new hardcode.
+    const nextCapabilitySlug = turn.tool_name === 'delegate_to_agent' ? turn.tool_input?.capability_slug : 'project-manager';
+    const nextIntentSlug = turn.tool_name === 'delegate_to_agent' ? turn.tool_input?.intent_slug : 'agent-selection-intent';
+    const preDispatchReserveMs = await getHopBudgetReserveMs(nextCapabilitySlug, nextIntentSlug);
+    if (preDispatchRemainingMs < preDispatchReserveMs) {
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
