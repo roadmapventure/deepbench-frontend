@@ -1,4 +1,4 @@
-// DeepBench v6.2.31 | api/capabilities/execute.js | S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- pre-dispatch budget check + pending_delegation checkpoint; dispatchDelegation() extracted so a resume dispatches an already-decided delegation directly instead of re-asking the model
+// DeepBench v6.3.28 | api/capabilities/execute.js | S-ARCH-LOOP-CONTINUITY-01 (LOO-001/LOO-004) -- requesting_agent_id threaded into request_help's task_context; is_active gate added to resolveCapabilityHolder()
 // DeepBench v6.1.43 | api/capabilities/execute.js | S-MI-42 -- _onEvent plumbing, live delegation/delegation_return events at all 5 real dispatch points; v6.1.43 -- S-MI-42 opt-in stream:true SSE transport, all handler branches
 // DeepBench v6.1.35 | api/capabilities/execute.js | AA-164 -- thread lastHelpSelection into the normal (non-checkpointed) terminal return
 // FEATURE: AA-76 — one generic route for every AI-pattern capability. No capability-specific
@@ -205,6 +205,11 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
 // fields. A Skill Profile may only name a capability_slug; the harness resolves who currently
 // holds it at the moment of dispatch, never a static agent reference. Single-holder assumption
 // (AA-93 covers the future multi-holder case -- not built here). ARCHITECTURE.md §19d/§19e.
+// FEATURE: LOO-004 -- adds the same is_active gate lib/project-manager.js's isActiveAgent()
+// already applies elsewhere; this primitive never had one. A deactivated holder is treated
+// identically to "no agent holds this capability" -- same error, no new error shape, no new
+// decision logic. Two-query shape (not a PostgREST embed) matches the existing isActiveAgent()
+// idiom in this codebase rather than introducing a new pattern.
 async function resolveCapabilityHolder(capability_slug) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -217,7 +222,15 @@ async function resolveCapabilityHolder(capability_slug) {
   if (!res.ok) throw new Error(`Failed to resolve holder of capability "${capability_slug}"`);
   const rows = await res.json();
   if (!rows.length) throw new Error(`No agent currently holds capability "${capability_slug}"`);
-  return rows[0].agent_id;
+  const agentId = rows[0].agent_id;
+  const activeRes = await fetch(
+    `${supabaseUrl}/rest/v1/agents?id=eq.${encodeURIComponent(agentId)}&select=is_active`,
+    { headers }
+  );
+  if (!activeRes.ok) throw new Error(`Failed to verify active status for capability "${capability_slug}" holder "${agentId}"`);
+  const activeRows = await activeRes.json();
+  if (!activeRows?.[0]?.is_active) throw new Error(`No agent currently holds capability "${capability_slug}"`);
+  return agentId;
 }
 
 // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- shared helper, extracted from fetchFormatOverride()'s inline
@@ -425,9 +438,13 @@ async function dispatchDelegation({
   if (via_tool === 'request_help') {
     const pmAgentId = await resolveCapabilityHolder('project-manager');
     onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
+    // FEATURE: LOO-001 -- requesting_agent_id threaded into Michelle's task_context (generic,
+    // always-present field, never omitted) so her own reasoning can recognize and reject a
+    // self-referral, per the no_match output LOO-002 adds. tool_input itself never carries this
+    // key (REQUEST_HELP_TOOL's schema has no agent_id field), so there is no collision risk.
     delegateResult = await runCapability({
       capability_slug: 'project-manager', intent_slug: 'agent-selection-intent', agent_id: pmAgentId,
-      task_context: JSON.stringify(tool_input), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+      task_context: JSON.stringify({ ...tool_input, requesting_agent_id: agent_id }), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       _trace_id: trace_id,
     });
     lastHelpSelection = {
