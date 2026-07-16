@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
+    "@vercel/functions": "^3.7.5",
     "jszip": "^3.10.1",
     "papaparse": "^5.4.1",
     "pdf-parse": "^1.1.1",
