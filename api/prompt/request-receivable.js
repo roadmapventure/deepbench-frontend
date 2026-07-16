@@ -193,7 +193,15 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
       // safety net a silent no-op in the majority of real cases (confirmed live: 10% of Owen's
       // qg-review-intent calls, 80% of Priya's hyp-hypothesis-test-display-intent calls). Reuses the
       // exact tool_result shape execute.js:543 already uses for delegate-hop resume, not a new pattern.
-      const correctionText = 'Your response did not conform to the required schema. Please try again and return the structured output exactly as specified.';
+      // FEATURE: AA-182 -- parseModelTurn() already computes exactly which required field(s) were
+      // missing (parseErr.message), but it was discarded before this point -- the retry's corrective
+      // message was always this same generic string regardless of what actually failed, so the one
+      // retry a call gets is really just another non-deterministic roll of the dice, not a corrective
+      // attempt. Confirmed live: 1/5 fresh library-catalog-intent calls still hit this even with
+      // temperature:0 already pinned (AA-166) -- same generic gap already visible in this file's own
+      // AA-151 comments on agent-selection-intent/intelligence-review-format. Still retry-once-then-
+      // throw -- this only changes what the model is told, not how many attempts it gets.
+      const correctionText = `Your response did not conform to the required schema: ${parseErr.message}. Return the structured output again, exactly as specified, making sure to include every field named above.`;
       const failedToolUse = llmData.content?.find(b => b.type === 'tool_use');
       const correctionMessage = failedToolUse
         ? { role: 'user', content: [{ type: 'tool_result', tool_use_id: failedToolUse.id, content: correctionText, is_error: true }] }
