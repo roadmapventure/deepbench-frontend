@@ -69,7 +69,7 @@ Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-
 
 `AA` had 192 rows total (by far the largest bucket) before this split — confirms `HAR`/`LOO` were doing real, distinct work under one name, not a false distinction.
 
-**Not decided here — deferred to a separate, already-in-progress session** (`S-ARCH-COMPETENCY-MODEL-design`, `docs/AGENT-COMPETENCY-MODEL.md`, DRAFT as of 2026-07-15): `AG` (Agent Identity), `SK` (Skills & Capabilities), `IN` (Intent), `FM` (Format). That session is reconciling these directly against the locked `ARCHITECTURE.md` §2 hierarchy (Technical Services → Skills → Skill Profiles → Capabilities → Competencies → Agents) with real per-agent completeness data — don't guess a replacement naming here before that lands.
+| `AGT` | **Agent Competency Model** — replaces `AG`/`SK`/`IN`/`FM` with one unified code, decided 2026-07-15 in `S-ARCH-COMPETENCY-MODEL-design` (`docs/AGENT-COMPETENCY-MODEL.md`). Deliberate correction, not just a convenience: the four-way split reflected the stale, pre-reconciliation model (`INTENT-MODEL.md`/`FORMAT-MODEL.md`, both superseded) that treated Intent and Format as separate first-class entities. This session established they're two of five (now six, pending confirmation) Skill *types* on one entity — Identity/Behavior/Knowledge/Intent/Format/Guardrails — not separate domains, so one code covering all 6 Agent Competency Model tables (`skill_profiles`, `skill_types`, `capabilities`, `capability_skill_profiles`, `agent_capability_assignments`, `agent_configs`, plus `agents` itself) is the correct reflection of the model, same precedent as `LOO` covering the whole delegation mechanism as one topic rather than several. | Confirmed, first rows: `AGT-001` onward. |
 
 ---
 
