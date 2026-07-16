@@ -60,6 +60,16 @@
 
 ---
 
+## Local Claude Code Tooling (not a deployed-app env var)
+
+| Variable | Purpose | Where it lives |
+|----------|---------|-----------------|
+| `VERCEL_TOKEN` | Auth for the Vercel CLI (`vercel logs`, `vercel inspect`), so a Claude Code session can pull real function logs itself instead of asking John to check the dashboard. Read automatically by the CLI — never passed as a `--token` flag or typed into a prompt. | Persistent Windows environment variable on John's machine only — **not** in this repo, `.env.local`, or any Vercel/Railway dashboard. Added 2026-07-16. |
+
+If a session's shell doesn't see it (`echo $VERCEL_TOKEN` empty in Bash), that session's process likely started before the variable was set — see `CLAUDE-DESIGN.md` Step 5b for the fallback.
+
+---
+
 ## Notes for Claude.ai Design Sessions
 
 When designing features that call external services:
