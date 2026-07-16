@@ -70,12 +70,7 @@ Full area index lives in `docs/FEATURES-LATER.md`'s copy of this same legend (un
 
 ## CHANNEL INTELLIGENCE — CHI (new track, opened 2026-07-16)
 
-> First rows ever logged under the new `CHI-[NUMBER]` code (`docs/SCREEN-INVENTORY.md`'s Channel Intelligence screen code — supersedes `MI-` for new items, see the note in the MARKET INTELLIGENCE — MI section above). Existing `MI-`-prefixed rows stay where they are, not renamed.
-
-| ID | Type | Feature | Status | Session |
-|----|------|---------|--------|---------|
-| CHI-01 | UI | **New, design session with John 2026-07-16 (live screenshot + live-reproduced test run against real dev deployment).** Agent Routing log (`AuditColumn`/`RoutingEventRow`) shows one bordered row per raw event even when several consecutive events belong to the same agent turn — `S-MI-68-design`'s `sameAgentAsPrevious` only suppressed the repeated header, not the separate row. John's explicit call: a new numbered line should mean a hand-off happened, not an activity. Fix: group consecutive same-agent events into one turn-numbered card. Kickoff written: `docs/kickoffs/v6.3.18-CHI-01-audit-routing-turn-grouping-and-truncation.md`. | ❌ Missing | S-CHI-AUDIT-GROUPING-01 (v6.3.18, kickoff written, coding session about to spawn) |
-| CHI-02 | UI | **New, same design session as `CHI-01`.** Long embedded log text (e.g. Michelle's `agent_selection.reasoning`) is hard-truncated by `shapeForLog()` (140 chars, `…` appended to the cut string) — the ellipsis lands wherever CSS word-wrap happens to break, sometimes alone on its own line, and the discarded text can never be recovered. Fix: stop hard-truncating this log's embedded text, clamp visually (3-line CSS line-clamp) with a click-to-expand toggle instead. Same kickoff as `CHI-01`: `docs/kickoffs/v6.3.18-CHI-01-audit-routing-turn-grouping-and-truncation.md`. | ❌ Missing | S-CHI-AUDIT-GROUPING-01 (v6.3.18, kickoff written, coding session about to spawn) |
+> First rows ever logged under the new `CHI-[NUMBER]` code (`docs/SCREEN-INVENTORY.md`'s Channel Intelligence screen code — supersedes `MI-` for new items, see the note in the MARKET INTELLIGENCE — MI section above). Existing `MI-`-prefixed rows stay where they are, not renamed. **`CHI-01`/`CHI-02` (turn-grouped Agent Routing cards + click-to-expand truncation) shipped and archived 2026-07-16 — see `docs/FEATURES-ARCHIVE.md`.**
 
 ---
 
