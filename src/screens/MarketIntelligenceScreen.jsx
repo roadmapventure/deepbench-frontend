@@ -2376,6 +2376,19 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-03a — no chat push here anymore (was kind:"hyp_submitted"); the submitted
     // theory text is already carried on hypFlow.chosenText (set above) and renders in
     // EvidenceColumn's submitted-theory block (Task 3) once testing starts.
+    // FEATURE: CHI-03b — live, Marcus-voiced acknowledgment, tailored to the submitted theory.
+    // Fire-and-forget relative to the hypothesis test itself (runHypothesisTest already starts
+    // below in the same function) — this call does not block or gate the test starting.
+    callCapability({
+      capability_slug: "channel-intelligence", intent_slug: "ci-submission-ack-intent", agent_id: "marcus",
+      task_context: { submitted_theory: text },
+    }).then(ack => {
+      setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]);
+    }).catch(e => {
+      console.error("[MarketIntelligenceScreen] ci-submission-ack-intent", e.message);
+      // No user-facing error for this one — it's a nice-to-have narration, not load-bearing;
+      // the existing "Priya is running a hypothesis test…" status strip already gives real feedback.
+    });
     const t0 = Date.now();
     const turnStart = t0; // FEATURE: MI-42 -- Task 4's caption reads this
     {
@@ -2408,7 +2421,17 @@ export default function MarketIntelligenceScreen() {
     // real Marcus-authored live acknowledgment. The full result stays visible in Evidence via
     // hypFlow.hypothesisTest/Task 3's submitted-theory block until setHypFlow(null) below actually
     // clears it.
-    setMessages(prev => [...prev, { role: "assistant", text: "Got it — noted as info only, not stored. See Evidence for the full result.", kind: "non_qa" }]);
+    // FEATURE: CHI-03b — real Marcus-voiced resolution ack, fire-and-forget relative to this
+    // function — narrates after the real state change (setHypFlow(null) below) has already
+    // happened, never blocking or gating it. Falls back to CHI-03a's static copy on failure.
+    callCapability({
+      capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
+      task_context: { resolution: "info_only", theory: hypFlow?.chosenText || "" },
+    }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+      .catch(e => {
+        console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
+        setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — noted as info only, not stored." }]); // fallback, same copy CHI-03a shipped
+      });
     setHypFlow(null);
   };
 
@@ -2506,13 +2529,28 @@ export default function MarketIntelligenceScreen() {
       // replaces with a live acknowledgment) — replaces the old rich hypothesis_test chat card
       // (MessageBubble, now deleted). Full result stays visible in Evidence throughout, until
       // setHypFlow(null) below actually clears it.
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        text: resolution === "accept"
-          ? "Got it — that's been stored as a forecast. See Evidence for the full result."
-          : "Got it — that proposal was rejected, nothing was stored.",
-        kind: "non_qa",
-      }]);
+      // FEATURE: CHI-03b — real Marcus-voiced resolution ack for both the accept and reject
+      // branches, fire-and-forget — narrates after setHypFlow(null) below has already run. Falls
+      // back to CHI-03a's static copy per-branch on failure.
+      if (resolution === "accept") {
+        callCapability({
+          capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
+          task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
+        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+          .catch(e => {
+            console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
+            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that's been stored as a forecast." }]);
+          });
+      } else {
+        callCapability({
+          capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
+          task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
+        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text }]))
+          .catch(e => {
+            console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
+            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored." }]);
+          });
+      }
       setHypFlow(null);
     } catch (e) {
       // FEATURE: AA-189 — this catch was previously missing entirely; any resolve failure (this

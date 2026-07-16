@@ -58,6 +58,7 @@ export const SERVICE_CATALOG = [
   // ci-answer-display-intent already use it via AA-164/S-ARCH-DISPLAY-LOOP-01, the catalog just
   // never reflected it) + Streaming (this session wires opt-in SSE streaming into every capability
   // this service exposes).
+  // FEATURE: CHI-03b — ci-submission-ack-intent/ci-resolution-ack-intent added under this existing service, no new entry needed
   { slug: 'channel-intelligence',    name: 'Channel Intelligence',      serviceType: 'ai',     patterns: ['Structured Output', 'RAG', 'Case-Based Reasoning', 'Orchestrator-Workers', 'Streaming'],          roadmap: 'now'  },
   // FEATURE: MI-12 — Quality Gate (Owen/CI-04): combined Guardrail + Eval pre-display review
   // FEATURE: MI-01d — Agent Delegation added: Owen's own delegate_to_agent retry (Task 3) is this
@@ -232,6 +233,8 @@ export const AI_TYPE_TO_SERVICE = {
   librarian:            'librarian',
   ci_routing:           'channel-intelligence',
   ci_answer:            'channel-intelligence',
+  'ci-submission-ack-intent': 'channel-intelligence',
+  'ci-resolution-ack-intent': 'channel-intelligence',
   quality_gate_review: 'quality-gate',
   // FEATURE: AI-41 — plan.js's capability_slug defaults to 'project-manager' (api/plan.js line 130),
   // which now flows through as ai_type per request-receivable.js's Task 2 fix. No SERVICE_CATALOG
