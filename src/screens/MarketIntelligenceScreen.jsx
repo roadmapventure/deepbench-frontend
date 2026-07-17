@@ -1392,7 +1392,11 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
 function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
   const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(qa.keyDataPoints);
   return (
-    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0,position:"relative"}}>
+    // FEATURE: CHI-18 — flex:1 makes this card's own background/border stretch to fill the scroll
+    // body's available height (its parent is a flex column), instead of shrink-wrapping just its
+    // text content. Leaves only the scroll body's own structural 14px gap between this box and the
+    // pinned footer below, instead of a large borderless dead zone when content is short.
+    <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0,position:"relative",flex:1}}>
       {/* FEATURE: CHI-05 */}
       <FeatureBadge id="CHI-05"/>
       <div style={{background:T.cardAlt,padding:"7px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
@@ -1539,8 +1543,17 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
       {/* FEATURE: MI-64 — duplicate compact status indicator, same component as InteractColumn's */}
       {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden"}}>
-        <div style={{padding:16,display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
+      {/* FEATURE: CHI-18 — gap:14 between the scroll body and the pinned footer, matching
+          AuditColumn's (Column 3) drawer-stack gap value. The footer itself stays fully unchanged
+          (padding, border, position as the flex column's last child) — it remains locked to the
+          card's bottom regardless of content length; only the separation from the content above it
+          is new. */}
+      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14}}>
+        {/* FEATURE: CHI-18 — padding-bottom dropped to 0: the narrative card above now stretches
+            (flex:1, Task 1) to fill this box, so its own trailing padding would otherwise stack on
+            top of the outer card's structural 14px gap to the footer (30px total measured, more
+            than the AuditColumn-matching 14px target). Top/side padding unchanged. */}
+        <div style={{padding:"16px 16px 0",display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
 
         {/* FEATURE: CHI-03a — Task 1's extracted card, independent of hypFlow: renders the instant
             Marcus has an answer, whether or not a hypothesis flow is ever started. */}
