@@ -9,6 +9,15 @@
 
 If a pattern here ever conflicts with a fresher read of `CLAUDE-DESIGN.md`/`ARCHITECTURE.md`, the repo doc wins — this file is the index, not a substitute for reading current state (`feedback-verify-never-assert-from-memory` applies here too).
 
+**Adding to this doc:** no special phrasing needed — state the correction, preference, or gap the way you already do ("the following is wrong," "do you have X," "add a pointer for Y"). Any session reading this applies the same routing test used above to decide where it goes:
+- Interaction/communication/decision-making pattern → here.
+- Architectural/technical/data-model fact → `ARCHITECTURE.md`.
+- Session-lifecycle mechanics (branching, worktrees, QA automation, versioning) → `CLAUDE.md`/`CLAUDE-DESIGN.md`.
+- Testing/verification standard → `STANDARDS.md`.
+- Per-feature history/rationale → `docs/SESSIONS.md`/`docs/FEATURES-ARCHIVE.md`.
+
+When it's genuinely ambiguous, say so and ask rather than guessing silently — Tier 3 territory per Decision Autonomy Tiers above.
+
 ---
 
 ## Decision Autonomy Tiers
