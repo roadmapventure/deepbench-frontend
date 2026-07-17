@@ -1359,31 +1359,27 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
         <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
         <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
       </div>
-      <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
-        {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
-        {(qa.body || []).map((b, i) => (
-          <div key={i}>
-            {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
-            <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
-          </div>
-        ))}
-        <ActualDataPointsTable rows={actualPoints}/>
-        <TheorizedDataPointsTable rows={theorizedPoints}/>
-      </div>
-      {qa.displayAgentCard && (
-        <div style={{display:'flex',alignItems:'center',gap:6,padding:'0 13px 11px 13px'}}>
-          <AgentAvatar who={qa.displayAgentId} size={16} ring={false}/>
-          <span style={{fontFamily:'Inter, sans-serif',fontSize:11,color:'#888',letterSpacing:'0.02em'}}>Formatted by</span>
-          <span style={{fontFamily:'Inter, sans-serif',fontSize:11,fontWeight:600,color:'#b6873a',letterSpacing:'0.02em'}}>{qa.displayAgentCard.name}</span>
-          <span style={{fontFamily:'Inter, sans-serif',fontSize:10,color:'#777'}}>{qa.displayAgentCard.role}</span>
+      <div style={{borderTop:`1px solid ${T.line}`,borderBottom:`1px solid ${T.line}`,maxHeight:320,overflowY:"auto"}}>
+        <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
+          {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
+          {(qa.body || []).map((b, i) => (
+            <div key={i}>
+              {b.heading && <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>{b.heading}</div>}
+              <p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{b.text}</p>
+            </div>
+          ))}
+          <ActualDataPointsTable rows={actualPoints}/>
+          <TheorizedDataPointsTable rows={theorizedPoints}/>
         </div>
-      )}
-      {qa.totalElapsedMs != null && (
-        <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,padding:"0 13px 8px 13px"}}>Full Agent Routing & Answer Given in {formatElapsed(qa.totalElapsedMs)}</div>
-      )}
-      {qa.needs_review && (
-        <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3,padding:"0 13px 8px 13px"}}>⚑ Marcus flagged this — {qa.review_reason || "flagged for review"}</div>
-      )}
+        {qa.displayAgentCard && (
+          <div style={{display:'flex',alignItems:'center',gap:6,padding:'0 13px 11px 13px'}}>
+            <AgentAvatar who={qa.displayAgentId} size={16} ring={false}/>
+            <span style={{fontFamily:'Inter, sans-serif',fontSize:11,color:'#888',letterSpacing:'0.02em'}}>Formatted by</span>
+            <span style={{fontFamily:'Inter, sans-serif',fontSize:11,fontWeight:600,color:'#b6873a',letterSpacing:'0.02em'}}>{qa.displayAgentCard.name}</span>
+            <span style={{fontFamily:'Inter, sans-serif',fontSize:10,color:'#777'}}>{qa.displayAgentCard.role}</span>
+          </div>
+        )}
+      </div>
       {qa.reviewChoice === "good" && (
         <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
       )}
