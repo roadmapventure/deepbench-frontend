@@ -139,11 +139,9 @@ Always verify column names against actual schema before writing. Never insert co
 - [ ] `docs/FEATURES.md` updated — feature IDs marked ✅ Done with commit hash
 - [ ] `docs/STYLE-GUIDE.md` updated — any new style rule added
 - [ ] `api/` dependency audit — if any `api/` file modified: verify every import is in `package.json` `dependencies` (not `devDependencies`). See BUG-10.
+- [ ] **(added 2026-07-17)** If any logic written this session resembles something that could plausibly exist platform-wide (not just for this one feature), grepped `shared/`/`lib/` for an existing service before treating it as new. This is a backstop, not the primary check — the design session's own kickoff doc should already have caught this via `CLAUDE-DESIGN.md` Step 4's Architect Review ("Duplicate functionality" / "Multi-site bug pattern → shared-service check"). If this checklist item catches something the kickoff doc missed, that's a design-session gap worth flagging back, not just silently patching around here.
 
-> ⛔ HARD STOP — Manual QA gate:
-> When a coding completion report is pasted, the ONLY valid next action is to present the Manual QA Checklist from Section 10 of the kickoff doc.
-> Do NOT update FEATURES.md, do NOT bump the version, do NOT commit.
-> Wait for John to report PASS/FAIL. If any item FAILS, generate a patch kickoff doc.
+> ⛔ **(Rewritten 2026-07-17 — was stale, contradicted the automated loop already live since 2026-07-02/2026-07-15.)** Manual QA gate: per the Automated Design→Code→Verify Loop (`CLAUDE-DESIGN.md`) and `docs/STANDARDS.md` Section 7, the **design session** runs the Manual QA Checklist itself, directly against live systems, and confirms PASS/FAIL — this coding session does not wait for John to report results. Push to `dev` as part of finishing (per `CLAUDE.md`'s hard rule), report the completion outcome, and let the design session take it from there. The only case where a coding session's completion report *should* wait for a human PASS/FAIL is if John started this coding session manually himself by pasting the prompt directly — in that specific case, he closes the loop personally, same as always.
 
 ---
 
