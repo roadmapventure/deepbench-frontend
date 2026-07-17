@@ -3,7 +3,8 @@
 
 **Version in dev:** v6.3.51 (`S-CHI-21`, `4b5f899`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None.
+**In flight now:**
+- `mobile-ui-audit-0717` (design session) — full mobile-viewport sweep found 5 issues, bundled into `MOB-001` (John's call). Kickoff written (`v6.3.52-MOB-001-mobile-ui-fixes-and-about-panel-live-stats.md`), spawning the coding session next.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
