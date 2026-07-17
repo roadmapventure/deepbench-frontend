@@ -1,3 +1,16 @@
+// DeepBench v6.3.34 | MarketIntelligenceScreen.jsx | CHI-07 — central duration/elapsed-time helpers:
+// buildHopEvent() resolves every logEvent/onEvent call's durationMs (real value passes through,
+// omitted value resolves to null only for the 5 declared NON_MEASURABLE_EVENT_TYPES, else logs a
+// console.error dev-guard) and buildMessage() guarantees totalElapsedMs travels with any
+// hopStart/hopEnd on a setMessages(...) push. Migrated all 23 logEvent/onEvent call sites and all 17
+// setMessages call sites to route through these two helpers instead of hand-written object literals.
+// Fixes a stray bug: failure_triage previously logged a literal durationMs: 0 (now correctly null,
+// like every other non-measurable sibling event). Render layer: non-qa MessageBubble ack bubbles and
+// the Theory Evidence card now show "Full Agent Routing & Answer Given in Xs" wherever hop data is
+// present (submission/info-only/resolution acks, hypothesis-test result) — previously only the qa
+// bubble and QaEvidenceCard rendered this caption. No new tokens/colors; reuses the existing mono
+// caption style. First of 5 sessions in the continuity-ux-0716 UX sweep (CHI-07 -> CHI-08 -> CHI-12
+// -> CHI-09 -> CHI-10).
 // DeepBench v6.3.32 | MarketIntelligenceScreen.jsx | CHI-05 — QaEvidenceCard's and MessageBubble's
 // dormant-copy review-choice ("Good with this analysis, or would you prefer deeper theories?") block
 // restyled from a flat T.cardAlt box to a distinct action-needed gradient card (T.brassGlow ->
@@ -797,6 +810,57 @@ function hopBadgeText(hopStart, hopEnd) {
   return hopStart === hopEnd ? `Hop ${hopStart}` : `Hops ${hopStart}–${hopEnd}`;
 }
 
+// FEATURE: CHI-07 — single declared list of event types with no independently-measurable
+// client-side duration: each one either shares its round trip with an adjacent real-duration
+// event (agent_selection, failure_triage — both fire alongside qa_answer/proofreader/display_format,
+// which already log the real number), or is an in-flight/marker signal with no completed duration
+// to measure (delegation, delegation_return, question_boundary). Declared once here instead of a
+// justifying comment repeated at every call site.
+const NON_MEASURABLE_EVENT_TYPES = new Set([
+  "agent_selection", "delegation", "delegation_return", "failure_triage", "question_boundary",
+]);
+
+// FEATURE: CHI-07 — every logEvent/onEvent call routes through this instead of hand-writing the
+// event object. Resolves durationMs once: a caller-supplied real value passes through unchanged;
+// an omitted value resolves to null for a declared non-measurable type; an omitted value on any
+// other type is a caller bug (a real Date.now()-turnStart was forgotten) — logged via
+// console.error, never thrown (never block the user over a logging gap), and still resolves to
+// null so the UI degrades the same way a legitimate non-measurable event already does.
+function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
+  let resolved = durationMs;
+  if (resolved == null) {
+    if (!NON_MEASURABLE_EVENT_TYPES.has(type)) {
+      console.error(`FEATURE: CHI-07 — event type "${type}" logged with no durationMs and is not declared non-measurable; pass a real Date.now()-turnStart value, or add "${type}" to NON_MEASURABLE_EVENT_TYPES if this is intentional.`);
+    }
+    resolved = null;
+  }
+  return { type, agentId, data, durationMs: resolved, ...extra };
+}
+
+// FEATURE: CHI-07 — every setMessages(...) push routes through this instead of a hand-written
+// object literal. Whenever hopStart is present, totalElapsedMs is a required companion, not a
+// field a caller can silently omit — 7 of this file's 17 setMessages call sites carried
+// hopStart/hopEnd but never totalElapsedMs before this fix (submission/info-only/resolution ack
+// bubbles). Sites that never carried hop data before this session still don't — this helper
+// enforces the pairing, it does not invent hop data for messages that never had it.
+function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalElapsedMs, needsReview, reviewReason }) {
+  const msg = { role, text };
+  if (kind != null) msg.kind = kind;
+  if (hopStart != null) {
+    if (totalElapsedMs == null) {
+      console.error(`FEATURE: CHI-07 — message (role="${role}", kind="${kind}") has hopStart/hopEnd but no totalElapsedMs; caller must pass Date.now()-turnStart.`);
+    }
+    msg.hopStart = hopStart;
+    msg.hopEnd = hopEnd;
+    msg.totalElapsedMs = totalElapsedMs ?? null;
+  }
+  if (needsReview) {
+    msg.needs_review = true;
+    msg.review_reason = reviewReason || "flagged for review";
+  }
+  return msg;
+}
+
 // FEATURE: CHI-03c — small mono-font cross-reference chip citing the Agent Routing hop range that
 // produced whatever card/message it's attached to. `accent` reuses the caller's own existing
 // borderLeft accent color (no new color introduced). Renders nothing if hopStart/hopEnd are absent
@@ -945,7 +1009,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
-  onEvent({ type: "qa_answer", agentId: "marcus", data: qa, durationMs: Date.now() - t0 });
+  onEvent(buildHopEvent("qa_answer", "marcus", qa, Date.now() - t0));
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
   // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
   // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
@@ -955,7 +1019,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // summary text, not the requester (Marcus) -- secondaryAgentId dropped, RoutingEventRow no longer
     // renders a second agent. durationMs: null (was a fabricated 0) -- not separately measurable from
     // the client, this hop shares its one real round trip with qa_answer above.
-    onEvent({ type: "agent_selection", agentId: qa.last_help_selection.selected_by_agent_id, data: qa.last_help_selection, durationMs: null });
+    onEvent(buildHopEvent("agent_selection", qa.last_help_selection.selected_by_agent_id, qa.last_help_selection));
   }
 
   t0 = Date.now();
@@ -972,7 +1036,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   const retried = !!gate.final_answer;
   // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
   // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
-  onEvent({ type: "proofreader", agentId: "owen", data: gate, durationMs: Date.now() - t0 });
+  onEvent(buildHopEvent("proofreader", "owen", gate, Date.now() - t0));
 
   if (gate.guardrail?.result === "block") {
     // FEATURE: AA-171 fix (S-ARCH-QG-ESCALATION-01) -- Owen's own qg-review-intent turn now
@@ -987,9 +1051,9 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       // FEATURE: MI-52 -- same re-pointing as the request_help hop above: agentId is the picker
       // (Michelle), not the requester (Owen); secondaryAgentId dropped; durationMs: null (was a
       // fabricated 0) -- not separately measurable from the client.
-      onEvent({ type: "agent_selection", agentId: gate.last_help_selection.selected_by_agent_id, data: gate.last_help_selection, durationMs: null });
+      onEvent(buildHopEvent("agent_selection", gate.last_help_selection.selected_by_agent_id, gate.last_help_selection));
     }
-    onEvent({ type: "failure_triage", agentId: gate.last_help_selection?.selected_by_agent_id || "owen", data: gate.triage, durationMs: 0 });
+    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", gate.triage));
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage), hopStart, hopEnd: getHopCount() };
   }
 
@@ -1018,9 +1082,9 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // not the picker with a requester fallback; it keeps the one real, actually-measured durationMs.
   // secondaryAgentId dropped from both -- RoutingEventRow no longer renders a second agent.
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: null });
+    onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection));
   }
-  onEvent({ type: "display_format", agentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
+  onEvent(buildHopEvent("display_format", display.display_agent_id, display, Date.now() - t0));
 
   // FEATURE: AA-137 — callCapability() returns a raw string when the display/format hand-off
   // declines its tool call and responds with plain text instead (e.g. it recognizes a real problem
@@ -1064,7 +1128,7 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
     task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
   });
   if (isStale()) return { kind: "non_qa", text: "" }; // FEATURE: CHI-04 — discarded by submit()'s own isStale() check regardless; value here is never rendered
-  onEvent({ type: "intent_routing", agentId: "marcus", data: routing, durationMs: Date.now() - t0 });
+  onEvent(buildHopEvent("intent_routing", "marcus", routing, Date.now() - t0));
   if (routing.intent === "escalate") {
     return { kind: "non_qa", text: ESCALATE_PLACEHOLDER };
   }
@@ -1127,9 +1191,9 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
   // secondaryAgentId dropped from both.
   if (display.selection) {
-    onEvent({ type: "agent_selection", agentId: display.selection.selected_by_agent_id, data: display.selection, durationMs: null });
+    onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection));
   }
-  onEvent({ type: "display_format", agentId: display.display_agent_id, data: display, durationMs: Date.now() - t0 });
+  onEvent(buildHopEvent("display_format", display.display_agent_id, display, Date.now() - t0));
   const hopEnd = getHopCount(); // FEATURE: CHI-03c — after this function's last onEvent call
 
   // FEATURE: AA-137 — same string-fallback case as runQaWithQualityGate() above, Priya's path.
@@ -1223,6 +1287,12 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
       {msg.hopStart != null && (
         <div style={{marginTop:4}}>
           <HopBadge hopStart={msg.hopStart} hopEnd={msg.hopEnd} accent={T.navy}/>
+        </div>
+      )}
+      {/* FEATURE: CHI-07 */}
+      {msg.totalElapsedMs != null && (
+        <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
+          Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
         </div>
       )}
       {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
@@ -1506,6 +1576,12 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
               <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Theory Evidence</div>
               <HopBadge hopStart={st.hopStart} hopEnd={st.hopEnd} accent={T.moss}/>
             </div>
+            {/* FEATURE: CHI-07 */}
+            {hypFlow.testElapsedMs != null && (
+              <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:2}}>
+                Full Agent Routing & Answer Given in {formatElapsed(hypFlow.testElapsedMs)}
+              </div>
+            )}
             {/* FEATURE: MI-66 — decision control (override warning + instructional copy + Info Only/Store
                 as Forecast buttons) moved to the top: this is the real human decision point (HITL control)
                 on this screen, distinct from the later ConfirmationCard gate below, and it previously
@@ -2438,13 +2514,7 @@ export default function MarketIntelligenceScreen() {
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
-    logEvent({
-      type: evt.type, // 'delegation' | 'delegation_return'
-      agentId: evt.fromAgentId,
-      secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null,
-      data: { message, viaTool: evt.viaTool || null },
-      durationMs: null, // in-flight signal, not a completed duration -- RoutingEventRow already guards on != null
-    }, { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, null, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   const conversationContext = () =>
@@ -2469,13 +2539,13 @@ export default function MarketIntelligenceScreen() {
     try {
       const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
       if (isStale()) return; // FEATURE: CHI-04
-      logEvent({ type: "hypothesis_generation", agentId: "priya", data: { candidates, patterns_used }, durationMs: Date.now() - t0 });
+      logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, patterns_used }, Date.now() - t0));
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
-      logEvent({ type: "error", agentId: "priya", data: { step: "hypothesis_generation", message: e.message }, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong generating hypotheses — try again.", kind: "error" }]);
+      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_generation", message: e.message }, Date.now() - t0));
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong generating hypotheses — try again." })]);
       setHypFlow(null);
     } finally {
       setWorkingStatus(null);
@@ -2485,7 +2555,7 @@ export default function MarketIntelligenceScreen() {
   const submit = async (text) => {
     const clean = (text || "").trim();
     if (!clean || loading) return;
-    setMessages(prev => [...prev, { role:"user", text: clean }]);
+    setMessages(prev => [...prev, buildMessage({ role: "user", text: clean })]);
     setLoading(true);
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
@@ -2494,7 +2564,7 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-04 — only when pipelineEvents is non-empty: skipped on the very first question of a
     // fresh session, and naturally skipped right after Clear too (pipelineEvents is already []).
     if (pipelineEvents.length > 0) {
-      logEvent({ type: "question_boundary", agentId: null, data: { timestamp: turnStart }, durationMs: null });
+      logEvent(buildHopEvent("question_boundary", null, { timestamp: turnStart }));
     }
     setStatus("Marcus is thinking…", { expectation: "expect < 2m" }); // FEATURE: MI-49 -- reverted from "question < 2m"
     try {
@@ -2537,22 +2607,22 @@ export default function MarketIntelligenceScreen() {
         // directly in MessageBubble, not from msg.text); msg.text is deliberately kept as the full
         // plain answer so conversationContext() (which reads m.text for every message) keeps
         // seeing real content for follow-up turns, not just the pointer sentence.
-        setMessages(prev => [...prev, {
-          role:"assistant", text: plainText, kind:"qa",
-          needs_review: !!result.needs_review, review_reason: result.review_reason,
+        setMessages(prev => [...prev, buildMessage({
+          kind: "qa", text: plainText,
+          needsReview: !!result.needs_review, reviewReason: result.review_reason,
           totalElapsedMs: elapsed,
           hopStart: result.hopStart, hopEnd: result.hopEnd, // FEATURE: CHI-03c
-        }]);
+        })]);
       } else if (result.kind === "qa_failed") {
-        setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       } else if (result.kind === "hyp_entry") {
-        setMessages(prev => [...prev, { role:"assistant", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. Pick or refine a hypothesis on the right.`, kind:"non_qa" }]);
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. Pick or refine a hypothesis on the right.` })]);
         await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, citations: [], reviewReason: null });
       } else {
-        setMessages(prev => [...prev, { role:"assistant", text: result.text, kind:"non_qa" }]);
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       }
     } catch (e) {
-      setMessages(prev => [...prev, { role:"assistant", text: "Something went wrong reaching Marcus — try again.", kind:"error" }]);
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong reaching Marcus — try again." })]);
       console.error("[MarketIntelligenceScreen]", e.message);
     } finally {
       setLoading(false);
@@ -2604,7 +2674,7 @@ export default function MarketIntelligenceScreen() {
       capability_slug: "channel-intelligence", intent_slug: "ci-submission-ack-intent", agent_id: "marcus",
       task_context: { submitted_theory: text },
     }).then(ack => {
-      setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: submissionAckHop, hopEnd: submissionAckHop }]);
+      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: ack.ack_text, hopStart: submissionAckHop, hopEnd: submissionAckHop, totalElapsedMs: Date.now() - turnStart })]);
     }).catch(e => {
       console.error("[MarketIntelligenceScreen] ci-submission-ack-intent", e.message);
       // No user-facing error for this one — it's a nice-to-have narration, not load-bearing;
@@ -2619,7 +2689,7 @@ export default function MarketIntelligenceScreen() {
     try {
       const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale, getHopCount: () => currentHopCount(pipelineEventsRef.current) }); // FEATURE: CHI-03c — getHopCount added
       if (isStale()) return; // FEATURE: CHI-04
-      logEvent({ type: "hypothesis_test", agentId: "priya", data: st, durationMs: Date.now() - t0 });
+      logEvent(buildHopEvent("hypothesis_test", "priya", st, Date.now() - t0));
       // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
       // until the user resolves it (Info Only / Store as Forecast); testElapsedMs carries onto
       // hypFlow so the eventual chat card (Task 3/4) can still caption real test time.
@@ -2627,8 +2697,8 @@ export default function MarketIntelligenceScreen() {
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
-      logEvent({ type: "error", agentId: "priya", data: { step: "hypothesis_test_display", message: e.message }, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong running that hypothesis test — try again.", kind: "error" }]);
+      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_test_display", message: e.message }, Date.now() - t0));
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong running that hypothesis test — try again." })]);
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
     } finally {
       setWorkingStatus(null);
@@ -2648,13 +2718,14 @@ export default function MarketIntelligenceScreen() {
     // happened, never blocking or gating it. Falls back to CHI-03a's static copy on failure.
     // FEATURE: CHI-03c — single-hop ack, no logEvent of its own; see submissionAckHop's identical comment above.
     const infoOnlyAckHop = currentHopCount(pipelineEventsRef.current) + 1;
+    const turnStart = Date.now(); // FEATURE: CHI-07 — onDiscard had no existing timing capture; feeds the ack bubble's totalElapsedMs
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
       task_context: { resolution: "info_only", theory: hypFlow?.chosenText || "" },
-    }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop }]))
+    }).then(ack => setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: ack.ack_text, hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop, totalElapsedMs: Date.now() - turnStart })]))
       .catch(e => {
         console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-        setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — noted as info only, not stored.", hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop }]); // fallback, same copy CHI-03a shipped
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — noted as info only, not stored.", hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop, totalElapsedMs: Date.now() - turnStart })]); // fallback, same copy CHI-03a shipped
       });
     setHypFlow(null);
   };
@@ -2693,7 +2764,7 @@ export default function MarketIntelligenceScreen() {
         onProgress, isStale,
       });
       if (isStale()) return; // FEATURE: CHI-04
-      logEvent({ type: "memory_consolidation", agentId: "elena", data: elenaResult, durationMs: Date.now() - t0 });
+      logEvent(buildHopEvent("memory_consolidation", "elena", elenaResult, Date.now() - t0));
 
       step = "patch_proposed";
       t0 = Date.now();
@@ -2707,7 +2778,7 @@ export default function MarketIntelligenceScreen() {
         onProgress, isStale,
       });
       if (isStale()) return; // FEATURE: CHI-04
-      logEvent({ type: "patch_proposed", agentId: "nadia", data: nadiaResult, durationMs: Date.now() - t0 });
+      logEvent(buildHopEvent("patch_proposed", "nadia", nadiaResult, Date.now() - t0));
 
       setHypFlow(prev => prev && ({
         ...prev, stage: "result",
@@ -2722,8 +2793,8 @@ export default function MarketIntelligenceScreen() {
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
-      logEvent({ type: "error", agentId: step === "memory_consolidation" ? "elena" : "nadia", data: { step, message: e.message }, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong committing that — try again.", kind: "error" }]);
+      logEvent(buildHopEvent("error", step === "memory_consolidation" ? "elena" : "nadia", { step, message: e.message }, Date.now() - t0));
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong committing that — try again." })]);
       setHypFlow(prev => prev && ({ ...prev, stage: "result" }));
     } finally {
       setWorkingStatus(null);
@@ -2746,7 +2817,7 @@ export default function MarketIntelligenceScreen() {
       if (isStale()) return; // FEATURE: CHI-04
 
       if (resolution === "edit") {
-        logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
+        logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result }, Date.now() - t0));
         setHypFlow(prev => prev && ({
           ...prev,
           confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique },
@@ -2754,7 +2825,7 @@ export default function MarketIntelligenceScreen() {
         return;
       }
 
-      logEvent({ type: "patch_resolved", agentId: "nadia", data: { resolution, result }, durationMs: Date.now() - t0 });
+      logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result }, Date.now() - t0));
       // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
       // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
       // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.
@@ -2771,19 +2842,19 @@ export default function MarketIntelligenceScreen() {
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
-        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]))
+        }).then(ack => setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]))
           .catch(e => {
             console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that's been stored as a forecast.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]);
+            setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — that's been stored as a forecast.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]);
           });
       } else {
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
-        }).then(ack => setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]))
+        }).then(ack => setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: ack.ack_text, hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]))
           .catch(e => {
             console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
-            setMessages(prev => [...prev, { role: "assistant", kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop }]);
+            setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]);
           });
       }
       setHypFlow(null);
@@ -2794,8 +2865,8 @@ export default function MarketIntelligenceScreen() {
       // S-AA-189-design) — the drafted confirmation is still valid, only the resolve action failed,
       // so the user can retry Accept/Reject on the same card instead of losing the draft.
       console.error("[MarketIntelligenceScreen] onResolveConfirmation", e.message);
-      logEvent({ type: "error", agentId: "nadia", data: { step: "resolve_confirmation", resolution, message: e.message }, durationMs: Date.now() - t0 });
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong resolving that — try again.", kind: "error" }]);
+      logEvent(buildHopEvent("error", "nadia", { step: "resolve_confirmation", resolution, message: e.message }, Date.now() - t0));
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong resolving that — try again." })]);
     } finally {
       setWorkingStatus(null);
     }
