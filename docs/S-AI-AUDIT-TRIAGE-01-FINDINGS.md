@@ -2,7 +2,7 @@
 
 > Session: `ai-audit-triage-0717` (worktree). Started 2026-07-17. Investigation session, not a kickoff doc yet — captures the full discussion so nothing gets lost mid-thread. Referenced from `docs/FEATURES.md`/`FEATURES-NEXT.md` rows once specific fixes are scoped, same pattern as `docs/S-ARCH-AGENT-VISIBILITY-01-FINDINGS.md`.
 >
-> **Backlog IDs now exist for this (added after John asked "would another session see this?" — they didn't, fixed 2026-07-17):** `LOG-15` (`docs/FEATURES.md`, the actual drawer bug — items 1/3/5/6 below) · `LOG-23` (item 2, missing Routing pattern) · `LOG-24` (item 4, persistent anti-hardcoding rule) · `LOG-25` (item 7, catalog retirement question). A session that finds any of these 4 rows first can trace back here; a session that finds this doc first can trace forward to the real rows.
+> **Backlog IDs (`docs/FEATURES.md`), updated 2026-07-17 after Part 4's hard rule:** `LOG-15` (the drawer bug — scope widened to "remove capability display entirely, pattern-only, every event type") · `LOG-23` (missing Routing pattern — concrete manifestation: blank `delegation`/`delegation_return` rows) · `LOG-24` (persistent anti-hardcoding rule) · `LOG-25` (catalog retirement question) · `LOG-26` (new — pattern names should be reasoning-derived, not catalog-matched). A session that finds any of these 5 rows first can trace back here; a session that finds this doc first can trace forward to the real rows.
 
 ## Original ask
 
@@ -60,11 +60,24 @@ John's own count is 4 topics — they map to items 1, 2, 4, 7 below, in the orde
 
 7. (J) 🔴 **Is `SERVICE_CATALOG`/`PATTERN_CATALOG` itself legacy infrastructure that should be retired**, per John's topic 4, "new rules of AI pattern assembly and naming"? Searched for an existing documented direction — found only adjacent-but-different things: `HAR-01` (detection should come from the model's self-report, not hardcoded declarations — but its own text keeps the catalog as the write-time validation source, doesn't retire it) and `AI-35` (consolidates redundant catalogs into one, doesn't eliminate the concept). **No existing "new rules" direction found — waiting on John to explain what he means**, not guessing.
 
+## Part 4 — John's hard rule (2026-07-17, from a live screenshot review of the Agent Routing drawer)
+
+Resolves and supersedes parts of items 1/2/3/6 above with a direct, non-negotiable product decision:
+
+1. **No capability may ever display in the Agent Routing drawer. Period, hard rule.** Not just `agent_selection`/`display_format` (the original `LOG-15` bug) — every event type that currently shows one (`intent_routing`, `qa_answer`, `proofreader`, `failure_triage`, `hypothesis_test`, `memory_consolidation`, `patch_proposed`, `patch_resolved`, `hypothesis_generation`, plus the 2 original bugs). `LOG-15` rewritten to this scope.
+2. The line under agent avatar+role shows **only** real, industry-named AI patterns.
+3. Hops with no real pattern data today are their own tracked issue, not a blocker to 1/2. **Diagnosed concretely:** the blank rows in John's screenshot are the `delegation`/`delegation_return` event type (`§19h` live micro-hop mechanism) — confirmed via code read to have **zero** capability and **zero** pattern data structurally (no `patterns_used` field exists in that event's payload at all). This is `LOG-23`, now updated with this concrete manifestation.
+4. Line format: `"AI patterns used: [names]"`.
+5. **Deepest one:** pattern names should not come from matching against `PATTERN_CATALOG` — they should reflect the model's own real reasoning for that specific hop. Harder than anything built today, including `§19i`'s mechanical bucket-1 detection. New item: `LOG-26`. Directly connects to item 7/`LOG-25`'s catalog-retirement question — may be its resolution, not confirmed.
+6. **John's direct question, answered honestly, not deflected:** yes — the conflation was real. Every fix proposed in this conversation (add "Project Manager" to `SERVICE_LABEL`, correct the display agents' slugs, then explicitly defending "capability stays, patterns get added alongside it") operated inside a frame that treated "show the right capability" as co-equal with "show the right pattern," never questioning whether capability belonged in a patterns display at all. Root cause: `describePipelineEvent()`'s own return shape (`{capability, summary, color}`) and `SERVICE_CATALOG`'s own schema (bundling a capability's identity with a static declared `patterns: [...]` array in one record) structurally invite treating Capability and Pattern as two attributes of one thing rather than separate concepts — inherited that framing from the code/data model instead of questioning it.
+
+Verified this session, not asserted: agent identity (who did the hop) is unaffected by removing the capability badge — already shown separately via `agentId`/`agentById()` at the hop-card header, confirmed independent code path.
+
 ## Open questions waiting on John (blocking further progress)
 
-- Item 7: what do you mean by "new rules of ai pattern assembly and naming"?
-- Item 4: sign off on persistent-rule wording once drafted.
-- Item 2: how should Michelle's routing/selection work actually be classified/tagged, once we agree "Routing" is missing from the catalog?
+- Item 7/`LOG-25`: what do you mean by "new rules of ai pattern assembly and naming"? (Part 4 item 5/`LOG-26` may be the answer — not yet confirmed as the same thing.)
+- Item 4/`LOG-24`: sign off on persistent-rule wording once drafted.
+- `LOG-26`: what does "reasoning-derived" pattern naming concretely mean, mechanically?
 
 ## Not yet done (carried forward, don't lose)
 
