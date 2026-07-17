@@ -16,6 +16,29 @@ This separation is what enforces branch discipline. A coding session starts cold
 
 ---
 
+## Standing Rule — Decision Autonomy Tiers (added 2026-07-17, John's explicit call)
+
+**John's own framing:** design sessions had been checking in on too many small decisions — not because each individual ask was unreasonable, but because the *default* was tilted too far toward asking, when most of what gets asked about here is cheap to revise if wrong (this repo is mostly markdown; a bad call is a two-minute fix, not a production incident). Three tiers, so "should I ask" stops being a fresh judgment call every time:
+
+**Tier 1 — decide and report, no check-in required:**
+- Which backlog file/tier (`FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`) a new item goes in, when the current criterion clearly applies.
+- Whether to fold a finding into an existing row or give it its own ID, when the scope reasoning is clear-cut.
+- Wording/phrasing choices in docs that don't touch already-locked terminology.
+- Any documentation change that's cheap to revise later with zero downstream cost if it turns out wrong.
+
+**Tier 2 — decide, but flag the call clearly in the close-out report (no need to wait for a response before proceeding):**
+- Judgment calls that could reasonably go either way, where the cost of either choice is low. John sees the call made and can redirect after the fact instead of gating the work on approval before it happens.
+
+**Tier 3 — ask first, always:**
+- Terminology or naming decisions that become canonical and get referenced by every future session (the specific risk: sessions "talking past" John with invented language — see the `ARCHITECTURE.md`/`SCREEN-INVENTORY.md` rebuild, 2026-07-17).
+- Anything touching shared state other sessions or people depend on — pushing to `dev`, deleting a worktree, renaming a heavily cross-referenced ID.
+- Reversing or contradicting a decision John already made.
+- Anything John has told this session directly he wants to be involved in, for that topic specifically.
+
+**When genuinely unsure which tier a call falls into, default to Tier 2** (decide, flag clearly) rather than Tier 3 (ask and wait) — the cost of a wrong Tier-2 call is a correction after the fact; the cost of defaulting to Tier 3 on everything is the exact fatigue this rule exists to fix.
+
+---
+
 ## Standing Rule — Automated Design→Code→Verify Loop (added 2026-07-02, John)
 
 **Once a kickoff doc is committed, the design session spawns the coding session itself** — via the `Agent` tool, foreground, no `isolation` param. **Revised 2026-07-07 (concurrent-sessions rule, see `CLAUDE.md`):** "operates directly on the real working tree" now means this design session's own manually-created worktree (see `CLAUDE.md`'s concurrent-sessions hard rule), not the shared main checkout — the spawned coding agent inherits that isolation rather than getting a second nested one, and pushes straight to `dev` from there via the fetch-rebase-push-retry discipline `CLAUDE.md` specifies. Before this change (single-session use), "the real working tree" meant the shared checkout directly; with multiple concurrent sessions that assumption breaks, hence the worktree requirement.
