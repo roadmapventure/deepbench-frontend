@@ -3,7 +3,8 @@
 
 **Version in dev:** v6.3.50 (`S-CHI-10`, `cc31e7f`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None.
+**In flight now:**
+- `design-chi-ux-0717` (design→coding, `CHI-21`, v6.3.51) — Chat/Evidence copy & wrap-up-metrics polish, kickoff doc written, spawning coding agent next. `CHI-18`/`CHI-19`/`CHI-20` logged as separate future sessions, not this one's scope.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
