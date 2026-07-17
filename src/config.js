@@ -12,7 +12,13 @@ export const CURRENT_USER = {
 };
 
 export const TENANT_ID = "global";
-export const APP_VERSION = "5.1.32";
+// FEATURE: MOB-001 — APP_VERSION is now a fallback-only value, shown only while AboutPanel's live
+// dev_version_counter fetch is loading or if it fails; the panel's real source of truth is the
+// live Supabase read (see AboutPanel.jsx MOB-001 comment). Corrected from the stale "5.1.32" to
+// the last known-good closed-out version at the time of this fix -- this constant will still go
+// stale again over time (it's not wired to bump automatically), but no longer matters for what
+// actually displays once the live fetch resolves.
+export const APP_VERSION = "6.3.50";
 
 // ── URLs ──────────────────────────────────────────────────────────────────────
 // BASE_URL used for shareable task links

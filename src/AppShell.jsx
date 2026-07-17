@@ -117,7 +117,14 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </div>
         <div>
           <div style={{fontFamily:display,fontSize:13,fontWeight:600,letterSpacing:.2,lineHeight:1}}>DeepBench</div>
-          <div style={{fontFamily:body,fontSize:5.5,color:"#b8c5d8",letterSpacing:1,textTransform:"uppercase",marginTop:1}}>AI Workforce Platform</div>
+          {/* FEATURE: MOB-001 — 5.5px measured genuinely illegible on real mobile render (confirmed live,
+              mobile-ui-audit-0717); revises the STYLE-GUIDE.md Section 24 locked value (was John-confirmed
+              at the time, S-MOBILE-NAV-01-design, but never checked against actual device rendering).
+              7.5px keeps "shrinks, does not drop" (still well under DeepBench's own 13px on this same header,
+              and under the desktop label's 9.5px) while landing in the same ~8-9.5px range every other
+              mono micro-label on the platform already uses (KPI strip labels, Agent Routing "LIVE" tag, etc.)
+              instead of sitting nearly 3px below all of them. See STYLE-GUIDE.md Section 24 amendment. */}
+          <div style={{fontFamily:body,fontSize:7.5,color:"#b8c5d8",letterSpacing:1,textTransform:"uppercase",marginTop:1}}>AI Workforce Platform</div>
         </div>
         <div style={{flex:1}}/>
         <button onClick={()=>setMobileMenuOpen(true)} aria-label="Open menu" style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>

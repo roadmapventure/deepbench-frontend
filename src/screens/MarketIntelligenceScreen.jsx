@@ -2433,8 +2433,13 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
           Send
         </button>
+        {/* FEATURE: MOB-001 — Clear's mobile tap target measured 36×13px live (confirmed, mobile-ui-audit-0717)
+            -- reused desktop's MI-57 mouse-oriented sizing verbatim, never given real touch-target padding
+            when adapted for mobile (MI-56). Vertical padding now matches Send's own 9px in this same row
+            (visual consistency, not an arbitrary new number) -- real height goes from ~13px to ~30px+.
+            Font size, color, weight, and the no-confirm-dialog Clear behavior are all unchanged. */}
         <div style={{width:1,alignSelf:"stretch",background:T.lineSoft,flexShrink:0}}/>
-        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"0 2px"}}>
+        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"9px 10px"}}>
           Clear
         </button>
       </div>

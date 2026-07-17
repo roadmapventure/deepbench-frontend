@@ -3,10 +3,13 @@
 // FEATURE: SH-21 — mobile-responsive layout (82% drawer width, scrollable tab bar, grid column drops)
 // FEATURE: SH-21 — mobile tab-bar scroll hint (fade gradient + chevron, John's follow-up request)
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // was: import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { APP_VERSION } from "../config.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import { supabase } from "../lib/supabase.js";
+import { useAgents } from "../hooks/useAgents.js";
+import { SERVICE_CATALOG, PATTERN_CATALOG } from "../hooks/useAIActivity.js";
 
 // ── Tab definitions ─────────────────────────────────────────────────────────────
 const TABS = [
@@ -220,6 +223,7 @@ function PurposeTab() {
 
 function ArchitectureTab() {
   const isMobile = useIsMobile();
+  const agents = useAgents(); // FEATURE: MOB-001 -- live roster count, was hardcoded "13"
   return (
     <>
       <SH mt={0}>The DEEP / BENCH Model</SH>
@@ -267,8 +271,18 @@ function ArchitectureTab() {
       <Divider />
       <SH>By the Numbers</SH>
       {/* FEATURE: SH-21 — stat grid drops 3→2 columns on mobile */}
+      {/* FEATURE: MOB-001 -- AI Patterns/AI Services/Bench agents now read live from the same
+          sources the AI Audit panel and Roster screen already use (PATTERN_CATALOG.length,
+          SERVICE_CATALOG.length, AGENTS.length via useAgents()) -- can no longer contradict those
+          other panels. The remaining 6 numbers are filesystem/DB-schema facts a browser can't
+          compute at runtime; snapshot-corrected to their real values as of 2026-07-17
+          (mobile-ui-audit-0717) but will drift again over time -- a permanent fix needs build-time
+          codegen or a schema-introspection RPC, deliberately out of scope this session (see kickoff
+          doc SCOPE RULES). If you're reading this after a future session and these look stale
+          again, that's expected -- check docs/FEATURES.md's MOB-001 row before re-deriving numbers
+          by hand. */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-        {[["40","Source files"],["~19,000","Lines of code"],["12","API routes"],["11","DB tables (154 cols)"],["23","Arch docs"],["61","Session specs"],["20","AI Patterns"],["19","AI Services"],["13","Bench agents"]].map(([n, l]) => (
+        {[["59","Source files"],["~29,500","Lines of code"],["11","API routes"],["23","DB tables (281 cols)"],["33","Arch docs"],["269","Session specs"],[String(PATTERN_CATALOG.length),"AI Patterns"],[String(SERVICE_CATALOG.length),"AI Services"],[String(agents.length),"Bench agents"]].map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
             <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{l}</div>
@@ -484,6 +498,16 @@ export default function AboutPanel({ onClose }) {
   const [tab, setTab] = useState("purpose");
   // FEATURE: SH-21 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
   const isMobile = useIsMobile();
+  // FEATURE: MOB-001 -- live version read from dev_version_counter (the same table every session
+  // already claims a version from), replacing the hardcoded APP_VERSION as the source of truth.
+  // Falls back to APP_VERSION (config.js) while this resolves or if the query errors -- never a
+  // blank header. anon role confirmed SELECT-able on this table, no RLS (verified live this session).
+  const [liveVersion, setLiveVersion] = useState(null);
+  useEffect(() => {
+    supabase.from("dev_version_counter").select("major,minor,patch").eq("id", 1).single()
+      .then(({ data, error }) => { if (data && !error) setLiveVersion(`${data.major}.${data.minor}.${data.patch}`); });
+  }, []);
+  const displayVersion = liveVersion || APP_VERSION;
 
   return (
     <>
@@ -500,7 +524,7 @@ export default function AboutPanel({ onClose }) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontFamily: mono, fontSize: 8, color: T.brassLight, letterSpacing: 2, textTransform: "uppercase", marginBottom: 3 }}>
-                Portfolio · DeepBench v{APP_VERSION}
+                Portfolio · DeepBench v{displayVersion}
               </div>
               <div style={{ fontFamily: display, fontSize: isMobile ? 15 : 18, fontWeight: 600, color: T.card }}>About DeepBench</div>
             </div>
