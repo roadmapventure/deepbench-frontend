@@ -144,7 +144,11 @@ Do not pre-load all of these. Read only what the session requires — but "requi
 
 ## Step 3 — What This App Is
 
-DeepBench v5.1 — AI agent workforce platform for government procurement intelligence.
+**Rewritten 2026-07-17 (John's explicit call) — dropped the hardcoded version number and platform-scope description that used to live here.** Both had gone stale and directly conflicted with other sources (the version number here said "v5.1" long after `CLAUDE-STATE.md` had moved past v6.3.x; the scope description said "government procurement intelligence" after the platform's scope had already been corrected to general enterprise, `S-PM-05-design`, 2026-06-23). Root cause: this file is read at every design session's Step 1/3, but rarely *edited* — a fact restated here goes stale the moment its real source of truth changes elsewhere, with nothing forcing this copy to catch up. Fixed by not duplicating either fact at all:
+
+- **Version:** never state one here — read `CLAUDE-STATE.md`'s "Version in dev" line fresh, same as everywhere else in this repo. Version numbers live in git/Supabase's `dev_version_counter`, not in prose.
+- **What DeepBench is / who it's for:** see `docs/ARCHITECTURE.md` §0 (The Product Pitch, LOCKED) — the single authoritative source, not restated here.
+
 - Live: `https://deepbench.roadmapventure.com`
 - Dev: `https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app`
 - Owner: John Leonard / Roadmap Venture
