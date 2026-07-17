@@ -116,6 +116,111 @@ export function pairedAgentTurnIds(rows) {
   return paired;
 }
 
+// FEATURE: LOG-21 -- classifyRow()/buildActivitySummary()/percentile() moved here from
+// useAgents.js so both useAIActivity()'s own byAgent (all-time, unscoped) and
+// useAgentActivitySummary() (MI screen's scoped/windowed drawer) run through the exact same
+// aggregation core -- previously two independently hand-written implementations of the same
+// per-row cost/latency/dedup math, which could silently drift out of sync (e.g. a future
+// pairing-dedup fix landing in only one of the two copies). The two screens still query
+// different scopes/time windows on purpose (see MI_LOOP_SCOPE/RECENCY_WINDOW_DAYS in
+// useAgents.js) -- this does NOT make their totals reconcile, it only guarantees the shared
+// math itself can never diverge again. Moved verbatim, byte-identical logic to before this move.
+
+// FEATURE: MI-58 — percentile_cont-equivalent linear interpolation, matches the Postgres
+// percentile_cont() semantics used to verify this fix's numbers against real data.
+export function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = p * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+// FEATURE: S-MI-20 — classifies one ai_activity_log row into a display "kind" for the by-kind
+// latency breakdown, and whether it should be counted there at all. turnTimestampsByAgent is a
+// Map<agent_id, number[]> of every 'agent-turn' row's own created_at (ms) for that agent, built
+// once per fetch, used only for the nearby-pairing check below.
+export function classifyRow(row, turnTimestampsByAgent) {
+  if (row.ai_type === 'agent-turn') {
+    const intentSlug = row.feature ? row.feature.split(':')[1] : null;
+    return { kind: intentSlug || row.feature || 'unknown', include: true };
+  }
+  if (CAPABILITY_WRAPPER_TYPES.has(row.ai_type) && row.feature === 'request-receivable') {
+    const rowTime = new Date(row.created_at).getTime();
+    const turnTimes = turnTimestampsByAgent.get(row.agent_id) || [];
+    const paired = turnTimes.some(t => Math.abs(t - rowTime) < PAIR_WINDOW_MS);
+    return { kind: row.ai_type, include: !paired };
+  }
+  return { kind: row.ai_type, include: true };
+}
+
+// FEATURE: AA-149 -- extracted from the fetchAll().then() callback so the aggregation math
+// (now including per-model breakdown) is unit-testable without mocking Supabase/React. Same
+// classifyRow()-driven kind bucketing as before, byte-identical output for every existing
+// caller -- this only adds a new byModel sub-bucket inside each kind, never removes anything.
+export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
+  // FEATURE: AI-51 — dedup agent-turn rows paired with a same-agent capability-wrapper row
+  // (see pairedAgentTurnIds()'s own comment above) before summing cost. Only
+  // d.totalCost/d.costCount change below — classifyRow()'s own latency dedup is untouched.
+  const paired = pairedAgentTurnIds(scopedRows);
+  const map = {};
+  for (const row of scopedRows) {
+    if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
+    const d = map[row.agent_id];
+    d.calls++;
+    const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
+      ? parseFloat(row.cost_usd)
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens));
+    if (rowCost != null && !paired.has(row.id)) { d.totalCost += rowCost; d.costCount++; }
+
+    const { kind, include } = classifyRow(row, turnTimestampsByAgent);
+    if (!include) continue;
+    if (!d.byKind[kind]) d.byKind[kind] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null, byModel: {} };
+    const k = d.byKind[kind];
+    k.calls++;
+    if (row.latency_ms) {
+      k.totalLatency += row.latency_ms;
+      k.latencyCount++;
+      k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
+    }
+
+    if (row.ai_type === 'agent-turn') {
+      const depthSeg = row.feature ? row.feature.split(':')[2] : null;
+      if (depthSeg && /^depth\d+$/.test(depthSeg) && row.latency_ms) {
+        if (!k.byDepth) k.byDepth = {};
+        if (!k.byDepth[depthSeg]) k.byDepth[depthSeg] = { calls: 0, latencies: [] };
+        k.byDepth[depthSeg].calls++;
+        k.byDepth[depthSeg].latencies.push(row.latency_ms);
+      }
+    }
+
+    const modelKey = row.model || 'unknown';
+    if (!k.byModel[modelKey]) k.byModel[modelKey] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
+    const km = k.byModel[modelKey];
+    km.calls++;
+    if (row.latency_ms) {
+      km.totalLatency += row.latency_ms;
+      km.latencyCount++;
+      km.maxLatency = km.maxLatency == null ? row.latency_ms : Math.max(km.maxLatency, row.latency_ms);
+    }
+  }
+  Object.values(map).forEach(d => {
+    d.avgCost = d.costCount ? d.totalCost / d.costCount : null;
+    Object.values(d.byKind).forEach(k => {
+      k.avgLatency = k.latencyCount ? Math.round(k.totalLatency / k.latencyCount) : null;
+      Object.values(k.byModel).forEach(km => {
+        km.avgLatency = km.latencyCount ? Math.round(km.totalLatency / km.latencyCount) : null;
+      });
+      Object.values(k.byDepth || {}).forEach(bd => {
+        bd.p75 = percentile(bd.latencies, 0.75);
+        delete bd.latencies;
+      });
+    });
+  });
+  return map;
+}
+
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)
 export const AI_TYPE_TO_SERVICE = {
   rag_briefing:   'prompt-assembly',
@@ -376,18 +481,41 @@ export function useAIActivity() {
     d.avgLatency = d.latencies.length ? Math.round(d.latencies.reduce((a,b)=>a+b,0)/d.latencies.length) : null;
   });
 
-  // Aggregate by agent
-  const byAgent = {};
-  for (const e of log) {
-    if (!e.agentId) continue;
-    if (!byAgent[e.agentId]) byAgent[e.agentId] = { agentId: e.agentId, calls: 0, cost: 0, latencies: [] };
-    byAgent[e.agentId].calls++;
-    byAgent[e.agentId].cost += e.cost || 0;
-    if (e.latencyMs) byAgent[e.agentId].latencies.push(e.latencyMs);
+  // FEATURE: LOG-21 -- byAgent now runs through the same buildActivitySummary() core
+  // useAgentActivitySummary() (useAgents.js) uses for calls/cost, instead of an independently
+  // hand-written loop -- so a future cost/dedup fix can never land in only one of the two
+  // implementations again. Adapts this hook's already-normalized `log` entries back into the
+  // raw-row shape buildActivitySummary()/pairedAgentTurnIds() expect; safe to re-run pairing on
+  // already-hydrate-time-resolved cost values since the dedup result is idempotent (the same
+  // rows pair the same way every time on identical input). avgLatency is still computed
+  // directly here (blended across all kinds, unconditional on latency_ms) to match this flat
+  // display shape exactly -- byte-identical semantics to the pre-LOG-21 inline loop, asserted
+  // in the Node test below. Output shape ({agentId, calls, cost, avgLatency}) is unchanged --
+  // AIActivityPanel.jsx (agentsSorted) is not touched this session.
+  const rawRowsForAgentSummary = log
+    .filter(e => e.agentId)
+    .map(e => ({
+      id: e.id, agent_id: e.agentId, ai_type: e.type, feature: e.location,
+      model: e.model, latency_ms: e.latencyMs, cost_usd: e.cost,
+      input_tokens: e.tokens, output_tokens: null, created_at: e.ts,
+    }));
+  const turnTimestampsByAgentForSummary = new Map();
+  for (const row of rawRowsForAgentSummary) {
+    if (row.ai_type !== 'agent-turn') continue;
+    if (!turnTimestampsByAgentForSummary.has(row.agent_id)) turnTimestampsByAgentForSummary.set(row.agent_id, []);
+    turnTimestampsByAgentForSummary.get(row.agent_id).push(new Date(row.created_at).getTime());
   }
-  Object.values(byAgent).forEach(d => {
-    d.avgLatency = d.latencies.length ? Math.round(d.latencies.reduce((a,b)=>a+b,0)/d.latencies.length) : null;
-  });
+  const agentSummary = buildActivitySummary(rawRowsForAgentSummary, turnTimestampsByAgentForSummary);
+  const byAgent = {};
+  for (const [agentId, d] of Object.entries(agentSummary)) {
+    const allLatencies = rawRowsForAgentSummary.filter(r => r.agent_id === agentId && r.latency_ms).map(r => r.latency_ms);
+    byAgent[agentId] = {
+      agentId,
+      calls: d.calls,
+      cost: d.totalCost,
+      avgLatency: allLatencies.length ? Math.round(allLatencies.reduce((a,b)=>a+b,0)/allLatencies.length) : null,
+    };
+  }
 
   // FEATURE: AI-23 — Aggregate by Service (remaps old ai_type to service_slug)
   // FEATURE: LOG-12 — group by capabilitySlugForRow() (resolves agent-turn rows to their real
