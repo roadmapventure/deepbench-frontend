@@ -902,6 +902,37 @@ function HopBadge({ hopStart, hopEnd, accent }) {
   );
 }
 
+// FEATURE: CHI-21 — single source for the combined hop+elapsed wrap-up line, replacing the
+// previously-stacked HopBadge (own line) + elapsed-time caption (own line) at both chat-bubble
+// render sites. hopEnd is the cumulative SESSION hop total at the moment this message finished
+// (hop numbering never resets within a session — CHI-03c), not this answer's own
+// hopStart..hopEnd span — confirmed with John this session: "the answer may have taken 4 hops
+// to create, but the full agent routing took 9 hops," so the total stated here must match
+// Column 3's running count, not a per-answer span. A later message's own hopEnd will be higher;
+// this line is a fixed snapshot of the total as of when THIS message finished, not a live value.
+function formatHopSummary(hopEnd, totalElapsedMs) {
+  if (hopEnd == null || totalElapsedMs == null) return null;
+  const hopWord = hopEnd === 1 ? "hop" : "hops";
+  return `Full Agent Routing & Answer in ${hopEnd} ${hopWord} total, ${formatElapsed(totalElapsedMs)}`;
+}
+
+// FEATURE: CHI-21 — replaces the two previously-stacked <div>s (HopBadge alone, elapsed-time
+// caption alone) with one row: badge on the left, enriched summary sentence to its right. Used
+// at both MessageBubble render sites (qa branch, default branch) — was duplicated JSX before
+// this extraction (Architect Review: duplicate-functionality check).
+function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent }) {
+  if (hopStart == null || hopEnd == null) return null;
+  const summary = formatHopSummary(hopEnd, totalElapsedMs);
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+      <HopBadge hopStart={hopStart} hopEnd={hopEnd} accent={accent}/>
+      {summary && (
+        <span style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>{summary}</span>
+      )}
+    </div>
+  );
+}
+
 // FEATURE: MI-52 — shared module-scope "first name only" resolver. Previously a local const
 // duplicated inside describeDelegationEvent (MI-49); RoutingEventRow now needs the identical
 // behavior (Task 1: drawer row headers switch from full name to first-name-only, matching the
@@ -1282,18 +1313,10 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
               ⚑ {msg.review_reason || "flagged for review"}
             </div>
           )}
-          I've pulled together an answer — the full breakdown is in Evidence. Take a look and let me know if you have questions.
+          I've pulled together an answer — review the full breakdown in the Evidence column to the right. Let me know if you have questions.
         </div>
-        {/* FEATURE: CHI-03c — hop-range badge, same navy accent as QaEvidenceCard's own borderLeft
-            (the Evidence card this pointer sentence refers to). */}
-        <div style={{marginTop:4}}>
-          <HopBadge hopStart={msg.hopStart} hopEnd={msg.hopEnd} accent={T.navy}/>
-        </div>
-        {msg.totalElapsedMs != null && (
-          <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
-            Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
-          </div>
-        )}
+        {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs). */}
+        <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy}/>
         {qaEvidence?.reviewChoice === "good" && (
           <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
         )}
@@ -1324,20 +1347,9 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         )}
         {msg.text}
       </div>
-      {/* FEATURE: CHI-03c — hop-range badge on CHI-03b's Marcus-voiced ack messages only (the only
-          non_qa kind that carries hopStart/hopEnd); T.navy accent matches the qa pointer sentence's
-          own badge above, since both are Marcus-attributed. */}
-      {msg.hopStart != null && (
-        <div style={{marginTop:4}}>
-          <HopBadge hopStart={msg.hopStart} hopEnd={msg.hopEnd} accent={T.navy}/>
-        </div>
-      )}
-      {/* FEATURE: CHI-07 */}
-      {msg.totalElapsedMs != null && (
-        <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
-          Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
-        </div>
-      )}
+      {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs), same
+          component as the qa branch above. */}
+      <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy}/>
       {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
           non-qa needs_review case (no message today reaches this with needs_review true, but this
           keeps the treatment consistent should a future non-qa kind carry the flag). */}
@@ -1384,7 +1396,9 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
       {/* FEATURE: CHI-05 */}
       <FeatureBadge id="CHI-05"/>
       <div style={{background:T.cardAlt,padding:"7px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-        <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
+        {/* FEATURE: CHI-21 — renamed from agent/screen identity ("Marcus Webb · Channel
+            Intelligence") to a purpose-describing title. */}
+        <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Analysis & Narrative — based on your question...</span>
         <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
       </div>
       <div style={{borderTop:`1px solid ${T.line}`,borderBottom:`1px solid ${T.line}`}}>
