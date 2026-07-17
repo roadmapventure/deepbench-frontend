@@ -78,11 +78,16 @@ export function useLearnedContext() {
 // agent IDs. Distinct from useAgentUsageCounts() above (RO-09): deliberately not reused/modified,
 // see Task 1 note in the kickoff doc — that hook's flat number shape is a direct sort-comparator
 // input in RosterScreen.jsx, changing it would silently break that sort. Also distinct from
-// useAIActivity()'s byAgent (src/hooks/useAIActivity.js): that aggregation is backed by an
-// in-memory log capped at 500 rows (hydrateFromSupabase()'s .limit(500)) — a rolling window, not
-// full history, so an occasionally-used agent could scroll out of it and be wrongly reported as
-// unused. This hook queries Supabase directly, independent of that cap, so an agent's "used at
-// least once, ever" status is never lost.
+// useAIActivity()'s byAgent (src/hooks/useAIActivity.js): that hook's module-level log store is
+// only populated when something calls hydrateFromSupabase() (in practice, when the AI Audit panel
+// mounts) — its own hook-level state doesn't depend on any caller here, so an agent used only on
+// a screen that never opens AI Audit this session would still show correctly in *this* hook.
+// FEATURE: LOG-19 -- previously said useAIActivity()'s byAgent was "backed by an in-memory log
+// capped at 500 rows (hydrateFromSupabase()'s .limit(500))" -- stale since AI-184 rewrote
+// hydrateFromSupabase() to page through the full table via .range(), no .limit(500) anywhere in
+// that function anymore. Both hooks read full history from Supabase today; the real distinction
+// is fetch trigger/lifecycle (this hook always fetches on its own mount; useAIActivity()'s store
+// only fills when hydrateFromSupabase() is actually called), not row-count coverage.
 // FEATURE: S-MI-18b — added optional `scope` param: { aiTypes: string[], featurePrefixes: string[] }.
 // When provided, only rows matching scope.aiTypes exactly OR whose `feature` starts with one of
 // scope.featurePrefixes are counted — lets a caller scope metrics to "this page's real loop
