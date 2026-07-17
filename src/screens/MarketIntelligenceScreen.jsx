@@ -500,17 +500,21 @@ const INTENT_CHAINS = {
 // expected-value-per-call model instead of expected-value-per-turn. Returns null (unchanged
 // contract) whenever depth0 has no historical data yet, same "fall back to the generic ceiling"
 // behavior as before.
+// FEATURE: CHI-10 — reads useAIActivity.js's p90 (was p75, same shared percentile() computation,
+// see that file's CHI-10 comment). Tightens the "expect >" floor from ~25%-of-runs-exceed-this to
+// ~10%-of-runs-exceed-this. Contract unchanged: returns null whenever depth0 has no historical
+// data yet, same fallback-to-generic-ceiling behavior as before.
 function estimateChainMs(chain, agentActivity) {
   let total = 0;
   for (const [agentId, kind] of chain) {
     const byDepth = agentActivity?.[agentId]?.byKind?.[kind]?.byDepth;
     const depth0 = byDepth?.depth0;
-    if (!depth0?.p75 || !depth0.calls) return null;
-    let hopTotal = depth0.p75;
+    if (!depth0?.p90 || !depth0.calls) return null;
+    let hopTotal = depth0.p90;
     for (let i = 1; ; i++) {
       const d = byDepth[`depth${i}`];
       if (!d) break;
-      hopTotal += d.p75 * (d.calls / depth0.calls);
+      hopTotal += d.p90 * (d.calls / depth0.calls);
     }
     total += hopTotal;
   }

@@ -1,3 +1,7 @@
+// DeepBench v6.3.50 | useAgents.js | CHI-10 — the "p75 latency buckets" line below is now p90; the
+// actual computation lives in useAIActivity.js (moved there by LOG-21) and is only re-exported
+// here — see that file's CHI-10 comment for the real change. Left as a pointer, not rewritten in
+// place, so this file's own history stays intact.
 // DeepBench v6.2.29 | useAgents.js | MI-58 — additive 30-day recency window on the ai_activity_log
 // query + per-depth p75 latency buckets (byKind[kind].byDepth) so estimateChainMs() can compute a
 // depth-weighted expected-value-per-call estimate instead of summing a single blended avgLatency.

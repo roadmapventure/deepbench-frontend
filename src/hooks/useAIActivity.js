@@ -233,8 +233,12 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
       Object.values(k.byModel).forEach(km => {
         km.avgLatency = km.latencyCount ? Math.round(km.totalLatency / km.latencyCount) : null;
       });
+      // FEATURE: CHI-10 — bumped from p75 to p90 (John's call, found live 2026-07-16: a p75-based
+      // estimate is, by definition, exceeded by ~25% of real runs — too loose for a user-facing "you'll
+      // wait about this long" signal). p90 tightens that to ~10%. Same percentile_cont-equivalent
+      // interpolation (percentile(), unchanged) — only the target quantile and this field's name change.
       Object.values(k.byDepth || {}).forEach(bd => {
-        bd.p75 = percentile(bd.latencies, 0.75);
+        bd.p90 = percentile(bd.latencies, 0.90);
         delete bd.latencies;
       });
     });
