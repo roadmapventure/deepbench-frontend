@@ -16,26 +16,9 @@ This separation is what enforces branch discipline. A coding session starts cold
 
 ---
 
-## Standing Rule — Decision Autonomy Tiers (added 2026-07-17, John's explicit call)
+## Standing Rule — Decision Autonomy Tiers
 
-**John's own framing:** design sessions had been checking in on too many small decisions — not because each individual ask was unreasonable, but because the *default* was tilted too far toward asking, when most of what gets asked about here is cheap to revise if wrong (this repo is mostly markdown; a bad call is a two-minute fix, not a production incident). Three tiers, so "should I ask" stops being a fresh judgment call every time:
-
-**Tier 1 — decide and report, no check-in required:**
-- Which backlog file/tier (`FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`) a new item goes in, when the current criterion clearly applies.
-- Whether to fold a finding into an existing row or give it its own ID, when the scope reasoning is clear-cut.
-- Wording/phrasing choices in docs that don't touch already-locked terminology.
-- Any documentation change that's cheap to revise later with zero downstream cost if it turns out wrong.
-
-**Tier 2 — decide, but flag the call clearly in the close-out report (no need to wait for a response before proceeding):**
-- Judgment calls that could reasonably go either way, where the cost of either choice is low. John sees the call made and can redirect after the fact instead of gating the work on approval before it happens.
-
-**Tier 3 — ask first, always:**
-- Terminology or naming decisions that become canonical and get referenced by every future session (the specific risk: sessions "talking past" John with invented language — see the `ARCHITECTURE.md`/`SCREEN-INVENTORY.md` rebuild, 2026-07-17).
-- Anything touching shared state other sessions or people depend on — pushing to `dev`, deleting a worktree, renaming a heavily cross-referenced ID.
-- Reversing or contradicting a decision John already made.
-- Anything John has told this session directly he wants to be involved in, for that topic specifically.
-
-**When genuinely unsure which tier a call falls into, default to Tier 2** (decide, flag clearly) rather than Tier 3 (ask and wait) — the cost of a wrong Tier-2 call is a correction after the fact; the cost of defaulting to Tier 3 on everything is the exact fatigue this rule exists to fix.
+**Moved 2026-07-17 to `docs/WORKING-WITH-JOHN.md`** (the "How to Work With John" interaction-pattern reference, `SES-003`) — that doc is now the canonical home for this and other communication/decision-making patterns. Read it there; it's already a mandatory Step 1 read below, so this doesn't add a lookup that wasn't already happening.
 
 ---
 
@@ -72,16 +55,9 @@ Applies from S-APPLE-01a-design (v5.3.0) onward.
 
 ---
 
-## Standing Rule — Skill/Capability Disclosure When Updating Agent Competencies (added 2026-07-16, John's explicit call)
+## Standing Rule — Skill/Capability Disclosure When Updating Agent Competencies
 
-**Before proposing or writing any content that creates, edits, or touches a Skill (`skill_profiles` row) or an agent's competency, state the answers to these explicitly — as part of the conversational walkthrough with John, not buried in a kickoff doc:**
-
-- Is this creating a **new** Skill record, or editing an existing one? If new: what are you naming it (slug), and what Skill type (Identity/Behavior/Knowledge/Intent/Format/Guardrails)?
-- What **Capability** (`capability_slug`) is it assigned to — name it.
-- Does that Capability already have other Skills attached? List them.
-- Who (which Agent(s)) is that Capability assigned to (`agent_capability_assignments`) — name them.
-
-**Verify every answer live against Supabase, every time — never from memory, a prior session's finding, or `AGENT-COMPETENCY-MODEL.md`'s own examples.** This is the same discipline as the standing verify-never-assert-from-memory rule (`CLAUDE.md`), applied specifically to Skill/Capability/Agent work because a wrong assumption here silently mis-scopes the edit (e.g. editing a Skill shared across Capabilities/Agents without realizing the blast radius). Applies to every session touching `skill_profiles`/`capability_skill_profiles`/`agent_capability_assignments` — content-authoring sessions (like `AA-194`) and structural/code sessions alike.
+**Moved 2026-07-17 to `docs/WORKING-WITH-JOHN.md`** (`SES-003`) — same consolidation as Decision Autonomy Tiers. Read it there; it's already a mandatory Step 1 read below.
 
 ---
 
@@ -113,9 +89,10 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 **Mandatory, added 2026-07-15 (was previously an optional skill run "if you thought to"; with 5-7 concurrent sessions, drift compounds too fast for that to be reliable):** run the `session-hygiene` skill's checks 1, 2, 3, and 5 now, before Step 1's reads — sizes/greps only, costs near-nothing. Check 5 (stale worktrees) matters most under real concurrency: don't assume `CLAUDE-STATE.md`'s "In flight now" is a complete picture of what's on disk. Report any findings briefly, same as the skill always has; don't silently fix without flagging first.
 
-1. `CLAUDE-STATE.md` — current version, next session, open blockers
-2. `docs/FEATURES.md` — **now** feature backlog (MI speed/loop/harness/charts) and session queue. Read `docs/FEATURES-NEXT.md` (other MI backlog) or `docs/FEATURES-LATER.md` (everything else) only when the session's actual scope is there.
-3. `docs/SESSIONS.md` — session log (only if you need version history)
+1. `docs/WORKING-WITH-JOHN.md` — communication/decision-making patterns (short, added 2026-07-17 per `SES-003`)
+2. `CLAUDE-STATE.md` — current version, next session, open blockers
+3. `docs/FEATURES.md` — **now** feature backlog (MI speed/loop/harness/charts) and session queue. Read `docs/FEATURES-NEXT.md` (other MI backlog) or `docs/FEATURES-LATER.md` (everything else) only when the session's actual scope is there.
+4. `docs/SESSIONS.md` — session log (only if you need version history)
 
 Report back after Step 1:
 - Current version in dev (state it as the `origin/dev` version you just fetched, not whatever the shared checkout's file said before that fetch)
