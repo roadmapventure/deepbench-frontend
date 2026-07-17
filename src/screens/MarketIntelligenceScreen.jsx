@@ -1855,7 +1855,7 @@ function RoutingActivityLine({ evt }) {
 // directly, so both call sites need only pass the two values (agents, agentActivity) that
 // genuinely differ per caller, rather than threading three additional hook results through props
 // for a single shared consumer.
-function AuditDrawersBody({ agents, agentActivity }) {
+function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
   const learned = useLearnedContext();
   const dataSources = useDataSources();
   // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
@@ -1876,7 +1876,7 @@ function AuditDrawersBody({ agents, agentActivity }) {
 
   return (
     <>
-      <Drawer title="Agents" count={`${activeIds.length} active · ${potentialIds.length} potential`}>
+      <Drawer title="Agents" count={`${activeIds.length} active · ${potentialIds.length} potential`} onOpen={onAgentsDrawerOpen}>
         {activeIds.map(id => {
           const agent = agentById(id);
           if (!agent) return null;
@@ -1900,7 +1900,7 @@ function AuditDrawersBody({ agents, agentActivity }) {
                 <StatCell val={stats?.calls ?? 0} label="Calls"/>
                 <StatCell val={stats?.avgCost != null ? `$${stats.avgCost.toFixed(2)}` : "—"} label="Avg Cost"/>
               </div>
-              {(baseline || (stats?.byKind && Object.keys(stats.byKind).length > 0)) && (
+              {(baseline || (stats?.byPattern && Object.keys(stats.byPattern).length > 0)) && (
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   {baseline && (
                     <LatencyStatRow
@@ -1909,34 +1909,21 @@ function AuditDrawersBody({ agents, agentActivity }) {
                       restText={`s avg (${baseline.calls} call${baseline.calls === 1 ? "" : "s"}, max ${(baseline.maxLatency/1000).toFixed(1)}s)`}
                     />
                   )}
-                  {stats?.byKind && Object.entries(stats.byKind)
+                  {/* FEATURE: MI-72b — replaces the byKind capability-type breakdown (known
+                      placeholder, S-MI-20) with the real per-agent, per-pattern breakdown added by
+                      MI-72a. PATTERN_NAME is the same lookup RoutingActivityLine already uses for
+                      Agent Routing's pattern labels — one source of truth platform-wide, falls back
+                      to the raw slug for anything not yet in PATTERN_CATALOG. No byModel sub-rows
+                      here (byPattern has no byModel sub-bucket) — out of scope to add one. */}
+                  {stats?.byPattern && Object.entries(stats.byPattern)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
-                    .map(([kind, k]) => (
-                      <div key={kind} style={{display:"flex",flexDirection:"column",gap:2}}>
-                        <LatencyStatRow
-                          label={formatKindLabel(kind)}
-                          valueNumber={k.avgLatency != null ? (k.avgLatency/1000).toFixed(1) : "—"}
-                          restText={`${k.avgLatency != null ? "s avg" : ""} (${k.calls} call${k.calls === 1 ? "" : "s"}${k.latencyCount > 1 ? `, max ${(k.maxLatency/1000).toFixed(1)}s` : ""})`}
-                        />
-                        {/* FEATURE: AA-149 -- per-model sub-rows, shown only when a kind has genuinely used more
-                            than one model (true today only for ci-answer-intent post-Haiku-switch during any
-                            overlap window, and for any future model experiment on any intent). Every other kind
-                            in the drawer today has exactly one model and renders with zero visual change. */}
-                        {k.byModel && Object.keys(k.byModel).length > 1 &&
-                          Object.entries(k.byModel)
-                            .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
-                            .map(([model, km]) => (
-                              <LatencyStatRow
-                                key={model}
-                                label={`↪ ${model}`}
-                                valueNumber={km.avgLatency != null ? (km.avgLatency/1000).toFixed(1) : "—"}
-                                restText={`${km.avgLatency != null ? "s avg" : ""} (${km.calls} call${km.calls === 1 ? "" : "s"})`}
-                                indent={true}
-                                fontSize={8}
-                              />
-                            ))
-                        }
-                      </div>
+                    .map(([patternSlug, p]) => (
+                      <LatencyStatRow
+                        key={patternSlug}
+                        label={PATTERN_NAME[patternSlug] || patternSlug}
+                        valueNumber={p.avgLatency != null ? (p.avgLatency/1000).toFixed(1) : "—"}
+                        restText={`${p.avgLatency != null ? "s avg" : ""} (${p.calls} call${p.calls === 1 ? "" : "s"}${p.latencyCount > 1 ? `, max ${(p.maxLatency/1000).toFixed(1)}s` : ""})`}
+                      />
                     ))}
                 </div>
               )}
@@ -2037,7 +2024,7 @@ function AuditDrawersBody({ agents, agentActivity }) {
 // FEATURE: MI-45 — slimmed to the Agent Routing drawer only (RoutingEventRow, shared with mobile's
 // pinned feed) plus AuditDrawersBody for the remaining four drawers — net-zero visual change,
 // extraction only (STYLE-GUIDE.md §21).
-function AuditColumn({ events, agentActivity }) {
+function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John
@@ -2070,7 +2057,7 @@ function AuditColumn({ events, agentActivity }) {
               : <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>
           )}
       </Drawer>
-      <AuditDrawersBody agents={agents} agentActivity={agentActivity}/>
+      <AuditDrawersBody agents={agents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
     </div>
   );
 }
@@ -2249,7 +2236,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo }) {
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen }) {
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -2404,7 +2391,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
             <button onClick={()=>setShowAgentInfo(false)} style={backBtnStyle}>← Back to Chat</button>
           </div>
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <AuditDrawersBody agentActivity={agentActivity} agents={agents}/>
+            <AuditDrawersBody agentActivity={agentActivity} agents={agents} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         </div>
       )}
@@ -2432,9 +2419,13 @@ export default function MarketIntelligenceScreen() {
   // FEATURE: MI-51 — showAgentInfo lifted here (was MobileBody-local showActivity) so the trigger
   // button can live in the shared page-title block (Task 1b) instead of inside MobileBody.
   const [showAgentInfo, setShowAgentInfo] = useState(false);
+  // FEATURE: MI-72b — bumping this on Agents-drawer open forces useAgentActivitySummary() to
+  // re-fetch fresh data instead of showing whatever was loaded once at page mount.
+  const [agentsRefreshKey, setAgentsRefreshKey] = useState(0);
   // FEATURE: MI-35 — lifted from AuditColumn so it's available at every setWorkingStatus( call
   // site below, not just inside AuditColumn.
-  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE);
+  const agentActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, MI_LOOP_SCOPE, 'global', agentsRefreshKey);
+  const onAgentsDrawerOpen = () => setAgentsRefreshKey(k => k + 1); // FEATURE: MI-72b
   const agents = useAgents(); // FEATURE: MI-42 -- needed here for describeDelegationEvent()'s name resolution
 
   // FEATURE: MI-51 — Clear resets chat + any active flow back to the seed-question empty state,
@@ -2901,14 +2892,14 @@ export default function MarketIntelligenceScreen() {
           <MobileBody
             messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}
             hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
-            events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo}
+            events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo} onAgentsDrawerOpen={onAgentsDrawerOpen}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence}/>
             <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} workingStatus={workingStatus} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
-            <AuditColumn events={pipelineEvents} agentActivity={agentActivity}/>
+            <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}
       </div>

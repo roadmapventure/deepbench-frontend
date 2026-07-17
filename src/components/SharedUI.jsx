@@ -340,10 +340,20 @@ export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, v
 // the bottom of the content wrapper that lets the user grow the drawer past its default maxHeight,
 // clamped via clampDrawerHeight() above. Not persisted — dragHeight is plain component state, resets
 // to null (→ default maxHeight) on every remount/reload.
-export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false }) => {
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [dragHeight, setDragHeight] = useState(null);
   const contentRef = useRef(null);
+
+  // FEATURE: MI-72b — fires onOpen exactly on the closed->open transition (not on every toggle,
+  // not on open->closed). Used by the Agents drawer to bump a refreshKey and re-fetch fresh data
+  // each time it's opened, rather than only once at page load.
+  const toggle = () => {
+    setOpen(o => {
+      if (!o && onOpen) onOpen();
+      return !o;
+    });
+  };
 
   const effectiveHeight = dragHeight == null
     ? maxHeight
@@ -366,7 +376,7 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
 
   return (
     <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
-      <div onClick={()=>setOpen(o=>!o)}
+      <div onClick={toggle}
         style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer"}}>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>{title}</div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>

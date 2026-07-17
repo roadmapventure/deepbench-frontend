@@ -139,7 +139,7 @@ export function recencyCutoffIso(days, nowMs = Date.now()) {
 // useAgentActivitySummary() and useAIActivity()'s own byAgent); imported above instead of
 // defined here. Byte-identical logic, no behavior change.
 
-export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
+export function useAgentActivitySummary(agentIds, scope, tenantId = 'global', refreshKey = 0) {
   const [summary, setSummary] = useState({});
 
   useEffect(() => {
@@ -191,7 +191,9 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
     });
 
     return () => { cancelled = true; };
-  }, []); // agentIds/scope are stable, page-defined constants — same no-deps precedent as before
+  }, [refreshKey]); // FEATURE: MI-72b — bumping refreshKey (e.g. on Agents-drawer open) re-fetches;
+  // agentIds/scope/tenantId remain page-defined constants, not real reactive deps, same precedent
+  // as before for those three specifically.
 
   return summary;
 }
