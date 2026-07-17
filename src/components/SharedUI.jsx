@@ -349,10 +349,9 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
   // not on open->closed). Used by the Agents drawer to bump a refreshKey and re-fetch fresh data
   // each time it's opened, rather than only once at page load.
   const toggle = () => {
-    setOpen(o => {
-      if (!o && onOpen) onOpen();
-      return !o;
-    });
+    const willOpen = !open;
+    if (willOpen && onOpen) onOpen();
+    setOpen(willOpen);
   };
 
   const effectiveHeight = dragHeight == null
