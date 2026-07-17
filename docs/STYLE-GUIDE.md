@@ -753,10 +753,19 @@ First application: `QaEvidenceCard`'s and `MessageBubble`'s (dormant) review-cho
 
 ---
 
+## Section 36 — Chat Bubble Speaker Label (Locked 2026-07-16 · S-CHI-08-design)
+
+Every `MessageBubble` (both the qa branch and the default/non-qa branch) renders a small, subtle label directly above the bubble, matching the bubble's own alignment: "You" for the user's own message (right-aligned), "Marcus" for every assistant message (left-aligned) — `fontFamily:mono, fontSize:9, color:T.muted`, no bold, no uppercase, no letter-spacing. Deliberately quieter than Section 28's agent+role CTA pairing (this is a persistent identity label on every bubble, not a one-time introduction moment) and deliberately *not* derived from `qaEvidence.displayAgentCard` — that field names whichever agent *formatted* the answer (e.g. Alex Reeves), a different agent than who's *speaking* in Chat. Chat is architecturally always Marcus's own voice (`CHI-03a`), so the assistant label is a static string, not per-message agent data. If a future session ever makes Chat's speaker something other than Marcus, revisit this section — it does not generalize to "whichever agent is attached to this message" today.
+
+Also locked in this session: the "⚑ {review_reason}" flagged-narrative caption lives *inside* the bubble now (first, before the bubble's main text, `marginBottom:8`), in the bubble's own body font — not a separate mono-font caption below the bubble as in prior sessions. The "Marcus flagged this —" prefix is dropped (redundant inside Marcus's own bubble); the ⚑ icon and `T.brassDeep` color are kept as the visual flag signal.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-16 | S-CHI-08-design | Section 36 added — Chat Bubble Speaker Label locked: subtle mono/9px/muted "You"/"Marcus" label above every `MessageBubble` (both branches), always static ("Marcus" for Chat, never `qaEvidence.displayAgentCard`). Flagged-narrative caption ("⚑ {review_reason}") merged inside the bubble (was a separate caption below it); "Marcus flagged this —" prefix dropped, ⚑ icon + brass color kept. Kickoff: `docs/kickoffs/v6.3.38-CHI-08-chat-bubble-consolidation.md`. |
 | 2026-07-16 | S-CHI-05-design | Section 35 added — Gradient Action Card "needs your input" pattern locked: new `T.brassGlow`/`T.white` tokens, gold-to-white gradient fill, sharp corners + brass Corners bracket, solid-brass/navy badge, bold navy question text, navy primary CTA (scoped exception to Section 7). First application: `QaEvidenceCard`/`MessageBubble`'s review-choice prompt. Kickoff: `docs/kickoffs/v6.3.32-CHI-05-evidence-review-choice-action-styling.md`. |
 | 2026-07-16 | S-CHI-04-design / CHI-04 | Section 34 added — Clear now resets `pipelineEvents`/`pendingDelegationsRef` (Column 3 used to survive Clear untouched); stale-generation guard (`clearGenerationRef`/`isStale`) locked as the durable cancellation pattern for any future async call this screen adds; question-boundary divider (`question_boundary` marker event + `QuestionDivider`) marks where one question's Agent Routing hops end and the next begin when Clear isn't used in between. Kickoff: `docs/kickoffs/v6.3.29-CHI-04-clear-reset-stale-guard-question-divider.md`. |
 | 2026-07-16 | S-CHI-03-design / CHI-03a | Section 33 added — Chat vs. Evidence content split locked: any document/analysis/narrative is evidence (Column 2), conversational commentary about it stays in chat. New `qaEvidence` state slot (independent of `hypFlow`) fixes a real bug where a plain Q&A never escalated left Evidence permanently empty. Columns renamed "Interact"→"Chat", "Evidence"→"Evidence & Interaction". Kickoff: `docs/kickoffs/v6.3.22-CHI-03a-chat-evidence-architecture-move.md`. |

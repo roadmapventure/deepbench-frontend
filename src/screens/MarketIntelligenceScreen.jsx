@@ -1236,6 +1236,8 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
   if (msg.kind === "qa") {
     return (
       <div style={{marginBottom:12,maxWidth:"96%"}}>
+        {/* FEATURE: CHI-08 */}
+        <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:3}}>Marcus</div>
         <div style={{
           maxWidth:"85%",padding:"10px 14px",fontFamily:body,fontSize:13,lineHeight:1.5,
           background: msg.needs_review ? "#f3e6cc" : T.card,
@@ -1243,6 +1245,15 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           border: `1px solid ${msg.needs_review ? T.brass : T.line}`,
           borderRadius:3,
         }}>
+          {/* FEATURE: CHI-08 — flagged narrative merged into the bubble, narrative first, pointer
+              sentence second, both the bubble's own body font (was a separate mono/9.5px caption
+              below the bubble). "Marcus flagged this —" prefix dropped (redundant inside Marcus's
+              own bubble); ⚑ icon + brass color kept as the visual flag signal. */}
+          {msg.needs_review && (
+            <div style={{color:T.brassDeep,marginBottom:8}}>
+              ⚑ {msg.review_reason || "flagged for review"}
+            </div>
+          )}
           I've pulled together an answer — the full breakdown is in Evidence. Take a look and let me know if you have questions.
         </div>
         {/* FEATURE: CHI-03c — hop-range badge, same navy accent as QaEvidenceCard's own borderLeft
@@ -1253,11 +1264,6 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         {msg.totalElapsedMs != null && (
           <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:4}}>
             Full Agent Routing & Answer Given in {formatElapsed(msg.totalElapsedMs)}
-          </div>
-        )}
-        {msg.needs_review && (
-          <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3,marginTop:6}}>
-            ⚑ Marcus flagged this — {msg.review_reason || "flagged for review"}
           </div>
         )}
         {qaEvidence?.reviewChoice === "good" && (
@@ -1272,6 +1278,8 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:isUser?"flex-end":"flex-start",marginBottom:12}}>
+      {/* FEATURE: CHI-08 */}
+      <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:3}}>{isUser ? "You" : "Marcus"}</div>
       <div style={{
         maxWidth:"85%",padding:"10px 14px",fontFamily:body,fontSize:13,lineHeight:1.5,
         background: isUser ? T.navy : (msg.needs_review ? "#f3e6cc" : T.card),
@@ -1279,6 +1287,13 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         border: isUser ? "none" : `1px solid ${msg.needs_review ? T.brass : T.line}`,
         borderRadius:3,
       }}>
+        {/* FEATURE: CHI-08 — same merge as the qa branch above; still dormant (no message today
+            reaches this branch with needs_review true), kept consistent for when one does. */}
+        {!isUser && msg.needs_review && (
+          <div style={{color:T.brassDeep,marginBottom:8}}>
+            ⚑ {msg.review_reason || "flagged for review"}
+          </div>
+        )}
         {msg.text}
       </div>
       {/* FEATURE: CHI-03c — hop-range badge on CHI-03b's Marcus-voiced ack messages only (the only
@@ -1300,9 +1315,6 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           keeps the treatment consistent should a future non-qa kind carry the flag). */}
       {!isUser && msg.needs_review && (
         <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
-          <div style={{fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:0.3}}>
-            ⚑ Marcus flagged this — {msg.review_reason || "flagged for review"}
-          </div>
           {msg.reviewChoice === "good" && (
             <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
           )}
