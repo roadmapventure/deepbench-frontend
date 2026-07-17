@@ -1,3 +1,9 @@
+// DeepBench v6.3.45 | MarketIntelligenceScreen.jsx | CHI-14 — Agent Routing drawer's zero-hop empty
+// state de-duplicated: desktop (AuditColumn) carried a stale sentence referencing internal session
+// IDs (S-MARKET-INTEL-01d/03, one already shipped), mobile had already independently drifted to a
+// different, shorter string. Both now render a single shared AGENT_ROUTING_EMPTY_TEXT constant —
+// "Real agent-hop events appear here as the chat runs." — fixed at the source so the two surfaces
+// cannot drift again. Text-content-only change; no styling touched.
 // DeepBench v6.3.44 | MarketIntelligenceScreen.jsx | CHI-13 — EvidenceColumn's card restructured to
 // match InteractColumn's scroll-body+pinned-footer anatomy: a new selectEvidenceFooterKind() pure
 // function centralizes the mutual exclusion (confirmation > hypothesis result > qa review) that was
@@ -1799,6 +1805,14 @@ function rollupBaseline(stats) {
   return { avgLatency: Math.round(totalLatency / latencyCount), maxLatency, calls };
 }
 
+// FEATURE: CHI-14 — single source of truth for the Agent Routing drawer's zero-hop empty
+// state, shared by desktop (AuditColumn) and mobile (MobileBody). Previously two independent
+// string literals had drifted: desktop carried a stale sentence referencing internal session
+// IDs (S-MARKET-INTEL-01d/03), one of which had already shipped; mobile's copy was already
+// correct. Fixed at the source instead of patching desktop's string in place, so the two
+// surfaces cannot drift again.
+const AGENT_ROUTING_EMPTY_TEXT = "Real agent-hop events appear here as the chat runs.";
+
 // FEATURE: CHI-01 — one bordered card per hop (was one per raw event). Card header
 // (avatar/name/role) renders once per hop, matching S-MI-68-design's original intent more
 // completely than sameAgentAsPrevious's header-only suppression did. Card border-left uses the
@@ -2086,9 +2100,7 @@ function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
           FEATURE: CHI-04 — count excludes question_boundary marker rows (realHopCount). */}
       <Drawer title="Agent Routing" count={`${realHopCount} hop${realHopCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
-          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-            Real agent-call events appear here as the conversation runs. About Channel Sales Intelligence and Demo Reset controls ship in S-MARKET-INTEL-01d / 03.
-          </div>
+          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
         ) : hops.map(hop =>
             hop.isBoundary
               ? <QuestionDivider key={hop.events[0].id} evt={hop.events[0]}/>
@@ -2412,7 +2424,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
           {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped". */}
           {ordered.length === 0
-            ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>Real agent-call events appear here as the conversation runs.</div>
+            ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
             : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>)}
         </div>
         {routingCanScrollMore && (
