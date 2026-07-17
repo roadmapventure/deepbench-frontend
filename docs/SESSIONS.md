@@ -1292,3 +1292,22 @@ John asked to continue the open `CHI` backlog. Presented the 5 open tickets (`CH
 Kickoff: `docs/kickoffs/v6.3.48-CHI-09-agent-routing-within-hop-chronological-order.md`.
 
 **Close-out:** `CHI-09` moved to `docs/FEATURES-ARCHIVE.md` as ✅ Done. `CHI-17` stays in `docs/FEATURES.md` as ❌ Missing, unaffected. `CLAUDE-STATE.md`'s "Version in dev" bumped to v6.3.48, "In flight now" bullet removed, "Last 3 sessions" rolling window updated (`S-STEP3-FIX-0717` aged out, already fully captured in its own `docs/SESSIONS.md` entry, confirmed before dropping). Worktree `chi-tickets-0717` and branch `session/chi-tickets-0717` removed per `CLAUDE.md` rule #7 after this close-out commit is pushed.
+
+---
+
+## S-MOB-RULE-0717 — Desktop/mobile parity check + `MOB` ID series (docs-only, no version bump)
+
+**Session:** S-MOB-RULE-0717 (worktree `mob-rule-0717`, 2026-07-17). Docs-only, no coding-session hand-off, no version bump.
+
+John asked whether a rule was needed for desktop/mobile parity: he fixes desktop first, wants to know if the same issue affects mobile, wants trivial mobile fixes folded into the same session, and wants anything requiring real design work logged automatically rather than dropped.
+
+**Design question raised and resolved by explicit override:** the natural fit per `SCREEN-INVENTORY.md`'s own stated principle ("ID = where, Type = what") would be a `Type: Mobile` tag on existing rows, not a new ID prefix — mobile isn't a Screen or a Platform Layer, it's a device context cutting across all of them. Recommended the `Type` tag on that basis. John explicitly overrode this: *"i want you to write it in, but for now everything is given the MOB id. It helps me prioritize - i consider fixes for it as a single entitiy, and then each one i can flag the bucket."* Accepted directly — a legitimate prioritization workflow the ID-purity argument doesn't account for (batch-viewing all open mobile work as one queue, independent of which screen/layer each item's root cause lives in).
+
+**Collision check before adopting `MOB`:** `grep -orh "MOB-[0-9]\+"` plus a broader `\bMOB\b` across `docs/FEATURES.md`, `docs/FEATURES-NEXT.md`, `docs/FEATURES-LATER.md`, `docs/FEATURES-ARCHIVE.md`, `docs/SCREEN-INVENTORY.md` — zero hits, confirmed clear.
+
+**Shipped:**
+1. `docs/SCREEN-INVENTORY.md` — new `MOB` row in the Platform Layers table, directly after the `SES` row (added by an earlier same-day session), same 4-column format. Row text explicitly calls out `MOB` as a deliberate exception to the taxonomy's own principle, quotes John's rationale, and points to the new Architect Review check as the row's populating mechanism.
+2. `CLAUDE-DESIGN.md` Step 4's Architect Review — new bullet, **Desktop/mobile parity check (added 2026-07-17):** if a session's fix touches a UI element existing on both desktop and mobile, check the mobile counterpart. Trivial fix → fold into the same session. Real design work needed → log immediately under `MOB`, never drop silently.
+3. **Incidental staleness fix, same section:** the Architect Review's intro line still read "Check all four:" despite already listing 7 checks before this addition (Duplicate functionality, Multi-site bug pattern, Cross-reference integrity, Layer violations, Schema alignment, Delegation legitimacy, Locked-section staleness) — corrected to "Check all of the following:" so the count doesn't need editing again on the next addition. Tier 1 (Decision Autonomy Tiers) call — non-canonical wording, cheap, obviously correct, no need to check in.
+
+**Close-out:** No `FEATURES.md` row needed — this was a rule/taxonomy change, not a tracked feature. `CLAUDE-STATE.md`'s "Last 3 sessions" rolling window updated (`S-CHI-09-design/S-CHI-09` aged out, already fully captured above, confirmed before dropping). Worktree `mob-rule-0717` and branch `session/mob-rule-0717` removed per `CLAUDE.md` rule #7 after this close-out commit is pushed.
