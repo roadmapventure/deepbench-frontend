@@ -85,43 +85,43 @@ Confirmed 2026-07-15, based on real usage counts across `FEATURES.md`/`FEATURES-
 | `MI-41` | UI | `CHI` |
 | `MI-53` | Architecture | `CHI` *(blocked on `AA-191`/`LOO`)* |
 | `MI-69` | Architecture | `CHI` |
-| `AA-153` | Continuity | `CHI` |
+| `AA-153` | Task Success Rate | `CHI` |
 | `TI-16` | Feature | `PRO` |
 | `AA-178` | Architecture | `LOO` |
 | `AA-179` | Architecture | `LOO` |
 | `AA-90` | Architecture | `LOO` |
 | `AA-99` | Architecture | `LOO` |
-| `AA-140` | Continuity | `LOO` |
-| `AA-151` | Continuity | `LOO` |
-| `AA-151b` | Continuity | `LOO` |
+| `AA-140` | Task Success Rate | `LOO` |
+| `AA-151` | Task Success Rate | `LOO` |
+| `AA-151b` | Task Success Rate | `LOO` |
 | `AA-159` | Speed | `LOO` |
-| `AA-185` | Continuity | `LOO` |
-| `AA-187` | Continuity | `LOO` |
+| `AA-185` | Task Success Rate | `LOO` |
+| `AA-187` | Task Success Rate | `LOO` |
 | `AA-191` | Architecture | `LOO` |
 | `AA-175` | Observability | `HAR` |
 | `AA-170` | Speed | `HAR` |
 | `AA-121` | Speed | `HAR` |
-| `AA-146` | Continuity | `HAR` |
+| `AA-146` | Task Success Rate | `HAR` |
 | `AA-169` | Architecture | `HAR` |
-| `AA-156` | Continuity | `HAR` |
+| `AA-156` | Task Success Rate | `HAR` |
 | `AA-177` | Architecture | `LOG` |
 | `AA-190` / `AA-192` | Observability | `LOG` *(code lives in harness files, purpose is logging — boundary case, see table above)* |
 | `AI-46` | Observability | `LOG` *(its own proposed fix includes a schema migration — `DAT` overlap once built)* |
 | `AI-52` | Observability | `LOG` |
 | `AI-53` | Observability | `LOG` |
 | `AA-172` | Data | `DAT` |
-| `AA-155` | Continuity | `DAT` *(real RPC migration — moved here after the DAT scope clarification)* |
+| `AA-155` | Task Success Rate | `DAT` *(real RPC migration — moved here after the DAT scope clarification)* |
 | `AA-181` | Architecture | `AGT` *(finalized 2026-07-15 — was "Competency Model, deferred," now confirmed since `S-ARCH-COMPETENCY-MODEL-design` landed `AGT`)* |
-| `AA-182` | Continuity | `AGT` |
+| `AA-182` | Task Success Rate | `AGT` |
 | `AA-180` | Architecture | `AGT` |
-| `AA-174` | Continuity | `AGT` |
+| `AA-174` | Task Success Rate | `AGT` |
 | `AA-133` | Speed | `AGT` |
-| `AA-167` | Continuity | `AGT` |
+| `AA-167` | Task Success Rate | `AGT` |
 | `AA-186` | Architecture | `AGT` |
-| `AA-161` | Continuity | `AGT` |
-| `AI-45` | Continuity | `AGT` |
-| `AA-173` | Continuity | **Unclassified** — a broad test/verification session spanning multiple buckets, not itself one thing |
-| `AA-168` | Continuity | **Unclassified** — two distinct bugs in one row, one `AGT`-shaped, one `HAR`-shaped |
-| `AA-194` | Continuity | **Worth checking with the other session** — new row, logged as `AA-194` (legacy prefix) despite being about `output_desc` authoring across the roster, which reads as `AGT` territory by content. Straddles two categories by its own text (complementary to `AA-191`/`LOO`) — not silently recoding it, flagging for you to confirm with that session. |
-| `AGT-001` | Continuity | Already `AGT` — logged directly in the new format by `S-ARCH-COMPETENCY-MODEL-design` itself. |
-| `AA-160` | Continuity | **Unclassified** — not yet root-caused, can't classify what isn't diagnosed |
+| `AA-161` | Task Success Rate | `AGT` |
+| `AI-45` | Task Success Rate | `AGT` |
+| `AA-173` | Task Success Rate | **Unclassified** — a broad test/verification session spanning multiple buckets, not itself one thing |
+| `AA-168` | Task Success Rate | **Unclassified** — two distinct bugs in one row, one `AGT`-shaped, one `HAR`-shaped |
+| `AA-194` | Task Success Rate | **Worth checking with the other session** — new row, logged as `AA-194` (legacy prefix) despite being about `output_desc` authoring across the roster, which reads as `AGT` territory by content. Straddles two categories by its own text (complementary to `AA-191`/`LOO`) — not silently recoding it, flagging for you to confirm with that session. |
+| `AGT-001` | Task Success Rate | Already `AGT` — logged directly in the new format by `S-ARCH-COMPETENCY-MODEL-design` itself. |
+| `AA-160` | Task Success Rate | **Unclassified** — not yet root-caused, can't classify what isn't diagnosed |

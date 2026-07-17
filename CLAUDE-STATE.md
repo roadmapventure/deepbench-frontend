@@ -5,7 +5,7 @@
 
 **In flight now:** None. **(Cleaned up 2026-07-17.)** Both bullets previously here were stale: `continuity-ux-0716`'s worktree was fully merged and removed — its claimed remaining work (`CHI-09`, `CHI-10`) is still genuinely open but already tracked as its own rows directly in `docs/FEATURES.md`, independent of any worktree. `continuity-regression-0716` had no matching worktree or branch anywhere on disk — `LOO-006`, the feature it named, already shipped and closed out (v6.3.43, see `docs/SESSIONS.md`) — the bullet was simply never removed at that close-out.
 
-**`AA-194` (Continuity):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
+**`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
 **AI Pattern Detection follow-up available, 2026-07-16 (`LOG-16` close-out):** `ARCHITECTURE.md §19i` (new, LOCKED) fully specifies the pattern-logging architecture — read it before starting `LOG-17` (`llm-as-judge`/Case-Based-Reasoning/`streaming` detection) or `LOG-15` (drawer capability mislabeling, `MarketIntelligenceScreen.jsx`'s `describePipelineEvent()`) so John doesn't have to re-explain the design. Not top-of-queue — pick up whenever, no live incident driving it.
 
