@@ -1,3 +1,4 @@
+// DeepBench v6.3.49 | api/capabilities/execute.js | S-HAR-04 -- runLoop()'s two call sites (callModel(), sendRequest()) now pass their existing deadline value through, no new computation
 // DeepBench v6.3.28 | api/capabilities/execute.js | S-ARCH-LOOP-CONTINUITY-01 (LOO-001/LOO-004) -- requesting_agent_id threaded into request_help's task_context; is_active gate added to resolveCapabilityHolder()
 // DeepBench v6.1.43 | api/capabilities/execute.js | S-MI-42 -- _onEvent plumbing, live delegation/delegation_return events at all 5 real dispatch points; v6.1.43 -- S-MI-42 opt-in stream:true SSE transport, all handler branches
 // DeepBench v6.1.35 | api/capabilities/execute.js | AA-164 -- thread lastHelpSelection into the normal (non-checkpointed) terminal return
@@ -539,6 +540,10 @@ async function runLoop({
     }
 
     const turnStart = Date.now();
+    // FEATURE: HAR-04 -- threads this loop's existing deadline (AA-139's own hop-budget value,
+    // no new computation) one level deeper into callModel()'s internal Anthropic call(s), so a
+    // hop that passes the pre-hop budget check can't still blow the shared maxDuration ceiling
+    // from inside callModel()'s own parse-failure retry. AA-69/S-SES003-TSR-design.
     const turn = await callModel({
       systemPrompt: enriched.system_prompt,
       model: enriched.llm.model,
@@ -547,6 +552,7 @@ async function runLoop({
       format_contract: enriched.format_contract,
       canRequestHelp,
       conversation_history: conversationHistory,
+      deadline,
     });
     logAgentTurn({
       capability_slug, intent_slug, agent_id, tenant_id,
@@ -619,11 +625,12 @@ async function runLoop({
         return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
       }
 
+      // FEATURE: HAR-04 -- same deadline passthrough as the callModel() call above.
       const result = await sendRequest({
         prompt_request: enriched, agent_id, capability_slug, tenant_id,
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
         turn_started_at: turnStart,
-        trace_id,
+        trace_id, deadline,
       });
       const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection };
       if (job_id) {

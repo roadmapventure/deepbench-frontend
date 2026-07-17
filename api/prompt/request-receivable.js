@@ -1,3 +1,4 @@
+// DeepBench v6.3.49 | api/prompt/request-receivable.js | S-HAR-04 -- callModel()/sendRequest() accept optional deadline; bounded, deadline-aware AbortSignal timeouts replace blind fixed constants (byte-identical when omitted)
 // DeepBench v6.0.22 | api/prompt/request-receivable.js | S-ARCH-DISPLAY-LOOP-01 — is_final flag on delegate_to_agent (terminal Display-agent hand-off)
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
 
@@ -143,10 +144,24 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
 const TRANSIENT_ANTHROPIC_STATUS = new Set([429, 500, 502, 503, 529]);
 const API_RETRY_BACKOFF_MS = 1000;
 
-async function postToAnthropicWithRetry(body, headers) {
+// FEATURE: HAR-04 -- deadline-aware timeout floor. Below this much real remaining time, don't
+// attempt an Anthropic call at all (Vercel would very likely kill it mid-flight with zero trace
+// anyway) -- fail fast with a clear, immediate error instead. Shared by the main call
+// (postToAnthropicWithRetry) and the parse-failure retry fetch, both below. AA-69/S-SES003-TSR-design.
+const MIN_VIABLE_CALL_MS = 8000;
+
+// FEATURE: HAR-04 -- deadline is the real epoch-ms ceiling this call must respect (threaded in from
+// callModel(), which defaults it to Date.now() + 55000 when its own caller passes nothing -- see
+// callModel() below). remainingMs is recomputed on every retry attempt, not just once at entry, so a
+// slow transient-error backoff loop can't silently overrun the caller's real budget.
+async function postToAnthropicWithRetry(body, headers, deadline) {
   for (let attempt = 0; ; attempt++) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < MIN_VIABLE_CALL_MS) {
+      throw Object.assign(new Error(`Insufficient time remaining for Anthropic call (${remainingMs}ms left)`), { status: 504 });
+    }
     const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(55000),
+      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
     });
     if (res.ok) return { res, apiRetryCount: attempt };
     if (attempt > 0 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
@@ -160,7 +175,13 @@ async function postToAnthropicWithRetry(body, headers) {
 // FEATURE: AA-80 — callModel(): pure extraction of sendRequest()'s prior Step 1 (call + retry-
 // once-on-parse-failure), now shared by sendRequest() itself and execute.js's loop. Never runs
 // guardrails/handler/logging -- that stays exclusively in sendRequest(). ARCHITECTURE.md §19d.
-export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, conversation_history = [] }) {
+// FEATURE: HAR-04 -- deadline is a new optional param (epoch ms). Omitted by every caller that
+// doesn't opt in (api/plan.js, confirmation.js) -- those get exactly today's behavior, a fresh
+// 55s window computed at this exact call, byte-identical. execute.js's runLoop() (AA-139) passes
+// its own already-computed deadline through here so this call's internal Anthropic request(s) are
+// bounded by real remaining budget, not a blind fixed constant.
+export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, conversation_history = [], deadline = null }) {
+  const effectiveDeadline = deadline || (Date.now() + 55000);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const anthropicHeaders = { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' };
@@ -175,7 +196,7 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
 
   const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, conversation_history });
 
-  const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders);
+  const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
   let usage = llmData.usage || { input_tokens: 0, output_tokens: 0 };
   let retryCount = 0;
@@ -210,7 +231,17 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
         ...callBody,
         messages: [...callBody.messages, { role: 'assistant', content: llmData.content }, correctionMessage],
       };
-      const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(55000) });
+      // FEATURE: HAR-04 -- same deadline-aware floor as the main call above: if the parse-failure
+      // retry itself has no realistic time left to complete, skip attempting the second fetch
+      // entirely and throw the existing "retry also failed" 422 immediately, rather than starting a
+      // fetch Vercel will likely kill with zero trace. Detail field notes the retry was skipped (vs.
+      // attempted-and-rejected) so this stays distinguishable from AA-157's rejection-reason logging.
+      const retryRemainingMs = effectiveDeadline - Date.now();
+      if (retryRemainingMs < MIN_VIABLE_CALL_MS) {
+        console.error(`[request-receivable] callModel retry skipped: insufficient time remaining (${retryRemainingMs}ms) firstFailure="${parseErr.message}"`);
+        throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: `Retry skipped -- insufficient time remaining (${retryRemainingMs}ms left, need ${MIN_VIABLE_CALL_MS}ms)` });
+      }
+      const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(Math.min(55000, retryRemainingMs)) });
       // FEATURE: AA-157 -- surface the retry's OWN rejection reason (this distinct HTTP call's real
       // status/body), not the ORIGINAL parse error that triggered the retry. Before this fix, every
       // occurrence of this 422 reported parseErr.message as `detail` -- why the FIRST call failed to
@@ -270,7 +301,10 @@ export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = fa
   ];
 }
 
-export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null }) {
+// FEATURE: HAR-04 -- deadline is a new optional param, same opt-in contract as callModel()'s own:
+// omitted by every caller that doesn't pass it (api/plan.js, confirmation.js) -- byte-identical
+// behavior. execute.js's runLoop() passes its own real deadline through.
+export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null, deadline = null }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -345,7 +379,9 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
   } else {
-    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, conversation_history: [] });
+    // FEATURE: HAR-04 -- deadline passed through unchanged; callModel() applies its own
+    // Date.now() + 55000 default when this is null (every non-opted-in caller, unaffected).
+    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, conversation_history: [], deadline });
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;
@@ -359,7 +395,18 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   const guardrails = format_contract.guardrails;
   const shouldRunGuardrails = guardrails ? (guardrails.must?.length > 0 || guardrails.must_not?.length > 0 || false) : false;
 
-  if (shouldRunGuardrails) {
+  // FEATURE: HAR-04 -- guardrails deadline defaults to Date.now() + 20000 (today's fixed window)
+  // only when sendRequest() itself received no deadline -- unaffected callers see byte-identical
+  // behavior. GUARDRAILS_MIN_VIABLE_MS floor: guardrails already fails open on any error today
+  // (the catch block below), so skipping the call outright under real time pressure is safe and
+  // consistent with existing behavior, not a new failure mode.
+  const GUARDRAILS_MIN_VIABLE_MS = 3000;
+  const guardrailsDeadline = deadline || (Date.now() + 20000);
+  const guardrailsRemainingMs = guardrailsDeadline - Date.now();
+
+  if (shouldRunGuardrails && guardrailsRemainingMs < GUARDRAILS_MIN_VIABLE_MS) {
+    console.warn(`[request-receivable] guardrails check skipped: insufficient time remaining (${guardrailsRemainingMs}ms)`);
+  } else if (shouldRunGuardrails) {
     // FEATURE: AA-44 — PAT-13 post-generation Haiku guardrails check
     const guardrailsStart = Date.now();
     const guardrailsModel = 'claude-haiku-4-5-20251001';
@@ -398,7 +445,8 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
           tool_choice: { type: 'tool', name: 'guardrails_check' },
           messages: [{ role: 'user', content: guardrailsPrompt }],
         }),
-        signal: AbortSignal.timeout(20000),
+        // FEATURE: HAR-04 -- bounded by real remaining time, not a blind fixed constant.
+        signal: AbortSignal.timeout(Math.min(20000, guardrailsRemainingMs)),
       });
 
       if (gRes.ok) {
