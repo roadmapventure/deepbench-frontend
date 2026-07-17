@@ -1266,3 +1266,29 @@ John reported that a session he'd just been in used "environment screen," and as
 Re-grepped after all 4 fixes (not just the first) to confirm no live (non-historical-note) mention of "Environment" remained anywhere in the touched files.
 
 **Close-out:** No version bump (docs-only, no code). `CLAUDE-STATE.md`'s "Last 3 sessions" rolling window updated — `S-AGT-023`/`S-LOO-007`'s entry aged out (already fully captured in its own `docs/SESSIONS.md` entry directly above, confirmed before dropping). `ARCHITECTURE.md`, `SCREEN-INVENTORY.md`, `FEATURES.md`, `CLAUDE-STATE.md`, `docs/SESSIONS.md` touched.
+
+---
+
+## S-CHI-09-design/S-CHI-09 — Agent Routing drawer: within-hop chronological event order (v6.3.48)
+
+**Session:** S-CHI-09-design (worktree `chi-tickets-0717`, 2026-07-17), coding session `S-CHI-09` spawned automatically per the Design→Code→Verify Loop. v6.3.48.
+
+John asked to continue the open `CHI` backlog. Presented the 5 open tickets (`CHI-09`, `CHI-10`, `CHI-11`, `CHI-15`, `CHI-16`); John chose to split `CHI-09` (which had bundled two unrelated fixes) into two issues and work only the first.
+
+**Split:** `CHI-09` kept the within-hop event order bug; the second fix (Michelle's unsummarized `agent_selection` raw-reasoning line) became `CHI-17` (next free ID — `CHI-16` was the highest in use across all 4 backlog files), filed `❌ Missing`, deferred.
+
+**Root cause (`MarketIntelligenceScreen.jsx`'s `groupEventsIntoHops()`, L796-817):** fed `ordered = [...events].reverse()` (newest-first, correct for hop-card stacking), but when merging consecutive same-agent events into one hop it just `push`ed each event onto that hop's own `events` array in iteration order — so *within* a hop, events inherited the same newest-first order the outer list uses, when a human reading one hop's own activity expects chronological (oldest-first) order. One shared function, called from both the desktop drawer and the mobile pinned feed — fixing it here fixes both call sites, no per-site patch (the repo's own "multi-site bug pattern → shared-service check" applied correctly from the start, since it was already one shared function, not duplicated).
+
+**Fix:** one line added to the function's closing `hops.map` — `events: [...h.events].reverse()` on the non-boundary branch.
+
+**Two side effects found while tracing this, confirmed in scope with John before writing the kickoff doc (not separate work):**
+1. `RoutingHopCard`'s left-border color reads `hop.events[hop.events.length - 1]` (`lastColor`) — under the bug that was actually the *oldest* event; after the fix it's the true last/most-recent event, matching what the variable name implied was always intended.
+2. `RoutingHopCard`'s React `key` is `hop.events[0].id` — under the bug that changed every time a new event streamed into a growing hop (forcing an unneeded remount); after the fix it's the oldest/first event, stable for the hop's whole lifetime.
+
+**Coding session:** single file (`MarketIntelligenceScreen.jsx`), single task, exactly as specced. Node test (`test-CHI-09.mjs`, Category B) — the coding session found and fixed two pre-existing defects in the kickoff doc's own T2 test fixture (a miscounted hop-collapse total, and Owen's two sub-events listed in the wrong relative order) — confirmed these were fixture-only errors, not touching the actual shipped diff, before accepting the fix. 14/14 tests passed after correction. `npm run build` succeeded. `git diff --stat` — exactly 1 file, 6 insertions/1 deletion. Committed `416d173`, pushed via `git push origin HEAD:dev`.
+
+**Design session's own independent live verification against the real dev preview** (Vercel deployment-protection bypass header appended as a query param to get past the SSO interstitial — see `docs/ENV-VARS.md`/memory `reference-vercel-bypass`): ran the live EMEA co-op-budget question end to end (6 hops, 1m 30s). Confirmed via direct `getComputedStyle` border-left-color reads, not just a visual glance — Marcus's hop 1 (`intent_routing` 3.6s → `qa_answer` 12.4s, `needs_review: true`) showed border color `rgb(182,135,58)` (`T.brass`, the `qa_answer`/needs_review color) rather than `T.navyMid` (`intent_routing`'s color) — proof the border now reads the *last* event in the hop, not the first, confirming side effect 1 live. Within-hop order for Marcus's 2-event hop displayed intent-routing before answer-generation — the only order that makes causal sense, and the order the pre-fix code could not have produced (it would have shown the answer before the routing decision). Owen's hop 4 (`delegation` "routing this to Eleanor" → `proofreader` "reviewing... 45.9s") showed border color `rgb(90,117,56)` (`T.moss`, matching `proofreader`'s pass-result color) — also consistent with the fix reading the true last event. Repeated the same check after resizing to a 375×812 mobile viewport — identical hop content and ordering from the shared function's second call site. Zero console errors on both. Side effect 2 (React key stability) not independently re-proven live — already deterministically covered by the Node test's T-side-effect-2 case (simulating a hop's growth step by step), per the standing guidance against re-proving an already-verified mechanism live when a pure-logic unit test already covers it.
+
+Kickoff: `docs/kickoffs/v6.3.48-CHI-09-agent-routing-within-hop-chronological-order.md`.
+
+**Close-out:** `CHI-09` moved to `docs/FEATURES-ARCHIVE.md` as ✅ Done. `CHI-17` stays in `docs/FEATURES.md` as ❌ Missing, unaffected. `CLAUDE-STATE.md`'s "Version in dev" bumped to v6.3.48, "In flight now" bullet removed, "Last 3 sessions" rolling window updated (`S-STEP3-FIX-0717` aged out, already fully captured in its own `docs/SESSIONS.md` entry, confirmed before dropping). Worktree `chi-tickets-0717` and branch `session/chi-tickets-0717` removed per `CLAUDE.md` rule #7 after this close-out commit is pushed.
