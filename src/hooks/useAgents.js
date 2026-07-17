@@ -155,7 +155,7 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global') {
           // FEATURE: AI-51 — 'id' added so pairedAgentTurnIds() can key its Set by real per-row
           // id instead of every row sharing `undefined` (which would falsely pair every row in
           // the batch as soon as any single agent-turn row paired).
-          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
+          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at,patterns_used')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))

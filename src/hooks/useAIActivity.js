@@ -185,6 +185,27 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
       k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
     }
 
+    // FEATURE: MI-72a -- parallel per-agent, per-pattern bucket (byPattern), gated by the same
+    // `include` flag classifyRow() already returns so a row excluded from byKind as a duplicate
+    // wrapper row is also excluded here. Unlike byKind (one row -> one kind), a single row can
+    // carry multiple patterns (row.patterns_used is an array) -- it contributes to every pattern
+    // bucket in that array, not just one. Zero visible effect this session -- MI-72b renders it.
+    if (Array.isArray(row.patterns_used)) {
+      if (!d.byPattern) d.byPattern = {};
+      for (const patternSlug of row.patterns_used) {
+        if (!d.byPattern[patternSlug]) {
+          d.byPattern[patternSlug] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
+        }
+        const p = d.byPattern[patternSlug];
+        p.calls++;
+        if (row.latency_ms) {
+          p.totalLatency += row.latency_ms;
+          p.latencyCount++;
+          p.maxLatency = p.maxLatency == null ? row.latency_ms : Math.max(p.maxLatency, row.latency_ms);
+        }
+      }
+    }
+
     if (row.ai_type === 'agent-turn') {
       const depthSeg = row.feature ? row.feature.split(':')[2] : null;
       if (depthSeg && /^depth\d+$/.test(depthSeg) && row.latency_ms) {
@@ -216,6 +237,10 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
         bd.p75 = percentile(bd.latencies, 0.75);
         delete bd.latencies;
       });
+    });
+    // FEATURE: MI-72a -- finalize byPattern's avgLatency, mirroring byKind's own finalization above.
+    Object.values(d.byPattern || {}).forEach(p => {
+      p.avgLatency = p.latencyCount ? Math.round(p.totalLatency / p.latencyCount) : null;
     });
   });
   return map;
