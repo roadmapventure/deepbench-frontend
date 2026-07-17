@@ -3,7 +3,9 @@
 
 **Version in dev:** v6.3.49 (`S-HAR-04`, `5422f94`/`627e0be`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None.
+**In flight now:**
+- `S-CHI-09` (worktree `chi-tickets-0717`, v6.3.48) — **Stale, needs verification/correction:** flagged 2026-07-17 by session-hygiene check 5c (`chi-ux-queue-check-0717`) — `chi-tickets-0717`'s own commit log shows `CHI-09`'s fix already committed and merged into `origin/dev` (`416d173`), contradicting this bullet's "about to be spawned" and `docs/FEATURES.md`'s `❌ Missing` status. Not corrected yet — flagged to John, awaiting go-ahead to fix vs. leave for a separate cleanup session.
+- `S-CHI-10` (worktree `chi-ux-queue-check-0717`, v6.3.50) — ETA estimate percentile bump (p75→p90), kickoff doc committed, coding session about to be spawned. Scope corrected from the original find: the "<"/">" wording is LOCKED design (`STYLE-GUIDE.md` §5a), not a bug — dropped from scope, John confirmed.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
