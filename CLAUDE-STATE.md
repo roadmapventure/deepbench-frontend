@@ -5,6 +5,7 @@
 
 **In flight now:**
 - `continuity-ux-0716` (design session) — 5-session sweep, run in order: `CHI-07` ✅ Done (v6.3.34) → `CHI-08` ✅ Done (v6.3.38) → `CHI-12` ✅ Done (v6.3.39) → `CHI-09` (Agent Routing narration accuracy, next up) → `CHI-10` (ETA percentile accuracy). Channel Intelligence Chat/Agent Routing/Evidence UX fixes, John's live-screenshot walkthrough 2026-07-16.
+- `evidence-footer-align-0716` (design session, `CHI-13`, v6.3.44 kickoff written) — Evidence column's CTA buttons weren't pinned to the card bottom like Chat's Send button (John's screenshot); restructures `EvidenceColumn` to match `InteractColumn`'s scroll-body+pinned-footer anatomy across all 3 decision points. Spawning coding session now.
 
 **`AA-194` (Continuity):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
