@@ -761,10 +761,21 @@ Also locked in this session: the "⚑ {review_reason}" flagged-narrative caption
 
 ---
 
+## Section 37 — Evidence Column: Scroll-Body + Pinned-Footer Anatomy (Locked 2026-07-16 · S-CHI-13-design)
+
+`EvidenceColumn`'s card (Column 2, "Evidence & Interaction") follows the same anatomy as `InteractColumn`'s card (Column 1, "Chat"): scrollable read-only content above (`flex:1,overflowY:"auto"`, no fixed `maxHeight` on any inner section), one pinned footer row below (`padding:"10px 14px",borderTop:`1px solid ${T.line}``, matching `InteractColumn`'s own footer row exactly, for visual parity between the two columns), rendering whichever decision `selectEvidenceFooterKind(qaEvidence, hypFlow)` reports currently active — `"qa-review"`, `"hyp-result"`, or `"hyp-confirmation"`. No footer renders when nothing is pending (`null`). Priority order when more than one could theoretically be live: confirmation > hypothesis result > qa review.
+
+Any future decision point added to Evidence reuses this pinned footer slot rather than flowing its CTA inline into the scrollable body — that's exactly the bug this section closes (a CTA's Y position used to depend on how much read-only content rendered above it, instead of being fixed).
+
+Cross-references: Section 35 (the brass "needs your input" gradient card's own styling is unchanged — `QaEvidenceCardFooter` is a pure relocation of that markup into the pinned footer slot, not a restyle). `ConfirmationCard` (`SharedUI.jsx`) itself is also unchanged — only its render location moved from inline scroll-body content to the pinned footer.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-16 | S-CHI-13-design | Section 37 added — Evidence Column scroll-body + pinned-footer anatomy locked: `EvidenceColumn` now matches `InteractColumn`'s card structure (scrollable content, no fixed `maxHeight`, one pinned footer row below). New `selectEvidenceFooterKind()` centralizes the mutual exclusion across the 3 decision points (qa review / hypothesis result / confirmation). `QaEvidenceCard`'s brass "needs your input" card (Section 35) extracted to `QaEvidenceCardFooter`, byte-identical styling. `ConfirmationCard` (`SharedUI.jsx`) unchanged, only relocated. Kickoff: `docs/kickoffs/v6.3.44-CHI-13-evidence-column-pinned-decision-footer.md`. |
 | 2026-07-16 | S-CHI-08-design | Section 36 added — Chat Bubble Speaker Label locked: subtle mono/9px/muted "You"/"Marcus" label above every `MessageBubble` (both branches), always static ("Marcus" for Chat, never `qaEvidence.displayAgentCard`). Flagged-narrative caption ("⚑ {review_reason}") merged inside the bubble (was a separate caption below it); "Marcus flagged this —" prefix dropped, ⚑ icon + brass color kept. Kickoff: `docs/kickoffs/v6.3.38-CHI-08-chat-bubble-consolidation.md`. |
 | 2026-07-16 | S-CHI-05-design | Section 35 added — Gradient Action Card "needs your input" pattern locked: new `T.brassGlow`/`T.white` tokens, gold-to-white gradient fill, sharp corners + brass Corners bracket, solid-brass/navy badge, bold navy question text, navy primary CTA (scoped exception to Section 7). First application: `QaEvidenceCard`/`MessageBubble`'s review-choice prompt. Kickoff: `docs/kickoffs/v6.3.32-CHI-05-evidence-review-choice-action-styling.md`. |
 | 2026-07-16 | S-CHI-04-design / CHI-04 | Section 34 added — Clear now resets `pipelineEvents`/`pendingDelegationsRef` (Column 3 used to survive Clear untouched); stale-generation guard (`clearGenerationRef`/`isStale`) locked as the durable cancellation pattern for any future async call this screen adds; question-boundary divider (`question_boundary` marker event + `QuestionDivider`) marks where one question's Agent Routing hops end and the next begin when Clear isn't used in between. Kickoff: `docs/kickoffs/v6.3.29-CHI-04-clear-reset-stale-guard-question-divider.md`. |

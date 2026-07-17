@@ -1,3 +1,16 @@
+// DeepBench v6.3.44 | MarketIntelligenceScreen.jsx | CHI-13 — EvidenceColumn's card restructured to
+// match InteractColumn's scroll-body+pinned-footer anatomy: a new selectEvidenceFooterKind() pure
+// function centralizes the mutual exclusion (confirmation > hypothesis result > qa review) that was
+// previously implicit in scattered inline gates, and gates a single footer slot pinned below the
+// scrollable content (padding/borderTop matching InteractColumn's own footer row exactly). Applied
+// to all 3 decision points that used to fall wherever the content stack ended: QaEvidenceCard's
+// "Good, thanks"/"Have Priya…" choice (extracted to a new QaEvidenceCardFooter component, byte-
+// identical markup/styling per STYLE-GUIDE.md §35), the hypothesis-result "Info Only"/"Store as
+// Forecast" buttons, and ConfirmationCard's Accept/Reject/Edit (SharedUI.jsx untouched, only its
+// render location moved). QaEvidenceCard's inner maxHeight:320/overflowY:"auto" cap (CHI-12's
+// workaround for the lack of a real scroll-body/footer split) is now redundant and removed — the
+// outer scroll body bounds and scrolls this content the same way InteractColumn's message list does.
+// Pure layout relocation — none of the three CTAs change appearance.
 // DeepBench v6.3.34 | MarketIntelligenceScreen.jsx | CHI-07 — central duration/elapsed-time helpers:
 // buildHopEvent() resolves every logEvent/onEvent call's durationMs (real value passes through,
 // omitted value resolves to null only for the 5 declared NON_MEASURABLE_EVENT_TYPES, else logs a
@@ -1359,7 +1372,7 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
         <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Marcus Webb · Channel Intelligence</span>
         <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
       </div>
-      <div style={{borderTop:`1px solid ${T.line}`,borderBottom:`1px solid ${T.line}`,maxHeight:320,overflowY:"auto"}}>
+      <div style={{borderTop:`1px solid ${T.line}`,borderBottom:`1px solid ${T.line}`}}>
         <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
           {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
           {(qa.body || []).map((b, i) => (
@@ -1386,18 +1399,23 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
       {qa.reviewChoice === "exploring" && (
         <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories.</div>
       )}
-      {/* FEATURE: CHI-05 */}
-      {!qa.reviewChoice && (
-        <div style={{margin:"0 13px 11px 13px",padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
-          <Corners/>
-          <span style={{display:"inline-block",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",background:T.brass,color:T.navy,padding:"3px 10px",borderRadius:0,marginBottom:10}}>● Needs your input</span>
-          <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={onGoodThanks} style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Good, thanks</button>
-            <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:"none",color:T.card,fontWeight:700,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
-          </div>
-        </div>
-      )}
+    </div>
+  );
+}
+
+// FEATURE: CHI-13 — extracted from QaEvidenceCard's old inline footer (see STYLE-GUIDE.md §35,
+// unchanged) so EvidenceColumn can render it in its own pinned footer slot instead of wherever
+// QaEvidenceCard's content happens to end.
+function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
+  return (
+    <div style={{padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
+      <Corners/>
+      <span style={{display:"inline-block",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",background:T.brass,color:T.navy,padding:"3px 10px",borderRadius:0,marginBottom:10}}>● Needs your input</span>
+      <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <button onClick={onGoodThanks} style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Good, thanks</button>
+        <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:"none",color:T.card,fontWeight:700,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
+      </div>
     </div>
   );
 }
@@ -1419,6 +1437,18 @@ function getEvidencePanelSentence(hypFlow) {
   if (!hypFlow) return "Once Marcus has an answer or a theory to test, it'll appear here for you to review and act on.";
   const label = INTENT_LABEL[hypFlow.intent] || hypFlow.intent;
   return `${label} — Data for you to interact with your chat...`;
+}
+
+// FEATURE: CHI-13 — single source of truth for which decision (if any) is currently pending in
+// Evidence, so exactly one footer renders at a time, pinned to the bottom of the card instead of
+// wherever it happens to land in scroll flow. Priority order: confirmation > hypothesis result >
+// qa review — mirrors the mutual exclusion the old inline gates (!hypFlow.confirmation,
+// stage === "result") already enforced implicitly, just centralized instead of scattered.
+function selectEvidenceFooterKind(qaEvidence, hypFlow) {
+  if (hypFlow?.confirmation) return "hyp-confirmation";
+  if (hypFlow?.hypothesisTest && hypFlow.stage === "result") return "hyp-result";
+  if (qaEvidence && !qaEvidence.reviewChoice) return "qa-review";
+  return null;
 }
 
 function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview }) {
@@ -1467,6 +1497,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
 
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
+  const footerKind = selectEvidenceFooterKind(qaEvidence, hypFlow);
 
   return (
     // FEATURE: MI-54 — bounded to the grid row height with an internal scroll region, matching
@@ -1605,16 +1636,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
                   </div>
                 )}
                 <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Review the theory evidence below, then select an option.</div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={onDiscard}
-                    style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-                    Info Only
-                  </button>
-                  <button onClick={() => onCommit()}
-                    style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-                    Store as Forecast
-                  </button>
-                </div>
               </>
             )}
 
@@ -1639,25 +1660,42 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
           </>
         )}
 
-        {hypFlow.confirmation && (
-          <>
-            {/* FEATURE: MI-51 — plain intro line above the unchanged ConfirmationCard, so this reads
-                as reviewing the actual save (Nadia's real data-patch-intent draft), not a surprise
-                second decision. */}
-            <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
-              Nadia (Data Expert) drafted this Data Room entry — review it before it's saved:
-            </div>
-            <ConfirmationCard
-              agent={nadia}
-              proposedAction={hypFlow.confirmation.proposed_action}
-              critique={hypFlow.confirmation.critique}
-              onResolve={onResolveConfirmation}
-            />
-          </>
-        )}
         </>
         )}
         </div>
+        {footerKind && (
+          <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,position:"relative"}}>
+            <FeatureBadge id="CHI-13"/>
+            {footerKind === "qa-review" && (
+              <QaEvidenceCardFooter qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
+            )}
+            {footerKind === "hyp-result" && (
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={onDiscard}
+                  style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+                  Info Only
+                </button>
+                <button onClick={() => onCommit()}
+                  style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+                  Store as Forecast
+                </button>
+              </div>
+            )}
+            {footerKind === "hyp-confirmation" && (
+              <>
+                <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep,marginBottom:8}}>
+                  Nadia (Data Expert) drafted this Data Room entry — review it before it's saved:
+                </div>
+                <ConfirmationCard
+                  agent={nadia}
+                  proposedAction={hypFlow.confirmation.proposed_action}
+                  critique={hypFlow.confirmation.critique}
+                  onResolve={onResolveConfirmation}
+                />
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
