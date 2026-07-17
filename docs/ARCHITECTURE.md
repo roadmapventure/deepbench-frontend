@@ -61,7 +61,7 @@ DeepBench is organized into 5 layers, stacked by real dependency (each layer cal
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Environment — Product Focus Area / Screen                │
+│  Product Focus Area / Screen                               │
 │  HITL-facing dashboards, one per domain of work:            │
 │  Channel Intelligence · Project Management · Bench · ...      │
 ├─────────────────────────────────────────────────────────┤
@@ -86,8 +86,8 @@ them: Functional Objectives (multi-tenancy, security, revenue/
 monetization, MCP exposure).
 ```
 
-### Environment — Product Focus Area / Screen
-The HITL-facing dashboards, one per domain of work. `docs/SCREEN-INVENTORY.md` is the authoritative, current list of Product Focus Areas and their Screens (Channel Intelligence, Project Management, Bench, Spend Analysis, Home, Platform overlays) — read it, don't rely on a list here going stale the way the old Layer 2 did (it named only 2 modules long after the real count grew past 9). A new Product Focus Area can be added without changing any layer below it.
+### Product Focus Area / Screen
+**(Renamed 2026-07-17 — was briefly "Environment," fully retired the same day; kept appearing as a compound "Environment — Product Focus Area" heading in the initial rewrite by oversight, which a later session legitimately picked up and used. Product Focus Area is the layer name, full stop, matching the single-term pattern of every other layer below.)** The HITL-facing dashboards, one per domain of work. `docs/SCREEN-INVENTORY.md` is the authoritative, current list of Product Focus Areas and their Screens (Channel Intelligence, Project Management, Bench, Spend Analysis, Home, Platform overlays) — read it, don't rely on a list here going stale the way the old Layer 2 did (it named only 2 modules long after the real count grew past 9). A new Product Focus Area can be added without changing any layer below it.
 
 ### Loop
 Agent-to-agent orchestration and routing — which agent handles what, delegation, continuity to complete a task or answer a question. Full mechanism: §19d (The Agent Loop).

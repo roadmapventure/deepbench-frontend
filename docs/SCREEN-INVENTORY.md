@@ -6,7 +6,7 @@
 >
 > **Type stays a separate column, deliberately not baked into the ID.** Screen/layer is a stable fact; Type is a judgment call that can shift mid-investigation — baking it into a permanent ID creates exactly the rename-and-broken-cross-reference risk this whole redesign exists to avoid (see the `dev_version_counter` fix for the same lesson applied to version numbers).
 >
-> **Renamed 2026-07-17 (John, live design conversation) — "Product Area" is now "Product Focus Area."** Same concept, sharper name — matches `ARCHITECTURE.md` §1's rewritten 5-layer model, where this is the "Environment" layer (the HITL-facing dashboards). See `ARCHITECTURE.md` §1 for the full layer model this taxonomy now plugs into.
+> **Renamed 2026-07-17 (John, live design conversation) — "Product Area" is now "Product Focus Area."** Same concept, sharper name — matches `ARCHITECTURE.md` §1's rewritten 5-layer model, where this is the "Product Focus Area" layer (the HITL-facing dashboards; briefly called "Environment" the same day, fully retired — that word doesn't apply anymore, see §1's own note). See `ARCHITECTURE.md` §1 for the full layer model this taxonomy now plugs into.
 
 ---
 

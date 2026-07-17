@@ -1247,3 +1247,22 @@ Checked `CLAUDE-RULES.md` directly rather than assuming its content (verify-neve
 **Also this session:** two new persistent memory corrections from John, both about *how* to work with him going forward, not this session's technical content — agent references must be `FirstName — Role` only (no surname, no agent code, and no "same exchange" carve-out, since that carve-out is exactly what let a prior version of this same rule lapse), and DeepBench mechanics must be explained in the platform's own vocabulary (Skill Profile, schema, `enum`), never invented layperson analogies. Also confirmed and reinforced: John needs proposals broken into one concrete use case at a time, never bundled.
 
 **Close-out:** `AGT-023` and `LOO-007` moved to `docs/FEATURES-ARCHIVE.md` (✅ Done). `AGT-024`, `AGT-025`, `DAT-001`, `DAT-002`, `DAT-003` remain open in `docs/FEATURES.md`, none blocking. `CLAUDE-STATE.md`'s "Version in dev" bumped to v6.3.47, "Last 3 sessions" updated. Worktree `loo-007-confidence-tier-0716` and its branch removed per `CLAUDE.md` rule #7, this session's goal (deliver `LOO-007`) fully met.
+
+---
+
+## S-ENVIRONMENT-TERM-CHECK-0717 — Retiring a terminology leftover, found via a concurrent session's own usage
+
+**Session:** S-ENVIRONMENT-TERM-CHECK-0717 (2026-07-17, worktree `environment-term-check-0717`, no kickoff doc, no application code touched, no version bump) — docs-only.
+
+John reported that a session he'd just been in used "environment screen," and asked whether that was supposed to have been retired in favor of "Product Focus Area." Checked the actual current `ARCHITECTURE.md` §1 text before answering, rather than assuming the other session (which turned out to be the concurrent `S-LOO-007`/`S-AGT-023` session logged directly above — a real, legitimate, active session, not a stale one) was behind on today's changes. Found the real cause: today's earlier live rewrite of §1 (the `S-WORKTREE-CLEANUP-0717` session) had settled on "Product Focus Area" as the layer's name in conversation, but the text actually written into the doc kept a compound heading, "Environment — Product Focus Area / Screen," in both the ASCII diagram and the section title — the only one of the 5 layers not reduced to a single clean term the way Loop/Harness/Platform Services/Data Model were. A session reading the current, correct doc would legitimately see "Environment" sitting prominently in a heading and reasonably use it — this was a real inconsistency left in the rewrite itself, not drift from an out-of-date session.
+
+**Confirmed with John before fixing** (Tier 3 — canonical terminology): fully retire "Environment," name the layer just "Product Focus Area" everywhere, matching the other 4 layers' pattern and John's original stated decision ("let's call it Product Focus Area").
+
+**Fixed, all 4 live mentions found via grep, not assumed complete after fixing the first one:**
+- `ARCHITECTURE.md`'s diagram (line 64) and section heading (line 89) — both changed from the compound "Environment — Product Focus Area / Screen" to just "Product Focus Area / Screen," with a brief historical note on the heading explaining the terminology was briefly "Environment" the same day before being retired, so a future reader hitting old cross-references or memory of the earlier phrasing isn't confused.
+- `SCREEN-INVENTORY.md`'s own rename note, which had described the layer as "the 'Environment' layer" — updated to name it correctly with the same historical aside.
+- `docs/FEATURES.md`'s `SES-001` row, which listed the 5 layers as "Environment/Loop/Harness/..." — updated to "Product Focus Area/Loop/Harness/...".
+
+Re-grepped after all 4 fixes (not just the first) to confirm no live (non-historical-note) mention of "Environment" remained anywhere in the touched files.
+
+**Close-out:** No version bump (docs-only, no code). `CLAUDE-STATE.md`'s "Last 3 sessions" rolling window updated — `S-AGT-023`/`S-LOO-007`'s entry aged out (already fully captured in its own `docs/SESSIONS.md` entry directly above, confirmed before dropping). `ARCHITECTURE.md`, `SCREEN-INVENTORY.md`, `FEATURES.md`, `CLAUDE-STATE.md`, `docs/SESSIONS.md` touched.
