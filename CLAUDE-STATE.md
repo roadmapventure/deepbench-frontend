@@ -3,7 +3,8 @@
 
 **Version in dev:** v6.3.47 (`S-LOO-007`, Supabase-content-only) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None. **(Cleaned up 2026-07-17.)** Both bullets previously here were stale: `continuity-ux-0716`'s worktree was fully merged and removed — its claimed remaining work (`CHI-09`, `CHI-10`) is still genuinely open but already tracked as its own rows directly in `docs/FEATURES.md`, independent of any worktree. `continuity-regression-0716` had no matching worktree or branch anywhere on disk — `LOO-006`, the feature it named, already shipped and closed out (v6.3.43, see `docs/SESSIONS.md`) — the bullet was simply never removed at that close-out.
+**In flight now:**
+- `S-CHI-09` (worktree `chi-tickets-0717`, v6.3.48) — Agent Routing drawer within-hop event order fix, kickoff doc committed, coding session about to be spawned. `CHI-09` split from its original bundled form this session; the second fix (Michelle's raw-reasoning line) is now `CHI-17`, deferred, not part of this session.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
