@@ -3,7 +3,8 @@
 
 **Version in dev:** v6.3.52 (`S-MOB-001`, `42188d3`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None.
+**In flight now:**
+- `ai-audit-triage-0717` (investigation session, worktree `ai-audit-triage-0717`) — full AI Audit / Agent Routing drawer / Agents drawer triage. No kickoff doc yet, still pre-scoping. `LOG-15` (real bug), `LOG-23`/`LOG-24`/`LOG-25` (new, separate architectural threads found while scoping `LOG-15` — missing "Routing" pattern, persistent anti-hardcoding rule needed, `SERVICE_CATALOG`/`PATTERN_CATALOG` retirement question) all logged in `docs/FEATURES.md`, full detail in `docs/S-AI-AUDIT-TRIAGE-01-FINDINGS.md`. Blocked on John's input on `LOG-24`/`LOG-25` before any of this can be scoped into a kickoff.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
