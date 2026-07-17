@@ -812,7 +812,12 @@ function groupEventsIntoHops(ordered) {
   return hops.map(h => {
     if (h.isBoundary) return h;
     seen += 1;
-    return { ...h, hopNumber: total - (seen - 1) };
+    // FEATURE: CHI-09 — h.events was accumulated in the same newest-first order as `ordered`
+    // (each new same-agent event gets pushed onto the end), so within a hop the events read
+    // newest-first too. Hop *cards* stay newest-first (unchanged); only this hop's own
+    // activity-line order flips to chronological (oldest first), matching how a human reads
+    // "what happened during this hop" top to bottom.
+    return { ...h, events: [...h.events].reverse(), hopNumber: total - (seen - 1) };
   });
 }
 
