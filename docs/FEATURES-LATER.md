@@ -3,7 +3,7 @@
 > Status: ✅ Done | 🔶 Partial | ❌ Missing | — N/A
 > Session: DONE = built | [ID] = assigned | S-future = not yet scheduled
 >
-> **Split 2026-07-07 from `docs/FEATURES.md`, per John's criterion: "anything not related to making MI successful goes to later."** This file holds everything not about the Market Intelligence screen — Shell, Dashboard, Assign Work, Personnel, Bench, the platform-wide Agent Architecture roadmap (Phases 1–5, marketplace, revenue, BYOA, JL-01, MCP exposure), Work Order/Intent/Format/Service/Skills catalogs, and Structural Enforcement. Read this only when scoping work in one of those areas — `docs/FEATURES.md` (now) is read by default at design-session Step 1, `docs/FEATURES-NEXT.md` covers other MI backlog.
+> **Split 2026-07-07 from `docs/FEATURES.md`, per John's criterion (updated 2026-07-17): "anything not related to making CI successful goes to Later."** This file holds everything not about the Channel Intelligence (CI) screen — Shell, Dashboard, Assign Work, Personnel, Bench, the platform-wide Agent Architecture roadmap (Phases 1–5, marketplace, revenue, BYOA, JL-01, MCP exposure), Work Order/Intent/Format/Service/Skills catalogs, and Structural Enforcement. Read this only when scoping work in one of those areas — `docs/FEATURES.md` (now) is read by default at design-session Step 1, `docs/FEATURES-NEXT.md` covers other CI backlog.
 >
 > **✅ Done rows archived:** if a feature isn't listed in any of the 3 files, check `docs/FEATURES-ARCHIVE.md` before assuming it's missing.
 
@@ -95,6 +95,7 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | TI-15 | Per-step execution running state | ❌ Missing | S11 (deferred) |
 | TI-17 | Pat execution via Railway | ❌ Missing | S11b (deferred) |
 | TI-18 | HITL step gate — full runtime execution contract: (1) execution pauses when a HITL step is reached, (2) signal emitted to notify human (UI state change + future notification), (3) human provides input via the step's comment/approval interface, (4) input injected into the next agent step's context, (5) execution resumes. Activates PAT-10 HITL in AI Audit By Pattern — triggers "Gates Triggered" counter + records human response time. Design session required before coding — needs: pause signal architecture, notification mechanism, resume-with-context handoff spec. | ❌ Missing | S-future (design required) |
+| TI-16 | Step output storage to Supabase JSONB — writes each step's output as a `deliverables` row (`step_id` set, intermediate tier; `is_final: true`/no `step_id` for the assembled task deliverable). **Q5 (the blocking design question — "where does agent step output live?") resolved 2026-06-13**: two-tier deliverables model, both tiers in the `deliverables` table, user can inspect/approve/request-change on any step deliverable, every deliverable links to `agent_id`. **Moved to `docs/FEATURES.md` 2026-07-14, moved back here 2026-07-17 (session-hygiene now/next/later re-check)** — Task Instructions is a different screen from the CI/Market Intelligence page; doesn't fit the Now-tier criterion despite Q5 no longer blocking. Needs a design session to scope the write path against `TI-14`/`TI-15` (S11, also in this file). | ❌ Missing | S11 (design required — Q5 no longer blocking) |
 
 ---
 
