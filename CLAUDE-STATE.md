@@ -4,7 +4,7 @@
 **Version in dev:** v6.3.50 (`S-CHI-10`, `cc31e7f`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
 **In flight now:**
-- `design-chi-ux-0717` (design→coding, `CHI-21`, v6.3.51) — Chat/Evidence copy & wrap-up-metrics polish, kickoff doc written, spawning coding agent next. `CHI-18`/`CHI-19`/`CHI-20` logged as separate future sessions, not this one's scope.
+- `design-chi-ux-0717` (design→coding, `CHI-21`, v6.3.51) — Chat/Evidence copy & wrap-up-metrics polish. **Coding done:** all 3 tasks implemented in `src/screens/MarketIntelligenceScreen.jsx` (combined `HopSummaryLine`/`formatHopSummary` using cumulative `hopEnd`, reworded pointer sentence, renamed Evidence card header), `test-CHI-21.mjs` 8/8 passed then deleted, `npm run build` clean, pushed to `dev` at `4b5f899`. **Still open:** live Manual QA checklist against the deployed dev preview (this session's local `vite`-only dev server has no `api/` backend, so the real agent round trip and cumulative-hop cross-check couldn't be exercised live — confirmed by code inspection + unit test only). `CHI-18`/`CHI-19`/`CHI-20` logged as separate future sessions, not this one's scope.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
