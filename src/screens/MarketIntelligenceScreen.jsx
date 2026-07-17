@@ -394,18 +394,9 @@ function buildFailureText(guardrail, triage) {
     : `${base}${reason} Try rephrasing the question.`;
 }
 
-// FEATURE: MI-04 — capability display metadata, sourced from the same SERVICE_CATALOG entries
-// already live in useAIActivity.js (not duplicated data — just the slugs this screen calls)
-// FEATURE: MI-67 — dropped the decorative/fabricated `.patterns` sub-field; `.name` (capability
-// display label) is real and unaffected.
-const SERVICE_LABEL = {
-  "channel-intelligence": { name: "Channel Intelligence" },
-  "quality-gate": { name: "Quality Gate" },
-  "hypothesis-evaluation": { name: "Hypothesis Evaluation" },
-  "memory-consolidation": { name: "Memory Consolidation" },
-  "data-analysis": { name: "Data Analysis" },
-  "pipeline-triage": { name: "Pipeline Triage" },
-};
+// FEATURE: LOG-15 — SERVICE_LABEL deleted (was the capability-slug -> human-label dictionary for
+// the Agent Routing drawer's now-removed capability badge; confirmed dead, its one call site was
+// RoutingActivityLine's `SERVICE_LABEL[capability]` lookup, itself removed this session).
 
 // FEATURE: AI-50c — slug -> human label, built from the same PATTERN_CATALOG useAIActivity.js owns
 const PATTERN_NAME = Object.fromEntries(PATTERN_CATALOG.map(p => [p.slug, p.name]));
@@ -722,38 +713,41 @@ function TheorizedDataPointsTable({ rows }) {
 // patch_proposed version_note) are simplified to match every other case's activity-only style.
 // Event-type dispatch (which case fires) is unchanged — still one hardcoded string per call site,
 // assigned by the frontend immediately after each callCapability() call, never agent-reported.
+// FEATURE: LOG-15 — capability field removed from every case's return object (John's hard rule,
+// 2026-07-17: no capability may ever display in the Agent Routing drawer). Same 12 cases, same
+// summary text, same colors — only the capability attribution is dropped.
 function describePipelineEvent(evt) {
   switch (evt.type) {
     case "intent_routing":
-      return { capability: "channel-intelligence", summary: "Reading the question, deciding how to route it", color: T.navyMid };
+      return { summary: "Reading the question, deciding how to route it", color: T.navyMid };
     case "qa_answer":
-      return { capability: "channel-intelligence", summary: "Reviewing found data, putting together an answer", color: evt.data.needs_review ? T.brass : T.moss };
+      return { summary: "Reviewing found data, putting together an answer", color: evt.data.needs_review ? T.brass : T.moss };
     case "proofreader": {
       const g = evt.data.guardrail || {}, e = evt.data.eval || {};
       if (g.result === "block") {
-        return { capability: "quality-gate", summary: "Blocking this answer — a policy issue was found", color: T.flag };
+        return { summary: "Blocking this answer — a policy issue was found", color: T.flag };
       }
       // FEATURE: CHI-02 — was shapeForLog(e.critique); truncation moved entirely to the render
       // layer (RoutingActivityLine) so the full text is never discarded here.
       const revised = e.result === "revise" ? ` — asked for a revision: ${e.critique}` : "";
-      return { capability: "quality-gate", summary: `Reviewing the answer for accuracy and policy issues${revised}`, color: e.result === "revise" ? T.brass : T.moss };
+      return { summary: `Reviewing the answer for accuracy and policy issues${revised}`, color: e.result === "revise" ? T.brass : T.moss };
     }
     case "failure_triage":
       // FEATURE: CHI-02 — was shapeForLog(evt.data.suggested_research_request); truncation moved
       // entirely to the render layer (RoutingActivityLine) so the full text is never discarded here.
-      return { capability: "pipeline-triage", summary: evt.data.recommend_escalate ? `Deciding whether more research would help — recommends: ${evt.data.suggested_research_request}` : "Deciding whether more research would help — more research wouldn't help here", color: T.brass };
+      return { summary: evt.data.recommend_escalate ? `Deciding whether more research would help — recommends: ${evt.data.suggested_research_request}` : "Deciding whether more research would help — more research wouldn't help here", color: T.brass };
     case "hypothesis_test":
-      return { capability: "hypothesis-evaluation", summary: "Validating selected theory, reviewing for challenges", color: T.moss };
+      return { summary: "Validating selected theory, reviewing for challenges", color: T.moss };
     case "memory_consolidation":
-      return { capability: "memory-consolidation", summary: evt.data.action === "consolidate" ? "Saving a new insight for future use" : "Reviewing for a reusable insight — none found", color: evt.data.action === "consolidate" ? T.moss : T.muted };
+      return { summary: evt.data.action === "consolidate" ? "Saving a new insight for future use" : "Reviewing for a reusable insight — none found", color: evt.data.action === "consolidate" ? T.moss : T.muted };
     case "patch_proposed": {
       // FEATURE: CHI-02 — was shapeForLog(evt.data.proposed_action.version_note); truncation moved
       // entirely to the render layer (RoutingActivityLine) so the full text is never discarded here.
       const note = evt.data.proposed_action?.version_note ? ` — ${evt.data.proposed_action.version_note}` : "";
-      return { capability: "data-analysis", summary: `Drafting a proposed correction to the data${note}`, color: T.brass };
+      return { summary: `Drafting a proposed correction to the data${note}`, color: T.brass };
     }
     case "patch_resolved":
-      return { capability: "data-analysis", summary: evt.data.resolution === "accept" ? "Saving new found data" : evt.data.resolution === "reject" ? "Discarding the proposed correction" : "Saving an edited correction", color: evt.data.resolution === "accept" ? T.moss : T.muted };
+      return { summary: evt.data.resolution === "accept" ? "Saving new found data" : evt.data.resolution === "reject" ? "Discarding the proposed correction" : "Saving an edited correction", color: evt.data.resolution === "accept" ? T.moss : T.muted };
     // FEATURE: S-ARCH-DISPLAY-LOOP-01 — the two connected hand-off entries proving the real
     // request_help -> Michelle -> delegate_to_agent(is_final:true) round trip: Marcus asking for
     // help (Michelle's own reasoning field, never a placeholder), then Michelle's pick handing off
@@ -761,25 +755,31 @@ function describePipelineEvent(evt) {
     case "agent_selection":
       // FEATURE: CHI-02 — was shapeForLog(evt.data.reasoning); truncation moved entirely to the
       // render layer (RoutingActivityLine) so the full text is never discarded here.
-      return { capability: "channel-intelligence", summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
+      return { summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
     case "display_format":
-      return { capability: "channel-intelligence", summary: "Formatting data for display", color: T.moss };
+      return { summary: "Formatting data for display", color: T.moss };
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
-      return { capability: "hypothesis-evaluation", summary: "Reviewing found data, putting together a theory", color: T.moss };
+      return { summary: "Reviewing found data, putting together a theory", color: T.moss };
     // FEATURE: MI-29 -- surfaces the real caught error (e.message) in the existing Pipeline Log
     // instead of it only ever reaching a devtools-only console.error. Reuses T.flag, the same
     // alert color already used for guardrail "block" results above -- no new color introduced.
     case "error":
-      return { capability: evt.data.step || null, summary: `Ran into a problem partway through — ${evt.data.message}`, color: T.flag };
+      return { summary: `Ran into a problem partway through — ${evt.data.message}`, color: T.flag };
     // FEATURE: MI-47 -- permanent drawer rows for every live handoff shown in the chat status line
     // (onDelegationProgress), alongside the pre-existing coarse checkpoint events above.
+    // FEATURE: LOG-15 — capability: null left untouched on these 2 cases (never removed like the
+    // other 12), per this session's own SCOPE RULES: "Do NOT touch delegation/delegation_return
+    // event handling — LOG-23/LOG-26, separate session." Inert either way (SERVICE_LABEL[null] was
+    // always undefined, RoutingActivityLine no longer destructures capability at all) — kept
+    // exactly as-is so this session's diff on these 2 lines is genuinely zero, not just behaviorally
+    // equivalent.
     case "delegation":
       return { capability: null, summary: evt.data.message, color: T.navyMid };
     case "delegation_return":
       return { capability: null, summary: evt.data.message, color: T.moss };
     default:
-      return { capability: null, summary: "", color: T.muted };
+      return { summary: "", color: T.muted };
   }
 }
 
@@ -1112,7 +1112,10 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       // fabricated 0) -- not separately measurable from the client.
       onEvent(buildHopEvent("agent_selection", gate.last_help_selection.selected_by_agent_id, gate.last_help_selection));
     }
-    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", gate.triage));
+    // FEATURE: LOG-15 — gate.triage never carried patterns_used; the real value lives one level up
+    // on gate itself (the shared callCapability() wrapper's top-level field), not nested inside
+    // gate.triage. Hoisted explicitly so failure_triage's pattern line shows real data.
+    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, patterns_used: gate.patterns_used || [] }));
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage), hopStart, hopEnd: getHopCount() };
   }
 
@@ -1893,13 +1896,12 @@ function RoutingHopCard({ hop, agentById }) {
 // upstream anymore (see Task 2); this component owns visual truncation via CSS line-clamp (3
 // lines) + a click-to-expand toggle, so the ellipsis lands at the true end of the last visible
 // line instead of wrapping alone, and the full text is always one click away.
+// FEATURE: LOG-15 — capability never displays here, ever (John's hard rule, 2026-07-17). One
+// generic line reads evt.data.patterns_used directly — no event-type branching, no capability
+// lookup. A hop with no real pattern data shows no line at all (never a fabricated placeholder) —
+// same "real data or nothing" principle MI-67 already established for this exact field.
 function RoutingActivityLine({ evt }) {
-  const { capability, summary, color } = describePipelineEvent(evt);
-  const svc = SERVICE_LABEL[capability];
-  // FEATURE: MI-67 — real patterns_used only; the static-string fallback this replaced could
-  // show patterns (Case-Based Reasoning, LLM-as-Judge, RAG on non-RAG intents) that never
-  // actually ran. An event with no real patterns_used now shows no pattern line at all, rather
-  // than a fabricated one.
+  const { summary, color } = describePipelineEvent(evt);
   const realPatterns = Array.isArray(evt.data?.patterns_used) ? evt.data.patterns_used : null;
   const patternLabel = realPatterns && realPatterns.length > 0
     ? realPatterns.map(slug => PATTERN_NAME[slug] || slug).join(', ')
@@ -1911,7 +1913,7 @@ function RoutingActivityLine({ evt }) {
     <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
       <span style={{width:6,height:6,borderRadius:"50%",background:color,marginTop:5,flexShrink:0}}/>
       <div style={{flex:1,minWidth:0}}>
-        {(svc || patternLabel) && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{svc?.name}{svc?.name && patternLabel ? ' · ' : ''}{patternLabel}</div>}
+        {patternLabel && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>AI patterns used: {patternLabel}</div>}
         <div
           onClick={() => isLong && setExpanded(e => !e)}
           style={{
@@ -2907,7 +2909,10 @@ export default function MarketIntelligenceScreen() {
       if (isStale()) return; // FEATURE: CHI-04
 
       if (resolution === "edit") {
-        logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result }, Date.now() - t0));
+        // FEATURE: LOG-15 — result.patterns_used exists (same shared mechanism, threaded through
+        // resolveConfirmation()) but wasn't hoisted to the top level the renderer reads; the
+        // {resolution, result} wrapper was silently dropping it.
+        logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, patterns_used: result.patterns_used || [] }, Date.now() - t0));
         setHypFlow(prev => prev && ({
           ...prev,
           confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique },
@@ -2915,7 +2920,8 @@ export default function MarketIntelligenceScreen() {
         return;
       }
 
-      logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result }, Date.now() - t0));
+      // FEATURE: LOG-15 — same wrapper-nesting fix as the edit branch above.
+      logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, patterns_used: result.patterns_used || [] }, Date.now() - t0));
       // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
       // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
       // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.

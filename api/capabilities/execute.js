@@ -448,10 +448,17 @@ async function dispatchDelegation({
       task_context: JSON.stringify({ ...tool_input, requesting_agent_id: agent_id }), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       _trace_id: trace_id,
     });
+    // FEATURE: LOG-15 — lastHelpSelection never carried patterns_used, even though the real value
+    // (delegateResult.patterns_used) was already computed one line above by the shared
+    // buildPatternsUsed() mechanism (request-receivable.js) — this is a thread-the-value fix, not new
+    // detection. This one object is reused 3 ways downstream (last_help_selection on non-final
+    // results, selection inside buildFinalDelegationResult()'s return) — fixing it here fixes every
+    // agent_selection event in the Agent Routing drawer at once.
     lastHelpSelection = {
       selected_by_agent_id: pmAgentId,
       reasoning: delegateResult?.content?.reasoning ?? null,
       candidates_considered: delegateResult?.content?.candidates ?? null,
+      patterns_used: delegateResult?.patterns_used || [],
     };
 
     if (delegationRequired) {
