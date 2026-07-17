@@ -23,7 +23,7 @@ export const AI_PAT = {
   CHAT_RESPONSE:           names('rag', 'prompt-chaining', 'streaming'),
   PROMPT_ASSEMBLY:         names('prompt-chaining', 'rag'),
   KNOWLEDGE_TRAINING:      names('rag', 'embeddings'),
-  KNOWLEDGE_REINFORCEMENT: names('embeddings', 'structured-output'),
+  KNOWLEDGE_REINFORCEMENT: names('embeddings'),
   AUTONOMOUS_RESEARCH:     names('react', 'browser-automation', 'streaming'),
   AI_REVIEW:               names('rag', 'prompt-chaining'),
   // DB-22 — full pattern set across the entire Create New Task → Assign Work flow

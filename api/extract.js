@@ -4,6 +4,7 @@
 
 import { Buffer } from "buffer";
 import { logActivity } from '../lib/activity-log.js';
+import { SERVICE_SLUG } from '../shared/ai-patterns.js';
 
 export const config = {
   api: {
@@ -112,7 +113,7 @@ async function handleExtract(req, res, startTime) {
 
   logActivity({
     tenantId: tenantId || 'global',
-    aiType: 'deterministic', feature: 'document-extraction',
+    aiType: SERVICE_SLUG.DOCUMENT_PARSING, feature: SERVICE_SLUG.DOCUMENT_PARSING,
     latencyMs: Date.now() - startTime,
   });
 
@@ -180,7 +181,7 @@ async function handleUploadCsv(req, res, startTime) {
   }
 
   logActivity({
-    tenantId, aiType: 'deterministic', feature: 'csv-upload',
+    tenantId, aiType: SERVICE_SLUG.CSV_UPLOAD, feature: SERVICE_SLUG.CSV_UPLOAD,
     latencyMs: Date.now() - startTime,
   });
 

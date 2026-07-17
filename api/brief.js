@@ -5,15 +5,18 @@
 
 import { assembleContext, callClaude } from "../lib/agent-run.js";
 import { logActivity } from "../lib/activity-log.js";
+import { SERVICE_SLUG } from "../shared/ai-patterns.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
 // FEATURE: AA-192a -- ai_type -> SERVICE_CATALOG feature slug for this route's callers.
 // Only types explicitly declared by a caller get logged -- see Task 1c.
+// FEATURE: AI-53 -- extraction now points at document-metadata-generation (split from the old
+// colliding document-extraction slug; see shared/ai-patterns.js SERVICE_CATALOG comment).
 const BRIEF_AI_TYPE_FEATURE = {
   routing:    "agent-routing",
   chat:       "chat-response",
-  extraction: "document-extraction",
+  extraction: SERVICE_SLUG.DOCUMENT_METADATA_GENERATION,
 };
 
 export default async function handler(req, res) {
