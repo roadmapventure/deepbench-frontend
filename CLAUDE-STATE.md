@@ -5,6 +5,7 @@
 
 **In flight now:**
 - `ai-audit-triage-0717` (investigation session, worktree `ai-audit-triage-0717`) — full AI Audit / Agent Routing drawer / Agents drawer triage. No kickoff doc yet, still pre-scoping. `LOG-15` (real bug), `LOG-23`/`LOG-24`/`LOG-25` (new, separate architectural threads found while scoping `LOG-15` — missing "Routing" pattern, persistent anti-hardcoding rule needed, `SERVICE_CATALOG`/`PATTERN_CATALOG` retirement question) all logged in `docs/FEATURES.md`, full detail in `docs/S-AI-AUDIT-TRIAGE-01-FINDINGS.md`. Blocked on John's input on `LOG-24`/`LOG-25` before any of this can be scoped into a kickoff.
+- `design-chi-tickets-review-0717` (design session) — `CHI-19` kickoff written (`v6.3.53-CHI-19-entity-terminology-resolution.md`), corrected target from `qa-answer-format` to `ci-answer-intent` after live Supabase verification. Spawning the coding session next.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
