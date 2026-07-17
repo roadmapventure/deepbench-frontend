@@ -3,7 +3,8 @@
 
 **Version in dev:** v6.3.48 (`S-CHI-09`, `416d173`) — highest closed-out version, live-verified. New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
-**In flight now:** None.
+**In flight now:**
+- `ses003-design-0717` (design session, worktree `ses003-design-0717`) — renamed the "Continuity" Type Taxonomy tag to "Task Success Rate (TSR)" platform-wide, split `AA-69` into CI-relevant `HAR-04` (shared `callModel()`/`sendRequest()` deadline-aware timeout fix, kickoff `v6.3.49` written) + PM-scoped `AA-69` remainder. Coding session about to spawn for `HAR-04`; this bullet clears once its 5/5 Category L result is confirmed and the row archives.
 
 **`AA-194` (Task Success Rate):** live-incident row (Sam Reyes/`intake-failure-intent.output_desc`) fixed and live-verified; broader 7-agent roster `output_desc` gap still open, tracked 🔶 Partial — full history in `docs/SESSIONS.md`.
 
