@@ -78,6 +78,8 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 **(added 2026-07-08 — Type tag, John's explicit call)** Every row in `docs/FEATURES.md` and `docs/FEATURES-NEXT.md` also gets a `Type` tag (Continuity/Speed/Architecture/Feature/Tech Debt/Data/Observability — full definitions in `docs/FEATURES.md`'s "Type Taxonomy" section). Assign the type that actually fits when logging a new item; if none of the existing types genuinely fit, add a new one to the taxonomy rather than forcing a close-but-wrong tag. Do not apply this retroactively to `docs/FEATURES-LATER.md` or `docs/FEATURES-ARCHIVE.md` unless a session is already touching a row there for another reason.
 
+**(added 2026-07-17 — new-ID prefix, `SCREEN-INVENTORY.md`)** Before assigning a new item's ID, check `docs/SCREEN-INVENTORY.md`'s taxonomy for the correct `[SCREEN-CODE]` (e.g. `CHI`, `PRO`) or `[PLATFORM-LAYER-CODE]` (`HAR`/`LOO`/`LOG`/`MCP`/`MKT`/`DAT`/`AGT`) prefix — do not default to an old `[AREA]-[NUMBER]` prefix (`MI`/`AA`/`AI`/etc.) by pattern-matching nearby rows, even ones logged recently. This convention has been active since 2026-07-15, but the rule previously lived only in `docs/FEATURES.md`'s "Feature ID Format" section — not on this file's own mandatory Step 1 reading list — so it was easy to miss; found live 2026-07-17 (naming-convention audit) that 3 rows logged that same week still used a retired prefix (`MI-73`/`MI-74`/`AI-46d`, recoded to `CHI-15`/`CHI-16`/`LOG-22`) despite the rule being live. When genuinely unsure which code fits, or whether an existing legacy-prefixed row (like `AA-194`) should be recoded, ask John rather than guessing — the convention applies prospectively only, existing IDs are never silently renamed.
+
 **(added 2026-07-15, John's explicit call — the `task_773e8b06` incident)** A `spawn_task` chip's `task_XXXXXXXX` ID is Claude Code's own session-tracking mechanism, not part of this project's feature-tracking system — it must never be the only identifier a piece of DeepBench work is known by. If a finding is significant enough to spin off via `spawn_task`, give it a real backlog ID (whichever of `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md` fits) in the same breath the task is spawned, and cite that ID — never the raw `task_XXXXXXXX` — in any coordination note or cross-reference to that work afterward. This is exactly what went wrong with `task_773e8b06`: never anchored to a durable ID at creation, so multiple sessions repeated "`task_773e8b06` is running separately, not blocking" as unverified fact for a full day, and the task's own session later failed to recognize a third-person mention of its own opaque ID as being about itself — see [[feedback-coordination-note-self-reference]]. A real ID at spawn time would have prevented both failure modes: sessions cite "blocked on `AA-191`," not "blocked on some session I have to go check on," and a session reading about its own backlog row doesn't have the same self-reference ambiguity a bare process ID does.
 
 ---
@@ -96,22 +98,24 @@ Report back after Step 1:
 - Current version in dev (state it as the `origin/dev` version you just fetched, not whatever the shared checkout's file said before that fetch)
 - Next scheduled session
 - Any open blocking questions
-- "What would you like to work on?"
+- **(Rewritten 2026-07-17 — was a bare "What would you like to work on?")** "What would you like to work on, and which Product Area/Screen (or Platform Layer, if it's cross-cutting) does it primarily touch? See `docs/SCREEN-INVENTORY.md` for the list." Ask for the area up front, before any scoping conversation starts — this is what makes Step 2's architecture read below mandatory instead of a self-assessed guess made with no context yet.
 
 ---
 
 ## Step 2 — Pull in context only when the session needs it
 
+**(Tightened 2026-07-17 — `docs/ARCHITECTURE.md`'s row below was previously self-assessed — "does this touch layer boundaries?" — decided by the session itself before it had enough context to judge that reliably. Found live: this let already-locked architecture get silently re-proposed or contradicted, requiring John to catch and correct it after the fact, repeatedly, instead of the session starting from what's already decided.)** Once Step 1's closing question has an answer naming a Product Area/Screen/Platform Layer, reading `docs/ARCHITECTURE.md` for whatever's locked in that area is **mandatory before proposing any scope** — not conditional on the session's own judgment that the topic "sounds architectural." A cross-reference index mapping each Product Area/Screen to its governing `ARCHITECTURE.md` section numbers is planned (tracked, not yet built — see John before assuming one exists); until it lands, this means actually reading the relevant sections with real attention, not skimming past ones that don't look related at a glance.
+
 | Read this | When |
 |-----------|------|
 | `docs/STANDARDS.md` | Generating a kickoff doc |
 | `docs/PRD.md` + `docs/MOCK-NOTES.md` | Any design or UX session |
-| `docs/ARCHITECTURE.md` | Session touches layer boundaries, migration work, or S-MIGRATE / S-BENCH / S-INFRA chain |
+| `docs/ARCHITECTURE.md` | **Now mandatory once Step 1 names an area** (see above) — no longer only "if session touches layer boundaries, migration work, or S-MIGRATE/S-BENCH/S-INFRA chain" |
 | `docs/STYLE-GUIDE.md` | Any session with UI work — read before designing, update at close |
 | `docs/ENV-VARS.md` | Features that call external services |
 | Relevant source files in `src/` | Read before designing against any existing component |
 
-Do not pre-load all of these. Read only what the session requires.
+Do not pre-load all of these. Read only what the session requires — but "requires" no longer excludes `ARCHITECTURE.md` by default; see above.
 
 ---
 

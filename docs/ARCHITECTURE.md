@@ -53,48 +53,89 @@ Capabilities
 
 ---
 
-## 1. The Four-Layer Architecture [LOCKED]
+## 1. The Platform Architecture — 5 Layers + Cross-Cutting Concerns [LOCKED, rewritten 2026-07-17]
 
-DeepBench is organized into four layers. Each layer has one responsibility.
-No layer duplicates what another layer owns.
+**Rewritten 2026-07-17 (John, live design conversation) — supersedes the prior "Four-Layer Architecture" wholesale, not a rename within it.** The prior version (Layer 1–4: Shared Foundation / Product Modules / Agent Capability Services / Platform Services) predated the platform's real evolution — it had no room for the Loop (agent-to-agent orchestration) or the Data Model as its own layer, and its "Platform Services" layer meant something different (Auth/multi-tenancy/security) than what "Platform Services" means below. Two docs describing the same system differently was itself a source of sessions re-deriving or contradicting already-settled architecture — this section is the reconciled replacement.
+
+DeepBench is organized into 5 layers, stacked by real dependency (each layer calls only the one directly below it), plus a set of cross-cutting concerns that intersect every layer rather than sitting at one level of the stack — forcing them into the stack would misrepresent what they are (see Functional Objectives below).
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 4 — Platform Services                            │
-│  Auth · Multi-tenancy · Security · API Gateway          │
-│  (stubs today, full implementation v6+)                 │
+│  Environment — Product Focus Area / Screen                │
+│  HITL-facing dashboards, one per domain of work:            │
+│  Channel Intelligence · Project Management · Bench · ...      │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 2 — Product Modules                              │
-│  Work Dashboard · Bench Dashboard                       │
-│  (what the user sees; calls Layer 3 for intelligence)   │
+│  Loop                                                        │
+│  Orchestration/routing — which agent handles what, when       │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 3 — Agent Capability Services                    │
-│  Task Planning · RAG Query · Chat · Data Analysis       │
-│  Web Research · Document Extraction · Audit Tracking …  │
-│  (independent capability services; the product nucleus) │
+│  Harness                                                       │
+│  Agent communication mechanics — message/tool-call protocol,    │
+│  prompt assembly                                                 │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 1 — Shared Foundation                            │
-│  tokens.js · agents.js · supabase.js · config.js        │
-│  (single source of truth; everything else reads from here)│
+│  Platform Services                                                │
+│  Shared foundational utilities — logging/AI Audit, generic         │
+│  display code, knowledge-flow plumbing                              │
+├─────────────────────────────────────────────────────────┤
+│  Data Model                                                          │
+│  3 entities, each independently RAG-backed: Competency · Library ·     │
+│  Reasoning                                                                │
 └─────────────────────────────────────────────────────────┘
+
+Cross-cutting, not a layer — intersects all 5, not yet built into any of
+them: Functional Objectives (multi-tenancy, security, revenue/
+monetization, MCP exposure).
 ```
 
-### Layer 1 — Shared Foundation
-Design tokens, agent roster data, Supabase client, environment config.
-Every other layer reads from this. Nothing duplicates it.
+### Environment — Product Focus Area / Screen
+The HITL-facing dashboards, one per domain of work. `docs/SCREEN-INVENTORY.md` is the authoritative, current list of Product Focus Areas and their Screens (Channel Intelligence, Project Management, Bench, Spend Analysis, Home, Platform overlays) — read it, don't rely on a list here going stale the way the old Layer 2 did (it named only 2 modules long after the real count grew past 9). A new Product Focus Area can be added without changing any layer below it.
 
-Files: `src/tokens.js`, `src/data/agents.js`, `src/lib/supabase.js`, `src/config.js`
+### Loop
+Agent-to-agent orchestration and routing — which agent handles what, delegation, continuity to complete a task or answer a question. Full mechanism: §19d (The Agent Loop).
 
-### Layer 2 — Product Modules
-The two user-facing dashboards:
-- **Work** — work order assignment, step execution, HITL management, capability audit
-- **Bench** — team roster, personnel files, skill profile assignments, training
+### Harness
+The shared generic execution pipeline every agent communicates through — never agent- or capability-specific code. Full principle: §19b (The Generic Capability Executor).
 
-New modules can be added without changing Layers 1 or 3.
-A module can be removed without affecting agent capabilities.
+Files: `api/capabilities/execute.js`, `api/prompt/db-assembly.js`, `api/prompt/ai-enrichment.js`, `api/prompt/request-receivable.js`
 
-### Layer 3 — Agent Capability Services
-Independent, discrete, deployable capability services. The nucleus of the product.
+Capability routes (what runs through the Harness) are detailed in §1a below, not repeated here.
+
+### Platform Services
+Shared foundational utilities that the Harness (and other layers) call into — not agent-specific, not orchestration, just shared infrastructure. This genuinely blends with the Harness at the edges by design (e.g. `db-assembly.js`/`ai-enrichment.js` are simultaneously core harness pipeline *and* a shared service any capability calls into) — don't force a single bucket where a piece of code spans both.
+
+Files (from the prior Layer 1 — Shared Foundation, folded in here as this layer's foundational component): `src/tokens.js`, `src/data/agents.js`, `src/lib/supabase.js`, `src/config.js`
+
+Three known components:
+- **Shared display/utility code** — cross-screen UI logic (data uploads, timing helpers, etc.)
+- **Logging / AI Audit** — the centralized `ai_activity_log` write path. See "AI Audit" below and §19i (AI Pattern Detection) for the full detection model.
+- **Knowledge-flow plumbing** — the generic retrieval pipeline any capability uses to pull Data Model content into a prompt (`lib/search-harness.js`).
+
+**AI Audit — consolidated summary (added 2026-07-17, first worked example of this section's format; more Product Focus Areas/Layers get this same treatment over time, see `SES-001`).**
+
+Storage: one central table, `ai_activity_log`. Write path: one shared function, `buildPatternsUsed()` (`api/prompt/request-receivable.js`), assembled every capability's call flows through — never duplicated per capability. Catalog: `SERVICE_CATALOG`/`PATTERN_CATALOG`, centralized in `shared/ai-patterns.js` (moved there by `AI-53` after a prior naming collision from duplicated per-file catalogs). Detection rule: a pattern may only be logged from one of four legitimate sources (mechanical fact, declared-and-triggers-real-behavior, model self-report, or harness-verified inference) — never from a Skill Profile declaration alone. Full detail, not repeated here: §19i.
+
+**Pattern naming — important scope note:** the platform works with the full breadth of real, industry-recognized AI patterns (RAG, ReAct, Tool Use, Reflection, LLM-as-Judge, Chain-of-Verification, and any other genuine pattern, present or future) — the specific patterns currently detected and listed in §19i's status table are examples of what's implemented today, not a fixed or exhaustive catalog. Do not treat any particular named list as the permanent standard.
+
+Presented in 3 places, each showing a different slice of the same central data — not 3 copies:
+1. **AI Audit screen** (`AIActivityPanel.jsx`, Platform overlay) — global view, all agents/capabilities, 5 internal sections (By Service/Pattern/Deterministic/LLM/Agent — `docs/AI-SERVICES.md` §6).
+2. **Channel Intelligence's Agent Routing drawer** — per-hop delegation/routing events for the current conversation only.
+3. **Channel Intelligence's Agents drawer** — per-agent pattern/latency rollup for the current conversation (`MI-72`'s real per-pattern breakdown).
+
+**Known landmine, not part of AI Audit itself — don't conflate:** Channel Intelligence has a *fourth*, adjacent drawer, "Agent Reasoning," which also shows a "patterns" count — but sourced from `the_reasoning` (case-based-reasoning row count), a completely different table and concept. Same word, unrelated meaning, sitting next to the real AI Audit drawers in the same panel. This exact confusion is the open bug `CHI-15` exists to fix.
+
+### Data Model
+Three structurally-separate entities, each answering a different question about an agent's expertise, world knowledge, or judgment. Two are independently RAG-backed (real `embedding` columns); Competency combines a non-RAG structured model with one RAG-backed table.
+
+- **Competency** — what makes an agent an agent. Two mechanisms, one concept: the structured Skill/Capability/Agent model below (`skill_profiles`, `capabilities`, `agent_capability_assignments` — not itself RAG) plus `knowledge_entries` (an agent's own personal training corpus, RAG-backed, populated via the Teach flow). Example, John's own: an NIGP spend-consultant agent's competency is both its assigned Skills/Capabilities *and* its own uploaded training documents that make it certified — together, not separately.
+- **Library** — `the_library`. Business/company data (Data Room model). §19c.
+- **Reasoning** — `the_reasoning`. An agent's own opinion/judgment about Library content — "it becomes the company's culture" (John, §19f). §19f.
+
+### Functional Objectives (cross-cutting, not a layer)
+Requirements that constrain every layer above but aren't themselves one — multi-tenancy, security/auth, revenue model, MCP exposure, monetization. Mostly unbuilt today (stubs only). As each gets built, it's realized as concrete mechanisms distributed across the 5 layers above (e.g. multi-tenancy becomes `tenant_id` scoping in the Data Model plus tenant-aware checks in the Harness) — it does not become its own permanent layer once built.
+
+---
+
+## 1a. Agent Capability Services — Detail
+Independent, discrete, deployable capability services. The nucleus of the product; executes through the Harness above.
 
 **Critical rules [LOCKED]:**
 - Capabilities are independent of any specific agent
@@ -131,11 +172,7 @@ Independent, discrete, deployable capability services. The nucleus of the produc
 
 **Deterministic capabilities** have no model, tokens, or cost — but they log execution count and latency to `ai_activity_log` with `ai_type = 'deterministic'`. They do NOT receive the `✦ AI` badge in the UI. This distinction is intentional product positioning. All capabilities — AI and deterministic — are productized services with a usage/cost model.
 
-### Layer 4 — Platform Services
-Auth, multi-tenancy, security certification, database isolation, API gateway.
-Stubs exist today (`tenant_id` on every table, `TENANT_ID` constant).
-Full implementation is v6+ territory.
-Design Layers 1–3 so this layer can wrap them without rewriting them.
+**Note:** Auth/multi-tenancy/security/API-gateway content (`tenant_id` on every table, `TENANT_ID` constant, stubs only today) previously lived here as "Layer 4 — Platform Services" — moved to **Functional Objectives** above under the rewritten model; "Platform Services" now means the shared-utilities layer, a different concept (see above). Full implementation of these objectives is still v6+ territory.
 
 ---
 
