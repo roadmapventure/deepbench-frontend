@@ -332,7 +332,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer } from "../components/SharedUI.jsx";
+import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
@@ -816,12 +816,14 @@ function groupEventsIntoHops(ordered) {
   return hops.map(h => {
     if (h.isBoundary) return h;
     seen += 1;
-    // FEATURE: CHI-09 — h.events was accumulated in the same newest-first order as `ordered`
-    // (each new same-agent event gets pushed onto the end), so within a hop the events read
-    // newest-first too. Hop *cards* stay newest-first (unchanged); only this hop's own
-    // activity-line order flips to chronological (oldest first), matching how a human reads
-    // "what happened during this hop" top to bottom.
-    return { ...h, events: [...h.events].reverse(), hopNumber: total - (seen - 1) };
+    // FEATURE: CHI-27 — reverts CHI-09's chronological within-hop reversal (John's direct call,
+    // 2026-07-18, live UX walkthrough): the panel's hop-to-hop order is newest-first, and having a
+    // hop's own activity lines read the opposite direction (oldest-first) was confusing to read even
+    // though CHI-09's order was chronologically correct. h.events keeps the same newest-first order
+    // `ordered` already established (each new same-agent event is pushed onto the end during
+    // accumulation above, so index 0 is the newest event in the hop, the last index is the oldest) —
+    // matching the rest of the panel's reading direction.
+    return { ...h, hopNumber: total - (seen - 1) };
   });
 }
 
@@ -1478,7 +1480,7 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
   return null;
 }
 
-function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview }) {
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1507,12 +1509,10 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
         <FeatureBadge id="MI-59"/>
+        <FeatureBadge id="CHI-26"/>
         {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" (Task 4 rename,
             since review/resolve actions moved here too, not just read-only content). */}
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
-        {/* FEATURE: MI-64 — duplicate compact status indicator so someone watching Evidence sees
-            progress without needing to look at chat; same AgentWorkingIndicator component, unmodified. */}
-        {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
         <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
             {getEvidencePanelSentence(null)}
@@ -1525,6 +1525,11 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
   const footerKind = selectEvidenceFooterKind(qaEvidence, hypFlow);
+  // FEATURE: CHI-29 — shared scroll-fade-hint mechanism (SharedUI.jsx), same MI-50 mechanism the
+  // mobile Agent Routing feed already uses, applied here so this scroll box gets the same
+  // bottom-edge fade+chevron affordance when content overflows.
+  const evidenceScrollRef = useRef(null);
+  const { canScrollMore: evidenceCanScrollMore, onScroll: checkEvidenceScroll } = useScrollFadeHint(evidenceScrollRef, [qaEvidence, hypFlow]);
 
   return (
     // FEATURE: MI-54 — bounded to the grid row height with an internal scroll region, matching
@@ -1533,21 +1538,21 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
     // inside the card instead of growing the whole page past the fold.
     <div style={{display:"flex",flexDirection:"column",gap:14,minHeight:0,flex:1,position:"relative"}}>
       <FeatureBadge id="MI-59"/>
+      <FeatureBadge id="CHI-26"/>
+      <FeatureBadge id="CHI-29"/>
       {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" in both states. */}
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
-      {/* FEATURE: MI-64 — duplicate compact status indicator, same component as InteractColumn's */}
-      {workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
       {/* FEATURE: CHI-18 — gap:14 between the scroll body and the pinned footer, matching
           AuditColumn's (Column 3) drawer-stack gap value. The footer itself stays fully unchanged
           (padding, border, position as the flex column's last child) — it remains locked to the
           card's bottom regardless of content length; only the separation from the content above it
           is new. */}
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14}}>
+      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14,position:"relative"}}>
         {/* FEATURE: CHI-18 — padding-bottom dropped to 0: the narrative card above now stretches
             (flex:1, Task 1) to fill this box, so its own trailing padding would otherwise stack on
             top of the outer card's structural 14px gap to the footer (30px total measured, more
             than the AuditColumn-matching 14px target). Top/side padding unchanged. */}
-        <div style={{padding:"16px 16px 0",display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
+        <div ref={evidenceScrollRef} onScroll={checkEvidenceScroll} style={{padding:"16px 16px 0",display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
 
         {/* FEATURE: CHI-03a — Task 1's extracted card, independent of hypFlow: renders the instant
             Marcus has an answer, whether or not a hypothesis flow is ever started. */}
@@ -1699,6 +1704,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, workingStatus, onIntentChange, on
         </>
         )}
         </div>
+        <ScrollFadeHint show={evidenceCanScrollMore} bg={T.cardAlt}/>
         {footerKind && (
           <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,position:"relative"}}>
             <FeatureBadge id="CHI-13"/>
@@ -1865,7 +1871,7 @@ function QuestionDivider({ evt }) {
 
 function RoutingHopCard({ hop, agentById }) {
   const primary = agentById(hop.agentId);
-  const lastColor = describePipelineEvent(hop.events[hop.events.length - 1]).color;
+  const lastColor = describePipelineEvent(hop.events[0]).color;
   return (
     <div style={{borderLeft:`3px solid ${lastColor}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:8}}>
       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
@@ -2122,7 +2128,9 @@ function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
       <FeatureBadge id="MI-22"/>
       <FeatureBadge id="MI-30"/>
       <FeatureBadge id="MI-31"/>
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Audit</div>
+      <FeatureBadge id="CHI-27"/>
+      <FeatureBadge id="CHI-28"/>
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Focus Area Audit</div>
       {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
       {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N hops" (John's explicit
           call: a new line should mean a hand-off, not an activity). FEATURE: CHI-03c — was "turns".
@@ -2133,7 +2141,7 @@ function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
         ) : hops.map(hop =>
             hop.isBoundary
               ? <QuestionDivider key={hop.events[0].id} evt={hop.events[0]}/>
-              : <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>
+              : <RoutingHopCard key={hop.events[hop.events.length - 1].id} hop={hop} agentById={agentById}/>
           )}
       </Drawer>
       <AuditDrawersBody agents={agents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
@@ -2372,15 +2380,10 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   };
 
   // FEATURE: MI-50 — bottom-edge scroll affordance for the pinned Agent Routing feed.
-  // UNCHANGED from current dev — do not re-implement, only relocate within the new shell.
-  const [routingCanScrollMore, setRoutingCanScrollMore] = useState(false);
+  // FEATURE: CHI-29 — now backed by the shared useScrollFadeHint hook (SharedUI.jsx), extracted so
+  // this mechanism isn't reimplemented by hand at the new Column 2 call site.
   const routingFeedRef = useRef(null);
-  const checkRoutingScroll = () => {
-    const el = routingFeedRef.current;
-    if (!el) return;
-    setRoutingCanScrollMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
-  };
-  useEffect(() => { checkRoutingScroll(); }, [ordered.length]);
+  const { canScrollMore: routingCanScrollMore, onScroll: checkRoutingScroll } = useScrollFadeHint(routingFeedRef, [ordered.length]);
 
   const tabStyle = (active, disabled) => ({
     flex:1, padding:"9px 6px", fontFamily:mono, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em",
@@ -2464,13 +2467,9 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped". */}
           {ordered.length === 0
             ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
-            : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[0].id} hop={hop} agentById={agentById}/>)}
+            : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[hop.events.length - 1].id} hop={hop} agentById={agentById}/>)}
         </div>
-        {routingCanScrollMore && (
-          <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${T.cardAlt} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
-            <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
-          </div>
-        )}
+        <ScrollFadeHint show={routingCanScrollMore} bg={T.cardAlt}/>
       </div>
 
       {showAgentInfo && (
@@ -3009,7 +3008,7 @@ export default function MarketIntelligenceScreen() {
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} workingStatus={workingStatus} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}

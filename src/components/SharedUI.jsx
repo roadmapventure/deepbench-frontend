@@ -22,7 +22,7 @@
 // DeepBench v5 — Shared Treasury UI components
 // Used across all screens. Import from here, never re-define in screen files.
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
 import { AVATAR_CFG } from "../data/agents.js";
@@ -404,6 +404,30 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
     </div>
   );
 };
+
+// FEATURE: CHI-29 — shared scroll-fade-hint mechanism, extracted from MI-50's mobile-only inline
+// copy (Agent Routing feed) so a second call site (Evidence & Interaction's analysis scroll box)
+// doesn't reimplement the same ref/state/scroll-math by hand. Bottom-edge fade gradient + bouncing
+// chevron, shown only when there's real unscrolled content below — same 4px threshold MI-50 used.
+// Caller supplies its own ref to the scrolling element; the returned onScroll goes on that same
+// element; ScrollFadeHint renders as an absolutely-positioned sibling inside a position:"relative"
+// ancestor whose bounds match the visible scroll viewport.
+export function useScrollFadeHint(scrollRef, deps) {
+  const [canScrollMore, setCanScrollMore] = useState(false);
+  const check = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  };
+  useEffect(() => { check(); }, deps);
+  return { canScrollMore, onScroll: check };
+}
+
+export const ScrollFadeHint = ({ show, bg }) => !show ? null : (
+  <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${bg} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
+    <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
+  </div>
+);
 
 // FEATURE: MI-01d — generic pending_confirmation UI. Any capability whose Skill Profile sets
 // requires_human_confirmation: true surfaces here, unmodified per-capability — proposedAction/
