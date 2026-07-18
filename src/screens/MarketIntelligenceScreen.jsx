@@ -2450,7 +2450,12 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         </button>
       </div>
 
-      <div style={{flexShrink:0,height:118,background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",position:"relative"}}>
+      {/* FEATURE: CHI-25 — height 118->176: the old height only ever showed one hop card
+          (often not even a full one), so the existing MI-50 fade/chevron sat below something
+          that already looked complete rather than visibly cut off. 176px was measured live
+          against a real 6-hop mobile Q&A chain to show one full hop plus a visibly truncated
+          second hop, so the cut-off card itself signals scrollability, not just the fade. */}
+      <div style={{flexShrink:0,height:176,background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",position:"relative"}}>
         <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
           <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
           <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
