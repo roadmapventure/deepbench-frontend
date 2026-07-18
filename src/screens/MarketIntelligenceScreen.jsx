@@ -1485,6 +1485,15 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
   const nadia = agents.find(a => a.id === "nadia");
+  // FEATURE: CHI-29 — moved above the early return below (patch, S-CHI-26b): this hook must run
+  // unconditionally on every render, same as every other hook in this function. The original
+  // placement (after the early return) violated React's Rules of Hooks — EvidenceColumn calls a
+  // different number of hooks depending on whether qaEvidence/hypFlow are set, which crashes React
+  // ("Minified React error #310") the instant the component transitions from its empty state to
+  // its populated state, since that's a re-render of the same mounted instance with a different
+  // hook count. Found live during S-CHI-26-design's own Manual QA verification.
+  const evidenceScrollRef = useRef(null);
+  const { canScrollMore: evidenceCanScrollMore, onScroll: checkEvidenceScroll } = useScrollFadeHint(evidenceScrollRef, [qaEvidence, hypFlow]);
 
   useEffect(() => {
     if (hypFlow && hypFlow.prefillText) { setCustomText(hypFlow.prefillText); setShowOwnTheory(true); }
@@ -1525,11 +1534,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
   const footerKind = selectEvidenceFooterKind(qaEvidence, hypFlow);
-  // FEATURE: CHI-29 — shared scroll-fade-hint mechanism (SharedUI.jsx), same MI-50 mechanism the
-  // mobile Agent Routing feed already uses, applied here so this scroll box gets the same
-  // bottom-edge fade+chevron affordance when content overflows.
-  const evidenceScrollRef = useRef(null);
-  const { canScrollMore: evidenceCanScrollMore, onScroll: checkEvidenceScroll } = useScrollFadeHint(evidenceScrollRef, [qaEvidence, hypFlow]);
 
   return (
     // FEATURE: MI-54 — bounded to the grid row height with an internal scroll region, matching
