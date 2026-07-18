@@ -2961,7 +2961,7 @@ export default function MarketIntelligenceScreen() {
     } finally {
       setNewsCardLoadingUrl(null);
     }
-    const visibleMessage = `Does ${card.headline} affect our channel program positioning?`; // FEATURE: CHI-33-patch -- reworded so Marcus's ci-routing-intent classifies this as a direct qa question, not escalate; see kickoff CONTEXT item 2.
+    const visibleMessage = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`; // FEATURE: CHI-33-patch2 -- reworded again to present the headline as delivered news (a given fact), not a causal test, matching ci-routing-intent's new EXTERNAL-FACT QUESTIONS rule; see kickoff CONTEXT.
     submit(visibleMessage, articleText ? { article_content: articleText, article_source: articleSource } : null);
   };
 

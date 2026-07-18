@@ -477,6 +477,18 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   if (goalText && goalText.trim()) {
     const workOrderParts = [`Goal: ${goalText.trim()}`];
     if (deliverableType) workOrderParts.push(`Deliverable type: ${deliverableType}`);
+    // FEATURE: HAR-06 -- generic task_context pass-through. Any field beyond goal/deliverable_type is
+    // appended here, same key/value serialization TASK DETAILS (AI-44) already uses one branch below --
+    // extends that existing generic mechanism to the .goal-present path instead of duplicating it.
+    // Additive only: every existing .goal-only caller (api/plan.js Work Orders, ordinary qa/theory/
+    // forecast/correct calls) carries zero extra keys, so this filters to nothing and output stays
+    // byte-identical. A future capability that wants to pass something new (CHI-33's article_content
+    // today, anything else tomorrow) just adds a key to the task_context object it already builds --
+    // no change to this file required ever again.
+    const extraEntries = Object.entries(task_context)
+      .filter(([k, v]) => k !== 'goal' && k !== 'deliverable_type' && v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+    workOrderParts.push(...extraEntries);
     sections.push({
       slug: 'current-task',
       label: 'CURRENT TASK',
