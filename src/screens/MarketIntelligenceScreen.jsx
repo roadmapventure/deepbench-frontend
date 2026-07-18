@@ -591,6 +591,20 @@ function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation 
   );
 }
 
+// FEATURE: CHI-33-patch -- live elapsed line for Column 2's true in-flight state (newsCards ===
+// null), reusing AgentWorkingIndicator's tick-every-second + formatElapsed() idiom without pulling
+// in its full chat-pane-specific layout (badges, AIDiamond icon) -- this renders inline inside the
+// existing empty-state box instead.
+function NewsCardsLoadingLine({ startedAt }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!startedAt) return "Grabbing the latest headlines...";
+  return `Grabbing the latest headlines... ${formatElapsed(now - startedAt)}`;
+}
+
 // FEATURE: MI-15 — shared display-label mapping for the raw data_type (the_library rows) /
 // confidence_tier (Q&A answers) vocabulary. Display-layer relabel only — the stored enum strings
 // (sourced/inferred/synthesized/learned/na) are unchanged everywhere else (DB, all 7 live Skill
@@ -1510,12 +1524,18 @@ function getEvidencePanelSentence(hypFlow) {
 // session's DESIGN RULES. String-safe: headline/snippet/source may be absent on a malformed card,
 // JSX simply renders nothing for an undefined child rather than throwing.
 function NewsCard({ card, loading, onClick }) {
+  // FEATURE: CHI-33-patch -- card.published_at is "YYYY-MM-DD" per Alex's news-cards-format schema,
+  // already live/populated; nullable when Jordan/Alex genuinely don't know the date. The
+  // +"T00:00:00" avoids a UTC-midnight-rollback-to-previous-day display bug in timezones west of UTC.
+  const formattedDate = card?.published_at
+    ? new Date(card.published_at + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
   return (
     <div onClick={onClick} style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",cursor:"pointer",opacity:loading?0.6:1}}>
       <div style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink,marginBottom:3}}>{card?.headline}</div>
       {card?.snippet && <div style={{fontFamily:body,fontSize:11,color:T.muted,lineHeight:1.4,marginBottom:5}}>{card.snippet}</div>}
       <div style={{fontFamily:mono,fontSize:9.5,color:T.mutedDeep,textTransform:"uppercase",letterSpacing:"0.04em"}}>
-        {card?.source}{loading ? " · Loading…" : ""}
+        {card?.source}{formattedDate ? ` · ${formattedDate}` : ""}{loading ? " · Loading…" : ""}
       </div>
     </div>
   );
@@ -1533,7 +1553,7 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
   return null;
 }
 
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl }) {
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1595,7 +1615,13 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         ) : (
           <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
             <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-              {getEvidencePanelSentence(null)}
+              {/* FEATURE: CHI-33-patch -- genuinely-loading (newsCards === null) gets the live
+                  "Grabbing the latest headlines..." line; fetch-completed-with-nothing (newsCards
+                  is [], or no fetch ever ran) keeps the static sentence unchanged -- a ticking line
+                  after the fetch already finished and failed would be actively misleading. */}
+              {newsCards === null
+                ? <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
+                : getEvidencePanelSentence(null)}
             </div>
           </div>
         )}
@@ -2432,7 +2458,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl }) {
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt }) {
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -2549,7 +2575,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={onAnalyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={onAnalyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}/>
           </div>
         )}
       </div>
@@ -2631,6 +2657,10 @@ export default function MarketIntelligenceScreen() {
   // [] = a fetch completed but returned nothing usable (fails open to the existing empty-state
   // sentence, never a broken/blank card list); populated array = the 3 real cards to render.
   const [newsCards, setNewsCards] = useState(null);
+  // FEATURE: CHI-33-patch -- start time of the current/most-recent fetchNewsCards() call, stamped
+  // fresh on every call (mount and every Clear-triggered refire); feeds NewsCardsLoadingLine's
+  // live elapsed timer while newsCards is still null.
+  const [newsCardsStartedAt, setNewsCardsStartedAt] = useState(null);
   // FEATURE: CHI-33 — tracks which card's on-click article fetch is currently in flight (by url),
   // so only that one card shows a loading state, not the whole panel.
   const [newsCardLoadingUrl, setNewsCardLoadingUrl] = useState(null);
@@ -2751,6 +2781,7 @@ export default function MarketIntelligenceScreen() {
   // light up the Agent Routing drawer live, not a new mechanism. Fires once on mount and again on
   // every Clear (onClear below); isStale() guards against a Clear firing mid-fetch from either path.
   const fetchNewsCards = async () => {
+    setNewsCardsStartedAt(Date.now()); // FEATURE: CHI-33-patch -- stamps a fresh start time on every call (mount and every Clear-triggered refire), feeds NewsCardsLoadingLine's elapsed timer.
     const myGeneration = clearGenerationRef.current;
     const isStale = () => clearGenerationRef.current !== myGeneration;
     try {
@@ -2760,11 +2791,15 @@ export default function MarketIntelligenceScreen() {
       });
       if (isStale()) return;
       setNewsCards(Array.isArray(result?.cards) ? result.cards : []);
+      setWorkingStatus(null); // FEATURE: CHI-33-patch -- clear the "Jordan is routing..." status this fetch wrote via onDelegationProgress; every other capability call already does this on completion, this one didn't.
     } catch (e) {
       console.error("[MarketIntelligenceScreen] fetchNewsCards", e.message);
       // Fails open to the existing empty-state sentence (newsCards stays non-null-but-empty),
       // never a broken/blank card list and never a thrown error surfaced to the user.
-      if (!isStale()) setNewsCards([]);
+      if (!isStale()) {
+        setNewsCards([]);
+        setWorkingStatus(null); // FEATURE: CHI-33-patch -- same cleanup on the failure path, so a failed fetch doesn't leave a stuck status either.
+      }
     }
   };
 
@@ -2926,7 +2961,7 @@ export default function MarketIntelligenceScreen() {
     } finally {
       setNewsCardLoadingUrl(null);
     }
-    const visibleMessage = `Can you see if the latest news, ${card.headline}, affects any channel program positioning?`;
+    const visibleMessage = `Does ${card.headline} affect our channel program positioning?`; // FEATURE: CHI-33-patch -- reworded so Marcus's ci-routing-intent classifies this as a direct qa question, not escalate; see kickoff CONTEXT item 2.
     submit(visibleMessage, articleText ? { article_content: articleText, article_source: articleSource } : null);
   };
 
@@ -3208,13 +3243,13 @@ export default function MarketIntelligenceScreen() {
             messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}
             hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
             events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo} onAgentsDrawerOpen={onAgentsDrawerOpen}
-            newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}
+            newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}
