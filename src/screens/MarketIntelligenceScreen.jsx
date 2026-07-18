@@ -1,4 +1,7 @@
-// DeepBench v6.3.45 | MarketIntelligenceScreen.jsx | CHI-14 — Agent Routing drawer's zero-hop empty
+// DeepBench v6.3.60 | MarketIntelligenceScreen.jsx | CHI-30 — reorders the 23 example questions and
+// adds a session-scoped rotation (static "library" question in slot 2; 6-of-10 pool randomizes into
+// slots 1,3-7 on refresh/Clear once the splash has been dismissed this tab session; drawer always 16).
+// (Prior header, kept for history: CHI-14 — Agent Routing drawer's zero-hop empty
 // state de-duplicated: desktop (AuditColumn) carried a stale sentence referencing internal session
 // IDs (S-MARKET-INTEL-01d/03, one already shipped), mobile had already independently drifted to a
 // different, shorter string. Both now render a single shared AGENT_ROUTING_EMPTY_TEXT constant —
@@ -341,36 +344,60 @@ import { PATTERN_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
 
-const EXAMPLE_QUESTIONS = [
-  { id: "clean",  label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
-  { id: "review", label: "Why is our EMEA retail partner's co-op budget utilization so low this quarter?" },
-  { id: "fail",   label: "How is our authorized reseller network performing in Vietnam?" },
+// FEATURE: CHI-30 — static seed question, always slot 2, never rotates.
+const STATIC_QUESTION = { id: "library-catalog", label: "What data is in the library and how can i use it?" };
+
+// FEATURE: CHI-30 — 10-question rotation pool (today's confirmed positions 1, 3-11). On every
+// empty-state render, 6 of these fill visible slots 1, 3-7; the other 4 lead the drawer. Order here
+// is the "default" order used verbatim (via splitRotation(pool, identity)) before the splash has
+// ever been dismissed this tab session.
+const ROTATING_POOL = [
+  { id: "japan-geo",          label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
+  { id: "crest-wireless",      label: "What made Crest Wireless's recent upgrade promotion successful, and can we replicate it with other US partners?" },
+  { id: "geo-revenue",         label: "How has our GEO revenue trended from 2023 to 2025, and which regions are growing fastest?" },
+  { id: "reseller-reqs",       label: "What are the public requirements for a partner to become an Apple Authorized Reseller?" },
+  { id: "upgrade-cycles",      label: "How do smartphone upgrade cycles vary by country, and what does that mean for our channel replenishment planning?" },
+  { id: "at-risk-accounts",    label: "Across all our channel partners globally, which ones are the biggest at-risk accounts this quarter, and why?" },
+  { id: "horizon-store",       label: "Why is Horizon Store in Vietnam so much more ready for our new product introduction than Signal Mobile in Thailand and Indonesia?" },
+  { id: "vitrine-tech",        label: "What's the training compliance gap at Vitrine Tech in Brazil, and what's the risk to their certification?" },
+  { id: "smartphone-growth",   label: "What is the smartphone growth trajectory in emerging markets, and how should that shape our channel investment?" },
+  { id: "coop-mdf-benchmark",  label: "How does our co-op/MDF utilization compare to industry benchmarks?" },
 ];
 
-// FEATURE: MI-60 — the 20 VP-of-Channel-Sales questions drafted/pipeline-tested by the
-// 2026-07-08/09 overnight session (AA-172/AA-173). Same {id, label} shape as EXAMPLE_QUESTIONS.
-const MORE_EXAMPLE_QUESTIONS = [
-  { id: 1,  label: "Why is co-op budget utilization so low for our EMEA large-format retail partner this quarter?" },
-  { id: 2,  label: "What made Crest Wireless's recent upgrade promotion successful, and can we replicate it with other US partners?" },
-  { id: 3,  label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
-  { id: 4,  label: "How is Jinhua Digital recovering after its sales decline in Greater China?" },
-  { id: 5,  label: "What risks should we watch as Elevate Mobility rapidly expands in India?" },
-  { id: 6,  label: "What is Nippo Carrier in Japan doing that makes them our top performer, and how do we scale it to other partners?" },
-  { id: 7,  label: "How is the installment plan program performing with Altiplano Móvil in Mexico?" },
-  { id: 8,  label: "What's the training compliance gap at Vitrine Tech in Brazil, and what's the risk to their certification?" },
-  { id: 9,  label: "Why is Horizon Store in Vietnam so much more ready for our new product introduction than Signal Mobile in Thailand and Indonesia?" },
-  { id: 10, label: "What is our channel strategy outlook for EMEA Emerging markets — India, Middle East, and Africa?" },
-  { id: 11, label: "What is our channel strategy outlook for Latin America this year?" },
-  { id: 12, label: "What is our channel strategy outlook for Southeast Asia?" },
-  { id: 13, label: "How does our co-op/MDF utilization compare to industry benchmarks?" },
-  { id: 14, label: "How does our partner training and turnover rate compare to industry benchmarks?" },
-  { id: 15, label: "What is the smartphone growth trajectory in emerging markets, and how should that shape our channel investment?" },
-  { id: 16, label: "How has our GEO revenue trended from 2023 to 2025, and which regions are growing fastest?" },
-  { id: 17, label: "What are the public requirements for a partner to become an Apple Authorized Reseller?" },
-  { id: 18, label: "How do smartphone upgrade cycles vary by country, and what does that mean for our channel replenishment planning?" },
-  { id: 19, label: "Across all our channel partners globally, which ones are the biggest at-risk accounts this quarter, and why?" },
-  { id: 20, label: "What is our co-op utilization rate for our partner in South Korea?" },
+// FEATURE: CHI-30 — fixed drawer tail (today's confirmed positions 12-23). Never rotates, never
+// reorders — always the last 12 questions in the drawer beneath whichever 4 pool leftovers lead it.
+const FIXED_DRAWER_TAIL = [
+  { id: "vietnam-reseller",             label: "How is our authorized reseller network performing in Vietnam?" },
+  { id: "meridian-electronics",         label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
+  { id: "emea-coop-large-format",       label: "Why is co-op budget utilization so low for our EMEA large-format retail partner this quarter?" },
+  { id: "jinhua-digital",               label: "How is Jinhua Digital recovering after its sales decline in Greater China?" },
+  { id: "elevate-mobility",             label: "What risks should we watch as Elevate Mobility rapidly expands in India?" },
+  { id: "nippo-carrier",                label: "What is Nippo Carrier in Japan doing that makes them our top performer, and how do we scale it to other partners?" },
+  { id: "altiplano-movil",              label: "How is the installment plan program performing with Altiplano Móvil in Mexico?" },
+  { id: "emea-emerging",                label: "What is our channel strategy outlook for EMEA Emerging markets — India, Middle East, and Africa?" },
+  { id: "southeast-asia",               label: "What is our channel strategy outlook for Southeast Asia?" },
+  { id: "training-turnover-benchmark",  label: "How does our partner training and turnover rate compare to industry benchmarks?" },
+  { id: "latin-america",                label: "What is our channel strategy outlook for Latin America this year?" },
+  { id: "south-korea-coop",             label: "What is our co-op utilization rate for our partner in South Korea?" },
 ];
+
+// FEATURE: CHI-30 — pure, testable split: shuffleFn is injected so both branches (deterministic
+// default vs. real rotation) share one code path. arr => arr (identity) produces the default split;
+// shuffleArray produces the rotated split.
+function splitRotation(pool, shuffleFn) {
+  const shuffled = shuffleFn(pool);
+  return { picks: shuffled.slice(0, 6), leftover: shuffled.slice(6) };
+}
+
+// FEATURE: CHI-30 — Fisher-Yates, pure aside from Math.random.
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const ESCALATE_PLACEHOLDER =
   `That reads as an "escalate" request. Escalating for deeper research ships in a future build — ask a direct question, or run a Theory/Forecast/Correct for now.`;
@@ -2199,6 +2226,30 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
   const [input, setInput] = useState("");
   const scrollRef = useRef(null);
 
+  // FEATURE: CHI-30 — reuses WelcomeSplash.jsx's existing sessionStorage flag (read-only, no new
+  // key): unset means this is the user's genuine first load this tab session (splash showing) —
+  // deterministic default. Already set means a later refresh in this same tab, or Clear (which can
+  // only be reached after the splash was already dismissed) — always randomize.
+  const [rotation, setRotation] = useState(() => {
+    const seenSplash = typeof sessionStorage !== "undefined" && sessionStorage.getItem("db_splash_dismissed");
+    return seenSplash ? splitRotation(ROTATING_POOL, shuffleArray) : splitRotation(ROTATING_POOL, arr => arr);
+  });
+  // FEATURE: CHI-30 — re-rolls only on the >0-to-0 transition (a real Clear), not on every render
+  // while messages stays empty, and not redundantly on the initial mount (already handled above).
+  const prevMessageCountRef = useRef(messages.length);
+  useEffect(() => {
+    if (prevMessageCountRef.current > 0 && messages.length === 0) {
+      setRotation(splitRotation(ROTATING_POOL, shuffleArray));
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
+  const visibleQuestions = [
+    rotation.picks[0], STATIC_QUESTION, rotation.picks[1], rotation.picks[2],
+    rotation.picks[3], rotation.picks[4], rotation.picks[5],
+  ];
+  const drawerQuestions = [...rotation.leftover, ...FIXED_DRAWER_TAIL];
+
   // FEATURE: MI-64 — tracks whether the user has manually scrolled away from the bottom, same
   // pattern as FetchContext.jsx's fetchUserScrolledRef/scrollToLatest (Agent Fetch feed) — auto-scroll
   // below respects this so a user reading earlier history isn't yanked back down.
@@ -2234,7 +2285,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             of these:
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {EXAMPLE_QUESTIONS.map(q => (
+            {visibleQuestions.map(q => (
               <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
                 style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
                 {q.label}
@@ -2242,10 +2293,10 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             ))}
           </div>
           <div style={{marginTop:8}}>
-            {/* FEATURE: MI-60 — 4th seed box, collapsed by default, capped/scrolling internally */}
-            <Drawer title="Browse 20 more example questions" count={MORE_EXAMPLE_QUESTIONS.length} maxHeight={220}>
+            {/* FEATURE: CHI-30 — drawer count is always 16 (4 rotation leftovers + fixed 12-tail) */}
+            <Drawer title={`Browse ${drawerQuestions.length} more example questions`} count={drawerQuestions.length} maxHeight={220}>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {MORE_EXAMPLE_QUESTIONS.map(q => (
+                {drawerQuestions.map(q => (
                   <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
                     style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
                     {q.label}
@@ -2283,6 +2334,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
       <div style={{background:"#fffdf8",border:`1px solid ${T.line}`,borderRadius:3,position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight: noMinHeight ? 0 : 420}}>
         <Corners/>
         <FeatureBadge id="MI-64"/>
+        <FeatureBadge id="CHI-30"/>
         <div style={{padding:"13px 16px",borderBottom:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
           <div>
