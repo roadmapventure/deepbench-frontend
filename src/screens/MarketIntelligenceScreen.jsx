@@ -1578,7 +1578,16 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           (padding, border, position as the flex column's last child) — it remains locked to the
           card's bottom regardless of content length; only the separation from the content above it
           is new. */}
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14,position:"relative"}}>
+      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14}}>
+        {/* FEATURE: CHI-29 — third patch (S-CHI-26d): dedicated position:"relative" wrapper around just
+            the scroll body + fade, separate from the footer. The original CHI-29 task put position:
+            "relative" on this outer card instead (which also contains the footer as a sibling) -- since
+            absolute+bottom:0 resolves against the NEAREST positioned ancestor, the fade was gluing itself
+            to the bottom of the whole card (behind the footer) instead of the scroll body's own visible
+            edge. This wrapper's bounds exactly match the scroll body's own rendered box (same flex:1/
+            minHeight:0 sizing, zero added padding/margin), so the fade now correctly overlays the scroll
+            body's own bottom edge, sitting above the footer where it belongs. */}
+        <div style={{position:"relative",display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
         {/* FEATURE: CHI-18 — padding-bottom dropped to 0: the narrative card above now stretches
             (flex:1, Task 1) to fill this box, so its own trailing padding would otherwise stack on
             top of the outer card's structural 14px gap to the footer (30px total measured, more
@@ -1736,6 +1745,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         )}
         </div>
         <ScrollFadeHint show={evidenceCanScrollMore} bg={T.cardAlt}/>
+        </div>
         {footerKind && (
           <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,position:"relative"}}>
             <FeatureBadge id="CHI-13"/>
