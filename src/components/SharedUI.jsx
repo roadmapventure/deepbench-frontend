@@ -412,6 +412,18 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
 // Caller supplies its own ref to the scrolling element; the returned onScroll goes on that same
 // element; ScrollFadeHint renders as an absolutely-positioned sibling inside a position:"relative"
 // ancestor whose bounds match the visible scroll viewport.
+// FEATURE: CHI-29 — second patch (S-CHI-26c): the original deps-only recheck was accidentally
+// coupled to how often the CALLER's deps array changes, not to the scrolling content's real size.
+// Works for the mobile Agent Routing feed (deps=[ordered.length] churns constantly as hops arrive)
+// but silently never recovers for a single atomic content change (Column 2's deps=[qaEvidence,
+// hypFlow], set once when an answer arrives) if the browser's layout isn't fully settled at that
+// exact instant (e.g. a webfont swap reflowing prose/table text after first paint). Fixed by making
+// the hook observe the scrolling element's actual content for changes, instead of trusting the
+// caller's deps array alone: a MutationObserver on the scroll container (catches new/changed DOM
+// content, e.g. QaEvidenceCard mounting) plus a document.fonts.ready hook (catches webfont-driven
+// reflow specifically) both re-run the same check(). deps is kept only to re-attach the observer
+// when the scrollRef's target element itself is swapped out (rare, but matches the original
+// contract) -- it is no longer the only thing that can trigger a recheck.
 export function useScrollFadeHint(scrollRef, deps) {
   const [canScrollMore, setCanScrollMore] = useState(false);
   const check = () => {
@@ -419,7 +431,16 @@ export function useScrollFadeHint(scrollRef, deps) {
     if (!el) return;
     setCanScrollMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
   };
-  useEffect(() => { check(); }, deps);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    document.fonts?.ready?.then(check);
+    return () => mo.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
   return { canScrollMore, onScroll: check };
 }
 
