@@ -184,7 +184,18 @@ function getSupabaseHeaders(key) {
 // completing in 33.4s had two entirely unlogged gaps (Marcus's own two turns) accounting for
 // ~16.5s of that total -- the same blind spot AA-120's incident report described as "a hop AA-118
 // never touched." Generic to every capability's own turns, not capability-specific.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id }) {
+// FEATURE: HAR-05 -- usedWebSearch is a new optional param, same mechanical-only contract as
+// request-receivable.js's sendRequest() detection (ARCHITECTURE.md §19i): true only when THIS
+// turn's own raw Anthropic response actually contains a server_tool_use/web_search block, never
+// inferred from enableWebSearch being offered. Needed because a delegating turn (e.g. Jordan
+// Ellsworth's ws-news-search-intent, which always ends in delegate_to_agent, never a final
+// sendRequest() call) would otherwise have its real web_search tool-use invisible to the AI Audit
+// entirely -- sendRequest()'s own detection only ever sees a capability's FINAL, non-delegating
+// turn. Found live during this session's own Category L verification (a real Jordan->Alex run
+// showed zero 'tool-use' pattern logged for Jordan's own turn) -- fixed here rather than left as a
+// known gap, since it directly contradicts this session's own AI PATTERN CHECK requirement that
+// Jordan's web_search call be logged mechanically. Unset (every existing caller) is byte-identical.
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false }) {
   logActivity({
     tenantId: tenant_id || 'global',
     agentId: agent_id || null,
@@ -196,6 +207,7 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     outputTokens: output_tokens ?? null,
     patternsUsed: Array.from(new Set([
       ...(is_delegate_call ? ['agent-delegation'] : []),
+      ...(usedWebSearch ? ['tool-use'] : []),
       ...intent_technical_services,
     ])),
     traceId: trace_id,
@@ -519,6 +531,14 @@ async function dispatchDelegation({
 // job_id: row.id) share this one implementation. No second copy of the loop logic anywhere.
 async function runLoop({
   capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+  // FEATURE: HAR-05 -- enableWebSearch threaded through runLoop() the same explicit-param way
+  // canRequestHelp already is (read from promptRequest in runCapability(), below -- ai-enrichment.js
+  // drops unknown fields from `enriched`, same reason canRequestHelp can't be read from there either).
+  // Not persisted to durable_hops (no new column this session) -- same accepted-gap precedent as
+  // requiresHumanConfirmation/critique*/display_agent_* below: a resumed chain runs without this
+  // flag, matching AA-138's proven scope. A single web-search-then-delegate hop is not expected to
+  // ever hit the checkpoint/resume path in practice.
+  enableWebSearch = false,
   delegationRequired,
   requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
   display_agent_id, display_agent_card,
@@ -558,9 +578,17 @@ async function runLoop({
       temperature: enriched.llm.temperature,
       format_contract: enriched.format_contract,
       canRequestHelp,
+      enableWebSearch,
       conversation_history: conversationHistory,
       deadline,
     });
+    // FEATURE: HAR-05 -- same mechanical-only shape as request-receivable.js's sendRequest()
+    // detection: only true when this turn's own raw response actually contains a server-executed
+    // web_search block. See logAgentTurn()'s own comment for why this call site needs its own
+    // detection rather than relying on sendRequest()'s (a delegating turn never reaches sendRequest()).
+    const turnUsedWebSearch = (turn.raw_content || []).some(
+      b => (b.type === 'server_tool_use' && b.name === 'web_search') || b.type === 'web_search_tool_result'
+    );
     logAgentTurn({
       capability_slug, intent_slug, agent_id, tenant_id,
       model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
@@ -569,6 +597,7 @@ async function runLoop({
       output_tokens: turn.usage?.output_tokens ?? null,
       intent_technical_services: enriched.intent_technical_services || [],
       trace_id,
+      usedWebSearch: turnUsedWebSearch,
     });
 
     if (!turn.is_delegate_call) {
@@ -781,6 +810,8 @@ export async function runCapability({
   // (db-assembly's raw output), never from `enriched` -- same reason the old `delegates` field
   // bypassed it: ai-enrichment.js rebuilds its own return object and drops unknown fields.
   const canRequestHelp = promptRequest.canRequestHelp === true;
+  // FEATURE: HAR-05 -- same read-from-promptRequest reasoning as canRequestHelp directly above.
+  const enableWebSearch = promptRequest.enableWebSearch === true;
   const delegationRequired = promptRequest.delegationRequired === true;
   const requiresHumanConfirmation = promptRequest.requiresHumanConfirmation === true;
   const critiqueCapabilitySlug = promptRequest.critiqueCapabilitySlug || null;
@@ -794,6 +825,7 @@ export async function runCapability({
   try {
     return await runLoop({
       capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+      enableWebSearch,
       delegationRequired,
       requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
       display_agent_id, display_agent_card,

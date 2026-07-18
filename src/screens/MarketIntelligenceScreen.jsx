@@ -1090,11 +1090,15 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // FEATURE: CHI-23 — hop numbers are no longer computed inside this function; the outer call site
 // now reads the gold currentHopCount() directly, before the turn starts and after every one of the
 // turn's events (including any the caller logs after this function returns) has posted.
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
+// FEATURE: CHI-33 — backgroundContext is an optional extra object (article_content/article_source
+// from a news-card click, api/fetch-article.js) spread into this call's task_context only, never
+// into the visible chat bubble (that's built separately by the caller, submit() below, from the
+// plain confirmed question text). Unset (every existing caller) is byte-identical.
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null) {
   let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
+    task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale,
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
   onEvent(buildHopEvent("qa_answer", "marcus", qa, Date.now() - t0));
@@ -1210,7 +1214,10 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   };
 }
 
-async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
+// FEATURE: CHI-33 — backgroundContext threaded straight through to runQaWithQualityGate() below,
+// never applied to the routing call above (routing only ever needs the plain question text to
+// classify intent). Unset (every existing caller) is byte-identical.
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null) {
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
@@ -1224,7 +1231,7 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext);
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -1497,6 +1504,23 @@ function getEvidencePanelSentence(hypFlow) {
   return `${label} — Data for you to interact with your chat...`;
 }
 
+// FEATURE: CHI-33 — Column 2 news card, true-empty-state only. Reuses EvidenceColumn's existing
+// card visual language (T.cardAlt background, T.lineSoft border, mono/body font tokens already in
+// scope in this file) -- no new colors, no new border styles, no new spacing scale, per this
+// session's DESIGN RULES. String-safe: headline/snippet/source may be absent on a malformed card,
+// JSX simply renders nothing for an undefined child rather than throwing.
+function NewsCard({ card, loading, onClick }) {
+  return (
+    <div onClick={onClick} style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",cursor:"pointer",opacity:loading?0.6:1}}>
+      <div style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink,marginBottom:3}}>{card?.headline}</div>
+      {card?.snippet && <div style={{fontFamily:body,fontSize:11,color:T.muted,lineHeight:1.4,marginBottom:5}}>{card.snippet}</div>}
+      <div style={{fontFamily:mono,fontSize:9.5,color:T.mutedDeep,textTransform:"uppercase",letterSpacing:"0.04em"}}>
+        {card?.source}{loading ? " · Loading…" : ""}
+      </div>
+    </div>
+  );
+}
+
 // FEATURE: CHI-13 — single source of truth for which decision (if any) is currently pending in
 // Evidence, so exactly one footer renders at a time, pinned to the bottom of the card instead of
 // wherever it happens to land in scroll flow. Priority order: confirmation > hypothesis result >
@@ -1509,7 +1533,7 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
   return null;
 }
 
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview }) {
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1544,18 +1568,37 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     // state. STYLE-GUIDE.md §19's shared taxonomy still has 2 other real render sites
     // (Pipeline Log confidence_tier summary, Data Sources drawer) — describeDataType() itself
     // is unchanged and still imported/used there.
+    // FEATURE: CHI-33 — while newsCards is null (still loading) or [] (a fetch completed but
+    // returned nothing usable), this branch renders exactly what it did before this session,
+    // unchanged. The instant newsCards is populated (non-null, real items), it renders the 3 news
+    // cards + a new header line instead. getEvidencePanelSentence() itself is unchanged — it still
+    // applies to its original real-chat-answer case; only this true-empty-state render path forks.
+    const hasNewsCards = !!(newsCards && newsCards.length > 0);
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
         <FeatureBadge id="MI-59"/>
         <FeatureBadge id="CHI-26"/>
+        <FeatureBadge id="CHI-33"/>
         {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" (Task 4 rename,
             since review/resolve actions moved here too, not just read-only content). */}
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
-        <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
-          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-            {getEvidencePanelSentence(null)}
+        {hasNewsCards ? (
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:10}}>
+              Today's top channel sales news. Select if you need analysis...
+            </div>
+            {newsCards.map((card, i) => (
+              <NewsCard key={card?.url || i} card={card} loading={!!card?.url && newsCardLoadingUrl === card.url}
+                onClick={() => onAnalyzeNewsCard && onAnalyzeNewsCard(card)}/>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
+            <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
+              {getEvidencePanelSentence(null)}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2389,7 +2432,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen }) {
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl }) {
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -2400,7 +2443,16 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   // that this gate/flash logic was completely unaware of. Every use of the old hasActiveFlow below
   // (tab-enabled gate, auto-switch-to-evidence trigger, flash-dot gate, selectTab's own gate) is
   // renamed to this corrected name.
-  const hasEvidenceContent = !!qaEvidence || !!hypFlow;
+  // FEATURE: CHI-33 — mobile parity gap, found during this session's Architect Review: newsCards
+  // was not accounted for here, so on mobile the Evidence & Interaction tab would stay
+  // disabled/non-flashing even after news cards load, since neither qaEvidence nor hypFlow would be
+  // set yet on a fresh page load. Deliberate choice (Tier 2, flagged clearly): this enables + flashes
+  // the tab once cards load, consistent with how a plain qaEvidence-only answer is already treated —
+  // it does NOT auto-switch mobile to the Evidence tab on load (the auto-switch effect below is keyed
+  // off hasEvidenceContent transitioning false->true from a user-initiated flow start; auto-switching
+  // away from Chat before the user has done anything on a fresh page load would be a UX change beyond
+  // what was asked).
+  const hasEvidenceContent = !!qaEvidence || !!hypFlow || !!(newsCards && newsCards.length);
   const ordered = [...events].reverse();
 
   const prevMsgCount = useRef(messages.length);
@@ -2413,30 +2465,42 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   // qaEvidence (never starting a hypothesis flow) never flashed/enabled the Evidence tab. Now also
   // flags unseen content the moment qaEvidence itself changes (a new answer landing), independent
   // of whether hypFlow exists at all.
+  // FEATURE: CHI-33 — also flags unseen content the moment newsCards goes from not-yet-loaded to
+  // populated (a real newsCards.length change), so the tab flashes once cards land on a fresh page
+  // load (Manual QA checklist item 8) -- tracked separately from the auto-switch effect below, which
+  // deliberately does NOT react to newsCards.
   const prevStage = useRef(hypFlow?.stage);
   const prevQaEvidence = useRef(qaEvidence);
+  const prevNewsCardsLen = useRef(newsCards ? newsCards.length : 0);
   useEffect(() => {
-    if ((qaEvidence !== prevQaEvidence.current || (hypFlow && hypFlow.stage !== prevStage.current)) && mobileTab !== "evidence") {
+    const newsCardsLen = newsCards ? newsCards.length : 0;
+    if ((qaEvidence !== prevQaEvidence.current || (hypFlow && hypFlow.stage !== prevStage.current) || newsCardsLen !== prevNewsCardsLen.current) && mobileTab !== "evidence") {
       setEvidenceUnseen(true);
     }
     prevQaEvidence.current = qaEvidence;
     prevStage.current = hypFlow?.stage;
-  }, [qaEvidence, hypFlow?.stage, mobileTab]);
+    prevNewsCardsLen.current = newsCardsLen;
+  }, [qaEvidence, hypFlow?.stage, newsCards, mobileTab]);
 
   // FEATURE: MI-51 — Evidence auto-activates (switches to the active tab) the moment a theory flow
-  // starts (hasEvidenceContent false -> true, i.e. right when the user clicks "Have Priya... generate a
+  // starts (hasFlowContent false -> true, i.e. right when the user clicks "Have Priya... generate a
   // few theories ->"), so the live elapsed/expect status strip is immediately visible without an
   // extra manual tap. This is a one-time switch at flow start, not on every stage change — the user
   // can freely navigate back to Chat mid-generation (status strip stays visible either way, Evidence
   // flashes via the effect above once new content is ready).
-  const prevHasFlow = useRef(hasEvidenceContent);
+  // FEATURE: CHI-33 — deliberately keyed on hasFlowContent (qaEvidence/hypFlow only), NOT the
+  // combined hasEvidenceContent used for tab-enable/flash above -- a fresh page load's cards
+  // arriving must enable + flash the tab (handled above) without ever auto-navigating the user away
+  // from Chat before they've done anything themselves (kickoff's explicit scope boundary).
+  const hasFlowContent = !!qaEvidence || !!hypFlow;
+  const prevHasFlow = useRef(hasFlowContent);
   useEffect(() => {
-    if (hasEvidenceContent && !prevHasFlow.current) {
+    if (hasFlowContent && !prevHasFlow.current) {
       setMobileTab("evidence");
       setEvidenceUnseen(false);
     }
-    prevHasFlow.current = hasEvidenceContent;
-  }, [hasEvidenceContent]);
+    prevHasFlow.current = hasFlowContent;
+  }, [hasFlowContent]);
 
   const selectTab = (tab) => {
     if (tab === "evidence" && !hasEvidenceContent) return;
@@ -2485,7 +2549,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={onAnalyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}/>
           </div>
         )}
       </div>
@@ -2563,6 +2627,13 @@ export default function MarketIntelligenceScreen() {
   // live in Evidence — hypFlow alone can't carry it, since it may never exist). Cleared only by
   // onClear() below, not replaced by a new hypFlow.
   const [qaEvidence, setQaEvidence] = useState(null);
+  // FEATURE: CHI-33 — Column 2 live news feed. null = still loading (or not yet fetched);
+  // [] = a fetch completed but returned nothing usable (fails open to the existing empty-state
+  // sentence, never a broken/blank card list); populated array = the 3 real cards to render.
+  const [newsCards, setNewsCards] = useState(null);
+  // FEATURE: CHI-33 — tracks which card's on-click article fetch is currently in flight (by url),
+  // so only that one card shows a loading state, not the whole panel.
+  const [newsCardLoadingUrl, setNewsCardLoadingUrl] = useState(null);
   const [pipelineEvents, setPipelineEvents] = useState([]);
   // FEATURE: CHI-03c — mirrors pipelineEvents synchronously (updated inside logEvent's own
   // setPipelineEvents updater, same tick) so hopStart/hopEnd capture inside the async
@@ -2593,6 +2664,8 @@ export default function MarketIntelligenceScreen() {
     setPipelineEvents([]); // FEATURE: CHI-04 — Agent Routing (Column 3) now resets with everything else
     pipelineEventsRef.current = []; // FEATURE: CHI-03c — must reset alongside setPipelineEvents([]) above, or the hop-count ref stays stale and the next question's hop badges start from the wrong number
     pendingDelegationsRef.current = new Map(); // FEATURE: CHI-04 — stale pending-delegation markers would otherwise mis-target a future event once ids restart from 0
+    setNewsCards(null); // FEATURE: CHI-33 — back to the loading/default empty-state sentence until the refetch below lands
+    fetchNewsCards(); // FEATURE: CHI-33 — refire on Clear, same as a fresh page load
   };
 
   // FEATURE: MI-42 -- one shared status-setter for both MI-41's macro-hop swaps (explicit calls
@@ -2672,6 +2745,36 @@ export default function MarketIntelligenceScreen() {
     logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, null, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
+  // FEATURE: CHI-33 — Column 2 live news feed. Jordan Ellsworth (web-search-news) real-delegates
+  // to Alex Reeves (screen-controls/news-cards-format) via the ordinary harness delegation loop —
+  // onProgress: onDelegationProgress is the same wiring every other capability call already uses to
+  // light up the Agent Routing drawer live, not a new mechanism. Fires once on mount and again on
+  // every Clear (onClear below); isStale() guards against a Clear firing mid-fetch from either path.
+  const fetchNewsCards = async () => {
+    const myGeneration = clearGenerationRef.current;
+    const isStale = () => clearGenerationRef.current !== myGeneration;
+    try {
+      const result = await callCapability({
+        capability_slug: "web-search-news", intent_slug: "ws-news-search-intent", agent_id: "jordan",
+        task_context: {}, onProgress: onDelegationProgress, isStale,
+      });
+      if (isStale()) return;
+      setNewsCards(Array.isArray(result?.cards) ? result.cards : []);
+    } catch (e) {
+      console.error("[MarketIntelligenceScreen] fetchNewsCards", e.message);
+      // Fails open to the existing empty-state sentence (newsCards stays non-null-but-empty),
+      // never a broken/blank card list and never a thrown error surfaced to the user.
+      if (!isStale()) setNewsCards([]);
+    }
+  };
+
+  // FEATURE: CHI-33 — fires once on mount. Deliberately empty dependency array: this is a
+  // fresh-page-load-only trigger, refire-on-Clear is handled separately inside onClear() above.
+  useEffect(() => {
+    fetchNewsCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const conversationContext = () =>
     messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
 
@@ -2707,7 +2810,10 @@ export default function MarketIntelligenceScreen() {
     }
   };
 
-  const submit = async (text) => {
+  // FEATURE: CHI-33 — backgroundContext is an optional second param (analyzeNewsCard() below is the
+  // only caller that passes it). setMessages keeps using only `clean` (the visible chat bubble text)
+  // -- backgroundContext never reaches the chat bubble, only runIntentPipeline()'s task_context.
+  const submit = async (text, backgroundContext = null) => {
     const clean = (text || "").trim();
     if (!clean || loading) return;
     setMessages(prev => [...prev, buildMessage({ role: "user", text: clean })]);
@@ -2740,7 +2846,7 @@ export default function MarketIntelligenceScreen() {
             return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
           });
         }
-      }, setStatus, onProgress, isStale); // FEATURE: CHI-23 — getHopCount param removed, no longer threaded through
+      }, setStatus, onProgress, isStale, backgroundContext); // FEATURE: CHI-23 — getHopCount param removed, no longer threaded through. FEATURE: CHI-33 — backgroundContext threaded through
       if (isStale()) return; // FEATURE: CHI-04 — Clear fired while this question was in flight; discard silently (finally still runs, harmlessly re-sets already-null loading/workingStatus)
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
@@ -2789,6 +2895,39 @@ export default function MarketIntelligenceScreen() {
       setLoading(false);
       setWorkingStatus(null);
     }
+  };
+
+  // FEATURE: CHI-33 — card click -> chat. Fetches the full article first (background context,
+  // never shown in the chat bubble), then submits the exact confirmed visible question text.
+  // String-safe: a card with no url (Category C) shows an error message instead of throwing or
+  // silently submitting with no context.
+  const analyzeNewsCard = async (card) => {
+    if (!card || typeof card.url !== "string" || !card.url) {
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "That story doesn't have a link to analyze." })]);
+      return;
+    }
+    setNewsCardLoadingUrl(card.url);
+    let articleText = null, articleSource = null;
+    try {
+      const res = await fetch("/api/fetch-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: card.url }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        articleText = data.text || null;
+        articleSource = data.source || null;
+      } else {
+        console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article failed:", res.status);
+      }
+    } catch (e) {
+      console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article", e.message);
+    } finally {
+      setNewsCardLoadingUrl(null);
+    }
+    const visibleMessage = `Can you see if the latest news, ${card.headline}, affects any channel program positioning?`;
+    submit(visibleMessage, articleText ? { article_content: articleText, article_source: articleSource } : null);
   };
 
   // FEATURE: CHI-03a — onGoodThanks/onReview now operate on qaEvidence directly (were
@@ -3069,12 +3208,13 @@ export default function MarketIntelligenceScreen() {
             messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear}
             hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
             events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo} onAgentsDrawerOpen={onAgentsDrawerOpen}
+            newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}

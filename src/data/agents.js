@@ -254,6 +254,19 @@ export const AGENTS = [
     color: T.navy,
     benchGroups: ["mi"],
   },
+  // FEATURE: AGT-026 — Jordan Ellsworth (CI-07) Web Search Expert
+  {
+    id: "jordan", name: "Jordan Ellsworth", role: "Web Search Expert",
+    code: "CI-07", hiredOn: "Jul 2026", trainer: "RMV", arch: "Tool Use + Web Search",
+    specialty: "Live Trade-Press Research · Channel & Competitor News · Source Verification",
+    salary: 95000, value: 110000, hourly: 50, reportHrs: 1, reportCost: 50,
+    docs: 0, classes: 0, chunks: 0, skill: 74, situational: 40,
+    trainable: true, trainableBy: "RMV",
+    revenueModel: "Per-report",
+    quip: `"If it's not in the search results yet, it's not news yet."`,
+    color: T.moss,
+    benchGroups: ["mi"],
+  },
 ];
 
 // FEATURE: RO-10 — Bench screen category filter definitions. "all" is not
@@ -295,6 +308,8 @@ export const AVATAR_CFG = {
   owen:   { skin:"#e0c2a0", hair:"#5a4a3a", collar:"#2a2a3a", extra:"glasses", border:T.brass },
   sam:    { skin:"#d8b088", hair:"#3a2a1a", collar:"#2a3a52", extra:"",        border:T.brass },
   elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
+  // FEATURE: AGT-026 — Jordan Ellsworth avatar
+  jordan: { skin:"#d0a888", hair:"#3a2e24", collar:"#1e3a44", extra:"headset", border:T.moss },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -325,6 +340,8 @@ export const AGENT_PRONOUNS = {
   owen:   { subject:"he",   object:"him",  possessive:"his"   },
   sam:    { subject:"they", object:"them", possessive:"their" },
   elena:  { subject:"she",  object:"her",  possessive:"her"   },
+  // FEATURE: AGT-026 — Jordan Ellsworth pronouns
+  jordan: { subject:"he", object:"him", possessive:"his" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────

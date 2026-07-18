@@ -60,13 +60,17 @@ const DELEGATE_TO_AGENT_TOOL = {
 // FEATURE: AA-154 -- optional temperature param, included in both returned shapes only when
 // defined. Omitting the key for every unset caller preserves Anthropic's own default (1.0) --
 // no behavior change for any capability that doesn't set it.
-function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, conversation_history = [] }) {
+// FEATURE: HAR-05 -- enableWebSearch is a new optional param, same opt-in shape as
+// canRequestHelp directly above. Omitted (or false) for every existing caller is
+// byte-identical: webSearchTool = [], tools array unchanged.
+export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
-  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
+  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search' }] : [];
+  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
 
   if (tools.length === 0) {
     return {
@@ -180,7 +184,7 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
 // 55s window computed at this exact call, byte-identical. execute.js's runLoop() (AA-139) passes
 // its own already-computed deadline through here so this call's internal Anthropic request(s) are
 // bounded by real remaining budget, not a blind fixed constant.
-export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, conversation_history = [], deadline = null }) {
+export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, conversation_history = [], deadline = null }) {
   const effectiveDeadline = deadline || (Date.now() + 55000);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -191,10 +195,11 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
-  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools];
+  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search' }] : [];
+  const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const hasSchemaTool = !!schemaTool;
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, conversation_history });
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
@@ -331,7 +336,10 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   // below, Section 5/STEP 5). intent_technical_services is still destructured (harmless, currently
   // unused downstream after this session -- db-assembly.js's own separate technical_services read,
   // used to trigger REFLECT inclusion, is untouched and unaffected).
-  const { task_id, sections, system_prompt, format_contract, llm, intent_technical_services = [], debug: enrichDebug = {} } = prompt_request || {};
+  // FEATURE: HAR-05 -- enableWebSearch read directly off prompt_request, same shape as every
+  // other top-level flag already destructured here (format_contract, llm). Unset for every
+  // existing caller -- byte-identical.
+  const { task_id, sections, system_prompt, format_contract, llm, enableWebSearch = false, intent_technical_services = [], debug: enrichDebug = {} } = prompt_request || {};
 
   if (!format_contract) {
     throw new Error('format_contract required');
@@ -373,19 +381,34 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   // FEATURE: AA-80 — precomputed_turn lets execute.js's loop skip a duplicate model call when
   // it already has the final turn's parsed output. Every existing caller omits this param and
   // gets the exact original single-call, single-attempt-then-retry-once behavior, unchanged.
-  let parsedResponse, usage, retryCount;
+  let parsedResponse, usage, retryCount, rawContent;
   if (precomputed_turn) {
     parsedResponse = precomputed_turn.tool_input;
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
+    rawContent = precomputed_turn.raw_content || [];
   } else {
     // FEATURE: HAR-04 -- deadline passed through unchanged; callModel() applies its own
     // Date.now() + 55000 default when this is null (every non-opted-in caller, unaffected).
-    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, conversation_history: [], deadline });
+    // FEATURE: HAR-05 -- enableWebSearch threaded the same way canRequestHelp already would be
+    // (this path never threads canRequestHelp either -- every existing non-precomputed caller of
+    // sendRequest(), api/plan.js and confirmation.js, has no delegation flow). Unset (every
+    // existing caller) is byte-identical.
+    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, conversation_history: [], deadline });
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;
+    rawContent = turn.raw_content || [];
   }
+
+  // FEATURE: HAR-05 -- mechanical pattern detection (ARCHITECTURE.md §19i). Only true when the
+  // Anthropic response actually contains a server-executed web_search block -- never inferred
+  // from enableWebSearch being true on the request alone. Anthropic's web_search tool surfaces as
+  // a `server_tool_use` block (name: 'web_search') and/or a paired `web_search_tool_result` block;
+  // checked defensively for both since the exact live shape can vary slightly by API version.
+  const usedWebSearch = rawContent.some(
+    b => (b.type === 'server_tool_use' && b.name === 'web_search') || b.type === 'web_search_tool_result'
+  );
 
   // ── STEP 2: Guardrails (PAT-13) ─────────────────────────────────────────────
   let guardrailsRan = false;
@@ -507,6 +530,8 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     ...buildPatternsUsed(isJson, guardrailsRan, delegation_occurred, enrichDebug.rag_retrieved === true),
     ...(enrichDebug.reflect_ran ? ['reflect'] : []),
     ...(enrichDebug.synthesis_ran ? ['intelligent-synthesis'] : []),
+    // FEATURE: HAR-05 -- mechanical only, set above from the real Anthropic response shape.
+    ...(usedWebSearch ? ['tool-use'] : []),
   ]));
   const latency_ms = Date.now() - startTime;
 

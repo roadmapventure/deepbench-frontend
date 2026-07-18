@@ -34,6 +34,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   let formatContract = { ...DEFAULT_FORMAT_CONTRACT };
   let llm = { ...DEFAULT_LLM };
   let canRequestHelp = false;
+  let enableWebSearch = false;
   let delegationRequired = false;
   let requiresHumanConfirmation = false;
   let critiqueCapabilitySlug = null;
@@ -174,6 +175,14 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
         if (traits.can_request_help === true) {
           canRequestHelp = true;
         }
+        // FEATURE: HAR-05 -- enable_web_search passthrough, same gate/shape as can_request_help
+        // directly above. Attaches Anthropic's web_search tool to this call only. Mechanical
+        // pattern detection happens in request-receivable.js, never from this declaration alone
+        // (ARCHITECTURE.md §19i -- a Skill Profile field may never be the sole source of a
+        // logged pattern).
+        if (traits.enable_web_search === true) {
+          enableWebSearch = true;
+        }
         // FEATURE: AA-142 -- delegation_required passthrough, same shape as can_request_help
         // directly above. Marks an intent whose entire job is completing a hand-off via
         // request_help/delegate_to_agent -- never a legitimate direct-text answer (unlike e.g.
@@ -283,7 +292,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
 
-  return { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices };
+  return { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices };
 }
 
 function buildLabel(typeSlug, name) {
@@ -320,6 +329,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       synthesis: DEFAULT_SYNTHESIS,
       llm: DEFAULT_LLM,
       canRequestHelp: false,
+      enableWebSearch: false,
       delegationRequired: false,
       requiresHumanConfirmation: false,
       critiqueCapabilitySlug: null,
@@ -450,7 +460,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used
@@ -557,6 +567,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     synthesis,
     llm,
     canRequestHelp,
+    enableWebSearch,
     delegationRequired,
     requiresHumanConfirmation,
     critiqueCapabilitySlug,

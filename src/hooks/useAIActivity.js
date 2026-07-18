@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
-import { PATTERN_CATALOG, SERVICE_CATALOG } from '../../shared/ai-patterns.js';
+import { PATTERN_CATALOG, SERVICE_CATALOG, SERVICE_SLUG } from '../../shared/ai-patterns.js';
 export { PATTERN_CATALOG, SERVICE_CATALOG };
 
 // FEATURE: AI-51 — moved from useAgents.js (S-MI-20 origin) so this canonical shared cost/pattern
@@ -281,6 +281,11 @@ export const AI_TYPE_TO_SERVICE = {
   // channel-intelligence and quality-gate need no new entry here: their capability_slug values
   // already equal their SERVICE_CATALOG slugs exactly, resolved by the existing `|| e.type` fallback.
   'project-manager': 'task-planning',
+  // FEATURE: CHI-33 -- api/fetch-article.js's fallback path is hand-rolled, not capability-
+  // dispatched (same reason brief.js needs its own BRIEF_AI_TYPE_FEATURE map), so 'fallback-summary'
+  // needs an explicit entry here rather than relying on the `|| e.type` fallback other capabilities
+  // get for free.
+  'fallback-summary': SERVICE_SLUG.ARTICLE_EXTRACTION,
 };
 
 // FEATURE: LOG-12 -- agent-turn rows always carry their real capability as the first ':'-delimited

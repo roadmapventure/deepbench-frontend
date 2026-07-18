@@ -157,6 +157,14 @@ export const SERVICE_CATALOG = [
   // no cost_usd/input_tokens by design (the real billed cost is already attributed to the capability-
   // level row sendRequest() writes separately) -- real call count + avg latency, $0 cost, as intended.
   { slug: 'agent-turn', name: 'Agent Turn (Delegation Loop Reasoning)', serviceType: 'ai', patterns: ['Tool Use', 'Orchestrator-Workers'], roadmap: 'now' },
+  // FEATURE: AGT-026 -- web-search-news capability (Jordan Ellsworth, CI-07). No AI_TYPE_TO_SERVICE
+  // entry needed -- same fallback pattern as data-analysis/pipeline-triage/hypothesis-evaluation.
+  { slug: 'web-search-news', name: 'Web Search News (Jordan Ellsworth)', serviceType: 'ai', patterns: ['Tool Use', 'Orchestrator-Workers'], roadmap: 'now' },
+  // FEATURE: CHI-33 -- article-extraction (api/fetch-article.js). Hybrid: primary path is a plain
+  // fetch()+Readability extraction (no LLM call, no pattern), fallback path is a real Claude call
+  // with web_search -- ai_type 'fallback-summary' needs an explicit AI_TYPE_TO_SERVICE entry
+  // (src/hooks/useAIActivity.js) since this route is hand-rolled, not capability-dispatched.
+  { slug: 'article-extraction', name: 'Article Extraction', serviceType: 'hybrid', patterns: [], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge
