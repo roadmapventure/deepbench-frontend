@@ -1,4 +1,7 @@
-// DeepBench v6.3.60 | MarketIntelligenceScreen.jsx | CHI-30 — reorders the 23 example questions and
+// DeepBench v6.3.65 | MarketIntelligenceScreen.jsx | CHI-32 — patches CHI-30: rotation split changed
+// from 6/4 to 2/8 (3 visible slots instead of 7 — slot 1 + static slot 2 + slot 3), matching the
+// original pre-CHI-30 UI shape. Drawer count now 20 (was 16), computed automatically.
+// (Prior header, kept for history: CHI-30 — reorders the 23 example questions and
 // adds a session-scoped rotation (static "library" question in slot 2; 6-of-10 pool randomizes into
 // slots 1,3-7 on refresh/Clear once the splash has been dismissed this tab session; drawer always 16).
 // (Prior header, kept for history: CHI-14 — Agent Routing drawer's zero-hop empty
@@ -347,10 +350,10 @@ import { PATTERN_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c
 // FEATURE: CHI-30 — static seed question, always slot 2, never rotates.
 const STATIC_QUESTION = { id: "library-catalog", label: "What data is in the library and how can i use it?" };
 
-// FEATURE: CHI-30 — 10-question rotation pool (today's confirmed positions 1, 3-11). On every
-// empty-state render, 6 of these fill visible slots 1, 3-7; the other 4 lead the drawer. Order here
-// is the "default" order used verbatim (via splitRotation(pool, identity)) before the splash has
-// ever been dismissed this tab session.
+// FEATURE: CHI-30 (split size patched by CHI-32) — 10-question rotation pool (today's confirmed
+// positions 1, 3-11). On every empty-state render, 2 of these fill visible slots 1, 3; the other 8
+// lead the drawer. Order here is the "default" order used verbatim (via splitRotation(pool, identity))
+// before the splash has ever been dismissed this tab session.
 const ROTATING_POOL = [
   { id: "japan-geo",          label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
   { id: "crest-wireless",      label: "What made Crest Wireless's recent upgrade promotion successful, and can we replicate it with other US partners?" },
@@ -365,7 +368,7 @@ const ROTATING_POOL = [
 ];
 
 // FEATURE: CHI-30 — fixed drawer tail (today's confirmed positions 12-23). Never rotates, never
-// reorders — always the last 12 questions in the drawer beneath whichever 4 pool leftovers lead it.
+// reorders — always the last 12 questions in the drawer beneath whichever 8 pool leftovers lead it.
 const FIXED_DRAWER_TAIL = [
   { id: "vietnam-reseller",             label: "How is our authorized reseller network performing in Vietnam?" },
   { id: "meridian-electronics",         label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
@@ -381,12 +384,11 @@ const FIXED_DRAWER_TAIL = [
   { id: "south-korea-coop",             label: "What is our co-op utilization rate for our partner in South Korea?" },
 ];
 
-// FEATURE: CHI-30 — pure, testable split: shuffleFn is injected so both branches (deterministic
-// default vs. real rotation) share one code path. arr => arr (identity) produces the default split;
-// shuffleArray produces the rotated split.
+// FEATURE: CHI-32 — patches CHI-30: split point changed from 6/4 to 2/8 (3 visible slots instead of
+// 7, per John's call to keep the original UI shape). shuffleFn injection unchanged.
 function splitRotation(pool, shuffleFn) {
   const shuffled = shuffleFn(pool);
-  return { picks: shuffled.slice(0, 6), leftover: shuffled.slice(6) };
+  return { picks: shuffled.slice(0, 2), leftover: shuffled.slice(2) };
 }
 
 // FEATURE: CHI-30 — Fisher-Yates, pure aside from Math.random.
@@ -2254,10 +2256,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
     prevMessageCountRef.current = messages.length;
   }, [messages.length]);
 
-  const visibleQuestions = [
-    rotation.picks[0], STATIC_QUESTION, rotation.picks[1], rotation.picks[2],
-    rotation.picks[3], rotation.picks[4], rotation.picks[5],
-  ];
+  const visibleQuestions = [rotation.picks[0], STATIC_QUESTION, rotation.picks[1]];
   const drawerQuestions = [...rotation.leftover, ...FIXED_DRAWER_TAIL];
 
   // FEATURE: MI-64 — tracks whether the user has manually scrolled away from the bottom, same
@@ -2303,7 +2302,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             ))}
           </div>
           <div style={{marginTop:8}}>
-            {/* FEATURE: CHI-30 — drawer count is always 16 (4 rotation leftovers + fixed 12-tail) */}
+            {/* FEATURE: CHI-30 (patched by CHI-32) — drawer count is always 20 (8 rotation leftovers + fixed 12-tail) */}
             <Drawer title={`Browse ${drawerQuestions.length} more example questions`} count={drawerQuestions.length} maxHeight={220}>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {drawerQuestions.map(q => (
@@ -2345,6 +2344,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
         <Corners/>
         <FeatureBadge id="MI-64"/>
         <FeatureBadge id="CHI-30"/>
+        <FeatureBadge id="CHI-32"/>
         <div style={{padding:"13px 16px",borderBottom:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
           <div>
