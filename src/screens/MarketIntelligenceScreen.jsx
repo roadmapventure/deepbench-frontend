@@ -1056,12 +1056,10 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // his own final output (final_answer) carries the delegated result forward, since nothing outside
 // his own tool-call loop is visible to this caller otherwise -- same shape Nadia's
 // data-patch-execute-intent already uses for her promote action's Eleanor delegation (S-APPLE-04b).
-// FEATURE: CHI-03c — getHopCount snapshots the live Agent Routing hop count (see
-// currentHopCount() above); hopStart is captured before this operation's first onEvent call,
-// hopEnd immediately after its last, both attached to every returned "qa"/"qa_failed" result so
-// the eventual qaEvidence/chat pointer sentence can render a `Hops N–M` cross-reference badge.
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, getHopCount) {
-  const hopStart = getHopCount() + 1;
+// FEATURE: CHI-23 — hop numbers are no longer computed inside this function; the outer call site
+// now reads the gold currentHopCount() directly, before the turn starts and after every one of the
+// turn's events (including any the caller logs after this function returns) has posted.
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
   let t0 = Date.now();
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
@@ -1116,7 +1114,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // on gate itself (the shared callCapability() wrapper's top-level field), not nested inside
     // gate.triage. Hoisted explicitly so failure_triage's pattern line shows real data.
     onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, patterns_used: gate.patterns_used || [] }));
-    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage), hopStart, hopEnd: getHopCount() };
+    return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
   }
 
   const finalAnswer = retried ? gate.final_answer : qa;
@@ -1170,7 +1168,6 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       needs_review: true, review_reason: "Display agent output couldn't be rendered in the expected format — see message below.",
       displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
       displayAgentId: typeof display === "string" ? null : display.display_agent_id,
-      hopStart, hopEnd: getHopCount(), // FEATURE: CHI-03c
     };
   }
   return {
@@ -1179,11 +1176,10 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     citations: display.citations, confidence_tier: display.confidence_tier,
     needs_review: display.needs_review, review_reason: display.review_reason,
     displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
-    hopStart, hopEnd: getHopCount(), // FEATURE: CHI-03c
   };
 }
 
-async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, getHopCount) {
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false) {
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
@@ -1197,7 +1193,7 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, getHopCount);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale);
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -1225,7 +1221,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
 // -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
 // candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
 // format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false, getHopCount }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false }) {
   const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
@@ -1244,10 +1240,6 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     onProgress, isStale,
   });
   if (isStale()) return display; // FEATURE: CHI-04
-  // FEATURE: CHI-03c — hopStart captured immediately before this function's first onEvent call
-  // (below), so it doesn't include the intent-selection hop(s) any outer caller logged before
-  // invoking this function -- mirrors runQaWithQualityGate()'s identical capture pattern.
-  const hopStart = getHopCount() + 1;
   // FEATURE: MI-52 -- same treatment as runQaWithQualityGate()'s Display-agent hand-off above:
   // agent_selection's agentId is the picker (Michelle), durationMs: null (not a fabricated duplicate);
   // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
@@ -1256,7 +1248,6 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
     onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection));
   }
   onEvent(buildHopEvent("display_format", display.display_agent_id, display, Date.now() - t0));
-  const hopEnd = getHopCount(); // FEATURE: CHI-03c — after this function's last onEvent call
 
   // FEATURE: AA-137 — same string-fallback case as runQaWithQualityGate() above, Priya's path.
   // MessageBubble's hypothesis_test case only ever renders st.headline/st.supports/.complicates/
@@ -1272,10 +1263,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // correctly attributed to the separate display_format event two lines above). Every branch below
   // explicitly sets patterns_used from `analysis`, overriding whatever `display` itself carries.
   return typeof display === "string"
-    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }
+    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [] }
     : typeof display.content === "string"
-    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }
-    : { ...display, patterns_used: analysis.patterns_used || [], hopStart, hopEnd }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
+    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [] }
+    : { ...display, patterns_used: analysis.patterns_used || [] }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
 }
 
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
@@ -2567,29 +2558,31 @@ export default function MarketIntelligenceScreen() {
   // of appending a new one, and clears the pending marker. A pending row that's never claimed (e.g.
   // an error path with no follow-up for that agent) simply stays in the array forever, unmodified --
   // never silently removed, per this task's design rule.
+  // FEATURE: CHI-23 — `next` is now computed synchronously against `pipelineEventsRef.current`
+  // (the source of truth) BEFORE setPipelineEvents is ever called, and the ref is assigned
+  // immediately, in plain JS, not inside the callback React passes to setPipelineEvents. The old
+  // version assumed React invokes that callback the instant setPipelineEvents is called; that's
+  // not guaranteed (same defect shape as STANDARDS.md Section 8's BUG-3), and a currentHopCount()
+  // read with no intervening await could see a ref that hadn't picked up the most recent push yet.
+  // setPipelineEvents now receives the already-computed array directly instead of an updater function.
   const logEvent = (evt, { replaces } = {}) => {
+    const prev = pipelineEventsRef.current;
+    let next;
     if (replaces) {
-      setPipelineEvents(prev => {
-        const id = prev.length;
-        pendingDelegationsRef.current.set(replaces.awaitingAgentId, { id, key: replaces.key });
-        const next = [...prev, { ...evt, id }];
-        pipelineEventsRef.current = next; // FEATURE: CHI-03c — keep hop-count ref in sync
-        return next;
-      });
-      return;
-    }
-    setPipelineEvents(prev => {
+      const id = prev.length;
+      pendingDelegationsRef.current.set(replaces.awaitingAgentId, { id, key: replaces.key });
+      next = [...prev, { ...evt, id }];
+    } else {
       const pending = pendingDelegationsRef.current.get(evt.agentId);
-      let next;
       if (pending) {
         pendingDelegationsRef.current.delete(evt.agentId);
         next = prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
       } else {
         next = [...prev, { ...evt, id: prev.length }];
       }
-      pipelineEventsRef.current = next; // FEATURE: CHI-03c — keep hop-count ref in sync
-      return next;
-    });
+    }
+    pipelineEventsRef.current = next;
+    setPipelineEvents(next);
   };
 
   // FEATURE: MI-47 -- also logs every live handoff as its own permanent Agent Routing drawer row
@@ -2658,6 +2651,10 @@ export default function MarketIntelligenceScreen() {
     if (pipelineEvents.length > 0) {
       logEvent(buildHopEvent("question_boundary", null, { timestamp: turnStart }));
     }
+    // FEATURE: CHI-23 — the real, current hop total right before this turn's own events start;
+    // hopStart for this turn's message is this count + 1 (John's own framing: the label just
+    // grabs the final gold number, and for a following question, subtracts the delta from it).
+    const hopCountBeforeTurn = currentHopCount(pipelineEventsRef.current);
     setStatus("Marcus is thinking…", { expectation: "expect < 2m" }); // FEATURE: MI-49 -- reverted from "question < 2m"
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
@@ -2673,7 +2670,7 @@ export default function MarketIntelligenceScreen() {
             return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
           });
         }
-      }, setStatus, onProgress, isStale, () => currentHopCount(pipelineEventsRef.current)); // FEATURE: CHI-03c getHopCount added
+      }, setStatus, onProgress, isStale); // FEATURE: CHI-23 — getHopCount param removed, no longer threaded through
       if (isStale()) return; // FEATURE: CHI-04 — Clear fired while this question was in flight; discard silently (finally still runs, harmlessly re-sets already-null loading/workingStatus)
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
@@ -2703,7 +2700,9 @@ export default function MarketIntelligenceScreen() {
           kind: "qa", text: plainText,
           needsReview: !!result.needs_review, reviewReason: result.review_reason,
           totalElapsedMs: elapsed,
-          hopStart: result.hopStart, hopEnd: result.hopEnd, // FEATURE: CHI-03c
+          // FEATURE: CHI-23 — hopEnd read fresh from the gold count here, after every one of this
+          // turn's events has posted (not a snapshot taken inside runQaWithQualityGate before it returned).
+          hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current),
         })]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
@@ -2761,7 +2760,9 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-03c — this ack call has no onEvent/logEvent of its own (Scope Rules: do not add
     // one), so hopStart===hopEnd, both the current live hop count -- it shares whatever hop is
     // "current" at the moment it fires, same as every other single-hop, can_request_help:false ack.
-    const submissionAckHop = currentHopCount(pipelineEventsRef.current) + 1;
+    // FEATURE: CHI-23 — removed incorrect "+1"; this ack logs no event of its own, so it shares
+    // whatever hop is already current, per this line's own pre-existing comment above.
+    const submissionAckHop = currentHopCount(pipelineEventsRef.current);
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-submission-ack-intent", agent_id: "marcus",
       task_context: { submitted_theory: text },
@@ -2774,18 +2775,22 @@ export default function MarketIntelligenceScreen() {
     });
     const t0 = Date.now();
     const turnStart = t0; // FEATURE: MI-42 -- Task 4's caption reads this
+    const hopCountBeforeTurn = currentHopCount(pipelineEventsRef.current); // FEATURE: CHI-23
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_test, agentActivity);
       setStatus("Priya is running a hypothesis test…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale, getHopCount: () => currentHopCount(pipelineEventsRef.current) }); // FEATURE: CHI-03c — getHopCount added
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale }); // FEATURE: CHI-23 — getHopCount param removed
       if (isStale()) return; // FEATURE: CHI-04
       logEvent(buildHopEvent("hypothesis_test", "priya", st, Date.now() - t0));
       // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
       // until the user resolves it (Info Only / Store as Forecast); testElapsedMs carries onto
       // hypFlow so the eventual chat card (Task 3/4) can still caption real test time.
-      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: st, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: Date.now() - turnStart }));
+      // FEATURE: CHI-23 — hop numbers read fresh from the gold count here, after the trailing
+      // hypothesis_test event just above (the old code captured hopEnd inside runHypothesisTest,
+      // before this trailing event existed — structurally one hop short, every time).
+      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: { ...st, hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current) }, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: Date.now() - turnStart }));
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
@@ -2809,7 +2814,9 @@ export default function MarketIntelligenceScreen() {
     // function — narrates after the real state change (setHypFlow(null) below) has already
     // happened, never blocking or gating it. Falls back to CHI-03a's static copy on failure.
     // FEATURE: CHI-03c — single-hop ack, no logEvent of its own; see submissionAckHop's identical comment above.
-    const infoOnlyAckHop = currentHopCount(pipelineEventsRef.current) + 1;
+    // FEATURE: CHI-23 — removed incorrect "+1"; this ack logs no event of its own, so it shares
+    // whatever hop is already current, per this line's own pre-existing comment above.
+    const infoOnlyAckHop = currentHopCount(pipelineEventsRef.current);
     const turnStart = Date.now(); // FEATURE: CHI-07 — onDiscard had no existing timing capture; feeds the ack bubble's totalElapsedMs
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
@@ -2933,7 +2940,9 @@ export default function MarketIntelligenceScreen() {
       // branches, fire-and-forget — narrates after setHypFlow(null) below has already run. Falls
       // back to CHI-03a's static copy per-branch on failure.
       // FEATURE: CHI-03c — single-hop ack, no logEvent of its own; see submissionAckHop's identical comment above.
-      const resolutionAckHop = currentHopCount(pipelineEventsRef.current) + 1;
+      // FEATURE: CHI-23 — removed incorrect "+1"; this ack logs no event of its own, so it shares
+      // whatever hop is already current, per this line's own pre-existing comment above.
+      const resolutionAckHop = currentHopCount(pipelineEventsRef.current);
       if (resolution === "accept") {
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
