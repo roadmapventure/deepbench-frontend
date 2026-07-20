@@ -1350,16 +1350,17 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           border: `1px solid ${msg.needs_review ? T.brass : T.line}`,
           borderRadius:3,
         }}>
-          {/* FEATURE: CHI-08 — flagged narrative merged into the bubble, narrative first, pointer
-              sentence second, both the bubble's own body font (was a separate mono/9.5px caption
-              below the bubble). "Marcus flagged this —" prefix dropped (redundant inside Marcus's
-              own bubble); ⚑ icon + brass color kept as the visual flag signal. */}
+          {/* FEATURE: CHI-36 — pointer sentence always renders first; when needs_review is set, its own
+              wording changes to lead into the flag narrative below it instead of closing the thought.
+              Reverses CHI-08's original narrative-first order (John's direct call, live walkthrough). */}
+          {msg.needs_review
+            ? "I've pulled together an answer — review the full breakdown in the Evidence column to the right. Before you do, let me give you a quick background about the data ..."
+            : "I've pulled together an answer — review the full breakdown in the Evidence column to the right. Let me know if you have questions."}
           {msg.needs_review && (
-            <div style={{color:T.brassDeep,marginBottom:8}}>
+            <div style={{color:T.brassDeep,marginTop:8}}>
               ⚑ {msg.review_reason || "flagged for review"}
             </div>
           )}
-          I've pulled together an answer — review the full breakdown in the Evidence column to the right. Let me know if you have questions.
         </div>
         {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs). */}
         <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy}/>
@@ -1553,7 +1554,7 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
   return null;
 }
 
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt }) {
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -1599,9 +1600,12 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         <FeatureBadge id="MI-59"/>
         <FeatureBadge id="CHI-26"/>
         <FeatureBadge id="CHI-33"/>
-        {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" (Task 4 rename,
-            since review/resolve actions moved here too, not just read-only content). */}
-        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
+        {/* FEATURE: CHI-34 — renamed "Evidence & Interaction" -> "News & Evidence".
+            FEATURE: CHI-35 — suppressed on mobile (bare=true): the tab button above it already
+            names the column there; desktop keeps it, no tab affordance to rely on instead. */}
+        {!bare && (
+          <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>News & Evidence</div>
+        )}
         {hasNewsCards ? (
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:10}}>
@@ -1642,8 +1646,12 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
       <FeatureBadge id="MI-59"/>
       <FeatureBadge id="CHI-26"/>
       <FeatureBadge id="CHI-29"/>
-      {/* FEATURE: CHI-03a — header renamed "Evidence" -> "Evidence & Interaction" in both states. */}
-      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Evidence & Interaction</div>
+      {/* FEATURE: CHI-34 — renamed "Evidence & Interaction" -> "News & Evidence".
+          FEATURE: CHI-35 — suppressed on mobile (bare=true): the tab button above it already
+          names the column there; desktop keeps it, no tab affordance to rely on instead. */}
+      {!bare && (
+        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>News & Evidence</div>
+      )}
       {/* FEATURE: CHI-18 — gap:14 between the scroll body and the pinned footer, matching
           AuditColumn's (Column 3) drawer-stack gap value. The footer itself stays fully unchanged
           (padding, border, position as the flex column's last child) — it remains locked to the
@@ -2462,6 +2470,14 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
+  const [newsLineDismissed, setNewsLineDismissed] = useState(false);
+  // FEATURE: CHI-40 — resets every time a fresh fetch starts (mount + every Clear-triggered
+  // refire), same signal fetchNewsCards() already stamps for NewsCardsLoadingLine's own timer.
+  useEffect(() => { setNewsLineDismissed(false); }, [newsCardsStartedAt]);
+  // FEATURE: CHI-40 — dismissed for good (until the next refresh) the moment the user actually
+  // opens the News & Evidence tab; John's exact ask, "once they click News & Evidence, that
+  // line is gone until the news is refreshed."
+  useEffect(() => { if (mobileTab === "evidence") setNewsLineDismissed(true); }, [mobileTab]);
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   // FEATURE: CHI-03c — was `hasActiveFlow = !!hypFlow`, blind to CHI-03a's qaEvidence: a plain Q&A
@@ -2566,7 +2582,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
             qaEvidence answer left the Evidence tab disabled and never flashing on mobile, even
             though real content was sitting there. Fixed here, see STYLE-GUIDE.md §21's amendment. */}
         <button onClick={() => selectTab("evidence")} style={tabStyle(mobileTab==="evidence", !hasEvidenceContent)}>
-          Evidence & Interaction {hasEvidenceContent && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
+          News & Evidence {hasEvidenceContent && evidenceUnseen && mobileTab!=="evidence" && <span style={flashDot}/>}
         </button>
       </div>
 
@@ -2575,7 +2591,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={onAnalyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare/>
           </div>
         )}
       </div>
@@ -2583,6 +2599,17 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
       {workingStatus && (
         <div style={{flexShrink:0,padding:"8px 14px",background:"#fbf6ea",borderTop:`1px solid ${T.lineSoft}`}}>
           <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>
+        </div>
+      )}
+
+      {/* FEATURE: CHI-40 — mobile-only heads-up that news is loading/available without asking a
+          question first. Hidden once the user visits News & Evidence (see effect above), or once a
+          completed fetch has zero usable cards (nothing to point at). */}
+      {!newsLineDismissed && (newsCards === null || (newsCards && newsCards.length > 0)) && (
+        <div style={{flexShrink:0,padding:"6px 14px",fontFamily:mono,fontSize:10.5,color:T.muted,background:T.cardAlt,borderTop:`1px solid ${T.lineSoft}`}}>
+          {newsCards === null
+            ? <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
+            : "Click News above for current headlines"}
         </div>
       )}
 
