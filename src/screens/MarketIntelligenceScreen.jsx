@@ -1,6 +1,11 @@
-// DeepBench v6.3.65 | MarketIntelligenceScreen.jsx | CHI-32 — patches CHI-30: rotation split changed
+// DeepBench v6.3.69 | MarketIntelligenceScreen.jsx | CHI-38/CHI-39 — Column 2 news-card loading
+// skeletons (3x NewsCardSkeleton + existing elapsed-time caption while newsCards === null) and idle
+// 10s auto-rotation shimmer on the example-question blocks (2 rotating buttons, static button, drawer
+// toggle all shimmer in sync via a shared ShimmerSweep overlay, reusing tokens.js's existing shimmer
+// keyframe). No new keyframe, no Drawer.jsx change.
+// (Prior header, kept for history: CHI-32 — patches CHI-30: rotation split changed
 // from 6/4 to 2/8 (3 visible slots instead of 7 — slot 1 + static slot 2 + slot 3), matching the
-// original pre-CHI-30 UI shape. Drawer count now 20 (was 16), computed automatically.
+// original pre-CHI-30 UI shape. Drawer count now 20 (was 16), computed automatically.)
 // (Prior header, kept for history: CHI-30 — reorders the 23 example questions and
 // adds a session-scoped rotation (static "library" question in slot 2; 6-of-10 pool randomizes into
 // slots 1,3-7 on refresh/Clear once the splash has been dismissed this tab session; drawer always 16).
@@ -1519,6 +1524,30 @@ function getEvidencePanelSentence(hypFlow) {
   return `${label} — Data for you to interact with your chat...`;
 }
 
+// FEATURE: CHI-38/CHI-39 — shared shimmer sweep overlay. Reuses tokens.js's existing `shimmer`
+// keyframe (already used by TaskInstructionsScreen.jsx's step-loading bar) — no new keyframe, no
+// new colors. Absolutely positioned; the parent must have position:"relative" and ideally
+// overflow:"hidden" so the sweep doesn't bleed past rounded/bordered edges.
+function ShimmerSweep() {
+  return (
+    <div style={{position:"absolute",inset:0,background:`linear-gradient(90deg,transparent 0%,rgba(182,135,58,0.28) 50%,transparent 100%)`,backgroundSize:"200% 100%",animation:"shimmer 1.2s linear infinite",pointerEvents:"none"}}/>
+  );
+}
+
+// FEATURE: CHI-38 — skeleton placeholder mimicking NewsCard's exact box (same T.cardAlt/T.lineSoft/
+// padding as the real card below) so the loading state doesn't jump in size once real cards arrive.
+// Three muted bars stand in for headline/snippet/source-line; ShimmerSweep animates over the whole card.
+function NewsCardSkeleton() {
+  return (
+    <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",position:"relative",overflow:"hidden"}}>
+      <div style={{height:13,width:"70%",background:T.line,marginBottom:6}}/>
+      <div style={{height:10,width:"92%",background:T.line,marginBottom:4,opacity:0.6}}/>
+      <div style={{height:10,width:"38%",background:T.line,opacity:0.6}}/>
+      <ShimmerSweep/>
+    </div>
+  );
+}
+
 // FEATURE: CHI-33 — Column 2 news card, true-empty-state only. Reuses EvidenceColumn's existing
 // card visual language (T.cardAlt background, T.lineSoft border, mono/body font tokens already in
 // scope in this file) -- no new colors, no new border styles, no new spacing scale, per this
@@ -1616,17 +1645,23 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
                 onClick={() => onAnalyzeNewsCard && onAnalyzeNewsCard(card)}/>
             ))}
           </div>
-        ) : (
-          <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
-            <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-              {/* FEATURE: CHI-33-patch -- genuinely-loading (newsCards === null) gets the live
-                  "Grabbing the latest headlines..." line; fetch-completed-with-nothing (newsCards
-                  is [], or no fetch ever ran) keeps the static sentence unchanged -- a ticking line
-                  after the fetch already finished and failed would be actively misleading. */}
-              {newsCards === null
-                ? <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
-                : getEvidencePanelSentence(null)}
+        ) : newsCards === null ? (
+          // FEATURE: CHI-38 — genuinely-loading state now pairs the existing live elapsed-time
+          // caption with 3 skeleton cards (visual shape, not just text) so Column 2 doesn't feel
+          // static while the fetch is in flight.
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:2}}>
+              <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
             </div>
+            <NewsCardSkeleton/>
+            <NewsCardSkeleton/>
+            <NewsCardSkeleton/>
+          </div>
+        ) : (
+          // FEATURE: CHI-33-patch -- fetch-completed-with-nothing (newsCards is [], or no fetch ever
+          // ran) keeps the static sentence unchanged -- nothing is loading at this point.
+          <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
+            <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{getEvidencePanelSentence(null)}</div>
           </div>
         )}
       </div>
@@ -2333,6 +2368,26 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
     prevMessageCountRef.current = messages.length;
   }, [messages.length]);
 
+  // FEATURE: CHI-39 — idle auto-rotation: every 10s while the welcome/idle state is showing
+  // (messages.length === 0), re-roll rotation.picks via the exact same splitRotation() call Clear
+  // already uses (L2331). STATIC_QUESTION (slot 2) is never part of picks/leftover — unchanged,
+  // never rotates. Interval is armed only while idle and torn down the instant that stops being
+  // true (messages.length leaves 0) or the component unmounts — no orphaned timers.
+  const [isShimmering, setIsShimmering] = useState(false);
+  useEffect(() => {
+    if (messages.length !== 0) return;
+    const shimmerTimeouts = [];
+    const interval = setInterval(() => {
+      setRotation(splitRotation(ROTATING_POOL, shuffleArray));
+      setIsShimmering(true);
+      shimmerTimeouts.push(setTimeout(() => setIsShimmering(false), 700));
+    }, 10000);
+    return () => {
+      clearInterval(interval);
+      shimmerTimeouts.forEach(clearTimeout);
+    };
+  }, [messages.length]);
+
   const visibleQuestions = [rotation.picks[0], STATIC_QUESTION, rotation.picks[1]];
   const drawerQuestions = [...rotation.leftover, ...FIXED_DRAWER_TAIL];
 
@@ -2371,14 +2426,21 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             of these:
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {/* FEATURE: CHI-39 — each button wrapped so ShimmerSweep can overlay it; all 4 blocks
+                (2 rotating buttons, static button, drawer toggle below) shimmer together on every
+                10s idle tick via the shared isShimmering trigger. */}
             {visibleQuestions.map(q => (
-              <button key={q.id} onClick={() => submit(q.label)} disabled={loading}
-                style={{textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
-                {q.label}
-              </button>
+              <div key={q.id} style={{position:"relative",overflow:"hidden"}}>
+                <button onClick={() => submit(q.label)} disabled={loading}
+                  style={{width:"100%",textAlign:"left",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",fontFamily:body,fontSize:12.5,color:T.ink,cursor:loading?"default":"pointer"}}>
+                  {q.label}
+                </button>
+                {isShimmering && <ShimmerSweep/>}
+              </div>
             ))}
           </div>
-          <div style={{marginTop:8}}>
+          <div style={{marginTop:8,position:"relative",overflow:"hidden"}}>
+            {isShimmering && <ShimmerSweep/>}
             {/* FEATURE: CHI-30 (patched by CHI-32) — drawer count is always 20 (8 rotation leftovers + fixed 12-tail) */}
             <Drawer title={`Browse ${drawerQuestions.length} more example questions`} count={drawerQuestions.length} maxHeight={220}>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
