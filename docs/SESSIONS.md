@@ -1508,3 +1508,15 @@ John's live screenshot walkthrough of Channel Intelligence's UX/UI produced 10 n
 **Design session's own live verification against the real deployed dev preview, not accepted from the coding report alone:** confirmed desktop's 3-column header and mobile's tab both read "News & Evidence"; mobile's in-panel duplicate header confirmed gone on both the news view and the Q&A/hypothesis view; a real flagged answer (external-news channel-positioning question, triggering both Owen's revision cycle and Marcus's own `needs_review` self-flag) rendered the exact specified wording and order; the mobile status line's full lifecycle (loading text → "Click News above..." → disappears on tab open) confirmed via direct DOM state checks after the in-app browser's `computer`/screenshot tools began timing out mid-session (same recurring tooling instability noted in `CHI-33`'s own close-out) — verified via `read_page`/`javascript_tool` DOM inspection instead, a real dispatched click confirmed to produce the same state change a genuine click would; mobile auto-jump-to-Chat confirmed via the tab button's own active-state styling immediately after a real news-card click, before the answer arrived (the screen's pre-existing `MI-51` auto-switch-to-Evidence-on-answer-arrival then correctly took back over once the real answer landed, unrelated to and unaffected by this fix). Zero console errors across every check, on both viewport sizes.
 
 **Close-out:** `CHI-34`/`35`/`36`/`40`/`41` archived ✅ Done. `CHI-37`/`38`/`39` remain open in `docs/FEATURES.md`, `AA-143` updated in place. Full detail: `docs/FEATURES-ARCHIVE.md`.
+
+---
+
+## S-CHI-32-design / S-CHI-32 (v6.3.65, 2026-07-18, worktree `design-chi30-3slot-patch-0718`)
+
+**Migrated from `CLAUDE-STATE.md`'s rolling window 2026-07-20 (`S-CHI-38-39-design` close-out) — aged out to make room, full detail preserved here per the rolling-window rule.**
+
+Patches `CHI-30`'s rotation from 7 visible slots down to 3, John's direct call after seeing `CHI-30` live: keeps the original pre-`CHI-30` UI shape (3 shown + one drawer) while preserving the same rotation mechanism. `splitRotation()`'s split changed 6/4→2/8, `visibleQuestions` shrunk 7→3 entries; drawer count falls out to 20 automatically (was 16), matching the original pre-`CHI-30` count. `STATIC_QUESTION`'s slot 2 and the rotation/re-roll logic itself untouched. Does not touch `CHI-31` (separate concurrent session `design-chi-31-0718`). 1 file, Node test 6/6 PASS (deleted before commit), build clean.
+
+**Design session's own live verification against the worktree's own dev server, not accepted from code read alone:** fresh load showed exactly 3 buttons matching today's confirmed default order 1-2-3, drawer read/expanded to 20 correctly; reload re-rolled slots 1/3 with slot 2 static; Ask+Clear re-rolled a fresh draw; 390×844 mobile identical via `MobileBody`'s `InteractColumn` reuse. Zero console errors attributable to this patch.
+
+**Close-out:** `CHI-32` archived ✅ Done. Full detail: `docs/FEATURES-ARCHIVE.md`.
