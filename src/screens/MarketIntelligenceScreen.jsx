@@ -806,6 +806,12 @@ function describePipelineEvent(evt) {
       return { summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
     case "display_format":
       return { summary: "Formatting data for display", color: T.moss };
+    // FEATURE: LOO-009/CHI-37 — Alex Reeves's news-cards-format completion, matching
+    // "display_format"'s simple style since Alex's screen-controls/news-cards-format work is
+    // display-flavored. No new color token — reuses T.moss, already used by display_format/
+    // agent_selection for the same "agent completed its work cleanly" meaning.
+    case "news_fetch":
+      return { summary: "Formatting the news feed for display", color: T.moss };
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
       return { summary: "Reviewing found data, putting together a theory", color: T.moss };
@@ -1063,7 +1069,39 @@ async function resolveInProgress(result, onProgress = null, isStale = () => fals
   return result;
 }
 
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false }) {
+// FEATURE: LOO-009/CHI-37 — resolves the hop-completion event(s) a callCapability() call produces,
+// given its already-resolved result. Every caller must declare hopEvents (see callCapability below —
+// enforced, not optional) instead of hand-writing a follow-up onEvent(buildHopEvent(...)) call, which
+// is exactly the gap CHI-37 fell through (fetchNewsCards() was the one call site with no existing
+// template to copy — see docs/kickoffs/v6.3.70-CHI-37-generic-hop-completion.md's CONTEXT). Each
+// hopEvents entry:
+//   - type: the logged event type string (e.g. "qa_answer", "news_fetch")
+//   - resolveAgentId: (result) => string|null — the completing agent's id, or null to skip this
+//     entry entirely (covers the conditional "agent_selection" case: null when no internal hand-off
+//     happened for this call)
+//   - resolveData: optional (result) => any, defaults to the whole result — use to log a narrower
+//     object (e.g. a hand-off's own reasoning, not the full answer payload)
+function resolveHopEvents(hopEvents, result, t0) {
+  const elapsed = Date.now() - t0;
+  return hopEvents
+    .map(({ type, resolveAgentId, resolveData }) => {
+      const agentId = resolveAgentId(result);
+      if (!agentId) return null;
+      const data = resolveData ? resolveData(result) : result;
+      const durationMs = NON_MEASURABLE_EVENT_TYPES.has(type) ? null : elapsed;
+      return buildHopEvent(type, agentId, data, durationMs);
+    })
+    .filter(Boolean);
+}
+
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hopEvents = null }) {
+  // FEATURE: LOO-009/CHI-37 — structurally impossible to forget completion logging: a caller that
+  // passes onEvent must also declare hopEvents. A caller with no interest in hop logging (none exist
+  // today, but a future one might) simply omits both.
+  if (onEvent && !hopEvents) {
+    throw new Error(`callCapability: onEvent supplied without hopEvents for ${capability_slug}/${intent_slug} — every caller must declare how to resolve the completing agent(s). See LOO-009/CHI-37.`);
+  }
+  const t0 = Date.now();
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1081,7 +1119,15 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   // FEATURE: MI-67 — patterns_used was a real, already-computed sibling field on `result` that
   // this unwrap discarded; every event built from this return needs it for an accurate Agent
   // Routing log.
-  return { ...(result.content || {}), patterns_used: result.patterns_used || [] };
+  const unwrapped = { ...(result.content || {}), patterns_used: result.patterns_used || [] };
+  // FEATURE: LOO-009/CHI-37 — fires generically, in place of every call site's old hand-written
+  // follow-up. isStale() checked here (not left to the caller) for the same reason every existing
+  // manual call site already checked it before firing: never log an event for a call a Clear has
+  // already invalidated.
+  if (onEvent && hopEvents && !isStale()) {
+    for (const evt of resolveHopEvents(hopEvents, unwrapped, t0)) onEvent(evt);
+  }
+  return unwrapped;
 }
 
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
@@ -1114,27 +1160,30 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // into the visible chat bubble (that's built separately by the caller, submit() below, from the
 // plain confirmed question text). Unset (every existing caller) is byte-identical.
 async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null) {
-  let t0 = Date.now();
-  const qa = await callCapability({
-    capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-    task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale,
-  });
-  if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
-  onEvent(buildHopEvent("qa_answer", "marcus", qa, Date.now() - t0));
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
   // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
   // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
   // shape, same execute.js code path -- not a new event type).
-  if (qa.last_help_selection) {
-    // FEATURE: MI-52 -- agentId re-pointed to the picker (Michelle) whose own reasoning is the row's
-    // summary text, not the requester (Marcus) -- secondaryAgentId dropped, RoutingEventRow no longer
-    // renders a second agent. durationMs: null (was a fabricated 0) -- not separately measurable from
-    // the client, this hop shares its one real round trip with qa_answer above.
-    onEvent(buildHopEvent("agent_selection", qa.last_help_selection.selected_by_agent_id, qa.last_help_selection));
-  }
+  // FEATURE: MI-52 -- agentId re-pointed to the picker (Michelle) whose own reasoning is the row's
+  // summary text, not the requester (Marcus) -- secondaryAgentId dropped, RoutingEventRow no longer
+  // renders a second agent. durationMs: null (was a fabricated 0) -- not separately measurable from
+  // the client, this hop shares its one real round trip with qa_answer above.
+  // FEATURE: LOO-009/CHI-37 -- migrated onto the generic hop-completion mechanism (Task 1); the old
+  // hand-written onEvent(buildHopEvent(...)) follow-up calls are gone, callCapability fires them.
+  const qa = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
+    task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale,
+    onEvent, hopEvents: [
+      { type: "qa_answer", resolveAgentId: () => "marcus" },
+      { type: "agent_selection", resolveAgentId: (r) => r.last_help_selection?.selected_by_agent_id || null, resolveData: (r) => r.last_help_selection },
+    ],
+  });
+  if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
 
-  t0 = Date.now();
   setStatus("Owen is reviewing…"); // FEATURE: MI-42 (was MI-41) -- macro-hop swap, was invisible before
+  // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
+  // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
+  // FEATURE: LOO-009/CHI-37 -- migrated onto the generic hop-completion mechanism (Task 1).
   const gate = await callCapability({
     capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
     task_context: {
@@ -1142,12 +1191,13 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
     },
     onProgress, isStale,
+    onEvent, hopEvents: [
+      { type: "proofreader", resolveAgentId: () => "owen" },
+      { type: "agent_selection", resolveAgentId: (r) => r.last_help_selection?.selected_by_agent_id || null, resolveData: (r) => r.last_help_selection },
+    ],
   });
   if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
   const retried = !!gate.final_answer;
-  // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
-  // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
-  onEvent(buildHopEvent("proofreader", "owen", gate, Date.now() - t0));
 
   if (gate.guardrail?.result === "block") {
     // FEATURE: AA-171 fix (S-ARCH-QG-ESCALATION-01) -- Owen's own qg-review-intent turn now
@@ -1180,14 +1230,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // delegate_to_agent(is_final:true) -> whichever Display agent she ranked highest. Runs after the
   // Proofreader gate/retry sequence resolves, on finalAnswer (whichever of qa/gate.final_answer
   // won) — Owen's own evaluation semantics above are completely unchanged by this step.
-  t0 = Date.now();
   setStatus("Marcus is preparing the response…"); // FEATURE: MI-42 (was MI-41)
-  const display = await callCapability({
-    capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
-    task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
-    onProgress, isStale,
-  });
-  if (isStale()) return display; // FEATURE: CHI-04
   // FEATURE: MI-52 -- agent_selection (the picker's reasoning) and display_format (the formatter's
   // completion) describe two sub-phases of one un-separable server round trip -- one callCapability()
   // call, one client-observable elapsed time. agent_selection's agentId is now the picker (Michelle),
@@ -1195,10 +1238,29 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // number below). display_format's agentId is now the actual formatter (display.display_agent_id),
   // not the picker with a requester fallback; it keeps the one real, actually-measured durationMs.
   // secondaryAgentId dropped from both -- RoutingEventRow no longer renders a second agent.
-  if (display.selection) {
-    onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection));
-  }
-  onEvent(buildHopEvent("display_format", display.display_agent_id, display, Date.now() - t0));
+  // FEATURE: LOO-009/CHI-37 -- migrated onto the generic hop-completion mechanism (Task 1). Preserves
+  // the exact AA-137/AA-135 string-fallback edge case byte-for-byte: when display is a raw string,
+  // r.display_agent_id/r.selection both resolve to undefined via the same unconditional property
+  // read today's code already performed before the string check ran, so both resolvers return
+  // falsy/null and produce zero events -- identical real behavior, not "improved".
+  // FEATURE: LOO-009/CHI-37 -- hopEvents order is agent_selection BEFORE display_format, matching
+  // the pre-Task-2a hand-written order exactly (Michelle's pick is reasoned/logged first, then the
+  // chosen display agent's own completion). Task 2b's live 23-question regression proof (real dev
+  // preview run) caught this as a 100%-reproducible order swap when this array was first written in
+  // the reverse order (display_format, agent_selection) -- every question that reached the display
+  // hand-off showed OLD "agent_selection:michelle -> display_format:X" vs NEW "display_format:X ->
+  // agent_selection:michelle", a real hop-sequence/numbering change, not a false positive. Fixed
+  // here per this task's own "any diff is a regression, stop and fix" directive.
+  const display = await callCapability({
+    capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
+    task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
+    onProgress, isStale,
+    onEvent, hopEvents: [
+      { type: "agent_selection", resolveAgentId: (r) => r.selection?.selected_by_agent_id || null, resolveData: (r) => r.selection },
+      { type: "display_format", resolveAgentId: (r) => r.display_agent_id },
+    ],
+  });
+  if (isStale()) return display; // FEATURE: CHI-04
 
   // FEATURE: AA-137 — callCapability() returns a raw string when the display/format hand-off
   // declines its tool call and responds with plain text instead (e.g. it recognizes a real problem
@@ -2847,6 +2909,23 @@ export default function MarketIntelligenceScreen() {
     setPipelineEvents(next);
   };
 
+  // FEATURE: LOO-009/CHI-37 — always appends as a brand-new hop row, never resolves into a pending
+  // placeholder the way plain logEvent(evt) can (see logEvent's { replaces }-driven match/splice
+  // above). Needed specifically here: John confirmed live (2026-07-20) that Jordan's own "routing to
+  // Alex…" announcement (hop 1) must remain its own permanent, untouched hop, with Alex's completion
+  // landing as a genuinely separate hop 2 — not collapsed into Jordan's row the way logEvent's
+  // pending-match mechanism would do by default if used here (onDelegationProgress already registers
+  // "alex" as the awaited agent for Jordan's placeholder, so a plain logEvent(evt) completion call
+  // with agentId "alex" would splice into and overwrite Jordan's row, which is the opposite of what's
+  // wanted). This does not change logEvent/onDelegationProgress/pendingDelegationsRef in any way —
+  // Jordan's placeholder is simply left permanently unclaimed, same as any other pending entry that's
+  // never claimed elsewhere in this file (see logEvent's own comment on that).
+  const appendHopEvent = (evt) => {
+    const next = [...pipelineEventsRef.current, { ...evt, id: pipelineEventsRef.current.length }];
+    pipelineEventsRef.current = next;
+    setPipelineEvents(next);
+  };
+
   // FEATURE: MI-47 -- also logs every live handoff as its own permanent Agent Routing drawer row
   // (describePipelineEvent's new "delegation"/"delegation_return" cases), alongside the pre-existing
   // coarse checkpoint events -- additive only, does not replace/dedupe any existing event type.
@@ -2874,9 +2953,16 @@ export default function MarketIntelligenceScreen() {
     const myGeneration = clearGenerationRef.current;
     const isStale = () => clearGenerationRef.current !== myGeneration;
     try {
+      // FEATURE: LOO-009/CHI-37 — wires onto the generic hop-completion mechanism (Task 1), fixing
+      // the orphaned placeholder bug: Alex's completion now fires as its own hop 2, appended via
+      // appendHopEvent (not logEvent) so it never splices into/overwrites Jordan's own hop 1 "routing
+      // to Alex…" row above — see appendHopEvent's own comment. Alex is a real, normally-numbered
+      // hop like any other agent's, per John's explicit "no count exclusion, ever" call (this doc's
+      // CONTEXT) — no special-casing in groupEventsIntoHops/currentHopCount/the drawer badge.
       const result = await callCapability({
         capability_slug: "web-search-news", intent_slug: "ws-news-search-intent", agent_id: "jordan",
         task_context: {}, onProgress: onDelegationProgress, isStale,
+        onEvent: appendHopEvent, hopEvents: [{ type: "news_fetch", resolveAgentId: () => "alex" }],
       });
       if (isStale()) return;
       setNewsCards(Array.isArray(result?.cards) ? result.cards : []);
