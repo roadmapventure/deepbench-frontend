@@ -1115,19 +1115,29 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
   const result = await resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
-  if (result.status) return result;
   // FEATURE: MI-67 — patterns_used was a real, already-computed sibling field on `result` that
   // this unwrap discarded; every event built from this return needs it for an accurate Agent
   // Routing log.
-  const unwrapped = { ...(result.content || {}), patterns_used: result.patterns_used || [] };
+  // FEATURE: LOO-009/CHI-37 — bug found via this session's own live UI verification (not the 23-
+  // question diff, which couldn't have caught this — see below): `result.status` truthy (e.g. a
+  // real "final_delegation" status, confirmed live on the Jordan→Alex response) used to `return
+  // result` immediately, before any hop-event logic ran. Computing the return value first and
+  // firing hop events off *that* value afterward (whichever branch it took) fires correctly either
+  // way, instead of only ever firing for the plain-content branch. Task 2b's 23-question live diff
+  // derived its own "old"/"new" comparison from a standalone test-script reimplementation of this
+  // same early-return, so both sides of that comparison shared the identical gap and produced no
+  // visible diff — it took loading the real MI screen and watching hop 2 (Alex) never appear to
+  // surface this. Return-value semantics for every existing caller are byte-identical to before
+  // (same `result.status ? result : {...}` branch, just computed once instead of returned inline).
+  const finalResult = result.status ? result : { ...(result.content || {}), patterns_used: result.patterns_used || [] };
   // FEATURE: LOO-009/CHI-37 — fires generically, in place of every call site's old hand-written
   // follow-up. isStale() checked here (not left to the caller) for the same reason every existing
   // manual call site already checked it before firing: never log an event for a call a Clear has
   // already invalidated.
   if (onEvent && hopEvents && !isStale()) {
-    for (const evt of resolveHopEvents(hopEvents, unwrapped, t0)) onEvent(evt);
+    for (const evt of resolveHopEvents(hopEvents, finalResult, t0)) onEvent(evt);
   }
-  return unwrapped;
+  return finalResult;
 }
 
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
