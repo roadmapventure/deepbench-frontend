@@ -795,10 +795,29 @@ Cross-references: Section 35 (the brass "needs your input" gradient card's own s
 
 ---
 
+## Section 39 — Shimmer Sweep Overlay (Locked 2026-07-20 · S-CHI-38-39-design)
+
+For any "this content is loading or about to change" motion cue — skeleton placeholders or a periodic idle-motion signal — reuse the pre-existing `shimmer` keyframe (`tokens.js`, already used once by `TaskInstructionsScreen.jsx`'s step-loading progress bar) via a small shared overlay component, rather than deriving the gradient/animation properties inline a third time:
+
+```jsx
+function ShimmerSweep() {
+  return (
+    <div style={{position:"absolute",inset:0,background:`linear-gradient(90deg,transparent 0%,rgba(182,135,58,0.28) 50%,transparent 100%)`,backgroundSize:"200% 100%",animation:"shimmer 1.2s linear infinite",pointerEvents:"none"}}/>
+  );
+}
+```
+
+Parent element needs `position:"relative"` (and usually `overflow:"hidden"` so the sweep doesn't bleed past a bordered edge). No new keyframe, no new color token — reuses `T.brass` at 28% opacity, matching the existing brass-shimmer usage. First shipped by `CHI-38` (news-card loading skeletons, `MarketIntelligenceScreen.jsx`'s `EvidenceColumn`) and `CHI-39` (idle 10-second auto-rotation cue on the example-question blocks, same file's `InteractColumn`) — any future loading-skeleton or idle-motion cue reuses `ShimmerSweep` rather than a bespoke animation.
+
+**Scoping rule, not just a style rule:** if the element the shimmer overlays is itself a shared component reused elsewhere on the same screen (e.g. `Drawer`/`SharedUI.jsx`, reused by 6 different drawers on the Channel Intelligence screen alone), wrap only the specific call site that should shimmer in a local `position:"relative"` container — never bake the shimmer into the shared component itself, or every other reuse of that component starts shimmering too.
+
+---
+
 ## Change Log
 
 | Date | Session | Rule Added / Changed |
 |------|---------|---------------------|
+| 2026-07-20 | S-CHI-38-39-design | Section 39 added — Shimmer Sweep Overlay locked: reusable `ShimmerSweep` component wraps the pre-existing `shimmer` keyframe (no new keyframe/color) for any loading-skeleton or idle-motion cue. Scoping rule: never bake into a shared component reused elsewhere (e.g. `Drawer`) — wrap only the specific call site. First application: `CHI-38` (news-card loading skeletons), `CHI-39` (idle auto-rotation shimmer on example-question blocks). Kickoff: `docs/kickoffs/v6.3.69-CHI-38-CHI-39-shimmer-motion.md`. |
 | 2026-07-18 | S-CHI-26-design | Section 38 added — Evidence duplicate-status removal (`CHI-26`), Column 3 header renamed "Audit"→"Focus Area Audit" (`CHI-28`), Evidence scroll-fade via shared `ScrollFadeHint` extraction (`CHI-29`). Section 31 amended — within-hop activity order reverts to newest-first, matching hop-to-hop direction (`CHI-27`, reverts `CHI-09`). Section 21 amended — `MI-50`'s fade mechanism extracted to `SharedUI.jsx`, mobile behavior unchanged. Kickoff: `docs/kickoffs/v6.3.59-CHI-26-evidence-audit-panel-ux-fixes.md`. |
 | 2026-07-17 | S-AI-AUDIT-TRIAGE-01-design / LOG-15 | Section 31 amended — capability display permanently removed from the Agent Routing drawer (John's hard rule); per-event line is pattern-only now, format `"AI patterns used: [names]"`, no placeholder when no real pattern data exists. `SERVICE_LABEL` deleted (dead code once the capability field was removed). Kickoff: `docs/kickoffs/v6.3.55-LOG-15-agent-routing-patterns-only.md`. |
 | 2026-07-17 | S-CHI-18-design / CHI-18 | Section 37 amended — Evidence footer locked-spacing fix: outer Evidence card gains `gap:14` (matches `AuditColumn`'s drawer gap), `QaEvidenceCard` gains `flex:1` to stretch and fill available height, scroll body's bottom padding dropped to 0 (top/sides unchanged) so the two changes combine to a fixed 14px gap instead of a variable one. Footer's own anatomy untouched. Kickoff: `docs/kickoffs/v6.3.54-CHI-18-evidence-footer-spacing.md`. |
