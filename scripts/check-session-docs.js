@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v6.3.105 | scripts/check-session-docs.js | SES-011
+// DeepBench v6.3.107 | scripts/check-session-docs.js | SES-011a
 //
 // Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d --
 // previously a markdown checklist a session had to remember to run by hand
@@ -168,7 +168,7 @@ function freshDevText(relPath, localFallbackText) {
 function freshDevDirEntries(relDirPath) {
   let names;
   try {
-    const out = execFileSync("git", ["-C", SHARED_CHECKOUT, "ls-tree", "--name-only", "origin/dev", "--", relDirPath], { encoding: "utf8" });
+    const out = execFileSync("git", ["-C", SHARED_CHECKOUT, "ls-tree", "--name-only", "-r", "origin/dev", "--", relDirPath], { encoding: "utf8" });
     names = out.split("\n").map(l => l.trim()).filter(Boolean).map(p => path.basename(p));
   } catch {
     return []; // directory doesn't exist yet on origin/dev, or git unavailable
