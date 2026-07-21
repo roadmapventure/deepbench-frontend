@@ -1,3 +1,4 @@
+// DeepBench v6.3.88 | api/capabilities/execute.js | S-LOO-015 -- requester's own turn now credited on the request_help+delegationRequired branch, was completely invisible before
 // DeepBench v6.3.87 | api/capabilities/execute.js | S-LOO-014 -- originating agent's delegation_complete credit now fires before the 'delegation' placeholder, fixing hop-order (was: target numbered before originator)
 // DeepBench v6.3.86 | api/capabilities/execute.js | S-LOO-012 -- delegation_complete events now carry real content (reasoning/task) at the two call sites that previously had none
 // DeepBench v6.3.81 | api/capabilities/execute.js | S-LOO-011 -- delegation_complete event added to credit the originating agent's own turn in the plain delegate_to_agent + final branch
@@ -455,6 +456,24 @@ async function dispatchDelegation({
 
   if (via_tool === 'request_help') {
     const pmAgentId = await resolveCapabilityHolder('project-manager');
+    // FEATURE: LOO-015 — credits the REQUESTER's own turn (real work up to and including deciding
+    // to ask for help) before the 'delegation' announcement below creates its own placeholder for
+    // the broker. Without this, for any delegationRequired capability, the requester's own row is
+    // fully overwritten once the broker's own credit (LOO-009d, below) claims it — the requester has
+    // ZERO trace anywhere in the drawer (confirmed live 2026-07-21, John's own screenshot: a real
+    // Jordan->Michelle->Brent chain showed only Michelle and Brent, Jordan completely absent).
+    // Scoped to delegationRequired only, matching LOO-011/LOO-014's identical guard on the other
+    // branch: for the ordinary (non-delegationRequired) request_help case, the requester keeps its
+    // own turn and eventually answers directly, already credited by callCapability()'s automatic
+    // Shape-1 detection (LOO-010) once the whole call resolves — firing here too would double-credit
+    // that case. For a delegationRequired capability specifically, that Shape-1 detection never
+    // fires (this call always resolves via a delegation, display_agent_id always ends up set), so
+    // this is the only credit this agent's own turn will ever get. Content mirrors LOO-012's
+    // parity-restoration principle: tool_input.task_description/skill_needed is the same real field
+    // the delegateTaskContext below already reads, not new data.
+    if (delegationRequired) {
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null });
+    }
     onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
     // FEATURE: LOO-001 -- requesting_agent_id threaded into Michelle's task_context (generic,
     // always-present field, never omitted) so her own reasoning can recognize and reject a
