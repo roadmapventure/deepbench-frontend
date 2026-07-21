@@ -67,6 +67,17 @@ const DELEGATE_TO_AGENT_TOOL = {
 // FEATURE: HAR-05 -- enableWebSearch is a new optional param, same opt-in shape as
 // canRequestHelp directly above. Omitted (or false) for every existing caller is
 // byte-identical: webSearchTool = [], tools array unchanged.
+// FEATURE: AI-35 -- tool_choice now also goes 'auto' when webSearchTool is non-empty, not just
+// harnessTools. Found live during AI-35 2a's mandatory Category L test (Susan Smith's
+// pattern-vocabulary-review-intent: schema + enable_web_search:true, can_request_help unset):
+// with tool_choice forced to the schema tool alone (the old harnessTools.length>0-only gate),
+// Anthropic's API never gives the model room to actually invoke web_search before satisfying the
+// forced single-tool constraint -- the model still returned a schema-conformant response, but with
+// a fabricated citation ("Vig & Belinkov (2022)", confirmed via live web search: no such paper
+// exists), because it silently had zero real ability to search despite enable_web_search:true.
+// Zero-regression scope: the only existing enable_web_search:true Skill Profile
+// (ws-news-search-intent) already has can_request_help:true too, so harnessTools.length>0 was
+// already true for it -- this change is a no-op for every caller that existed before this session.
 export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
@@ -75,6 +86,7 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
   const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search' }] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
+  const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0;
 
   if (tools.length === 0) {
     return {
@@ -87,7 +99,7 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
   return {
     model, max_tokens, tools,
     ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
-    tool_choice: harnessTools.length > 0 ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
+    tool_choice: needsAutoChoice ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
     messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: systemPrompt }],
   };
 }
