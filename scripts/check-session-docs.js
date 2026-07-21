@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v6.3.107 | scripts/check-session-docs.js | SES-011a
+// DeepBench v6.3.107 | scripts/check-session-docs.js | SES-011a, SES-009b
 //
-// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d --
+// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d, 6, 6b, 6c --
 // previously a markdown checklist a session had to remember to run by hand
 // (greps + git commands typed out fresh each time). This is the same logic as
 // a single script, so "run session-hygiene" becomes "run this" instead of
@@ -114,6 +114,53 @@ function checkFeatureFile(findings, filename, requireType) {
       if (!type) {
         findings.push({ check: "3c", severity: "FLAG", detail: `${filename}: ${idMatch[1]} has a blank Type cell` });
       }
+    }
+  }
+}
+
+// ---- Checks 6, 6b, 6c: docs/STANDARDS.md drift (added SES-009b) ----
+function checkStandardsDrift(findings) {
+  const p = path.join(WORKTREE, "docs", "STANDARDS.md");
+  const text = readIfExists(p);
+  if (text === null) {
+    findings.push({ check: "6", severity: "WARN", detail: "docs/STANDARDS.md not found" });
+    return;
+  }
+
+  // 6: size baseline. 34 KB measured 2026-07-21 (SES-009b write time) -- 25%
+  // slack before flagging, since this doc legitimately grows with new rules
+  // over time (unlike FEATURES.md, unbounded growth here isn't automatically
+  // bloat -- new standing rules are expected content, not drift).
+  const bytes = Buffer.byteLength(text, "utf8");
+  const STANDARDS_BASELINE_KB = 34;
+  if (bytes > STANDARDS_BASELINE_KB * 1024 * 1.25) {
+    findings.push({ check: "6", severity: "FLAG", detail: `docs/STANDARDS.md is ${kb(bytes)} KB, over the ~${STANDARDS_BASELINE_KB} KB baseline (+25% slack)` });
+  }
+
+  // 6b: duplicate category-letter definitions -- the exact bug SES-005 found
+  // and fixed by hand in this same doc (Category K/M/L duplication).
+  function findDupeLetters(regex, label) {
+    const seen = new Map();
+    for (const m of text.matchAll(regex)) {
+      const letter = m[1];
+      seen.set(letter, (seen.get(letter) || 0) + 1);
+    }
+    for (const [letter, count] of seen) {
+      if (count > 1) {
+        findings.push({ check: "6b", severity: "FLAG", detail: `docs/STANDARDS.md: ${label} "${letter}" defined ${count} times -- likely duplication (same class as the Category K/M/L bug SES-005 fixed by hand)` });
+      }
+    }
+  }
+  findDupeLetters(/^\*\*([A-Z])\.\s/gm, "Section 4 test category");
+  findDupeLetters(/^### Category ([A-Z])\s/gm, "Section 5 checklist category");
+
+  // 6c: dangling "Section N" cross-references -- extract real headers, flag
+  // any prose mention of a Section number that isn't one of them.
+  const realSections = new Set([...text.matchAll(/^## Section (\d+):/gm)].map(m => m[1]));
+  const mentioned = new Set([...text.matchAll(/\bSection (\d+)\b/g)].map(m => m[1]));
+  for (const n of mentioned) {
+    if (!realSections.has(n)) {
+      findings.push({ check: "6c", severity: "FLAG", detail: `docs/STANDARDS.md mentions "Section ${n}" but no "## Section ${n}:" heading exists -- likely a stale cross-reference from a since-renumbered/removed section` });
     }
   }
 }
@@ -316,6 +363,7 @@ function main() {
   checkFeatureFile(findings, "FEATURES.md", true);
   checkFeatureFile(findings, "FEATURES-NEXT.md", true);
   checkFeatureFile(findings, "FEATURES-LATER.md", false);
+  checkStandardsDrift(findings);
 
   // Worktree cross-reference checks need the freshest possible CLAUDE-STATE.md/
   // FEATURES-ARCHIVE.md -- see freshDevText()'s comment for why the local
