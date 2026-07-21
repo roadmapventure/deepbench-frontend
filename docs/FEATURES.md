@@ -15,6 +15,8 @@
 
 **As of 2026-07-15, this legend governs existing IDs only — do not use it to assign new ones.** New IDs use `docs/SCREEN-INVENTORY.md`'s codes instead: screen-scoped items get `[SCREEN-CODE]-[NUMBER]` (`CHI`/`PRO`/`SPA`/`AGR`/`HOM`/`TMT`/`AIA`/`ABT`), non-screen platform-layer items get `[LAYER-CODE]-[NUMBER]` (`HAR`/`LOO`/`SCA`/`LOG`/`MCP`/`MKT`, plus `AG`/`SK`/`IN`/`FM`'s eventual replacement once `S-ARCH-COMPETENCY-MODEL-design` lands). **This line itself is already incomplete against `SCREEN-INVENTORY.md`'s fuller table (missing `DAT`/`AGT`/`SES`/`MOB`, all added there since) — added `SCA` here since it's this session's own work, not fixing the rest of the drift now.** Applies prospectively only — nothing below is renamed.
 
+**As of 2026-07-21 (`SES-006`), the number half of a new ID is no longer picked by reading this file — it's claimed atomically from Supabase's `feature_id_counter` table.** See `CLAUDE.md`'s concurrent-sessions hard rule (the one added 2026-07-21, right after rule #8) for the exact claim mechanism. Never assign a new number by eyeballing this file's or `FEATURES-NEXT.md`'s/`FEATURES-LATER.md`'s/`FEATURES-ARCHIVE.md`'s highest existing row and incrementing it yourself — that's the exact race this fixes.
+
 `[AREA]-[NUMBER]` (legacy, existing IDs only)
 Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables, `WO`=Work Order, `IN`=Intent, `FM`=Format, `SV`=Service, `SK`=Skills & Capabilities, `MI`=Market Intelligence, `AA`=Agent Architecture
 
