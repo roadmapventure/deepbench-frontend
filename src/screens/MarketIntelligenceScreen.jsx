@@ -1774,11 +1774,19 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   // > news). transitionDeps carries hypFlow?.stage/newsCards — the same 2 extra values the old
   // useEffect's dependency array had beyond the current key itself. resolved/freshDeps are new
   // (Part B/C of this session).
+  // FEATURE: CHI-51b — patch: the 3 hyp-related priority checks now also require
+  // !isHypResolved(hypFlow). Without this, useDrawerStack()'s suppression correctly blocks
+  // auto-open at the instant of resolution, but the moment it lifts (a genuinely new question
+  // arriving), the priority list still ranked hyp-result/hyp-draft/hyp-candidates above qa —
+  // isHypInResultPhase()/isHypAwaitingConfirmation() stay true forever post-resolution (Task 2's
+  // deliberate design, so the drawers keep rendering/reopenable) but that same truth must not
+  // also keep winning the auto-open race once the cycle is resolved. Render gates below (the
+  // drawers' own JSX conditions) are untouched — this only changes priority ranking.
   const { isOpen: isDrawerOpen, toggle: handleDrawerToggle } = useDrawerStack(
     [
-      ["hyp-draft", isHypAwaitingConfirmation(hypFlow)],
-      ["hyp-result", isHypInResultPhase(hypFlow)],
-      ["hyp-candidates", !!hypFlow],
+      ["hyp-draft", isHypAwaitingConfirmation(hypFlow) && !isHypResolved(hypFlow)],
+      ["hyp-result", isHypInResultPhase(hypFlow) && !isHypResolved(hypFlow)],
+      ["hyp-candidates", !!hypFlow && !isHypResolved(hypFlow)],
       ["qa", !!qaEvidence],
       ["news", newsCards !== undefined],
     ],
