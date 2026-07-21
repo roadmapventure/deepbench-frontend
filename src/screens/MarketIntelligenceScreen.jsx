@@ -1653,10 +1653,59 @@ function NewsCard({ card, loading, onClick }) {
 // qa review — mirrors the mutual exclusion the old inline gates (!hypFlow.confirmation,
 // stage === "result") already enforced implicitly, just centralized instead of scattered.
 function selectEvidenceFooterKind(qaEvidence, hypFlow) {
-  if (hypFlow?.confirmation) return "hyp-confirmation";
-  if (hypFlow?.hypothesisTest && hypFlow.stage === "result") return "hyp-result";
+  // FEATURE: CHI-51 — once resolved, no decision is pending anymore; both hyp branches below
+  // must not re-fire just because hypFlow.confirmation/hypothesisTest are still populated
+  // (Task 2a/2b deliberately keep them, for drawer persistence).
+  if (hypFlow?.confirmation && !hypFlow.resolution) return "hyp-confirmation";
+  if (hypFlow?.hypothesisTest && hypFlow.stage === "result" && !hypFlow.resolution) return "hyp-result";
   if (qaEvidence && !qaEvidence.reviewChoice) return "qa-review";
   return null;
+}
+
+// FEATURE: CHI-51 — generic drawer-stack orchestration service (STYLE-GUIDE.md §40/§29's shared
+// pattern, consolidated out of 5 previously-separate pieces of EvidenceColumn local state:
+// computeAutoCurrent(), manualOverride, the reset/auto-scroll effect, isDrawerOpen(),
+// handleDrawerToggle()). A caller uses this one hook instead of hand-rolling those pieces itself
+// — a future 6th drawer type extends the `priorityChecks` list, not five call sites.
+//
+// priorityChecks: ordered array of [key, isActive] pairs — first active entry wins (list
+// highest-priority first). scrollRef: the scroll container to reset-scroll on a genuine
+// transition. transitionDeps: extra values (beyond the computed current key itself) that should
+// also count as "a genuine transition" — e.g. a stage advancing without the key changing.
+// resolved: true once some tracked flow has concluded — today sourced from isHypResolved(hypFlow)
+// by this hook's one real caller, but this parameter itself is generic, not hyp-specific; a
+// future resolution-having drawer type would pass its own equivalent signal here, not add a
+// parallel mechanism. freshDeps: values whose next change ends the post-resolution quiet period
+// (a brand-new question, new content arriving) — deliberately separate from transitionDeps, since
+// "the same flow advancing a stage" and "something genuinely new arriving" are different events.
+function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, freshDeps) {
+  const autoCurrent = priorityChecks.find(([, active]) => active)?.[0] ?? null;
+  const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
+
+  useEffect(() => {
+    setManualOverride(null);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCurrent, ...transitionDeps]);
+
+  // FEATURE: CHI-51 — once `resolved` transitions true, suppress auto-open until freshDeps' next
+  // genuine change. Two separate effects, deliberately not one: `resolved` staying true forever
+  // (it's a permanent field once a theory cycle concludes) must not itself keep re-suppressing on
+  // every render — only the true transition (false→true) should flip suppression on.
+  const [suppressed, setSuppressed] = useState(false);
+  useEffect(() => { if (resolved) setSuppressed(true); }, [resolved]);
+  useEffect(() => {
+    setSuppressed(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, freshDeps);
+
+  const effectiveAutoCurrent = suppressed ? null : autoCurrent;
+  const isOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === effectiveAutoCurrent);
+  const toggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
+
+  return { isOpen, toggle };
 }
 
 function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare }) {
@@ -1703,6 +1752,14 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     return !!(hypFlow && hypFlow.confirmation);
   }
 
+  // FEATURE: CHI-51 — true once this theory cycle has been resolved (Info Only / Store as
+  // Forecast accepted / rejected) — hypFlow is no longer nulled on resolve (Task 2), so its
+  // drawers persist; this flag distinguishes "still live" from "done, read-only" for the
+  // footer/instructional gates and useDrawerStack's auto-open suppression.
+  function isHypResolved(hypFlow) {
+    return !!(hypFlow && hypFlow.resolution);
+  }
+
   // FEATURE: CHI-49 — the single "hyp" key splits into "hyp-candidates" (generating/choosing —
   // the offered choice) and "hyp-result" (testing onward — the test's own findings), per
   // STYLE-GUIDE.md §40's taxonomy decision record. Distinct mechanism from
@@ -1712,36 +1769,24 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   // once Nadia's proposal lands, Draft Forecast is the new arrival that should auto-open — Result
   // still exists underneath, just collapses, same "papers on a desk" persistence CHI-49 already
   // established for Candidates once a pick is made.
-  function computeAutoCurrent(qaEvidence, hypFlow, newsCards) {
-    if (isHypAwaitingConfirmation(hypFlow)) return "hyp-draft";
-    if (isHypInResultPhase(hypFlow)) return "hyp-result";
-    if (hypFlow) return "hyp-candidates";
-    if (qaEvidence) return "qa";
-    if (newsCards !== undefined) return "news";
-    return null;
-  }
-
-  const autoCurrent = computeAutoCurrent(qaEvidence, hypFlow, newsCards);
-  const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
-
-  // FEATURE: CHI-43 — reset any manual override, and re-scroll to the newest content, on every
-  // genuine state transition: a drawer appearing/disappearing (autoCurrent changes) or the same
-  // Theory drawer's content advancing a stage (generating->choosing->ready->testing->result). A
-  // user who manually reopened an old drawer to re-read it isn't yanked away by an unrelated event
-  // — only a real new arrival takes back the default view.
-  useEffect(() => {
-    setManualOverride(null);
-    if (evidenceScrollRef.current) {
-      evidenceScrollRef.current.scrollTo({ top: evidenceScrollRef.current.scrollHeight, behavior: "smooth" });
-    }
-    // FEATURE: CHI-46 — added newsCards: catches new content landing inside the News drawer while
-    // it's already autoCurrent (e.g., the loading skeleton resolving into real cards), so that
-    // arrival gets the same re-scroll-into-view treatment as a fresh qa/hyp arrival.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCurrent, hypFlow?.stage, newsCards]);
-
-  const isDrawerOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === autoCurrent);
-  const handleDrawerToggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
+  // FEATURE: CHI-51 — consolidated into useDrawerStack() (defined above EvidenceColumn). Priority
+  // order matches CHI-49/50's exact prior sequence (hyp-draft > hyp-result > hyp-candidates > qa
+  // > news). transitionDeps carries hypFlow?.stage/newsCards — the same 2 extra values the old
+  // useEffect's dependency array had beyond the current key itself. resolved/freshDeps are new
+  // (Part B/C of this session).
+  const { isOpen: isDrawerOpen, toggle: handleDrawerToggle } = useDrawerStack(
+    [
+      ["hyp-draft", isHypAwaitingConfirmation(hypFlow)],
+      ["hyp-result", isHypInResultPhase(hypFlow)],
+      ["hyp-candidates", !!hypFlow],
+      ["qa", !!qaEvidence],
+      ["news", newsCards !== undefined],
+    ],
+    evidenceScrollRef,
+    [hypFlow?.stage, newsCards],
+    isHypResolved(hypFlow),
+    [qaEvidence, newsCards]
+  );
 
   // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
   // `!qaEvidence && !hypFlow`, MI-59/CHI-03a/CHI-33/CHI-38) is deleted: its own News-rendering JSX
@@ -1961,7 +2006,10 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
                 Full Agent Routing & Answer Given in {formatElapsed(hypFlow.testElapsedMs)}
               </div>
             )}
-            {!hypFlow.confirmation && (
+            {/* FEATURE: CHI-51 — added !hypFlow.resolution: the Info Only path never sets
+                confirmation, so without this the "select an option" line would keep showing
+                inside a reopened, already-resolved Result drawer with no footer left to act on. */}
+            {!hypFlow.confirmation && !hypFlow.resolution && (
               <>
                 {st.override_warning && (
                   <div style={{padding:"9px 11px",background:"#f3e6cc",border:`1px solid ${T.brass}`,fontFamily:body,fontSize:11,color:T.brassDeep}}>
@@ -3331,7 +3379,10 @@ export default function MarketIntelligenceScreen() {
         console.error("[MarketIntelligenceScreen] ci-resolution-ack-intent", e.message);
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — noted as info only, not stored.", hopStart: infoOnlyAckHop, hopEnd: infoOnlyAckHop, totalElapsedMs: Date.now() - turnStart })]); // fallback, same copy CHI-03a shipped
       });
-    setHypFlow(null);
+    // FEATURE: CHI-51 — no longer nulls hypFlow; Candidates/Result stay rendered (collapsed,
+    // reopenable) instead of being destroyed. `resolution` is the new signal the footer/
+    // instructional gates and useDrawerStack's suppression key off of.
+    setHypFlow(prev => prev && ({ ...prev, resolution: "info_only" }));
   };
 
   // FEATURE: MI-01d — Track as Assumption / Make Permanent. Calls Elena (memory-consolidation,
@@ -3488,7 +3539,10 @@ export default function MarketIntelligenceScreen() {
             setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — that proposal was rejected, nothing was stored.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]);
           });
       }
-      setHypFlow(null);
+      // FEATURE: CHI-51 — no longer nulls hypFlow; Result/Draft Forecast stay rendered (collapsed,
+      // reopenable). Reuses the exact same "stored"/"rejected" vocabulary the ack calls above
+      // already use for task_context.resolution.
+      setHypFlow(prev => prev && ({ ...prev, resolution: resolution === "accept" ? "stored" : "rejected" }));
     } catch (e) {
       // FEATURE: AA-189 — this catch was previously missing entirely; any resolve failure (this
       // bug or a future one) silently stuck ConfirmationCard open with zero feedback. Symmetric to
