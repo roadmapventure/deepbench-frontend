@@ -1589,6 +1589,34 @@ Two AI Audit "By Pattern" integrity bugs from a prior live screenshot walkthroug
 
 **Verified directly against `ARCHITECTURE.md` before editing, not assumed:** grepped §19i's implementation-status table and confirmed `react` was already listed under "Roadmap/inactive," and confirmed `useAIActivity.js`'s `patternsActiveCount` is indeed a bare filter over `PATTERN_CATALOG` with no separate computation path — both claims in the kickoff doc checked fresh, not taken on trust.
 
+---
+
+## S-SES-006-design / S-SES-006 (v6.3.91, `1d18225`, 2026-07-21, worktree `design-ses-006-0721`)
+
+Atomic feature-ID counter, mirrors the existing `dev_version_counter` mechanism (`CLAUDE.md` rule #5) for the identical race on feature/backlog IDs: new Supabase table `feature_id_counter` (prefix-keyed, `next_number` column), seeded 12 active prefixes at their real high-water marks read from the 3 active `FEATURES*.md` files at seed time. `CLAUDE.md` and `docs/FEATURES.md`'s "Feature ID Format" section updated with the atomic-claim SQL (`INSERT ... ON CONFLICT DO UPDATE ... RETURNING`).
+
+Real repeated collisions this fixes: `AA-197`/`AA-198`, `CHI-13`/`CHI-14`, `HAR-02`/`AA-197` — all cases where two concurrent sessions independently picked the same next number by eyeballing the highest existing row.
+
+Node test 18/18 PASS (scratch-prefix atomic increment under simulated concurrency, real-prefix claim/rollback, RLS-off behavior matching project-wide convention). Live-verified: a real claim against a seeded prefix, confirmed the counter row incremented exactly once and no other prefix's row was touched.
+
+**Close-out:** `SES-006` archived ✅ Done. Full detail (seeding methodology, exact prefix/high-water-mark table): `docs/FEATURES-ARCHIVE.md`.
+
+---
+
+## S-DAT-6-design / S-DAT-6 (v6.3.94, `addb9a2`, 2026-07-21, worktree `design-confirmation-uuid-0721`)
+
+Found live during `CHI-42`'s own verification session (logged independently there as `AA-199`/`task_469f3123`, reconciled/superseded by this session's `DAT-6`/`LOO-17` before close-out — see `AA-199`'s row in `docs/FEATURES.md`). Traced end-to-end, not assumed: `writeLibrary()`'s `insert` operation (`lib/librarian.js`) ran a raw Postgres `the_library?id=eq.<supersedes_id>` lookup with zero UUID-format validation whenever `params.supersedes_id` was set. Live-reproduced twice against the real dev preview: a "Store as Forecast" commit on a hypothesis-test result populates `supersedes_id` with the new entry's own human-readable `chunk_id` slug (e.g. `geo-revenue-analysis-fy2025`), not a real row id, throwing Postgres `22P02`.
+
+**Identified as the same bug shape `AA-189` (✅ Done) already fixed at a sibling call site** — `AA-189`'s own kickoff doc explicitly named `supersedes_id` as "the same category" as the `source_chunk_ids` guard it added to `writeTheReasoning()`, but didn't touch it, leaving this site unguarded. Fix mirrors `AA-189` exactly: a `UUID_RE` format check before the lookup, reusing the existing `denied-supersedes-cross-room` tier on a malformed id — no new response shape, no schema change, 1 file.
+
+Node test 6/6 PASS, deleted before commit. `npm run build` clean. Version header updated on `lib/librarian.js`.
+
+**Live QA — honestly incomplete, not silently accepted as full PASS:** a fresh live click-through (new hypothesis flow → Store as Forecast → Accept) reached a new `ConfirmationCard` with the identical bug-shape `chunk_id`, confirming the repro path is real and current — but the follow-up write call hit real, live `Anthropic 529 overloaded` errors on 3 consecutive attempts (confirmed via raw network response bodies), external and unrelated to this fix, before ever reaching `writeLibrary()`. Per this repo's own guidance against looping retries on a known-flaky external call, the live Accept round-trip itself was not re-confirmed this session — flagged as the one open item, not silently closed.
+
+**Also found and logged, not fixed this session (deliberately split, one-feature-per-session discipline):** `LOO-17` — `resolveAccept()`/`markAcceptedDelegated()` flips a `pending_confirmations` row to `status:'accepted'` on a mere `durable_hops` checkpoint return (`{status:'in_progress', job_id}`), not only on a genuinely completed write. Confirmed live via direct Supabase query on 2 separate stuck rows (including one produced by this session's own Anthropic-overload hit) — `resolution` shows a stale in-progress checkpoint pointer while `status` already reads `accepted`, permanently blocking Edit/Reject (409) and turning further Accept clicks into retries of the same dead job. Generic to every `requires_human_confirmation` capability that can checkpoint, not specific to `DAT-6`. Needs its own design session — open question flagged to John: on a failed resume, revert the confirmation to `pending` (John's stated preference, matches `AA-189`'s existing "leave card open" precedent, zero new UI work) or a new distinct `accept_failed` status (more semantically precise, needs new UI treatment/approval). Logged as `LOO-17` in `docs/FEATURES.md`.
+
+**Close-out:** `DAT-6` marked 🔶 Partial in `docs/FEATURES.md` (code shipped + unit-tested + deployed; live Accept round-trip re-check still open, worth a quick retry once Anthropic capacity is normal — not archived to ✅ Done pending that). `LOO-17` stays `❌ Missing`, queued as next design session on this track. `AA-199` marked superseded, pointing to both.
+
 **Manual QA self-verified against the real deployed dev preview after push, not accepted on Node test + build alone:** all 9 checklist items PASS. Header's "Patterns Active" read `15/24` (was `16/24` pre-fix, dropped by exactly 1); "Not yet active · 7 patterns" now includes ReAct (confirmed by expanding it); a new "Uncatalogued · 1 pattern" bucket appeared below it, expanding to show "Reflection — Auto-detected — not yet catalogued, CALLS 18, COST $0.03" — distinct from the Reasoning section's own "Reflection" row (CALLS 6, COST $0.04, the current `reflect` slug) exactly as designed. Every other pattern row's calls/cost matched across checks (RAG 3363/$3.23, Tool Use 3470/$19.54, etc.), no unrelated shift. Repeated on a genuinely fresh 390×844 mobile tab (not just a resized desktop tab, which turned out to not reliably re-trigger the mobile breakpoint) via the hamburger menu's "AI Audit" entry — identical `15/24`, `Not yet active · 7`, `Uncatalogued · 1`. Zero console errors on both viewports. Direct Supabase query (`SELECT count(*) FROM ai_activity_log WHERE patterns_used::text ILIKE '%reflection%'`, project `rallojeqnkgtxgsdsnqm`) returned `18`, reconciling exactly with the Uncatalogued row's displayed call count.
 
 **Close-out:** `LOG-30`/`LOG-31`/`LOG-32`/`LOG-34` marked ✅ Done in `docs/FEATURES.md` (kept in place, not moved to `docs/FEATURES-ARCHIVE.md` — that file wasn't part of the kickoff's own commit scope; left for a future doc-hygiene sweep).
