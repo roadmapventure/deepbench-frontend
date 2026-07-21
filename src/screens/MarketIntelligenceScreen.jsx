@@ -1527,14 +1527,14 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
     <div style={{background:T.card,border:`1px solid ${T.line}`,borderLeft:`4px solid ${T.navy}`,borderRadius:0,position:"relative",flex:1}}>
       {/* FEATURE: CHI-05 */}
       <FeatureBadge id="CHI-05"/>
-      <div style={{background:T.cardAlt,padding:"7px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-        {/* FEATURE: CHI-21 — renamed from agent/screen identity ("Marcus Webb · Channel
-            Intelligence") to a purpose-describing title. */}
-        <span style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.navy}}>Analysis & Narrative — based on your question...</span>
-        <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
-      </div>
-      <div style={{borderTop:`1px solid ${T.line}`,borderBottom:`1px solid ${T.line}`}}>
+      {/* FEATURE: CHI-43 — own header row removed; its title text now lives as the wrapping Drawer's
+          `title` prop (EvidenceColumn, Task 2) so the two headers don't stack. HopBadge relocated to
+          the top of this now-headerless body, same visual weight, one level lower. */}
+      <div style={{borderBottom:`1px solid ${T.line}`}}>
         <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
+          <div style={{display:"flex",justifyContent:"flex-end"}}>
+            <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
+          </div>
           {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
           {(qa.body || []).map((b, i) => (
             <div key={i}>
@@ -1678,6 +1678,34 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     if (hypFlow && hypFlow.prefillText) { setCustomText(hypFlow.prefillText); setShowOwnTheory(true); }
   }, [hypFlow && hypFlow.prefillText]);
 
+  // FEATURE: CHI-43 — pure, testable: which of the 2 possible Evidence drawers should default to
+  // open. null when neither qaEvidence nor hypFlow exist yet (the true-empty-state branch below,
+  // unaffected by this session).
+  function computeAutoCurrent(qaEvidence, hypFlow) {
+    if (hypFlow) return "hyp";
+    if (qaEvidence) return "qa";
+    return null;
+  }
+
+  const autoCurrent = computeAutoCurrent(qaEvidence, hypFlow);
+  const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
+
+  // FEATURE: CHI-43 — reset any manual override, and re-scroll to the newest content, on every
+  // genuine state transition: a drawer appearing/disappearing (autoCurrent changes) or the same
+  // Theory drawer's content advancing a stage (generating->choosing->ready->testing->result). A
+  // user who manually reopened an old drawer to re-read it isn't yanked away by an unrelated event
+  // — only a real new arrival takes back the default view.
+  useEffect(() => {
+    setManualOverride(null);
+    if (evidenceScrollRef.current) {
+      evidenceScrollRef.current.scrollTo({ top: evidenceScrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCurrent, hypFlow?.stage]);
+
+  const isDrawerOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === autoCurrent);
+  const handleDrawerToggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
+
   // FEATURE: CHI-03a — Task 3's submitted-theory block gate: hypFlow.chosenText already carries
   // this text (set by onSelectHypothesis's startTest branch) -- no new state. Renders once the test
   // has actually started (testing/result stages, or confirmation set), stacked below the qa card.
@@ -1786,8 +1814,19 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
 
         {/* FEATURE: CHI-03a — Task 1's extracted card, independent of hypFlow: renders the instant
             Marcus has an answer, whether or not a hypothesis flow is ever started. */}
-        {qaEvidence && <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>}
+        {/* FEATURE: CHI-43 — wrapped in a controlled Drawer (STYLE-GUIDE.md §40): auto-opens/collapses
+            per isDrawerOpen("qa"), still one click to reopen manually. QaEvidenceCard's own header row
+            was removed (Task 3) so this Drawer's title is the card's only header. */}
+        {qaEvidence && (
+          <Drawer title="Analysis & Narrative — based on your question..." open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}>
+            <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
+          </Drawer>
+        )}
 
+        {/* FEATURE: CHI-43 — wrapped in a controlled Drawer (STYLE-GUIDE.md §40): auto-opens/collapses
+            per isDrawerOpen("hyp"), stays open throughout a theory flow's stage transitions. */}
+        {hypFlow && (
+        <Drawer title={INTENT_LABEL[hypFlow.intent] || hypFlow.intent} open={isDrawerOpen("hyp")} onToggle={handleDrawerToggle("hyp")}>
         {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
             chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
             carries this text (onSelectHypothesis's startTest branch). */}
@@ -1798,8 +1837,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           </div>
         )}
 
-        {hypFlow && (
-        <>
         {/* FEATURE: MI-59 — shared sentence, intent-prefixed. The MI-59 kickoff doc specced this as
             rendering "above the intent-toggle buttons," but MI-51 already removed that button row
             entirely (onIntentChange is kept only for call-site parity, no longer invoked here — see
@@ -1931,7 +1968,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           </>
         )}
 
-        </>
+        </Drawer>
         )}
         </div>
         <ScrollFadeHint show={evidenceCanScrollMore} bg={T.cardAlt}/>

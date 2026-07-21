@@ -340,8 +340,13 @@ export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, v
 // the bottom of the content wrapper that lets the user grow the drawer past its default maxHeight,
 // clamped via clampDrawerHeight() above. Not persisted — dragHeight is plain component state, resets
 // to null (→ default maxHeight) on every remount/reload.
-export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined }) => {
-  const [open, setOpen] = useState(defaultOpen);
+// FEATURE: CHI-43 — new opt-in controlled `open`/`onToggle` props (STYLE-GUIDE.md §29 amendment).
+// Backward-compatible: no existing call site passes `open`, so `controlledOpen` is undefined for all
+// of them and `open` falls back to the same internal state as before, byte-identical behavior.
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined }) => {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
   const [dragHeight, setDragHeight] = useState(null);
   const contentRef = useRef(null);
 
@@ -351,7 +356,8 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
   const toggle = () => {
     const willOpen = !open;
     if (willOpen && onOpen) onOpen();
-    setOpen(willOpen);
+    if (isControlled) { if (onToggle) onToggle(willOpen); }
+    else { setInternalOpen(willOpen); }
   };
 
   const effectiveHeight = dragHeight == null
