@@ -1,0 +1,1 @@
+- `design-apple-readiness-0717` (design session) — active, ongoing design conversation on Apple demo readiness, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).

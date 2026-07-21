@@ -1,0 +1,1 @@
+- `design-ses-009-0721` (design session, worktree `design-ses-009-0721`) — working `SES-009` (persistent regression suite for Category K/M + extending session-hygiene to watch `STANDARDS.md` drift). Scoping now.

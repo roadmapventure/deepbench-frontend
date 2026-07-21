@@ -1,0 +1,1 @@
+- `design-0720` (design session) — active, ongoing design conversation, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`) — topic not yet written down; worktree name is a bare date, no topic hint.

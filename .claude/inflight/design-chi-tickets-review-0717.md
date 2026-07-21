@@ -1,0 +1,1 @@
+- `design-chi-tickets-review-0717` (design session) — active, ongoing design conversation reviewing CHI tickets, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).

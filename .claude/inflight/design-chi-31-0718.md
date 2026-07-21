@@ -1,0 +1,1 @@
+- `design-chi-31-0718` (design session) — active, ongoing design conversation on `CHI-31`, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).
