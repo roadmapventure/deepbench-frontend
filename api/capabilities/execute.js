@@ -1,3 +1,4 @@
+// DeepBench v6.3.87 | api/capabilities/execute.js | S-LOO-014 -- originating agent's delegation_complete credit now fires before the 'delegation' placeholder, fixing hop-order (was: target numbered before originator)
 // DeepBench v6.3.86 | api/capabilities/execute.js | S-LOO-012 -- delegation_complete events now carry real content (reasoning/task) at the two call sites that previously had none
 // DeepBench v6.3.81 | api/capabilities/execute.js | S-LOO-011 -- delegation_complete event added to credit the originating agent's own turn in the plain delegate_to_agent + final branch
 // DeepBench v6.3.74 | api/capabilities/execute.js | S-LOO-009d -- delegation_complete event added for the broker's own leg in the request_help + delegationRequired auto-resolve branch
@@ -521,6 +522,26 @@ async function dispatchDelegation({
   } else if (via_tool === 'delegate_to_agent') {
     const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = tool_input;
     const delegateTaskContext = (task_context && typeof task_context === 'object') ? { ...task_context, delegation_task: task } : { delegation_task: task };
+    // FEATURE: LOO-014 — delegationRequired/tool_input.is_final are both already known here, before
+    // any dispatch happens — neither depends on the nested call's result. Computed once, reused
+    // below, so the early-fire decision and the existing final-branch check share one evaluation,
+    // never two independently-computed conditions that could drift out of sync.
+    const willResolveFinal = delegationRequired || tool_input.is_final === true;
+    if (willResolveFinal) {
+      // FEATURE: LOO-014 — moved from after the nested call resolves (LOO-011's original position)
+      // to here, before the 'delegation' announcement below creates its own placeholder. Fixes a
+      // real hop-order bug found live 2026-07-21 (John's screenshot): hop numbers are array-creation
+      // order, oldest first: the 'delegation' announcement below always created the EARLIEST row for
+      // this exchange, so the target's own credit (LOO-009, which claims that early row in place)
+      // kept the early position even though its content arrives last — while the originator's credit
+      // (LOO-011), firing only after the nested call resolved, always created a genuinely later row.
+      // Result: target numbered before originator, backwards from real chronology. Firing here
+      // instead gives the originator's own row the true earliest position — their real work
+      // genuinely happens first — while the 'delegation' placeholder (and the target's later claim
+      // on it) correctly becomes the second, later hop. Content unchanged from LOO-011/LOO-012 — only
+      // the firing point moved.
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null });
+    }
     onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
@@ -530,22 +551,8 @@ async function dispatchDelegation({
     if (delegateResult.status === 'in_progress') {
       return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
     }
-    if (delegationRequired || tool_input.is_final === true) {
-      // FEATURE: LOO-011 — credits the ORIGINATING agent's own turn (real work, up to and including
-      // the decision to delegate) — previously invisible once the target's own completion (below)
-      // claimed the 'delegation' placeholder above and overwrote it in place. Fires only in this
-      // FINAL branch: the ordinary returning case (this same agent keeps its own turn and eventually
-      // answers directly) is already credited by callCapability()'s own automatic Shape-1 detection
-      // once the whole call resolves (LOO-010) — firing here too would double-credit that case, so
-      // this is scoped exactly to the one branch that previously had no credit for the originator at
-      // all. Fires unconditionally, not gated on "did this agent's own turn do enough work to
-      // deserve it" — every real agent turn is its own hop, full stop, no judgment call needed here.
-      // FEATURE: LOO-012 — attaches the task description this agent itself wrote for its target
-      // (already destructured as `task` above from tool_input) — real content the old system never
-      // had (it never credited this agent at all), more informative than a bare name.
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null });
-      // FEATURE: LOO-009 — same gap, second dispatch shape: a plain delegate_to_agent call that
-      // resolves final also never fired a completion event for the agent it named as final.
+    if (willResolveFinal) {
+      // FEATURE: LOO-009 — unchanged: credits the target, claiming the 'delegation' placeholder above.
       onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
     }
