@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench | scripts/check-session-docs.js | SES-010
+// DeepBench v6.3.105 | scripts/check-session-docs.js | SES-011
 //
 // Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d --
 // previously a markdown checklist a session had to remember to run by hand
@@ -160,6 +160,25 @@ function freshDevText(relPath, localFallbackText) {
   }
 }
 
+// Directory counterpart to freshDevText() -- same staleness rationale: another
+// session's inflight file may have been added/removed on origin/dev more
+// recently than this worktree's own checkout. Lists blob paths via ls-tree
+// (works even though .claude/inflight/ may not exist locally in every worktree
+// yet), then fetches each file's content the same way freshDevText() already does.
+function freshDevDirEntries(relDirPath) {
+  let names;
+  try {
+    const out = execFileSync("git", ["-C", SHARED_CHECKOUT, "ls-tree", "--name-only", "origin/dev", "--", relDirPath], { encoding: "utf8" });
+    names = out.split("\n").map(l => l.trim()).filter(Boolean).map(p => path.basename(p));
+  } catch {
+    return []; // directory doesn't exist yet on origin/dev, or git unavailable
+  }
+  return names.map(name => ({
+    name: name.replace(/\.md$/, ""),
+    text: freshDevText(`${relDirPath}/${name}`, null),
+  })).filter(e => e.text !== null);
+}
+
 // Generic section-bullet extractor -- "In flight now" and "Last 3 sessions"
 // are both a bolded header followed by a run of "- " lines up to the next
 // bolded header or "---" break. Shared by extractInFlightBullets() (needs the
@@ -175,13 +194,14 @@ function extractSectionLines(stateText, header) {
   return window.split("\n").filter(l => /^\-\s/.test(l));
 }
 
+// (Retargeted 2026-07-21, SES-011 -- "In flight now" is no longer a
+// CLAUDE-STATE.md text block a session's status lives in; each session now
+// writes its own .claude/inflight/<short-session-name>.md file instead. The
+// stateText param is intentionally unused now -- kept in the signature so
+// call sites (checkWorktrees, checkBulletStaleness) don't need to change,
+// only what feeds them.)
 function extractInFlightBullets(stateText) {
-  const bullets = [];
-  for (const line of extractSectionLines(stateText, "**In flight now:**")) {
-    const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i);
-    if (nameMatch) bullets.push({ name: nameMatch[1], text: line });
-  }
-  return bullets;
+  return freshDevDirEntries(".claude/inflight");
 }
 
 // ---- Check 1b: per-entry character cap (added 2026-07-21, John asked directly
@@ -197,18 +217,24 @@ function extractInFlightBullets(stateText) {
 const ENTRY_LENGTH_CAP = 800;
 
 function checkEntryLengths(findings, stateText) {
-  const sections = [
-    { header: "**In flight now:**", label: "In flight now" },
-    { header: "**Last 3 sessions:**", label: "Last 3 sessions" },
-  ];
-  for (const { header, label } of sections) {
-    for (const line of extractSectionLines(stateText, header)) {
-      const len = line.length;
-      if (len > ENTRY_LENGTH_CAP) {
-        const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i) || line.match(/^-\s*(\S+)/);
-        const label2 = nameMatch ? nameMatch[1] : line.slice(0, 40) + "...";
-        findings.push({ check: "1b", severity: "FLAG", detail: `"${label}" entry "${label2}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
-      }
+  // "In flight now" (retargeted 2026-07-21, SES-011): each session's status is
+  // now a whole .claude/inflight/<name>.md file, not a CLAUDE-STATE.md bullet
+  // -- the file's full text is the "entry" this check caps.
+  for (const entry of freshDevDirEntries(".claude/inflight")) {
+    const len = entry.text.length;
+    if (len > ENTRY_LENGTH_CAP) {
+      findings.push({ check: "1b", severity: "FLAG", detail: `"In flight now" entry "${entry.name}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
+    }
+  }
+
+  // "Last 3 sessions" is unmoved (Context's explicit scope decision, SES-011)
+  // -- still a CLAUDE-STATE.md text block, checked the same way as before.
+  for (const line of extractSectionLines(stateText, "**Last 3 sessions:**")) {
+    const len = line.length;
+    if (len > ENTRY_LENGTH_CAP) {
+      const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i) || line.match(/^-\s*(\S+)/);
+      const label2 = nameMatch ? nameMatch[1] : line.slice(0, 40) + "...";
+      findings.push({ check: "1b", severity: "FLAG", detail: `"Last 3 sessions" entry "${label2}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
     }
   }
 }
