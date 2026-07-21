@@ -1,3 +1,4 @@
+// DeepBench v6.3.74 | api/capabilities/execute.js | S-LOO-009d -- delegation_complete event added for the broker's own leg in the request_help + delegationRequired auto-resolve branch
 // DeepBench v6.3.71 | api/capabilities/execute.js | S-LOO-009 -- delegation_complete event added at both dispatchDelegation() final-outcome returns
 // DeepBench v6.3.49 | api/capabilities/execute.js | S-HAR-04 -- runLoop()'s two call sites (callModel(), sendRequest()) now pass their existing deadline value through, no new computation
 // DeepBench v6.3.28 | api/capabilities/execute.js | S-ARCH-LOOP-CONTINUITY-01 (LOO-001/LOO-004) -- requesting_agent_id threaded into request_help's task_context; is_active gate added to resolveCapabilityHolder()
@@ -480,6 +481,14 @@ async function dispatchDelegation({
       if (!rec?.recommended_agent_id || !matchedCandidate) {
         throw new Error(`request_help: delegationRequired capability's agent-selection-intent response had no valid recommended_agent_id matching a real candidate (capability_slug: ${capability_slug}/${intent_slug})`);
       }
+      // FEATURE: LOO-009d — the broker's own leg (this request_help call to pmAgentId) just
+      // resolved with a real pick. This delegationRequired path takes an early 'final' return
+      // below and never reaches the ordinary returningFromAgentId/delegation_return block further
+      // down in this function (the signal that already correctly covers the non-delegationRequired
+      // case) — so this leg needs its own explicit completion event here, or the broker's real,
+      // completed work stays permanently invisible. Fires only after the candidate is confirmed
+      // valid, never on the throw path above.
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
         : { delegation_task: tool_input.task_description || tool_input.skill_needed };
