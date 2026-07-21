@@ -1,3 +1,4 @@
+// DeepBench v6.3.106 | MarketIntelligenceScreen.jsx | S-CHI-49 -- single Theory drawer splits into "{intent} Candidates" (generating/choosing) and "{intent} Result" (testing onward), per STYLE-GUIDE.md §40's taxonomy decision record
 // DeepBench v6.3.97 | MarketIntelligenceScreen.jsx | S-CHI-44 -- theory selection auto-advances into the test (no more "ready" stage/second click); submitted-theory block stays visible during the "committing" stage instead of going blank
 // DeepBench v6.3.86 | MarketIntelligenceScreen.jsx | S-LOO-012 -- delegation_complete drawer rows (describePipelineEvent) now render real reasoning/task/service-label content instead of a bare "has finished." template
 // DeepBench v6.3.77 | MarketIntelligenceScreen.jsx | S-LOO-010 -- automatic agent-crediting via display_agent_id, hopEvents mechanism fully removed
@@ -1686,8 +1687,21 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   // final `return null` below in real usage — kept as an explicit check (not collapsed to
   // `return "news"` unconditionally) as a defensive guard against a future caller that omits
   // the prop entirely.
+  // FEATURE: CHI-49 — pure, testable: true once a theory has been chosen and a test is
+  // running/landed/being acted on. Shared between computeAutoCurrent (below) and the Result
+  // drawer's own render gate so the two can never drift out of sync on which stages count.
+  function isHypInResultPhase(hypFlow) {
+    return !!(hypFlow && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.stage === "committing" || hypFlow.confirmation));
+  }
+
+  // FEATURE: CHI-49 — the single "hyp" key splits into "hyp-candidates" (generating/choosing —
+  // the offered choice) and "hyp-result" (testing onward — the test's own findings), per
+  // STYLE-GUIDE.md §40's taxonomy decision record. Distinct mechanism from
+  // selectEvidenceFooterKind()'s own "hyp-result" string below (the pinned-footer decision key,
+  // not a drawer key) — same English word for the same real-world phase, not a shared constant.
   function computeAutoCurrent(qaEvidence, hypFlow, newsCards) {
-    if (hypFlow) return "hyp";
+    if (isHypInResultPhase(hypFlow)) return "hyp-result";
+    if (hypFlow) return "hyp-candidates";
     if (qaEvidence) return "qa";
     if (newsCards !== undefined) return "news";
     return null;
@@ -1715,14 +1729,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   const isDrawerOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === autoCurrent);
   const handleDrawerToggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
 
-  // FEATURE: CHI-03a — Task 3's submitted-theory block gate: hypFlow.chosenText already carries
-  // this text (set by onSelectHypothesis) -- no new state. Renders once the test
-  // has actually started (testing/result/committing stages, or confirmation set), stacked below the qa card.
-  // FEATURE: CHI-44 — added "committing" so this block doesn't disappear the instant "Store as
-  // Forecast" is clicked; Column 1's existing elapsed-timer status strip already covers live-progress
-  // narration during the wait, this just keeps Column 2 from looking blank/frozen in the meantime.
-  const showSubmittedTheory = !!(hypFlow && hypFlow.chosenText && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.stage === "committing" || hypFlow.confirmation));
-
   // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
   // `!qaEvidence && !hypFlow`, MI-59/CHI-03a/CHI-33/CHI-38) is deleted: its own News-rendering JSX
   // is relocated, byte-identical, into the "News" Drawer below (now the scroll body's first child,
@@ -1735,6 +1741,9 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
   const footerKind = selectEvidenceFooterKind(qaEvidence, hypFlow);
+  // FEATURE: CHI-49 — shared derived state for the 2-drawer split (Task 2).
+  const intentLabel = hypFlow ? (INTENT_LABEL[hypFlow.intent] || hypFlow.intent) : null;
+  const hypChosen = !!(hypFlow && hypFlow.chosenText);
 
   return (
     // FEATURE: MI-54 — bounded to the grid row height with an internal scroll region, matching
@@ -1745,6 +1754,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
       <FeatureBadge id="MI-59"/>
       <FeatureBadge id="CHI-26"/>
       <FeatureBadge id="CHI-29"/>
+      <FeatureBadge id="CHI-49"/>
       {/* FEATURE: CHI-34 — renamed "Evidence & Interaction" -> "News & Evidence".
           FEATURE: CHI-35 — suppressed on mobile (bare=true): the tab button above it already
           names the column there; desktop keeps it, no tab affordance to rely on instead. */}
@@ -1816,34 +1826,19 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           </Drawer>
         )}
 
-        {/* FEATURE: CHI-43 — wrapped in a controlled Drawer (STYLE-GUIDE.md §40): auto-opens/collapses
-            per isDrawerOpen("hyp"), stays open throughout a theory flow's stage transitions. */}
+        {/* FEATURE: CHI-49 — Theory splits into 2 drawers (STYLE-GUIDE.md §40 taxonomy decision
+            record): Candidates (the offered choice, generating/choosing) and Result (the test's
+            own findings, testing onward). Candidates renders whenever hypFlow exists — it never
+            disappears once a pick is made, same "papers on a desk" persistence as every other
+            drawer in this cluster; it just collapses and its title gains a chosen-summary. */}
         {hypFlow && (
-        <Drawer title={INTENT_LABEL[hypFlow.intent] || hypFlow.intent} open={isDrawerOpen("hyp")} onToggle={handleDrawerToggle("hyp")}
-          headerRight={<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/>}>
-        {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
-            chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
-            carries this text (set by onSelectHypothesis). */}
-        {showSubmittedTheory && (
-          <div style={{background:T.card,border:`1px solid ${T.lineSoft}`,padding:"9px 11px"}}>
-            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.brassDeep,marginBottom:4}}>Submitted theory</div>
-            <div style={{fontSize:12,lineHeight:1.5,color:T.ink}}>{hypFlow.chosenText}</div>
-          </div>
-        )}
+        <Drawer title={hypChosen ? `${intentLabel} Candidates — ${hypFlow.candidates?.length ?? 0} offered, chose: "${hypFlow.chosenText}"` : `${intentLabel} Candidates`}
+          count={!hypChosen ? (hypFlow.candidates?.length ?? null) : null}
+          open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}>
 
-        {/* FEATURE: MI-59 — shared sentence, intent-prefixed. The MI-59 kickoff doc specced this as
-            rendering "above the intent-toggle buttons," but MI-51 already removed that button row
-            entirely (onIntentChange is kept only for call-site parity, no longer invoked here — see
-            the MI-51 comment just below) — there is no toggle row left to anchor to, so this renders
-            directly under the header instead, in the same position the toggle row used to occupy. */}
         <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
           {getEvidencePanelSentence(hypFlow)}
         </div>
-
-        {/* FEATURE: MI-51 — Theory/Forecast/Correct switcher REMOVED. hypFlow.intent is still set at
-            entry (enterHypothesisFlow, direct-typed classification via runIntentPipeline) and still
-            passed through unchanged to onSelectHypothesis/onCommit; it is simply no longer a visible,
-            switchable control. */}
 
         {hypFlow.stage === "generating" && (
           /* FEATURE: MI-62 */
@@ -1888,6 +1883,52 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           </div>
         )}
 
+        {/* FEATURE: CHI-49 — read-only recap once a theory has been picked: reopening this
+            drawer after it collapses shows what was offered (same list, unchanged, no click
+            handlers) with the chosen one marked, instead of an empty body. Only renders when
+            candidates is real — defensive: the extracted-hypothesis entry path (enterHypothesisFlow
+            with extractedHypothesis set) can reach hypChosen with candidates still null; the
+            collapsed title's own chosen-summary already covers that case on its own. */}
+        {hypChosen && hypFlow.candidates && (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Offered</div>
+            {hypFlow.candidates.map(h => (
+              <div key={h.id}
+                style={{padding:"9px 11px",background:T.card,border:`1px solid ${h.text === hypFlow.chosenText ? T.brassDeep : T.lineSoft}`,fontFamily:body,fontSize:12,color:T.ink,display:"flex",gap:8}}>
+                <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{h.id}</span>
+                <span>{h.text}</span>
+                {h.text === hypFlow.chosenText && (
+                  <span style={{marginLeft:"auto",fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.brassDeep,flexShrink:0}}>Chosen</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        </Drawer>
+        )}
+
+        {/* FEATURE: CHI-49 — Result drawer: only exists once a theory has actually been chosen
+            (testing onward) — nothing to show before that, so it doesn't render prematurely
+            alongside Candidates. Auto-opens the instant it starts existing (isHypInResultPhase
+            true the same render CHI-44's auto-fire sets stage:"testing"). */}
+        {isHypInResultPhase(hypFlow) && (
+        <Drawer title={`${intentLabel} Result`} open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
+          headerRight={<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/>}>
+
+        {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
+            chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
+            carries this text (set by onSelectHypothesis). FEATURE: CHI-49 — relocated here (was
+            in the single combined drawer) since it's context for the test's own findings, not
+            the candidate-offering step — the Candidates drawer's collapsed title already names
+            the chosen text on its own. */}
+        {hypFlow.chosenText && (
+          <div style={{background:T.card,border:`1px solid ${T.lineSoft}`,padding:"9px 11px"}}>
+            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.brassDeep,marginBottom:4}}>Submitted theory</div>
+            <div style={{fontSize:12,lineHeight:1.5,color:T.ink}}>{hypFlow.chosenText}</div>
+          </div>
+        )}
+
         {hypFlow.stage === "testing" && (
           /* FEATURE: MI-62 */
           <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
@@ -1906,13 +1947,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
                 Full Agent Routing & Answer Given in {formatElapsed(hypFlow.testElapsedMs)}
               </div>
             )}
-            {/* FEATURE: MI-66 — decision control (override warning + instructional copy + Info Only/Store
-                as Forecast buttons) moved to the top: this is the real human decision point (HITL control)
-                on this screen, distinct from the later ConfirmationCard gate below, and it previously
-                rendered last, after a full read of the supporting evidence. override_warning now shares
-                the buttons' !hypFlow.confirmation gate -- a deliberate behavior change confirmed with
-                John: it no longer stays visible once the buttons are replaced by the ConfirmationCard
-                during Nadia's draft-review stage; it belongs to the decision moment, not the whole flow. */}
             {!hypFlow.confirmation && (
               <>
                 {st.override_warning && (
@@ -1934,9 +1968,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               </div>
             )}
 
-            {/* FEATURE: MI-51 — honest verdict: Supports/Complicates/Consider always render when
-                present (mirrors MessageBubble's existing hypothesis_test rendering). Reordered below the
-                decision control and evidence tables/chart per MI-66. */}
             <div style={{display:"flex",flexDirection:"column",gap:9}}>
               {st.supports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.supports.text || st.supports}</p></div>)}
               {st.complicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.complicates.text || st.complicates}</p></div>)}
