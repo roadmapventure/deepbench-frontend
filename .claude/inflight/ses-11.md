@@ -1,1 +1,0 @@
-- `ses-11` (design session) — closing out `SES-011` (lighter-weight bookkeeping path + per-session inflight files, `docs/kickoffs/v6.3.105-SES-011-lightweight-bookkeeping-path.md`); performing this file's own migration as part of close-out.
