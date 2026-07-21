@@ -40,7 +40,7 @@ Branch: commit directly to `dev`. No feature branches.
 2. Max 3 files modified per session
 3. Max 4 tasks per kickoff doc
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
-5. Node.js test must pass before any commit
+5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a)
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
@@ -127,6 +127,8 @@ Mandatory K tests:
 - Label-based dedup (not ID-based) for LLM-generated steps
 - Answers snapshot overlaid before unanswered detection fires
 
+**Persistence (added 2026-07-21, SES-009a):** any Category K test written this session is also persisted as a new file in `tests/regression/`, named `<feature-id>-<slug>.js`, importing the real implementation under test (never a hardcoded reimplementation) — unlike the session's own inline test, this file is never deleted.
+
 **M. Cross-Reference Consistency Tests** — REQUIRED for any session that touches data shared across more than one file: `PATTERN_CATALOG`, `aiPatterns.js` (`AI_PAT` constants, `AGENT_PATTERNS` map), AiBadge label strings, `SERVICE_CATALOG`, `AGENT_NAMES`, `AVATAR_CFG`, `agent_configs` schema, or any shared constant map. Also required for any session that introduces a new constant, slug, or status flag that will be referenced in more than one file.
 
 Mandatory M tests:
@@ -137,6 +139,8 @@ Mandatory M tests:
 - Every service slug in `SERVICE_CATALOG` with `roadmap: 'now'` has a corresponding live implementation (verified by checking that the relevant `api/` route or inline logic exists)
 - No slug, constant, or status value appears with conflicting definitions across the files that reference it
 - Any new constant introduced this session is defined in exactly one place and imported everywhere else — never redefined
+
+**Persistence (added 2026-07-21, SES-009a):** any Category M test written this session is also persisted as a new file in `tests/regression/`, same convention as Category K above.
 
 **L. Live API Integration Tests** — REQUIRED for any session that modifies an `api/` endpoint, modifies code that calls an `api/` endpoint, adds retry logic, or changes any payload sent to an API endpoint. Pure logic tests cannot catch LLM response shape issues; a live call test catches these before the code ships.
 
@@ -242,9 +246,11 @@ Complete every item before committing. This is the canonical "standing checklist
 
 ### Category K — Component State Initialization
 - [ ] All mandatory K tests (Section 4) pass — see Section 4 for the full list
+- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
 
 ### Category M — Cross-Reference Consistency
 - [ ] All mandatory M tests (Section 4) pass — see Section 4 for the full list
+- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
 - [ ] `node scripts/check-ai-logging-coverage.js` run and reviewed for any session adding or touching a real LLM/embedding call site — new CRITICAL findings must be resolved before commit; new WARNING findings must at least be looked at and either fixed or explicitly logged as a follow-up ID, not silently ignored
 
 ### Category L — Live API Integration
