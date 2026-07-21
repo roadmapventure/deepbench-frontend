@@ -21,8 +21,19 @@
 
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 
-const ROOT = process.cwd();
+function arg(name, fallback) {
+  const prefix = `--${name}=`;
+  const hit = process.argv.find(a => a.startsWith(prefix));
+  return hit ? hit.slice(prefix.length) : fallback;
+}
+
+// FEATURE: SES-010 -- added --worktree flag, same cwd-sensitivity fix already
+// applied to check-session-docs.js/check-kickoff-doc.js. A bare process.cwd()
+// silently scans the wrong directory (returns "clean" with zero files found)
+// when this script is invoked from outside the target worktree.
+const ROOT = arg("worktree", process.cwd());
 
 const SERVER_DIRS = ["api", "lib"];
 const CLIENT_DIR = "src";
@@ -113,7 +124,45 @@ function checkClientFile(filePath) {
   return findings;
 }
 
-function main() {
+// FEATURE: SES-010 -- mechanizes STANDARDS.md Section 12's SERVICE_CATALOG
+// roadmap rule: "when any api/ route or service capability ships in a coding
+// session, that session MUST update the corresponding SERVICE_CATALOG entry
+// from roadmap: 'next'/'later' to roadmap: 'now' in the same commit." This
+// exact drift has already happened twice (see ai-patterns.js's own BUG-22
+// comments: "prompt-assembly is live; move off roadmap", "ai-enrichment is
+// live (16 calls); move off roadmap") -- both caught by hand, after the fact.
+//
+// Heuristic, not a formal verifier: cross-references each non-'now'
+// SERVICE_CATALOG slug against real api/ file basenames on disk (normalizing
+// dashes). A same-named file existing is a strong signal the service has
+// shipped, but doesn't prove it -- a human confirms before flipping the flag,
+// same review posture as every other finding in this script.
+async function checkServiceCatalogRoadmap(root) {
+  let SERVICE_CATALOG;
+  try {
+    ({ SERVICE_CATALOG } = await import(pathToFileURL(path.join(root, "shared", "ai-patterns.js")).href));
+  } catch (e) {
+    return [{ severity: "WARNING", file: path.join(root, "shared/ai-patterns.js"), detail: `could not import to check roadmap staleness: ${e.message}` }];
+  }
+
+  const apiFiles = [...walk(path.join(root, "api"), [".js"])];
+  const apiBasenames = new Set(apiFiles.map(f => path.basename(f, ".js")));
+
+  const findings = [];
+  for (const svc of SERVICE_CATALOG) {
+    if (svc.roadmap === "now") continue;
+    if (apiBasenames.has(svc.slug)) {
+      findings.push({
+        severity: "WARNING",
+        file: path.join(root, "shared/ai-patterns.js"),
+        detail: `SERVICE_CATALOG slug "${svc.slug}" has roadmap: '${svc.roadmap}', but a same-named api/ file exists on disk -- confirm whether this should flip to roadmap: 'now'`,
+      });
+    }
+  }
+  return findings;
+}
+
+async function main() {
   const findings = [];
 
   for (const dir of SERVER_DIRS) {
@@ -128,6 +177,8 @@ function main() {
   for (const f of clientFiles) {
     findings.push(...checkClientFile(f));
   }
+
+  findings.push(...(await checkServiceCatalogRoadmap(ROOT)));
 
   const critical = findings.filter(f => f.severity === "CRITICAL");
   const warning = findings.filter(f => f.severity === "WARNING");
@@ -152,3 +203,7 @@ function main() {
 }
 
 main();
+// main() is now async (checkServiceCatalogRoadmap uses dynamic import()) --
+// process.exit() inside it still terminates correctly once its own promise
+// chain resolves; no top-level await needed since main() never returns a
+// value the caller uses.
