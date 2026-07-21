@@ -1,3 +1,4 @@
+// DeepBench v6.3.97 | MarketIntelligenceScreen.jsx | S-CHI-44 -- theory selection auto-advances into the test (no more "ready" stage/second click); submitted-theory block stays visible during the "committing" stage instead of going blank
 // DeepBench v6.3.86 | MarketIntelligenceScreen.jsx | S-LOO-012 -- delegation_complete drawer rows (describePipelineEvent) now render real reasoning/task/service-label content instead of a bare "has finished." template
 // DeepBench v6.3.77 | MarketIntelligenceScreen.jsx | S-LOO-010 -- automatic agent-crediting via display_agent_id, hopEvents mechanism fully removed
 // (Prior header, kept for history: CHI-32 — patches CHI-30: rotation split changed
@@ -1707,9 +1708,12 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   const handleDrawerToggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
 
   // FEATURE: CHI-03a — Task 3's submitted-theory block gate: hypFlow.chosenText already carries
-  // this text (set by onSelectHypothesis's startTest branch) -- no new state. Renders once the test
-  // has actually started (testing/result stages, or confirmation set), stacked below the qa card.
-  const showSubmittedTheory = !!(hypFlow && hypFlow.chosenText && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.confirmation));
+  // this text (set by onSelectHypothesis) -- no new state. Renders once the test
+  // has actually started (testing/result/committing stages, or confirmation set), stacked below the qa card.
+  // FEATURE: CHI-44 — added "committing" so this block doesn't disappear the instant "Store as
+  // Forecast" is clicked; Column 1's existing elapsed-timer status strip already covers live-progress
+  // narration during the wait, this just keeps Column 2 from looking blank/frozen in the meantime.
+  const showSubmittedTheory = !!(hypFlow && hypFlow.chosenText && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.stage === "committing" || hypFlow.confirmation));
 
   // FEATURE: CHI-03a — true empty state only when NEITHER qaEvidence nor hypFlow exist (was gated
   // on !hypFlow alone). This is the core bug this session fixes: a plain Q&A the user never
@@ -1829,7 +1833,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         <Drawer title={INTENT_LABEL[hypFlow.intent] || hypFlow.intent} open={isDrawerOpen("hyp")} onToggle={handleDrawerToggle("hyp")}>
         {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
             chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
-            carries this text (onSelectHypothesis's startTest branch). */}
+            carries this text (set by onSelectHypothesis). */}
         {showSubmittedTheory && (
           <div style={{background:T.card,border:`1px solid ${T.lineSoft}`,padding:"9px 11px"}}>
             <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.brassDeep,marginBottom:4}}>Submitted theory</div>
@@ -1862,7 +1866,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Review or Select a theory to include in the analysis</div>
             {hypFlow.candidates.map(h => (
-              <div key={h.id} onClick={() => { setShowOwnTheory(false); onSelectHypothesis(h.text); }}
+              <div key={h.id} onClick={() => { setShowOwnTheory(false); onSelectHypothesis(h.text, { startTest: true }); }}
                 style={{padding:"9px 11px",background:T.card,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,color:T.ink,cursor:"pointer",display:"flex",gap:8}}>
                 <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{h.id}</span>
                 <span>{h.text}</span>
@@ -1874,7 +1878,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
                   placeholder="Write your own explanation"
                   style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
                 <div style={{display:"flex",gap:6}}>
-                  <button onClick={() => { if (customText.trim()) { onSelectHypothesis(customText.trim()); setCustomText(""); setShowOwnTheory(false); } }}
+                  <button onClick={() => { if (customText.trim()) { onSelectHypothesis(customText.trim(), { startTest: true }); setCustomText(""); setShowOwnTheory(false); } }}
                     disabled={!customText.trim()}
                     style={{padding:"6px 12px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11.5,cursor:customText.trim()?"pointer":"default"}}>
                     Save
@@ -1892,19 +1896,6 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               </button>
             )}
           </div>
-        )}
-
-        {hypFlow.stage === "ready" && hypFlow.chosenText && (
-          <>
-            <div style={{background:T.card,borderLeft:`3px solid ${T.brass}`,padding:"9px 12px"}}>
-              <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:4}}>Theory selected</div>
-              <p style={{margin:0,fontFamily:body,fontSize:12,lineHeight:1.5,color:T.ink,fontStyle:"italic"}}>{hypFlow.chosenText}</p>
-            </div>
-            <button onClick={() => onSelectHypothesis(hypFlow.chosenText, { startTest:true })}
-              style={{alignSelf:"flex-start",background:"none",border:`1px solid ${T.brass}`,color:T.brassDeep,fontWeight:600,fontFamily:body,fontSize:12,padding:"9px 12px",cursor:"pointer"}}>
-              Have Priya (Forecast/Theory/Performance Expert) test this theory →
-            </button>
-          </>
         )}
 
         {hypFlow.stage === "testing" && (
@@ -3210,22 +3201,14 @@ export default function MarketIntelligenceScreen() {
 
   const onIntentChange = (intent) => setHypFlow(prev => prev && ({ ...prev, intent }));
 
-  // FEATURE: MI-51 — theory testing is no longer auto-fired on selection. Choosing a theory (no
-  // second argument, or { startTest: false }) lands on the new "ready" stage showing the chosen
-  // theory + an explicit "Have Priya test this theory ->" button; only that button's click passes
-  // { startTest: true }, which is when runHypothesisTest() actually runs.
-  const onSelectHypothesis = async (text, { startTest } = {}) => {
+  const onSelectHypothesis = async (text) => {
     if (!hypFlow) return;
-    if (!startTest) {
-      // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
-      setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You selected a theory to test." })]);
-      setHypFlow(prev => prev && ({ ...prev, stage:"ready", chosenText: text }));
-      return;
-    }
-    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change (this line
-    // only runs on the startTest:true path, after the select-only branch above has already returned).
-    // See STYLE-GUIDE.md §36.
-    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You asked Priya to test that theory." })]);
+    // FEATURE: CHI-44 — auto-advances straight into the test on selection (was a 2-step select-then-
+    // confirm flow, MI-51's own deliberate choice at the time, reversed here per John's direct call,
+    // 2026-07-21 — same auto-fire precedent already established by the news-card flow). Collapses
+    // CHI-42's 2 bubbles for this flow (select, then a separate test-button click) into 1, since it's
+    // now a single physical click.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You selected a theory to test." })]);
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
