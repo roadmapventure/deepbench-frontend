@@ -1,0 +1,1 @@
+- `design-ses-016-0721` (design session, worktree `design-ses-016-0721`) — `SES-016` kickoff written (v6.3.115): delete 4 dead debris files, migrate 1 into `tests/regression/`. `SES-017` split out (2 live-API files, blocked on in-flight harness/loop sessions). Spawning the coding session now.
