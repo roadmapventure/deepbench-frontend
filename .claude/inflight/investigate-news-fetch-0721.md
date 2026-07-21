@@ -1,0 +1,1 @@
+- `investigate-news-fetch-0721` (investigation session) — John reported live dev regression: news fetch spins ~1 min then nothing happens (first test in 10 hours, during which SES-020/AI-35-2a/SES-019/DAT-7/CHI-49-53 etc. all shipped). Diagnosing root cause; also evaluating whether a regression sweep is warranted.
