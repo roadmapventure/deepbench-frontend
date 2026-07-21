@@ -1,3 +1,4 @@
+// DeepBench v6.3.86 | api/capabilities/execute.js | S-LOO-012 -- delegation_complete events now carry real content (reasoning/task) at the two call sites that previously had none
 // DeepBench v6.3.81 | api/capabilities/execute.js | S-LOO-011 -- delegation_complete event added to credit the originating agent's own turn in the plain delegate_to_agent + final branch
 // DeepBench v6.3.74 | api/capabilities/execute.js | S-LOO-009d -- delegation_complete event added for the broker's own leg in the request_help + delegationRequired auto-resolve branch
 // DeepBench v6.3.71 | api/capabilities/execute.js | S-LOO-009 -- delegation_complete event added at both dispatchDelegation() final-outcome returns
@@ -489,7 +490,11 @@ async function dispatchDelegation({
       // case) — so this leg needs its own explicit completion event here, or the broker's real,
       // completed work stays permanently invisible. Fires only after the candidate is confirmed
       // valid, never on the throw path above.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
+      // FEATURE: LOO-012 — attaches the real reasoning already computed one line above (rec.reasoning,
+      // via lastHelpSelection) to this event, restoring the content the old Shape-2 "agent_selection"
+      // declaration used to carry before LOO-009b removed it as a redundant crediting mechanism —
+      // redundant for crediting, not for content, which is the gap this closes.
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null });
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
         : { delegation_task: tool_input.task_description || tool_input.skill_needed };
@@ -535,7 +540,10 @@ async function dispatchDelegation({
       // this is scoped exactly to the one branch that previously had no credit for the originator at
       // all. Fires unconditionally, not gated on "did this agent's own turn do enough work to
       // deserve it" — every real agent turn is its own hop, full stop, no judgment call needed here.
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent' });
+      // FEATURE: LOO-012 — attaches the task description this agent itself wrote for its target
+      // (already destructured as `task` above from tool_input) — real content the old system never
+      // had (it never credited this agent at all), more informative than a bare name.
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null });
       // FEATURE: LOO-009 — same gap, second dispatch shape: a plain delegate_to_agent call that
       // resolves final also never fired a completion event for the agent it named as final.
       onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });

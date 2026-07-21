@@ -1,3 +1,4 @@
+// DeepBench v6.3.86 | MarketIntelligenceScreen.jsx | S-LOO-012 -- delegation_complete drawer rows (describePipelineEvent) now render real reasoning/task/service-label content instead of a bare "has finished." template
 // DeepBench v6.3.77 | MarketIntelligenceScreen.jsx | S-LOO-010 -- automatic agent-crediting via display_agent_id, hopEvents mechanism fully removed
 // (Prior header, kept for history: CHI-32 — patches CHI-30: rotation split changed
 // from 6/4 to 2/8 (3 visible slots instead of 7 — slot 1 + static slot 2 + slot 3), matching the
@@ -343,7 +344,7 @@ import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRender
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
-import { PATTERN_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c
+import { PATTERN_CATALOG, SERVICE_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c/LOO-012
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -430,6 +431,13 @@ function buildFailureText(guardrail, triage) {
 
 // FEATURE: AI-50c — slug -> human label, built from the same PATTERN_CATALOG useAIActivity.js owns
 const PATTERN_NAME = Object.fromEntries(PATTERN_CATALOG.map(p => [p.slug, p.name]));
+
+// FEATURE: LOO-012 — slug -> human label, same data-driven pattern as PATTERN_NAME immediately
+// above, reusing SERVICE_CATALOG (already platform-wide) instead of a new dictionary. Restores a
+// real per-service label on delegation_complete hops with no agent-authored text to show (a final
+// target's own completion) — was a static per-type label before LOO-010 removed the declarations
+// that carried it; this is the generic replacement, not new content.
+const SERVICE_NAME = Object.fromEntries(SERVICE_CATALOG.map(s => [s.slug, s.name]));
 
 // FEATURE: AA-125 — shared free-text shaping so every event type that embeds a raw
 // model-authored string (reasoning/critique/notes) gets the same "short, readable log
@@ -825,8 +833,24 @@ function describePipelineEvent(evt) {
     // FEATURE: LOO-009c — same shape as delegation_return immediately above (both are terminal,
     // "agent completed its work cleanly" events, T.moss per that existing convention) — the gap
     // this session closes: this case never existed, so delegation_complete rendered blank.
-    case "delegation_complete":
-      return { capability: null, summary: evt.data.message, color: T.moss };
+    // FEATURE: LOO-012 — restores real content, checked in order of specificity, all generic
+    // (field-presence only, never capability-specific):
+    case "delegation_complete": {
+      if (evt.data.reasoning) {
+        // PM-broker's own pick — agent-selection-intent's fixed schema, generic across whichever
+        // agent currently holds the project-manager capability. Exact restoration of the old
+        // "agent_selection" text.
+        return { capability: null, summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
+      }
+      if (evt.data.task) {
+        // Originating agent's own hand-off summary (LOO-011's self-credit case).
+        return { capability: null, summary: evt.data.task, color: T.moss };
+      }
+      // Final target's own completion, no agent-authored text available — a real, distinct label
+      // per service instead of a bare "has finished.", reusing SERVICE_NAME (Task 2 above).
+      const serviceName = SERVICE_NAME[evt.data.toCapabilitySlug] || evt.data.toCapabilitySlug || "its work";
+      return { capability: null, summary: `Completed ${serviceName}`, color: T.moss };
+    }
     default:
       return { summary: "", color: T.muted };
   }
@@ -2916,7 +2940,10 @@ export default function MarketIntelligenceScreen() {
     setStatus(message, { kind: 'orchestration' });
     if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
       const attributedAgentId = evt.type === 'delegation_complete' ? evt.toAgentId : evt.fromAgentId;
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null }, null, {}));
+      // FEATURE: LOO-012 — reasoning/task/toCapabilitySlug now carried into the stored event's data
+      // (previously dropped — only message/viaTool survived), so describePipelineEvent below can
+      // render real content instead of always falling through to the bare "has finished." template.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null }, null, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
