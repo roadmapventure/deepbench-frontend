@@ -342,7 +342,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCard, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint } from "../components/SharedUI.jsx";
+import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, ConfirmationCardActions, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
@@ -1694,12 +1694,26 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     return !!(hypFlow && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.stage === "committing" || hypFlow.confirmation));
   }
 
+  // FEATURE: CHI-50 — true once Nadia's data-patch proposal has actually landed
+  // (hypFlow.confirmation set) — a strict subset of isHypInResultPhase (every hyp-draft moment is
+  // also a result-phase moment, since confirmation only ever arrives after a test result exists).
+  // Drives the new "hyp-draft" autoCurrent key and the Draft Forecast drawer's own render gate,
+  // kept in sync the same way isHypInResultPhase already keeps hyp-result/Result in sync.
+  function isHypAwaitingConfirmation(hypFlow) {
+    return !!(hypFlow && hypFlow.confirmation);
+  }
+
   // FEATURE: CHI-49 — the single "hyp" key splits into "hyp-candidates" (generating/choosing —
   // the offered choice) and "hyp-result" (testing onward — the test's own findings), per
   // STYLE-GUIDE.md §40's taxonomy decision record. Distinct mechanism from
   // selectEvidenceFooterKind()'s own "hyp-result" string below (the pinned-footer decision key,
   // not a drawer key) — same English word for the same real-world phase, not a shared constant.
+  // FEATURE: CHI-50 — "hyp-draft" added as the highest-priority hyp key, ahead of "hyp-result":
+  // once Nadia's proposal lands, Draft Forecast is the new arrival that should auto-open — Result
+  // still exists underneath, just collapses, same "papers on a desk" persistence CHI-49 already
+  // established for Candidates once a pick is made.
   function computeAutoCurrent(qaEvidence, hypFlow, newsCards) {
+    if (isHypAwaitingConfirmation(hypFlow)) return "hyp-draft";
     if (isHypInResultPhase(hypFlow)) return "hyp-result";
     if (hypFlow) return "hyp-candidates";
     if (qaEvidence) return "qa";
@@ -1978,6 +1992,25 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
 
         </Drawer>
         )}
+
+        {/* FEATURE: CHI-50 — Draft Forecast drawer: Nadia's data-patch proposal, split out of the
+            pinned footer (was ConfirmationCard rendered whole there) into its own drawer — it's
+            readable content that came back from an action (clicking "Store as Forecast"), the
+            same shape as every other drawer in this cluster, not a decision control itself. Only
+            exists once hypFlow.confirmation lands; auto-opens the instant it does (Result
+            collapses underneath, same relationship Candidates/Result already established). Title
+            is fixed, not intent-dynamic — reuses the platform's locked INTENT_LABEL.forecast
+            vocabulary since Nadia's write is always a forecast record regardless of which intent
+            (theory/forecast/correct) started the flow. */}
+        {isHypAwaitingConfirmation(hypFlow) && (
+        <Drawer title="Draft Forecast" open={isDrawerOpen("hyp-draft")} onToggle={handleDrawerToggle("hyp-draft")}
+          headerRight={<span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase",letterSpacing:"0.02em"}}>Needs Your Decision</span>}>
+          <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
+            Nadia (Data Expert) drafted this Data Room entry — accept, edit, or reject below.
+          </div>
+          <ConfirmationCardContent agent={nadia} proposedAction={hypFlow.confirmation.proposed_action} critique={hypFlow.confirmation.critique}/>
+        </Drawer>
+        )}
         </div>
         <ScrollFadeHint show={evidenceCanScrollMore} bg={T.cardAlt}/>
         </div>
@@ -2000,17 +2033,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               </div>
             )}
             {footerKind === "hyp-confirmation" && (
-              <>
-                <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep,marginBottom:8}}>
-                  Nadia (Data Expert) drafted this Data Room entry — review it before it's saved:
-                </div>
-                <ConfirmationCard
-                  agent={nadia}
-                  proposedAction={hypFlow.confirmation.proposed_action}
-                  critique={hypFlow.confirmation.critique}
-                  onResolve={onResolveConfirmation}
-                />
-              </>
+              <ConfirmationCardActions onResolve={onResolveConfirmation}/>
             )}
           </div>
         )}
@@ -3373,6 +3396,13 @@ export default function MarketIntelligenceScreen() {
           user_reasoning: hypothesisTestText || chosenText,
         },
       }));
+      // FEATURE: CHI-50 — chat pointer, same static-message pattern used elsewhere in this
+      // function (e.g. the resolution-step "Got it — that's been stored as a forecast." push).
+      // Unlike MI-65's deliberate no-chat-push choice for the theory-test-result landing (a
+      // read-only arrival), this moment requires a real decision (accept/edit/reject a Data
+      // Room write) — worth more than a silent footer/drawer change. No new AI call, no new
+      // intent — a plain static string.
+      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Nadia has a draft ready for your review — see the Draft Forecast panel below." })]);
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);

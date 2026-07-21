@@ -466,27 +466,19 @@ export const ScrollFadeHint = ({ show, bg }) => !show ? null : (
 // never a bespoke layout per agent. First frontend implementation of this gate anywhere on the
 // platform (confirmed by grep this design session: zero prior pending_confirmation/confirmation_id
 // UI exists) — lives here, not in a screen file, so it is reusable platform-wide going forward.
-export function ConfirmationCard({ agent, proposedAction, critique, onResolve }) {
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const resolve = async (resolution, editedText = null) => {
-    setBusy(true);
-    try {
-      await onResolve(resolution, editedText);
-    } finally {
-      setBusy(false);
-    }
-  };
-
+// FEATURE: CHI-50 — split from the old monolithic ConfirmationCard: Content (agent header,
+// proposed fields, critique — read-only) and Actions (Reject/Edit/Accept, edit textarea — the
+// actual decision control) render in different places on the Channel Intelligence screen (a
+// drawer vs. the pinned footer). The "Needs Your Decision" badge that used to sit inline here
+// moved to the caller's Drawer headerRight (see MarketIntelligenceScreen.jsx) — visible whether
+// collapsed or open, same treatment CHI-45 gave the hop-range badge.
+export function ConfirmationCardContent({ agent, proposedAction, critique }) {
   return (
     <div style={{background:T.card,border:`1px solid ${T.brassLight}`,borderLeft:`4px solid ${T.brass}`,borderRadius:3}}>
       <div style={{background:"#f6ecd8",padding:"7px 12px",display:"flex",alignItems:"center",gap:8}}>
         {agent && <AgentAvatar who={agent.id} size={20}/>}
         <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{agent ? agent.name : "Agent"}</span>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{agent ? agent.role : ""}</span>
-        <span style={{marginLeft:"auto",fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase"}}>Needs Your Decision</span>
       </div>
       <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:8}}>
         {Object.entries(proposedAction || {}).filter(([, v]) => v !== null && v !== "").map(([k, v]) => (
@@ -500,39 +492,58 @@ export function ConfirmationCard({ agent, proposedAction, critique, onResolve })
             {typeof critique === "object" ? JSON.stringify(critique) : critique}
           </div>
         )}
-        {editing ? (
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <textarea rows={2} value={editText} onChange={e=>setEditText(e.target.value)}
-              placeholder="Rewrite the correction…"
-              style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
-            <div style={{display:"flex",gap:6}}>
-              <button disabled={busy||!editText.trim()} onClick={()=>resolve("edit", editText.trim())}
-                style={{flex:1,padding:"7px 6px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11,cursor:busy?"default":"pointer"}}>
-                Resubmit
-              </button>
-              <button disabled={busy} onClick={()=>setEditing(false)}
-                style={{flex:1,padding:"7px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{display:"flex",gap:6,marginTop:2}}>
-            <button disabled={busy} onClick={()=>resolve("reject")}
-              style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
-              Reject
-            </button>
-            <button disabled={busy} onClick={()=>setEditing(true)}
-              style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:busy?"default":"pointer"}}>
-              Edit
-            </button>
-            <button disabled={busy} onClick={()=>resolve("accept")}
-              style={{flex:1,padding:"8px 6px",background:T.brass,color:T.card,border:"none",fontFamily:body,fontSize:11,fontWeight:600,cursor:busy?"default":"pointer"}}>
-              Accept
-            </button>
-          </div>
-        )}
       </div>
+    </div>
+  );
+}
+
+// FEATURE: CHI-50 — the decision-control half of the old ConfirmationCard, unchanged internals
+// (editing/editText/busy state, resolve()), just no longer sharing a component with the
+// read-only content above.
+export function ConfirmationCardActions({ onResolve }) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const resolve = async (resolution, editedText = null) => {
+    setBusy(true);
+    try {
+      await onResolve(resolution, editedText);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return editing ? (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <textarea rows={2} value={editText} onChange={e=>setEditText(e.target.value)}
+        placeholder="Rewrite the correction…"
+        style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
+      <div style={{display:"flex",gap:6}}>
+        <button disabled={busy||!editText.trim()} onClick={()=>resolve("edit", editText.trim())}
+          style={{flex:1,padding:"7px 6px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11,cursor:busy?"default":"pointer"}}>
+          Resubmit
+        </button>
+        <button disabled={busy} onClick={()=>setEditing(false)}
+          style={{flex:1,padding:"7px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div style={{display:"flex",gap:6}}>
+      <button disabled={busy} onClick={()=>resolve("reject")}
+        style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
+        Reject
+      </button>
+      <button disabled={busy} onClick={()=>setEditing(true)}
+        style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:busy?"default":"pointer"}}>
+        Edit
+      </button>
+      <button disabled={busy} onClick={()=>resolve("accept")}
+        style={{flex:1,padding:"8px 6px",background:T.brass,color:T.card,border:"none",fontFamily:body,fontSize:11,fontWeight:600,cursor:busy?"default":"pointer"}}>
+        Accept
+      </button>
     </div>
   );
 }
