@@ -13,7 +13,7 @@
 
 ## Feature ID Format
 
-**As of 2026-07-15, this legend governs existing IDs only — do not use it to assign new ones.** New IDs use `docs/SCREEN-INVENTORY.md`'s codes instead: screen-scoped items get `[SCREEN-CODE]-[NUMBER]` (`CHI`/`PRO`/`SPA`/`AGR`/`HOM`/`TMT`/`AIA`/`ABT`), non-screen platform-layer items get `[LAYER-CODE]-[NUMBER]` (`HAR`/`LOO`/`LOG`/`MCP`/`MKT`, plus `AG`/`SK`/`IN`/`FM`'s eventual replacement once `S-ARCH-COMPETENCY-MODEL-design` lands). Applies prospectively only — nothing below is renamed.
+**As of 2026-07-15, this legend governs existing IDs only — do not use it to assign new ones.** New IDs use `docs/SCREEN-INVENTORY.md`'s codes instead: screen-scoped items get `[SCREEN-CODE]-[NUMBER]` (`CHI`/`PRO`/`SPA`/`AGR`/`HOM`/`TMT`/`AIA`/`ABT`), non-screen platform-layer items get `[LAYER-CODE]-[NUMBER]` (`HAR`/`LOO`/`SCA`/`LOG`/`MCP`/`MKT`, plus `AG`/`SK`/`IN`/`FM`'s eventual replacement once `S-ARCH-COMPETENCY-MODEL-design` lands). **This line itself is already incomplete against `SCREEN-INVENTORY.md`'s fuller table (missing `DAT`/`AGT`/`SES`/`MOB`, all added there since) — added `SCA` here since it's this session's own work, not fixing the rest of the drift now.** Applies prospectively only — nothing below is renamed.
 
 `[AREA]-[NUMBER]` (legacy, existing IDs only)
 Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ`=Analyzer, `FT`=Fetch, `RO`=Roster, `PE`=Personnel File, `TC`=Teach, `TT`=Test Team, `AI`=AI Infrastructure, `AG`=Agent Identity, `LA`=Landing, `DL`=Deliverables, `WO`=Work Order, `IN`=Intent, `FM`=Format, `SV`=Service, `SK`=Skills & Capabilities, `MI`=Market Intelligence, `AA`=Agent Architecture

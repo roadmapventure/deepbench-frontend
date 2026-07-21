@@ -101,7 +101,7 @@ Loop calls Harness once per turn and decides, based on what comes back, whether 
 
 No agent is named in this mechanism by identity — every resolution happens live, by capability, never hardcoded (Rule #1, §19d/§19e).
 
-Full mechanism detail, not repeated here: §19d (Agent Loop, sniff test, single delegation path), §19e (Resource Ownership Brokers — a distinct, orthogonal concern: *who's allowed to touch a resource*, not *who gets asked*).
+Full mechanism detail, not repeated here: §19d (Agent Loop, sniff test, single delegation path), §19e (Resource Ownership Brokers — a distinct, orthogonal concern: *who's allowed to touch a resource*, not *who gets asked*), §19h (Live Agent-Orchestration Visibility — the `_onEvent` mechanism firing at Loop's own dispatch points).
 
 ### Platform
 
@@ -128,10 +128,10 @@ Harness consumes the Scaffold built above it; it doesn't build one of its own. N
 
 Files: `api/capabilities/execute.js`, `api/prompt/db-assembly.js`, `api/prompt/ai-enrichment.js`, `api/prompt/request-receivable.js`
 
-Capability routes (what runs through the Harness) are detailed in §1a below, not repeated here. Full mechanism detail, not repeated here: §19d, §19e.
+Capability routes (what runs through the Harness) are detailed in §1a below, not repeated here. Full mechanism detail, not repeated here: §19d, §19e, §19h (Live Agent-Orchestration Visibility — the `_onEvent` mechanism threaded through the same `runLoop()`/`runCapability()`/`resumeCapability()`/`resolveAccept()` functions described above, by function name, not yet by this section's vocabulary).
 
 ### Platform Services
-Shared foundational utilities that the Harness (and other layers) call into — not agent-specific, not orchestration, just shared infrastructure. This genuinely blends with the Harness at the edges by design (e.g. `db-assembly.js`/`ai-enrichment.js` are simultaneously core harness pipeline *and* a shared service any capability calls into) — don't force a single bucket where a piece of code spans both.
+Shared foundational utilities that Scaffold, Harness, and other layers call into — not agent-specific, not orchestration, just shared infrastructure. **Corrected 2026-07-20 (`SES-001` coherence pass) — this used to say "Harness," stale since the Scaffold/Harness split.** `db-assembly.js`/`ai-enrichment.js` genuinely blend with Platform Services at the edges by design (they're simultaneously Scaffold's own construction code *and* callers of Platform Services' knowledge-flow plumbing/display code) — don't force a single bucket where a piece of code spans both.
 
 Files (from the prior Layer 1 — Shared Foundation, folded in here as this layer's foundational component): `src/tokens.js`, `src/data/agents.js`, `src/lib/supabase.js`, `src/config.js`
 
