@@ -1588,6 +1588,14 @@ Shipped 2 more items:
 
 Both scripts version-headered/`FEATURE:`-tagged per this session's own new `check-version-headers.js` (dogfooded immediately). Docs/tooling-only, no version bump.
 
+**Follow-up, same day (`design-tier2-precommit-hook-0721`) — Tier 2 catalog, batch 3/3, final item.** Built the local pre-commit gate: `C:/Projects/.claude/hooks/block-unverified-commit.js`, a 6th local `PreToolUse:Bash` hook (same non-repo, machine-local caveat as `SES-010`'s original 5). Denies a `git commit` if a staged file matches `test-*.mjs`/`test-*.js` (`STANDARDS.md` §4's "deleted before committing" rule), and — only when the commit actually touches `src/`/`api/` — runs the real `npm run build` and denies on failure. Deliberately scoped to skip the build step entirely for docs/scripts-only commits (the majority of commits across 5-7 concurrent sessions on a given day) to avoid adding several seconds of friction to every commit regardless of relevance.
+
+Hit and fixed a real Windows bug while testing: `execFileSync("npm", ...)` fails with `ENOENT` on Windows without `shell: true` (`npm` resolves to `npm.cmd`, not found via bare `PATH` lookup without shell resolution) — same class of platform gotcha as the `pathToFileURL` fix earlier this same day. Tested via 4 real scenarios in throwaway worktrees, not just synthetic stdin: staged test file → denied; passing build → silent; a deliberately broken `src/main.jsx` → denied; a docs-only staged change → silent, in 0.13s (confirms the build-skip actually skips, not just returns fast by luck). Also live-fire confirmed via an actual `git commit` call through the real Bash tool (not manual piping) — correctly blocked.
+
+Updated `CLAUDE.md`'s mechanized-hooks note from "5 hooks" to "6 hooks, extended same day" to keep the count accurate.
+
+**`SES-010`'s Tier 2 catalog is now fully worked through, 3 batches, same day:** all originally-listed items either shipped (this entry + the two before it) or explicitly resolved as already-done (type-tag gate) or out-of-scope-for-a-toggle (`eslint-plugin-react-hooks`, flagged separately, no ESLint exists in this repo at all). Remaining: the Supabase schema-diff check (acknowledged as the most complex item, scoping still pending) and the deleted-test-file audit-trail gap (folds into `SES-009`, not its own item, never intended to be built here). Docs-only from the repo's own perspective — the hook itself lives outside it.
+
 **Close-out:** `CHI-37` archived ✅ Done. Full detail: `docs/FEATURES-ARCHIVE.md`.
 
 ---
