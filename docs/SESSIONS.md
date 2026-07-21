@@ -1537,7 +1537,7 @@ Generic hop-completion mechanism (`callCapability` now requires a `hopEvents` de
 
 ---
 
-## S-LOG-30-design / S-LOG-30 (v6.3.92, 2026-07-21, worktree `design-ai-audit-now-0719`)
+## S-LOG-30-design / S-LOG-30 (v6.3.92, `61eb2e6`, 2026-07-21, worktree `design-ai-audit-now-0719`)
 
 Two AI Audit "By Pattern" integrity bugs from a prior live screenshot walkthrough (`design-ai-audit-screen-0717`), scoped and kicked off same-session: `LOG-30`/`LOG-31`/`LOG-34` fixed in code; `LOG-32`'s original write-site question found already-resolved during Architect Review before any code was written.
 
@@ -1551,4 +1551,6 @@ Two AI Audit "By Pattern" integrity bugs from a prior live screenshot walkthroug
 
 **Verified directly against `ARCHITECTURE.md` before editing, not assumed:** grepped §19i's implementation-status table and confirmed `react` was already listed under "Roadmap/inactive," and confirmed `useAIActivity.js`'s `patternsActiveCount` is indeed a bare filter over `PATTERN_CATALOG` with no separate computation path — both claims in the kickoff doc checked fresh, not taken on trust.
 
-**Close-out:** `LOG-30`/`LOG-31`/`LOG-32`/`LOG-34` marked ✅ Done in `docs/FEATURES.md` (kept in place, not moved to `docs/FEATURES-ARCHIVE.md` — that file wasn't part of the kickoff's own commit scope; left for a future doc-hygiene sweep). Manual QA self-verified against the live deployed dev preview (see `CLAUDE-STATE.md`/commit for the live-verification detail).
+**Manual QA self-verified against the real deployed dev preview after push, not accepted on Node test + build alone:** all 9 checklist items PASS. Header's "Patterns Active" read `15/24` (was `16/24` pre-fix, dropped by exactly 1); "Not yet active · 7 patterns" now includes ReAct (confirmed by expanding it); a new "Uncatalogued · 1 pattern" bucket appeared below it, expanding to show "Reflection — Auto-detected — not yet catalogued, CALLS 18, COST $0.03" — distinct from the Reasoning section's own "Reflection" row (CALLS 6, COST $0.04, the current `reflect` slug) exactly as designed. Every other pattern row's calls/cost matched across checks (RAG 3363/$3.23, Tool Use 3470/$19.54, etc.), no unrelated shift. Repeated on a genuinely fresh 390×844 mobile tab (not just a resized desktop tab, which turned out to not reliably re-trigger the mobile breakpoint) via the hamburger menu's "AI Audit" entry — identical `15/24`, `Not yet active · 7`, `Uncatalogued · 1`. Zero console errors on both viewports. Direct Supabase query (`SELECT count(*) FROM ai_activity_log WHERE patterns_used::text ILIKE '%reflection%'`, project `rallojeqnkgtxgsdsnqm`) returned `18`, reconciling exactly with the Uncatalogued row's displayed call count.
+
+**Close-out:** `LOG-30`/`LOG-31`/`LOG-32`/`LOG-34` marked ✅ Done in `docs/FEATURES.md` (kept in place, not moved to `docs/FEATURES-ARCHIVE.md` — that file wasn't part of the kickoff's own commit scope; left for a future doc-hygiene sweep).
