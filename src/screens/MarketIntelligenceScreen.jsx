@@ -1677,16 +1677,23 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     if (hypFlow && hypFlow.prefillText) { setCustomText(hypFlow.prefillText); setShowOwnTheory(true); }
   }, [hypFlow && hypFlow.prefillText]);
 
-  // FEATURE: CHI-43 — pure, testable: which of the 2 possible Evidence drawers should default to
-  // open. null when neither qaEvidence nor hypFlow exist yet (the true-empty-state branch below,
-  // unaffected by this session).
-  function computeAutoCurrent(qaEvidence, hypFlow) {
+  // FEATURE: CHI-43 — pure, testable: which of the 3 possible Evidence drawers should default to
+  // open. null only if the newsCards prop is ever genuinely undefined (defensive-only case, not
+  // reachable via the real EvidenceColumn caller today).
+  // FEATURE: CHI-46 — added "news" as the 3rd, lowest-priority key: the natural default when
+  // nothing else is active. newsCards is always at least `null` (useState(null) in the parent,
+  // never `undefined`) from the very first render, so this branch effectively always wins over the
+  // final `return null` below in real usage — kept as an explicit check (not collapsed to
+  // `return "news"` unconditionally) as a defensive guard against a future caller that omits
+  // the prop entirely.
+  function computeAutoCurrent(qaEvidence, hypFlow, newsCards) {
     if (hypFlow) return "hyp";
     if (qaEvidence) return "qa";
+    if (newsCards !== undefined) return "news";
     return null;
   }
 
-  const autoCurrent = computeAutoCurrent(qaEvidence, hypFlow);
+  const autoCurrent = computeAutoCurrent(qaEvidence, hypFlow, newsCards);
   const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
 
   // FEATURE: CHI-43 — reset any manual override, and re-scroll to the newest content, on every
@@ -1699,8 +1706,11 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     if (evidenceScrollRef.current) {
       evidenceScrollRef.current.scrollTo({ top: evidenceScrollRef.current.scrollHeight, behavior: "smooth" });
     }
+    // FEATURE: CHI-46 — added newsCards: catches new content landing inside the News drawer while
+    // it's already autoCurrent (e.g., the loading skeleton resolving into real cards), so that
+    // arrival gets the same re-scroll-into-view treatment as a fresh qa/hyp arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCurrent, hypFlow?.stage]);
+  }, [autoCurrent, hypFlow?.stage, newsCards]);
 
   const isDrawerOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === autoCurrent);
   const handleDrawerToggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
@@ -1713,66 +1723,14 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
   // narration during the wait, this just keeps Column 2 from looking blank/frozen in the meantime.
   const showSubmittedTheory = !!(hypFlow && hypFlow.chosenText && (hypFlow.stage === "testing" || hypFlow.stage === "result" || hypFlow.stage === "committing" || hypFlow.confirmation));
 
-  // FEATURE: CHI-03a — true empty state only when NEITHER qaEvidence nor hypFlow exist (was gated
-  // on !hypFlow alone). This is the core bug this session fixes: a plain Q&A the user never
-  // escalates into a hypothesis flow used to leave Evidence stuck in this empty state permanently,
-  // even though qaEvidence had real content to show.
-  if (!qaEvidence && !hypFlow) {
-    // FEATURE: MI-59 — informational-only empty state; the 4 dummy data-type pills that used
-    // to render here (Sourced/Analysis/Source Simulation/Learned) had no click handler and no
-    // tie to any flow or action (confirmed live) — removed outright, not just hidden for this
-    // state. STYLE-GUIDE.md §19's shared taxonomy still has 2 other real render sites
-    // (Pipeline Log confidence_tier summary, Data Sources drawer) — describeDataType() itself
-    // is unchanged and still imported/used there.
-    // FEATURE: CHI-33 — while newsCards is null (still loading) or [] (a fetch completed but
-    // returned nothing usable), this branch renders exactly what it did before this session,
-    // unchanged. The instant newsCards is populated (non-null, real items), it renders the 3 news
-    // cards + a new header line instead. getEvidencePanelSentence() itself is unchanged — it still
-    // applies to its original real-chat-answer case; only this true-empty-state render path forks.
-    const hasNewsCards = !!(newsCards && newsCards.length > 0);
-    return (
-      <div style={{display:"flex",flexDirection:"column",gap:14,position:"relative"}}>
-        <FeatureBadge id="MI-59"/>
-        <FeatureBadge id="CHI-26"/>
-        <FeatureBadge id="CHI-33"/>
-        {/* FEATURE: CHI-34 — renamed "Evidence & Interaction" -> "News & Evidence".
-            FEATURE: CHI-35 — suppressed on mobile (bare=true): the tab button above it already
-            names the column there; desktop keeps it, no tab affordance to rely on instead. */}
-        {!bare && (
-          <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>News & Evidence</div>
-        )}
-        {hasNewsCards ? (
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:10}}>
-              Today's top channel sales news. Select if you need analysis...
-            </div>
-            {newsCards.map((card, i) => (
-              <NewsCard key={card?.url || i} card={card} loading={!!card?.url && newsCardLoadingUrl === card.url}
-                onClick={() => onAnalyzeNewsCard && onAnalyzeNewsCard(card)}/>
-            ))}
-          </div>
-        ) : newsCards === null ? (
-          // FEATURE: CHI-38 — genuinely-loading state now pairs the existing live elapsed-time
-          // caption with 3 skeleton cards (visual shape, not just text) so Column 2 doesn't feel
-          // static while the fetch is in flight.
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:2}}>
-              <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
-            </div>
-            <NewsCardSkeleton/>
-            <NewsCardSkeleton/>
-            <NewsCardSkeleton/>
-          </div>
-        ) : (
-          // FEATURE: CHI-33-patch -- fetch-completed-with-nothing (newsCards is [], or no fetch ever
-          // ran) keeps the static sentence unchanged -- nothing is loading at this point.
-          <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
-            <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{getEvidencePanelSentence(null)}</div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
+  // `!qaEvidence && !hypFlow`, MI-59/CHI-03a/CHI-33/CHI-38) is deleted: its own News-rendering JSX
+  // is relocated, byte-identical, into the "News" Drawer below (now the scroll body's first child,
+  // participating in the same computeAutoCurrent/isDrawerOpen mechanism as Analysis/Theory), so News
+  // is no longer gated behind "nothing else exists yet" and survives a qaEvidence/hypFlow arrival
+  // instead of being permanently unreachable. This also removes the previously-unavoidable second
+  // `return` statement, which existed only to serve that gate.
+  const hasNewsCards = !!(newsCards && newsCards.length > 0);
 
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
@@ -1813,6 +1771,38 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             top of the outer card's structural 14px gap to the footer (30px total measured, more
             than the AuditColumn-matching 14px target). Top/side padding unchanged. */}
         <div ref={evidenceScrollRef} onScroll={checkEvidenceScroll} style={{padding:"16px 16px 0",display:"flex",flexDirection:"column",gap:14,overflowY:"auto",flex:1,minHeight:0}}>
+
+        {/* FEATURE: CHI-46 — News moves out of the "only when nothing else exists" gate into its own
+            persistent drawer, lowest-priority in computeAutoCurrent — collapses once Analysis/Theory
+            becomes current, but never disappears. Body content below is byte-identical to the deleted
+            true-empty-state branch's own news-rendering JSX (hasNewsCards/loading/empty-sentence), just
+            relocated and no longer gated behind `!qaEvidence && !hypFlow`. */}
+        <Drawer title="News" open={isDrawerOpen("news")} onToggle={handleDrawerToggle("news")}>
+          {hasNewsCards ? (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:10}}>
+                Today's top channel sales news. Select if you need analysis...
+              </div>
+              {newsCards.map((card, i) => (
+                <NewsCard key={card?.url || i} card={card} loading={!!card?.url && newsCardLoadingUrl === card.url}
+                  onClick={() => onAnalyzeNewsCard && onAnalyzeNewsCard(card)}/>
+              ))}
+            </div>
+          ) : newsCards === null ? (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:2}}>
+                <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
+              </div>
+              <NewsCardSkeleton/>
+              <NewsCardSkeleton/>
+              <NewsCardSkeleton/>
+            </div>
+          ) : (
+            <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
+              <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{getEvidencePanelSentence(null)}</div>
+            </div>
+          )}
+        </Drawer>
 
         {/* FEATURE: CHI-03a — Task 1's extracted card, independent of hypFlow: renders the instant
             Marcus has an answer, whether or not a hypothesis flow is ever started. */}
