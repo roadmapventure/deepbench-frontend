@@ -14,6 +14,8 @@ Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
 
 This separation is what enforces branch discipline. A coding session starts cold, reads the kickoff doc, and switches to `dev` as its first act. Blurring the boundary is how code ends up on `main` without a review gate.
 
+**Mechanized 2026-07-21 (`SES-010`).** A local `PreToolUse` hook (`C:/Projects/.claude/hooks/block-design-session-code.js`) now denies any Edit/Write targeting `src/` or `api/` when the current worktree's branch matches `session/design-*` — a real backstop, not just a discipline reminder. Same caveat as `CLAUDE.md`'s concurrent-sessions note: this hook is local to the machine it was set up on, not part of the repo.
+
 ---
 
 ## Standing Rule — Decision Autonomy Tiers
@@ -87,7 +89,7 @@ This applies to items mentioned casually in conversation, not just items with a 
 
 **Your session worktree should already exist by this point** (`CLAUDE.md`'s router sets it up as the very first action, before any reads). Read all three of these — and everything else this session touches — from that worktree path, never the shared checkout at `C:/Projects/deepbench-frontend` directly. A worktree freshly branched from `origin/dev` is correct by construction, so no separate fetch+`git show` freshness check is needed (retired 2026-07-15 — see `CLAUDE.md`).
 
-**Mandatory, added 2026-07-15 (was previously an optional skill run "if you thought to"; with 5-7 concurrent sessions, drift compounds too fast for that to be reliable):** run the `session-hygiene` skill's checks 1, 2, 3, and 5 now, before Step 1's reads — sizes/greps only, costs near-nothing. Check 5 (stale worktrees) matters most under real concurrency: don't assume `CLAUDE-STATE.md`'s "In flight now" is a complete picture of what's on disk. Report any findings briefly, same as the skill always has; don't silently fix without flagging first.
+**Mandatory, added 2026-07-15 (was previously an optional skill run "if you thought to"; with 5-7 concurrent sessions, drift compounds too fast for that to be reliable):** run the `session-hygiene` skill's checks 1, 2, 3, and 5 now, before Step 1's reads — sizes/greps only, costs near-nothing. **As of 2026-07-21 (`SES-010`):** these checks (plus 3c/5b/5c/5d) are now one script, `node scripts/check-session-docs.js` — run that directly instead of re-deriving each grep. On John's own machine it also fires automatically after `git worktree add` via a local hook, but don't rely on that being present everywhere; run it explicitly. Check 5 (stale worktrees) matters most under real concurrency: don't assume `CLAUDE-STATE.md`'s "In flight now" is a complete picture of what's on disk. Report any findings briefly, same as the skill always has; don't silently fix without flagging first.
 
 1. `docs/WORKING-WITH-JOHN.md` — communication/decision-making patterns (short, added 2026-07-17 per `SES-003`)
 2. `CLAUDE-STATE.md` — current version, next session, open blockers

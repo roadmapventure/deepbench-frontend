@@ -316,7 +316,7 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 | BUG-7: Ephemeral `answers[q.id]` state lost on refresh | Answers stored in React state only | Persist answers on `step.questions[n].a` in Supabase | K answer persistence |
 | BUG-8: Archived steps lost after Update Plan | Save wrote active only | `saveStepsToSupabase` writes `[...active, ...archived]` | K supabase write |
 | BUG-9: `extractTextFromFile` 500 on PDF — `readAsDataURL` corrupts binary base64 | `readAsDataURL` is not binary-safe for PDFs; corrupted bytes reach `pdf-parse` and throw | Always use `readAsArrayBuffer` → `Uint8Array` → `btoa(binary)` (NIGP pattern). Never use `readAsDataURL` for file upload. | L binary round-trip |
-| BUG-10: `api/extract.js` 500 — "Cannot find package 'pdf-parse'" on Vercel | `pdf-parse` and `jszip` were missing from DeepBench `package.json`. `npm run build` and Node.js tests pass locally because Vite only bundles frontend and local node_modules are available. The gap only surfaces on Vercel at runtime. | Before any session that adds or modifies an `api/` function: audit all `import`/`require` statements in that file and verify every package is listed in `package.json` `dependencies` (not `devDependencies`). | Dependency audit (pre-commit) |
+| BUG-10: `api/extract.js` 500 — "Cannot find package 'pdf-parse'" on Vercel | `pdf-parse` and `jszip` were missing from DeepBench `package.json`. `npm run build` and Node.js tests pass locally because Vite only bundles frontend and local node_modules are available. The gap only surfaces on Vercel at runtime. | Before any session that adds or modifies an `api/` function: run `node scripts/check-api-deps.js` (added `SES-010`, mechanizes this exact audit — every `api/` import checked against `package.json` `dependencies`, exit 1 on any CRITICAL finding). | Dependency audit (pre-commit) |
 
 ---
 
@@ -402,6 +402,8 @@ Every agent added to `src/data/agents.js` MUST include ALL of the following fiel
 | `claude-sonnet-4-5` | `claude-sonnet-4-6` |
 
 **Rule:** Never use short-form model IDs in `logAICall()` call sites or server-side `ai_activity_log` inserts. Always use the canonical versioned string. `MODEL_ID_NORMALIZE` in `useAIActivity.js` normalizes legacy short-form IDs as a safety net — it is not a license to keep using short-form IDs in new code.
+
+**Mechanized 2026-07-21 (`SES-010`).** `node scripts/check-model-ids.js` sweeps `api/`, `lib/`, and `src/` for this exact pattern — flags any short-form id used as a value (not a `MODEL_ID_NORMALIZE`-style lookup key), CRITICAL for server-side (a possible real API-call bug, not just a logging one), WARNING for client-side. Run before commit on any session touching a `model:` field. First run (2026-07-21) found live, pre-existing violations: `api/brief.js` and `lib/agent-run.js` both pass `"claude-sonnet-4-5"` as a real server-side call value, and `src/contexts/FetchContext.jsx`'s `logAICall()` call site uses `"claude-haiku-4-5"`. Not fixed by this session — flagged for whoever picks up the fix.
 
 **Why:** The AI Audit panel groups by model string. Short-form and full-version IDs produce two separate rows for the same model, splitting cost and call counts. An AI Transparency screen with fragmented model data or "Unknown provider" labels fails its purpose.
 
