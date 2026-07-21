@@ -1,4 +1,4 @@
-// DeepBench v6.3.72 | MarketIntelligenceScreen.jsx | S-LOO-009b -- onDelegationProgress/logEvent pairing fix, Shape-2 hopEvents removed
+// DeepBench v6.3.73 | MarketIntelligenceScreen.jsx | S-LOO-009c -- describePipelineEvent gains delegation_complete case, fixes blank drawer row
 // (Prior header, kept for history: CHI-32 — patches CHI-30: rotation split changed
 // from 6/4 to 2/8 (3 visible slots instead of 7 — slot 1 + static slot 2 + slot 3), matching the
 // original pre-CHI-30 UI shape. Drawer count now 20 (was 16), computed automatically.)
@@ -827,6 +827,11 @@ function describePipelineEvent(evt) {
     case "delegation":
       return { capability: null, summary: evt.data.message, color: T.navyMid };
     case "delegation_return":
+      return { capability: null, summary: evt.data.message, color: T.moss };
+    // FEATURE: LOO-009c — same shape as delegation_return immediately above (both are terminal,
+    // "agent completed its work cleanly" events, T.moss per that existing convention) — the gap
+    // this session closes: this case never existed, so delegation_complete rendered blank.
+    case "delegation_complete":
       return { capability: null, summary: evt.data.message, color: T.moss };
     default:
       return { summary: "", color: T.muted };
