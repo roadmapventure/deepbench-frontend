@@ -4,6 +4,7 @@
 **Version in dev:** v6.3.102 (`S-LOO-17`) — highest closed-out version, live-verified (also includes `S-HAR-8`, v6.3.101, `S-CHI-45`, v6.3.100, `S-LOG-35b`, v6.3.99, `S-LOG-35a`, v6.3.98, merged in the same window). New versions are claimed atomically from Supabase's `dev_version_counter` table (`CLAUDE.md` concurrent-sessions rule #5) — this line updates only at each session's close-out, so it can legitimately trail versions already claimed by in-flight sessions. Full version-by-version history: `docs/SESSIONS.md` / `docs/FEATURES-ARCHIVE.md`.
 
 **In flight now:**
+- `ses-11` (design session) — working `SES-011`, a lighter-weight path for low-risk bookkeeping edits (skip the full 8-step worktree ceremony for single-line additive-only backlog rows).
 - `design-0720` (design session) — active, ongoing design conversation, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`) — topic not yet written down; worktree name is a bare date, no topic hint.
 - `design-apple-readiness-0717` (design session) — active, ongoing design conversation on Apple demo readiness, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).
 - `design-chi-31-0718` (design session) — active, ongoing design conversation on `CHI-31`, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).
