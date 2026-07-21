@@ -1520,3 +1520,15 @@ Patches `CHI-30`'s rotation from 7 visible slots down to 3, John's direct call a
 **Design session's own live verification against the worktree's own dev server, not accepted from code read alone:** fresh load showed exactly 3 buttons matching today's confirmed default order 1-2-3, drawer read/expanded to 20 correctly; reload re-rolled slots 1/3 with slot 2 static; Ask+Clear re-rolled a fresh draw; 390×844 mobile identical via `MobileBody`'s `InteractColumn` reuse. Zero console errors attributable to this patch.
 
 **Close-out:** `CHI-32` archived ✅ Done. Full detail: `docs/FEATURES-ARCHIVE.md`.
+
+---
+
+## S-CHI-37-design / S-CHI-37 (v6.3.70, 2026-07-20, worktree `design-chi-37-0720`)
+
+Generic hop-completion mechanism (`callCapability` now requires a `hopEvents` declaration whenever a caller passes `onEvent`, structurally closing the gap that let `fetchNewsCards()`'s Jordan→Alex placeholder go permanently orphaned), migrated the 3 existing Q&A call sites onto it, then wired `fetchNewsCards()` via a new append-only `appendHopEvent`. `LOO-009` (Harness-layer version) logged separately, out of scope. 1 file, Node 11/11 PASS, build clean.
+
+**Two real bugs found and fixed via this session's own live verification, neither accepted on code-read alone:** a live 23-question before/after diff against the real dev preview caught a 100%-reproducible hop-order swap on the Display call site (fixed, re-ran clean — 0 regressions/18 QA-routed, 5 non-qa skipped); loading the actual MI screen then showed hop 2 never rendering at all — root cause was a pre-existing `if (result.status) return result` early-return skipping the new hop-event block whenever a call resolves via internal delegation (`status: "final_delegation"`), a class of bug the 23-question script's standalone reimplementation of `callCapability` couldn't have caught. Fixed, then live-reconfirmed on a real preview deployment: fresh load shows Jordan (hop 1, unchanged) + Alex (hop 2) as two separate cards; a real question (8-hop Owen→Michelle→Eleanor escalation) starts its own hops at 3, chat's "8 hops total" matches the drawer's "8 hops" badge; Clear correctly refires the Jordan/Alex pair; zero console errors.
+
+**Note (retroactively added 2026-07-20, `design-loo-010-0720`, while closing out the `LOO-009`–`011` track):** the `hopEvents` mechanism this session built was fully superseded and removed by `LOO-009b`/`LOO-010` once the harness gained a live completion event — see `docs/FEATURES-ARCHIVE.md`'s `LOO-009`/`LOO-010`/`LOO-011` rows for the full follow-on story, including two real bugs this session's own "2 permanent hops" assumption masked (`LOO-009`'s Owen/Marcus pairing bug, `LOO-011`'s Jordan/Alex originator-credit gap).
+
+**Close-out:** `CHI-37` archived ✅ Done. Full detail: `docs/FEATURES-ARCHIVE.md`.
