@@ -183,6 +183,7 @@ export default function AIActivityPanel({ onClose }) {
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
   const [zeroClosed, setZeroClosed] = useState(true);
   const [inactivePtnClosed, setInactivePtnClosed] = useState(true);
+  const [uncatalogedPtnClosed, setUncatalogedPtnClosed] = useState(true);
   const toggle = (key) => setSections(s => ({ ...s, [key]: !s[key] }));
   // FEATURE: AI-48 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
   const isMobile = useIsMobile();
@@ -250,9 +251,18 @@ export default function AIActivityPanel({ onClose }) {
               patternsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
                 : (() => {
-                    const structural = patternsSorted.filter(p => (p.active || p.partial) && p.patternType === 'structural');
-                    const reasoning  = patternsSorted.filter(p => (p.active || p.hitlSpecial || p.partial) && p.patternType === 'reasoning');
-                    const inactive   = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
+                    const structural   = patternsSorted.filter(p => (p.active || p.partial) && p.patternType === 'structural');
+                    const reasoning    = patternsSorted.filter(p => (p.active || p.hitlSpecial || p.partial) && p.patternType === 'reasoning');
+                    const inactive     = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
+                    // FEATURE: LOG-31/LOG-32 -- a real, logged pattern slug that computeByPattern()'s
+                    // LOG-14 fallback auto-detected (patternType: 'unknown') matched none of the 3
+                    // buckets above and rendered nowhere -- silent data loss, confirmed live on 18 rows
+                    // (historical 'reflection' slug, write-site already fixed elsewhere, AA-190c).
+                    // Generic catch-all, same "auto-detected still gets shown" principle byService's
+                    // own render already follows one section up -- never a per-slug special case.
+                    const uncatalogued = patternsSorted.filter(p =>
+                      !structural.includes(p) && !reasoning.includes(p) && !inactive.includes(p)
+                    );
                     return (
                       <>
                         {/* FEATURE: AI-36 — Structural subsection */}
@@ -282,6 +292,22 @@ export default function AIActivityPanel({ onClose }) {
                               <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{inactivePtnClosed?"▼":"▲"}</div>
                             </div>
                             {!inactivePtnClosed && inactive.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                          </div>
+                        )}
+
+                        {/* FEATURE: LOG-31/LOG-32 -- Uncatalogued collapse card, same shape/styling as
+                            the "Not yet active" card above -- real activity that hasn't been given a
+                            proper catalog entry yet, shown honestly rather than dropped. */}
+                        {uncatalogued.length > 0 && (
+                          <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
+                            <div
+                              onClick={()=>setUncatalogedPtnClosed(o=>!o)}
+                              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
+                            >
+                              <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Uncatalogued · {uncatalogued.length} pattern{uncatalogued.length === 1 ? "" : "s"}</div>
+                              <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{uncatalogedPtnClosed?"▼":"▲"}</div>
+                            </div>
+                            {!uncatalogedPtnClosed && uncatalogued.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
                           </div>
                         )}
                       </>

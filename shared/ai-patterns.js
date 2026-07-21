@@ -6,7 +6,7 @@
 // now only has to happen in this one file to reach every consumer.
 export const PATTERN_CATALOG = [
   { slug: 'rag',                name: 'RAG',                desc: 'Retrieval-Augmented Generation — embed query, search vector store, inject retrieved chunks into context before LLM call',             active: true,  patternType: 'structural' },
-  { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: true,  patternType: 'reasoning'  },
+  { slug: 'react',              name: 'ReAct',              desc: 'Reasoning + Acting — LLM reasons about state, selects action, executes, observes result, repeats until terminal state',               active: false, patternType: 'reasoning'  },
   { slug: 'tool-use',           name: 'Tool Use',           desc: 'Structured function calling — LLM selects from a declared tool schema and returns a structured response',                              active: true,  patternType: 'reasoning'  },
   { slug: 'prompt-chaining',    name: 'Prompt Chaining',    desc: 'Sequential prompt assembly — output of one prompt feeds as input to the next; multiple calls form a pipeline',                        active: true,  patternType: 'reasoning'  },
   { slug: 'reflect',            name: 'Reflection',         desc: 'Agent critiques and improves its own prior output — self-review pass before returning result',                                         active: true,  patternType: 'reasoning' },
