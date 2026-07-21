@@ -1,3 +1,4 @@
+// DeepBench v6.3.101 | api/prompt/request-receivable.js | S-HAR-8 -- postToAnthropicWithRetry() bumped to 3 total attempts, escalating backoff ([1000, 3000]ms)
 // DeepBench v6.3.49 | api/prompt/request-receivable.js | S-HAR-04 -- callModel()/sendRequest() accept optional deadline; bounded, deadline-aware AbortSignal timeouts replace blind fixed constants (byte-identical when omitted)
 // DeepBench v6.0.22 | api/prompt/request-receivable.js | S-ARCH-DISPLAY-LOOP-01 — is_final flag on delegate_to_agent (terminal Display-agent hand-off)
 // FEATURE: AA-44 — Request & Receivable: third step of the Prompt Service pipeline
@@ -136,7 +137,7 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
   return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
 }
 
-// FEATURE: AA-113 -- retry once on a transient non-2xx Anthropic HTTP error (429/500/502/503/529),
+// FEATURE: AA-113 -- retry on a transient non-2xx Anthropic HTTP error (429/500/502/503/529),
 // with a short backoff, before giving up. Every callModel() caller across the whole platform
 // (execute.js's delegation loop, sendRequest()'s own non-precomputed path) shares this helper --
 // generic infrastructure, not capability-specific. Previously any transient API hiccup at any hop
@@ -145,8 +146,14 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
 // no duplicate write). Non-transient errors (4xx other than 429) still fail fast, unchanged --
 // retrying a malformed request or an auth failure would never help. Deliberately scoped to the
 // initial call only -- the existing parse-failure retry's own second fetch() is untouched.
+// FEATURE: HAR-8 -- was 1 retry (2 total attempts, flat 1000ms pause). Bumped after 11 real 529-
+// overload failures in one day (2026-07-21, confirmed via durable_hops) exhausted the old single
+// retry -- uniform, harness-level, applies identically to every model call on the platform, no
+// per-capability special-casing. Escalating backoff (was flat) gives a genuinely overloaded API
+// more room to recover on the 2nd retry than the 1st.
 const TRANSIENT_ANTHROPIC_STATUS = new Set([429, 500, 502, 503, 529]);
-const API_RETRY_BACKOFF_MS = 1000;
+const MAX_ANTHROPIC_ATTEMPTS = 3;
+const API_RETRY_BACKOFF_MS = [1000, 3000];
 
 // FEATURE: HAR-04 -- deadline-aware timeout floor. Below this much real remaining time, don't
 // attempt an Anthropic call at all (Vercel would very likely kill it mid-flight with zero trace
@@ -168,11 +175,11 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
       method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
     });
     if (res.ok) return { res, apiRetryCount: attempt };
-    if (attempt > 0 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
+    if (attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
       const text = await res.text();
       throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), { status: 502, detail: text });
     }
-    await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS));
+    await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS[attempt]));
   }
 }
 
