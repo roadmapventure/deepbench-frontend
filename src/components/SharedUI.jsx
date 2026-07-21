@@ -343,7 +343,10 @@ export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, v
 // FEATURE: CHI-43 — new opt-in controlled `open`/`onToggle` props (STYLE-GUIDE.md §29 amendment).
 // Backward-compatible: no existing call site passes `open`, so `controlledOpen` is undefined for all
 // of them and `open` falls back to the same internal state as before, byte-identical behavior.
-export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined }) => {
+// FEATURE: CHI-45 — headerRight adds an optional, always-visible (open or collapsed) slot in the
+// header row, next to the chevron, for content like HopBadge that should read as metadata on the
+// drawer itself rather than as part of the (collapsible) body content. See STYLE-GUIDE.md §29.
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined, headerRight = undefined }) => {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -388,6 +391,7 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
           {count!=null && (
             <span style={{fontFamily:mono,fontSize:9,color:T.muted,background:T.paperDeep,padding:"2px 7px",borderRadius:10,border:`1px solid ${T.lineSoft}`}}>{count}</span>
           )}
+          {headerRight}
           <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{open?"▲":"▼"}</span>
         </div>
       </div>

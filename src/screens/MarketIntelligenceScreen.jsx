@@ -1529,13 +1529,11 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
       {/* FEATURE: CHI-05 */}
       <FeatureBadge id="CHI-05"/>
       {/* FEATURE: CHI-43 — own header row removed; its title text now lives as the wrapping Drawer's
-          `title` prop (EvidenceColumn, Task 2) so the two headers don't stack. HopBadge relocated to
-          the top of this now-headerless body, same visual weight, one level lower. */}
+          `title` prop (EvidenceColumn, Task 2) so the two headers don't stack. */}
+      {/* FEATURE: CHI-45 — HopBadge relocated out of this body to the wrapping Drawer's headerRight
+          (always visible, open or collapsed) — see STYLE-GUIDE.md §40's CHI-45 amendment. */}
       <div style={{borderBottom:`1px solid ${T.line}`}}>
         <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:9}}>
-          <div style={{display:"flex",justifyContent:"flex-end"}}>
-            <HopBadge hopStart={qa.hopStart} hopEnd={qa.hopEnd} accent={T.navy}/>
-          </div>
           {qa.headline && <div style={{fontFamily:body,fontSize:13,fontWeight:600,color:T.ink}}>{qa.headline}</div>}
           {(qa.body || []).map((b, i) => (
             <div key={i}>
@@ -1822,7 +1820,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             per isDrawerOpen("qa"), still one click to reopen manually. QaEvidenceCard's own header row
             was removed (Task 3) so this Drawer's title is the card's only header. */}
         {qaEvidence && (
-          <Drawer title="Analysis & Narrative — based on your question..." open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}>
+          <Drawer title="Analysis & Narrative — based on your question..." open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}
+            headerRight={<HopBadge hopStart={qaEvidence.hopStart} hopEnd={qaEvidence.hopEnd} accent={T.navy}/>}>
             <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
           </Drawer>
         )}
@@ -1830,7 +1829,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         {/* FEATURE: CHI-43 — wrapped in a controlled Drawer (STYLE-GUIDE.md §40): auto-opens/collapses
             per isDrawerOpen("hyp"), stays open throughout a theory flow's stage transitions. */}
         {hypFlow && (
-        <Drawer title={INTENT_LABEL[hypFlow.intent] || hypFlow.intent} open={isDrawerOpen("hyp")} onToggle={handleDrawerToggle("hyp")}>
+        <Drawer title={INTENT_LABEL[hypFlow.intent] || hypFlow.intent} open={isDrawerOpen("hyp")} onToggle={handleDrawerToggle("hyp")}
+          headerRight={<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/>}>
         {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
             chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
             carries this text (set by onSelectHypothesis). */}
@@ -1907,13 +1907,9 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
 
         {st && hypFlow.stage === "result" && (
           <>
-            {/* FEATURE: CHI-03c — hop-range badge citing the Agent Routing hops that produced this
-                theory test result. T.moss accent matches this block's own "Supports" verdict color
-                (no dedicated borderLeft accent exists on this flat section to reuse instead). */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-              <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Theory Evidence</div>
-              <HopBadge hopStart={st.hopStart} hopEnd={st.hopEnd} accent={T.moss}/>
-            </div>
+            {/* FEATURE: CHI-45 — hop-range badge relocated to the wrapping Drawer's headerRight (always
+                visible, open or collapsed) — see STYLE-GUIDE.md §40's CHI-45 amendment. */}
+            <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Theory Evidence</div>
             {/* FEATURE: CHI-07 */}
             {hypFlow.testElapsedMs != null && (
               <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:2}}>
