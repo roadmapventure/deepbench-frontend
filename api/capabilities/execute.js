@@ -1,3 +1,4 @@
+// DeepBench v6.3.81 | api/capabilities/execute.js | S-LOO-011 -- delegation_complete event added to credit the originating agent's own turn in the plain delegate_to_agent + final branch
 // DeepBench v6.3.74 | api/capabilities/execute.js | S-LOO-009d -- delegation_complete event added for the broker's own leg in the request_help + delegationRequired auto-resolve branch
 // DeepBench v6.3.71 | api/capabilities/execute.js | S-LOO-009 -- delegation_complete event added at both dispatchDelegation() final-outcome returns
 // DeepBench v6.3.49 | api/capabilities/execute.js | S-HAR-04 -- runLoop()'s two call sites (callModel(), sendRequest()) now pass their existing deadline value through, no new computation
@@ -525,6 +526,16 @@ async function dispatchDelegation({
       return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
     }
     if (delegationRequired || tool_input.is_final === true) {
+      // FEATURE: LOO-011 — credits the ORIGINATING agent's own turn (real work, up to and including
+      // the decision to delegate) — previously invisible once the target's own completion (below)
+      // claimed the 'delegation' placeholder above and overwrote it in place. Fires only in this
+      // FINAL branch: the ordinary returning case (this same agent keeps its own turn and eventually
+      // answers directly) is already credited by callCapability()'s own automatic Shape-1 detection
+      // once the whole call resolves (LOO-010) — firing here too would double-credit that case, so
+      // this is scoped exactly to the one branch that previously had no credit for the originator at
+      // all. Fires unconditionally, not gated on "did this agent's own turn do enough work to
+      // deserve it" — every real agent turn is its own hop, full stop, no judgment call needed here.
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent' });
       // FEATURE: LOO-009 — same gap, second dispatch shape: a plain delegate_to_agent call that
       // resolves final also never fired a completion event for the agent it named as final.
       onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
