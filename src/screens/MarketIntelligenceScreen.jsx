@@ -994,7 +994,15 @@ function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent }) {
 // duplicated inside describeDelegationEvent (MI-49); RoutingEventRow now needs the identical
 // behavior (Task 1: drawer row headers switch from full name to first-name-only, matching the
 // chat status line), so this is the one implementation both call, not a second copy.
+// FEATURE: LOO-011 — found live during this session's own Manual QA (not pre-scoped, no pairing/
+// grouping logic touched): describeDelegationEvent (below) unconditionally resolves BOTH fromName
+// and toName for every event before branching on evt.type, so any event with a null id crashed here
+// (`null.split(" ")`) before the delegation_complete branch that doesn't even use fromName was ever
+// reached. LOO-011's new originator-credit event is the first-ever caller to pass a null
+// fromAgentId (by design — it has no real "from" agent) — this null-guard is the minimal, generic
+// root-cause fix, not scoped to any one event type or agent.
 function firstNameFor(id, agentById) {
+  if (!id) return "";
   return (agentById(id)?.name || id).split(" ")[0];
 }
 
