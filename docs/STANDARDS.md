@@ -138,13 +138,12 @@ Mandatory M tests:
 - No slug, constant, or status value appears with conflicting definitions across the files that reference it
 - Any new constant introduced this session is defined in exactly one place and imported everywhere else — never redefined
 
-**L. Live API Integration Tests** — REQUIRED for any session that modifies an `api/` endpoint, modifies code that calls an `api/` endpoint, adds retry logic, or changes any payload sent to an API endpoint. Added after S14p4b — a change to `handleUpdatePlan` caused the planning agent to intermittently return no steps. Pure logic tests cannot catch LLM response shape issues. A live call test catches these before the code ships.
+**L. Live API Integration Tests** — REQUIRED for any session that modifies an `api/` endpoint, modifies code that calls an `api/` endpoint, adds retry logic, or changes any payload sent to an API endpoint. Pure logic tests cannot catch LLM response shape issues; a live call test catches these before the code ships.
 
-**Scoping breadth for Category L when a session applies an already-proven mechanism to more data of the same shape (added 2026-07-02, `S-ARCH-AGENT-LOOP-03`):** a full live multi-turn round trip is required for whatever's genuinely novel in the session — a mechanism path, tool combination, or schema interaction not yet exercised live before. It is not required, one-for-one, for every additional data row that reapplies a mechanism already proven live by a prior session on a structurally identical shape. `S-ARCH-AGENT-LOOP-03` ran 4 full live L-tests (25 min, repeated 55s-timeout retries) when 3 of the 4 (`ci-routing-intent`, `intake-commit-intent`, `intake-failure-intent`) re-exercised the exact `can_request_help`/`request_help` path already proven live twice by `S-ARCH-AGENT-LOOP-02`/`S-ARCH-LOOP-PATCH-02` on the same schema shape — only the 4th (`qg-review-intent`'s novel `delegate_to_agent`-from-`task_context` path) carried real incremental risk. Category F (schema/data alignment, cheap and deterministic) still applies to every row regardless; reserve the expensive full live round trip for the case(s) actually establishing new behavior.
-
-**Loop-closure proof specificity (added 2026-07-08, found during `AA-110`'s investigation into `S-APPLE-05`'s Category L test):** when a live test's pass condition is "does the downstream agent's output reflect a new write," the proof must be uniquely traceable to that specific write — not a generic keyword or theme also reachable from pre-existing seeded content. Root cause: `S-APPLE-05`'s loop-closure check searched Marcus's answer for the word "enablement" as proof his response depended on Elena's new `the_reasoning` write — but "enablement" is an existing theme in the seeded Data Room, so Marcus can (and does) say it from pre-existing content alone, with zero dependency on the new write. A tighter proof checks for content verbatim or near-verbatim to the specific new entry, or a direct citation to that entry's row id (`the_reasoning.id` / `the_library.id`), not a generic subject-matter keyword.
-
-**`delegation_required` intent testing standard (added 2026-07-08, `AA-148`):** any `delegation_required` intent's Category L test must confirm two things, not just one — (a) the final result reaches a proper `final_delegation` shape or a thrown/guarded error, never a bare narration string silently accepted as an ordinary final answer, and (b) if the request checkpoints/resumes mid-flight (forceable deterministically via `__setTestBudgetMs(0)`), the persisted `delegation_required` value on the resulting `durable_hops` row matches the original capability's own trait. Root cause: `AA-142`'s narration guard existed but was live-proven silently inert on any request that checkpointed mid-flight, because `resumeCapability()` hardcoded `delegationRequired: false` — a gap `AA-142`'s own session flagged as accepted/deferred but never live-tested, so it shipped and later fired in production undetected. A Category L test that only exercises the non-checkpointing path cannot catch this class of bug.
+**Current rule, consolidated 2026-07-21 (`SES-005`) from 4 previously-separate dated amendments — full history/rationale for each in git blame, not restated here:**
+- **Scoping breadth:** a full live round trip is required only for what's genuinely novel in the session — a mechanism path, tool combination, or schema interaction not yet exercised live before. It is not required, one-for-one, for every additional data row reapplying an already-proven mechanism on a structurally identical shape. Category F (schema/data alignment) still applies to every row regardless.
+- **Loop-closure proof specificity:** when a live test's pass condition is "does the downstream agent's output reflect a new write," the proof must be uniquely traceable to that specific write — content verbatim/near-verbatim to the new entry, or a direct citation to its row id — never a generic keyword also reachable from pre-existing seeded content.
+- **`delegation_required` intent standard:** any `delegation_required` intent's Category L test must confirm (a) the final result reaches a proper `final_delegation` shape or a thrown/guarded error, never a bare narration string accepted as an ordinary final answer, and (b) if the request checkpoints/resumes mid-flight (forceable via `__setTestBudgetMs(0)`), the persisted `delegation_required` value on the resulting `durable_hops` row matches the original capability's own trait.
 
 How to run: `node --env-file=.env.local test-[session-id]-api.mjs`
 Requires `ANTHROPIC_API_KEY` in `.env.local`. Delete before committing.
@@ -242,35 +241,16 @@ Complete every item before committing. This is the canonical "standing checklist
 - [ ] Byline: Inter `text-xs`, no borders or cards
 
 ### Category K — Component State Initialization
-- [ ] `initializeStepsFromSupabase()` — no `mergeSteps()` call
-- [ ] `initializeStepsFromFirstPlan()` — `mergeSteps([], new, [])`
-- [ ] `updateStepsFromPlan()` — `mergeSteps(active, new, archived)`
-- [ ] Each operation has its own code path — no sharing
-- [ ] `saveStepsToSupabase()` writes full array with archived
-- [ ] `pendingArchive` preserved in all writes
-- [ ] `handleApprove` strips `pendingArchive` from approved step only
-- [ ] Unanswered detection uses answers snapshot not stale state
-- [ ] Label-based dedup (not ID-based)
-- [ ] Active/archived split on load by `mergeStatus`
+- [ ] All mandatory K tests (Section 4) pass — see Section 4 for the full list
 
 ### Category M — Cross-Reference Consistency
-- [ ] Every pattern slug in AiBadge labels / AGENT_PATTERNS exists in PATTERN_CATALOG
-- [ ] No active-false pattern appears as a live badge on a currently-executing feature
-- [ ] No now-tier service slug is absent from the codebase (route or inline logic exists)
-- [ ] No slug or constant is defined in more than one place with conflicting values
-- [ ] Any new constant introduced is defined once and imported — not redefined inline
+- [ ] All mandatory M tests (Section 4) pass — see Section 4 for the full list
 - [ ] `node scripts/check-ai-logging-coverage.js` run and reviewed for any session adding or touching a real LLM/embedding call site — new CRITICAL findings must be resolved before commit; new WARNING findings must at least be looked at and either fixed or explicitly logged as a follow-up ID, not silently ignored
 
 ### Category L — Live API Integration
-- [ ] Live API test file written and run before commit
+- [ ] Live API test file written and run before commit — asserts against Section 4's mandatory test lists for whichever endpoint(s) this session touches
 - [ ] `test-[session]-api.mjs` deleted before commit
-- [ ] Loop-closure/round-trip live tests check for content uniquely tied to the new write (verbatim phrasing or a direct row-id citation) — not a generic keyword also reachable from pre-existing seeded data
-- [ ] `PLAN API: PASS` confirmed in test output
-- [ ] `TITLE API: PASS` confirmed (if title.js involved)
-- [ ] Retry logic tested: empty → retry → success path confirmed
-- [ ] Retry logic tested: empty → retry → empty → error thrown
-- [ ] Payload integrity: no `mergeStatus`/`pendingArchive` in `stepsContext`
-- [ ] `task.steps` for `stepsContext` is `mergedToSet.active` after Update Plan
+- [ ] Loop-closure/round-trip live tests check for content uniquely tied to the new write (Section 4) — not a generic keyword
 
 **Added 2026-07-07 (John's explicit call — a coding session's own live testing ran to ~22 minutes this way, a real cost against the real Anthropic/Supabase backend, not overhead):** run each live scenario **once** by default. Only repeat a scenario when the session's actual goal is measuring an intermittent-failure rate (state that goal explicitly in the kickoff/report) — not as generic extra assurance after a first pass already succeeded. If a first pass fails on a transient, already-tracked issue (e.g. a known flaky backend call), report it honestly and move on; don't loop retrying to manufacture more confidence than the one real data point provides.
 
@@ -340,23 +320,9 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 
 ---
 
-## Section 9: S-POLISH-01 — Deferred Known Issues
+## Section 9: Retired — moved to backlog (2026-07-21, `SES-005`)
 
-### Fix 1: Update Plan immediate click race condition
-
-**Symptom:** Answer 1 question, click Update Plan immediately → unanswered questions disappear. Browser refresh restores them.
-
-**Root cause:** Stale closure in `handleUpdatePlan` reads `mergedSteps` before `setMergedSteps` from `handleAnswerChange` commits.
-
-**Fix:** Add `useRef` to always hold latest `mergedSteps`:
-```js
-const mergedStepsRef = useRef(mergedSteps);
-useEffect(() => { mergedStepsRef.current = mergedSteps; }, [mergedSteps]);
-```
-Then read `mergedStepsRef.current` in `handleUpdatePlan` instead of `mergedSteps`.
-3-line change. File: `TaskInstructionsScreen.jsx` only.
-
-**Status:** Deferred — acceptable behavior for now. Fix after all other sessions complete.
+**This numbered slot is intentionally kept, not renumbered** — `CLAUDE-DESIGN.md` and other docs cite "STANDARDS.md Section 11/12" by number; removing this slot would silently invalidate every such cross-reference. The content previously here (`S-POLISH-01`'s deferred "Update Plan immediate click race condition" fix) was a stale bug-tracking entry embedded in a general standards doc, not a standard — it now lives as `PRO-1` in `docs/FEATURES-LATER.md`, the first real usage of the `PRO-` prefix per `docs/SCREEN-INVENTORY.md`'s Task Instructions → Project Management mapping.
 
 ---
 
