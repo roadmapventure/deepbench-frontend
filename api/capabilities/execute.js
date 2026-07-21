@@ -1,3 +1,4 @@
+// DeepBench v6.3.102 | api/capabilities/execute.js | LOO-17 -- resolveAccept()/continue branch no longer mark a checkpoint as a completed accept; new accept_failed terminal state; widened eligibility guards
 // DeepBench v6.3.88 | api/capabilities/execute.js | S-LOO-015 -- requester's own turn now credited on the request_help+delegationRequired branch, was completely invisible before
 // DeepBench v6.3.87 | api/capabilities/execute.js | S-LOO-014 -- originating agent's delegation_complete credit now fires before the 'delegation' placeholder, fixing hop-order (was: target numbered before originator)
 // DeepBench v6.3.86 | api/capabilities/execute.js | S-LOO-012 -- delegation_complete events now carry real content (reasoning/task) at the two call sites that previously had none
@@ -48,7 +49,7 @@
 import { assemblePrompt } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
-import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated } from '../_lib/handlers/confirmation.js';
+import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
 
@@ -1072,21 +1073,40 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
 export async function resolveAccept({ confirmation_id, _onEvent = null }) {
   const row = await getPendingConfirmation(confirmation_id);
   if (!row) throw Object.assign(new Error('confirmation not found'), { status: 404 });
-  if (row.status !== 'pending') throw Object.assign(new Error(`confirmation already ${row.status}`), { status: 409 });
+  // FEATURE: LOO-17 -- same guard widening as resolvePendingConfirmation() (Task 2).
+  if (!['pending', 'accept_failed'].includes(row.status)) {
+    throw Object.assign(new Error(`confirmation already ${row.status}`), { status: 409 });
+  }
 
   const onAcceptIntentSlug = await getOnAcceptIntentSlug(row.intent_slug);
   if (!onAcceptIntentSlug) {
     return resolvePendingConfirmation({ confirmation_id, resolution: 'accept' });
   }
 
-  const result = await runCapability({
-    capability_slug: row.capability_slug,
-    intent_slug: onAcceptIntentSlug,
-    agent_id: row.agent_id,
-    task_context: row.proposed_action,
-    tenant_id: row.tenant_id,
-    _onEvent,
-  });
+  let result;
+  try {
+    result = await runCapability({
+      capability_slug: row.capability_slug,
+      intent_slug: onAcceptIntentSlug,
+      agent_id: row.agent_id,
+      task_context: row.proposed_action,
+      tenant_id: row.tenant_id,
+      _onEvent,
+    });
+  } catch (e) {
+    // FEATURE: LOO-17 -- a fast/synchronous failure is exactly as exhausted as one that failed
+    // after a checkpoint (HAR-8's 3 attempts already happened inside this call before this throw
+    // surfaced) -- mark it accept_failed consistently, not silently pending.
+    await markAcceptFailed(confirmation_id, e);
+    throw e;
+  }
+
+  // FEATURE: LOO-17 -- a checkpoint is not a completed result. Link the job so the `continue`
+  // branch (Task 4) can close this out for real once it actually finishes.
+  if (result.status === 'in_progress') {
+    await linkCheckpointJob(confirmation_id, result.job_id);
+    return result;
+  }
   await markAcceptedDelegated(confirmation_id, result);
   return result;
 }
@@ -1132,7 +1152,10 @@ export default async function handler(req, res) {
       if (resolution === 'edit') {
         const row = await getPendingConfirmation(confirmation_id);
         if (!row) return res.status(404).json({ error: 'confirmation not found' });
-        if (row.status !== 'pending') return res.status(409).json({ error: `confirmation already ${row.status}` });
+        // FEATURE: LOO-17 -- same guard widening as Task 2/3.
+        if (!['pending', 'accept_failed'].includes(row.status)) {
+          return res.status(409).json({ error: `confirmation already ${row.status}` });
+        }
         if (!edited_task_context) return res.status(400).json({ error: 'edited_task_context required for edit' });
         await markEdited(confirmation_id);
         if (body.stream === true) {
@@ -1176,8 +1199,24 @@ export default async function handler(req, res) {
       if (body.stream === true) {
         return streamResult(res, (emit) => resumeCapability({ job_id, _onEvent: emit }));
       }
-      const result = await resumeCapability({ job_id });
-      return res.status(200).json(result);
+      try {
+        const result = await resumeCapability({ job_id });
+        // FEATURE: LOO-17 -- a further in_progress means it checkpointed again, still not done;
+        // only close out a linked confirmation on a genuine terminal result.
+        if (result.status !== 'in_progress') {
+          const linkedConfirmationId = await getConfirmationByCheckpointJobId(job_id);
+          if (linkedConfirmationId) await markAcceptedDelegated(linkedConfirmationId, result);
+        }
+        return res.status(200).json(result);
+      } catch (e) {
+        // FEATURE: LOO-17 -- close out a linked confirmation as accept_failed before re-throwing;
+        // the existing error-response shape/status for the client is completely unchanged (the
+        // outer catch below still builds the same response) -- only the confirmation's own durable
+        // state differs from today.
+        const linkedConfirmationId = await getConfirmationByCheckpointJobId(job_id);
+        if (linkedConfirmationId) await markAcceptFailed(linkedConfirmationId, e);
+        throw e;
+      }
     }
 
     // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
