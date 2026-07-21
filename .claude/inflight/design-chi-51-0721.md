@@ -1,1 +1,1 @@
-- `design-chi-51-0721` (design session, worktree `design-chi-51-0721`) — working `CHI-51` (drawers survive flow resolution instead of being wiped; auto-open suppressed once a flow fully resolves). Scoping now.
+- `design-chi-51-0721` (design session, worktree `design-chi-51-0721`) — `CHI-51` kickoff written (v6.3.111), spawning the coding session now.
