@@ -1,8 +1,4 @@
-// DeepBench v6.3.69 | MarketIntelligenceScreen.jsx | CHI-38/CHI-39 — Column 2 news-card loading
-// skeletons (3x NewsCardSkeleton + existing elapsed-time caption while newsCards === null) and idle
-// 10s auto-rotation shimmer on the example-question blocks (2 rotating buttons, static button, drawer
-// toggle all shimmer in sync via a shared ShimmerSweep overlay, reusing tokens.js's existing shimmer
-// keyframe). No new keyframe, no Drawer.jsx change.
+// DeepBench v6.3.72 | MarketIntelligenceScreen.jsx | S-LOO-009b -- onDelegationProgress/logEvent pairing fix, Shape-2 hopEvents removed
 // (Prior header, kept for history: CHI-32 — patches CHI-30: rotation split changed
 // from 6/4 to 2/8 (3 visible slots instead of 7 — slot 1 + static slot 2 + slot 3), matching the
 // original pre-CHI-30 UI shape. Drawer count now 20 (was 16), computed automatically.)
@@ -1013,6 +1009,9 @@ function describeDelegationEvent(evt, agents) {
     // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
     // payload: fromAgentId is the sub-agent who was helping, toAgentId is who receives control back.
   }
+  if (evt.type === 'delegation_complete') { // FEATURE: LOO-009b
+    return `${toName} has finished.`;
+  }
   switch (evt.viaTool) {
     case 'request_help':
       return `${fromName} is asking ${toName} who should help…`;
@@ -1185,7 +1184,6 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale,
     onEvent, hopEvents: [
       { type: "qa_answer", resolveAgentId: () => "marcus" },
-      { type: "agent_selection", resolveAgentId: (r) => r.last_help_selection?.selected_by_agent_id || null, resolveData: (r) => r.last_help_selection },
     ],
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
@@ -1203,7 +1201,6 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     onProgress, isStale,
     onEvent, hopEvents: [
       { type: "proofreader", resolveAgentId: () => "owen" },
-      { type: "agent_selection", resolveAgentId: (r) => r.last_help_selection?.selected_by_agent_id || null, resolveData: (r) => r.last_help_selection },
     ],
   });
   if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
@@ -1218,12 +1215,6 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // whatever the real delegate returned, copied verbatim by Owen; gate.last_help_selection
     // carries Michelle's own real reasoning for the pick, surfaced the same way AA-164 already
     // surfaces Marcus's own request_help hop above (qa.last_help_selection).
-    if (gate.last_help_selection) {
-      // FEATURE: MI-52 -- same re-pointing as the request_help hop above: agentId is the picker
-      // (Michelle), not the requester (Owen); secondaryAgentId dropped; durationMs: null (was a
-      // fabricated 0) -- not separately measurable from the client.
-      onEvent(buildHopEvent("agent_selection", gate.last_help_selection.selected_by_agent_id, gate.last_help_selection));
-    }
     // FEATURE: LOG-15 — gate.triage never carried patterns_used; the real value lives one level up
     // on gate itself (the shared callCapability() wrapper's top-level field), not nested inside
     // gate.triage. Hoisted explicitly so failure_triage's pattern line shows real data.
@@ -1265,10 +1256,6 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
     onProgress, isStale,
-    onEvent, hopEvents: [
-      { type: "agent_selection", resolveAgentId: (r) => r.selection?.selected_by_agent_id || null, resolveData: (r) => r.selection },
-      { type: "display_format", resolveAgentId: (r) => r.display_agent_id },
-    ],
   });
   if (isStale()) return display; // FEATURE: CHI-04
 
@@ -2899,21 +2886,23 @@ export default function MarketIntelligenceScreen() {
   // not guaranteed (same defect shape as STANDARDS.md Section 8's BUG-3), and a currentHopCount()
   // read with no intervening await could see a ref that hadn't picked up the most recent push yet.
   // setPipelineEvents now receives the already-computed array directly instead of an updater function.
+  // FEATURE: LOO-009b — a still-pending placeholder is now checked FIRST, every call, whether or
+  // not `replaces` was supplied. Before this fix, any call carrying `{replaces}` (every
+  // onDelegationProgress call, unconditionally) skipped this check entirely and could never
+  // resolve an earlier pending row — root cause of the permanently-stuck "X is routing to Y" line.
   const logEvent = (evt, { replaces } = {}) => {
     const prev = pipelineEventsRef.current;
+    const pending = pendingDelegationsRef.current.get(evt.agentId);
     let next;
-    if (replaces) {
+    if (pending) {
+      pendingDelegationsRef.current.delete(evt.agentId);
+      next = prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
+    } else if (replaces) {
       const id = prev.length;
       pendingDelegationsRef.current.set(replaces.awaitingAgentId, { id, key: replaces.key });
       next = [...prev, { ...evt, id }];
     } else {
-      const pending = pendingDelegationsRef.current.get(evt.agentId);
-      if (pending) {
-        pendingDelegationsRef.current.delete(evt.agentId);
-        next = prev.map(e => (e.id === pending.id ? { ...evt, id: pending.id } : e));
-      } else {
-        next = [...prev, { ...evt, id: prev.length }];
-      }
+      next = [...prev, { ...evt, id: prev.length }];
     }
     pipelineEventsRef.current = next;
     setPipelineEvents(next);
@@ -2946,9 +2935,19 @@ export default function MarketIntelligenceScreen() {
   // resumes next, e.g. Owen after Marcus's retry-via-Marcus hop). The next event logged for that
   // agentId (any ordinary logEvent(evt) call, unmodified elsewhere in this file) replaces this row
   // in place instead of sitting duplicated above it.
+  // FEATURE: LOO-009b — 'delegation_return'/'delegation_complete' are both terminal: they either
+  // claim the pending row 'delegation' registered, or (unclaimed edge case) append plainly — neither
+  // ever awaits anything further itself, so neither passes `replaces` anymore. 'delegation_complete'
+  // credits toAgentId (the agent who actually finished — same field 'delegation' used to name them
+  // as the target); 'delegation_return' keeps its existing fromAgentId convention, unchanged.
   const onDelegationProgress = (evt) => {
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
+    if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
+      const attributedAgentId = evt.type === 'delegation_complete' ? evt.toAgentId : evt.fromAgentId;
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null }, null, {}));
+      return;
+    }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
     logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, null, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
