@@ -1,0 +1,1 @@
+- `design-chi-50-0721` (design session, worktree `design-chi-50-0721`) — working `CHI-50` (Nadia's data-patch proposal becomes its own "Draft Forecast" drawer, pulled out of the pinned footer). Scoping now.
