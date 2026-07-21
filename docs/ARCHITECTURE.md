@@ -65,24 +65,20 @@ DeepBench is organized into 5 layers, stacked by real dependency (each layer cal
 │  HITL-facing dashboards, one per domain of work:            │
 │  Channel Intelligence · Project Management · Bench · ...      │
 ├─────────────────────────────────────────────────────────┤
-│  Loop                                                        │
-│  Orchestration/routing — which agent handles what, when       │
-├─────────────────────────────────────────────────────────┤
-│  Harness                                                       │
-│  Agent communication mechanics — message/tool-call protocol,    │
-│  prompt assembly                                                 │
-├─────────────────────────────────────────────────────────┤
-│  Platform Services                                                │
-│  Shared foundational utilities — logging/AI Audit, generic         │
-│  display code, knowledge-flow plumbing                              │
-├─────────────────────────────────────────────────────────┤
-│  Data Model                                                          │
-│  3 entities, each independently RAG-backed: Competency · Library ·     │
-│  Reasoning                                                                │
+│  Platform                                                     │
+│  The whole system many agents run on:                          │
+│    Data Model — Competency · Library · Reasoning                 │
+│    Platform Services — logging/AI Audit, knowledge-flow            │
+│      plumbing, generic display code                                  │
+│    Scaffold — what one agent is given, once, before it starts          │
+│    Harness — one agent's operating system for a single turn              │
 └─────────────────────────────────────────────────────────┘
 
-Cross-cutting, not a layer — intersects all 5, not yet built into any of
-them: Functional Objectives (multi-tenancy, security, revenue/
+Loop — cross-cutting, not a nested layer: how work repeats through
+Scaffold + Harness until a gate passes.
+
+Also cross-cutting, not a layer — intersects everything, not yet built
+into any of it: Functional Objectives (multi-tenancy, security, revenue/
 monetization, MCP exposure).
 ```
 
@@ -93,27 +89,40 @@ monetization, MCP exposure).
 
 **Loop — consolidated summary (added 2026-07-17, `SES-001`).**
 
-**Industry term:** Agent Loop — the standard execution mechanism for any tool-using agent: invoke the model → it emits an action (tool call) → the harness executes it → the result is fed back as an observation → invoke again → repeat until a final answer or a stop condition. Dominant flavor in the literature is ReAct (Yao et al., 2022) — reasoning interleaved with a genuinely diverse, freely-explored action space.
+**Not a nested layer — cross-cutting**, same shape as Functional Objectives (below): it intersects Scaffold and Harness rather than sitting as a box beside them. Confirmed in code: `runLoop()`'s `for` loop (`api/capabilities/execute.js`).
 
-**Where DeepBench fits:** `runLoop()` (`api/capabilities/execute.js`) is a real, live Agent Loop, confirmed in code: call model → model either finalizes or emits one of exactly two harness tools (`request_help`, `delegate_to_agent`) → result fed back into `conversationHistory` → call model again → repeat, capped at `MAX_LOOP_DEPTH = 5`. It genuinely satisfies the Agent Loop definition.
+Loop calls Harness once per turn and decides, based on what comes back, whether to call it again. Scaffold assembles the agent's starting point, once. Then, each turn: the model reasons and decides what to do (Harness's Execution carries that out); if it calls a tool, Harness's Equipment resolves who or what it points to; Harness's Evaluation checks its gates — guardrails, `is_final`, `requires_human_confirmation`, and the hardcoded depth cap (`MAX_LOOP_DEPTH = 5`). **Loop makes no judgment of its own** — it just reads Evaluation's verdict and either stops (a gate passed, or the depth cap was hit) or feeds the result back into memory and calls Harness again.
 
-**Where it doesn't reach ReAct:** the action space is narrow by design — exactly two tools, both delegation-flavored (`request-receivable.js`'s `harnessTools`). There is no general tool palette the model explores mid-task (search, compute, fetch); knowledge retrieval happens once, before the loop starts, via Platform Services' knowledge-flow plumbing, not as an in-loop action. DeepBench has no general ReAct-style tool-exploration loop wired into the main harness today — NIGP had one; Brent's Railway/Playwright agent is the platform's closer-to-ReAct implementation, isolated from this harness and not currently functioning. Real, separate gap — not resolved by this entry, see `LOO-008` (`FEATURES.md`).
+**Industry term:** Agent Loop / ReAct (Yao et al., 2022) — reasoning interleaved with a freely-explored action space, repeated until done. DeepBench's is a real, live instance of the pattern, but narrow by design: exactly two tools available (`request_help`, `delegate_to_agent`), never a general search/compute/fetch palette. Full history and rationale: `LOO-008` (`FEATURES.md`).
 
-**Functions the loop performs**, once a call resolves to one of its two tools:
-- **Routing** — the agent holding the broker/resolver capability (`project-manager`) makes a live, reasoned decision about which specialist should handle the request. Resolved fresh every call, never a static lookup.
-- **Orchestrator-Workers or Handoff, chosen per call:** `delegate_to_agent` carries its own `is_final` boolean — the calling agent's own live judgment on each call, not a static trait. `is_final: true` (or a `delegation_required` capability, which forces this regardless) makes the result terminal: the resolved agent's answer stands as final, no further turn (Handoff). Omitted/`false` returns the result as an observation and the loop continues (Orchestrator-Workers).
-- **Human-in-the-Loop / Control Gate** — orthogonal to the above: any action flagged `requires_human_confirmation` pauses the loop for human accept/reject/edit, optionally preceded by one critique pass from a second resolved agent.
-
-No agent is named in this mechanism by identity — every role above (broker, critique agent, resolved specialist) is resolved live by capability, never hardcoded (Rule #1, §19d/§19e).
+No agent is named in this mechanism by identity — every resolution happens live, by capability, never hardcoded (Rule #1, §19d/§19e).
 
 Full mechanism detail, not repeated here: §19d (Agent Loop, sniff test, single delegation path), §19e (Resource Ownership Brokers — a distinct, orthogonal concern: *who's allowed to touch a resource*, not *who gets asked*).
 
+### Platform
+
+**Platform — added 2026-07-17/18 (`SES-001`), adopted from an external source (Weave Intelligence) on John's explicit direction — DeepBench's `§1` previously had no explicit "Platform" entry, only its parts.** The whole system many agents run on. Contains four things, each detailed in its own section: **Data Model** (below — the persistent knowledge/identity substrate: Competency, Library, Reasoning), **Platform Services** (below — shared infrastructure: logging/AI Audit, knowledge-flow plumbing, generic display code), **Scaffold**, and **Harness** (both immediately below). **Loop is not a fifth contained part** — it's cross-cutting, describing how work repeats through Scaffold and Harness (see the diagram above; Loop's own detailed section is still pending its own walkthrough pass).
+
+Two pieces of the source's own model don't yet have a checked DeepBench equivalent — flagged honestly rather than force-fit: **Tooling** (per-domain external integrations, e.g. Salesforce/GitHub) has no confirmed match in DeepBench today; **Path Specs** (the source's probabilistic/deterministic/hybrid execution-rule distinction) — Skill Profile data is the closest analog, but that specific distinction hasn't been checked against it.
+
+### Scaffold
+What one agent is given, once, before its work starts. Confirmed in code: `assemblePrompt()` (`db-assembly.js`) builds the system prompt from the agent's Competency — specifically its structured Skill Profile half (traits like `can_request_help`, `delegation_required`). `enrichPrompt()` (`ai-enrichment.js`) pulls RAG context from Data Model's Library and Reasoning tables, via Platform Services' knowledge-flow plumbing (`lib/search-harness.js`), and runs its own pre-planning step — a real, separate Anthropic call, on every invocation, uncached today. `conversationHistory` (`execute.js`) is what accumulates as memory across a task's turns. Built once, handed to Harness, which runs on it repeatedly.
+
+**Competency's RAG half isn't wired in yet — by design, not by oversight.** Competency (`§2`) is defined as two halves: the structured Skill Profile model *plus* `knowledge_entries` (an agent's own personal training corpus, RAG-backed, populated via Teach). Checked directly: `knowledge_entries` appears nowhere in `db-assembly.js`, `ai-enrichment.js`, or `request-receivable.js` — only the structured half currently feeds Scaffold. The table and the concept already exist, ready for this (`§19f` separately notes `knowledge_entries`/`queryRAG()` as deferred, not yet ported onto the shared retrieval pipeline `the_library`/`the_reasoning` both use). Tracked as `DAT-004`.
+
+**"REFLECT" isn't the industry Reflection pattern — worth being precise, since the name collision is real.** It drafts a numbered execution plan (Haiku, given the agent's identity/knowledge/task) and splices that plan straight into the assembled system prompt — a pre-planning step, not the industry Reflection pattern (an agent critiquing/revising its own *prior output*, Reflexion/Self-Refine style). It still belongs in Scaffold — its output literally becomes part of what the agent is given before it starts — but the name is misleading against the established industry term. Same shape as the existing `CHI-15` "Agent Reasoning drawer vs. AI Audit" naming collision already on record.
+
 ### Harness
-The shared generic execution pipeline every agent communicates through — never agent- or capability-specific code. Full principle: §19b (The Generic Capability Executor).
+One agent's operating system for a single turn. Three sub-parts:
+- **Equipment** — what the agent is capable with this turn, and resolving a target when it's used. `REQUEST_HELP_TOOL`/`DELEGATE_TO_AGENT_TOOL` (`request-receivable.js`) are the two fixed tool definitions every scaffolded agent is given; `resolveCapabilityHolder()` (`execute.js`) does the live resolution when one gets used (e.g. finding whoever holds `project-manager`). Named "Equipment," not "Capability" or "Access" — both collide with `§2`'s reserved vocabulary (Capability/Seniority, and permissions like `uber_access`/`data_room_access`).
+- **Execution** — calling the model, carrying out its decision. `callModel()` (`request-receivable.js`) sends the call and parses the response (tool call vs. final answer); `dispatchDelegation()` (`execute.js`) executes a tool call.
+- **Evaluation** — gates and judgment, two different kinds. **Per-capability, data-declared rules**, authored in Scaffold and checked here: a real, separate post-generation Haiku call (`request-receivable.js`, "STEP 2: Guardrails") checks the output against the capability's declared `must`/`must_not` rules and sets `guardrails_passed` (fails open on error, not closed); the `requires_human_confirmation` pause; `quality-gate.js` — a real, existing capability (`§19b`'s migration notes), not independently inspected this session. **Platform-wide, hardcoded rules**, uniform for every capability, never data-configurable: the loop depth cap (`MAX_LOOP_DEPTH = 5`) — physically checked inside the `runLoop()` function (`execute.js`), but conceptually Evaluation's rule, not a judgment Loop makes on its own.
+
+Harness consumes the Scaffold built above it; it doesn't build one of its own. No agent is named in this mechanism by identity — every resolution above happens live, by capability, never hardcoded (Rule #1, `§19d`/`§19e`).
 
 Files: `api/capabilities/execute.js`, `api/prompt/db-assembly.js`, `api/prompt/ai-enrichment.js`, `api/prompt/request-receivable.js`
 
-Capability routes (what runs through the Harness) are detailed in §1a below, not repeated here.
+Capability routes (what runs through the Harness) are detailed in §1a below, not repeated here. Full mechanism detail, not repeated here: §19d, §19e.
 
 ### Platform Services
 Shared foundational utilities that the Harness (and other layers) call into — not agent-specific, not orchestration, just shared infrastructure. This genuinely blends with the Harness at the edges by design (e.g. `db-assembly.js`/`ai-enrichment.js` are simultaneously core harness pipeline *and* a shared service any capability calls into) — don't force a single bucket where a piece of code spans both.
