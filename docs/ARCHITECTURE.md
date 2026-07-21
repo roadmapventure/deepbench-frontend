@@ -928,8 +928,10 @@ Full agents.js migration (salary, stats, avatar, flags) is a separate future ses
 
 **The mechanism:** `api/capabilities/execute.js` — one generic route, called with `{ capability_slug, intent_slug, agent_id, task_context, tenant_id, format_skill_profile_slug, display_agent_id }`. The last two are optional, generalized from `AA-69`'s Work Order format-last pattern (`api/plan.js`) so any capability can have its output shaped by a display agent's Format Skill in the same single call (`AA-77`, `S-APPLE-03a-2`). It runs the same three already-generic pipeline steps every capability needs, in sequence:
 1. `assemblePrompt()` (`db-assembly.js`) — loads the Skill Profiles for `capability_slug`, filtered to `intent_slug`
-2. `enrichPrompt()` (`ai-enrichment.js`) — REFLECT/synthesis, RAG retrieval via `fetch_instruction`
+2. `enrichPrompt()` (`ai-enrichment.js`) — RAG retrieval via `fetch_instruction`, plus a pre-planning step (internally named "REFLECT" — not the industry Reflection pattern, see `§1`'s Scaffold entry) that drafts an execution plan and splices it into the system prompt
 3. `sendRequest()` (`request-receivable.js`) — builds the model call from `format_contract` (model, max_tokens, schema — all Skill Profile data per §2's universal properties and the `AA-75` fix), calls Anthropic, runs declared guardrails, dispatches to a handler, logs to `ai_activity_log`, returns content
+
+**Terminology note (added 2026-07-17/18/20, `SES-001`) — these three steps map onto two distinct concepts in `§1`'s Platform model, not one.** Steps 1-2 are **Scaffold** — what one agent is given, once, before its work starts. Step 3 is part of **Harness** — specifically its Execution sub-part (the model call itself); the guardrail check inside `sendRequest()` is Harness's Evaluation sub-part. The loop that repeats this whole sequence (`runLoop()`, `§19d`) is **Loop** — cross-cutting, not a fourth step nested here. Full definitions, not repeated: `§1`.
 
 None of these three files change per capability. `execute.js` itself contains zero capability-specific logic — no `if (capability_slug === 'x')`, ever. That conditional is exactly the thing this section exists to prevent.
 
