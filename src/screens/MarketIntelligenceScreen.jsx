@@ -1404,7 +1404,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
 // (Good, thanks / Sent to Priya) can still render in chat, sourced from the shared qaEvidence
 // state slot instead of msg.reviewChoice (onGoodThanks/onReview no longer index into messages).
 function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
-  const isUser = msg.role === "user";
+  // FEATURE: CHI-42 — kind:"user_action" narration bubbles (pushed synchronously at the moment of
+  // a user decision, before any async ack) render as "You" bubbles too, via kind rather than role —
+  // see STYLE-GUIDE.md §36 for the full rationale (role:"user" would leak into conversationContext()).
+  const isUser = msg.role === "user" || msg.kind === "user_action";
 
   // FEATURE: S-ARCH-DISPLAY-LOOP-01 / CHI-03a — Marcus's Q&A answer used to render its full
   // analysis card (headline/body/tables/byline/review-choice buttons) directly in chat; that
@@ -1456,7 +1459,9 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
       <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:3}}>{isUser ? "You" : "Marcus"}</div>
       <div style={{
         maxWidth:"85%",padding:"10px 14px",fontFamily:body,fontSize:13,lineHeight:1.5,
-        background: isUser ? T.navy : (msg.needs_review ? "#f3e6cc" : T.card),
+        // FEATURE: CHI-42 — user_action bubbles use T.navyMid (already-existing, already-reused
+        // token), not solid T.navy — that fill stays reserved for real typed input. See STYLE-GUIDE.md §36.
+        background: msg.kind === "user_action" ? T.navyMid : (isUser ? T.navy : (msg.needs_review ? "#f3e6cc" : T.card)),
         color: isUser ? T.card : T.ink,
         border: isUser ? "none" : `1px solid ${msg.needs_review ? T.brass : T.line}`,
         borderRadius:3,
@@ -2990,8 +2995,10 @@ export default function MarketIntelligenceScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // FEATURE: CHI-42 — kind:"user_action" narration bubbles are excluded here so they never get
+  // replayed into Marcus's own next prompt as fabricated user speech. See STYLE-GUIDE.md §36.
   const conversationContext = () =>
-    messages.filter(m => typeof m.text === "string").map(m => `${m.role}: ${m.text}`).join("\n");
+    messages.filter(m => typeof m.text === "string" && m.kind !== "user_action").map(m => `${m.role}: ${m.text}`).join("\n");
 
   const enterHypothesisFlow = async ({ intent, extractedHypothesis, flaggedQuestion, flaggedAnswer, citations, reviewReason }) => {
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
@@ -3149,10 +3156,16 @@ export default function MarketIntelligenceScreen() {
   // message-index-based, MI-51) since the review-choice buttons moved from chat into
   // EvidenceColumn's QaEvidenceCard, and there is only ever one "most recent" qaEvidence, not an
   // indexable list.
-  const onGoodThanks = () => setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "good" }));
+  const onGoodThanks = () => {
+    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You're good with this analysis." })]);
+    setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "good" }));
+  };
 
   const onReview = () => {
     if (!qaEvidence) return;
+    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You asked for deeper theories." })]);
     const { question, text, citations, review_reason } = qaEvidence;
     setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "exploring" }));
     enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: question, flaggedAnswer: text, citations: citations || [], reviewReason: review_reason });
@@ -3167,9 +3180,15 @@ export default function MarketIntelligenceScreen() {
   const onSelectHypothesis = async (text, { startTest } = {}) => {
     if (!hypFlow) return;
     if (!startTest) {
+      // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
+      setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You selected a theory to test." })]);
       setHypFlow(prev => prev && ({ ...prev, stage:"ready", chosenText: text }));
       return;
     }
+    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change (this line
+    // only runs on the startTest:true path, after the select-only branch above has already returned).
+    // See STYLE-GUIDE.md §36.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You asked Priya to test that theory." })]);
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
@@ -3227,6 +3246,8 @@ export default function MarketIntelligenceScreen() {
   };
 
   const onDiscard = () => {
+    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You marked that as info only." })]);
     // FEATURE: MI-51 — "Info Only" copy (was "Theory discarded — not written to the Data Room.",
     // the old "Discard" button's text) — same no-op outcome, reworded for the 2-outcome decision.
     // FEATURE: CHI-03a — the old rich hypothesis_test chat card (MessageBubble, now deleted) is
@@ -3262,6 +3283,8 @@ export default function MarketIntelligenceScreen() {
   // intent (set at flow entry, unchanged) is used below instead of a per-button override.
   const onCommit = async () => {
     if (!hypFlow) return;
+    // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change or async call. See STYLE-GUIDE.md §36.
+    setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You requested a forecast." })]);
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
@@ -3340,6 +3363,10 @@ export default function MarketIntelligenceScreen() {
       if (isStale()) return; // FEATURE: CHI-04
 
       if (resolution === "edit") {
+        // FEATURE: CHI-42 — instant "You" narration bubble; fires once the branch is known (not
+        // fully synchronous with the click, since resolveConfirmation() already resolved above) —
+        // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
+        setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You edited the proposal." })]);
         // FEATURE: LOG-15 — result.patterns_used exists (same shared mechanism, threaded through
         // resolveConfirmation()) but wasn't hoisted to the top level the renderer reads; the
         // {resolution, result} wrapper was silently dropping it.
@@ -3368,6 +3395,10 @@ export default function MarketIntelligenceScreen() {
       // whatever hop is already current, per this line's own pre-existing comment above.
       const resolutionAckHop = currentHopCount(pipelineEventsRef.current);
       if (resolution === "accept") {
+        // FEATURE: CHI-42 — instant "You" narration bubble; fires once the branch is known (not
+        // fully synchronous with the click, since resolveConfirmation() already resolved above) —
+        // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
+        setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You confirmed the forecast." })]);
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
@@ -3377,6 +3408,10 @@ export default function MarketIntelligenceScreen() {
             setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Got it — that's been stored as a forecast.", hopStart: resolutionAckHop, hopEnd: resolutionAckHop, totalElapsedMs: Date.now() - t0 })]);
           });
       } else {
+        // FEATURE: CHI-42 — instant "You" narration bubble; fires once the branch is known (not
+        // fully synchronous with the click, since resolveConfirmation() already resolved above) —
+        // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
+        setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You rejected that proposal." })]);
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
