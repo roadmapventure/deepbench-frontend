@@ -1214,11 +1214,14 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
   // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
   // FEATURE: LOO-010 -- migrated onto automatic crediting (Task 1).
+  // FEATURE: CHI-42 -- backgroundContext now threads through to Owen's review call too, not just
+  // Marcus's own call above -- he was structurally blind to article-sourced answers otherwise.
   const gate = await callCapability({
     capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
     task_context: {
       question: message, candidate_answer: qa.answer, confidence_tier: qa.confidence_tier, citations: qa.citations,
       agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
+      ...(backgroundContext || {}),
     },
     onProgress, isStale,
     onEvent, hop_type: "proofreader",
@@ -1272,9 +1275,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // hand-off showed OLD "agent_selection:michelle -> display_format:X" vs NEW "display_format:X ->
   // agent_selection:michelle", a real hop-sequence/numbering change, not a false positive. Fixed
   // here per this task's own "any diff is a regression, stop and fix" directive.
+  // FEATURE: CHI-42 -- backgroundContext now threads through to the Display call too, completing
+  // the pipeline (Marcus's own call already had it) -- see Owen's call above for the same fix.
   const display = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
-    task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason },
+    task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason, ...(backgroundContext || {}) },
     onProgress, isStale,
   });
   if (isStale()) return display; // FEATURE: CHI-04
