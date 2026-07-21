@@ -1,3 +1,4 @@
+// DeepBench v6.3.112 | api/_lib/handlers/reasoning-write.js | DAT-7 -- graceful denial: status:422 + detail.tier instead of a bare throw
 // DeepBench v6.0.13 | api/_lib/handlers/reasoning-write.js | S-APPLE-04b re-scope -- Nadia's the_reasoning write handler
 // FEATURE: AA-104/AA-107 (ARCHITECTURE.md §19f) -- dispatched generically via format_contract.handler
 // === 'reasoning-write', same registry pattern as library-write.js. Self-write, no Eleanor: Nadia is
@@ -29,8 +30,12 @@ export async function handle({ agent_id, tenant_id, content }) {
     confidence: confidence || null,
   });
 
+  // FEATURE: DAT-7 -- graceful denial: attach status/detail instead of a bare throw, matching
+  // request-receivable.js's existing 501 idiom, so execute.js's outer catch (line ~1249) can
+  // forward a real status/detail instead of collapsing every denial into a raw 500.
   if (!result.success) {
-    throw new Error(`reasoning-write handler: writeContent failed -- ${result._access?.tier || 'unknown reason'}`);
+    const tier = result._access?.tier || 'unknown';
+    throw Object.assign(new Error(`reasoning-write handler: writeContent failed -- ${tier}`), { status: 422, detail: { tier } });
   }
 
   return { deliverable_id: null, entry_id: result.entry?.id || null, handler_result: result };

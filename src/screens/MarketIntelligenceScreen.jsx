@@ -1,3 +1,4 @@
+// DeepBench v6.3.112 | MarketIntelligenceScreen.jsx | DAT-7 -- resolveConfirmation() forwards status/detail on failure; onResolveConfirmation() shows a specific recovery message for denied writes instead of the generic retry copy
 // DeepBench v6.3.106 | MarketIntelligenceScreen.jsx | S-CHI-49 -- single Theory drawer splits into "{intent} Candidates" (generating/choosing) and "{intent} Result" (testing onward), per STYLE-GUIDE.md §40's taxonomy decision record
 // DeepBench v6.3.97 | MarketIntelligenceScreen.jsx | S-CHI-44 -- theory selection auto-advances into the test (no more "ready" stage/second click); submitted-theory block stays visible during the "committing" stage instead of going blank
 // DeepBench v6.3.86 | MarketIntelligenceScreen.jsx | S-LOO-012 -- delegation_complete drawer rows (describePipelineEvent) now render real reasoning/task/service-label content instead of a bare "has finished." template
@@ -1167,7 +1168,12 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "resolve", confirmation_id, resolution, edited_task_context, stream: !!onProgress }),
   });
-  if (!res.ok) throw new Error(`resolve ${resolution} failed: ${res.status}`);
+  // FEATURE: DAT-7 -- read the response body on failure and forward status/detail so
+  // onResolveConfirmation()'s catch can branch on a real denial tier instead of a generic message.
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(body.error || `resolve ${resolution} failed: ${res.status}`), { status: res.status, detail: body.detail || null });
+  }
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
   return resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
 }
@@ -3559,7 +3565,13 @@ export default function MarketIntelligenceScreen() {
       // so the user can retry Accept/Reject on the same card instead of losing the draft.
       console.error("[MarketIntelligenceScreen] onResolveConfirmation", e.message);
       logEvent(buildHopEvent("error", "nadia", { step: "resolve_confirmation", resolution, message: e.message }, Date.now() - t0));
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong resolving that — try again." })]);
+      // FEATURE: DAT-7 -- a denied write (bad chunk_id baked into proposed_action) will fail
+      // identically forever; the generic "try again" message is actively wrong advice for it.
+      // Only Edit/Reject actually unblock the user in that case.
+      const isDeniedWrite = typeof e.detail?.tier === "string" && e.detail.tier.startsWith("denied-");
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: isDeniedWrite
+        ? "This proposal's Data Room reference no longer resolves — use Edit to redraft it, or Reject."
+        : "Something went wrong resolving that — try again." })]);
     } finally {
       setWorkingStatus(null);
     }

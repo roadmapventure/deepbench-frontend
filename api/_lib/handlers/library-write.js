@@ -1,3 +1,4 @@
+// DeepBench v6.3.112 | api/_lib/handlers/library-write.js | DAT-7 -- graceful denial: status:422 + detail.tier instead of a bare throw
 // DeepBench v6.0.5 | api/_lib/handlers/library-write.js | AG-33 -- Eleanor Voss's data-room-custody handler
 // FEATURE: AG-33 -- dispatched generically via format_contract.handler === 'library-write', same
 // registry pattern as store.js. This file performs no agent-id check of its own -- ARCHITECTURE.md
@@ -20,8 +21,11 @@ export async function handle({ agent_id, tenant_id, content }) {
     ...params,
   });
 
+  // FEATURE: DAT-7 -- graceful denial: attach status/detail instead of a bare throw, same shape
+  // as reasoning-write.js's identical fix (Category M -- both write handlers must stay in sync).
   if (!result.success) {
-    throw new Error(`library-write handler: writeLibrary failed -- ${result.error || result._librarian?.tier || 'unknown reason'}`);
+    const tier = result.error || result._librarian?.tier || 'unknown';
+    throw Object.assign(new Error(`library-write handler: writeLibrary failed -- ${tier}`), { status: 422, detail: { tier } });
   }
 
   return { deliverable_id: null, entry_id: result.entry?.id || null, handler_result: result };
