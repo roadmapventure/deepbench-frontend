@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // DeepBench | scripts/check-session-docs.js | SES-010
 //
-// Mechanizes the `session-hygiene` skill's checks 1, 2, 3, 3c, 5, 5b, 5c, 5d --
+// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d --
 // previously a markdown checklist a session had to remember to run by hand
 // (greps + git commands typed out fresh each time). This is the same logic as
 // a single script, so "run session-hygiene" becomes "run this" instead of
@@ -160,20 +160,57 @@ function freshDevText(relPath, localFallbackText) {
   }
 }
 
-function extractInFlightBullets(stateText) {
+// Generic section-bullet extractor -- "In flight now" and "Last 3 sessions"
+// are both a bolded header followed by a run of "- " lines up to the next
+// bolded header or "---" break. Shared by extractInFlightBullets() (needs the
+// worktree-name capture) and the entry-length check (needs raw bullet text
+// only, no name parsing).
+function extractSectionLines(stateText, header) {
   if (!stateText) return [];
-  const idx = stateText.indexOf("**In flight now:**");
+  const idx = stateText.indexOf(header);
   if (idx === -1) return [];
   const after = stateText.slice(idx);
-  const end = after.search(/\n\*\*[A-Z]/); // next bolded section header
+  const end = after.search(/\n(\*\*[A-Z]|---)/); // next bolded header or section break
   const window = end === -1 ? after : after.slice(0, end);
+  return window.split("\n").filter(l => /^\-\s/.test(l));
+}
+
+function extractInFlightBullets(stateText) {
   const bullets = [];
-  const lines = window.split("\n").filter(l => /^\-\s/.test(l));
-  for (const line of lines) {
+  for (const line of extractSectionLines(stateText, "**In flight now:**")) {
     const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i);
     if (nameMatch) bullets.push({ name: nameMatch[1], text: line });
   }
   return bullets;
+}
+
+// ---- Check 1b: per-entry character cap (added 2026-07-21, John asked directly
+// after SES-010's own sweep flagged this as a Tier 1 item that never got built).
+// Check 1 only catches the *whole file* growing past baseline -- a file that's
+// technically under that cap can still hide one paragraph-length bullet that's
+// exactly the bloat pattern the 2026-07-01/2026-07-07 cleanups existed to fix
+// (STANDARDS.md's own rule: "2-4 sentences... not a single run-on sentence with
+// a dozen clauses strung together with em-dashes"). 800 chars is calibrated
+// against this file's own real entries at the time this check was written --
+// generous enough for a genuinely detailed 3-4 sentence bullet, tight enough to
+// catch a paragraph masquerading as one.
+const ENTRY_LENGTH_CAP = 800;
+
+function checkEntryLengths(findings, stateText) {
+  const sections = [
+    { header: "**In flight now:**", label: "In flight now" },
+    { header: "**Last 3 sessions:**", label: "Last 3 sessions" },
+  ];
+  for (const { header, label } of sections) {
+    for (const line of extractSectionLines(stateText, header)) {
+      const len = line.length;
+      if (len > ENTRY_LENGTH_CAP) {
+        const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i) || line.match(/^-\s*(\S+)/);
+        const label2 = nameMatch ? nameMatch[1] : line.slice(0, 40) + "...";
+        findings.push({ check: "1b", severity: "FLAG", detail: `"${label}" entry "${label2}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
+      }
+    }
+  }
 }
 
 function checkWorktrees(findings, stateText) {
@@ -249,6 +286,7 @@ function checkBulletStaleness(findings, stateText, archiveText) {
 function main() {
   const findings = [];
   const stateText = checkClaudeState(findings);
+  checkEntryLengths(findings, stateText);
   checkFeatureFile(findings, "FEATURES.md", true);
   checkFeatureFile(findings, "FEATURES-NEXT.md", true);
   checkFeatureFile(findings, "FEATURES-LATER.md", false);
