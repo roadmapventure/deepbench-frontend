@@ -1,3 +1,4 @@
+// DeepBench v6.3.116 | shared/ai-patterns.js | AI-35 -- pattern-vocabulary-review SERVICE_CATALOG entry (Susan Smith's self-maintenance broker)
 // DeepBench v6.3.0 | shared/ai-patterns.js | AA-190b -- canonical PATTERN_CATALOG, extracted so
 // both the Vite frontend (src/hooks/useAIActivity.js) and Vercel serverless backend
 // (lib/activity-log.js) import the exact same array instead of the frontend defining its own
@@ -165,6 +166,13 @@ export const SERVICE_CATALOG = [
   // with web_search -- ai_type 'fallback-summary' needs an explicit AI_TYPE_TO_SERVICE entry
   // (src/hooks/useAIActivity.js) since this route is hand-rolled, not capability-dispatched.
   { slug: 'article-extraction', name: 'Article Extraction', serviceType: 'hybrid', patterns: [], roadmap: 'now' },
+  // FEATURE: AI-35 -- pattern-vocabulary-review capability (Susan Smith, Trainer Agent). Susan's
+  // Skill Profile carries enable_web_search: true (HAR-05) -- when her real Anthropic response
+  // actually contains a web_search tool-use block, request-receivable.js's existing mechanical
+  // detection (usedWebSearch) logs 'tool-use' automatically, no new wiring needed. patterns uses
+  // the display Name ('Tool Use'), matching every other entry in this catalog -- corresponds to
+  // PATTERN_CATALOG's 'tool-use' slug.
+  { slug: 'pattern-vocabulary-review', name: 'Pattern Vocabulary Review (Susan Smith)', serviceType: 'ai', patterns: ['Tool Use'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge

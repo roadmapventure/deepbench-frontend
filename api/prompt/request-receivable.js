@@ -1,3 +1,4 @@
+// DeepBench v6.3.116 | api/prompt/request-receivable.js | AI-35 -- registers pattern-vocabulary-write handler
 // DeepBench v6.3.101 | api/prompt/request-receivable.js | S-HAR-8 -- postToAnthropicWithRetry() bumped to 3 total attempts, escalating backoff ([1000, 3000]ms)
 // DeepBench v6.3.49 | api/prompt/request-receivable.js | S-HAR-04 -- callModel()/sendRequest() accept optional deadline; bounded, deadline-aware AbortSignal timeouts replace blind fixed constants (byte-identical when omitted)
 // DeepBench v6.0.22 | api/prompt/request-receivable.js | S-ARCH-DISPLAY-LOOP-01 — is_final flag on delegate_to_agent (terminal Display-agent hand-off)
@@ -6,11 +7,13 @@
 import { handle as storeHandle } from '../_lib/handlers/store.js';
 import { handle as libraryWriteHandle } from '../_lib/handlers/library-write.js';
 import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write.js';
+// FEATURE: AI-35 -- Susan Smith's pattern_vocabulary review/promote handler registration.
+import { handle as patternVocabularyWriteHandle } from '../_lib/handlers/pattern-vocabulary-write.js';
 import { logActivity } from '../../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle };
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
