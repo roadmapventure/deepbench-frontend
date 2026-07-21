@@ -1,1 +1,0 @@
-- `design-ses-009-0721` (design session, worktree `design-ses-009-0721`) — `SES-009` split into `SES-009a` (regression suite scaffold, v6.3.109) and `SES-009b` (STANDARDS.md drift watch, v6.3.110) kickoff docs written, `SES-016` (debris test-file cleanup) logged as a separate backlog row. Spawning the coding sessions now.
