@@ -896,8 +896,14 @@ function hopBadgeText(hopStart, hopEnd) {
 // which already log the real number), or is an in-flight/marker signal with no completed duration
 // to measure (delegation, delegation_return, question_boundary). Declared once here instead of a
 // justifying comment repeated at every call site.
+// FEATURE: LOO-009b fixup — "delegation_complete" (the harness's new terminal-completion event,
+// S-LOO-009) is the same shape as "delegation_return": a terminal marker fired the instant the
+// pending row is claimed, with no separately-measurable client-side round trip of its own (see
+// onDelegationProgress's own comment above). Missing here caused a real, live-reproduced CHI-07
+// console.error on every occurrence — found via this session's own live verification against the
+// dev preview, not in the kickoff doc's original spec, fixed same-session per Root Cause Analysis.
 const NON_MEASURABLE_EVENT_TYPES = new Set([
-  "agent_selection", "delegation", "delegation_return", "failure_triage", "question_boundary",
+  "agent_selection", "delegation", "delegation_return", "delegation_complete", "failure_triage", "question_boundary",
 ]);
 
 // FEATURE: CHI-07 — every logEvent/onEvent call routes through this instead of hand-writing the
