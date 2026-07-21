@@ -1,1 +1,2 @@
-- `design-chi-31-0718` (design session) — active, ongoing design conversation on `CHI-31`, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).
+# design-chi-31-0718
+Design session, in progress — CHI-31 (confidence-tier/meta-answer guardrail gap on library-catalog question). Re-syncing against 3 days of concurrent activity before scoping a fix; John wants a data-recategorization approach, not a Skill-rule change, plus one deliberately-kept guardrail-demo case.
