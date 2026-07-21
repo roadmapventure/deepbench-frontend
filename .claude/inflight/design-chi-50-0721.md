@@ -1,1 +1,0 @@
-- `design-chi-50-0721` (design session, worktree `design-chi-50-0721`) — `CHI-50` kickoff written (v6.3.108), spawning the coding session now.
