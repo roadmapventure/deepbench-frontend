@@ -1,3 +1,4 @@
+// DeepBench v6.3.71 | api/capabilities/execute.js | S-LOO-009 -- delegation_complete event added at both dispatchDelegation() final-outcome returns
 // DeepBench v6.3.49 | api/capabilities/execute.js | S-HAR-04 -- runLoop()'s two call sites (callModel(), sendRequest()) now pass their existing deadline value through, no new computation
 // DeepBench v6.3.28 | api/capabilities/execute.js | S-ARCH-LOOP-CONTINUITY-01 (LOO-001/LOO-004) -- requesting_agent_id threaded into request_help's task_context; is_active gate added to resolveCapabilityHolder()
 // DeepBench v6.1.43 | api/capabilities/execute.js | S-MI-42 -- _onEvent plumbing, live delegation/delegation_return events at all 5 real dispatch points; v6.1.43 -- S-MI-42 opt-in stream:true SSE transport, all handler branches
@@ -491,6 +492,13 @@ async function dispatchDelegation({
       if (autoResolvedResult.status === 'in_progress') {
         return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: autoResolvedResult.job_id, toolUseId: tool_use_id };
       }
+      // FEATURE: LOO-009 — the delegation announced above never got a matching completion event
+      // when it resolved final (no return trip possible) — this is that event, same shape as
+      // delegation/delegation_return, fired exactly where finalizeDelegation() learns the real
+      // terminal agent. Nested is_final-in-is_final chains need no special handling: _onEvent is
+      // already threaded into the nested runCapability() call above, so a deeper final hand-off
+      // fires its OWN delegation_complete at its own level automatically.
+      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent' });
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = pmAgentId;
@@ -508,6 +516,9 @@ async function dispatchDelegation({
       return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
     }
     if (delegationRequired || tool_input.is_final === true) {
+      // FEATURE: LOO-009 — same gap, second dispatch shape: a plain delegate_to_agent call that
+      // resolves final also never fired a completion event for the agent it named as final.
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = targetAgentId;
