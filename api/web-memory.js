@@ -1,3 +1,4 @@
+// DeepBench v6.3.99 | api/web-memory.js | LOG-35b -- log the real summarization call, response's own model field
 // api/web-memory.js
 // v4.2.0: GET endpoint refactored to use rag-query.js (vector search) + agent-run (REFLECT)
 //         Drops all custom string filter code and manual Supabase queries for entries.
@@ -150,6 +151,22 @@ Structure your response as valid JSON only:
 
       const claudeData = await claudeRes.json();
       const rawLearning = claudeData.content?.[0]?.text || "";
+
+      // FEATURE: LOG-35b -- this call previously had zero AI Audit coverage (confirmed via
+      // scripts/check-ai-logging-coverage.js: 2 real call markers, only 1 logActivity() call in
+      // this file). Logs claudeData.model (the response's own field) rather than re-typing the
+      // request-side literal a second time -- the response is authoritative about what was
+      // actually used, so this call site can't drift out of sync with itself even if the request
+      // side changes later. Matches the existing "summarization" AI_TYPES catalog entry
+      // (useAIActivity.js) -- same aiType string, no new catalog entry needed.
+      logActivity({
+        tenantId: "global",
+        aiType: "summarization",
+        feature: "web-memory:post",
+        model: claudeData.model,
+        inputTokens: claudeData.usage?.input_tokens ?? null,
+        outputTokens: claudeData.usage?.output_tokens ?? null,
+      });
 
       let learning;
       try {
