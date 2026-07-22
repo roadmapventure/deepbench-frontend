@@ -1852,7 +1852,13 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           (padding, border, position as the flex column's last child) — it remains locked to the
           card's bottom regardless of content length; only the separation from the content above it
           is new. */}
-      <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14}}>
+      {/* FEATURE: CHI-55 -- background/border removed so this column sits directly on the app's real
+          page background (T.paperDeep, AppShell.jsx) instead of a same-colored T.cardAlt box that gave
+          every individually-open Drawer inside it (also T.cardAlt) zero contrast against its own
+          container -- matches AuditColumn (Column 3)'s equivalent wrapper, which has never set a
+          background here. Layout properties (flex/minHeight/overflow/gap) are unchanged; this is a
+          visual-only removal, confirmed live against Column 3 as the reference (John, 2026-07-21). */}
+      <div style={{display:"flex",flexDirection:"column",flex:1,minHeight:0,overflow:"hidden",gap:14}}>
         {/* FEATURE: CHI-29 — third patch (S-CHI-26d): dedicated position:"relative" wrapper around just
             the scroll body + fade, separate from the footer. The original CHI-29 task put position:
             "relative" on this outer card instead (which also contains the footer as a sibling) -- since
@@ -2087,7 +2093,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         </Drawer>
         )}
         </div>
-        <ScrollFadeHint show={evidenceCanScrollMore} bg={T.cardAlt}/>
+        <ScrollFadeHint show={evidenceCanScrollMore} bg={T.paperDeep}/>
         </div>
         {footerKind && (
           <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,position:"relative"}}>
