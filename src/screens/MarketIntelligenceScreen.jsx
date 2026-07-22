@@ -1638,12 +1638,11 @@ function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
 
 // FEATURE: MI-59 — one shared sentence source for both EvidenceColumn states, so the
 // empty-state and populated-state copy can't drift apart as separate hardcoded strings.
-function getEvidencePanelSentence(hypFlow) {
-  // FEATURE: CHI-03a — empty-state copy updated: Evidence now also fills from a plain Q&A
-  // (qaEvidence), not just a hypothesis flow, so the copy no longer promises "interaction" alone.
-  if (!hypFlow) return "Once Marcus has an answer or a theory to test, it'll appear here for you to review and act on.";
-  const label = INTENT_LABEL[hypFlow.intent] || hypFlow.intent;
-  return `${label} — Data for you to interact with your chat...`;
+// FEATURE: CHI-58 — simplified: the hypFlow branch is dead code now that the Candidates drawer
+// (its only caller that ever passed a real hypFlow) generates its own copy inline (Task 2 above).
+// The News drawer's empty-state call site (L1931) always passes no argument.
+function getEvidencePanelSentence() {
+  return "Once Marcus has an answer or a theory to test, it'll appear here for you to review and act on.";
 }
 
 // FEATURE: CHI-38/CHI-39 — shared shimmer sweep overlay. Reuses tokens.js's existing `shimmer`
@@ -1675,7 +1674,7 @@ function NewsCardSkeleton() {
 // scope in this file) -- no new colors, no new border styles, no new spacing scale, per this
 // session's DESIGN RULES. String-safe: headline/snippet/source may be absent on a malformed card,
 // JSX simply renders nothing for an undefined child rather than throwing.
-function NewsCard({ card, loading, onClick }) {
+function NewsCard({ card, loading, onClick, analyzed }) {
   // FEATURE: CHI-33-patch -- card.published_at is "YYYY-MM-DD" per Alex's news-cards-format schema,
   // already live/populated; nullable when Jordan/Alex genuinely don't know the date. The
   // +"T00:00:00" avoids a UTC-midnight-rollback-to-previous-day display bug in timezones west of UTC.
@@ -1683,8 +1682,15 @@ function NewsCard({ card, loading, onClick }) {
     ? new Date(card.published_at + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
   return (
-    <div onClick={onClick} style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:"10px 12px",cursor:"pointer",opacity:loading?0.6:1}}>
-      <div style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink,marginBottom:3}}>{card?.headline}</div>
+    // FEATURE: CHI-58 — border highlight on analyzed, same T.brassDeep accent + uppercase-label
+    // pattern the Candidates drawer's "Chosen" badge already established (STYLE-GUIDE.md §40).
+    <div onClick={onClick} style={{background:T.cardAlt,border:`1px solid ${analyzed ? T.brassDeep : T.lineSoft}`,padding:"10px 12px",cursor:"pointer",opacity:loading?0.6:1}}>
+      <div style={{display:"flex",gap:8}}>
+        <div style={{fontFamily:body,fontSize:12.5,fontWeight:600,color:T.ink,marginBottom:3,flex:1}}>{card?.headline}</div>
+        {analyzed && (
+          <span style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.brassDeep,flexShrink:0}}>Analyzed</span>
+        )}
+      </div>
       {card?.snippet && <div style={{fontFamily:body,fontSize:11,color:T.muted,lineHeight:1.4,marginBottom:5}}>{card.snippet}</div>}
       <div style={{fontFamily:mono,fontSize:9.5,color:T.mutedDeep,textTransform:"uppercase",letterSpacing:"0.04em"}}>
         {card?.source}{formattedDate ? ` · ${formattedDate}` : ""}{loading ? " · Loading…" : ""}
@@ -1724,7 +1730,7 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
 // parallel mechanism. freshDeps: values whose next change ends the post-resolution quiet period
 // (a brand-new question, new content arriving) — deliberately separate from transitionDeps, since
 // "the same flow advancing a stage" and "something genuinely new arriving" are different events.
-function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, freshDeps) {
+function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, freshDeps, alsoOpenWhen = {}) {
   const autoCurrent = priorityChecks.find(([, active]) => active)?.[0] ?? null;
   const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
 
@@ -1748,7 +1754,17 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
   }, freshDeps);
 
   const effectiveAutoCurrent = suppressed ? null : autoCurrent;
-  const isOpen = (key) => (manualOverride && manualOverride.key === key ? manualOverride.open : key === effectiveAutoCurrent);
+  // FEATURE: CHI-58 — generic "stays open alongside" pairing: a key listed here also counts as open
+  // whenever the effective current key is one of its named partners, manual override still wins
+  // either way. Not hyp-specific — a future drawer pair needing the same relationship reuses this
+  // parameter instead of a second bespoke mechanism. Today's only caller passes {"hyp-result":
+  // ["hyp-draft"]}: Result stays open once Draft Forecast arrives, reversing CHI-50's original
+  // "Result collapses underneath" choice (STYLE-GUIDE.md §40, CHI-58 amendment).
+  const isOpen = (key) => {
+    if (manualOverride && manualOverride.key === key) return manualOverride.open;
+    if (key === effectiveAutoCurrent) return true;
+    return !!(alsoOpenWhen[key] && alsoOpenWhen[key].includes(effectiveAutoCurrent));
+  };
   const toggle = (key) => (willOpen) => setManualOverride({ key, open: willOpen });
 
   return { isOpen, toggle };
@@ -1839,7 +1855,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     evidenceScrollRef,
     [hypFlow?.stage, newsCards],
     isHypResolved(hypFlow),
-    [qaEvidence, newsCards]
+    [qaEvidence, newsCards],
+    { "hyp-result": ["hyp-draft"] } // FEATURE: CHI-58
   );
 
   // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
@@ -1914,6 +1931,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               </div>
               {newsCards.map((card, i) => (
                 <NewsCard key={card?.url || i} card={card} loading={!!card?.url && newsCardLoadingUrl === card.url}
+                  analyzed={!!card?.url && qaEvidence?.sourceNewsUrl === card.url}
                   onClick={() => onAnalyzeNewsCard && onAnalyzeNewsCard(card)}/>
               ))}
             </div>
@@ -1928,7 +1946,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             </div>
           ) : (
             <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`,padding:16}}>
-              <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{getEvidencePanelSentence(null)}</div>
+              <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{getEvidencePanelSentence()}</div>
             </div>
           )}
         </Drawer>
@@ -1951,18 +1969,23 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             disappears once a pick is made, same "papers on a desk" persistence as every other
             drawer in this cluster; it just collapses and its title gains a chosen-summary. */}
         {hypFlow && (
-        <Drawer title={hypChosen ? `${intentLabel} Candidates — ${hypFlow.candidates?.length ?? 0} offered, chose: "${hypFlow.chosenText}"` : `${intentLabel} Candidates`}
+        /* FEATURE: CHI-58 — title is now always the plain label; the chose-summary sentence
+           moves to a separate body line (below), only rendered once a pick exists. Narration-only
+           lines removed per this session's governing principle: Column 1's AgentWorkingIndicator
+           already narrates "generating," so Column 2 doesn't need its own copy of that status. */
+        <Drawer title={`${intentLabel} Candidates`}
           count={!hypChosen ? (hypFlow.candidates?.length ?? null) : null}
           open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}>
 
-        <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
-          {getEvidencePanelSentence(hypFlow)}
-        </div>
+        {hypChosen && (
+          <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
+            {hypFlow.candidates?.length ?? 0} offered, chose: "{hypFlow.chosenText}"
+          </div>
+        )}
 
         {hypFlow.stage === "generating" && (
-          /* FEATURE: MI-62 */
-          <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
-            Priya is generating candidate theories. Live progress is shown below.
+          <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,fontStyle:"italic"}}>
+            Generating candidate theories...
           </div>
         )}
 
@@ -2035,19 +2058,9 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         <Drawer title={`${intentLabel} Result`} open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
           headerRight={<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/>}>
 
-        {/* FEATURE: CHI-03a — Task 3's submitted-theory block, moved from the old hyp_submitted
-            chat card (MessageBubble, now deleted). No new state: hypFlow.chosenText already
-            carries this text (set by onSelectHypothesis). FEATURE: CHI-49 — relocated here (was
-            in the single combined drawer) since it's context for the test's own findings, not
-            the candidate-offering step — the Candidates drawer's collapsed title already names
-            the chosen text on its own. */}
-        {hypFlow.chosenText && (
-          <div style={{background:T.card,border:`1px solid ${T.lineSoft}`,padding:"9px 11px"}}>
-            <div style={{fontFamily:mono,fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.brassDeep,marginBottom:4}}>Submitted theory</div>
-            <div style={{fontSize:12,lineHeight:1.5,color:T.ink}}>{hypFlow.chosenText}</div>
-          </div>
-        )}
-
+        {/* FEATURE: CHI-58 — the submitted-theory recap block previously here was removed: the
+            (still-visible, collapsed) Candidates drawer's own chosen-summary already shows this
+            text (Task 2), so this drawer no longer duplicates it. */}
         {hypFlow.stage === "testing" && (
           /* FEATURE: MI-62 */
           <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
@@ -2059,13 +2072,9 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           <>
             {/* FEATURE: CHI-45 — hop-range badge relocated to the wrapping Drawer's headerRight (always
                 visible, open or collapsed) — see STYLE-GUIDE.md §40's CHI-45 amendment. */}
-            <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>Theory Evidence</div>
-            {/* FEATURE: CHI-07 */}
-            {hypFlow.testElapsedMs != null && (
-              <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:2}}>
-                Full Agent Routing & Answer Given in {formatElapsed(hypFlow.testElapsedMs)}
-              </div>
-            )}
+            {/* FEATURE: CHI-58 — "Theory Evidence" title and the elapsed-time status line both removed:
+                the drawer's own title already says "Result," and the status line now fires as a chat
+                message instead (Task 3c) — Column 2 shows content, not status. */}
             {/* FEATURE: CHI-51 — added !hypFlow.resolution: the Info Only path never sets
                 confirmation, so without this the "select an option" line would keep showing
                 inside a reopened, already-resolved Result drawer with no footer left to act on. */}
@@ -3303,6 +3312,9 @@ export default function MarketIntelligenceScreen() {
           text: plainText, question: clean, citations: result.citations || [],
           totalElapsedMs: elapsed,
           reviewChoice: null,
+          // FEATURE: CHI-58 — which news article (if any) triggered this answer, so the News drawer
+          // can mark it "Analyzed" on reopen. null for a plain typed question, unchanged behavior.
+          sourceNewsUrl: backgroundContext?.article_url || null,
         });
         // FEATURE: CHI-03a — chat's qa bubble shrinks to a fixed pointer sentence (rendered
         // directly in MessageBubble, not from msg.text); msg.text is deliberately kept as the full
@@ -3366,7 +3378,10 @@ export default function MarketIntelligenceScreen() {
       setNewsCardLoadingUrl(null);
     }
     const visibleMessage = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`; // FEATURE: CHI-33-patch2 -- reworded again to present the headline as delivered news (a given fact), not a causal test, matching ci-routing-intent's new EXTERNAL-FACT QUESTIONS rule; see kickoff CONTEXT.
-    submit(visibleMessage, articleText ? { article_content: articleText, article_source: articleSource } : null);
+    // FEATURE: CHI-58 — article_url threaded through so submit()'s qa branch can persist which
+    // article this answer came from onto qaEvidence (Task 1b), independent of whether the fetch
+    // itself succeeded (a card can still be "the one analyzed" even if fetch-article failed open).
+    submit(visibleMessage, { article_content: articleText, article_source: articleSource, article_url: card.url });
   };
 
   // FEATURE: CHI-03a — onGoodThanks/onReview now operate on qaEvidence directly (were
@@ -3448,7 +3463,15 @@ export default function MarketIntelligenceScreen() {
       // FEATURE: CHI-23 — hop numbers read fresh from the gold count here, after the trailing
       // hypothesis_test event just above (the old code captured hopEnd inside runHypothesisTest,
       // before this trailing event existed — structurally one hop short, every time).
-      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: { ...st, hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current) }, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: Date.now() - turnStart }));
+      // FEATURE: CHI-58 — testElapsedMs captured once so the chat push below and hypFlow's own
+      // field stay byte-identical (previously only carried on hypFlow — MI-65's comment already
+      // anticipated this exact chat push).
+      const chiTestElapsedMs = Date.now() - turnStart;
+      setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: { ...st, hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current) }, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: chiTestElapsedMs }));
+      // FEATURE: CHI-58 — status narration moves to chat per this session's governing principle;
+      // replaces the Result drawer's own now-removed "Full Agent Routing & Answer Given in Xs" line
+      // (Task 3b). Same non_qa kind already used for other plain status/pointer bubbles on this screen.
+      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Full Agent Routing & Answer Given in ${formatElapsed(chiTestElapsedMs)}` })]);
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
