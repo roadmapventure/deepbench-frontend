@@ -1,0 +1,1 @@
+investigate-marcus-error-0721 — investigating "Something went wrong reaching Marcus — try again" on Channel Sales Intelligence screen during a full end-to-end Q&A run (John's screenshot, 2026-07-21). Root cause not yet found.
