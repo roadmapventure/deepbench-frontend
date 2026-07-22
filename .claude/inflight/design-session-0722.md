@@ -1,0 +1,1 @@
+design-session-0722 — process/doc-hygiene cleanup (SES-010 workaround standardization, FEATURES.md/CLAUDE-STATE.md bloat), now investigating AA-182/AA-180 row corruption before scoping any beta-blocking ticket work.
