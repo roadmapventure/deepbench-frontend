@@ -62,6 +62,10 @@ export const SERVICE_CATALOG = [
   // FEATURE: AW-28 — preview-prompt: DB Assembly + AI Enrichment without LLM call
   { slug: 'preview-prompt',          name: 'Prompt Preview',           serviceType: 'preview', patterns: ['RAG'],                                                                                        roadmap: 'now'  },
   { slug: 'knowledge-retrieval',     name: 'Knowledge Retrieval',      serviceType: 'hybrid', patterns: ['RAG','Embeddings'],                                           roadmap: 'now'  },
+  // FEATURE: SCA-1 -- Conversations write/retrieve (lib/conversations.js), mirroring
+  // knowledge-retrieval's shape exactly per this session's kickoff doc. Backend infra only --
+  // no live caller yet (SCA-2 wires this into the real chat flow).
+  { slug: 'conversation-memory',     name: 'Conversation Memory',      serviceType: 'hybrid', patterns: ['RAG'],                                                       roadmap: 'now'  },
   { slug: 'autonomous-research',     name: 'Autonomous Research',       serviceType: 'ai',     patterns: ['ReAct','Browser Automation','Tool Use','Streaming'],           roadmap: 'now'  },
   // FEATURE: BUG-22 — knowledge-reinforcement live via TeachScreen + FetchContext
   // FEATURE: AI-53 -- corrected: real call site (lib/knowledge-write.js's embedAndUpsertEntry())

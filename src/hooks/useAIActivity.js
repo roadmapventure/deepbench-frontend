@@ -286,6 +286,11 @@ export const AI_TYPE_TO_SERVICE = {
   // needs an explicit entry here rather than relying on the `|| e.type` fallback other capabilities
   // get for free.
   'fallback-summary': SERVICE_SLUG.ARTICLE_EXTRACTION,
+  // FEATURE: SCA-1 -- lib/conversations.js's writeConversationTurn()/queryConversations() log
+  // feature: 'conversation-memory-write'/'conversation-memory-retrieval' (aiType stays 'similarity'
+  // on both calls). Mirrors knowledge-retrieval's existing entry shape per this session's kickoff doc.
+  'conversation-memory-write':     'conversation-memory',
+  'conversation-memory-retrieval': 'conversation-memory',
 };
 
 // FEATURE: LOG-12 -- agent-turn rows always carry their real capability as the first ':'-delimited
