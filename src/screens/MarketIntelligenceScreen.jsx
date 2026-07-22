@@ -1002,6 +1002,16 @@ function HopBadge({ hopStart, hopEnd, accent }) {
   );
 }
 
+// FEATURE: CHI-59 — single shared badge for "this drawer has a decision waiting on you," so every
+// pending-HITL-decision drawer in EvidenceColumn carries the exact same visual signal. Replaces
+// Draft Forecast's own inline copy of this markup (CHI-50) and the separate inline footer pill
+// this session removes from QaEvidenceCardFooter (CHI-05) — one visual language for "your turn."
+function NeedsDecisionBadge() {
+  return (
+    <span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase",letterSpacing:"0.02em"}}>Needs Your Decision</span>
+  );
+}
+
 // FEATURE: CHI-21 — single source for the combined hop+elapsed wrap-up line, replacing the
 // previously-stacked HopBadge (own line) + elapsed-time caption (own line) at both chat-bubble
 // render sites. hopEnd is the cumulative SESSION hop total at the moment this message finished
@@ -1617,7 +1627,9 @@ function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
   return (
     <div style={{padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
       <Corners/>
-      <span style={{display:"inline-block",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",background:T.brass,color:T.navy,padding:"3px 10px",borderRadius:0,marginBottom:10}}>● Needs your input</span>
+      {/* FEATURE: CHI-59 — inline "Needs your input" pill removed; the wrapping Drawer's own
+          headerRight NeedsDecisionBadge now carries this signal, visible whether the drawer is
+          open or collapsed (this pill only ever showed once already open). */}
       <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         <button onClick={onGoodThanks} style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Good, thanks</button>
@@ -1958,7 +1970,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             was removed (Task 3) so this Drawer's title is the card's only header. */}
         {qaEvidence && (
           <Drawer title="Analysis & Narrative — based on your question..." open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}
-            headerRight={<HopBadge hopStart={qaEvidence.hopStart} hopEnd={qaEvidence.hopEnd} accent={T.navy}/>}>
+            headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{!qaEvidence.reviewChoice && <NeedsDecisionBadge/>}<HopBadge hopStart={qaEvidence.hopStart} hopEnd={qaEvidence.hopEnd} accent={T.navy}/></div>}>
             <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
           </Drawer>
         )}
@@ -1975,7 +1987,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
            already narrates "generating," so Column 2 doesn't need its own copy of that status. */
         <Drawer title={`${intentLabel} Candidates`}
           count={!hypChosen ? (hypFlow.candidates?.length ?? null) : null}
-          open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}>
+          open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}
+          headerRight={hypFlow.stage === "choosing" ? <NeedsDecisionBadge/> : null}>
 
         {hypChosen && (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
@@ -2056,7 +2069,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             true the same render CHI-44's auto-fire sets stage:"testing"). */}
         {isHypInResultPhase(hypFlow) && (
         <Drawer title={`${intentLabel} Result`} open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
-          headerRight={<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/>}>
+          headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{hypFlow.stage === "result" && !hypFlow.resolution && <NeedsDecisionBadge/>}<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/></div>}>
 
         {/* FEATURE: CHI-58 — the submitted-theory recap block previously here was removed: the
             (still-visible, collapsed) Candidates drawer's own chosen-summary already shows this
@@ -2121,7 +2134,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             (theory/forecast/correct) started the flow. */}
         {isHypAwaitingConfirmation(hypFlow) && (
         <Drawer title="Draft Forecast" open={isDrawerOpen("hyp-draft")} onToggle={handleDrawerToggle("hyp-draft")}
-          headerRight={<span style={{fontFamily:mono,fontSize:9,padding:"2px 7px",background:T.brass,color:T.card,borderRadius:2,textTransform:"uppercase",letterSpacing:"0.02em"}}>Needs Your Decision</span>}>
+          headerRight={<NeedsDecisionBadge/>}>
           <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
             Nadia (Data Expert) drafted this Data Room entry — accept, edit, or reject below.
           </div>
@@ -2141,11 +2154,11 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               <div style={{display:"flex",gap:6}}>
                 <button onClick={onDiscard}
                   style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-                  Info Only
+                  Store as Info Only
                 </button>
                 <button onClick={() => onCommit()}
                   style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-                  Store as Forecast
+                  Create Forecast
                 </button>
               </div>
             )}
