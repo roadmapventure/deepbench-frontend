@@ -374,6 +374,9 @@ const ROTATING_POOL = [
 
 // FEATURE: CHI-30 — fixed drawer tail (today's confirmed positions 12-23). Never rotates, never
 // reorders — always the last 12 questions in the drawer beneath whichever 8 pool leftovers lead it.
+// (CHI-31 tried adding a 13th guardrail-demo question here; dropped per John's call -- the wording
+// it landed on couldn't be made reliable enough not to mislead, and the underlying idea is spun off
+// as its own follow-up design item instead. No demo question ships this session.)
 const FIXED_DRAWER_TAIL = [
   { id: "vietnam-reseller",             label: "How is our authorized reseller network performing in Vietnam?" },
   { id: "meridian-electronics",         label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
@@ -624,6 +627,11 @@ function NewsCardsLoadingLine({ startedAt }) {
 // re-reading it. whoTag only ever applies to the "Analysis" label, sourced from the_library.source
 // (user->"Human", agent->"AI"); a confidence_tier context has no source column, so it's implicitly
 // AI but still renders no who-tag (per the locked table, only the_library rows carry a source col).
+// FEATURE: CHI-31 — added source_simulation as a new the_library.data_type value only (never a
+// confidence_tier value — Marcus's schema enum is untouched). 'synthesized' no longer special-cases
+// isBaseline; it always renders "Analysis" now that source_simulation is the explicit value for
+// designed-baseline demo scenarios, so a genuinely-synthesized row (e.g. the deliberate Signal
+// Mobile guardrail holdout) no longer masquerades under the safer "Source Simulation" label.
 function describeDataType(dataType, { isBaseline, source } = {}) {
   const whoTag = source === 'user' ? "Human" : source === 'agent' ? "AI" : null;
 
@@ -633,9 +641,9 @@ function describeDataType(dataType, { isBaseline, source } = {}) {
     case 'inferred':
       return { label: "Analysis", color: T.brass, whoTag };
     case 'synthesized':
-      return isBaseline
-        ? { label: "Source Simulation", color: T.mutedDeep, whoTag: null }
-        : { label: "Analysis", color: T.brass, whoTag };
+      return { label: "Analysis", color: T.brass, whoTag };
+    case 'source_simulation':
+      return { label: "Source Simulation", color: T.mutedDeep, whoTag: null };
     case 'learned':
       return { label: "Learned", color: T.navyMid, whoTag: null };
     default:
