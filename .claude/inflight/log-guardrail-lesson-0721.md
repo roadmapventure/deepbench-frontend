@@ -1,0 +1,1 @@
+design session, worktree `log-guardrail-lesson-0721` — writing up AGT-028/AGT-029: Owen's guardrail-escalation-to-fix behavior + Susan (Trainer)'s knowledge_entries training-write loop, found live during CHI-53 follow-up conversation with John.
