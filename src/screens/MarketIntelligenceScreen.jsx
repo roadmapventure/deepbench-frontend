@@ -1,3 +1,4 @@
+// DeepBench v6.3.120 | MarketIntelligenceScreen.jsx | CHI-56 -- turn-tracking service adopted: real hop durations for delegation/agent_selection/failure_triage events (were permanently null), AgentWorkingIndicator right-justified to match the user bubble it reports on, HopSummaryLine gains an estimate line, new transaction_complete marker (onGoodThanks) alongside the existing question_boundary start marker
 // DeepBench v6.3.112 | MarketIntelligenceScreen.jsx | DAT-7 -- resolveConfirmation() forwards status/detail on failure; onResolveConfirmation() shows a specific recovery message for denied writes instead of the generic retry copy
 // DeepBench v6.3.106 | MarketIntelligenceScreen.jsx | S-CHI-49 -- single Theory drawer splits into "{intent} Candidates" (generating/choosing) and "{intent} Result" (testing onward), per STYLE-GUIDE.md §40's taxonomy decision record
 // DeepBench v6.3.97 | MarketIntelligenceScreen.jsx | S-CHI-44 -- theory selection auto-advances into the test (no more "ready" stage/second click); submitted-theory block stays visible during the "committing" stage instead of going blank
@@ -348,6 +349,9 @@ import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources }
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
 import { PATTERN_CATALOG, SERVICE_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c/LOO-012
+// FEATURE: CHI-56 — shared turn-tracking service (hop-duration resolution, transaction-boundary
+// event builder); see src/lib/turnTracking.js for full rationale.
+import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -591,9 +595,14 @@ function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation 
     return () => clearInterval(id);
   }, []);
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,position:"relative"}}>
+    // FEATURE: CHI-56 — alignItems:"flex-end" + maxWidth:"85%" added: Live status always reports
+    // on the User prompt's own action, which is always right-aligned (John's confirmed terminology,
+    // kickoff CONTEXT) — matches MessageBubble's own bubble width (~L1447/1482) exactly, no second
+    // width constant introduced.
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,position:"relative",alignItems:"flex-end",maxWidth:"85%"}}>
       <FeatureBadge id="MI-47"/>
       <FeatureBadge id="MI-49"/>
+      <FeatureBadge id="CHI-56"/>
       <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>
         elapsed {formatElapsed(now - turnStartedAt)}{expectation ? ` | ${expectation}` : ""}
       </span>
@@ -881,11 +890,14 @@ function describePipelineEvent(evt) {
 // FEATURE: CHI-04 — a `question_boundary` marker event always starts its own entry (never merges
 // into an adjacent hop regardless of agentId) and is excluded from hop numbering below — it's a
 // visual divider (QuestionDivider, rendered by AuditColumn), not a real agent hop.
+// FEATURE: CHI-56 — `transaction_complete` is the same shape of marker (the new symmetric
+// "closing half," fired from onGoodThanks): both are boundary markers, neither should merge into
+// an adjacent hop or count toward hop numbering.
 function groupEventsIntoHops(ordered) {
   const hops = [];
   for (const evt of ordered) {
     const last = hops[hops.length - 1];
-    if (evt.type === "question_boundary") {
+    if (evt.type === "question_boundary" || evt.type === "transaction_complete") {
       hops.push({ agentId: evt.agentId, events: [evt], isBoundary: true });
       continue;
     }
@@ -924,21 +936,14 @@ function hopBadgeText(hopStart, hopEnd) {
   return hopStart === hopEnd ? `Hop ${hopStart}` : `Hops ${hopStart}–${hopEnd}`;
 }
 
-// FEATURE: CHI-07 — single declared list of event types with no independently-measurable
-// client-side duration: each one either shares its round trip with an adjacent real-duration
-// event (agent_selection, failure_triage — both fire alongside qa_answer/proofreader/display_format,
-// which already log the real number), or is an in-flight/marker signal with no completed duration
-// to measure (delegation, delegation_return, question_boundary). Declared once here instead of a
-// justifying comment repeated at every call site.
-// FEATURE: LOO-009b fixup — "delegation_complete" (the harness's new terminal-completion event,
-// S-LOO-009) is the same shape as "delegation_return": a terminal marker fired the instant the
-// pending row is claimed, with no separately-measurable client-side round trip of its own (see
-// onDelegationProgress's own comment above). Missing here caused a real, live-reproduced CHI-07
-// console.error on every occurrence — found via this session's own live verification against the
-// dev preview, not in the kickoff doc's original spec, fixed same-session per Root Cause Analysis.
-const NON_MEASURABLE_EVENT_TYPES = new Set([
-  "agent_selection", "delegation", "delegation_return", "delegation_complete", "failure_triage", "question_boundary",
-]);
+// FEATURE: CHI-56 — NON_MEASURABLE_EVENT_TYPES now lives in src/lib/turnTracking.js (imported
+// above), narrowed to a single true exception ("question_boundary" -- a client-inserted marker
+// with no agent work behind it). The other 5 types this constant used to declare non-measurable
+// (agent_selection, delegation, delegation_return, delegation_complete, failure_triage) now all
+// resolve a real durationMs via resolveEventDuration()/resolveDelegationDuration()/
+// resolveEmbeddedDuration() at their own call sites (onDelegationProgress, the failure_triage and
+// agent_selection buildHopEvent calls, below) — "a hop is an instance that has work and time, no
+// matter how brief" (John, confirmed this session).
 
 // FEATURE: CHI-07 — every logEvent/onEvent call routes through this instead of hand-writing the
 // event object. Resolves durationMs once: a caller-supplied real value passes through unchanged;
@@ -963,7 +968,7 @@ function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
 // hopStart/hopEnd but never totalElapsedMs before this fix (submission/info-only/resolution ack
 // bubbles). Sites that never carried hop data before this session still don't — this helper
 // enforces the pairing, it does not invent hop data for messages that never had it.
-function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalElapsedMs, needsReview, reviewReason }) {
+function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalElapsedMs, needsReview, reviewReason, estimate }) {
   const msg = { role, text };
   if (kind != null) msg.kind = kind;
   if (hopStart != null) {
@@ -974,6 +979,9 @@ function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalE
     msg.hopEnd = hopEnd;
     msg.totalElapsedMs = totalElapsedMs ?? null;
   }
+  // FEATURE: CHI-56 -- the estimate live at turn-start, shown by HopSummaryLine alongside the real
+  // elapsed time above. Same != null guard pattern as hopStart/totalElapsedMs.
+  if (estimate != null) msg.estimate = estimate;
   if (needsReview) {
     msg.needs_review = true;
     msg.review_reason = reviewReason || "flagged for review";
@@ -1012,15 +1020,23 @@ function formatHopSummary(hopEnd, totalElapsedMs) {
 // caption alone) with one row: badge on the left, enriched summary sentence to its right. Used
 // at both MessageBubble render sites (qa branch, default branch) — was duplicated JSX before
 // this extraction (Architect Review: duplicate-functionality check).
-function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent }) {
+// FEATURE: CHI-56 — new optional `estimate` prop: the snapshotted workingStatus.expectation string
+// (via buildEndStatusEstimate(), Task 4) that was live when the turn started, shown as a second,
+// muted line beneath the existing hop-badge/summary row so John can see whether the system's own
+// estimate was accurate. Absent (older messages, or a flow that doesn't snapshot one) renders
+// nothing extra, same as today.
+function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent, estimate }) {
   if (hopStart == null || hopEnd == null) return null;
   const summary = formatHopSummary(hopEnd, totalElapsedMs);
   return (
-    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
-      <HopBadge hopStart={hopStart} hopEnd={hopEnd} accent={accent}/>
-      {summary && (
-        <span style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>{summary}</span>
-      )}
+    <div style={{display:"flex",flexDirection:"column",gap:2}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+        <HopBadge hopStart={hopStart} hopEnd={hopEnd} accent={accent}/>
+        {summary && (
+          <span style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>{summary}</span>
+        )}
+      </div>
+      {estimate && <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>({estimate})</span>}
     </div>
   );
 }
@@ -1224,6 +1240,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // FEATURE: LOO-010 -- migrated onto automatic crediting (Task 1).
   // FEATURE: CHI-53 -- backgroundContext now threads through to Owen's review call too, not just
   // Marcus's own call above -- he was structurally blind to article-sourced answers otherwise.
+  // FEATURE: CHI-56 -- this call's own real round trip, so failure_triage below (an embedded
+  // sub-field of this same response, not an independent event) can attribute the same real,
+  // honestly-measured duration the sibling "proofreader" event already gets via callCapability's
+  // own internal hop_type timing.
+  const t0 = Date.now();
   const gate = await callCapability({
     capability_slug: "quality-gate", intent_slug: "qg-review-intent", agent_id: "owen",
     task_context: {
@@ -1249,7 +1270,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // FEATURE: LOG-15 — gate.triage never carried patterns_used; the real value lives one level up
     // on gate itself (the shared callCapability() wrapper's top-level field), not nested inside
     // gate.triage. Hoisted explicitly so failure_triage's pattern line shows real data.
-    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, patterns_used: gate.patterns_used || [] }));
+    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, patterns_used: gate.patterns_used || [] }, resolveEmbeddedDuration(Date.now() - t0)));
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
   }
 
@@ -1394,7 +1415,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // display_format's agentId is the actual formatter (display.display_agent_id), real durationMs kept.
   // secondaryAgentId dropped from both.
   if (display.selection) {
-    onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection));
+    // FEATURE: CHI-56 -- agent_selection is an embedded sub-field of this same display call, not an
+    // independent event; attribute the same real, already-measured parent-call duration the sibling
+    // "display_format" event below computes (same t0, same one round trip).
+    onEvent(buildHopEvent("agent_selection", display.selection.selected_by_agent_id, display.selection, resolveEmbeddedDuration(Date.now() - t0)));
   }
   onEvent(buildHopEvent("display_format", display.display_agent_id, display, Date.now() - t0));
 
@@ -1462,8 +1486,11 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
             </div>
           )}
         </div>
-        {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs). */}
-        <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy}/>
+        {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs). FEATURE:
+            CHI-56 — estimate prop threaded through so End status shows the original estimate
+            alongside the real elapsed time (only this qa branch — the default branch below never
+            carries an estimate today). */}
+        <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy} estimate={msg.estimate}/>
         {qaEvidence?.reviewChoice === "good" && (
           <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
         )}
@@ -2239,11 +2266,16 @@ const AGENT_ROUTING_EMPTY_TEXT = "Real agent-hop events appear here as the chat 
 // only when the user asks a follow-up without hitting Clear (Clear already wipes the whole panel,
 // Task 1 — nothing to divide there). Rendered in place of a RoutingHopCard wherever
 // groupEventsIntoHops() marks a hop isBoundary.
+// FEATURE: CHI-56 — renders both boundary-marker types (question_boundary/"start", the pre-existing
+// behavior, unchanged wording/trigger; transaction_complete/"complete", new — the closing half of a
+// transaction). Label derived from evt.type directly rather than a new prop — QuestionDivider
+// already receives the full event.
 function QuestionDivider({ evt }) {
+  const label = evt.type === "transaction_complete" ? "Transaction complete" : "New question";
   return (
     <div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0"}}>
       <div style={{flex:1,height:1,background:T.line}}/>
-      <span style={{fontFamily:mono,fontSize:9,color:T.muted,whiteSpace:"nowrap"}}>New question · {formatClockTime(evt.data.timestamp)}</span>
+      <span style={{fontFamily:mono,fontSize:9,color:T.muted,whiteSpace:"nowrap"}}>{label} · {formatClockTime(evt.data.timestamp)}</span>
       <div style={{flex:1,height:1,background:T.line}}/>
     </div>
   );
@@ -3029,6 +3061,11 @@ export default function MarketIntelligenceScreen() {
   // awaitingAgentId, { id, key } >. Not React state -- purely an internal bookkeeping side-table for
   // logEvent's own replace-in-place check below, never read for rendering.
   const pendingDelegationsRef = useRef(new Map());
+  // FEATURE: CHI-56 -- running "last event arrival" timestamp for onDelegationProgress's real
+  // arrival-delta duration (resolveDelegationDuration()); updated to Date.now() after every
+  // resolution. null until the first delegation-family event of a fresh pipeline arrives, which
+  // is exactly resolveDelegationDuration()'s own "no prior tick to diff against" case.
+  const lastEventAtRef = useRef(null);
 
   // FEATURE: CHI-04 — bumped by onClear() above; every in-flight async call captures the value at
   // its own start and checks it again after each await ("isStale()", below) to detect a Clear that
@@ -3092,16 +3129,24 @@ export default function MarketIntelligenceScreen() {
   const onDelegationProgress = (evt) => {
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
+    // FEATURE: CHI-56 — real client-side arrival-delta duration (was a literal `null` at both
+    // buildHopEvent call sites below): resolveEventDuration() routes every delegation-family type
+    // to resolveDelegationDuration(), the delta between this event's arrival and the previous
+    // event's arrival. lastEventAtRef is updated after every resolution, unconditionally, so the
+    // next tick (of either branch below) always diffs against this one.
+    const now = Date.now();
+    const durationMs = resolveEventDuration(evt.type, { nowMs: now, lastEventAtMs: lastEventAtRef.current });
+    lastEventAtRef.current = now;
     if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
       const attributedAgentId = evt.type === 'delegation_complete' ? evt.toAgentId : evt.fromAgentId;
       // FEATURE: LOO-012 — reasoning/task/toCapabilitySlug now carried into the stored event's data
       // (previously dropped — only message/viaTool survived), so describePipelineEvent below can
       // render real content instead of always falling through to the bare "has finished." template.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null }, null, {}));
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, null, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: CHI-33 — Column 2 live news feed. Jordan Ellsworth (web-search-news) real-delegates
@@ -3193,16 +3238,22 @@ export default function MarketIntelligenceScreen() {
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
+    // FEATURE: CHI-56 -- the estimate live at turn-start, snapshotted here (before intent_routing's
+    // later upgrade to a routing-chain-based figure, ~L3244 below) so End status can show what the
+    // system originally told the user alongside the real elapsed time, not the upgraded figure.
+    const expectationAtStart = buildEndStatusEstimate("expect < 2m");
     // FEATURE: CHI-04 — only when pipelineEvents is non-empty: skipped on the very first question of a
     // fresh session, and naturally skipped right after Clear too (pipelineEvents is already []).
+    // FEATURE: CHI-56 -- now built via buildTransactionBoundaryEvent("start", ...) (turnTracking.js)
+    // instead of an inline literal -- byte-identical resulting event shape, unchanged trigger point.
     if (pipelineEvents.length > 0) {
-      logEvent(buildHopEvent("question_boundary", null, { timestamp: turnStart }));
+      logEvent(buildTransactionBoundaryEvent("start", turnStart));
     }
     // FEATURE: CHI-23 — the real, current hop total right before this turn's own events start;
     // hopStart for this turn's message is this count + 1 (John's own framing: the label just
     // grabs the final gold number, and for a following question, subtracts the delta from it).
     const hopCountBeforeTurn = currentHopCount(pipelineEventsRef.current);
-    setStatus("Marcus is thinking…", { expectation: "expect < 2m" }); // FEATURE: MI-49 -- reverted from "question < 2m"
+    setStatus("Marcus is thinking…", { expectation: expectationAtStart }); // FEATURE: MI-49 -- reverted from "question < 2m"
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
@@ -3250,6 +3301,9 @@ export default function MarketIntelligenceScreen() {
           // FEATURE: CHI-23 — hopEnd read fresh from the gold count here, after every one of this
           // turn's events has posted (not a snapshot taken inside runQaWithQualityGate before it returned).
           hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current),
+          // FEATURE: CHI-56 -- the estimate snapshotted at this turn's start, so End status can show
+          // it alongside the real elapsed time above.
+          estimate: expectationAtStart,
         })]);
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
@@ -3308,6 +3362,10 @@ export default function MarketIntelligenceScreen() {
   const onGoodThanks = () => {
     // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You're good with this analysis." })]);
+    // FEATURE: CHI-56 -- symmetric "transaction complete" marker: the user is done with this plain
+    // Q&A, no further action. Only terminal case this session adds (theory/forecast commit-reject-
+    // accept flows are Session 2's scope, per this session's kickoff SCOPE RULES).
+    logEvent(buildTransactionBoundaryEvent("complete", Date.now()));
     setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "good" }));
   };
 
