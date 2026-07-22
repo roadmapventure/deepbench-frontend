@@ -1208,6 +1208,8 @@ Because classification happens at read time from immutable Layer A facts (the sa
 
 **Historical data cannot be retroactively corrected** — this principle from the prior model is unchanged and still governs Layer A/B: nothing recorded pre-rewrite can be assumed true or false after the fact. Pre-existing rows keep their original frozen classification, labeled honestly, forever; only rows logged after the new model ships get the versioned, re-derivable treatment.
 
+**Corollary, locked 2026-07-22 (live design conversation, John, `design-ai-35-2b-0721` — a mistake that had already recurred across multiple prior sessions before being caught and written down here):** never build a reconciliation table, alias column, or any other artifact whose job is to map an old/legacy identifier forward to its current Layer C entry. Any such mapping is itself a second thing that must be kept in sync with Layer C — exactly the class of problem this three-layer model exists to eliminate. The correct behavior is always: read Layer A/log data as it currently exists, read Layer C as it currently exists, join them live, and let anything with no current match fall into the existing generic "not yet catalogued" fallback (already built, `useAIActivity.js`) — the same honest treatment as any other unclassified row, no special-casing, no permanent bridge-building between what a pattern used to be called and what it's called now.
+
 ### Layer C — Self-Maintenance Mechanism [added 2026-07-21, `design-ai-35-0721`]
 
 The schema above defines what a governed vocabulary entry looks like, but not how it stays current — this closes that gap. Answers the same governance questions (1)-(3) on an ongoing basis, not just for the one-time launch audit.
