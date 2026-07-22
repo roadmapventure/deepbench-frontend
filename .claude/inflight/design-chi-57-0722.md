@@ -1,0 +1,1 @@
+- `design-chi-57-0722` (design session) — active, ongoing design conversation on CHI-57 (Agent Routing "new question" divider gap). Scope confirmed with John (4 original trigger points + a 5th, `onCommit`, added by mutual agreement). Kickoff doc not yet written. No unique commits yet (worktree currently matches `dev`).
