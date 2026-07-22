@@ -1,3 +1,4 @@
+// DeepBench v6.3.119 | LOO-19 -- Michelle's request_help dispatch passes task_context as a real object, not a stringified blob; JS's Object.entries() on a string iterates characters, which combined with HAR-06's new generic pass-through corrupted her prompt on every request_help call since 2026-07-18
 // DeepBench v6.3.102 | api/capabilities/execute.js | LOO-17 -- resolveAccept()/continue branch no longer mark a checkpoint as a completed accept; new accept_failed terminal state; widened eligibility guards
 // DeepBench v6.3.88 | api/capabilities/execute.js | S-LOO-015 -- requester's own turn now credited on the request_help+delegationRequired branch, was completely invisible before
 // DeepBench v6.3.87 | api/capabilities/execute.js | S-LOO-014 -- originating agent's delegation_complete credit now fires before the 'delegation' placeholder, fixing hop-order (was: target numbered before originator)
@@ -482,7 +483,7 @@ async function dispatchDelegation({
     // key (REQUEST_HELP_TOOL's schema has no agent_id field), so there is no collision risk.
     delegateResult = await runCapability({
       capability_slug: 'project-manager', intent_slug: 'agent-selection-intent', agent_id: pmAgentId,
-      task_context: JSON.stringify({ ...tool_input, requesting_agent_id: agent_id }), tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
+      task_context: { ...tool_input, requesting_agent_id: agent_id }, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       _trace_id: trace_id,
     });
     // FEATURE: LOG-15 — lastHelpSelection never carried patterns_used, even though the real value
