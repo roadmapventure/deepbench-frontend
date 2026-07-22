@@ -3238,6 +3238,19 @@ export default function MarketIntelligenceScreen() {
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
     const turnStart = Date.now(); // FEATURE: MI-42 -- captured once, feeds Task 4's final-timeline caption
+    // FEATURE: CHI-56 -- seed the delegation-arrival-delta reference to this turn's own start, not
+    // left null/stale from whatever the previous turn's last delegation-family event was. Two real
+    // reasons: (1) a genuinely first-of-turn delegation_complete/delegation_return (no preceding
+    // "delegation" tick within the same pipeline) would otherwise resolve null, which buildHopEvent's
+    // own pre-existing guard treats as an undeclared-type caller bug (a real console.error,
+    // live-reproduced this session on a retried call) -- "every hop shows a real time, no exceptions"
+    // (John) requires a real reference point from the first tick of every turn, not just most of
+    // them. (2) diffing the first delegation-family event of a new turn against the PREVIOUS turn's
+    // last one would silently fold the user's own between-questions think-time into that hop's
+    // reported duration -- dishonest data, not a measurement of real agent work. Seeding to turnStart
+    // makes the first hop's duration mean "time from this question starting to this hand-off," the
+    // same honest semantic every other hop already has.
+    lastEventAtRef.current = turnStart;
     // FEATURE: CHI-56 -- the estimate live at turn-start, snapshotted here (before intent_routing's
     // later upgrade to a routing-chain-based figure, ~L3244 below) so End status can show what the
     // system originally told the user alongside the real elapsed time, not the upgraded figure.
