@@ -1,3 +1,4 @@
+// DeepBench v6.3.126 | src/lib/turnTracking.js | CHI-61 -- fixed stale buildTransactionBoundaryEvent comment (trigger-point description hadn't been updated since CHI-57 broadened "start" to 6 follow-up-action call sites)
 // DeepBench v6.3.120 | src/lib/turnTracking.js | new file
 // FEATURE: CHI-56 — single shared service for hop-duration resolution and transaction-boundary
 // events, replacing the ad-hoc Date.now()/buildHopEvent pattern duplicated across submit(),
@@ -44,12 +45,14 @@ export function resolveEventDuration(type, { nowMs, lastEventAtMs, parentCallDur
   return undefined; // caller-measured types (qa_answer, proofreader, etc.) already pass a real value directly -- this function is never consulted for those, this branch exists only as an explicit "not handled here" signal if it's ever called by mistake
 }
 
-// FEATURE: CHI-56 -- builds a transaction-boundary event. `kind` is "start" (existing
-// question_boundary behavior, unchanged trigger point -- only a genuinely new typed/example
-// question, never a follow-up action) or "complete" (new -- fired from a flow's own terminal
-// action, e.g. onGoodThanks). Both render via QuestionDivider/a new sibling component in
-// MarketIntelligenceScreen.jsx (Task 4) -- this function only builds the event object, it does
-// not render anything.
+// FEATURE: CHI-56 -- builds a transaction-boundary event. `kind` is "start" or "complete". Both
+// render via QuestionDivider/a sibling component in MarketIntelligenceScreen.jsx -- this function
+// only builds the event object, it does not render anything.
+// FEATURE: CHI-61 -- corrected stale trigger-point description: "start" originally fired only for
+// a genuinely new typed/example question (CHI-56), but CHI-57 deliberately broadened it to 6
+// follow-up-action call sites (onReview, onSelectHypothesis, onCommit, onResolveConfirmation x3)
+// without this comment being updated to match. "complete" fires from a flow's own terminal action
+// -- onGoodThanks (CHI-56), and now onDiscard/onResolveConfirmation's accept+reject branches (CHI-61).
 export function buildTransactionBoundaryEvent(kind, timestamp) {
   return { type: kind === "start" ? "question_boundary" : "transaction_complete", agentId: null, data: { timestamp }, durationMs: null };
 }

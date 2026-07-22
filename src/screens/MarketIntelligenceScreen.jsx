@@ -1,3 +1,4 @@
+// DeepBench v6.3.126 | MarketIntelligenceScreen.jsx | CHI-61 -- terminal transaction_complete markers added at the 3 real theory/forecast conclusion points (onDiscard, onResolveConfirmation accept/reject), Marcus's next-step bubble once candidates land (enterHypothesisFlow), 3 redundant "Sent to Priya for deeper theories" captions removed (superseded by CHI-42's "You asked for deeper theories." user_action bubble)
 // DeepBench v6.3.120 | MarketIntelligenceScreen.jsx | CHI-56 -- turn-tracking service adopted: real hop durations for delegation/agent_selection/failure_triage events (were permanently null), AgentWorkingIndicator right-justified to match the user bubble it reports on, HopSummaryLine gains an estimate line, new transaction_complete marker (onGoodThanks) alongside the existing question_boundary start marker
 // DeepBench v6.3.112 | MarketIntelligenceScreen.jsx | DAT-7 -- resolveConfirmation() forwards status/detail on failure; onResolveConfirmation() shows a specific recovery message for denied writes instead of the generic retry copy
 // DeepBench v6.3.106 | MarketIntelligenceScreen.jsx | S-CHI-49 -- single Theory drawer splits into "{intent} Candidates" (generating/choosing) and "{intent} Result" (testing onward), per STYLE-GUIDE.md §40's taxonomy decision record
@@ -1504,9 +1505,6 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         {qaEvidence?.reviewChoice === "good" && (
           <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
         )}
-        {qaEvidence?.reviewChoice === "exploring" && (
-          <div style={{marginTop:6,fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
-        )}
       </div>
     );
   }
@@ -1543,9 +1541,6 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
           {msg.reviewChoice === "good" && (
             <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
-          )}
-          {msg.reviewChoice === "exploring" && (
-            <div style={{fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories. See the Evidence tab.</div>
           )}
           {/* FEATURE: CHI-05 */}
           {!msg.reviewChoice && (
@@ -1612,9 +1607,6 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
       </div>
       {qa.reviewChoice === "good" && (
         <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>✓ Good, thanks — no further action.</div>
-      )}
-      {qa.reviewChoice === "exploring" && (
-        <div style={{padding:"0 13px 11px 13px",fontFamily:body,fontSize:11,fontStyle:"italic",color:T.muted}}>→ Sent to Priya for deeper theories.</div>
       )}
     </div>
   );
@@ -3236,6 +3228,14 @@ export default function MarketIntelligenceScreen() {
       if (isStale()) return; // FEATURE: CHI-04
       logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, patterns_used }, Date.now() - t0));
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
+      // FEATURE: CHI-61 -- Marcus's instructive next-step bubble; candidates previously landed with
+      // zero chat narration telling the user what to do with them. Only fires on the generated-
+      // candidates path (extractedHypothesis's early-return above never reaches here — that path
+      // has no candidates array, a single prefilled theory instead, a different UI affordance).
+      const n = candidates?.length ?? 0;
+      if (n > 0) {
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `You have ${n} theor${n === 1 ? "y" : "ies"} to choose from — select one or write your own for deeper analysis.` })]);
+      }
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
@@ -3497,6 +3497,10 @@ export default function MarketIntelligenceScreen() {
   const onDiscard = () => {
     // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You marked that as info only." })]);
+    // FEATURE: CHI-61 -- symmetric "transaction complete" marker, same treatment onGoodThanks() got
+    // in CHI-56. Info-only is a real terminal resolution (no further action follows), unlike
+    // onSelectHypothesis/onCommit's "start" markers which are mid-flow, not terminal.
+    logEvent(buildTransactionBoundaryEvent("complete", Date.now()));
     // FEATURE: MI-51 — "Info Only" copy (was "Theory discarded — not written to the Data Room.",
     // the old "Discard" button's text) — same no-op outcome, reworded for the 2-outcome decision.
     // FEATURE: CHI-03a — the old rich hypothesis_test chat card (MessageBubble, now deleted) is
@@ -3661,6 +3665,9 @@ export default function MarketIntelligenceScreen() {
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You confirmed the forecast." })]);
         logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
+        // FEATURE: CHI-61 -- terminal marker: accept is a real conclusion (unlike the edit branch
+        // above, which loops back into another confirmation round, not terminal).
+        logEvent(buildTransactionBoundaryEvent("complete", Date.now()));
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
@@ -3675,6 +3682,8 @@ export default function MarketIntelligenceScreen() {
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You rejected that proposal." })]);
         logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
+        // FEATURE: CHI-61 -- terminal marker, same as the accept branch above.
+        logEvent(buildTransactionBoundaryEvent("complete", Date.now()));
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
