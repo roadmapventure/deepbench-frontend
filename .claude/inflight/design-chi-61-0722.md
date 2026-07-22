@@ -1,1 +1,0 @@
-design-chi-61-0722: CHI-61 kickoff written and pushed (v6.3.126). About to spawn coding agent into this same worktree (branch to be renamed session/chi-61-coding first, per SES-010 guard). Session continues through Step 5 QA/close-out after the coding agent returns.
