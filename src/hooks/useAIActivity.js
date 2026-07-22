@@ -301,6 +301,15 @@ export const AI_TYPE_TO_SERVICE = {
 // "Quality Gate," landing in "Agent Turn" instead).
 export function capabilitySlugForRow({ ai_type, feature }) {
   const rawSlug = (ai_type === 'agent-turn' && feature) ? feature.split(':')[0] : ai_type;
+  // FEATURE: SCA-1 -- feature-level override, checked before the ai_type-based resolution below.
+  // Closes a real misattribution gap found during this session's own Task 3 verification: Conversations
+  // writes/retrievals (lib/conversations.js) always log ai_type: 'similarity' (already mapped to
+  // 'knowledge-retrieval'), so the two conversation-memory-* AI_TYPE_TO_SERVICE entries were unreachable
+  // dead code -- real calls would misattribute to Knowledge Retrieval forever. Additive and safe for
+  // every existing row: today's `feature` values ('knowledge-retrieval', 'db-assembly', etc.) are not
+  // themselves keys in AI_TYPE_TO_SERVICE, so this branch only fires for feature values that already
+  // have their own explicit entry -- currently only the two new conversation-memory-* rows.
+  if (feature && AI_TYPE_TO_SERVICE[feature]) return AI_TYPE_TO_SERVICE[feature];
   return AI_TYPE_TO_SERVICE[rawSlug] || rawSlug;
 }
 
