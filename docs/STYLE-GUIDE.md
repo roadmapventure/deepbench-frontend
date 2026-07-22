@@ -680,6 +680,8 @@ First (and, as of this session, only) application: `AuditColumn`'s Agent Routing
 
 **Amended 2026-07-21 (`S-CHI-45-design`/`CHI-45`) — optional `headerRight` slot.** `Drawer` gains a third opt-in prop, `headerRight` (a `ReactNode`, default `undefined`), rendered in the header's right-side group between `count` and the open/closed chevron — visible regardless of open/closed state, same as `count` already is. Default `undefined` is a no-op in JSX, so every pre-existing call site (7, as of this session) is byte-unaffected. First application: `EvidenceColumn`'s 2 drawers (`CHI-45`) each pass their own `HopBadge` here, relocated out of the open body content — see §40's `CHI-45` amendment for the full rationale.
 
+**Amended 2026-07-22 (`S-CHI-59-design`/`CHI-59`) — `headerRight` can carry 2 badges at once.** When a drawer needs to show both `NeedsDecisionBadge` (§35's amendment, below) and `HopBadge` simultaneously, `headerRight` receives a small `<div style={{display:"flex",alignItems:"center",gap:6}}>` wrapping both — still a single `ReactNode`, no change to `Drawer` itself. First application: "Analysis & Narrative" and "Result" (`CHI-59`), each showing the decision badge only while a choice is pending, alongside their existing `HopBadge`.
+
 ---
 
 ## Section 30 — Stage-Status Copy Accuracy (Locked 2026-07-14 · S-MI-62-design)
@@ -768,6 +770,8 @@ A distinct visual pattern for any moment that requires an explicit user decision
 - **Primary action:** solid `T.navy` fill, `T.card` text, bold, squared — **scoped exception to Section 7's locked brass-gradient Primary CTA rule.** This exception applies only to this "needs your input" pattern; every other Primary CTA in the app stays brass-gradient per Section 7, unchanged.
 
 First application: `QaEvidenceCard`'s and `MessageBubble`'s (dormant) review-choice blocks, `MarketIntelligenceScreen.jsx` (`CHI-05`). Any future "you must decide before continuing" moment reuses this pattern rather than inventing a fourth card variant.
+
+**Amended 2026-07-22 (`S-CHI-59-design`/`CHI-59`) — Badge bullet superseded for every `EvidenceColumn` drawer instance.** John's explicit call: every drawer with a pending HITL decision must signal it the same way, visible whether the drawer is open or collapsed — a footer-only pill (this section's original Badge bullet) fails that, since it's invisible until the drawer is already open. The Badge bullet above no longer applies to `QaEvidenceCardFooter`'s rendering (the pill is removed there entirely, `CHI-59`) — the signal moved to the wrapping `Drawer`'s own `headerRight` slot instead, as the shared `NeedsDecisionBadge` component (§29's amendment, above), reworded "Needs Your Decision" to match the pattern `CHI-50`'s Draft Forecast drawer already established. Every other property of this section (card fill, corners, question text, both action buttons' styling) is unchanged — this amendment touches the Badge bullet only, and only for the `QaEvidenceCardFooter` instance. `MessageBubble`'s dormant non-qa variant still renders the original full pattern, badge included, unchanged — it's dead code today (no message reaches it), tracked separately as `CHI-63` rather than reconciled here.
 
 ---
 
