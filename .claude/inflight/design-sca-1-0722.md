@@ -1,1 +1,0 @@
-design-sca-1-0722 — writing SCA-1's kickoff doc (Conversations table + match_conversations RPC + write/retrieve module, backend infra only). Follow-on from investigate-marcus-timeout-0722's discovery session.
