@@ -656,6 +656,14 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 
 ---
 
+## DATA MODEL — DAT (Supabase schema/security, not CI-specific)
+
+| ID | Type | Feature | Status | Session |
+|----|------|---------|--------|---------|
+| DAT-9 | Architecture | **Found 2026-07-21/22, surfaced by Supabase's own advisory during `investigate-marcus-error-0721`/`investigate-marcus-timeout-0722` (unrelated to either session's actual scope — flagged in passing, not investigated further).** All 25 public-schema tables have Row Level Security disabled — the anon key can read or modify every row in every table. Needs its own design session: enabling RLS blindly would block all access with no policies in place, so this needs deliberate per-table policy design (which tables are genuinely public-readable via the anon key vs. service-key-only), not a blanket `ENABLE ROW LEVEL SECURITY`. No owner, no prior ID — this is the first time it's been logged. | ❌ Missing | S-future (design required) |
+
+---
+
 ## Full Session Order
 
 Moved to `docs/SESSIONS.md` (2026-07-01 cleanup — this table duplicated session history already tracked there). See SESSIONS.md "Full Session Order (archived from FEATURES.md)" section.
