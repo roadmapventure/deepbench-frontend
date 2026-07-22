@@ -2542,6 +2542,7 @@ function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
       <FeatureBadge id="MI-31"/>
       <FeatureBadge id="CHI-27"/>
       <FeatureBadge id="CHI-28"/>
+      <FeatureBadge id="CHI-57"/>
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:T.muted}}>Focus Area Audit</div>
       {/* FEATURE: MI-55 — resizable opt-in, Agent Routing only */}
       {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N hops" (John's explicit
@@ -3386,6 +3387,7 @@ export default function MarketIntelligenceScreen() {
     if (!qaEvidence) return;
     // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change. See STYLE-GUIDE.md §36.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You asked for deeper theories." })]);
+    logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
     const { question, text, citations, review_reason } = qaEvidence;
     setQaEvidence(prev => prev && ({ ...prev, reviewChoice: "exploring" }));
     enterHypothesisFlow({ intent:"theory", extractedHypothesis:null, flaggedQuestion: question, flaggedAnswer: text, citations: citations || [], reviewReason: review_reason });
@@ -3401,6 +3403,7 @@ export default function MarketIntelligenceScreen() {
     // CHI-42's 2 bubbles for this flow (select, then a separate test-button click) into 1, since it's
     // now a single physical click.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You selected a theory to test." })]);
+    logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
@@ -3500,6 +3503,7 @@ export default function MarketIntelligenceScreen() {
     if (!hypFlow) return;
     // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change or async call. See STYLE-GUIDE.md §36.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You requested a forecast." })]);
+    logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
@@ -3589,6 +3593,7 @@ export default function MarketIntelligenceScreen() {
         // fully synchronous with the click, since resolveConfirmation() already resolved above) —
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You edited the proposal." })]);
+        logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
         // FEATURE: LOG-15 — result.patterns_used exists (same shared mechanism, threaded through
         // resolveConfirmation()) but wasn't hoisted to the top level the renderer reads; the
         // {resolution, result} wrapper was silently dropping it.
@@ -3621,6 +3626,7 @@ export default function MarketIntelligenceScreen() {
         // fully synchronous with the click, since resolveConfirmation() already resolved above) —
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You confirmed the forecast." })]);
+        logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "stored", theory: hypFlow?.chosenText || "" },
@@ -3634,6 +3640,7 @@ export default function MarketIntelligenceScreen() {
         // fully synchronous with the click, since resolveConfirmation() already resolved above) —
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You rejected that proposal." })]);
+        logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
         callCapability({
           capability_slug: "channel-intelligence", intent_slug: "ci-resolution-ack-intent", agent_id: "marcus",
           task_context: { resolution: "rejected", theory: hypFlow?.chosenText || "" },
