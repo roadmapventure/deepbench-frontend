@@ -2074,12 +2074,10 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         {/* FEATURE: CHI-58 — the submitted-theory recap block previously here was removed: the
             (still-visible, collapsed) Candidates drawer's own chosen-summary already shows this
             text (Task 2), so this drawer no longer duplicates it. */}
-        {hypFlow.stage === "testing" && (
-          /* FEATURE: MI-62 */
-          <div style={{padding:12,background:T.card,border:`1px dashed ${T.lineSoft}`,fontFamily:body,fontSize:11.5,lineHeight:1.6,color:T.mutedDeep,fontStyle:"italic"}}>
-            Priya is testing this theory against a fresh Data Room query. Live progress is shown below.
-          </div>
-        )}
+        {/* FEATURE: CHI-58-patch — the "testing"-stage narration block previously here (MI-62) was
+            removed: the testing stage's progress is already visible via Column 1's AgentWorkingIndicator
+            strip, same governing principle CHI-58 already applied to the Candidates drawer's
+            "generating"-stage narration. */}
 
         {st && hypFlow.stage === "result" && (
           <>
