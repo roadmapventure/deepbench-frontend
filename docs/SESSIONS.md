@@ -1850,3 +1850,21 @@ Design session for `CHI-61`, `CHI-56`'s "Session 2" — queued next per `CLAUDE-
 **Not independently re-driven live:** `onResolveConfirmation()`'s accept/reject branches (Task 1b/1c) — accepted via `git diff`-confirmed byte-identical code to the just-proven `onDiscard()` pattern, per the standing "prove a mechanism once" guidance; `CHI-42`'s own archive entry already independently proves those same 3 branches' `user_action` bubbles fire correctly.
 
 `CHI-61` archived ✅ Done in `docs/FEATURES-ARCHIVE.md`. Worktree (`design-chi-61-0722`) and its branch (`session/chi-61-coding`) removed at close-out.
+
+## S-CHI-60-design/S-CHI-60 (v6.3.127, `22e7e28`, worktree `design-chi-60-0722`, 2026-07-22)
+
+Draft Forecast formatting fix: `data-patch-intent` gains `can_request_help` + ask-then-reach instructions mirroring `data-patch-execute-intent`'s already-proven pattern; new sibling intent `data-patch-display-intent` added for Alex under `screen-controls`. Ruled out `delegation_required` (incompatible with `requires_human_confirmation`) and a `format_skill_profile_slug` override first, before landing on the sibling-intent approach. Supabase-only, zero code files touched.
+
+Node test 18/18 PASS (1 known gap, `LOO-20`, John-approved to ship open). **Surfaced `LOO-20`** during this session: `resumeCapability()` (`api/capabilities/execute.js`) hardcodes `requiresHumanConfirmation: false` on checkpoint-resume, so a checkpointed confirmation-gated chain can silently skip the human confirmation card — a Draft Forecast `promote` action could write to the Data Room unseen. John's explicit call was to ship `CHI-60` with this open rather than block on it.
+
+`CHI-60` archived ✅ Done in `docs/FEATURES-ARCHIVE.md`. `LOO-20` logged fresh in `docs/FEATURES.md` as highest-priority open item.
+
+## design-sca-2-0722 (docs-only, no version bump, worktree `design-sca-2-0722`, 2026-07-22)
+
+Started as a design session to write `SCA-2`'s kickoff doc (wire the `Conversations` table from `SCA-1` into the real chat flow). John's own questioning during the scoping walkthrough — asking for a concrete use case, then pointing out the described scenario "is not happening at this time" and asking whether the discovery session needed re-evaluation — surfaced that the premise itself needed checking before any kickoff doc was written.
+
+**Direct Supabase verification (not trusting the prior session's summary) found the premise didn't hold.** Queried `ai_activity_log`/`durable_hops` directly: only 1 real timeout has ever been recorded for `channel-intelligence`/`ci-answer-intent` across ~1,370 real calls (2026-07-07 through today), and its payload (~7,900 tokens estimated) wasn't even the largest on record — several 20,000+-token calls completed successfully, one in 48.8s. Only 3 of 761 `depth0` calls (0.4%) have ever exceeded 20K tokens. The original reported screenshot that opened `investigate-marcus-timeout-0722`'s whole thread was actually root-caused to `LOO-19` (Michelle's `request_help` prompt corruption via `Object.entries()` on a stringified `task_context`) — already fixed, `v6.3.119` — and was conflated with the separate token-bloat finding in `SCA-2`'s original `FEATURES.md` wording.
+
+**Found the real dominant recurring failure instead:** 6 of the 7 genuine `durable_hops` `status:'failed'` rows for `ci-answer-intent` share `HAR-9`'s exact signature (`library-catalog-intent` schema validation, missing `citations` field), recurring 2026-07-08 through today — already tracked, but root cause still not investigated, and now confirmed as the actual dominant failure mode rather than an occasional flake.
+
+**John's call: move `SCA-2` to `docs/FEATURES-NEXT.md`** (re-scoped, corrected description, no longer framed as fixing an active incident — `SCA-1`'s backend infra stays valid for whenever it's picked up) and **elevate `HAR-9`'s priority** in `docs/FEATURES.md`, then close this session with no kickoff doc written. No code touched, no version bump — a pure re-scoping/backlog-correction session.
