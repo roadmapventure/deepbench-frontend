@@ -130,5 +130,8 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 | Agent roster (source of truth) | `src/data/agents.js` |
 | Working with John — decision autonomy tiers, walkthrough gate | `docs/WORKING-WITH-JOHN.md` |
 | Session history + the "found live…" rationale behind these rules | `docs/SESSIONS.md` |
-| Path-scoped rules (load only when touching the files they govern) | `.claude/rules/` |
+| System invariants — **read** when touching the files they govern (tokens→`src/`, logging/capabilities→`api/`, library→`lib/`); don't rely on auto-scoping | `.claude/rules/` |
 | Doc-bloat tripwire | `.claude/skills/session-hygiene/` |
+| Architecture/scope not settled — run a discovery session (decisions + constraints, no kickoff doc) | `.claude/skills/discovery/SKILL.md` |
+| Session lost its frame (wrong architecture / going in circles / after a compaction) — inventory before proposing | `.claude/skills/reframe/SKILL.md` |
+| Surprise mid-session dependency ("can't do X until Y") — classify before investigating | `.claude/skills/triage/SKILL.md` |
