@@ -80,7 +80,9 @@ then writes the kickoff doc for the coding session that implements the changes.
 
 ---
 
-## Kickoff Doc — 10 Required Sections
+## Kickoff Doc — Required Sections (SUPERSEDED — see `docs/STANDARDS.md` §3)
+
+> This v5.1-era 10-section list is retired. The canonical, enumerated kickoff structure is `docs/STANDARDS.md` §3 (11 sections). Kept below only as history — do not use it.
 
 1. **SESSION** — name, version, branch, files to read in Step 0
 2. **CONTEXT** — what the feature does and why

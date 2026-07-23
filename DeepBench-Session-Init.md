@@ -131,8 +131,8 @@ When John says "generate kickoff doc for [session]":
 2. Read the relevant source files directly via filesystem MCP (preferred) or `REPO-SNAPSHOT.md`
    (fallback) — confirm what already exists.
 3. If UI work: ask John for a screenshot or describe the mock for approval.
-4. Write the doc to the **10-section format** — the canonical list is `docs/SESSIONS.md`
-   → "Kickoff Doc — 10 Required Sections." Apply the **standing-rules-by-reference** discipline
+4. Write the doc to the canonical **11-section** kickoff structure, enumerated in `docs/STANDARDS.md` §3.
+   Apply the **standing-rules-by-reference** discipline
    (`docs/STANDARDS.md` §3): name a standing rule ("STANDARDS.md §11 applies"), don't restate it in
    full prose; session-specific facts (exact values, files, scope) are still spelled out in full.
    Section 9 (COMMIT) uses `git push origin HEAD:dev` (`CLAUDE.md` hard rule), never bare

@@ -5,7 +5,7 @@
 > restates it — so a rule can't go stale in two places at once.
 
 - **Versioning & session naming** → `docs/STANDARDS.md` §1. Version numbers are claimed
-  atomically from Supabase per `CLAUDE.md` rule 5 — never hand-incremented.
+  atomically from Supabase per the `session-setup` skill (`CLAUDE.md`'s Atomic-counters hard rule) — never hand-incremented.
 - **Session scope** (1 feature / max 3 files / max 4 tasks / Node test + `npm run build`
   before commit / STOP on compacting / no `dev → main` without John) → `docs/STANDARDS.md` §2.
 - **Design tokens, palette, fonts** → `src/tokens.js` (the values) + `docs/STYLE-GUIDE.md`.
