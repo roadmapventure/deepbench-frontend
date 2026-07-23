@@ -1,3 +1,11 @@
+// DeepBench v6.3.132 | api/prompt/ai-enrichment.js | LOG-37 -- stop discarding real retrieved chunk ids
+// FEATURE: LOG-37 -- ARCHITECTURE.md §19i Layer A. Every retrieval path (queryRAG, queryContent's
+// the_library/the_reasoning/the_library_catalog branches) already returns `chunks` with real row
+// ids; fetchSection() kept only `result.matchCount` and dropped `result.chunks` on the floor one
+// line from where it could be saved. The ids are now threaded upward exactly the way the existing
+// `_rag_chunks` count already is, so request-receivable.js can record which chunks actually came
+// back rather than only how many. Additive: `rag_chunks_by_section` and every other debug field
+// keep their existing shape and meaning.
 // DeepBench v6.1.32 | api/prompt/ai-enrichment.js | AA-107 -- the_library + the_reasoning both route through lib/search-harness.js
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
@@ -62,6 +70,9 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
+        // FEATURE: LOG-37 -- real ids of the chunks this section actually retrieved. Sibling of
+        // the count above, threaded the same way; empty array when a path returns no chunks.
+        _rag_chunk_ids: (result.chunks || []).map(c => c && c.id).filter(Boolean),
         _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
         _librarian_tier: result._librarian?.tier || result._access?.tier || null,
       };
@@ -137,6 +148,8 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   const omitted = [];
   const fetchErrors = [];
   const ragChunksBySection = {};
+  // FEATURE: LOG-37 -- parallel to ragChunksBySection above, ids instead of counts.
+  const ragChunkIdsBySection = {};
   // FEATURE: S-APPLE-02b — fetchSection() sets _librarian_tier per-section when the broker
   // engages, but it was never captured before this loop discards non-render fields. Additive,
   // opt-in: stays null for every call that doesn't route through the Librarian broker.
@@ -148,6 +161,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     if (!s.content) { omitted.push(s.slug); continue; }
     renderedMap[s.slug] = s.content;
     if (s._rag_chunks !== undefined) ragChunksBySection[s.slug] = s._rag_chunks;
+    // FEATURE: LOG-37 -- same guard shape as the count above; empty arrays are skipped so a
+    // section that retrieved nothing adds no key, matching rag_chunks_by_section's behavior of
+    // only carrying sections that actually went through a fetch.
+    if (s._rag_chunk_ids !== undefined && s._rag_chunk_ids.length > 0) ragChunkIdsBySection[s.slug] = s._rag_chunk_ids;
   }
 
   const renderedBlocks = orderedFetched
@@ -312,6 +329,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
       fetch_errors: fetchErrors,
       rag_retrieved: Object.keys(ragChunksBySection).length > 0,
       rag_chunks_by_section: ragChunksBySection,
+      // FEATURE: LOG-37 -- Layer A source for call_facts.retrieved_chunk_ids. Flattening,
+      // de-duplication and the 50-id cap happen in request-receivable.js's buildCallFacts(),
+      // which is the single place that assembles the written fact object.
+      rag_chunk_ids_by_section: ragChunkIdsBySection,
       librarian_tier: librarianTier,
       rag_scope_requested: sections.find(s => s.type === "rag")?.fetch_instruction?.scope || null,
       rag_scope_effective: Object.keys(ragChunksBySection).length > 0

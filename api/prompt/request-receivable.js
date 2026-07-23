@@ -1,3 +1,4 @@
+// DeepBench v6.3.132 | api/prompt/request-receivable.js | LOG-37 -- assemble and pass Layer A call_facts (real tool names, retrieved chunk ids, gates fired) alongside the untouched patterns_used write
 // DeepBench v6.3.131 | api/prompt/request-receivable.js | HAR-9/HAR-11 -- parseModelTurn() reads stop_reason to distinguish max_tokens truncation from a genuine schema omission; callModel()'s retry correction now asks a truncated turn for concision instead of "include every field"
 // DeepBench v6.3.116 | api/prompt/request-receivable.js | AI-35 -- registers pattern-vocabulary-write handler
 // DeepBench v6.3.101 | api/prompt/request-receivable.js | S-HAR-8 -- postToAnthropicWithRetry() bumped to 3 total attempts, escalating backoff ([1000, 3000]ms)
@@ -354,6 +355,75 @@ export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = fa
   ];
 }
 
+// FEATURE: LOG-37 -- ARCHITECTURE.md §19i Layer A. Facts, never names: everything below is a real
+// structural property of the response or of what actually executed, recorded verbatim. Layer B
+// decides at read time what to call any of it. Deliberately no agent-id or capability-slug
+// conditionals anywhere in here (`.claude/rules/capabilities-are-data.md`) -- capture is generic.
+const RETRIEVED_CHUNK_ID_CAP = 50;
+
+// FEATURE: LOG-37 -- single source of truth for "which tools did this response actually invoke".
+// `usedWebSearch` (the pre-existing HAR-05 boolean feeding patterns_used) is now derived from this
+// same list rather than re-scanning rawContent with a second, drift-prone predicate. Equivalence
+// with the original predicate is exact: the only tool names this platform ever sends are the
+// format contract's skill_profile_slug, 'request_help', 'delegate_to_agent' and Anthropic's own
+// server-side 'web_search' -- so a client `tool_use` block can never be named 'web_search'.
+// The `web_search_tool_result` fallback preserves the original defensive both-shapes handling:
+// depending on API version the search can surface as the paired result block alone.
+export function extractToolCalls(rawContent) {
+  const blocks = Array.isArray(rawContent) ? rawContent : [];
+  const names = [];
+  for (const b of blocks) {
+    if (!b || typeof b !== 'object') continue;
+    if ((b.type === 'tool_use' || b.type === 'server_tool_use') && b.name) {
+      names.push(b.name);
+    } else if (b.type === 'web_search_tool_result' && !names.includes('web_search')) {
+      names.push('web_search');
+    }
+  }
+  return names;
+}
+
+// FEATURE: LOG-37 -- assembles the call_facts object written to ai_activity_log.call_facts.
+// Keys are omitted entirely when their fact set is empty, so an all-empty call yields `{}`, which
+// logActivity() writes as NULL -- "nothing to record" and "not captured" stay distinguishable.
+// Gate names are the literal internal gate names ('synthesis', never 'intelligent-synthesis') --
+// naming them after patterns is exactly the write-time conclusion-freezing LOG-37 exists to stop.
+export function buildCallFacts({
+  rawContent = [],
+  guardrailsRan = false,
+  reflectRan = false,
+  synthesisRan = false,
+  ragChunkIdsBySection = null,
+} = {}) {
+  const facts = {};
+
+  const toolCalls = extractToolCalls(rawContent);
+  if (toolCalls.length > 0) facts.tool_calls = toolCalls;
+
+  // Flatten across sections, de-duplicate (the same chunk can legitimately come back for two
+  // sections), then cap. Truncation is silent and acceptable -- the real per-section counts
+  // already live in enrichDebug.rag_chunks_by_section.
+  const chunkIds = [];
+  const seen = new Set();
+  for (const ids of Object.values(ragChunkIdsBySection || {})) {
+    for (const id of (Array.isArray(ids) ? ids : [])) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      chunkIds.push(id);
+    }
+  }
+  if (chunkIds.length > 0) facts.retrieved_chunk_ids = chunkIds.slice(0, RETRIEVED_CHUNK_ID_CAP);
+
+  const gates = [
+    ...(guardrailsRan ? ['guardrails'] : []),
+    ...(reflectRan ? ['reflect'] : []),
+    ...(synthesisRan ? ['synthesis'] : []),
+  ];
+  if (gates.length > 0) facts.gated_subroutine_fired = gates;
+
+  return facts;
+}
+
 // FEATURE: HAR-04 -- deadline is a new optional param, same opt-in contract as callModel()'s own:
 // omitted by every caller that doesn't pass it (api/plan.js, confirmation.js) -- byte-identical
 // behavior. execute.js's runLoop() passes its own real deadline through.
@@ -454,9 +524,10 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   // from enableWebSearch being true on the request alone. Anthropic's web_search tool surfaces as
   // a `server_tool_use` block (name: 'web_search') and/or a paired `web_search_tool_result` block;
   // checked defensively for both since the exact live shape can vary slightly by API version.
-  const usedWebSearch = rawContent.some(
-    b => (b.type === 'server_tool_use' && b.name === 'web_search') || b.type === 'web_search_tool_result'
-  );
+  // FEATURE: LOG-37 -- the block scan itself moved into extractToolCalls() so the Layer A fact and
+  // this boolean can never disagree; usedWebSearch's meaning and patterns_used are unchanged.
+  const toolCallNames = extractToolCalls(rawContent);
+  const usedWebSearch = toolCallNames.includes('web_search');
 
   // ── STEP 2: Guardrails (PAT-13) ─────────────────────────────────────────────
   let guardrailsRan = false;
@@ -543,6 +614,9 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
           latencyMs: guardrailsLatency,
           patternsUsed: ['guardrails', 'prompt-chaining'],
           traceId: trace_id,
+          // FEATURE: LOG-37 -- this call really did invoke a tool (the guardrails_check schema
+          // tool, forced via tool_choice above) and recorded nothing about it until now.
+          callFacts: { tool_calls: ['guardrails_check'] },
         });
       }
     } catch (err) {
@@ -583,6 +657,16 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   ]));
   const latency_ms = Date.now() - startTime;
 
+  // FEATURE: LOG-37 -- Layer A facts assembled from data already in scope; the patternsUsed block
+  // above is deliberately untouched and keeps working exactly as it does today.
+  const callFacts = buildCallFacts({
+    rawContent,
+    guardrailsRan,
+    reflectRan: enrichDebug.reflect_ran === true,
+    synthesisRan: enrichDebug.synthesis_ran === true,
+    ragChunkIdsBySection: enrichDebug.rag_chunk_ids_by_section,
+  });
+
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
   // directly for channel-intelligence/quality-gate today, needs zero new AI_TYPE_TO_SERVICE entries
   // for either) instead of the hardcoded 'request-receivable' literal, which previously collapsed
@@ -598,6 +682,8 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     latencyMs: latency_ms,
     patternsUsed,
     traceId: trace_id,
+    // FEATURE: LOG-37 -- additive; omitted-shape callers elsewhere still write call_facts: null.
+    callFacts,
   });
 
   // ── STEP 5: Return response ──────────────────────────────────────────────────
