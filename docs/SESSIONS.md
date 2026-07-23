@@ -1868,3 +1868,79 @@ Started as a design session to write `SCA-2`'s kickoff doc (wire the `Conversati
 **Found the real dominant recurring failure instead:** 6 of the 7 genuine `durable_hops` `status:'failed'` rows for `ci-answer-intent` share `HAR-9`'s exact signature (`library-catalog-intent` schema validation, missing `citations` field), recurring 2026-07-08 through today — already tracked, but root cause still not investigated, and now confirmed as the actual dominant failure mode rather than an occasional flake.
 
 **John's call: move `SCA-2` to `docs/FEATURES-NEXT.md`** (re-scoped, corrected description, no longer framed as fixing an active incident — `SCA-1`'s backend infra stays valid for whenever it's picked up) and **elevate `HAR-9`'s priority** in `docs/FEATURES.md`, then close this session with no kickoff doc written. No code touched, no version bump — a pure re-scoping/backlog-correction session.
+
+## SES-021 — CLAUDE.md diet + Session-Init dedupe (design/docs)
+
+*Applied as `SES-021`, v6.3.129 — claimed atomically from Supabase.*
+
+Reconciled the always-on session docs so every rule has exactly one home. `CLAUDE.md` went from a
+~22 KB always-on file (mostly procedure + inline "found live" narrative) to a thin router + hard
+rules + pointer core. The procedures moved to a new `.claude/skills/session-setup/` skill (loads at
+session start, not every turn); the rationale/history below moved here. **No rule changed** — only
+procedures and rationale relocated. `DeepBench-Session-Init.md` was deduped to pointers against the
+same homes.
+
+### Rationale migrated out of CLAUDE.md (kept here so it isn't lost)
+
+**Retired read-only bootstrap check (2026-07-15).** CLAUDE.md previously specified a separate
+"read-only bootstrap check" (`git fetch` + `git show origin/dev:<path>`) to work around the shared
+checkout going stale, applied only to `CLAUDE.md` and `CLAUDE-STATE.md`. Made redundant once the
+per-session worktree became mandatory *before any read*: a worktree branched fresh from `origin/dev`
+is already correct for every file, so one normal Read replaces the fetch+`git show`+scratch-file
+dance. This also fixed a real inefficiency — a 2026-07-15 design session read `CLAUDE-STATE.md` twice
+(once stale for the hygiene check, once via `git show` for content), burning ~13% of context before
+any work started.
+
+**Why the shared checkout is deliberately never kept in sync (John asked directly, 2026-07-16).**
+With 5–7 concurrent sessions, any `git pull`/`checkout` against the one shared directory would race
+every other session doing the same — and a working-tree checkout isn't atomic across files, so a read
+caught mid-pull could see a mix of old and new file states. A consistently-stale checkout is a
+*safer* failure mode than one that's usually fresh but occasionally mid-mutation, precisely because
+nobody trusts it enough to skip verifying. The shared checkout also can't be hidden — it's the
+obviously-named top-level folder, trivially discoverable, while worktree paths are buried three
+levels deep in `.claude/worktrees/<name>/`. That obvious-but-wrong vs. hidden-but-right asymmetry is
+why every sub-agent must be *given* the worktree path explicitly rather than left to discover one.
+**Fallback circuit-breaker:** any session about to read from the shared checkout directly should
+`fetch origin dev` then read via `git show origin/dev:<path>` and flag the misdirection, so the
+upstream gap gets fixed rather than papered over.
+
+**Sub-agent staleness, found live 2026-07-16.** Two sweep sub-agents were both pointed at the shared
+checkout with no worktree path in their prompts; one caught the resulting 193-commits-behind
+staleness itself and rerouted to a fresh worktree, the other didn't and re-reported an already-fixed
+bug (`AA-192a`/`b`) until the parent cross-checked both reports. Root cause: a bare task description
+with no explicit path defaults to the discoverable shared checkout — hence the "state the worktree
+path verbatim in every sub-agent prompt" rule.
+
+**Route-around-a-deny, found live 2026-07-21 (`SES-019`).** `block-unverified-commit.js` denied a
+legitimate `git rm` of debris test files because it matched on staged path alone, not add/delete
+status (fixed same day). The correct response was to fix the hook or flag it — not to retry the
+`git commit` through PowerShell because a hook only matched `Bash`. Routing around a deny defeats the
+hook regardless of whether the specific instance was safe.
+
+**`HEAD:dev` vs bare `dev`, found live 2026-07-16 (`continuity-ux-0716`).** Worktrees share one set
+of local refs, so a bare `git push origin dev` resolves to whichever local branch is named `dev`
+(normally the shared checkout's, deliberately never kept current) rather than the executing
+worktree's HEAD — pushing stale content or failing confusingly. `HEAD:dev` sidesteps the shared-ref
+lookup.
+
+**Atomic counters — the collisions that motivated them.** Version: `AZ-19` and `S-MOBILE-ROSTER-01`
+both claimed `v6.2.4` by read-and-increment before the `dev_version_counter` fix (rule 5 → now the
+`session-setup` skill). Feature IDs: `AA-197`/`AA-198`, `CHI-13`/`CHI-14`, `HAR-02`/`AA-197` collided
+the same way before `feature_id_counter` (`SES-006`). Both are now claimed atomically; Postgres
+serialization makes the claim itself the reservation.
+
+**Per-session inflight files (`SES-011`).** Moved from a shared "In flight now" bullet list to
+per-session `.claude/inflight/<name>.md` files after a shared list kept mis-flagging quiet-but-active
+worktrees. Found live 2026-07-21: 8 real in-progress design worktrees were misflagged as
+stale/abandoned by `session-hygiene` check 5 purely because none had committed since branching — the
+one-line inflight file is the only on-disk signal distinguishing a live conversation from a
+finished-and-forgotten worktree.
+
+### Stale bits reconciled in Session-Init this session
+
+- **Already fixed on current `dev`:** Session-Init Step 9 already used `git push origin HEAD:dev`
+  (not bare `git push origin dev`) — no change needed; noted so the scope's assumption is on record.
+- **Fixed this session:** Step 10b's ⛔ "wait for John's PASS/FAIL" manual-QA hard-stop contradicted
+  the 2026-07-15 self-test hard rule (design/coding sessions verify their own Manual QA against live
+  systems; John only closes the loop when he personally started a coding session). Step 10 now points
+  to the Automated Design→Code→Verify Loop instead of gating on John's manual sign-off.

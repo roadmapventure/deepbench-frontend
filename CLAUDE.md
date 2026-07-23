@@ -1,11 +1,21 @@
-<!-- DeepBench v6.3.105 | CLAUDE.md | SES-011 -- lightweight bookkeeping path + per-session inflight files -->
+<!-- DeepBench v6.3.129 | CLAUDE.md | SES-021 -- router + hard rules + pointers; procedures live in .claude/skills/session-setup/ -->
 # DeepBench — Session Router
 
-**Before reading anything else, do this — every session, no matter what kind:**
-1. Set up your session worktree (see the concurrent-sessions hard rule below for the exact commands: name-collision check, `git fetch origin dev`, `worktree add ... origin/dev`). Do this first, before any orientation reads — not deferred until you're about to edit a file. A worktree freshly branched from `origin/dev` is a correct, current checkout by construction, which is what makes step 2 safe. **This applies even if the session doesn't cleanly fit "design" or "coding"** — an audit, investigation, or multi-sweep research session still needs a current, correct checkout to read from, and still has to isolate itself from the 5-7 other concurrent sessions touching this repo. Don't skip worktree setup just because neither branch below describes the task.
-2. From inside that worktree's path — never the shared checkout at `C:/Projects/deepbench-frontend` directly — read this file's own copy, then ask: "Design session or coding session? If coding, paste the kickoff doc path." (If the task is neither — an audit/sweep/investigation — proceed with the worktree already set up in step 1; there's no separate router branch for it, but the isolation and freshness requirements are identical.)
+**Every session, first action — before any orientation read, no matter the session type:**
 
-**Retired 2026-07-15 (doc-hygiene session):** this file previously specified a separate "read-only bootstrap check" (`git fetch` + `git show origin/dev:<path>`) to work around the shared checkout's disk copy going stale, applied only to this file and `CLAUDE-STATE.md`. That's now redundant — since the worktree above is created fresh from `origin/dev` before any reads happen, every file in it (this one, `CLAUDE-STATE.md`, `docs/FEATURES.md`, everything) is already correct, with one normal Read call each instead of a fetch+`git show`+scratch-file dance per file. This also fixed a real inefficiency: a design session on 2026-07-15 read `CLAUDE-STATE.md` twice — once from the stale shared checkout for a hygiene check, once again via `git show` for real content — burning ~13% of context before any actual work started.
+1. **Set up your worktree and inflight file.** Follow the **`session-setup` skill**
+   (`.claude/skills/session-setup/SKILL.md`) — worktree branched fresh from `origin/dev`,
+   `.env.local` copied in, your `.claude/inflight/<short-session-name>.md` created. Do this
+   *first*, before reading or editing anything. A worktree freshly branched from `origin/dev`
+   is a correct, current checkout by construction — which is what makes step 2 safe.
+   This applies even to audit / investigation / multi-sweep sessions that don't cleanly fit
+   "design" or "coding": they still need a current checkout to read from and still have to
+   isolate from the 5–7 other concurrent sessions on this repo.
+2. **From inside that worktree's path** — never the shared checkout at
+   `C:/Projects/deepbench-frontend` directly — read this file's own copy, then ask:
+   *"Design session or coding session? If coding, paste the kickoff doc path."*
+   (Neither — an audit/sweep/investigation? Proceed with the worktree from step 1; there's no
+   separate router branch, but the isolation and freshness requirements are identical.)
 
 ---
 
@@ -19,48 +29,106 @@
 3. Read `CLAUDE-RULES.md` only if you hit a pattern or rule question mid-session
 
 ## If CODING session (no kickoff doc given):
-**Stop.** Every coding session requires a kickoff doc. Ask John to provide the path or run a design session first.
+**Stop.** Every coding session requires a kickoff doc. Ask John to provide the path or run a
+design session first.
 
 ---
 
-> **Hard rule:** Never merge `dev → main` without John's explicit sign-off.
-> **Hard rule:** One feature per session. Max 3 files. Max 4 tasks.
-> **Hard rule:** Every coding session must be preceded by a design session that produced a kickoff doc.
-> **Hard rule (added 2026-07-15 — self-test, no manual QA hand-off):** Per the Automated Design→Code→Verify Loop (`CLAUDE-DESIGN.md`), every coding session pushes to `dev` itself as part of finishing, and every design session verifies its own Manual QA Checklist directly against live systems — John is not expected to manually test and should not be asked to unless he started a coding session himself by pasting the prompt directly (in which case he closes that loop personally, same as always). If a session finds itself asking John to test something it could check itself, that's the bug to fix, not a reason to ask.
-> **Hard rule (added 2026-07-15 — verify, never assert from memory):** Never state a fact about code, schema, config, or Supabase data as true because it's recalled from a memory file, an earlier message, or "this looks like a pattern I've seen before." If it's checkable — a file, a table, a query — check it fresh in this session before asserting it. A memory file's claim is a pointer to go verify, never sufficient evidence on its own; this rule exists because that already-stated caveat on every memory file wasn't being heeded consistently enough. If a genuinely fresh check isn't practical in the moment, say so explicitly ("this is from memory, not verified this session") rather than stating it with the same confidence as something just checked.
-> **Mechanized 2026-07-21 (`SES-010`, extended same day with a 6th hook).** Five of this file's/`STANDARDS.md`'s hard rules — no `cd && ...` compounds, no bare `git push origin dev`, no writing to `src/`/`api/` from a `session/design-*` branch, no reading/editing/running non-git commands against the shared checkout directly, and (added later the same day) no committing a staged `test-*.mjs` file or a `src/`/`api/` change that fails `npm run build` — are now enforced by real `PreToolUse`/`PostToolUse` hooks, not discipline alone. **Caveat: these hooks live in `C:/Projects/.claude/settings.json` and `C:/Projects/.claude/hooks/*.js` — outside this repo, not git-tracked, not pushed to `dev`.** They only exist on the machine where `SES-010` ran them. Don't assume they're present in any other environment (a fresh machine, a CI runner, another contributor) — the written rules below are still the source of truth; the hooks are a local backstop, not a replacement.
-> **Hard rule (added 2026-07-21, `SES-019` — found live, `design-ses-016-0721`'s coding session).** If a `PreToolUse` hook denies an action and the reason looks like a false positive, never route around it by retrying the same underlying action through a different tool the hook doesn't match (e.g. running `git commit` via `PowerShell` because a hook only matches `Bash`) — that defeats the hook regardless of whether this specific instance was actually safe. Stop, report the exact deny reason, and either fix the root cause (the hook itself, if it's genuinely wrong) or ask, before proceeding by any other path. Concretely: `block-unverified-commit.js` denied a legitimate `git rm` of debris test files because it matched on staged path alone, not add/delete status (fixed same day) — the correct response was to fix that bug or flag it, not to find an unmatched tool.
-> **Hard rule:** Never write `cd "C:/Projects/deepbench-frontend" && <command>` in a Bash call. Any `cd && ...` compound — not just git — can trigger a hardcoded, non-suppressible permission prompt with no Always-allow option (confirmed for `cd && git ...` and `cd && grep ... | ...`). Instead, pass the path directly as an argument to the command (`git -C "path" <command>`, `grep -rn "pattern" "path/subdir1" "path/subdir2"`, etc.) so no directory change occurs at all.
-> **Hard rule (added 2026-07-07 — concurrent sessions, timing tightened 2026-07-15):** John runs multiple Claude Code sessions on this repo simultaneously. Every session — design or coding — must isolate its work in its own git worktree as its very first action, before reading or editing any file or spawning a coding agent (not deferred until the first edit — see the top of this file). Do NOT use the `EnterWorktree` tool here — the session's own working directory is `C:/Projects` (the parent of this repo), not the repo root, so `EnterWorktree` cannot recognize it and will error ("not in a git repository"). Instead, set up and use a worktree manually:
-> 1. **First check for a name collision:** `git -C "C:/Projects/deepbench-frontend" worktree list` — if a worktree with your intended `<short-session-name>` already exists, pick a more specific name (include a topic hint, not just a date — multiple sessions on the same day will otherwise pick the same generic name, e.g. two unrelated sessions both trying `design-0707`). Then: `git -C "C:/Projects/deepbench-frontend" worktree add ".claude/worktrees/<short-session-name>" -b "session/<short-session-name>" origin/dev` — **always branch explicitly from `origin/dev`**, never rely on a tool's default base ref. This repo's remote default branch is `main`, not `dev` — a tool that branches from "the default branch" will silently branch from the wrong place.
-> 1b. **(added 2026-07-15)** Immediately after `worktree add`, copy `.env.local` from the shared checkout into the new worktree: it's gitignored, so `git worktree add` never brings it along, and a worktree missing it will hit a silent blank-page failure at Supabase-client-construction time the first time anything reads `import.meta.env`. `Copy-Item "C:/Projects/deepbench-frontend/.env.local" "C:/Projects/deepbench-frontend/.claude/worktrees/<short-session-name>/.env.local"` (PowerShell) or the Bash equivalent. Do this before any dev-server preview or Node test in the worktree, not reactively after hitting the blank page.
-> 2. Do all Read/Edit/Write/Bash work for the rest of the session against that worktree's absolute path (`C:/Projects/deepbench-frontend/.claude/worktrees/<short-session-name>/...`) — never the shared checkout at `C:/Projects/deepbench-frontend` directly. For git commands, use `git -C "<worktree-path>" <command>` (never `cd` into it, per the rule above).
-> 3. **(broadened 2026-07-16 — was "coding agent" only, which left research/audit/sweep sub-agents unowned)** If this session spawns **any** sub-agent via the `Agent` tool — a coding agent implementing a kickoff doc, or a research/audit/sweep agent doing read-only investigation — do **not** pass `isolation: "worktree"`; the sub-agent should operate inside this session's own worktree (already isolated from every other concurrent session), not a second nested worktree. **State the worktree's absolute path directly in the sub-agent's prompt text** (e.g. "operate against `C:/Projects/deepbench-frontend/.claude/worktrees/<short-session-name>/...`, never the shared checkout") — a sub-agent does not automatically inherit the parent's worktree context or reliably infer it from this file alone, and a sub-agent given a bare task description (e.g. "audit client-side LLM calls in `src/`") with no explicit path will default to the shared checkout, which is exactly the failure this rule exists to prevent. This was found live 2026-07-16: two sweep sub-agents were both pointed at the shared checkout with no worktree path in their prompts; one caught the resulting 193-commits-behind staleness itself and rerouted to a fresh worktree, the other didn't and re-reported an already-fixed bug (`AA-192a`/`b`) until the parent cross-checked both reports against each other after the fact.
-> 3c. **(added 2026-07-17 — same gap as rule #3, but for terminology/conventions, not just worktree location)** A sub-agent's prompt is self-contained by construction — it starts with zero memory of this conversation and won't independently discover recently-decided naming, architecture, or backlog conventions any more reliably than it discovers the worktree path. For any sub-agent whose task touches naming, architecture, or backlog classification, tell it to read the current `CLAUDE.md`/`CLAUDE-DESIGN.md`/`docs/SCREEN-INVENTORY.md` as part of its own bootstrap — don't hand-enumerate today's specific decisions into the prompt instead, since that list goes stale the moment another session changes something. For a narrowly-scoped, fully self-contained task (an exact criterion given verbatim, nothing to look up), it's fine to just supply what's needed directly without sending it to read anything — use judgment on which shape fits, but default to "tell it to read the current docs" for anything more open-ended than a fully-specified mechanical task.
-> 3b. **(added 2026-07-16 — why the shared checkout stays stale, and the fallback for when a session ends up there anyway)** John asked directly why sessions don't just keep the shared checkout's working tree updated as part of every push, as a backup. Deliberately not done: with 5-7 concurrent sessions, any `git pull`/`git checkout` against one shared directory would race against every other session doing the same thing — and a working-tree checkout isn't atomic across every file, so a read caught mid-pull could see a mix of old and new file states across different files in the same read. A checkout that's obviously, consistently stale is a *safer* failure mode than one that's usually fresh but sometimes mid-mutation, precisely because nobody trusts it enough to skip verifying — a "kept in sync" shared checkout would invite exactly that false confidence. Relatedly: the shared checkout can't be hidden from a session or sub-agent either — `C:/Projects/deepbench-frontend` is the obviously-named, top-level project folder, trivially discoverable by any directory listing with zero prior knowledge, while worktree paths are deliberately hidden three levels deep in `.claude/worktrees/<name>/` and can't be guessed. That asymmetry (obvious-but-wrong vs. hidden-but-right) is why rule #3 above requires the worktree path to be *given* explicitly to every sub-agent rather than relying on it to *discover* the correct one — the discoverable path is never the one you want followed. **Fallback circuit-breaker:** if any session or sub-agent — no matter how it got there — ever finds itself about to read a file from `C:/Projects/deepbench-frontend` directly rather than a worktree path, treat that as a signal something upstream already went wrong (a missing worktree-path instruction, a stale system reminder, anything). Don't trust the raw file on disk: `git -C "C:/Projects/deepbench-frontend" fetch origin dev` (safe to run concurrently from any number of sessions — it only updates remote-tracking refs, never touches the working tree) then read via `git -C "C:/Projects/deepbench-frontend" show origin/dev:<path>` instead. Flag the misdirection to John rather than silently self-correcting and moving on, so the upstream gap (why this session ended up without a worktree path) gets fixed too, not just papered over for this one read.
-> 4. Before any push to `dev` (kickoff commit, close-out commit — anything) from inside the worktree: `git -C "<worktree-path>" fetch origin dev` then rebase onto it (`git -C "<worktree-path>" rebase origin/dev`) before pushing. If the push is rejected as non-fast-forward, another concurrent session merged first — re-fetch, re-rebase, and retry once.
-> 4b. **(added 2026-07-16 — found live, `continuity-ux-0716`)** Push with `git -C "<worktree-path>" push origin HEAD:dev`, never bare `git ... push origin dev`. Worktrees share one set of local refs — a bare `dev` refspec resolves to whatever local branch happens to be named `dev` (normally the one checked out in the shared checkout at `C:/Projects/deepbench-frontend`, per rule 3b), not this worktree's own branch/HEAD. That local `dev` is deliberately never kept current (rule 3b), so a bare push either fails confusingly (non-fast-forward, but for the wrong reason — re-fetch/re-rebase in the worktree does nothing to fix it) or, worse, could succeed and push stale content if the shared checkout's `dev` ever happened to be ahead. `HEAD:dev` sidesteps the shared-ref lookup entirely by pushing the worktree's actual current commit.
-> 5. **(rewritten 2026-07-15 — was "read `CLAUDE-STATE.md` and increment," a real race under 5-7 concurrent sessions; multiple sessions have had to rename an already-written kickoff file/version headers after discovering a collision, e.g. `AZ-19`/`S-MOBILE-ROSTER-01` both claiming `v6.2.4`.)** Assign the version by claiming it atomically from Supabase, never by reading and incrementing a number yourself: `UPDATE dev_version_counter SET patch = patch + 1, updated_at = now(), updated_by_session = '<short-session-name>' WHERE id = 1 RETURNING major, minor, patch;` via the Supabase MCP's `execute_sql` (project `rallojeqnkgtxgsdsnqm`). Postgres serializes concurrent `UPDATE`s to the same row, so this is race-free even if another session claims a version in the same instant — no re-check-before-push needed, the claim itself is the reservation. Use the returned `major.minor.patch` as-is in the kickoff filename, "SESSION" header, and every file's version-header comment. `CLAUDE-STATE.md`'s "Version in dev" line stays what it's always been — the highest *closed-out* version, updated at close-out (`CLAUDE-DESIGN.md` Step 5c) — not the source for claiming a new one.
-> 6. **(rewritten 2026-07-21 — `SES-011`, per-session inflight files)** Each session's status lives in its own `.claude/inflight/<short-session-name>.md` file (one line, same content a bullet used to hold) — never edit another session's file, and never edit a shared list for this purpose anymore. `CLAUDE-STATE.md`'s "In flight now" header now just points at `.claude/inflight/` (aggregated view: `node scripts/check-session-docs.js`). When picking "what's next," claim the next unclaimed item from the queue below rather than assuming you're the only session working through it.
-> 6c. **(added 2026-07-21, John's explicit call — found live, `design-ux-review-0721`; retargeted to per-session files same day, `SES-011`)** Create your own `.claude/inflight/<short-session-name>.md` file as one of your session's **first actions, right after worktree setup** — do not wait until you happen to be editing `CLAUDE-STATE.md` for another reason. Reason: a worktree that's genuinely mid-design-conversation but hasn't committed anything yet is byte-for-byte indistinguishable on disk from one that finished and was never cleaned up — both show zero commits ahead of `origin/dev` and zero uncommitted changes. The `.claude/inflight/<short-session-name>.md` file is the *only* signal that tells the two apart, so a hygiene/staleness check (or another session) has no way to know a quiet worktree is still wanted unless that file exists. Found live 2026-07-21 (under the prior shared-bullet scheme): 8 real in-progress design worktrees (`design-0720`, `design-ai-audit-now-0719`, `design-apple-readiness-0717`, `design-chi-31-0718`, `design-chi-tickets-0717`, `design-chi-tickets-review-0717`, `design-forecast-eta-0720`, plus `design-ai-audit-screen-0717` which already had one) had no bullet and were misflagged as stale/abandoned by `session-hygiene`'s check 5 purely because none had committed anything since branching. A one-line file is enough — worktree name, one clause on topic if known, nothing else required until there's real content to report.
-> 7. When your session is fully done (worktree merged into `dev` and pushed), remove the worktree: `git -C "C:/Projects/deepbench-frontend" worktree remove ".claude/worktrees/<short-session-name>"` then `git -C "C:/Projects/deepbench-frontend" branch -D "session/<short-session-name>"`.
-> 8. **(added 2026-07-07 — doc-cleanup session; retargeted to per-session files 2026-07-21, `SES-011`)** When your session finishes and you push its close-out commit, also delete your own `.claude/inflight/<short-session-name>.md` file in that same commit — it's your job to remove it, not the next session's to notice it's stale. Per-file deletes are structurally per-session (never touch another session's file), so this can no longer collide with another session's in-flight status the way the old shared "In flight now" list sometimes did — no adjacency-conflict resolution needed here anymore.
->
-> **Hard rule (added 2026-07-21 — `SES-011`, lightweight bookkeeping path):** A session whose only pending edit is a **pure append** — zero deleted or modified lines — confined to either (a) a brand-new `.claude/inflight/<short-session-name>.md` file, or (b) one new row appended to the end of `docs/FEATURES.md`/`docs/FEATURES-NEXT.md`/`docs/FEATURES-LATER.md`, may skip part of the 8-step ceremony above:
-> - If this session already has a worktree open, make the edit there directly — no second worktree.
-> - If not, create one as normal (rule 1) but **skip step 1b** (`.env.local` copy — irrelevant, no dev server or Node test is involved in a pure bookkeeping edit).
-> - Commit, fetch/rebase, push as normal (rules 4/4b) — no shortcut on the actual git safety steps.
-> - **Skip steps 7/8's immediate manual removal.** A worktree with zero commits ahead of `origin/dev` after its push holds no unmerged work — `scripts/check-session-docs.js`'s existing worktree checks (5, 5b) already detect and flag exactly this state for batched cleanup later; there is no need for every bookkeeping-only session to run the removal commands itself in the moment.
-> - **Before pushing, run `git -C "<worktree-path>" diff --stat` against the previous commit.** Any deletion shown means this wasn't actually a qualifying edit — stop, and finish it as a normal full-ceremony session instead of pushing under this exception.
->
-> **Hard rule (added 2026-07-21 — `SES-006`, atomic feature-ID counter):** Assign every new feature/backlog ID (`CHI-`, `LOG-`, `SES-`, `LOO-`, etc. — any prefix from `docs/SCREEN-INVENTORY.md`'s taxonomy) by claiming it atomically from Supabase's `feature_id_counter` table, never by reading the highest existing number in `docs/FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`/`FEATURES-ARCHIVE.md` and incrementing it yourself. Mirrors rule #5's `dev_version_counter` fix for the identical race, now closed for feature IDs too — real repeated collisions this fixes: `AA-197`/`AA-198`, `CHI-13`/`CHI-14`, `HAR-02`/`AA-197` (full detail: `SES-006`, `docs/FEATURES-ARCHIVE.md`). Claim via the Supabase MCP's `execute_sql` (project `rallojeqnkgtxgsdsnqm`):
-> ```sql
-> INSERT INTO feature_id_counter (prefix, next_number, updated_by_session)
-> VALUES ('<PREFIX>', 1, '<short-session-name>')
-> ON CONFLICT (prefix) DO UPDATE
->   SET next_number = feature_id_counter.next_number + 1,
->       updated_at = now(),
->       updated_by_session = EXCLUDED.updated_by_session
-> RETURNING next_number;
-> ```
-> The returned `next_number` is the ID to use directly (`<PREFIX>-<next_number>`) — works identically whether the prefix already has claimed rows or is being used for the first time (lazily starts at 1, no separate seeding step needed for a genuinely new prefix). Postgres serializes this the same way it already serializes `dev_version_counter` claims — race-free by construction, no re-check-before-push step needed. Confirm the prefix itself is legitimate against `docs/SCREEN-INVENTORY.md`'s taxonomy before claiming — this table doesn't govern which prefixes are valid, only the number. Legacy area-prefixed IDs (`AA`, `MI`, `AI`, etc.) are frozen per the 2026-07-15 taxonomy rule and have no counter row — never claim a new legacy-prefixed ID through this mechanism or any other.
+## Hard rules
+
+These are the always-on rules. Statements only — the *procedures* they imply live in the
+`session-setup` skill; the *rationale/history* behind them lives in `docs/SESSIONS.md`.
+
+> **Merge:** Never merge `dev → main` without John's explicit sign-off.
+
+> **Scope:** One feature per session. Max 3 files. Max 4 tasks.
+
+> **Kickoff-gated:** Every coding session must be preceded by a design session that produced a
+> kickoff doc.
+
+> **Self-test — no manual-QA hand-off (2026-07-15):** Per the Automated Design→Code→Verify Loop
+> (`CLAUDE-DESIGN.md`), every coding session pushes to `dev` itself as part of finishing, and
+> every design session verifies its own Manual QA Checklist directly against live systems. John
+> is not expected to manually test and should not be asked to — *unless* he started a coding
+> session himself by pasting the prompt directly, in which case he closes that loop personally.
+> A session asking John to test something it could check itself is the bug to fix, not a reason
+> to ask.
+
+> **Verify, never assert from memory (2026-07-15):** Never state a fact about code, schema,
+> config, or Supabase data as true because it's recalled from a memory file, an earlier message,
+> or "a pattern I've seen before." If it's checkable — a file, a table, a query — check it fresh
+> this session before asserting. A memory file's claim is a pointer to go verify, never
+> sufficient evidence on its own. If a genuinely fresh check isn't practical, say so explicitly
+> ("this is from memory, not verified this session").
+
+> **Never route around a hook deny (2026-07-21, `SES-019`):** If a `PreToolUse` hook denies an
+> action and the reason looks like a false positive, never retry the same underlying action
+> through a different tool the hook doesn't match (e.g. `git commit` via PowerShell because a
+> hook only matches `Bash`) — that defeats the hook regardless of whether this instance was safe.
+> Stop, report the exact deny reason, and either fix the root cause or ask before proceeding.
+
+> **No `cd && …` compounds:** Never write `cd "C:/Projects/deepbench-frontend" && <command>` in a
+> Bash call. Any `cd && …` compound — not just git — can trigger a hardcoded, non-suppressible
+> permission prompt with no Always-allow option. Pass the path directly as an argument instead:
+> `git -C "path" <command>`, `grep -rn "pattern" "path/sub1" "path/sub2"`, etc.
+
+> **Worktree isolation (2026-07-07, tightened 2026-07-15):** John runs 5–7 Claude Code sessions
+> on this repo simultaneously. Every session — design or coding — isolates its work in its own
+> git worktree, branched explicitly from `origin/dev`, as its very first action (see the router
+> above and the `session-setup` skill for the commands). Never read/edit/run against the shared
+> checkout at `C:/Projects/deepbench-frontend` directly. Do **not** use the `EnterWorktree` tool
+> here — the session's working directory is `C:/Projects` (the parent), so it errors. If a
+> session ever finds itself about to read a file from the shared checkout directly, treat that as
+> a signal something upstream went wrong: `git -C "C:/Projects/deepbench-frontend" fetch origin dev`
+> then read via `git … show origin/dev:<path>` instead, and flag the misdirection to John.
+
+> **Sub-agents inherit the worktree, never nest one (2026-07-16, extended 2026-07-17):** Any
+> sub-agent spawned via the `Agent` tool — coding, research, audit, or sweep — operates inside
+> *this* session's worktree; do **not** pass `isolation: "worktree"`. State the worktree's
+> absolute path verbatim in the sub-agent's prompt (a sub-agent given a bare task defaults to the
+> discoverable-but-wrong shared checkout). For any sub-agent whose task touches naming,
+> architecture, or backlog classification, tell it to read the current
+> `CLAUDE.md` / `CLAUDE-DESIGN.md` / `docs/SCREEN-INVENTORY.md` as part of its own bootstrap
+> rather than hand-enumerating today's decisions into the prompt.
+
+> **Push with `HEAD:dev`, never bare `dev` (2026-07-16):** Push with
+> `git -C "<worktree-path>" push origin HEAD:dev`, never `git … push origin dev`. Worktrees share
+> one set of local refs — a bare `dev` refspec resolves to whichever local branch is named `dev`
+> (the shared checkout's, deliberately never kept current), not this worktree's HEAD. `HEAD:dev`
+> pushes the worktree's actual commit. (Fetch/rebase-before-push mechanics: `session-setup` skill.)
+
+> **Atomic counters, never read-and-increment (2026-07-21):** Version numbers
+> (`dev_version_counter`) and feature/backlog IDs (`feature_id_counter`) are both claimed
+> atomically from Supabase, never by reading the highest existing value and incrementing it
+> yourself — that races under concurrent sessions and has caused real version/ID collisions. Exact
+> SQL and project ID: `session-setup` skill.
+
+> **Hooks are a local backstop, not the source of truth (2026-07-21, `SES-010`):** Six of the
+> rules above / in `STANDARDS.md` — no `cd && …` compounds, no bare `git push origin dev`, no
+> writing to `src/`/`api/` from a `session/design-*` branch, no reading/editing/running non-git
+> commands against the shared checkout, no committing a staged `test-*.mjs`, and no committing a
+> `src/`/`api/` change that fails `npm run build` — are enforced by real `PreToolUse`/`PostToolUse`
+> hooks on John's machine. **Caveat: those hooks live in `C:/Projects/.claude/settings.json` and
+> `C:/Projects/.claude/hooks/*.js` — outside this repo, not git-tracked, not pushed to `dev`.**
+> They exist only on the machine where `SES-010` set them up. Don't assume they're present in any
+> other environment (a fresh machine, a CI runner, another contributor). The written rules here
+> are the source of truth; the hooks are a backstop, not a replacement.
+
+---
+
+## Pointers — everything else has exactly one home
+
+| Need | Home |
+|---|---|
+| **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `.claude/skills/session-setup/SKILL.md` |
+| Rules & reference index (versioning, scope, tokens, roster, schema, patterns) | `CLAUDE-RULES.md` |
+| Design workflow (Automated Design→Code→Verify Loop) | `CLAUDE-DESIGN.md` |
+| Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `.claude/inflight/` |
+| Standards, test categories, pre-commit checklist | `docs/STANDARDS.md` |
+| Architecture, stack, URLs, schema, capability model | `docs/ARCHITECTURE.md` |
+| Design tokens / palette / fonts (values) | `src/tokens.js` + `docs/STYLE-GUIDE.md` |
+| Agent roster (source of truth) | `src/data/agents.js` |
+| Working with John — decision autonomy tiers, walkthrough gate | `docs/WORKING-WITH-JOHN.md` |
+| Session history + the "found live…" rationale behind these rules | `docs/SESSIONS.md` |
+| Path-scoped rules (load only when touching the files they govern) | `.claude/rules/` |
+| Doc-bloat tripwire | `.claude/skills/session-hygiene/` |
