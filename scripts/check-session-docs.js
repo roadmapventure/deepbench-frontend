@@ -356,16 +356,34 @@ function checkWorktrees(findings, stateText) {
   }
 }
 
-// ---- Check 5c: "In flight now" bullet mentions an already-archived feature ID ----
+// ---- Check 5c: inflight marker mentions an already-archived feature ID ----
+//
+// Recalibrated 2026-07-23 (SES-23's housekeeping pass). This check was matching
+// EITHER a real archive row (`| ID |`) OR any backticked mention anywhere in the
+// archive -- so an ID merely cross-referenced in some unrelated row's prose read
+// as "archived." Two of eight live flags were wrong on that basis alone.
+//
+// The deeper limit is precision, not the matcher: a marker legitimately cites
+// archived IDs as context -- the shipped mechanism it's fixing, or a record of
+// what it logged -- and that is indistinguishable here from the bug this check
+// exists to catch (prose describing shipped work as still pending). Measured
+// against the real markers on dev, one of eight flags pointed at genuinely stale
+// prose. So this is now a WARN worded as "go read the prose," not a FLAG worded
+// as a defect -- the volume was what made housekeeping passes skim the group.
+//
+// A cleaner staleness signal exists and is deliberately NOT built here (its own
+// item): marker age / worktree inactivity. The one genuinely stale marker found
+// in that pass was six days old with a never-closed-out session -- ID archival
+// was only an indirect proxy for that.
 function checkBulletStaleness(findings, stateText, archiveText) {
   if (!archiveText) return;
-  const bullets = extractInFlightBullets(stateText);
-  for (const b of bullets) {
-    const idMentions = [...b.text.matchAll(/`([A-Z]{2,4}-[0-9]+[a-z]?)`/g)].map(m => m[1]);
-    for (const id of idMentions) {
-      if (archiveText.includes(`| ${id} |`) || archiveText.includes(`\`${id}\``)) {
-        findings.push({ check: "5c", severity: "FLAG", detail: `"In flight now" bullet for "${b.name}" mentions ${id}, which already appears in docs/FEATURES-ARCHIVE.md -- bullet prose may be describing already-shipped work as pending` });
-      }
+  const archivedRow = id => new RegExp(`^\\|\\s*${id}\\s*\\|`, "m").test(archiveText);
+  for (const b of extractInFlightBullets(stateText)) {
+    // Dedupe per marker -- an ID named twice in one marker's prose is one
+    // finding, not two (LOG-23 double-reported before this).
+    const ids = [...new Set([...b.text.matchAll(/`([A-Z]{2,4}-[0-9]+[a-z]?)`/g)].map(m => m[1]))];
+    for (const id of ids.filter(archivedRow)) {
+      findings.push({ check: "5c", severity: "WARN", detail: `inflight marker "${b.name}" mentions ${id}, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding.` });
     }
   }
 }

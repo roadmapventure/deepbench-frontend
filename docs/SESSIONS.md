@@ -1946,3 +1946,60 @@ finished-and-forgotten worktree.
   the 2026-07-15 self-test hard rule (design/coding sessions verify their own Manual QA against live
   systems; John only closes the loop when he personally started a coding session). Step 10 now points
   to the Automated Design→Code→Verify Loop instead of gating on John's manual sign-off.
+
+---
+
+## S-SES-22-23 (v6.3.130, `d3fcd19`, 2026-07-23, worktree `design-session-0723d`)
+
+Housekeeping session — John's ask: run `SES-22`, `SES-23`, and the `session-hygiene` flags.
+Docs + one tooling script, no `src/`/`api/` change. Full per-row detail lives in
+`docs/FEATURES-ARCHIVE.md`'s PROCESS IMPROVEMENT — SES section; only what isn't captured there
+is recorded below.
+
+**The near-miss worth remembering.** `SES-23` was logged that morning off a single observed
+instance. Checking it live found **four at once** — `design-chi-beta-triage-0722`,
+`design-log-23-0722`, `design-session-0723b`, `design-session-0723c` — each holding an unstaged
+inflight marker, and therefore each presenting to `check-session-docs.js` check 5 as
+"zero commits ahead, no marker, likely finished, cleanup skipped." Two were under 45 minutes old.
+This session *was* the housekeeping pass whose job is to act on that flag; the only reason nothing
+was deleted is that it looked at disk before trusting the check. The fix went to the cause on both
+sides — the written procedure (`session-setup` step 2b) and the mechanical backstop
+(check 5e, which now suppresses check 5's verdict rather than merely adding to it).
+
+**A wrong assertion made and corrected mid-session, recorded because the correction is the lesson.**
+This session told John all 8 of check 5c's flags were "false positives by construction — the matcher
+hits any backticked ID anywhere in the archive," reasoning from the matcher's source without
+checking it against the data. Checking afterward: only 2 of 8 were wrong on that basis; 5 of the
+flagged IDs have real archive rows. The flags *were* mostly noise, but for a different reason —
+reading the markers showed they cite archived IDs as legitimate context (the shipped mechanism being
+fixed; a record of what the session logged), which check 5c structurally cannot distinguish from the
+bug it exists to catch. Exactly one of eight pointed at genuinely stale prose. John chose option B:
+row-anchor the matcher, dedupe per marker, and downgrade to `WARN` worded as "read the prose."
+8 flags → 5 warnings. The general lesson is `feedback-verify-never-assert-from-memory` applied to
+source-reading, not just recall: reading a matcher tells you what it *can* match, never what it
+*does* match — that requires running it against the data.
+
+**Also cleared:** the four empty orphan directories under `.claude/worktrees/`
+(`design-chi-58-0722`, `design-chi-60-0722`, `design-chi-ux-0719`, `design-ses-010-0721`) — all
+zero-child, no git registration, no `session/*` branch. This closes `CLAUDE-STATE.md`'s standing
+"Unresolved" note that `design-chi-ux-0719` was locked by an unidentified process ("device or
+resource busy" on 2026-07-21): it deleted cleanly on the first attempt today, so whatever held it
+had since released. That note is removed from `CLAUDE-STATE.md` rather than carried forward.
+
+**Deliberately left open, logged rather than folded in** (scope discipline — a housekeeping pass
+that grows to fix everything it finds stops being one): `SES-24` (`session-hygiene` skill prose
+still written against the shared "In flight now" bullet list `SES-011` retired — the script was
+retargeted, the human-readable skill text was not, so a session running the check by hand looks in
+the wrong file entirely), `SES-25` (`CLAUDE-STATE.md` at 29.7 KB and `FEATURES.md` at 184.8 KB,
+~6× and ~4.6× their baselines — needs its own pruning session), `SES-26` (the machine-local
+`PreToolUse` hook's allowlist omits `ls-tree`, which `check-session-docs.js:218` itself runs against
+the shared checkout — the repo's own tooling performs a read the hook forbids a session to perform;
+denied this session's own call, worked around per the never-route-around-a-deny rule rather than
+retried through PowerShell).
+
+**Not touched, on purpose:** the four worktrees flagged by the new check 5e. Deleting another
+session's worktree is shared state, and the evidence said at least two were live. Their owning
+sessions should stage and push their markers. Likewise `design-ai-audit-screen-0717`'s marker,
+which is genuinely stale (six days old, still in the pre-`SES-011` bullet format, session never
+closed out) but belongs to another session — the `session-setup` skill's "only ever edit or delete
+your own inflight file" rule applies.
