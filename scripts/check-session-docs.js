@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v6.3.107 | scripts/check-session-docs.js | SES-011a, SES-009b
+// DeepBench v6.3.130 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23
 //
-// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d, 6, 6b, 6c --
+// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c --
 // previously a markdown checklist a session had to remember to run by hand
 // (greps + git commands typed out fresh each time). This is the same logic as
 // a single script, so "run session-hygiene" becomes "run this" instead of
@@ -302,19 +302,33 @@ function checkWorktrees(findings, stateText) {
   // "registered but filtered out of the comparison set" as "not registered".
   const worktreesUnderManagement = registered.filter(p => p.includes("/.claude/worktrees/"));
 
-  // Check 5: registered worktree, zero-ahead of dev, no bullet.
+  // Check 5: registered worktree, zero-ahead of dev, no marker.
   // The currently-running session's own worktree is always exempt here: its
-  // bullet was added locally (CLAUDE.md rule 6c) but isn't pushed to origin/dev
-  // until close-out, so comparing it against the freshly-fetched dev copy would
-  // always read as "no bullet" for the entire lifetime of the session that
-  // added it -- a guaranteed false positive, not a real staleness signal.
+  // marker was added locally (session-setup step 2) but isn't pushed to origin/dev
+  // until its first commit, so comparing it against the freshly-fetched dev copy
+  // would read as "no marker" until then -- a false positive, not a real
+  // staleness signal.
+  //
+  // Check 5e (added 2026-07-23, SES-23): before calling a worktree stale, look on
+  // its own disk for the marker. A session that created its marker correctly but
+  // never staged it is INVISIBLE to the origin/dev comparison above -- and
+  // presents with the exact signature check 5 reports as "finished, safe to
+  // clean." Found live 2026-07-23: four worktrees at once, two of them under 45
+  // minutes old, all four flagged as stale by check 5 while sitting on unstaged
+  // markers. An on-disk marker means the session is (or recently was) real:
+  // report the unpushed marker as the actual defect and suppress check 5's
+  // misleading "likely finished" verdict for that worktree entirely.
   const selfName = path.basename(WORKTREE.replace(/\\/g, "/"));
   for (const wt of worktreesUnderManagement) {
     const name = wt.split("/").pop();
     if (name === selfName) continue;
     if (bulletNames.has(name)) continue;
+    if (fs.existsSync(path.join(wt, ".claude", "inflight", `${name}.md`))) {
+      findings.push({ check: "5e", severity: "FLAG", detail: `worktree "${name}" has an inflight marker on disk that was never pushed to dev (session-setup step 2b) -- it is invisible to every other session and to check 5. Treat as LIVE, not stale: do NOT remove this worktree. The owning session should stage and push its marker.` });
+      continue;
+    }
     if (isAncestorOfDev(wt)) {
-      findings.push({ check: "5", severity: "FLAG", detail: `worktree "${name}" has zero commits ahead of dev and no "In flight now" bullet -- likely finished but rule 8 (bullet cleanup) was skipped` });
+      findings.push({ check: "5", severity: "FLAG", detail: `worktree "${name}" has zero commits ahead of dev, no marker on dev, and no marker on disk -- likely finished but session-setup step 6 (cleanup) was skipped` });
     }
   }
 

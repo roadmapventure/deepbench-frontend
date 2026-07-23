@@ -61,7 +61,7 @@ Every kickoff doc must have these 11 sections in order:
 7. **SCOPE RULES** (what NOT to touch)
 8. **NODE.JS TEST** (full code written out — not described, not referenced)
 9. **CLAUDE CODE VERIFICATION CHECKLIST** — session-specific checks only (see "Standing rules by reference" below)
-10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — worktrees share local refs, so a bare `dev` refspec silently targets whichever local branch happens to be named `dev`, not this session's worktree; see `CLAUDE.md` concurrent-sessions rule #4b)
+10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — worktrees share local refs, so a bare `dev` refspec silently targets whichever local branch happens to be named `dev`, not this session's worktree; see `CLAUDE.md`'s "Push with `HEAD:dev`, never bare `dev`" hard rule)
 11. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
 **Standing rules by reference (added 2026-07-01).** Claude Code carries persistent cross-session memory now — the "Claude Code has no memory" premise this rule used to rest on is out of date. A kickoff doc no longer needs to restate a standing rule in full prose; naming it is enough (e.g. "STANDARDS.md Section 11 applies to all 6 agents" instead of re-listing all 23 fields; "Category M applies — see STANDARDS.md Section 5" instead of re-deriving the checklist). This applies specifically to **standing rules** — things that are true every session and don't change: the 23-field agent standard, the AI Audit wiring requirement, the Always Required / Category J/K/L/M checklist items in Section 5, the known bug patterns in Section 8.

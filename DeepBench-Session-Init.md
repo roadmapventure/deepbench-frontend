@@ -164,7 +164,7 @@ manually test — that hand-off is retired.
 
 **The one exception:** if John *personally* started a coding session by pasting the prompt himself,
 he closes that loop personally, same as always — present him the kickoff doc's Manual QA Checklist
-(Section 10) as a numbered list for that case only.
+(Section 11) as a numbered list for that case only.
 
 ### 10b — Act on QA results
 

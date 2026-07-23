@@ -76,6 +76,31 @@ is byte-for-byte identical on disk to one that finished and was never cleaned up
 commits ahead of `origin/dev` and zero uncommitted changes. This file is the only signal that tells
 `session-hygiene`'s staleness check (and other sessions) that a quiet worktree is still wanted.
 
+### 2b. Stage and push it in your **first** commit — creating it is not enough (`SES-23`)
+
+```
+git -C "<worktree-path>" add ".claude/inflight/<short-session-name>.md"
+```
+
+The marker only does its job once it's on `origin/dev` — that's the only copy `session-hygiene`'s
+check 5 and every concurrent session can see. A marker sitting untracked in your own worktree is
+invisible to all of them, so a session that creates it correctly and then commits only its actual
+work files (`git add docs/FEATURES.md`) still reads to everyone else as a finished, cleanable
+worktree while it's mid-flight.
+
+**Explicitly stage it — don't rely on `git add -A`/`git commit -a` happening to sweep it up.** If your
+first real commit is narrowly scoped to an explicit path list, add this path to that list. If a long
+session hasn't needed a commit yet, commit the marker on its own rather than leaving it untracked for
+hours; it's a pure append, so the lightweight bookkeeping path below covers it.
+
+*Found live 2026-07-23: four worktrees simultaneously — `design-chi-beta-triage-0722`,
+`design-log-23-0722`, `design-session-0723b`, `design-session-0723c` — each had a correctly-created
+marker on disk that had never been staged, so all four presented to `check-session-docs.js` as
+finished-and-abandoned during a housekeeping pass, two of them while under 45 minutes old. Nothing
+was lost, but only because the pass checked disk before acting on the flag. Before this step existed,
+every written instruction was satisfied and the marker still never reached `dev` — its only
+guaranteed appearance in git history was step 5's commit deleting it.*
+
 ### 3. Claim your version number atomically (when you need one)
 
 Never read `CLAUDE-STATE.md` and increment — that races under 5–7 concurrent sessions and has caused
