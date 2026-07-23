@@ -1193,6 +1193,16 @@ A pattern name is a *derived label* over Layer A facts, not something baked into
 
 Because classification happens at read time from immutable Layer A facts (the same principle `AA-181` already proved out for `cost_usd`), a rule can be corrected or a pattern renamed by editing the rule once — every past and future row re-derives correctly, with no migration. This directly answers governance questions (4) and (5) above: a rename is a one-line rule edit, and a new pattern is a new rule evaluated against facts already being captured, not new instrumentation.
 
+**Who names a hop — decided 2026-07-23 (`design-log-23-0723`), John's explicit call. Resolves `LOG-26`.**
+
+A pattern name on an individual hop is assigned by a **Layer B rule**, never by an agent asked to judge the hop and never by the model naming its own pattern. The distinctions that matter are structural facts, not interpretations — Request Routing vs. orchestration is exactly `willResolveFinal` (`api/capabilities/execute.js`), i.e. whether the delegating agent synthesized the result or the target's output became final. Reading a model's reasoning text to infer that would be less reliable than reading the fact directly, and would cost a real LLM call per hop for a display label.
+
+The model's own reasoning is not discarded — it displays **alongside** the rule-derived name (already carried on the `delegation` event as `reasoning` and already rendered). The name is earned from verifiable evidence; the reasoning explains it in the agent's own words.
+
+Susan Smith — Trainer's role is unchanged and remains Layer C only: she governs which names are allowed to exist. She is never invoked to classify an individual hop.
+
+*Note this only holds because Layer B computes names at read time — nothing writes a pattern name into the log row. That is what makes a rename free (edit the entry, every past and future row re-derives) and it is precisely what today's write-time stamping does not allow; see `LOG-42` for a live case of a wrong name frozen into 1,199 rows.*
+
 ### Layer C — Pattern Vocabulary (citation-governed, answers questions (1)-(3) above)
 
 - `pattern_slug`, `name`, `description`
