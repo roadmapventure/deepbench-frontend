@@ -1,3 +1,4 @@
+// DeepBench v6.3.131 | api/prompt/request-receivable.js | HAR-9/HAR-11 -- parseModelTurn() reads stop_reason to distinguish max_tokens truncation from a genuine schema omission; callModel()'s retry correction now asks a truncated turn for concision instead of "include every field"
 // DeepBench v6.3.116 | api/prompt/request-receivable.js | AI-35 -- registers pattern-vocabulary-write handler
 // DeepBench v6.3.101 | api/prompt/request-receivable.js | S-HAR-8 -- postToAnthropicWithRetry() bumped to 3 total attempts, escalating backoff ([1000, 3000]ms)
 // DeepBench v6.3.49 | api/prompt/request-receivable.js | S-HAR-04 -- callModel()/sendRequest() accept optional deadline; bounded, deadline-aware AbortSignal timeouts replace blind fixed constants (byte-identical when omitted)
@@ -125,7 +126,15 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
 // on a required field, only a field missing entirely. request_help/delegate_to_agent calls are exempt
 // -- their own required-field completeness is a separate, pre-existing concern, out of this session's
 // scope.
+// FEATURE: HAR-9 -- Anthropic returns stop_reason:'max_tokens' on every truncated turn; this file
+// had never read it (zero references to stop_reason existed anywhere in api/ or src/). Without it a
+// response cut off mid-generation and a response the model simply authored wrong throw byte-identical
+// errors -- confirmed live against durable_hops: 28 library-catalog-intent failures were truncation
+// (cut off mid-word, citations never started) while 5 qg-review-intent failures were complete,
+// well-formed 337-1134 char JSON that just omitted final_answer. Completes AA-182, which made the
+// retry corrective for schema-shape failures but never handled the truncation case.
 export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
+  const wasTruncated = responseData.stop_reason === 'max_tokens';
   const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
   if (toolUseBlock) {
     const isHarnessTool = toolUseBlock.name === 'request_help' || toolUseBlock.name === 'delegate_to_agent';
@@ -134,8 +143,10 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
       const missing = required.filter(key => !(key in (toolUseBlock.input || {})));
       if (missing.length > 0) {
         throw Object.assign(
-          new Error(`Schema tool "${schemaTool.name}" called with missing required field(s): ${missing.join(', ')}`),
-          { rawInput: toolUseBlock.input }
+          new Error(wasTruncated
+            ? `Schema tool "${schemaTool.name}" output was truncated at the model's max_tokens limit before required field(s): ${missing.join(', ')}`
+            : `Schema tool "${schemaTool.name}" called with missing required field(s): ${missing.join(', ')}`),
+          { rawInput: toolUseBlock.input, truncated: wasTruncated }
         );
       }
     }
@@ -146,7 +157,14 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
       tool_input: toolUseBlock.input,
     };
   }
-  if (hasSchemaTool) throw new Error('No tool_use block in response');
+  if (hasSchemaTool) {
+    throw Object.assign(
+      new Error(wasTruncated
+        ? "No tool_use block in response -- output was truncated at the model's max_tokens limit"
+        : 'No tool_use block in response'),
+      { truncated: wasTruncated }
+    );
+  }
   const textBlock = responseData.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text block in response');
   return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
@@ -249,7 +267,15 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
       // temperature:0 already pinned (AA-166) -- same generic gap already visible in this file's own
       // AA-151 comments on agent-selection-intent/intelligence-review-format. Still retry-once-then-
       // throw -- this only changes what the model is told, not how many attempts it gets.
-      const correctionText = `Your response did not conform to the required schema: ${parseErr.message}. Return the structured output again, exactly as specified, making sure to include every field named above.`;
+      // FEATURE: HAR-9 -- AA-182's correction text tells the model to return everything again "making
+      // sure to include every field," which is correct for a genuine omission and actively harmful for
+      // a truncation: the response was cut off for length, so asking for the same content plus more,
+      // into the same max_tokens ceiling with a now-longer prompt, cannot succeed. Confirmed live:
+      // 0 recoveries across 30 real truncation retries. Same shape as postToAnthropicWithRetry()'s
+      // existing rule that a 400 is not worth retrying -- classify first, then retry only what can work.
+      const correctionText = parseErr.truncated
+        ? `Your previous response was cut off because it exceeded the response length limit. Return the same structured output again, but substantially more concise -- shorten or summarize the longest fields so that the complete response, including every required field, fits within the limit.`
+        : `Your response did not conform to the required schema: ${parseErr.message}. Return the structured output again, exactly as specified, making sure to include every field named above.`;
       const failedToolUse = llmData.content?.find(b => b.type === 'tool_use');
       const correctionMessage = failedToolUse
         ? { role: 'user', content: [{ type: 'tool_result', tool_use_id: failedToolUse.id, content: correctionText, is_error: true }] }
