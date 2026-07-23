@@ -1,3 +1,4 @@
+// DeepBench v6.3.133 | api/capabilities/execute.js | LOG-37b -- Layer A call-fact capture on the agent-turn write path: logAgentTurn() now records the real tool name the turn called (delegate_to_agent vs request_help vs a schema tool, plus web_search) in the new call_facts jsonb column, instead of only the frozen pattern slug derived from a boolean. patterns_used deliberately unchanged -- Layer A is purely additive, Layer B reclassifies at read time later.
 // DeepBench v6.3.119 | LOO-19 -- Michelle's request_help dispatch passes task_context as a real object, not a stringified blob; JS's Object.entries() on a string iterates characters, which combined with HAR-06's new generic pass-through corrupted her prompt on every request_help call since 2026-07-18
 // DeepBench v6.3.102 | api/capabilities/execute.js | LOO-17 -- resolveAccept()/continue branch no longer mark a checkpoint as a completed accept; new accept_failed terminal state; widened eligibility guards
 // DeepBench v6.3.88 | api/capabilities/execute.js | S-LOO-015 -- requester's own turn now credited on the request_help+delegationRequired branch, was completely invisible before
@@ -203,7 +204,29 @@ function getSupabaseHeaders(key) {
 // showed zero 'tool-use' pattern logged for Jordan's own turn) -- fixed here rather than left as a
 // known gap, since it directly contradicts this session's own AI PATTERN CHECK requirement that
 // Jordan's web_search call be logged mechanically. Unset (every existing caller) is byte-identical.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false }) {
+// FEATURE: LOG-37b -- ARCHITECTURE.md §19i Layer A, agent-turn write path (37.0% of all logged
+// calls, the single largest slice). This function already knew everything Layer A needs and threw
+// it away: `is_delegate_call` is true for BOTH harness delegation tools, so which one actually
+// fired -- delegate_to_agent or request_help -- was never recorded (LOG-44 is open precisely
+// because nobody can tell those 2,796 rows apart), and `usedWebSearch` collapses into the same
+// 'tool-use' slug request-receivable.js writes for a JSON schema call (LOG-46's conflation, at a
+// second write site). `tool_calls` records the real tool identifiers instead, in order.
+// Deliberately additive: the patternsUsed block below is byte-identical to pre-LOG-37b, including
+// the `intent_technical_services` spread -- that spread is a *declared* list with no runtime check,
+// which is exactly the untrustworthy-declaration mechanism §19i exists to kill, but removing it
+// would change patterns_used behavior and needs its own row. Layer A's job here is to capture the
+// real facts alongside it so Layer B can eventually reclassify at read time and ignore the
+// declaration; it is not to reclassify anything now.
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [] }) {
+  // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
+  // server-side tool Anthropic ran (same mechanical detection the caller already does for
+  // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
+  // that passes usedWebSearch gets the fact recorded too. Set-deduped for consistency with the
+  // patternsUsed block below; at the single real call site tool_calls holds at most one name.
+  const toolCallFacts = Array.from(new Set([
+    ...tool_calls,
+    ...(usedWebSearch ? ['web_search'] : []),
+  ]));
   logActivity({
     tenantId: tenant_id || 'global',
     agentId: agent_id || null,
@@ -219,6 +242,9 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
       ...intent_technical_services,
     ])),
     traceId: trace_id,
+    // FEATURE: LOG-37b -- omit the key entirely when nothing was called; logActivity() writes
+    // null rather than `{}`, so "no tool call" stays distinguishable from "not captured".
+    callFacts: toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : null,
   });
 }
 
@@ -665,6 +691,14 @@ async function runLoop({
       intent_technical_services: enriched.intent_technical_services || [],
       trace_id,
       usedWebSearch: turnUsedWebSearch,
+      // FEATURE: LOG-37b -- the real tool this turn called, written verbatim. Already in scope and
+      // already trusted here: the delegation-routing block below (nextCapabilitySlug /
+      // nextIntentSlug / pendingDelegation.via_tool) reads this same field to decide where the hop
+      // goes, while the log write recorded only the is_delegate_call boolean derived from it.
+      // Never derived, translated, or normalized -- 'delegate_to_agent' and 'request_help' are
+      // different facts and collapsing them is the bug LOG-44 exists to fix. Null on a plain text
+      // turn (parseModelTurn(), request-receivable.js:171), which correctly yields call_facts null.
+      tool_calls: turn.tool_name ? [turn.tool_name] : [],
     });
 
     if (!turn.is_delegate_call) {
