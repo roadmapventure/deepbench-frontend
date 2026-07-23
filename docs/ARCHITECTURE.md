@@ -1247,6 +1247,36 @@ The schema above defines what a governed vocabulary entry looks like, but not ho
 
 ---
 
+## 19j. Deliberately-Empty Findings — "I checked and found nothing" [discovery `design-chi-65-0723`, 2026-07-23 — NOT LOCKED, two open questions below]
+
+**Origin.** `CHI-65` — selecting a candidate theory on Channel Intelligence crashed the entire page with React error #31 ("Objects are not valid as a React child (found: object with keys `{text, citations}`)"). Root-caused this session; the crash turned out to be a symptom of a contract gap, not a render bug on its own.
+
+### The gap
+
+Priya Nair — Forecast/Theory/Performance Expert — returns a hypothesis test as three sections (`supports`, `complicates`, `consider`), each shaped `{text, citations}` (`hyp-hypothesis-test-intent`'s `traits.schema`). Alex Reeves — Screen Controls Editor — then renders them into the Column 2 card via `intelligence-review-format` (on the `screen-controls` Capability), whose schema repeats the same shape. **What the screen displays is Alex's output, not Priya's** — worth stating, because the reverse was assumed for most of this session before it was checked.
+
+`complicates.text` is typed `["string","null"]` in **both** schemas, and `intelligence-review-format`'s own guardrail (*"complicates.citations may be empty only if complicates.text is null"*) treats null as a valid state. So:
+
+> **A deliberate "I checked and found nothing" and an accidentally-dropped field arrive as the identical value.** Nothing in the contract, the validator, or the guardrails can tell them apart — and neither can a human reading the card.
+
+Nothing catches it downstream either. `parseModelTurn()` (`request-receivable.js`) validates **only that top-level required keys are present** — `required.filter(key => !(key in input))`. It does not check types, does not recurse into nested objects, and does not reject null. The `stop_reason` truncation signal `HAR-9` added is only consulted when a required key is *missing*, so it never fires here. Tracked as `HAR-14`.
+
+### Decided
+
+- **The section is always shown, never hidden.** A section that silently disappears reads to the user as an oversight rather than a finding (John, 2026-07-23). Hiding is not an acceptable treatment for an empty finding.
+- **The sentence is authored by the agent, not the screen.** Platform code must never write "no complicating factors found" — that is the platform putting words in an agent's mouth. Wording varying run to run is accepted and expected (John, 2026-07-23).
+- **It must be the content specialist who says it, not the display agent.** Only the agent that performed the analysis knows whether it actually looked. A display agent asserting "nothing was found" is asserting something it has no way to verify. This is also why it does not violate `intelligence-review-format`'s own *"never introduces a claim the content specialist did not already make"* rule — the display agent renders the statement, it does not originate it.
+- **Once a deliberate empty is always written out, the ambiguity dissolves by construction:** text present means considered, text absent means something broke. They stop being the same value.
+
+### Open — not decided, do not build against either
+
+1. **Who reviews the analysis before it reaches the screen?** The Q&A chain runs Marcus → Owen Marsh — The Proofreader (`qg-review-intent`) → display. The hypothesis-test chain has **no review step at all** (`INTENT_CHAINS.hypothesis_test`). Two candidate shapes were discussed and neither was chosen: (a) Alex Reeves — Screen Controls Editor — gains `can_request_help` and pushes back when a card isn't fit to show; (b) Owen Marsh — The Proofreader — gains a second Intent Skill on his existing `quality-gate` Capability, scoped to theory review. **(a) requires amending §19d's LOCKED line that a `delegation_required` formatter's hand-off is *always* terminal** ("a Format Skill hand-off never changes the facts... there is no legitimate case where the delegator needs another turn") — that supersession is John's call, not a session's. (b) does not touch §19d. Note that `qg-review-intent` itself is not reusable as-is: its schema returns `{answer, citations, confidence_tier}` and its five guardrail rules are Q&A-specific, so pointing it at a hypothesis test would mean rewriting the one Skill Marcus's answers depend on.
+2. **What the screen does when a section is still unusable after all of the above.** A hardcoded placeholder line was proposed and rejected (it is the platform speaking as the agent). Treating it as a failed test and reusing the existing error path was proposed and not agreed. Still open.
+
+**Whichever shape (1) takes, it must pass §19d's sniff test.** A deterministic "if `text` is null, push back" is a hardcoded reflex — the same shape as the "always seek backup" trait already rejected there. It only passes if the reviewing agent judges *this particular* output unfit and states why in a logged reason.
+
+---
+
 ## 17. v4 Preservation [LOCKED]
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.
