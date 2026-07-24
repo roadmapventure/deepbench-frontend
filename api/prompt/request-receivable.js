@@ -1,3 +1,8 @@
+// DeepBench v6.3.136 | api/prompt/request-receivable.js | LOG-37a-patch -- record the retrieval method as its own Layer A fact
+// FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7. buildCallFacts() now also collapses
+// ai-enrichment.js's per-section retrieval methods into a single retrieval_method fact, which is what
+// makes retrieved_chunk_ids meaningful: ids now only ever appear alongside a real similarity search.
+// patterns_used is deliberately byte-identical -- `rag`'s own false-positive problem is LOG-42/53/59.
 // DeepBench v6.3.132 | api/prompt/request-receivable.js | LOG-37 -- assemble and pass Layer A call_facts (real tool names, retrieved chunk ids, gates fired) alongside the untouched patterns_used write
 // DeepBench v6.3.131 | api/prompt/request-receivable.js | HAR-9/HAR-11 -- parseModelTurn() reads stop_reason to distinguish max_tokens truncation from a genuine schema omission; callModel()'s retry correction now asks a truncated turn for concision instead of "include every field"
 // DeepBench v6.3.116 | api/prompt/request-receivable.js | AI-35 -- registers pattern-vocabulary-write handler
@@ -394,6 +399,7 @@ export function buildCallFacts({
   reflectRan = false,
   synthesisRan = false,
   ragChunkIdsBySection = null,
+  ragMethodBySection = null,
 } = {}) {
   const facts = {};
 
@@ -413,6 +419,15 @@ export function buildCallFacts({
     }
   }
   if (chunkIds.length > 0) facts.retrieved_chunk_ids = chunkIds.slice(0, RETRIEVED_CHUNK_ID_CAP);
+
+  // FEATURE: LOG-37a-patch -- Layer A fact 7: *how* context was fetched. Collapsed across sections
+  // because one call can legitimately fetch through several Knowledge profiles: all searches ->
+  // 'similarity-search', all lookups -> 'direct-lookup', both -> 'mixed'. The key is omitted
+  // entirely when no context was fetched at all, so "fetched nothing" stays distinguishable from
+  // "not captured" -- same posture as every other key here.
+  const methods = new Set(Object.values(ragMethodBySection || {}).filter(Boolean));
+  if (methods.size === 1) facts.retrieval_method = [...methods][0];
+  else if (methods.size > 1) facts.retrieval_method = 'mixed';
 
   const gates = [
     ...(guardrailsRan ? ['guardrails'] : []),
@@ -665,6 +680,8 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     reflectRan: enrichDebug.reflect_ran === true,
     synthesisRan: enrichDebug.synthesis_ran === true,
     ragChunkIdsBySection: enrichDebug.rag_chunk_ids_by_section,
+    // FEATURE: LOG-37a-patch -- threaded off enrichDebug exactly like the ids above.
+    ragMethodBySection: enrichDebug.rag_method_by_section,
   });
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs

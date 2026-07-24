@@ -1,3 +1,11 @@
+// DeepBench v6.3.136 | api/prompt/ai-enrichment.js | LOG-37a-patch -- gate chunk ids on real retrieval, capture the retrieval method
+// FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7: record *how* context was fetched,
+// not just that it was. LOG-37a (v6.3.132) populated _rag_chunk_ids from `result.chunks` for every
+// source, but a plain table read returns a field literally named `chunks` too -- getRosterCandidates()
+// (lib/project-manager.js) yields `chunks: [{ id: <agent_id> }]`. Agent ids were therefore about to
+// land in a column that is supposed to hold retrieved-document ids. The fix is not a roster special
+// case: the method is derived generically from fi.source and recorded as its own fact, and chunk ids
+// are kept only when that method is a real similarity search.
 // DeepBench v6.3.132 | api/prompt/ai-enrichment.js | LOG-37 -- stop discarding real retrieved chunk ids
 // FEATURE: LOG-37 -- ARCHITECTURE.md §19i Layer A. Every retrieval path (queryRAG, queryContent's
 // the_library/the_reasoning/the_library_catalog branches) already returns `chunks` with real row
@@ -17,6 +25,21 @@ import { logActivity } from '../../lib/activity-log.js';
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
 const RAG_TIMEOUT_MS = 10000;
+
+// FEATURE: LOG-37a-patch -- the two sources whose fetch is a plain table read: `roster` goes to
+// getRosterCandidates() (a Supabase select over the agent roster) and `the_library_catalog` to
+// describeLibraryCatalog() (a catalog listing). Neither embeds anything, so neither can produce a
+// retrieved chunk. Every other source -- the_library / the_reasoning via queryContent(), and the
+// null/unknown fallthrough via queryRAG() -- runs a real embedding similarity search.
+const DIRECT_LOOKUP_SOURCES = new Set(['roster', 'the_library_catalog']);
+
+// FEATURE: LOG-37a-patch -- derived from the same generic fi.source trait fetchSection() already
+// branches on, never from who the agent is or which capability is running
+// (.claude/rules/capabilities-are-data.md). Unknown/absent sources fall through to
+// 'similarity-search' because that is where fetchSection() itself routes them (queryRAG).
+function retrievalMethodFor(source) {
+  return DIRECT_LOOKUP_SOURCES.has(source) ? 'direct-lookup' : 'similarity-search';
+}
 
 async function fetchWithTimeout(promise, timeoutMs) {
   let timer;
@@ -66,13 +89,23 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
             }),
             RAG_TIMEOUT_MS
           );
+      // FEATURE: LOG-37a-patch -- computed once here so the ids below can be gated on it.
+      const ragMethod = retrievalMethodFor(fi.source);
       return {
         ...section,
         content: result.context || "",
         _rag_chunks: result.matchCount || 0,
+        // FEATURE: LOG-37a-patch -- how this section's context was fetched. Sibling of the count
+        // and the ids, threaded the same way.
+        _rag_method: ragMethod,
         // FEATURE: LOG-37 -- real ids of the chunks this section actually retrieved. Sibling of
         // the count above, threaded the same way; empty array when a path returns no chunks.
-        _rag_chunk_ids: (result.chunks || []).map(c => c && c.id).filter(Boolean),
+        // FEATURE: LOG-37a-patch -- and empty whenever nothing was actually retrieved. A direct
+        // lookup's `chunks` are table rows whose ids are agent ids / catalog ids, not chunk ids;
+        // they are discarded rather than renamed, because they have no Layer A home here.
+        _rag_chunk_ids: ragMethod === 'similarity-search'
+          ? (result.chunks || []).map(c => c && c.id).filter(Boolean)
+          : [],
         _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
         _librarian_tier: result._librarian?.tier || result._access?.tier || null,
       };
@@ -150,6 +183,8 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   const ragChunksBySection = {};
   // FEATURE: LOG-37 -- parallel to ragChunksBySection above, ids instead of counts.
   const ragChunkIdsBySection = {};
+  // FEATURE: LOG-37a-patch -- same shape again, method instead of ids/counts.
+  const ragMethodBySection = {};
   // FEATURE: S-APPLE-02b — fetchSection() sets _librarian_tier per-section when the broker
   // engages, but it was never captured before this loop discards non-render fields. Additive,
   // opt-in: stays null for every call that doesn't route through the Librarian broker.
@@ -165,6 +200,9 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     // section that retrieved nothing adds no key, matching rag_chunks_by_section's behavior of
     // only carrying sections that actually went through a fetch.
     if (s._rag_chunk_ids !== undefined && s._rag_chunk_ids.length > 0) ragChunkIdsBySection[s.slug] = s._rag_chunk_ids;
+    // FEATURE: LOG-37a-patch -- same guard shape again, minus the length check (a method is a
+    // scalar and is always meaningful when a fetch ran, even when it retrieved nothing).
+    if (s._rag_method !== undefined) ragMethodBySection[s.slug] = s._rag_method;
   }
 
   const renderedBlocks = orderedFetched
@@ -333,6 +371,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
       // de-duplication and the 50-id cap happen in request-receivable.js's buildCallFacts(),
       // which is the single place that assembles the written fact object.
       rag_chunk_ids_by_section: ragChunkIdsBySection,
+      // FEATURE: LOG-37a-patch -- Layer A source for call_facts.retrieval_method. Collapsing the
+      // per-section methods into the single written fact ('mixed' when both appear) happens in
+      // request-receivable.js's buildCallFacts(), same division of labour as the ids above.
+      rag_method_by_section: ragMethodBySection,
       librarian_tier: librarianTier,
       rag_scope_requested: sections.find(s => s.type === "rag")?.fetch_instruction?.scope || null,
       rag_scope_effective: Object.keys(ragChunksBySection).length > 0
