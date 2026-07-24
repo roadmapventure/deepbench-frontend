@@ -68,8 +68,8 @@ function isPatternTrusted(slug, aiType, ts) {
 // slug -- so an empty ai_activity_log yields {} and zero rows on screen, which is exactly John's
 // stated rule and ARCHITECTURE.md §19i's locked corollary ("read Layer A/log data as it currently
 // exists, read Layer C as it currently exists, join them live"). `vocab` is Layer C: a
-// Map<pattern_slug, name> from pattern_vocabulary (see usePatternVocabulary below), used for the
-// NAME only. A slug with no vocabulary entry is humanized, never mapped, aliased, or special-cased.
+// Map<pattern_slug, {name, description}> from pattern_vocabulary (see usePatternVocabulary below).
+// A slug with no vocabulary entry is humanized, never mapped, aliased, or special-cased.
 export function computeByPattern(log, vocab = new Map()) {
   const byPattern = {};
   for (const e of log) {
@@ -91,14 +91,19 @@ export function computeByPattern(log, vocab = new Map()) {
       // autoDetected, which is the honest signal that the WRITE path still stamps a
       // pre-2b slug (LOG-44..LOG-48), not a display defect to paper over.
       if (!byPattern[slug]) {
-        const governedName = vocab.get(slug);
+        const governed = vocab.get(slug);
         byPattern[slug] = {
           slug,
-          name: governedName || humanizeSlug(slug),
-          desc: governedName ? null : 'Auto-detected — not yet catalogued',
+          name: governed?.name || humanizeSlug(slug),
+          // FEATURE: LOG-36 -- a governed pattern shows Susan Smith (Trainer)'s own researched,
+          // citation-backed description straight from pattern_vocabulary.description. Fixed
+          // 2026-07-23 after the first cut selected only (pattern_slug, name), which left the two
+          // researched patterns rendering a blank line while the UNresearched ones still showed
+          // "not yet catalogued" -- exactly backwards. Never falls back to PATTERN_CATALOG.desc.
+          desc: governed?.description || (governed ? null : 'Auto-detected — not yet catalogued'),
           active: true,
           patternType: 'unknown',
-          autoDetected: !governedName,
+          autoDetected: !governed,
           total: 0,
           cost: 0,
         };
@@ -536,14 +541,14 @@ export function fetchPatternVocabulary() {
   if (!_vocabPromise) {
     _vocabPromise = supabase
       .from('pattern_vocabulary')
-      .select('pattern_slug, name')
+      .select('pattern_slug, name, description')
       .then(({ data, error }) => {
         if (error) {
           console.warn('[pattern vocabulary] read failed:', error.message);
           _vocabPromise = null; // allow a later mount to retry; never cache a failure
           return EMPTY_VOCAB;
         }
-        _vocabCache = new Map((data || []).map(r => [r.pattern_slug, r.name]));
+        _vocabCache = new Map((data || []).map(r => [r.pattern_slug, { name: r.name, description: r.description }]));
         return _vocabCache;
       });
   }
@@ -660,7 +665,7 @@ export function useAIActivity() {
     // comes from real patternsUsed); only the NAME was catalog-sourced. Same resolution order as
     // By Pattern now: pattern_vocabulary -> humanizeSlug -> raw slug.
     const observedSlugs = [...new Set(entries.flatMap(e => Array.isArray(e.patternsUsed) ? e.patternsUsed : []))];
-    const observedPatterns = observedSlugs.map(slug => vocab.get(slug) || humanizeSlug(slug) || slug);
+    const observedPatterns = observedSlugs.map(slug => vocab.get(slug)?.name || humanizeSlug(slug) || slug);
     byService[svc.slug] = {
       ...svc,
       patterns:   entries.length > 0 ? observedPatterns : svc.patterns,

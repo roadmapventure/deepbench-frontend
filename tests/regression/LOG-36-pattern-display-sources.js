@@ -178,10 +178,16 @@ export default async function () {
 
   const out = computeByPattern(
     [{ type: "planning", ts: "2099-01-01T00:00:00Z", cost: 1, patternsUsed: ["prompt-chaining", "rag"] }],
-    new Map([["prompt-chaining", "Prompt Chaining"]])
+    new Map([["prompt-chaining", { name: "Prompt Chaining", description: "A governed, cited description." }]])
   );
   assert.strictEqual(Object.keys(out).length, 2, "only the two logged slugs may bucket");
   assert.strictEqual(out["prompt-chaining"].name, "Prompt Chaining", "governed name comes from the vocabulary");
+  // A governed pattern must surface Susan Smith (Trainer)'s researched description, never a blank
+  // line and never PATTERN_CATALOG.desc. Regression guard for the first cut of LOG-36, which
+  // selected only (pattern_slug, name) and left the two researched rows emptier than the
+  // unresearched ones.
+  assert.strictEqual(out["prompt-chaining"].desc, "A governed, cited description.", "governed description comes from the vocabulary");
+  assert.strictEqual(out["rag"].desc, "Auto-detected — not yet catalogued", "an ungoverned slug keeps the not-yet-catalogued caption");
   assert.strictEqual(out["rag"].name, humanizeSlug("rag"), "unmatched slug falls back to humanizeSlug, never a catalog name");
   assert.strictEqual(out["rag"].name, "Rag", "the approved expected value — an alias table to 'RAG' is banned");
 }

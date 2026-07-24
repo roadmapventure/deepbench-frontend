@@ -454,7 +454,7 @@ function buildFailureText(guardrail, triage) {
 // the per-agent/per-pattern rollup) degrade identically. Never maps a legacy slug to a catalog
 // name -- ARCHITECTURE.md §19i's corollary bans that outright.
 function patternLabelFor(vocab, slug) {
-  return vocab.get(slug) || humanizeSlug(slug) || slug;
+  return vocab.get(slug)?.name || humanizeSlug(slug) || slug;
 }
 
 // FEATURE: LOO-012 — slug -> human label, same data-driven shape the deleted PATTERN_NAME map had,
