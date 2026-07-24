@@ -1271,7 +1271,30 @@ Nothing catches it downstream either. `parseModelTurn()` (`request-receivable.js
 ### Open — not decided, do not build against either
 
 1. ~~**Who reviews the analysis before it reaches the screen?**~~ **Sequenced 2026-07-23, John's explicit call: ship the instruction first, decide a reviewer on real evidence afterward — do not add one on speculation.** See "Why a reviewer is second, not first" below. The two candidate shapes are recorded here so a future session doesn't re-derive them, **neither chosen**: (a) Alex Reeves — Screen Controls Editor — gains `can_request_help` and pushes back when a card isn't fit to show — costs a turn only when something is wrong, but **requires amending §19d's LOCKED line that a `delegation_required` formatter's hand-off is *always* terminal** ("a Format Skill hand-off never changes the facts... there is no legitimate case where the delegator needs another turn"); that supersession is John's call, not a session's. (b) Owen Marsh — The Proofreader — gains a second Intent Skill on his existing `quality-gate` Capability, scoped to theory review — does not touch §19d, but costs an agent turn on *every* theory test. Note `qg-review-intent` is **not reusable as-is** for either: its schema returns `{answer, citations, confidence_tier}` and its five guardrail rules are Q&A-specific, so pointing it at a hypothesis test would mean rewriting the one Skill Marcus's answers depend on. Also note the hypothesis-test chain has **no review step at all** today (`INTENT_CHAINS.hypothesis_test`), where the Q&A chain runs Marcus → Owen Marsh — The Proofreader → display; that asymmetry is real regardless of which shape is eventually picked.
-2. **What the screen does when a section is still unusable after all of the above.** A hardcoded placeholder line was proposed and rejected (it is the platform speaking as the agent). Treating it as a failed test and reusing the existing error path was proposed and not agreed. Still open.
+2. ~~**What the screen does when a section is still unusable after all of the above.**~~ **Decided 2026-07-23 (John): show the section with a fallback line — do not discard the analysis.** Only the exact copy stays open (below). Reasoning and the option ruled out are in "The empty-section fallback" below.
+
+### The empty-section fallback [decided 2026-07-23, exact copy still open]
+
+**Show the section with a fallback line; keep the sections that did come back.** The alternative — treating it as a failed test and reusing the existing error path (`MarketIntelligenceScreen.jsx` L3490) — was ruled out on measured cost: queried live 2026-07-23 across 180 recorded runs, `hyp-hypothesis-test-intent` averages **25.8s** (max 39.2s) and the display hop adds ~4.4s. Discarding a complete analysis and forcing a ~30s re-run to recover from one malformed field is a bad trade, and it hides the failure rather than showing it.
+
+**Binding constraint on the copy — this is the point of the whole section, not a style note.** The fallback must read unmistakably as *a fault report*, never as a finding. If it reads like something the content specialist concluded (e.g. "no input at this time"), the deliberate-empty/accidental-empty ambiguity is simply reintroduced one layer higher, at the display, after being eliminated in the data. Those two states must never look alike:
+
+- **She found nothing** (her own words, varying run to run): *"I looked for evidence that would undercut this and found none in the Data Room."*
+- **It didn't come back** (system voice, visually distinct): *"— this section did not come back —"* or similar.
+
+**Exact copy is still open — John's sign-off required before it reaches code** (`docs/WORKING-WITH-JOHN.md`, UI-appearance approval gate).
+
+**Why the earlier rejection doesn't apply here.** A hardcoded line was proposed and rejected earlier in this same session, correctly: at that point it would have *replaced* the agent stating her own finding. Once the always-state-it instruction ships, she is supposed to have spoken — so the fallback is no longer a substitute for content, it is a report that content is missing. Different job, and the rejection does not carry over.
+
+### Scope for the next (coding) session
+
+Three things ship together, and the third is not optional:
+
+1. Priya Nair's — Forecast/Theory/Performance Expert — always-state-it instruction on `hyp-hypothesis-test-intent`, mirrored on `intelligence-review-format`.
+2. The screen guard at `MarketIntelligenceScreen.jsx` L2106-2108 — never let the object reach JSX; render the fallback above.
+3. **`intelligence-review-format`'s guardrail must be reworded in the same session.** It currently reads *"complicates.citations may be empty only if complicates.text is null"* — the moment the instruction requires text always, that line contradicts it. This is not part of the deferred reviewer question; leaving it would ship a Skill that argues with itself.
+
+The Pipeline Log event feeding `LOG-54` is a natural fourth (the guard must already detect the condition to avoid crashing), but it is its own row — scope it deliberately rather than letting it ride along unexamined.
 
 ### Why a reviewer is second, not first
 
