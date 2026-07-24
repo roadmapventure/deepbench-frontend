@@ -1,3 +1,4 @@
+// DeepBench v6.3.135 | MarketIntelligenceScreen.jsx | CHI-65 -- the Result drawer's three hypothesis-test sections (supports/complicates/consider) are unwrapped through a new sectionText() type guard instead of `st.x.text || st.x`, which fell through to the {text, citations} OBJECT whenever text was present-but-falsy and killed the whole page with React error #31; a section with no usable text now renders nothing (no placeholder -- ARCHITECTURE.md §19j)
 // DeepBench v6.3.134 | MarketIntelligenceScreen.jsx | LOG-36 -- pattern names resolve through the governed pattern_vocabulary (usePatternVocabulary) then humanizeSlug, never the static PATTERN_CATALOG
 // DeepBench v6.3.126 | MarketIntelligenceScreen.jsx | CHI-61 -- terminal transaction_complete markers added at the 3 real theory/forecast conclusion points (onDiscard, onResolveConfirmation accept/reject), Marcus's next-step bubble once candidates land (enterHypothesisFlow), 3 redundant "Sent to Priya for deeper theories" captions removed (superseded by CHI-42's "You asked for deeper theories." user_action bubble)
 // DeepBench v6.3.120 | MarketIntelligenceScreen.jsx | CHI-56 -- turn-tracking service adopted: real hop durations for delegation/agent_selection/failure_triage events (were permanently null), AgentWorkingIndicator right-justified to match the user bubble it reports on, HopSummaryLine gains an estimate line, new transaction_complete marker (onGoodThanks) alongside the existing question_boundary start marker
@@ -481,6 +482,20 @@ function shapeForLog(text, maxLen = 140) {
   }
   if (s.length <= maxLen) return s;
   return `${s.slice(0, maxLen).trim()}…`;
+}
+
+// FEATURE: CHI-65 — the Result drawer's three sections arrive as {text, citations} (both
+// hyp-hypothesis-test-intent's and intelligence-review-format's schemas), except on the
+// AA-135/AA-137 string-content paths where the whole value is a plain string. The previous
+// `v.text || v` unwrap handled both, but fell through to the OBJECT whenever text was present-
+// but-falsy — a state complicates.text's own ["string","null"] type explicitly permits — handing
+// React an object and taking the entire page down (error #31). Returns usable text or "", never
+// an object. Deliberately does NOT substitute placeholder copy for an empty section: the screen
+// holds no content policy, that guarantee lives at the agent level (ARCHITECTURE.md §19j).
+function sectionText(v) {
+  if (typeof v === "string") return v.trim();
+  if (v && typeof v.text === "string") return v.text.trim();
+  return "";
 }
 
 // FEATURE: MI-19 — render a per-step Pipeline Log duration the same way everywhere.
@@ -1887,6 +1902,10 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
 
   const st = hypFlow?.hypothesisTest;
   const { actual: stActualPoints, theorized: stTheorizedPoints } = groupKeyDataPoints(st?.key_data_points);
+  // FEATURE: CHI-65 — unwrap the three sections to plain text once; see sectionText().
+  const stSupports = sectionText(st?.supports);
+  const stComplicates = sectionText(st?.complicates);
+  const stConsider = sectionText(st?.consider);
   const footerKind = selectEvidenceFooterKind(qaEvidence, hypFlow);
   // FEATURE: CHI-49 — shared derived state for the 2-drawer split (Task 2).
   const intentLabel = hypFlow ? (INTENT_LABEL[hypFlow.intent] || hypFlow.intent) : null;
@@ -2116,9 +2135,9 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             )}
 
             <div style={{display:"flex",flexDirection:"column",gap:9}}>
-              {st.supports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.supports.text || st.supports}</p></div>)}
-              {st.complicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.complicates.text || st.complicates}</p></div>)}
-              {st.consider && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>→ Consider also</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{st.consider.text || st.consider}</p></div>)}
+              {stSupports && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.moss,marginBottom:3}}>✓ Supports</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{stSupports}</p></div>)}
+              {stComplicates && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.flag,marginBottom:3}}>⚠ Complicates</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{stComplicates}</p></div>)}
+              {stConsider && (<div><div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.mutedDeep,marginBottom:3}}>→ Consider also</div><p style={{margin:0,fontFamily:body,fontSize:11.5,lineHeight:1.5,color:T.ink}}>{stConsider}</p></div>)}
             </div>
           </>
         )}
