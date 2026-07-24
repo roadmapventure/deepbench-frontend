@@ -1263,30 +1263,31 @@ Nothing catches it downstream either. `parseModelTurn()` (`request-receivable.js
 
 ### Decided
 
-- **The section is always shown, never hidden.** A section that silently disappears reads to the user as an oversight rather than a finding (John, 2026-07-23). Hiding is not an acceptable treatment for an empty finding.
-- **The sentence is authored by the agent, not the screen.** Platform code must never write "no complicating factors found" — that is the platform putting words in an agent's mouth. Wording varying run to run is accepted and expected (John, 2026-07-23).
+- ~~**The section is always shown, never hidden.**~~ **Withdrawn 2026-07-23 by John, later the same session** — see "The screen holds no content policy" below. The screen shows what the agent filled and nothing else; a section the agent never filled simply isn't there.
+- **The sentence is authored by the agent, not the screen.** Platform code must never write "no complicating factors found" — that is the platform putting words in an agent's mouth. Wording varying run to run is accepted and expected (John, 2026-07-23). **This is the load-bearing decision of this whole section** — every other conclusion here follows from it, including the withdrawal above.
 - **It must be the content specialist who says it, not the display agent.** Only the agent that performed the analysis knows whether it actually looked. A display agent asserting "nothing was found" is asserting something it has no way to verify. This is also why it does not violate `intelligence-review-format`'s own *"never introduces a claim the content specialist did not already make"* rule — the display agent renders the statement, it does not originate it.
 - **Once a deliberate empty is always written out, the ambiguity dissolves by construction:** text present means considered, text absent means something broke. They stop being the same value.
 
 ### Open — not decided, do not build against either
 
 1. ~~**Who reviews the analysis before it reaches the screen?**~~ **Sequenced 2026-07-23, John's explicit call: ship the instruction first, decide a reviewer on real evidence afterward — do not add one on speculation.** See "Why a reviewer is second, not first" below. The two candidate shapes are recorded here so a future session doesn't re-derive them, **neither chosen**: (a) Alex Reeves — Screen Controls Editor — gains `can_request_help` and pushes back when a card isn't fit to show — costs a turn only when something is wrong, but **requires amending §19d's LOCKED line that a `delegation_required` formatter's hand-off is *always* terminal** ("a Format Skill hand-off never changes the facts... there is no legitimate case where the delegator needs another turn"); that supersession is John's call, not a session's. (b) Owen Marsh — The Proofreader — gains a second Intent Skill on his existing `quality-gate` Capability, scoped to theory review — does not touch §19d, but costs an agent turn on *every* theory test. Note `qg-review-intent` is **not reusable as-is** for either: its schema returns `{answer, citations, confidence_tier}` and its five guardrail rules are Q&A-specific, so pointing it at a hypothesis test would mean rewriting the one Skill Marcus's answers depend on. Also note the hypothesis-test chain has **no review step at all** today (`INTENT_CHAINS.hypothesis_test`), where the Q&A chain runs Marcus → Owen Marsh — The Proofreader → display; that asymmetry is real regardless of which shape is eventually picked.
-2. ~~**What the screen does when a section is still unusable after all of the above.**~~ **Decided 2026-07-23 (John): show the section with the fallback line `No input at this time` — do not discard the analysis.** Reasoning, the option ruled out, and one recorded risk are in "The empty-section fallback" below.
+2. ~~**What the screen does when a section is still unusable after all of the above.**~~ **Decided 2026-07-23 (John) — and the question itself was the wrong one.** The screen does nothing about it: it renders what it was given and never authors content. See "The screen holds no content policy" below.
 
-### The empty-section fallback [decided 2026-07-23]
+### The screen holds no content policy [decided 2026-07-23 — supersedes this session's own earlier fallback proposal]
 
-**Show the section with a fallback line; keep the sections that did come back.** The alternative — treating it as a failed test and reusing the existing error path (`MarketIntelligenceScreen.jsx` L3490) — was ruled out on measured cost: queried live 2026-07-23 across 180 recorded runs, `hyp-hypothesis-test-intent` averages **25.8s** (max 39.2s) and the display hop adds ~4.4s. Discarding a complete analysis and forcing a ~30s re-run to recover from one malformed field is a bad trade, and it hides the failure rather than showing it.
+**John, 2026-07-23, overturning a decision this session had already talked him into:** *"why is the screen forcing content? Why are we not just displaying whatever the agent provides? If we want better or enforce content we should do it at the agent level — remember the whole premise of this platform is to remove hardcoding."*
 
-**Copy — decided 2026-07-23, John's explicit call: `No input at this time`.**
+**This session had reached the opposite answer and was wrong.** It proposed the screen render a fallback line (`No input at this time`) whenever a section came back empty, defended as "a fault report, not a finding." That defence was a rationalization: it is still platform code writing a sentence into a card where an agent's words belong. Showing a section the agent never filled is the same error one step further — the screen asserting a section exists when the agent said nothing about it. **Both are recorded here as ruled out, with the reasoning, so a future session doesn't rediscover the same appealing shortcut.** The earlier "always show the section, never hide it" decision falls with them: its rationale (a missing section reads as an oversight) is an argument for making the agent reliable, not for the screen faking reliability the agent didn't deliver.
 
-The two states must still never look alike:
+**The settled division:**
 
-- **She found nothing** (her own words, varying run to run): *"I looked for evidence that would undercut this and found none in the Data Room."*
-- **It didn't come back** (system): *"No input at this time"*.
+- **Agent level — the guarantee.** The content specialist fills every section. If she has nothing for one, she says so *in her own words* ("no conclusions found for this section," however she phrases it). Enforcement of that belongs to agent mechanisms — the Skill instruction now, an agent guardrail later — never to screen code.
+- **Screen level — no content decisions at all.** Render what came back. A value that isn't usable text renders nothing. The screen never invents a line, never labels a gap, never decides a section exists.
+- **The one thing that is not a content decision, and stays:** the screen must not hand React an object where a string goes. That is a type error, the same class as passing a number where a date is expected — it decides nothing about what is shown, it only stops the page from dying (`CHI-65`). Everything visible still comes from the agent.
 
-**Because the chosen copy does not itself signal a fault, the visual treatment now carries that job alone — this is the binding constraint.** Render it muted and italic, visibly not body text, so it cannot be mistaken for a sentence the content specialist wrote. A future session must not "tidy" this into the same style as real section content; the styling *is* the fault signal here, not decoration.
+**Accepted gap, John's explicit call:** if the content specialist forgets, the section is simply absent and the user gets no explanation. That is knowingly accepted for now and caught later by an agent guardrail (§19j question 1), not by screen code. `LOG-54` is what will say how often it actually happens.
 
-*Recorded risk, John's call made with this stated (not a live objection — do not re-open without him):* "No input at this time" reads as a conclusion the content specialist reached rather than as a delivery failure, which is the same deliberate-empty/accidental-empty ambiguity this section eliminates in the data, reappearing at the display layer. The session recommended fault-explicit copy ("— this section did not come back —"); John chose this wording instead. If real usage shows users reading it as a finding, that is the thing to revisit, and `LOG-54`'s counts are what would show it.
+**Handoff unchanged.** The content specialist still sends her content to the display agent, who fills the drawer exactly as he does for every other control on that screen. Nothing in this decision changes the existing chain — it only removes the screen-authored copy this session had proposed adding to it.
 
 **Why the earlier rejection doesn't apply here.** A hardcoded line was proposed and rejected earlier in this same session, correctly: at that point it would have *replaced* the agent stating her own finding. Once the always-state-it instruction ships, she is supposed to have spoken — so the fallback is no longer a substitute for content, it is a report that content is missing. Different job, and the rejection does not carry over.
 
@@ -1294,11 +1295,11 @@ The two states must still never look alike:
 
 Three things ship together, and the third is not optional:
 
-1. Priya Nair's — Forecast/Theory/Performance Expert — always-state-it instruction on `hyp-hypothesis-test-intent`, mirrored on `intelligence-review-format`.
-2. The screen guard at `MarketIntelligenceScreen.jsx` L2106-2108 — never let the object reach JSX; render the fallback above.
+1. **The instruction** — `hyp-hypothesis-test-intent`: fill every section; if you have nothing for one, say so in your own words. Mirrored on `intelligence-review-format` so the display agent carries her statement through rather than inventing one of his own.
+2. **The crash guard only** — `MarketIntelligenceScreen.jsx` L2106-2108: never hand React an object. A value that isn't usable text renders nothing. **No fallback copy, no placeholder, no forced heading** — see "The screen holds no content policy" above; this is the constraint most likely to be quietly re-broken by someone trying to be helpful.
 3. **`intelligence-review-format`'s guardrail must be reworded in the same session.** It currently reads *"complicates.citations may be empty only if complicates.text is null"* — the moment the instruction requires text always, that line contradicts it. This is not part of the deferred reviewer question; leaving it would ship a Skill that argues with itself.
 
-The Pipeline Log event feeding `LOG-54` is a natural fourth (the guard must already detect the condition to avoid crashing), but it is its own row — scope it deliberately rather than letting it ride along unexamined.
+`LOG-54`'s signal is *not* folded in here. It was proposed as a natural fourth on the reasoning that the crash guard must already detect the condition — but that reasoning only held while the screen was going to render something about it. With the screen holding no content policy, a detection hook exists solely to serve logging, which is `LOG-54`'s own scope to design, not a rider on this one.
 
 ### Why a reviewer is second, not first
 
