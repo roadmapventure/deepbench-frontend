@@ -1235,6 +1235,20 @@ The "historical data cannot be retroactively corrected" principle above stands a
 
 **Corollary, locked 2026-07-22 (live design conversation, John, `design-ai-35-2b-0721` — a mistake that had already recurred across multiple prior sessions before being caught and written down here):** never build a reconciliation table, alias column, or any other artifact whose job is to map an old/legacy identifier forward to its current Layer C entry. Any such mapping is itself a second thing that must be kept in sync with Layer C — exactly the class of problem this three-layer model exists to eliminate. The correct behavior is always: read Layer A/log data as it currently exists, read Layer C as it currently exists, join them live, and let anything with no current match fall into the existing generic "not yet catalogued" fallback (already built, `useAIActivity.js`) — the same honest treatment as any other unclassified row, no special-casing, no permanent bridge-building between what a pattern used to be called and what it's called now.
 
+**Extension — provable-fact backfill via intent-provability [added 2026-07-24, John's explicit ruling, `design-log-42-0724`]**
+
+The amendment above sanctions correcting a *stored label* where Layer A facts contradict it. This extension adds a **more conservative** remediation that leaves the label untouched, plus a second route to the "mechanically determinable" bar.
+
+**Second route to the bar — intent-provability.** The amendment proves falsity from a row's own `call_facts`, but `call_facts` is null on ~99% of historical rows. A pattern is *also* mechanically determinable when the row's **intent** (in `feature`) **structurally pins a single technique** — evidenced by that intent's realized pattern-set being uniform across runs (`agent-selection-intent` → always the routing signature; contrast task intents like `ci-answer-intent`, whose pattern varies run-to-run). Because intent is present on nearly every row, this route reaches history that `call_facts` cannot.
+
+**Remediation — backfill the fact, never the label.** Where a historical anomaly is provable by either route, the sanctioned fix is to **backfill the provable Layer A fact** (e.g. `call_facts.retrieval_method: "direct-lookup"`), leaving `patterns_used` frozen as the honest legacy record. Layer B then re-derives the pattern correctly at read time, uniformly with every other row. This is preferred over the amendment's label-correction: it adds ground truth rather than overwriting a classification, and needs no display special-casing.
+
+**Bounds.** Backfill only mechanically-determinable facts — never inferred, never fabricated (e.g. never synthesize `retrieved_chunk_ids` for a lost retrieval). Task-intent history whose facts are genuinely unrecoverable stays unresolved — honest read-time fallback, never invention. Per-anomaly, John-authorized, as the amendment requires.
+
+**The sorting test for any anomaly.** Does the intent provably pin the pattern? Yes → structural, backfillable now. No → task, awaits forward facts + Layer B; not recoverable on history.
+
+**Deliberated exceptions [John, 2026-07-24].** The mechanically-determinable bar is the **default, not an absolute**. Specific anomalies will warrant backfilling a fact that is *not* strictly provable. Allowed only under a **higher** gate, never a lower one: the reasoning for that row-class is written down, John and the session reason it through and explicitly find it safe, and John authorizes it per-anomaly. Two hard conditions: (1) **preference is never sufficient** — the documented safety finding is the gate; (2) **provenance is marked** — any non-provable backfill records how it was justified (`proven` vs `authorized-by-judgment`), so the fact layer stays honestly distinguishable and a judgment call is never later read as an observed fact.
+
 ### Layer C — Self-Maintenance Mechanism [added 2026-07-21, `design-ai-35-0721`]
 
 The schema above defines what a governed vocabulary entry looks like, but not how it stays current — this closes that gap. Answers the same governance questions (1)-(3) on an ongoing basis, not just for the one-time launch audit.
