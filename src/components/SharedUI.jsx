@@ -1,3 +1,6 @@
+// DeepBench v6.3.137 | SharedUI.jsx | CHI-66 — Drawer wraps its own children in an ErrorBoundary
+// (variant "inline"), so a render error in one drawer's content is contained to that drawer instead
+// of unmounting the screen that owns the conversation state. Card is deliberately NOT wrapped.
 // DeepBench v6.2.24 | SharedUI.jsx | MI-55 — Drawer gains an opt-in `resizable` prop (Agent Routing
 // only): drag-to-resize grip handle, floor locked at the passed maxHeight, ceiling clamped to
 // min(80vh, real content scrollHeight) via the new exported clampDrawerHeight() pure helper. Not
@@ -25,6 +28,7 @@
 import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import { AVATAR_CFG } from "../data/agents.js";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from "recharts";
 
@@ -346,6 +350,13 @@ export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, v
 // FEATURE: CHI-45 — headerRight adds an optional, always-visible (open or collapsed) slot in the
 // header row, next to the chevron, for content like HopBadge that should read as metadata on the
 // drawer itself rather than as part of the (collapsible) body content. See STYLE-GUIDE.md §29.
+// FEATURE: CHI-66 — the boundary around {children} below is per-drawer deliberately, not per-screen.
+// A boundary unmounts everything beneath it, so one placed at the app root or around the screen would
+// still take MarketIntelligenceScreen down and destroy its unpersisted `messages` state — the whole
+// conversation. Sitting inside Drawer, a crash in one drawer's content is contained to that drawer:
+// the screen, the chat column and every prior turn stay mounted. The boundary goes inside the content
+// <div ref={contentRef}> so the padding, gap, maxHeight/overflowY and resize handle stay outside it
+// and a crashed drawer keeps its normal frame and header.
 export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined, headerRight = undefined }) => {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
@@ -399,7 +410,7 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
         <>
           <div ref={contentRef}
             style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10, ...(maxHeight ? {maxHeight:effectiveHeight, overflowY:"auto"} : {})}}>
-            {children}
+            <ErrorBoundary variant="inline">{children}</ErrorBoundary>
           </div>
           {resizable && (
             <div
