@@ -30,10 +30,26 @@ const SCAN_ROOTS = ["src/components", "src/screens"];
 // AIActivityPanel.jsx's Platform Roadmap tier filter. Note it selects !p.active
 // entries only — patterns with no calls — which is exactly why it is not a
 // log-driven display and not LOG-36's business.
-const ROADMAP_ALLOWANCE = {
-  file: "src/components/AIActivityPanel.jsx",
-  expr: "PATTERN_CATALOG.filter(p => !p.active && p.roadmap === key)",
-};
+const ALLOWANCES = [
+  {
+    file: "src/components/AIActivityPanel.jsx",
+    expr: "PATTERN_CATALOG.filter(p => !p.active && p.roadmap === key)",
+    why: "Platform Roadmap tier filter (LOG-56) — selects !p.active entries, i.e. patterns with " +
+         "no calls. Intent, not activity, so not a log-driven display.",
+  },
+  {
+    // Added when LOG-36's About-panel change was REVERTED mid-session (John's explicit call).
+    // The tile is knowingly still catalog-driven and knowingly disagrees with the AI Audit
+    // panel's "Patterns Logged" stat. It could not be made log-driven cheaply: useAIActivity()'s
+    // _log is filled only by hydrateFromSupabase(), whose sole src/ caller is AIActivityPanel's
+    // mount effect, so About rendered a confident "0". Folded into LOG-56 so the whole About
+    // panel (this tile + the SVG diagram + the glossary) is decided as one screen.
+    file: "src/components/AboutPanel.jsx",
+    expr: '[String(PATTERN_CATALOG.length),"AI Patterns"]',
+    why: "About panel stat tile (LOG-56) — deliberate, tracked exception, not an oversight.",
+  },
+];
+const ALLOWANCE_FILES = new Set(ALLOWANCES.map(a => a.file));
 
 function listFiles(dir) {
   const abs = path.join(ROOT, dir);
@@ -60,22 +76,22 @@ export default async function () {
 
   // ── 1. No display file derives a pattern name or count from PATTERN_CATALOG ──
   const offenders = [];
-  let allowanceSeen = false;
+  const seen = new Set();
 
   for (const rel of files) {
+    const relPosix = rel.replace(/\\/g, "/");
     const code = stripComments(fs.readFileSync(path.join(ROOT, rel), "utf8"));
     for (const rawLine of code.split(/\r?\n/)) {
       const line = rawLine.trim();
       if (!line.includes("PATTERN_CATALOG")) continue;
 
-      // The import that carries the roadmap allowance is itself allowed.
-      if (/^import\s/.test(line) && rel.replace(/\\/g, "/") === ROADMAP_ALLOWANCE.file) continue;
+      // The import that carries an allowance is itself allowed.
+      if (/^import\s/.test(line) && ALLOWANCE_FILES.has(relPosix)) continue;
 
-      if (rel.replace(/\\/g, "/") === ROADMAP_ALLOWANCE.file && line.includes(ROADMAP_ALLOWANCE.expr)) {
-        allowanceSeen = true;
-        continue;
-      }
-      offenders.push(`${rel.replace(/\\/g, "/")}: ${line}`);
+      const hit = ALLOWANCES.find(a => a.file === relPosix && line.includes(a.expr));
+      if (hit) { seen.add(hit.file); continue; }
+
+      offenders.push(`${relPosix}: ${line}`);
     }
   }
 
@@ -84,11 +100,13 @@ export default async function () {
     "PATTERN_CATALOG must not drive any pattern name or count in a display file " +
     "(ARCHITECTURE.md §19i corollary). Offending lines:\n  " + offenders.join("\n  ")
   );
-  assert.ok(
-    allowanceSeen,
-    `${ROADMAP_ALLOWANCE.file}'s Platform Roadmap filter was not found — if that section was ` +
-    "moved or removed (LOG-56), update this allowance deliberately rather than deleting the check."
-  );
+  for (const a of ALLOWANCES) {
+    assert.ok(
+      seen.has(a.file),
+      `${a.file}'s allowed expression was not found (${a.why}). If that code was moved or removed ` +
+      "(LOG-56), update this allowance deliberately rather than deleting the check."
+    );
+  }
 
   // ── 2. src/aiPatterns.js (LOG-57): allowance is bounded, not open-ended ──
   // This file DOES read PATTERN_CATALOG today — LOG-20 sources its AI_PAT badge strings

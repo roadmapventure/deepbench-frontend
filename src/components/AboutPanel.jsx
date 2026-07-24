@@ -10,10 +10,16 @@ import { APP_VERSION } from "../config.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { supabase } from "../lib/supabase.js";
 import { useAgents } from "../hooks/useAgents.js";
-// FEATURE: LOG-36 -- PATTERN_CATALOG import dropped: the "AI Patterns" tile is a count of patterns
-// that have actually run, read from the log via useAIActivity(), not a count of static file entries.
-// SERVICE_CATALOG stays exactly as it was.
-import { SERVICE_CATALOG, useAIActivity } from "../hooks/useAIActivity.js";
+// FEATURE: LOG-36 -- this file was briefly retargeted onto a live logged-pattern count, then
+// reverted to PATTERN_CATALOG within the same session (John's explicit call). Reason: useAIActivity()
+// reads an in-memory _log that ONLY hydrateFromSupabase() fills, and its only caller in all of src/
+// is AIActivityPanel.jsx's mount effect -- so opening About without opening AI Audit first rendered
+// a confident "0", which is worse than the stale 24. Fixing it properly needs either a Supabase
+// aggregate object or a row-cap-exposed single-column scan over 16k+ rows for one number. Deferred
+// to LOG-56, which owns the rest of this panel's pattern content (the SVG diagram and glossary) --
+// so the whole About panel gets decided as one screen instead of being touched twice.
+// This tile is therefore KNOWINGLY still catalog-driven. Do not "fix" it in isolation.
+import { SERVICE_CATALOG, PATTERN_CATALOG } from "../hooks/useAIActivity.js";
 
 // ── Tab definitions ─────────────────────────────────────────────────────────────
 const TABS = [
@@ -228,9 +234,6 @@ function PurposeTab() {
 function ArchitectureTab() {
   const isMobile = useIsMobile();
   const agents = useAgents(); // FEATURE: MOB-001 -- live roster count, was hardcoded "13"
-  // FEATURE: LOG-36 -- live count of patterns with logs, same number the AI Audit panel's
-  // "Patterns Logged" stat shows.
-  const { patternsLoggedCount } = useAIActivity();
   return (
     <>
       <SH mt={0}>The DEEP / BENCH Model</SH>
@@ -279,12 +282,14 @@ function ArchitectureTab() {
       <SH>By the Numbers</SH>
       {/* FEATURE: SH-21 — stat grid drops 3→2 columns on mobile */}
       {/* FEATURE: MOB-001 -- AI Patterns/AI Services/Bench agents now read live from the same
-          sources the AI Audit panel and Roster screen already use (SERVICE_CATALOG.length,
-          AGENTS.length via useAgents()) -- can no longer contradict those other panels.
-          FEATURE: LOG-36 -- "AI Patterns" no longer reads PATTERN_CATALOG.length (24 static file
-          entries, true regardless of whether any of them ever ran). It is patternsLoggedCount from
-          useAIActivity(): how many distinct patterns the ai_activity_log actually shows, the same
-          number the AI Audit panel's "Patterns Logged" stat displays.
+          sources the AI Audit panel and Roster screen already use (PATTERN_CATALOG.length,
+          SERVICE_CATALOG.length, AGENTS.length via useAgents()) -- can no longer contradict those
+          other panels.
+          FEATURE: LOG-36 -- "AI Patterns" still reads PATTERN_CATALOG.length, KNOWINGLY: it counts
+          24 static file entries, true regardless of whether any of them ever ran, and so it does
+          NOT agree with the AI Audit panel's "Patterns Logged" stat (11 as of 2026-07-23). That
+          disagreement is deliberate and tracked -- see the import comment at the top of this file
+          and LOG-56, which owns this panel's pattern content as one screen. Do not fix in isolation.
           The remaining 6 numbers are filesystem/DB-schema facts a browser can't
           compute at runtime; snapshot-corrected to their real values as of 2026-07-17
           (mobile-ui-audit-0717) but will drift again over time -- a permanent fix needs build-time
@@ -293,7 +298,7 @@ function ArchitectureTab() {
           again, that's expected -- check docs/FEATURES.md's MOB-001 row before re-deriving numbers
           by hand. */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-        {[["59","Source files"],["~29,500","Lines of code"],["11","API routes"],["23","DB tables (281 cols)"],["33","Arch docs"],["269","Session specs"],[String(patternsLoggedCount),"AI Patterns"],[String(SERVICE_CATALOG.length),"AI Services"],[String(agents.length),"Bench agents"]].map(([n, l]) => (
+        {[["59","Source files"],["~29,500","Lines of code"],["11","API routes"],["23","DB tables (281 cols)"],["33","Arch docs"],["269","Session specs"],[String(PATTERN_CATALOG.length),"AI Patterns"],[String(SERVICE_CATALOG.length),"AI Services"],[String(agents.length),"Bench agents"]].map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
             <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{l}</div>
