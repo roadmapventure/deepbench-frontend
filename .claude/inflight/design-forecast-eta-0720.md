@@ -1,1 +1,0 @@
-- `design-forecast-eta-0720` (design session) — active, ongoing design conversation on forecast ETA, John confirmed still in use 2026-07-21. No unique commits yet (worktree currently matches `dev`).

@@ -1,1 +1,0 @@
-﻿design-session-0723e - worktree `design-session-0723e`, branch `session/design-session-0723e`. Topic TBD (session opened 2026-07-23, awaiting John's direction). Renamed from -0723d to avoid colliding with the closed S-SES-22-23 session's worktree name.
