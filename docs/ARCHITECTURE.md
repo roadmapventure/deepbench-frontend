@@ -1299,6 +1299,8 @@ Three things ship together, and the third is not optional:
 2. **The crash guard only** — `MarketIntelligenceScreen.jsx` L2106-2108: never hand React an object. A value that isn't usable text renders nothing. **No fallback copy, no placeholder, no forced heading** — see "The screen holds no content policy" above; this is the constraint most likely to be quietly re-broken by someone trying to be helpful.
 3. **`intelligence-review-format`'s guardrail must be reworded in the same session.** It currently reads *"complicates.citations may be empty only if complicates.text is null"* — the moment the instruction requires text always, that line contradicts it. This is not part of the deferred reviewer question; leaving it would ship a Skill that argues with itself.
 
+   *Worth knowing while rewording it: that guardrail is already being violated in live data with nothing catching it.* Completed hop `baa64ec7` (2026-07-08) carries a full-paragraph `complicates.text` alongside `citations: []` — the exact combination the rule forbids — and the result was stored and rendered normally. So the rule is not enforced by any mechanism today; rewording it is necessary to remove the contradiction, but do not assume the reworded version will be obeyed either. Enforcement is §19j question 1's problem, not this line's.
+
 `LOG-54`'s signal is *not* folded in here. It was proposed as a natural fourth on the reasoning that the crash guard must already detect the condition — but that reasoning only held while the screen was going to render something about it. With the screen holding no content policy, a detection hook exists solely to serve logging, which is `LOG-54`'s own scope to design, not a rider on this one.
 
 ### Why a reviewer is second, not first
