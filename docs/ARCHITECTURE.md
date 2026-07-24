@@ -1219,6 +1219,20 @@ Susan Smith — Trainer's role is unchanged and remains Layer C only: she govern
 
 **Historical data cannot be retroactively corrected** — this principle from the prior model is unchanged and still governs Layer A/B: nothing recorded pre-rewrite can be assumed true or false after the fact. Pre-existing rows keep their original frozen classification, labeled honestly, forever; only rows logged after the new model ships get the versioned, re-derivable treatment.
 
+**Amendment — human-authorized anomaly correction [added 2026-07-23, John's explicit ruling, `design-log-37-0723`]**
+
+The "historical data cannot be retroactively corrected" principle above stands as the **default**, not an absolute bar.
+
+**The exception:** a specific, identified anomaly that John and a session have reviewed together and reached alignment on may be corrected — when John explicitly authorizes that correction. Authorization is **per-anomaly and belongs to John alone**. No session may correct historical data on its own judgment, however confident, and reaching alignment is not itself authorization.
+
+**Why the default has an exception at all.** The original principle rests on an epistemic claim: we cannot know after the fact what a historical row really did, so relabelling it would be fabrication. That reasoning is sound where it applies — but it is not universal, and `LOG-37` produced the counter-example. Row `id=19175` (2026-07-23) carries `patterns_used: [… 'rag']` alongside `call_facts: {retrieval_method: 'direct-lookup'}` with zero retrieved chunk ids. That row does not merely look doubtful — it is **mechanically self-contradicting**. Where Layer A facts prove a stored label false, "we cannot know" is no longer true, and freezing a known-false label is not honesty; it is preserving a known error.
+
+**What this does not license:**
+- It does **not** weaken the corollary below — no reconciliation table, alias column, or permanent old→new mapping artifact, ever, for any reason.
+- It does **not** cover rows that are merely *uncertain* or *named differently today*. **Provable falsity is the bar**, not preference.
+- It does **not** authorize a blanket sweep. Each anomaly is its own reviewed, authorized decision.
+- Where a row's original meaning is genuinely unrecoverable — `LOG-46`'s `tool-use` conflated two mechanisms and recorded neither — no authorization helps. That data is gone. The honest treatment stays exclusion at read time (`LOG-16`'s `isPatternTrusted()` precedent), never invention.
+
 **Corollary, locked 2026-07-22 (live design conversation, John, `design-ai-35-2b-0721` — a mistake that had already recurred across multiple prior sessions before being caught and written down here):** never build a reconciliation table, alias column, or any other artifact whose job is to map an old/legacy identifier forward to its current Layer C entry. Any such mapping is itself a second thing that must be kept in sync with Layer C — exactly the class of problem this three-layer model exists to eliminate. The correct behavior is always: read Layer A/log data as it currently exists, read Layer C as it currently exists, join them live, and let anything with no current match fall into the existing generic "not yet catalogued" fallback (already built, `useAIActivity.js`) — the same honest treatment as any other unclassified row, no special-casing, no permanent bridge-building between what a pattern used to be called and what it's called now.
 
 ### Layer C — Self-Maintenance Mechanism [added 2026-07-21, `design-ai-35-0721`]
