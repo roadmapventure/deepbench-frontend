@@ -1,3 +1,4 @@
+// DeepBench v6.3.134 | AIActivityPanel.jsx | LOG-36 -- By Pattern is one flat log-driven list; "Patterns Logged" stat
 // DeepBench v6.2.9 | AIActivityPanel.jsx | AI-48 mobile-responsive AI Audit panel
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
@@ -177,13 +178,16 @@ const MCP_SURFACES = [
 ];
 
 export default function AIActivityPanel({ onClose }) {
-  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, servicesCatalogTotal, patternsActiveCount, patternsCatalogTotal, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  // FEATURE: LOG-36 -- patternsActiveCount/patternsCatalogTotal removed from the hook; the stat
+  // strip now reads the live logged count.
+  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, servicesCatalogTotal, patternsLoggedCount, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
   const [zeroClosed, setZeroClosed] = useState(true);
-  const [inactivePtnClosed, setInactivePtnClosed] = useState(true);
-  const [uncatalogedPtnClosed, setUncatalogedPtnClosed] = useState(true);
+  // FEATURE: LOG-36 -- inactivePtnClosed/uncatalogedPtnClosed removed with the collapse cards they
+  // drove: with the catalog seed loop gone there is no "not yet active" bucket to collapse, and
+  // every row is by definition uncatalogued-or-governed real activity, one flat list.
   const toggle = (key) => setSections(s => ({ ...s, [key]: !s[key] }));
   // FEATURE: AI-48 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
   const isMobile = useIsMobile();
@@ -218,7 +222,7 @@ export default function AIActivityPanel({ onClose }) {
             ["Total Calls",    totalCalls],
             ["Total Cost",     fmt$(totalCost)],
             ["Services Active",`${servicesActive}/${servicesCatalogTotal}`],
-            ["Patterns Active",`${patternsActiveCount}/${patternsCatalogTotal}`],
+            ["Patterns Logged",patternsLoggedCount],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(
             <div key={k}>
@@ -244,75 +248,18 @@ export default function AIActivityPanel({ onClose }) {
         {tab === "activity" && (
           <>
             {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
-            {/* FEATURE: AI-32 — By Pattern inactive collapse card */}
-            {/* FEATURE: AI-36 — By Pattern section split into Structural and Reasoning subsections */}
+            {/* FEATURE: LOG-36 -- one flat list, ordered by call count. The AI-36 Structural/Reasoning
+                split is GONE: patternType exists only in the static catalog, pattern_vocabulary has no
+                equivalent column, and the taxonomy itself is unsourced (Cognitive Function and
+                Execution Topology are two perpendicular axes in the published literature, not two
+                halves of one binary) — choosing a real taxonomy is LOG-58. The AI-32 "Not yet active"
+                and LOG-31/LOG-32 "Uncatalogued" collapse cards go with it: with the catalog seed loop
+                deleted, every row here is a pattern that genuinely ran. */}
             <SectionHeader label="By Pattern · Industry Catalog" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
             {sections.pattern && (
               patternsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
-                : (() => {
-                    const structural   = patternsSorted.filter(p => (p.active || p.partial) && p.patternType === 'structural');
-                    const reasoning    = patternsSorted.filter(p => (p.active || p.hitlSpecial || p.partial) && p.patternType === 'reasoning');
-                    const inactive     = patternsSorted.filter(p => !p.active && !p.hitlSpecial && !p.partial);
-                    // FEATURE: LOG-31/LOG-32 -- a real, logged pattern slug that computeByPattern()'s
-                    // LOG-14 fallback auto-detected (patternType: 'unknown') matched none of the 3
-                    // buckets above and rendered nowhere -- silent data loss, confirmed live on 18 rows
-                    // (historical 'reflection' slug, write-site already fixed elsewhere, AA-190c).
-                    // Generic catch-all, same "auto-detected still gets shown" principle byService's
-                    // own render already follows one section up -- never a per-slug special case.
-                    const uncatalogued = patternsSorted.filter(p =>
-                      !structural.includes(p) && !reasoning.includes(p) && !inactive.includes(p)
-                    );
-                    return (
-                      <>
-                        {/* FEATURE: AI-36 — Structural subsection */}
-                        {structural.length > 0 && (
-                          <>
-                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4}}>Structural</div>
-                            {structural.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
-                          </>
-                        )}
-
-                        {/* FEATURE: AI-36 — Reasoning subsection */}
-                        {reasoning.length > 0 && (
-                          <>
-                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Reasoning</div>
-                            {reasoning.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
-                          </>
-                        )}
-
-                        {/* Inactive collapse card — unchanged */}
-                        {inactive.length > 0 && (
-                          <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
-                            <div
-                              onClick={()=>setInactivePtnClosed(o=>!o)}
-                              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
-                            >
-                              <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Not yet active · {inactive.length} patterns</div>
-                              <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{inactivePtnClosed?"▼":"▲"}</div>
-                            </div>
-                            {!inactivePtnClosed && inactive.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
-                          </div>
-                        )}
-
-                        {/* FEATURE: LOG-31/LOG-32 -- Uncatalogued collapse card, same shape/styling as
-                            the "Not yet active" card above -- real activity that hasn't been given a
-                            proper catalog entry yet, shown honestly rather than dropped. */}
-                        {uncatalogued.length > 0 && (
-                          <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
-                            <div
-                              onClick={()=>setUncatalogedPtnClosed(o=>!o)}
-                              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
-                            >
-                              <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Uncatalogued · {uncatalogued.length} pattern{uncatalogued.length === 1 ? "" : "s"}</div>
-                              <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{uncatalogedPtnClosed?"▼":"▲"}</div>
-                            </div>
-                            {!uncatalogedPtnClosed && uncatalogued.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()
+                : patternsSorted.map(pat => <PatternRow key={pat.slug} d={pat}/>)
             )}
 
             {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}

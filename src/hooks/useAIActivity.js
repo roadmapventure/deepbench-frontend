@@ -1,3 +1,4 @@
+// DeepBench v6.3.134 | useAIActivity.js | LOG-36 -- pattern displays read from the log, not the static catalog
 // DeepBench v6.1.43 | MarketIntelligenceScreen.jsx / useAIActivity.js | S-MI-42 -- two-tone indicator, final-timeline caption, streaming/agent-delegation catalog fixes
 // DeepBench v6.0.21 | useAIActivity.js | S-MARKET-INTEL-01d — agent-delegation pattern catalog fix (replaces stale agent-orchestration), quality-gate/pipeline-triage/data-analysis patterns retrofit
 // FEATURE: AI-14 — useAIActivity — byLLM + byAgent aggregations, reinforcement type, future tracking types
@@ -7,6 +8,9 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
+// FEATURE: LOG-36 -- PATTERN_CATALOG is no longer read by anything in this file; it is imported
+// solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
+// (LOG-56), which renders patterns precisely BECAUSE they have no logs and is out of scope here.
 import { PATTERN_CATALOG, SERVICE_CATALOG, SERVICE_SLUG } from '../../shared/ai-patterns.js';
 export { PATTERN_CATALOG, SERVICE_CATALOG };
 
@@ -20,9 +24,10 @@ export const CAPABILITY_WRAPPER_TYPES = new Set([
 ]);
 export const PAIR_WINDOW_MS = 2000;
 
-// FEATURE: AI-53 -- maps a real logged pattern slug (e.g. 'embeddings') to its display name
-// (e.g. 'Embeddings') for byService's self-derived patterns list, below.
-const PATTERN_NAME_BY_SLUG = Object.fromEntries(PATTERN_CATALOG.map(p => [p.slug, p.name]));
+// FEATURE: LOG-36 -- PATTERN_NAME_BY_SLUG (AI-53, built from PATTERN_CATALOG) deleted. Every
+// pattern NAME on every display now resolves through pattern_vocabulary first and humanizeSlug()
+// second -- never through the static catalog. Falling back to a PATTERN_CATALOG name would be the
+// legacy-slug reconciliation artifact ARCHITECTURE.md §19i's corollary bans outright.
 
 // FEATURE: AI-53 -- local SERVICE_CATALOG definition removed; now imported from
 // shared/ai-patterns.js (see import above) so both this Vite frontend file and the Vercel
@@ -57,11 +62,16 @@ function isPatternTrusted(slug, aiType, ts) {
   return new Date(ts).getTime() >= new Date(PATTERN_VERIFICATION_CUTOFF).getTime();
 }
 
-export function computeByPattern(log) {
+// FEATURE: LOG-36 -- the log is the driver. The PATTERN_CATALOG seed loop that used to open this
+// function (one zero-count bucket per static catalog entry, 24 of them, whether or not that pattern
+// had ever run) is DELETED. A bucket now exists if and only if a real, trusted logged row named its
+// slug -- so an empty ai_activity_log yields {} and zero rows on screen, which is exactly John's
+// stated rule and ARCHITECTURE.md §19i's locked corollary ("read Layer A/log data as it currently
+// exists, read Layer C as it currently exists, join them live"). `vocab` is Layer C: a
+// Map<pattern_slug, name> from pattern_vocabulary (see usePatternVocabulary below), used for the
+// NAME only. A slug with no vocabulary entry is humanized, never mapped, aliased, or special-cased.
+export function computeByPattern(log, vocab = new Map()) {
   const byPattern = {};
-  for (const pat of PATTERN_CATALOG) {
-    byPattern[pat.slug] = { ...pat, total: 0, cost: 0 };
-  }
   for (const e of log) {
     const used = Array.isArray(e.patternsUsed) ? e.patternsUsed : [];
     // FEATURE: LOG-16 -- filter to only patterns this row can actually stand behind before
@@ -75,8 +85,23 @@ export function computeByPattern(log) {
       // FEATURE: LOG-14 — self-maintaining fallback: a real pattern slug the harness logged that
       // isn't yet in PATTERN_CATALOG gets its own auto-labeled bucket instead of being silently
       // dropped ("invisible rather than mis-attributed" no longer means invisible forever).
+      // FEATURE: LOG-36 -- this is now the ONLY bucket shape; every bucket is created here.
+      // A governed slug (one pattern_vocabulary knows) takes its name and drops the
+      // "not yet catalogued" caption; everything else is humanized and stays flagged
+      // autoDetected, which is the honest signal that the WRITE path still stamps a
+      // pre-2b slug (LOG-44..LOG-48), not a display defect to paper over.
       if (!byPattern[slug]) {
-        byPattern[slug] = { slug, name: humanizeSlug(slug), desc: 'Auto-detected — not yet catalogued', active: true, patternType: 'unknown', autoDetected: true, total: 0, cost: 0 };
+        const governedName = vocab.get(slug);
+        byPattern[slug] = {
+          slug,
+          name: governedName || humanizeSlug(slug),
+          desc: governedName ? null : 'Auto-detected — not yet catalogued',
+          active: true,
+          patternType: 'unknown',
+          autoDetected: !governedName,
+          total: 0,
+          cost: 0,
+        };
       }
       byPattern[slug].total += 1;
       byPattern[slug].cost += splitCost;
@@ -317,7 +342,11 @@ export function capabilitySlugForRow({ ai_type, feature }) {
 // Same one-line shape as MarketIntelligenceScreen.jsx's local formatKindLabel() (not imported --
 // that function is screen-local and this is a different call site; duplicating one pure one-line
 // formatter is not worth a new shared module for two callers).
-function humanizeSlug(slug) {
+// FEATURE: LOG-36 -- exported: it is now the platform-wide last resort for every pattern name
+// (By Pattern, By Service, Channel Intelligence's routing lines and per-agent rollup), so all four
+// display sites degrade identically instead of each inventing its own fallback.
+export function humanizeSlug(slug) {
+  if (typeof slug !== 'string' || slug.length === 0) return '';
   return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
@@ -490,12 +519,61 @@ export async function hydrateFromSupabase(tenantId = 'global') {
 
 export function clearAILog() { _log = []; notify(); }
 
+// FEATURE: LOG-36 -- Layer C (the governed vocabulary) read, exposed as ONE shared hook.
+// AIActivityPanel.jsx reaches it through useAIActivity(); MarketIntelligenceScreen.jsx does not call
+// useAIActivity() at all and calls this directly -- a second private fetch in that screen would be
+// the duplicate-functionality violation the Architect Review checks for, so there is deliberately
+// only this one implementation. Selects pattern_slug + name only (the display needs nothing else).
+// pattern_vocabulary has RLS off, so the ordinary anon client can read it with no policy work.
+// On error: warn and resolve to an EMPTY map -- every display then degrades to humanizeSlug().
+// It must never fall back to PATTERN_CATALOG names (§19i corollary).
+const EMPTY_VOCAB = new Map();
+let _vocabCache = null;
+let _vocabPromise = null;
+
+export function fetchPatternVocabulary() {
+  if (_vocabCache) return Promise.resolve(_vocabCache);
+  if (!_vocabPromise) {
+    _vocabPromise = supabase
+      .from('pattern_vocabulary')
+      .select('pattern_slug, name')
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[pattern vocabulary] read failed:', error.message);
+          _vocabPromise = null; // allow a later mount to retry; never cache a failure
+          return EMPTY_VOCAB;
+        }
+        _vocabCache = new Map((data || []).map(r => [r.pattern_slug, r.name]));
+        return _vocabCache;
+      });
+  }
+  return _vocabPromise;
+}
+
+export function usePatternVocabulary() {
+  const [vocab, setVocab] = useState(() => _vocabCache || EMPTY_VOCAB);
+  const [loading, setLoading] = useState(() => !_vocabCache);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPatternVocabulary().then(v => {
+      if (cancelled) return;
+      setVocab(v);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return { vocab, loading };
+}
+
 export function useAIActivity() {
   const [log, setLog] = useState([..._log]);
   useEffect(() => {
     _listeners.push(setLog);
     return () => { _listeners = _listeners.filter(fn => fn !== setLog); };
   }, []);
+  // FEATURE: LOG-36 -- Layer C names for both pattern display sites in this hook (byPattern and
+  // byService's observed-pattern list). Cached module-level, so this is one read per page load.
+  const { vocab } = usePatternVocabulary();
 
   // Aggregate by type
   const byType = {};
@@ -578,8 +656,11 @@ export function useAIActivity() {
     // array, so a service's displayed patterns can never go stale relative to what it actually
     // logs. Falls back to the static hint only when the service has zero real calls yet (nothing
     // to compute from -- roadmap/not-yet-live entries).
+    // FEATURE: LOG-36 -- WHICH patterns appear here was already log-driven (AI-53, observedSlugs
+    // comes from real patternsUsed); only the NAME was catalog-sourced. Same resolution order as
+    // By Pattern now: pattern_vocabulary -> humanizeSlug -> raw slug.
     const observedSlugs = [...new Set(entries.flatMap(e => Array.isArray(e.patternsUsed) ? e.patternsUsed : []))];
-    const observedPatterns = observedSlugs.map(slug => PATTERN_NAME_BY_SLUG[slug] || slug);
+    const observedPatterns = observedSlugs.map(slug => vocab.get(slug) || humanizeSlug(slug) || slug);
     byService[svc.slug] = {
       ...svc,
       patterns:   entries.length > 0 ? observedPatterns : svc.patterns,
@@ -610,10 +691,14 @@ export function useAIActivity() {
   }
 
   // FEATURE: AI-50c — real per-call pattern attribution (see computeByPattern's own comment)
-  const byPattern = computeByPattern(log);
+  // FEATURE: LOG-36 -- vocab passed in for name resolution; the log alone decides which buckets exist.
+  const byPattern = computeByPattern(log, vocab);
 
-  const servicesActive      = Object.values(byService).filter(s => s.total > 0).length;
-  const patternsActiveCount = PATTERN_CATALOG.filter(p => p.active).length;
+  const servicesActive = Object.values(byService).filter(s => s.total > 0).length;
+  // FEATURE: LOG-36 -- replaces patternsActiveCount/patternsCatalogTotal (both derived from the
+  // static catalog, so the old "X/24" stat could never go to zero no matter what the log said).
+  // This is simply how many patterns have logs right now.
+  const patternsLoggedCount = Object.keys(byPattern).length;
 
   // FEATURE: AI-23 patch — sorted arrays for dynamic section rendering
   // Services: primary sort = type order (ai→hybrid→logic), secondary = calls desc
@@ -624,11 +709,10 @@ export function useAIActivity() {
     return b.total - a.total;
   });
 
-  // Patterns: sorted by calls desc; inactive patterns always at bottom
-  const patternsSorted = Object.values(byPattern).sort((a, b) => {
-    if (a.active !== b.active) return a.active ? -1 : 1;
-    return b.total - a.total;
-  });
+  // Patterns: sorted by calls desc, one flat order.
+  // FEATURE: LOG-36 -- the `a.active !== b.active` tiebreak is deleted: with the catalog seed loop
+  // gone, every bucket came from a real logged call, so `active` no longer distinguishes anything.
+  const patternsSorted = Object.values(byPattern).sort((a, b) => b.total - a.total);
 
   // Agents: sorted by calls desc
   const agentsSorted = Object.values(byAgent).sort((a, b) => b.calls - a.calls);
@@ -637,7 +721,7 @@ export function useAIActivity() {
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsActiveCount, patternsCatalogTotal: PATTERN_CATALOG.length, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
 }
 
 export { MODEL_PROVIDER };

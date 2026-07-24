@@ -1,3 +1,4 @@
+// DeepBench v6.3.134 | MarketIntelligenceScreen.jsx | LOG-36 -- pattern names resolve through the governed pattern_vocabulary (usePatternVocabulary) then humanizeSlug, never the static PATTERN_CATALOG
 // DeepBench v6.3.126 | MarketIntelligenceScreen.jsx | CHI-61 -- terminal transaction_complete markers added at the 3 real theory/forecast conclusion points (onDiscard, onResolveConfirmation accept/reject), Marcus's next-step bubble once candidates land (enterHypothesisFlow), 3 redundant "Sent to Priya for deeper theories" captions removed (superseded by CHI-42's "You asked for deeper theories." user_action bubble)
 // DeepBench v6.3.120 | MarketIntelligenceScreen.jsx | CHI-56 -- turn-tracking service adopted: real hop durations for delegation/agent_selection/failure_triage events (were permanently null), AgentWorkingIndicator right-justified to match the user bubble it reports on, HopSummaryLine gains an estimate line, new transaction_complete marker (onGoodThanks) alongside the existing question_boundary start marker
 // DeepBench v6.3.112 | MarketIntelligenceScreen.jsx | DAT-7 -- resolveConfirmation() forwards status/detail on failure; onResolveConfirmation() shows a specific recovery message for denied writes instead of the generic retry copy
@@ -349,7 +350,10 @@ import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, Conf
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
-import { PATTERN_CATALOG, SERVICE_CATALOG } from "../hooks/useAIActivity.js"; // FEATURE: AI-50c/LOO-012
+// FEATURE: LOG-36 -- PATTERN_CATALOG import dropped; pattern names come from the governed
+// vocabulary (usePatternVocabulary) with humanizeSlug as the fallback. SERVICE_CATALOG is
+// untouched (LOO-012, unrelated).
+import { SERVICE_CATALOG, usePatternVocabulary, humanizeSlug } from "../hooks/useAIActivity.js"; // FEATURE: LOG-36/LOO-012
 // FEATURE: CHI-56 — shared turn-tracking service (hop-duration resolution, transaction-boundary
 // event builder); see src/lib/turnTracking.js for full rationale.
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
@@ -440,11 +444,20 @@ function buildFailureText(guardrail, triage) {
 // the Agent Routing drawer's now-removed capability badge; confirmed dead, its one call site was
 // RoutingActivityLine's `SERVICE_LABEL[capability]` lookup, itself removed this session).
 
-// FEATURE: AI-50c — slug -> human label, built from the same PATTERN_CATALOG useAIActivity.js owns
-const PATTERN_NAME = Object.fromEntries(PATTERN_CATALOG.map(p => [p.slug, p.name]));
+// FEATURE: LOG-36 -- the module-level PATTERN_NAME map (AI-50c, built from PATTERN_CATALOG) is
+// deleted. A pattern name is now resolved at render time through usePatternVocabulary() ->
+// humanizeSlug() -> raw slug, the same order every other pattern display uses. It cannot be a
+// module constant any more because the vocabulary is read from Supabase, not from a static file.
 
-// FEATURE: LOO-012 — slug -> human label, same data-driven pattern as PATTERN_NAME immediately
-// above, reusing SERVICE_CATALOG (already platform-wide) instead of a new dictionary. Restores a
+// FEATURE: LOG-36 -- one shared resolver so both call sites in this file (RoutingActivityLine and
+// the per-agent/per-pattern rollup) degrade identically. Never maps a legacy slug to a catalog
+// name -- ARCHITECTURE.md §19i's corollary bans that outright.
+function patternLabelFor(vocab, slug) {
+  return vocab.get(slug) || humanizeSlug(slug) || slug;
+}
+
+// FEATURE: LOO-012 — slug -> human label, same data-driven shape the deleted PATTERN_NAME map had,
+// reusing SERVICE_CATALOG (already platform-wide) instead of a new dictionary. Restores a
 // real per-service label on delegation_complete hops with no agent-authored text to show (a final
 // target's own completion) — was a static per-type label before LOO-010 removed the declarations
 // that carried it; this is the generic replacement, not new content.
@@ -2323,9 +2336,11 @@ function RoutingHopCard({ hop, agentById }) {
 // same "real data or nothing" principle MI-67 already established for this exact field.
 function RoutingActivityLine({ evt }) {
   const { summary, color } = describePipelineEvent(evt);
+  // FEATURE: LOG-36 -- governed vocabulary name, else humanized slug, else the raw slug.
+  const { vocab } = usePatternVocabulary();
   const realPatterns = Array.isArray(evt.data?.patterns_used) ? evt.data.patterns_used : null;
   const patternLabel = realPatterns && realPatterns.length > 0
-    ? realPatterns.map(slug => PATTERN_NAME[slug] || slug).join(', ')
+    ? realPatterns.map(slug => patternLabelFor(vocab, slug)).join(', ')
     : null;
   const [expanded, setExpanded] = useState(false);
   const fullText = `${summary}${evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}`;
@@ -2369,6 +2384,8 @@ function RoutingActivityLine({ evt }) {
 function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
   const learned = useLearnedContext();
   const dataSources = useDataSources();
+  // FEATURE: LOG-36 -- governed pattern names for the per-agent/per-pattern rollup below.
+  const { vocab } = usePatternVocabulary();
   // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
   // 'speed-baseline-test' tenant, unfiltered by MI_LOOP_SCOPE (scope: null) since those rows are
   // already fully isolated deliberate test data, not production MI-loop traffic.
@@ -2422,16 +2439,17 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
                   )}
                   {/* FEATURE: MI-72b — replaces the byKind capability-type breakdown (known
                       placeholder, S-MI-20) with the real per-agent, per-pattern breakdown added by
-                      MI-72a. PATTERN_NAME is the same lookup RoutingActivityLine already uses for
-                      Agent Routing's pattern labels — one source of truth platform-wide, falls back
-                      to the raw slug for anything not yet in PATTERN_CATALOG. No byModel sub-rows
-                      here (byPattern has no byModel sub-bucket) — out of scope to add one. */}
+                      MI-72a. FEATURE: LOG-36 -- patternLabelFor() is the same resolver
+                      RoutingActivityLine uses for Agent Routing's pattern labels — one source of
+                      truth platform-wide: governed vocabulary name, else humanized slug, else the
+                      raw slug. No byModel sub-rows here (byPattern has no byModel sub-bucket) —
+                      out of scope to add one. */}
                   {stats?.byPattern && Object.entries(stats.byPattern)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
                     .map(([patternSlug, p]) => (
                       <LatencyStatRow
                         key={patternSlug}
-                        label={PATTERN_NAME[patternSlug] || patternSlug}
+                        label={patternLabelFor(vocab, patternSlug)}
                         valueNumber={p.avgLatency != null ? (p.avgLatency/1000).toFixed(1) : "—"}
                         restText={`${p.avgLatency != null ? "s avg" : ""} (${p.calls} call${p.calls === 1 ? "" : "s"}${p.latencyCount > 1 ? `, max ${(p.maxLatency/1000).toFixed(1)}s` : ""})`}
                       />
