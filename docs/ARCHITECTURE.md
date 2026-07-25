@@ -1454,9 +1454,10 @@ rank above config**, below the `intent` anchor:
 
 1. `intent` (anchor) · 2. `retrieval_method` · 3. `tool_calls` · 4. `gated_subroutine_fired` ·
 5. `sub_calls_chained` · 6. `retrieved_chunk_ids` (count) · 7. `assembled_skill_slugs` (k→i→f) ·
-8. `capability_slug` · 9. `traits.schema` · 10. `traits.source` ·
-11. `input_references_other_deliverable` · 12. `self_reported_claims` · 13. `traits.intent_allowlist` ·
-14. `execution_type` · 15. `trace_id` (plumbing, last).
+8. `model_modality` (embedding/generative/none — config-band lead; **added `design-log-65-0724` (LOG-65 POC 2)**) ·
+9. `capability_slug` · 10. `traits.schema` · 11. `traits.source` ·
+12. `input_references_other_deliverable` · 13. `self_reported_claims` · 14. `traits.intent_allowlist` ·
+15. `execution_type` · 16. `trace_id` (plumbing, last).
 
 Three caveats on the order (all locked with it): **(a)** the order is a diagnostic + canonical-aggregation-key
 aid, **not the matcher** — `@>` is order-independent (proven empirically in the POC); get it directionally
@@ -1465,6 +1466,39 @@ requires the stored signature be an **ordered projection** (canonical, gaps-remo
 (LOG-67). **(c)** facts-over-config holds for **contingent** patterns only; the **primary/structural** pattern
 is provable from `intent` + config alone (history/backfill), which is why `intent` is #1 and
 `assembled_skill_slugs` stays upper-middle. POC result + full reasoning: `docs/harvests/LOG-64-poc-signature-join-0724.md`.
+
+### LOG-65 POC 2 outcomes — anomaly gate + criteria shape [locked `design-log-65-0724`, 2026-07-24/25]
+
+Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settled the open
+`criteria`-shape question. Gate **passes**. Full detail: `docs/harvests/LOG-65-poc-anomaly-requirements-0724.md`.
+
+- **One missed requirement found → one new field (`model_modality`, #8).** The intent anchor
+  (`intent` from `feature`) is a real slug **only for the 7,136 `agent-turn` rows**; for router
+  rows the intent is in `call_facts.tool_calls`, and for the 1,346 raw embedding subroutines
+  (`LOG-59`) there is no intent at all. `model_modality` (source: the existing `ai_activity_log.model`
+  column; `text-embedding-* → embedding`, `null → none`, else `generative`) is a **read-time
+  derivation** — no new capture, not stored in `call_facts`. It lets one gold row name the retrieval
+  subroutines (`criteria: {model_modality: embedding}` → "Vector Embedding / Retrieval Subroutine")
+  and structurally forbids any generation pattern from matching a non-generative row (false `rag`
+  dies by assertion, not omission). Guard: `none` assumes null `model` = deterministic — correct only
+  while `model` is logged wherever a model runs.
+- **`criteria` uses a BOUNDED three-operator set, not pure `@>`.** Proven live: a real retrieval row
+  logs `retrieval_method='mixed'`, so `@>`-equality on `similarity-search` **misses** it; RAG needs
+  `retrieved_chunk_ids > 0`. The set is exactly: **`@>`/equality (presence)**, **`in` (enumeration)**,
+  **numeric `>` (contingent facts)** — three operators, not an open expression language.
+- **Merged patterns = Shape B: one gold row per pattern with `intent in [...]`.** Both shapes resolve
+  correctly (`agent-selection-intent` and `ci-routing-intent` both → Request Routing); Shape B wins on
+  single-sourcing (name/definition/citation, one-edit rename) now that the operator set exists anyway.
+- **The Displayer returns a SET** (primary + supporting), via the one generic operator matcher — proven
+  on a rich row returning {Request Routing, Output Guardrails, RAG}, no per-pattern code.
+- **Coverage: going-forward unmatchable = 0.** The 7,157 unmatchable rows are 100% historical; ~6,850
+  recover via `trace_id` sibling or `ai_type`→capability backfill (`LOG-69`), leaving a **permanent
+  floor of ~300 legacy/test rows (182 already blank today), none ever governed-named** — state it, do
+  not silently drop it.
+- **Motivation confirmed live:** legacy naming (`buildPatternsUsed` + per-path literals →
+  `ai_activity_log.patterns_used`) is still hardcoded and still writing on every new row (including the
+  false `rag`); `patterns_used` is deliberately **not** a signature input. Write-path fix `LOG-63`
+  unshipped.
 
 ### Locked constraints (also in `.claude/rules/ai-pattern-signature.md`)
 
