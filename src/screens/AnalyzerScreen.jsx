@@ -655,7 +655,11 @@ function AnalyzerView({ taskId }) {
       <div style={{width:200,flexShrink:0,background:T.paper,borderRight:`1px solid ${T.line}`,padding:"16px 0",display:"flex",flexDirection:"column",overflowY:"auto"}}>
         {data&&(
           <div style={{padding:"0 16px 12px",borderBottom:`1px solid ${T.line}`,marginBottom:10}}>
-            <div style={{fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:600,marginBottom:3,fontFamily:mono}}>Now Analyzing</div>
+            {/* FEATURE: SH-23 -- surface Spend status beside the "Now Analyzing" kicker at the kicker's own 8.5px */}
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:6,marginBottom:3}}>
+              <div style={{fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:600,fontFamily:mono}}>Now Analyzing</div>
+              {FOCUS_AREA_STATUS.spendAnalysis && <span style={{...FOCUS_STATUS_STYLE, fontSize:8.5}}>({FOCUS_AREA_STATUS.spendAnalysis})</span>}
+            </div>
             <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy,lineHeight:1.2}}>{fileName.replace(/\.csv$/i,"")}</div>
             <div style={{fontSize:10,color:T.muted,marginTop:2,fontFamily:mono}}>{data.txCount.toLocaleString()} rows</div>
           </div>
