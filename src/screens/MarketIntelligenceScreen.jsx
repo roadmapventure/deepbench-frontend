@@ -1,3 +1,4 @@
+// DeepBench v6.3.138 | MarketIntelligenceScreen.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.3.135 | MarketIntelligenceScreen.jsx | CHI-65 -- the Result drawer's three hypothesis-test sections (supports/complicates/consider) are unwrapped through a new sectionText() type guard instead of `st.x.text || st.x`, which fell through to the {text, citations} OBJECT whenever text was present-but-falsy and killed the whole page with React error #31; a section with no usable text now renders nothing (no placeholder -- ARCHITECTURE.md §19j)
 // DeepBench v6.3.134 | MarketIntelligenceScreen.jsx | LOG-36 -- pattern names resolve through the governed pattern_vocabulary (usePatternVocabulary) then humanizeSlug, never the static PATTERN_CATALOG
 // DeepBench v6.3.126 | MarketIntelligenceScreen.jsx | CHI-61 -- terminal transaction_complete markers added at the 3 real theory/forecast conclusion points (onDiscard, onResolveConfirmation accept/reject), Marcus's next-step bubble once candidates land (enterHypothesisFlow), 3 redundant "Sent to Priya for deeper theories" captions removed (superseded by CHI-42's "You asked for deeper theories." user_action bubble)
@@ -344,7 +345,7 @@
 // (S-ARCH-DISPLAY-LOOP-01) Agent Selection + Display Format for Marcus's real Display-agent hand-off)
 // FEATURE: MI-13 — Theory Evidence renders via the generic visualization mechanism, not a hardcoded chart
 import { useState, useRef, useEffect } from "react";
-import { T, display, body, mono } from "../tokens.js";
+import { T, display, body, mono, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, ConfirmationCardActions, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint } from "../components/SharedUI.jsx";
@@ -3762,7 +3763,8 @@ export default function MarketIntelligenceScreen() {
             page title, mobile-only — was a small button inside MobileBody's own pane-button row. */}
         <div style={{marginBottom: isMobile ? 12 : 18, display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:10}}>
           <div>
-            <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence</div>
+            {/* FEATURE: SH-23 */}
+            <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence{FOCUS_AREA_STATUS.channelSales && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.channelSales})</span>}</div>
             <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
           </div>
           {isMobile && (

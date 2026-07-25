@@ -1,3 +1,4 @@
+// DeepBench v6.3.138 | tokens.js | S-SH-23 -- focus-area release-status labels
 // DeepBench v5.1.15 | tokens.js | Treasury design system — colors, fonts, formatters
 // FEATURE: SH-01 — Treasury design tokens
 // src/tokens.js — v5.0.0
@@ -32,6 +33,17 @@ export const T = {
 export const display = '"Fraunces", Georgia, serif';
 export const body    = '"Inter", -apple-system, system-ui, sans-serif';
 export const mono    = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace';
+
+// FEATURE: SH-23 -- single source of truth for Product Focus Area release status.
+// Rendered muted (T.muted, 0.72em relative to the title it sits beside, weight 400) in the Work
+// dropdown, the mobile nav, and each focus area's homepage title. Graduating a focus area to full
+// release is one edit: set its value to null and the guarded render drops the tag everywhere.
+export const FOCUS_AREA_STATUS = {
+  channelSales:  "Beta",
+  projectMgmt:   "Alpha",
+  spendAnalysis: "Alpha",
+};
+export const FOCUS_STATUS_STYLE = { color: T.muted, fontSize: "0.72em", fontWeight: 400 };
 
 export const FONT_URL = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap";
 

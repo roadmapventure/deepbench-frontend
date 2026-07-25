@@ -1,3 +1,4 @@
+// DeepBench v6.3.138 | AppShell.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.2.0 | AppShell.jsx | S-MOBILE-NAV-01 — mobile header collapse (SH-19): logo + shrunk subtitle + hamburger opening an 82%-width right-side drawer (Work/Bench/Platform nav groups); Work dropdown's "Market Intelligence" item renamed "Channel Sales Intelligence" (MI-46)
 // DeepBench v6.1.45 | AppShell.jsx | S-MI-44 — Work dropdown click-interception fix (MI-44): nav wrapper needed its own zIndex (transform creates a new stacking context, the backdrop's zIndex:998 was painting above it regardless of the dropdown's own zIndex:999) + subtle gold down-arrow dropdown hint
 // DeepBench v6.1.40 | AppShell.jsx | S-MI-32 — root height fix (MI-32/33, minHeight→height so the flex/scroll chain gets a real viewport-bounded size) + Work/Bench nav restructure with Work dropdown (MI-36)
@@ -8,7 +9,7 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
+import { T, display, body, mono, GLOBAL_CSS, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { Toast } from "./components/SharedUI.jsx";
@@ -100,10 +101,11 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
 
   if (isMobile) {
     const NAV_GROUPS = [
+      // FEATURE: SH-23 -- release-status per Work focus area (Bench item gets none)
       { label: "Work", items: [
-        { label: "Channel Sales Intelligence", icon: "◈", path: "/", active: isMI },
-        { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend },
-        { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend },
+        { label: "Channel Sales Intelligence", icon: "◈", path: "/", active: isMI, status: FOCUS_AREA_STATUS.channelSales },
+        { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend, status: FOCUS_AREA_STATUS.projectMgmt },
+        { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend, status: FOCUS_AREA_STATUS.spendAnalysis },
       ]},
       { label: "Bench", items: [
         { label: "Agent Roster", icon: "👥", path: "/bench", active: isBench },
@@ -157,6 +159,8 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
                           background: item.active ? "rgba(182,135,58,.09)" : "transparent",
                           color: item.active ? T.navy : T.ink, fontWeight: item.active ? 600 : 400}}>
                         <span style={{width:18,textAlign:"center",flexShrink:0}}>{item.icon}</span>{item.label}
+                        {/* FEATURE: SH-23 */}
+                        {item.status && <span style={FOCUS_STATUS_STYLE}> ({item.status})</span>}
                       </button>
                     ))}
                   </div>
@@ -211,15 +215,18 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:7,color:T.brassLight,pointerEvents:"none"}}>▼</span>
           {workMenuOpen && (
             <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
+              {/* FEATURE: SH-23 -- status per focus area */}
               {[
-                {label:"Channel Sales Intelligence", icon:"◈", path:"/"},
-                {label:"Project Management", icon:"📋", path:"/work"},
-                {label:"Spend Analysis", icon:"💰", path:"/work/1/analyze"},
+                {label:"Channel Sales Intelligence", icon:"◈", path:"/",              status:FOCUS_AREA_STATUS.channelSales},
+                {label:"Project Management",         icon:"📋", path:"/work",          status:FOCUS_AREA_STATUS.projectMgmt},
+                {label:"Spend Analysis",             icon:"💰", path:"/work/1/analyze", status:FOCUS_AREA_STATUS.spendAnalysis},
               ].map(item => (
                 <button key={item.path}
                   onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
                   style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer"}}>
                   <span>{item.icon}</span>{item.label}
+                  {/* FEATURE: SH-23 */}
+                  {item.status && <span style={FOCUS_STATUS_STYLE}> ({item.status})</span>}
                 </button>
               ))}
             </div>

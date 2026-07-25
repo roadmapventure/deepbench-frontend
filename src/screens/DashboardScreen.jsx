@@ -1,8 +1,9 @@
+// DeepBench v6.3.138 | DashboardScreen.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.2.8 | DashboardScreen.jsx | DB-23 mobile composition
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { T, display, body, mono, GLOBAL_CSS } from "../tokens.js";
+import { T, display, body, mono, GLOBAL_CSS, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, Toast, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
@@ -537,7 +538,8 @@ export default function DashboardScreen() {
 
             {/* Masthead — stacked, CTA full-width below subheader */}
             <div style={{marginBottom:12}}>
-              <div style={{fontFamily:display,fontSize:22,fontWeight:500,color:T.navy,letterSpacing:"-.3px",lineHeight:1.1,marginBottom:4}}>Your work... Defined</div>
+              {/* FEATURE: SH-23 */}
+              <div style={{fontFamily:display,fontSize:22,fontWeight:500,color:T.navy,letterSpacing:"-.3px",lineHeight:1.1,marginBottom:4}}>Your work... Defined{FOCUS_AREA_STATUS.projectMgmt && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.projectMgmt})</span>}</div>
               <div style={{fontFamily:body,fontStyle:"italic",fontSize:11.5,color:T.mutedDeep,lineHeight:1.4}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
               <div style={{marginTop:10}}>
                 <button onClick={()=>navigate("/work/new")} style={{width:"100%",justifyContent:"center",background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
@@ -641,7 +643,8 @@ export default function DashboardScreen() {
         {/* Masthead */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
           <div>
-            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work... Defined</div>
+            {/* FEATURE: SH-23 */}
+            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work... Defined{FOCUS_AREA_STATUS.projectMgmt && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.projectMgmt})</span>}</div>
             <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,lineHeight:1.5}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
           </div>
           {/* FEATURE: DB-06 — Assign New Work button */}
