@@ -1,3 +1,4 @@
+// DeepBench v6.3.141 | SharedUI.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.137 | SharedUI.jsx | CHI-66 — Drawer wraps its own children in an ErrorBoundary
 // (variant "inline"), so a render error in one drawer's content is contained to that drawer instead
 // of unmounting the screen that owns the conversation state. Card is deliberately NOT wrapped.
@@ -357,7 +358,9 @@ export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, v
 // the screen, the chat column and every prior turn stay mounted. The boundary goes inside the content
 // <div ref={contentRef}> so the padding, gap, maxHeight/overflowY and resize handle stay outside it
 // and a crashed drawer keeps its normal frame and header.
-export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined, headerRight = undefined }) => {
+// FEATURE: CHI-71 -- optional `scrollKey` rendered as data-drawer-key so useDrawerStack can locate
+// the newly-active drawer and bring its TOP into view (was: scroll the whole column to its bottom).
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined, headerRight = undefined, scrollKey = undefined }) => {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -394,7 +397,7 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
   };
 
   return (
-    <div style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
+    <div data-drawer-key={scrollKey} style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
       <div onClick={toggle}
         style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer"}}>
         <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>{title}</div>

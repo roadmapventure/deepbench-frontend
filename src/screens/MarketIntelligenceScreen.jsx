@@ -1,3 +1,4 @@
+// DeepBench v6.3.141 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.140 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 1) -- chat-header rename ("Chat with Marcus" + "Q&A · Corrections · Escalations" branding + "Question › Analysis › Theory › Forecast › Update" Process/Steps line), page subtitle -> "Apple channel performance analysis", hops summary on one line, "(expect" -> "(expected"
 // DeepBench v6.3.138 | MarketIntelligenceScreen.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.3.135 | MarketIntelligenceScreen.jsx | CHI-65 -- the Result drawer's three hypothesis-test sections (supports/complicates/consider) are unwrapped through a new sectionText() type guard instead of `st.x.text || st.x`, which fell through to the {text, citations} OBJECT whenever text was present-but-falsy and killed the whole page with React error #31; a section with no usable text now renders nothing (no placeholder -- ARCHITECTURE.md §19j)
@@ -1645,17 +1646,12 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
 // unchanged) so EvidenceColumn can render it in its own pinned footer slot instead of wherever
 // QaEvidenceCard's content happens to end.
 function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
+  // FEATURE: CHI-71 -- flattened to match the hyp-result footer's clean style (was a brass-gradient card)
   return (
-    <div style={{padding:"14px 16px",background:`linear-gradient(180deg, ${T.brassGlow} 0%, ${T.white} 50%)`,border:`1px solid ${T.brass}`,borderRadius:0,position:"relative"}}>
-      <Corners/>
-      {/* FEATURE: CHI-59 — inline "Needs your input" pill removed; the wrapping Drawer's own
-          headerRight NeedsDecisionBadge now carries this signal, visible whether the drawer is
-          open or collapsed (this pill only ever showed once already open). */}
-      <div style={{fontFamily:body,fontSize:14,fontWeight:700,color:T.navy,margin:"8px 0 12px",lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        <button onClick={onGoodThanks} style={{textAlign:"left",background:T.white,border:`1px solid ${T.line}`,color:T.mutedDeep,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Good, thanks</button>
-        <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:"none",color:T.card,fontWeight:700,fontFamily:body,fontSize:12,padding:"9px 16px",cursor:"pointer",borderRadius:0}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
-      </div>
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.navy,lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
+      <button onClick={onGoodThanks} style={{textAlign:"left",background:"transparent",border:`1px solid ${T.line}`,color:T.ink,fontFamily:body,fontSize:11,padding:"8px 10px",cursor:"pointer"}}>Good, thanks</button>
+      <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:`1px solid ${T.navy}`,color:T.card,fontWeight:600,fontFamily:body,fontSize:11,padding:"8px 10px",cursor:"pointer"}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
     </div>
   );
 }
@@ -1769,8 +1765,16 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
 
   useEffect(() => {
     setManualOverride(null);
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const container = scrollRef.current;
+    if (!container) return;
+    // FEATURE: CHI-71 -- bring the newly-active drawer's TOP into view (was: jump to column bottom)
+    const el = autoCurrent ? container.querySelector(`[data-drawer-key="${autoCurrent}"]`) : null;
+    if (el) {
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top), behavior: "smooth" });
+    } else {
+      container.scrollTo({ top: 0, behavior: "smooth" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCurrent, ...transitionDeps]);
@@ -1960,7 +1964,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             becomes current, but never disappears. Body content below is byte-identical to the deleted
             true-empty-state branch's own news-rendering JSX (hasNewsCards/loading/empty-sentence), just
             relocated and no longer gated behind `!qaEvidence && !hypFlow`. */}
-        <Drawer title="News" open={isDrawerOpen("news")} onToggle={handleDrawerToggle("news")}>
+        {/* FEATURE: CHI-71 -- scrollKey lets useDrawerStack bring this drawer's top into view */}
+        <Drawer title="News" scrollKey="news" open={isDrawerOpen("news")} onToggle={handleDrawerToggle("news")}>
           {hasNewsCards ? (
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <div style={{fontFamily:body,fontSize:12,color:T.muted,marginBottom:10}}>
@@ -1994,7 +1999,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             per isDrawerOpen("qa"), still one click to reopen manually. QaEvidenceCard's own header row
             was removed (Task 3) so this Drawer's title is the card's only header. */}
         {qaEvidence && (
-          <Drawer title="Analysis & Narrative — based on your question..." open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}
+          <Drawer title="Analysis & Narrative — based on your question..." scrollKey="qa" open={isDrawerOpen("qa")} onToggle={handleDrawerToggle("qa")}
             headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{!qaEvidence.reviewChoice && <NeedsDecisionBadge/>}<HopBadge hopStart={qaEvidence.hopStart} hopEnd={qaEvidence.hopEnd} accent={T.navy}/></div>}>
             <QaEvidenceCard qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
           </Drawer>
@@ -2010,7 +2015,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
            moves to a separate body line (below), only rendered once a pick exists. Narration-only
            lines removed per this session's governing principle: Column 1's AgentWorkingIndicator
            already narrates "generating," so Column 2 doesn't need its own copy of that status. */
-        <Drawer title={`${intentLabel} Candidates`}
+        <Drawer title={`${intentLabel} Candidates`} scrollKey="hyp-candidates"
           count={!hypChosen ? (hypFlow.candidates?.length ?? null) : null}
           open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}
           headerRight={hypFlow.stage === "choosing" ? <NeedsDecisionBadge/> : null}>
@@ -2093,7 +2098,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             alongside Candidates. Auto-opens the instant it starts existing (isHypInResultPhase
             true the same render CHI-44's auto-fire sets stage:"testing"). */}
         {isHypInResultPhase(hypFlow) && (
-        <Drawer title={`${intentLabel} Result`} open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
+        <Drawer title={`${intentLabel} Result`} scrollKey="hyp-result" open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
           headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{hypFlow.stage === "result" && !hypFlow.resolution && <NeedsDecisionBadge/>}<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/></div>}>
 
         {/* FEATURE: CHI-58 — the submitted-theory recap block previously here was removed: the
@@ -2156,7 +2161,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             vocabulary since Nadia's write is always a forecast record regardless of which intent
             (theory/forecast/correct) started the flow. */}
         {isHypAwaitingConfirmation(hypFlow) && (
-        <Drawer title="Draft Forecast" open={isDrawerOpen("hyp-draft")} onToggle={handleDrawerToggle("hyp-draft")}
+        <Drawer title="Draft Forecast" scrollKey="hyp-draft" open={isDrawerOpen("hyp-draft")} onToggle={handleDrawerToggle("hyp-draft")}
           headerRight={<NeedsDecisionBadge/>}>
           <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
             Nadia (Data Expert) drafted this Data Room entry — accept, edit, or reject below.
@@ -2175,12 +2180,13 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             )}
             {footerKind === "hyp-result" && (
               <div style={{display:"flex",gap:6}}>
+                {/* FEATURE: CHI-71 -- unify: secondary light + primary navy (Send color) */}
                 <button onClick={onDiscard}
                   style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
                   Store as Info Only
                 </button>
                 <button onClick={() => onCommit()}
-                  style={{flex:1,padding:"8px 6px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
+                  style={{flex:1,padding:"8px 6px",background:T.navy,border:`1px solid ${T.navy}`,fontFamily:body,fontSize:11,color:T.card,fontWeight:600,cursor:"pointer"}}>
                   Create Forecast
                 </button>
               </div>
