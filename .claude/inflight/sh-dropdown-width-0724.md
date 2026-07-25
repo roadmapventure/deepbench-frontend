@@ -1,1 +1,0 @@
-sh-dropdown-width-0724 — worktree `sh-dropdown-width-0724`, branch `session/sh-dropdown-width-0724`. SH-23 follow-up (v6.3.139): widen the desktop Work dropdown so focus-area names fit one line, and right-justify the (Beta)/(Alpha) status. Created 2026-07-24 from origin/dev.
