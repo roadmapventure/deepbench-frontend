@@ -1,3 +1,4 @@
+// DeepBench v6.3.140 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 1) -- chat-header rename ("Chat with Marcus" + "Q&A · Corrections · Escalations" branding + "Question › Analysis › Theory › Forecast › Update" Process/Steps line), page subtitle -> "Apple channel performance analysis", hops summary on one line, "(expect" -> "(expected"
 // DeepBench v6.3.138 | MarketIntelligenceScreen.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.3.135 | MarketIntelligenceScreen.jsx | CHI-65 -- the Result drawer's three hypothesis-test sections (supports/complicates/consider) are unwrapped through a new sectionText() type guard instead of `st.x.text || st.x`, which fell through to the {text, citations} OBJECT whenever text was present-but-falsy and killed the whole page with React error #31; a section with no usable text now renders nothing (no placeholder -- ARCHITECTURE.md §19j)
 // DeepBench v6.3.134 | MarketIntelligenceScreen.jsx | LOG-36 -- pattern names resolve through the governed pattern_vocabulary (usePatternVocabulary) then humanizeSlug, never the static PATTERN_CATALOG
@@ -1068,14 +1069,13 @@ function formatHopSummary(hopEnd, totalElapsedMs) {
 function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent, estimate }) {
   if (hopStart == null || hopEnd == null) return null;
   const summary = formatHopSummary(hopEnd, totalElapsedMs);
+  // FEATURE: CHI-71 -- badge + summary + estimate all on one line (was estimate on its own second line)
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:2}}>
-      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
-        <HopBadge hopStart={hopStart} hopEnd={hopEnd} accent={accent}/>
-        {summary && (
-          <span style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>{summary}</span>
-        )}
-      </div>
+    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+      <HopBadge hopStart={hopStart} hopEnd={hopEnd} accent={accent}/>
+      {summary && (
+        <span style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>{summary}</span>
+      )}
       {estimate && <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>({estimate})</span>}
     </div>
   );
@@ -2795,8 +2795,10 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
         <div style={{padding:"13px 16px",borderBottom:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
           {marcus && <AgentAvatar who={marcus.id} size={28}/>}
           <div>
-            <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{marcus ? marcus.name : "GEO CSO Expert"}</div>
-            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Channel Intelligence · Q&A · Theory · Forecast · Correct · Escalate</div>
+            {/* FEATURE: CHI-71 -- header rename + strategic-purpose branding line + Process/Steps line */}
+            <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>Chat with Marcus</div>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Q&A · Corrections · Escalations</div>
+            <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:2}}>Question › Analysis › Theory › Forecast › Update</div>
           </div>
         </div>
         {messageList}
@@ -3313,7 +3315,7 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-56 -- the estimate live at turn-start, snapshotted here (before intent_routing's
     // later upgrade to a routing-chain-based figure, ~L3244 below) so End status can show what the
     // system originally told the user alongside the real elapsed time, not the upgraded figure.
-    const expectationAtStart = buildEndStatusEstimate("expect < 2m");
+    const expectationAtStart = buildEndStatusEstimate("expected < 2m"); // FEATURE: CHI-71 -- past-tense always (summary line is retrospective)
     // FEATURE: CHI-04 — only when pipelineEvents is non-empty: skipped on the very first question of a
     // fresh session, and naturally skipped right after Clear too (pipelineEvents is already []).
     // FEATURE: CHI-56 -- now built via buildTransactionBoundaryEvent("start", ...) (turnTracking.js)
@@ -3765,7 +3767,7 @@ export default function MarketIntelligenceScreen() {
           <div>
             {/* FEATURE: SH-23 */}
             <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence{FOCUS_AREA_STATUS.channelSales && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.channelSales})</span>}</div>
-            <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Channel performance analysis, agent-orchestrated</div>
+            <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Apple channel performance analysis - agent-orchestrated</div>
           </div>
           {isMobile && (
             <button onClick={() => setShowAgentInfo(true)} style={{flexShrink:0,fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,cursor:"pointer",whiteSpace:"nowrap"}}>
