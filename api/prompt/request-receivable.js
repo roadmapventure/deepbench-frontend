@@ -1,3 +1,4 @@
+// DeepBench v6.3.145 | api/prompt/request-receivable.js | LOO-22 -- register library-lookup handler (Eleanor's record-level verification read)
 // DeepBench v6.3.142 | api/prompt/request-receivable.js | LOG-67 -- merge the config-half signature snapshot into call_facts on the model-call write path
 // DeepBench v6.3.136 | api/prompt/request-receivable.js | LOG-37a-patch -- record the retrieval method as its own Layer A fact
 // FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7. buildCallFacts() now also collapses
@@ -17,6 +18,8 @@ import { handle as libraryWriteHandle } from '../_lib/handlers/library-write.js'
 import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write.js';
 // FEATURE: AI-35 -- Susan Smith's pattern_vocabulary review/promote handler registration.
 import { handle as patternVocabularyWriteHandle } from '../_lib/handlers/pattern-vocabulary-write.js';
+// FEATURE: LOO-22 -- Eleanor's record-level library verification read handler registration.
+import { handle as libraryLookupHandle } from '../_lib/handlers/library-lookup.js';
 import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
@@ -24,7 +27,7 @@ import { mergeCallFacts } from './db-assembly.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle };
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
