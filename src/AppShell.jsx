@@ -1,3 +1,4 @@
+// DeepBench v6.3.139 | AppShell.jsx | S-SH-23b -- widen Work dropdown so focus-area names fit one line + right-justify the (Beta)/(Alpha) status
 // DeepBench v6.3.138 | AppShell.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.2.0 | AppShell.jsx | S-MOBILE-NAV-01 — mobile header collapse (SH-19): logo + shrunk subtitle + hamburger opening an 82%-width right-side drawer (Work/Bench/Platform nav groups); Work dropdown's "Market Intelligence" item renamed "Channel Sales Intelligence" (MI-46)
 // DeepBench v6.1.45 | AppShell.jsx | S-MI-44 — Work dropdown click-interception fix (MI-44): nav wrapper needed its own zIndex (transform creates a new stacking context, the backdrop's zIndex:998 was painting above it regardless of the dropdown's own zIndex:999) + subtle gold down-arrow dropdown hint
@@ -214,7 +215,8 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           {/* FEATURE: MI-44 -- small gold down-arrow hint, subtle, signals Work opens a dropdown */}
           <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:7,color:T.brassLight,pointerEvents:"none"}}>▼</span>
           {workMenuOpen && (
-            <div style={{position:"absolute",top:"100%",left:0,minWidth:220,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
+            // FEATURE: SH-23b -- widened so focus-area names stay on one line (was minWidth:220)
+            <div style={{position:"absolute",top:"100%",left:0,minWidth:280,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
               {/* FEATURE: SH-23 -- status per focus area */}
               {[
                 {label:"Channel Sales Intelligence", icon:"◈", path:"/",              status:FOCUS_AREA_STATUS.channelSales},
@@ -223,10 +225,10 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
               ].map(item => (
                 <button key={item.path}
                   onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
-                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer"}}>
+                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer",whiteSpace:"nowrap"}}>
                   <span>{item.icon}</span>{item.label}
-                  {/* FEATURE: SH-23 */}
-                  {item.status && <span style={FOCUS_STATUS_STYLE}> ({item.status})</span>}
+                  {/* FEATURE: SH-23b -- marginLeft:auto right-justifies the status to a shared column edge */}
+                  {item.status && <span style={{...FOCUS_STATUS_STYLE, marginLeft:"auto", paddingLeft:14}}>({item.status})</span>}
                 </button>
               ))}
             </div>
