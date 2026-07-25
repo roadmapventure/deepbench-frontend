@@ -1,0 +1,1 @@
+design-log-64-0724 — worktree `design-log-64-0724`, branch `session/design-log-64-0724`. Session on backlog item LOG-64. Created 2026-07-24 from origin/dev. Design session: understand the problem with John, reach a fix/kickoff if settled.
