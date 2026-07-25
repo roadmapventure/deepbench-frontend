@@ -1482,6 +1482,13 @@ Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settle
   and structurally forbids any generation pattern from matching a non-generative row (false `rag`
   dies by assertion, not omission). Guard: `none` assumes null `model` = deterministic — correct only
   while `model` is logged wherever a model runs.
+  > ⚠️ **Naming role OVERTURNED 2026-07-25 (`S-LOG-66`, John's call → `LOG-73`).** When the embedding
+  > subroutine was actually run through the Pattern Definer (Susan), she **DISCARDED** it — "a
+  > foundational NLP primitive already inside RAG/HyDE, not a distinct behavioral/orchestration
+  > pattern." So there is **no** "Vector Embedding / Retrieval Subroutine" gold pattern; the ~1,352
+  > embedding rows (`LOG-59`) stay **unclassified** (surfaced by `LEFT JOIN`, not dropped). `model_modality`'s
+  > **naming** role is dropped; its **false-generation guard** (the clause above) stands. "Going-forward
+  > unmatchable = 0" (below) no longer holds for embedding rows. §19k amendment + coverage recompute = `LOG-73`.
 - **`criteria` uses a BOUNDED three-operator set, not pure `@>`.** Proven live: a real retrieval row
   logs `retrieval_method='mixed'`, so `@>`-equality on `similarity-search` **misses** it; RAG needs
   `retrieved_chunk_ids > 0`. The set is exactly: **`@>`/equality (presence)**, **`in` (enumeration)**,
