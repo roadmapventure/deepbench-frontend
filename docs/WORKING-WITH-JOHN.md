@@ -159,6 +159,8 @@ The dominant time-sink is **Claude defending its own first answer when John's pr
 
 The distinction to hold: *productive design iteration on a genuinely-novel model is inherent and fine; Claude defending a worse first-draft is the waste to cut.*
 
+**Transferring John's context so this happens less:** the knowledge that makes his calls better is his *decision criteria* — what "good" means for DeepBench and how he weighs tradeoffs — captured in **`docs/JOHN-DECISION-PATTERNS.md`** (the `SES-004` reference, seeded from this session). Read it at the start of a design session, and **front-load the goal**: a design session goes faster when it opens with *"goal is X; success looks like Y; hard constraints are Z; when trading off, prefer ___."* Most mis-application comes from reasoning on generic priors without the goal in front of you. When a correction reveals a *criterion* (not a one-off), add it to that file.
+
 ---
 
 ## Source Memories
