@@ -1,3 +1,4 @@
+// DeepBench v6.3.143 | SharedUI.jsx | S-CHI-71 (pass 3) -- new shared DecisionFooter: the one standardized CHI user-interaction area (cream field + tan text + navy CTA), modeled on the chat input
 // DeepBench v6.3.141 | SharedUI.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.137 | SharedUI.jsx | CHI-66 — Drawer wraps its own children in an ErrorBoundary
 // (variant "inline"), so a render error in one drawer's content is contained to that drawer instead
@@ -428,6 +429,20 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
     </div>
   );
 };
+
+// FEATURE: CHI-71 -- the single standardized Channel-Intelligence user-interaction area, modeled on the
+// chat input row: a cream field wrapper, a tan prompt, a light "field-style" secondary option on the
+// left, and one navy CTA on the right. Every Column-2 interaction footer renders through this so they
+// can't drift apart again.
+export const DecisionFooter = ({ prompt, secondaryLabel, onSecondary, primaryLabel, onPrimary }) => (
+  <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 16px"}}>
+    {prompt && <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.4,marginBottom:10}}>{prompt}</div>}
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={onSecondary} style={{flex:1,textAlign:"left",padding:"9px 12px",border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:13,cursor:"pointer"}}>{secondaryLabel}</button>
+      <button onClick={onPrimary} style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>{primaryLabel}</button>
+    </div>
+  </div>
+);
 
 // FEATURE: CHI-29 — shared scroll-fade-hint mechanism, extracted from MI-50's mobile-only inline
 // copy (Agent Routing feed) so a second call site (Evidence & Interaction's analysis scroll box)

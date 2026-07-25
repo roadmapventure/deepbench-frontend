@@ -1,3 +1,4 @@
+// DeepBench v6.3.143 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 3) -- both Column-2 interaction footers (qa-review, hyp-result) now render through the shared DecisionFooter standard; hyp-result gains a prompt, Priya CTA shortened
 // DeepBench v6.3.141 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.140 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 1) -- chat-header rename ("Chat with Marcus" + "Q&A · Corrections · Escalations" branding + "Question › Analysis › Theory › Forecast › Update" Process/Steps line), page subtitle -> "Apple channel performance analysis", hops summary on one line, "(expect" -> "(expected"
 // DeepBench v6.3.138 | MarketIntelligenceScreen.jsx | S-SH-23 -- focus-area release-status labels
@@ -350,7 +351,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
-import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, ConfirmationCardActions, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint } from "../components/SharedUI.jsx";
+import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, ConfirmationCardActions, ChartRenderer, Drawer, useScrollFadeHint, ScrollFadeHint, DecisionFooter } from "../components/SharedUI.jsx";
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
@@ -1646,13 +1647,15 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
 // unchanged) so EvidenceColumn can render it in its own pinned footer slot instead of wherever
 // QaEvidenceCard's content happens to end.
 function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
-  // FEATURE: CHI-71 -- flattened to match the hyp-result footer's clean style (was a brass-gradient card)
+  // FEATURE: CHI-71 -- standardized via the shared DecisionFooter (cream field + tan text + navy CTA)
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      <div style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.navy,lineHeight:1.4}}>Good with this analysis, or would you prefer deeper theories?</div>
-      <button onClick={onGoodThanks} style={{textAlign:"left",background:"transparent",border:`1px solid ${T.line}`,color:T.ink,fontFamily:body,fontSize:11,padding:"8px 10px",cursor:"pointer"}}>Good, thanks</button>
-      <button onClick={onReview} style={{textAlign:"left",background:T.navy,border:`1px solid ${T.navy}`,color:T.card,fontWeight:600,fontFamily:body,fontSize:11,padding:"8px 10px",cursor:"pointer"}}>Have Priya (Forecast/Theory/Performance Expert) generate a few theories →</button>
-    </div>
+    <DecisionFooter
+      prompt="Good with this analysis, or would you prefer deeper theories?"
+      secondaryLabel="Good, thanks"
+      onSecondary={onGoodThanks}
+      primaryLabel="Have Priya generate theories →"
+      onPrimary={onReview}
+    />
   );
 }
 
@@ -2179,17 +2182,14 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
               <QaEvidenceCardFooter qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
             )}
             {footerKind === "hyp-result" && (
-              <div style={{display:"flex",gap:6}}>
-                {/* FEATURE: CHI-71 -- unify: secondary light + primary navy (Send color) */}
-                <button onClick={onDiscard}
-                  style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:"pointer"}}>
-                  Store as Info Only
-                </button>
-                <button onClick={() => onCommit()}
-                  style={{flex:1,padding:"8px 6px",background:T.navy,border:`1px solid ${T.navy}`,fontFamily:body,fontSize:11,color:T.card,fontWeight:600,cursor:"pointer"}}>
-                  Create Forecast
-                </button>
-              </div>
+              // FEATURE: CHI-71 -- standardized via the shared DecisionFooter
+              <DecisionFooter
+                prompt="Ready to act on this hypothesis?"
+                secondaryLabel="Store as Info Only"
+                onSecondary={onDiscard}
+                primaryLabel="Create Forecast"
+                onPrimary={() => onCommit()}
+              />
             )}
             {footerKind === "hyp-confirmation" && (
               <ConfirmationCardActions onResolve={onResolveConfirmation}/>
