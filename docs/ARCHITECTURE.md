@@ -1353,6 +1353,109 @@ Three things ship together, and the third is not optional:
 
 ---
 
+## 19k. AI Pattern Tracking — The Runtime Signature Model [discovery `design-log-38-0724`, 2026-07-24]
+
+**Extends `§19i` (LOCKED, not modified here).** This section is the concrete realization of `§19i`'s
+Layer A/B/C model, decided in a live discovery with John. Full reasoning: `docs/harvests/LOG-38-signature-discovery-0724.md`.
+
+**Three named services (John's naming — "Layer A/B/C means nothing and will be forgotten").** Each maps
+to a `§19i` layer, and each has a *different* caller:
+
+| Service | `§19i` layer | What it does | Who calls it |
+|---|---|---|---|
+| **Log Writer** | A | snapshots the structured **signature** into `ai_activity_log.call_facts` at write time | the **harness**, on every AI call (hot path — must be cheap, never block) |
+| **Log Displayer** | B | derives the pattern **name** at read time by matching signature → gold criteria | the **frontend** (the 3 consumers), at render time — *not* the harness |
+| **Pattern Definer** | C | Susan Smith — Trainer defines gold patterns (name + definition + citation + **criteria**) | the **agent path**, occasionally, when a new pattern needs naming (off critical path) |
+
+### The signature
+
+- A **signature** is the deterministic, **agent-agnostic** decode key for a single log row — the ordered
+  set of elements that determine which pattern(s) it used. `agent_id` is **stripped** (that is what makes
+  one signature match many rows). The only log column that seeds it is `ai_activity_log.feature` (the
+  intent slug); everything else is derived from config.
+- **Two zones:** a **config-half** (envelope — always derivable) and a **fact-half** (what happened —
+  sparse; a null element drops out).
+  - Config-half: `capability_skill_profiles.capability_slug` / `.skill_profile_slug`,
+    `skill_profiles.traits` (`source` / `schema` / `intent_allowlist`), `execution_type`. **Skill types
+    read: `knowledge`, `intent`, `format` only** — `identity` out (agent-ID, breaks agent-agnosticism),
+    `behavior` out for now (no pattern-driving traits today).
+  - Fact-half (from the Log Writer): `tool_calls`, `retrieved_chunk_ids`, `retrieval_method`,
+    `gated_subroutine_fired` (built, `LOG-37`); `input_references_other_deliverable`, `sub_calls_chained`
+    (+ `trace_id`), `self_reported_claims` (unbuilt, `LOG-49`).
+- **`guardrails` is a per-skill *column*, not a skill type** (there are **5** skill types, not 6).
+  Declared guardrails are on ~100% of skills → no signal; the Guardrails pattern is decoded from the
+  **fact** `gated_subroutine_fired`.
+
+### Storage — snapshot the values, derive the name
+
+- The **signature raw values** are **snapshotted at write time** (frozen on the row) → the row never
+  drifts. This *extends* `LOG-37`'s existing `call_facts` capture — one unified write-time capture, not a
+  parallel mechanism (Log Writer).
+- The **pattern name is derived at read time** and **never written into the log.** A pattern rename is a
+  one-line edit to the gold row; every past and future row re-derives instantly (self-cleanse). Writing a
+  name into the log is exactly the frozen-label defect this replaces (`patterns_used` / the false `rag`).
+- **History:** rows predating the snapshot are **backfilled** with a signature computed from current
+  config — for structural intents this is provable per `§19i`'s intent-provability, and freezing it also
+  ends drift for those rows. The fact-half stays null on history (unrecoverable, `LOG-46`) so contingent
+  patterns (RAG-augmented) correctly do not assert. **Provenance is date-based** (`created_at` vs the
+  capture-start date), **no per-row flag.**
+
+### The Log Displayer — a plain view, generic match, no per-pattern code
+
+- The connector is a **plain Postgres view** (NOT materialized → live, self-cleansing, no refresh). It
+  matches the log's signature against each gold pattern's **structured `criteria`** — one generic
+  comparison for every pattern (`signature @> criteria` for equality/presence; a bounded operator set for
+  comparisons like `chunks > 0`). **Adding a pattern is a data insert (a gold row) — no CASE branch, no
+  view edit, no deploy.**
+- The view **never runs AI.** The semantic judgment ("this behavior is Request Routing") happens **once**,
+  when the Pattern Definer defines the pattern; the view replays that frozen judgment cheaply, per row.
+  Semantics at definition time, equality at query time.
+- **Unclassifiable rows fall out** via `LEFT JOIN` (a **rich** signature matching nothing — an empty one is
+  expected, not a signal). That is a standing diagnostic pointing at one of three causes: the signature
+  (capture bug), the pattern inventory (a new pattern → Pattern Definer), or the criteria (too narrow).
+- **Scale:** aggregate by **distinct signature** (~dozens, bounded by ~29 intents), never per-row; compute
+  in the DB (`GROUP BY`). No stored summary — the summary *is* the live aggregate.
+- **Returns** a *set* of pattern objects per row — `slug`, `name` + `definition`/`citation` (gold), `role`
+  (`primary` = the `intent` pattern / `supporting`), `evidence` (which element fired the match). Three
+  honest states: governed match / matched-but-uncatalogued (`humanizeSlug`) / not-yet-classified.
+
+### Self-maintenance trigger
+
+An unclassified rich signature → a `pattern_candidates` row stamped with the triggering
+`ai_activity_log.id` (`source_ai_activity_log_id`) → Susan Smith — Trainer is invoked to name it. This is
+what populates `source_ai_activity_log_id` for new candidates going forward (`§19i` Layer C
+self-maintenance; the existing 26 stay null, never backfilled).
+
+### What this eliminates
+
+Hardcoded pattern-naming, wherever it lived: the static `PATTERN_CATALOG`, write-time
+`buildPatternsUsed()`/`patterns_used`, per-pattern CASE logic, and the hand-maintained `SERVICE_LABEL`
+dictionaries. Every "what pattern is this" call reads the one view; every *pattern* is data. The generic
+matcher is the only code, written once, hardcoding no pattern. Legacy code is retired at cutover
+(`LOG-40`), not instantly.
+
+### Build breakdown (each its own kickoff-gated coding session; run in parallel where deps allow)
+
+POC first (de-risk before the build): **`LOG-64`** (prove signature→pattern join, hand-built signatures,
+one case) → **`LOG-65`** (run every anomaly `LOG-42`/`53`/`59` through it; requirements-missed gate).
+Then: **`LOG-66`** (Pattern Definer — add `criteria` column + extend Susan's flow), **`LOG-67`** (Log
+Writer config-snapshot capture), **`LOG-68`** (self-maintenance trigger + `source_ai_activity_log_id`),
+**`LOG-69`** (historic backfill), **`LOG-38`** (the Displayer view itself), **`LOG-70`** (rewire the 6
+consumers), **`LOG-49`** (remaining facts), **`LOG-40`** (cutover), **`LOG-41`** (rollups).
+
+### Locked constraints (also in `.claude/rules/ai-pattern-signature.md`)
+
+1. The pattern **name is never written into the log** — derived at read time only.
+2. The signature is **config + facts, agent-agnostic** (`agent_id` stripped); only `feature` seeds it.
+3. Skill types in the signature: **`knowledge`, `intent`, `format` only.**
+4. The Displayer view is a **plain view, never materialized.**
+5. Pattern detection is **data (criteria on the gold pattern), not per-pattern code.**
+6. **No AI in the per-row/query path** — semantics happen once at definition time (Pattern Definer).
+7. Unclassifiable rows are surfaced (`LEFT JOIN`), never silently dropped; a **rich** unmatched signature
+   is the review signal.
+
+---
+
 ## 17. v4 Preservation [LOCKED]
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.
