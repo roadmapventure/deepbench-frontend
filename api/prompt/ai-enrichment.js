@@ -1,3 +1,4 @@
+// DeepBench v6.3.142 | api/prompt/ai-enrichment.js | LOG-67 -- forward the config-half signature snapshot through enrichPrompt()
 // DeepBench v6.3.136 | api/prompt/ai-enrichment.js | LOG-37a-patch -- gate chunk ids on real retrieval, capture the retrieval method
 // FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7: record *how* context was fetched,
 // not just that it was. LOG-37a (v6.3.132) populated _rag_chunk_ids from `result.chunks` for every
@@ -157,6 +158,9 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
       agent_id: effectiveAgentId,
       capability_slug: effectiveCapabilitySlug,
       intent_technical_services,
+      // FEATURE: LOG-67 -- forward the config-half snapshot from assemblePrompt() untouched, even on
+      // the empty-sections guard path; enrichment neither reads nor changes it.
+      signature_config: promptRequest.signature_config ?? null,
       debug: {
         sections_assembled: 0,
         sections_omitted: [],
@@ -361,6 +365,10 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     agent_id: effectiveAgentId,
     capability_slug: effectiveCapabilitySlug,
     intent_technical_services,
+    // FEATURE: LOG-67 -- forward the config-half snapshot from assemblePrompt() untouched; enrichment
+    // neither reads nor changes it. Every sendRequest() caller passes the enriched object through as
+    // prompt_request, so this one line carries the config-half to the request-receivable write path.
+    signature_config: promptRequest.signature_config ?? null,
     debug: {
       sections_assembled: Object.keys(renderedMap).length,
       sections_omitted: omitted,

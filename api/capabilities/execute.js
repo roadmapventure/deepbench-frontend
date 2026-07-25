@@ -1,3 +1,4 @@
+// DeepBench v6.3.142 | api/capabilities/execute.js | LOG-67 -- config-half signature snapshot merged into call_facts on the agent-turn write path
 // DeepBench v6.3.133 | api/capabilities/execute.js | LOG-37b -- Layer A call-fact capture on the agent-turn write path: logAgentTurn() now records the real tool name the turn called (delegate_to_agent vs request_help vs a schema tool, plus web_search) in the new call_facts jsonb column, instead of only the frozen pattern slug derived from a boolean. patterns_used deliberately unchanged -- Layer A is purely additive, Layer B reclassifies at read time later.
 // DeepBench v6.3.119 | LOO-19 -- Michelle's request_help dispatch passes task_context as a real object, not a stringified blob; JS's Object.entries() on a string iterates characters, which combined with HAR-06's new generic pass-through corrupted her prompt on every request_help call since 2026-07-18
 // DeepBench v6.3.102 | api/capabilities/execute.js | LOO-17 -- resolveAccept()/continue branch no longer mark a checkpoint as a completed accept; new accept_failed terminal state; widened eligibility guards
@@ -48,7 +49,7 @@
 // jobs that genuinely throw are now marked 'status: failed' with a real error instead of sitting
 // orphaned -- DB bookkeeping only, the HTTP error contract is unchanged.
 
-import { assemblePrompt } from '../prompt/db-assembly.js';
+import { assemblePrompt, mergeCallFacts } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 import { sendRequest, callModel } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
@@ -217,7 +218,7 @@ function getSupabaseHeaders(key) {
 // would change patterns_used behavior and needs its own row. Layer A's job here is to capture the
 // real facts alongside it so Layer B can eventually reclassify at read time and ignore the
 // declaration; it is not to reclassify anything now.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [] }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -242,9 +243,9 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
       ...intent_technical_services,
     ])),
     traceId: trace_id,
-    // FEATURE: LOG-37b -- omit the key entirely when nothing was called; logActivity() writes
-    // null rather than `{}`, so "no tool call" stays distinguishable from "not captured".
-    callFacts: toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : null,
+    // FEATURE: LOG-67 -- fact-half (tool_calls) + config-half (signature snapshot) in one call_facts.
+    // mergeCallFacts() returns null when both halves are empty, preserving LOG-37b's "null not {}" contract.
+    callFacts: mergeCallFacts(toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : null, signatureConfig),
   });
 }
 
@@ -639,6 +640,11 @@ async function runLoop({
   job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
   trace_id, // FEATURE: AI-46a -- always supplied by both real callers (runCapability()/resumeCapability()); pure passthrough, same category as job_id/hopCounter/deadline
   onEvent, // FEATURE: MI-42 -- always a real function by the time this fires; runCapability()/resumeCapability() already default it to a no-op
+  // FEATURE: LOG-67 -- the config-half signature snapshot from promptRequest (runCapability() reads it
+  // off db-assembly's raw output, same reason canRequestHelp can't come from `enriched`). Null on the
+  // resume path (durable_hops never persists it) -- an accepted gap, same precedent as
+  // requiresHumanConfirmation/enableWebSearch above; a resumed hop simply logs no config-half.
+  signatureConfig = null,
 }) {
   let delegationRetried = false;
   for (let depth = hopCounter.n; ; depth++) {
@@ -691,6 +697,9 @@ async function runLoop({
       intent_technical_services: enriched.intent_technical_services || [],
       trace_id,
       usedWebSearch: turnUsedWebSearch,
+      // FEATURE: LOG-67 -- the config-half snapshot, threaded from runCapability() (off promptRequest),
+      // merged into this row's call_facts alongside the fact-half tool_calls below.
+      signatureConfig,
       // FEATURE: LOG-37b -- the real tool this turn called, written verbatim. Already in scope and
       // already trusted here: the delegation-routing block below (nextCapabilitySlug /
       // nextIntentSlug / pendingDelegation.via_tool) reads this same field to decide where the hop
@@ -934,6 +943,9 @@ export async function runCapability({
       hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
       trace_id: traceId,
       onEvent,
+      // FEATURE: LOG-67 -- read the config-half off promptRequest (db-assembly's raw output), NOT
+      // `enriched` -- keeps the agent-turn write path independent of the enrichment passthrough.
+      signatureConfig: promptRequest.signature_config ?? null,
     });
   } catch (e) {
     await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id: traceId });

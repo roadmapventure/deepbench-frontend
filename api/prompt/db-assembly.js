@@ -1,3 +1,4 @@
+// DeepBench v6.3.142 | api/prompt/db-assembly.js | LOG-67 -- snapshot the runtime-signature config-half into call_facts at write time
 // DeepBench v6.1.40 | api/prompt/db-assembly.js | AA-121 — Knowledge Skill Profile intent_allowlist gate
 // DeepBench v6.1.13 | api/prompt/db-assembly.js | AA-142 — delegationRequired passthrough
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
@@ -307,6 +308,49 @@ function buildLabel(typeSlug, name) {
   return labels[typeSlug] || (name || typeSlug).toUpperCase();
 }
 
+// FEATURE: LOG-67 -- ARCHITECTURE.md §19k Log Writer, config-half. Projects the assembled skill
+// set into the agent-agnostic config-half of the runtime signature. identity/behavior stripped
+// (agent-agnostic, §19k rule 2); knowledge/intent/format only (rule 3). Ordered k->i->f, gaps
+// removed -- the ordered jsonb array IS the "ordered projection" §19k caveat (b) requires (jsonb
+// arrays preserve order; only object keys don't). Intent-type profiles arrive already scoped to
+// the fired intent by assemblePrompt()'s existing S-APPLE-02b/AA-108 filter -- this function does
+// not re-scope, it just projects what it's given (and includes only k/i/f, so a stray sibling
+// intent could never enter anyway). Empty keys omitted; returns null when nothing to record.
+const SIGNATURE_SKILL_TYPE_ORDER = ['knowledge', 'intent', 'format'];
+
+export function buildSignatureConfig(skillProfiles = [], { capability_slug = null, execution_type = null } = {}) {
+  const kept = (skillProfiles || []).filter(sp => SIGNATURE_SKILL_TYPE_ORDER.includes(sp.skill_type_slug));
+  const ordered = [...kept].sort((a, b) =>
+    (SIGNATURE_SKILL_TYPE_ORDER.indexOf(a.skill_type_slug) - SIGNATURE_SKILL_TYPE_ORDER.indexOf(b.skill_type_slug))
+    || ((a.display_order ?? 0) - (b.display_order ?? 0)));
+
+  const cfg = {};
+  const slugs = ordered.map(sp => sp.slug).filter(Boolean);
+  if (slugs.length) cfg.assembled_skill_slugs = slugs;
+  if (capability_slug) cfg.capability_slug = capability_slug;
+
+  const sources = [...new Set(ordered.map(sp => sp.traits?.source).filter(Boolean))];
+  const allowlists = [...new Set(ordered.flatMap(sp => Array.isArray(sp.traits?.intent_allowlist) ? sp.traits.intent_allowlist : []).filter(Boolean))];
+  const hasSchema = ordered.some(sp => sp.traits?.schema != null);
+  const traits = {};
+  if (sources.length) traits.source = sources;
+  if (hasSchema) traits.schema = true;
+  if (allowlists.length) traits.intent_allowlist = allowlists;
+  if (Object.keys(traits).length) cfg.traits = traits;
+
+  if (execution_type) cfg.execution_type = execution_type;
+  return Object.keys(cfg).length ? cfg : null;
+}
+
+// FEATURE: LOG-67 -- merges the fact-half (buildCallFacts / logAgentTurn inline) with the
+// config-half (buildSignatureConfig) into one call_facts object. Same "null when empty" contract
+// logActivity() already relies on: {} or null both write SQL NULL. Config-half keys are disjoint
+// from fact-half keys, so a flat spread is safe -- no key can collide.
+export function mergeCallFacts(factHalf, configHalf) {
+  const merged = { ...(factHalf || {}), ...(configHalf || {}) };
+  return Object.keys(merged).length ? merged : null;
+}
+
 export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -334,6 +378,9 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       requiresHumanConfirmation: false,
       critiqueCapabilitySlug: null,
       critiqueIntentSlug: null,
+      // FEATURE: LOG-67 -- no capability config on the degraded path; null keeps the field shape
+      // consistent for the enrichment passthrough / write-path readers (never undefined).
+      signature_config: null,
     };
   }
 
@@ -341,6 +388,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
 
   let agentConfigs = [];
   let skillProfiles = [];
+  // FEATURE: LOG-67 -- near-zero-variance signature field #14; sourced from the FK embed on the
+  // primary-capability select below (no extra round trip). Stays null if PostgREST can't resolve
+  // the embed -- the write is never blocked on it.
+  let executionType = null;
 
   // 1. Load agent_configs if agent_id provided
   if (agent_id) {
@@ -354,11 +405,15 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // 2. Load skill_profiles for the given capability_slug
   if (capability_slug) {
     const spR = await fetch(
-      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+      // FEATURE: LOG-67 -- embed the capability row via FK capability_skill_profiles_capability_slug_fkey
+      // to source execution_type without a second fetch.
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*),capabilities(execution_type)&order=display_order.asc`,
       { headers }
     );
     if (spR.ok) {
       const rows = await spR.json() || [];
+      // FEATURE: LOG-67 -- capture execution_type off the first row before the map discards row.capabilities.
+      executionType = rows[0]?.capabilities?.execution_type ?? null;
       skillProfiles = rows.map(row => ({
         ...row.skill_profiles,
         level: row.level,
@@ -426,6 +481,11 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     // with zero declared intents already runs in, just Identity/Behavior/Knowledge/Guardrails.
     skillProfiles = skillProfiles.filter(sp => sp.skill_type_slug !== 'intent');
   }
+
+  // FEATURE: LOG-67 -- snapshot BEFORE the enrichment merge below; the signature is the PRIMARY
+  // capability's own config only (agent-agnostic), never the enrichment capability's skills. Taken
+  // after the fired-intent filter above so it inherits the correct intent scoping for free.
+  const signatureConfig = buildSignatureConfig(skillProfiles, { capability_slug, execution_type: executionType });
 
   // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)
   // These profiles contribute technical_services triggers (reflect, synthesis) with Dan's authored prompts.
@@ -585,6 +645,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     critiqueCapabilitySlug,
     critiqueIntentSlug,
     intent_technical_services: intentTechnicalServices,
+    // FEATURE: LOG-67 -- the config-half of the runtime signature, frozen at write time. Carried
+    // through enrichPrompt() (passthrough) to the sendRequest() model-call write path, and read
+    // directly off this object at the agent-turn write path in execute.js's runCapability().
+    signature_config: signatureConfig,
   };
 }
 

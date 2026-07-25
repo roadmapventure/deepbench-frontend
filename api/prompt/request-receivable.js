@@ -1,3 +1,4 @@
+// DeepBench v6.3.142 | api/prompt/request-receivable.js | LOG-67 -- merge the config-half signature snapshot into call_facts on the model-call write path
 // DeepBench v6.3.136 | api/prompt/request-receivable.js | LOG-37a-patch -- record the retrieval method as its own Layer A fact
 // FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7. buildCallFacts() now also collapses
 // ai-enrichment.js's per-section retrieval methods into a single retrieval_method fact, which is what
@@ -17,6 +18,9 @@ import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write
 // FEATURE: AI-35 -- Susan Smith's pattern_vocabulary review/promote handler registration.
 import { handle as patternVocabularyWriteHandle } from '../_lib/handlers/pattern-vocabulary-write.js';
 import { logActivity } from '../../lib/activity-log.js';
+// FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
+// carried on the enriched prompt_request.
+import { mergeCallFacts } from './db-assembly.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
@@ -674,7 +678,11 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
 
   // FEATURE: LOG-37 -- Layer A facts assembled from data already in scope; the patternsUsed block
   // above is deliberately untouched and keeps working exactly as it does today.
-  const callFacts = buildCallFacts({
+  // FEATURE: LOG-67 -- fact-half (buildCallFacts) + config-half (snapshot from assemblePrompt,
+  // carried through enrichPrompt as prompt_request.signature_config). signature_config is null for
+  // any caller that predates LOG-67 or has no capability config -- mergeCallFacts handles null on
+  // either side. The buildCallFacts({...}) argument object is unchanged; only its result is wrapped.
+  const callFacts = mergeCallFacts(buildCallFacts({
     rawContent,
     guardrailsRan,
     reflectRan: enrichDebug.reflect_ran === true,
@@ -682,7 +690,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     ragChunkIdsBySection: enrichDebug.rag_chunk_ids_by_section,
     // FEATURE: LOG-37a-patch -- threaded off enrichDebug exactly like the ids above.
     ragMethodBySection: enrichDebug.rag_method_by_section,
-  });
+  }), prompt_request?.signature_config ?? null);
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
   // directly for channel-intelligence/quality-gate today, needs zero new AI_TYPE_TO_SERVICE entries
