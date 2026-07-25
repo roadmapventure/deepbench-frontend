@@ -2006,3 +2006,34 @@ sessions should stage and push their markers. Likewise `design-ai-audit-screen-0
 which is genuinely stale (six days old, still in the pre-`SES-011` bullet format, session never
 closed out) but belongs to another session — the `session-setup` skill's "only ever edit or delete
 your own inflight file" rule applies.
+
+## S-LOG-64 (POC, no version — docs/Supabase-read only, 2026-07-24, worktree `design-log-64-0724`)
+
+`LOG-64` — **POC 1 of the LOG-38 runtime signature model (`ARCHITECTURE.md §19k`): prove the
+signature→pattern join before the build. Done, mechanism de-risked.** Full working detail:
+`docs/harvests/LOG-64-poc-signature-join-0724.md`.
+
+**Proven live** on real row `ai_activity_log.id=19329` (Michelle, `agent-selection-intent`): a
+signature computed from real config + `call_facts` joined the real `request-routing` gold row via
+`signature @> criteria` → derived "Request Routing"; `@>` **empirically order-independent** (two
+key-orderings compare `=` and both match); a **structural** pattern resolves from the config-half
+**anchor alone** on an all-null fact-half, and the RAG criteria correctly did **not** match — the
+false-`rag` fix in miniature. All throwaway inline SQL; nothing persisted.
+
+**Decided with John, locked into `§19k`:** the 15-field signature order, ranked by **intrinsic
+telling-ness under full attribution** (John's frame — a null field drops out entirely, so coverage is
+handled by removal; ranking on telling × coverage double-counts absence). Under full attribution
+**facts are proof, config is only propensity → facts rank above config**, below the `intent` anchor;
+`trace_id` last. Three locked caveats: the order is a diagnostic/aggregation-key aid not the matcher
+(`@>` is order-agnostic); "attributed fields move up" needs an **ordered projection**, not bare jsonb
+(LOG-67); facts-over-config holds for contingent patterns only (the primary/structural one is provable
+from `intent` + config on history).
+
+**Requirements the POC surfaced (folded into the build tickets):** LOG-67 must scope the signature's
+intent-type skill to the **fired** intent (the naive all-skills-on-capability read leaked the sibling
+intent `work-order-decomposition`; one-WHERE-clause fix proven live) and store the signature as an
+ordered projection; LOG-66's `criteria` needs a bounded operator set beyond `@>` (for
+`retrieved_chunk_ids > 0`) and is an intent-enumeration-as-data for Susan's merged patterns
+(`agent-selection-intent` + `ci-routing-intent` = Request Routing); LOG-65 resolves the pure-`@>`
+-per-intent vs `in`-operator choice while running the full anomaly set. No new backlog rows needed —
+all findings homed on existing tickets. No code, no version bump.

@@ -1443,6 +1443,29 @@ Writer config-snapshot capture), **`LOG-68`** (self-maintenance trigger + `sourc
 **`LOG-69`** (historic backfill), **`LOG-38`** (the Displayer view itself), **`LOG-70`** (rewire the 6
 consumers), **`LOG-49`** (remaining facts), **`LOG-40`** (cutover), **`LOG-41`** (rollups).
 
+### Signature field order [locked `design-log-64-0724` (LOG-64 POC), 2026-07-24]
+
+The discovery deliberately left exact element positions open; the LOG-64 POC forced and fixed them.
+**Ranking principle: intrinsic telling-ness under *full attribution*** — "if this field is present, how much
+does it collapse the pattern space?" — **not** telling × coverage. A null field drops out of the signature
+entirely, so coverage is already handled by removal; penalizing sparsity again in the stored order
+double-counts the same absence. Under full attribution **facts are proof, config is only propensity → facts
+rank above config**, below the `intent` anchor:
+
+1. `intent` (anchor) · 2. `retrieval_method` · 3. `tool_calls` · 4. `gated_subroutine_fired` ·
+5. `sub_calls_chained` · 6. `retrieved_chunk_ids` (count) · 7. `assembled_skill_slugs` (k→i→f) ·
+8. `capability_slug` · 9. `traits.schema` · 10. `traits.source` ·
+11. `input_references_other_deliverable` · 12. `self_reported_claims` · 13. `traits.intent_allowlist` ·
+14. `execution_type` · 15. `trace_id` (plumbing, last).
+
+Three caveats on the order (all locked with it): **(a)** the order is a diagnostic + canonical-aggregation-key
+aid, **not the matcher** — `@>` is order-independent (proven empirically in the POC); get it directionally
+right, do not over-perfect (no single order is optimal for every pattern). **(b)** "attributed fields move up"
+requires the stored signature be an **ordered projection** (canonical, gaps-removed), not a bare `jsonb` object
+(LOG-67). **(c)** facts-over-config holds for **contingent** patterns only; the **primary/structural** pattern
+is provable from `intent` + config alone (history/backfill), which is why `intent` is #1 and
+`assembled_skill_slugs` stays upper-middle. POC result + full reasoning: `docs/harvests/LOG-64-poc-signature-join-0724.md`.
+
 ### Locked constraints (also in `.claude/rules/ai-pattern-signature.md`)
 
 1. The pattern **name is never written into the log** — derived at read time only.

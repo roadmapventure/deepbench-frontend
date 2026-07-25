@@ -154,6 +154,7 @@
 ## AI INFRASTRUCTURE — AI
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
+| LOG-64 | **POC 1 — signature→pattern join PROVEN 2026-07-24 (`design-log-64-0724`), de-risked. No code, no version (throwaway inline SQL only, nothing persisted).** On live row `ai_activity_log.id=19329` (Michelle, `agent-selection-intent`) a signature computed from real config + `call_facts` joined the real `request-routing` gold row via `signature @> criteria` → derived **"Request Routing"**; `@>` proven **empirically order-independent**; RAG criteria correctly did **not** match the all-null fact-half (**false-`rag` dissolves**). **Locked the 15-field full-attribution signature order** (facts-as-proof above config-as-propensity; `intent` #1, `trace_id` last) → appended to `ARCHITECTURE.md §19k`. **Two build requirements surfaced:** LOG-67 must scope the intent-skill to the *fired* intent (naive read leaked sibling intent `work-order-decomposition`; fix proven live) and store the signature as an *ordered projection* not bare jsonb; LOG-66's `criteria` needs a bounded operator set beyond `@>` and is an intent-enumeration-as-data for Susan's merged patterns. Full detail: `docs/harvests/LOG-64-poc-signature-join-0724.md`. | ✅ Done | S-LOG-64 (POC, `design-log-64-0724`) |
 | AI-01 | AiBadge on every AI-touched element app-wide — tooltip label on every instance | ✅ Done | S-AI01b + patch + patch2 (e975715) |
 | AI-02 | Universal AI status dot | ✅ Done | DONE |
 | AI-04 | Intelligent agent routing | ✅ Done | DONE |
