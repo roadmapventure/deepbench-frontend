@@ -1,0 +1,1 @@
+ui-update-0724 — worktree `ui-update-0724`, branch `session/ui-update-0724`. Session on a UI update (topic TBD with John). Created 2026-07-24 from origin/dev. Design session: understand the problem with John, reach a fix/kickoff if settled.
