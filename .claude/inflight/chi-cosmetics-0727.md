@@ -1,0 +1,1 @@
+chi-cosmetics-0727 — worktree `chi-cosmetics-0727`, branch `session/chi-cosmetics-0727`. Session started 2026-07-27 from origin/dev. Building CHI-79 (Draft-ready bubble missing its closing hop caption) + CHI-80 (Accept button → dark-blue hero CTA), the two cosmetics split out of LOO-20's forecast screenshot. John directed both together.
