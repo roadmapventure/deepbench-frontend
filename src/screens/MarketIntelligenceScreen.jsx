@@ -1,3 +1,4 @@
+// DeepBench v6.3.146 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 4) -- AgentWorkingIndicator live status back to ONE line (elapsed + estimate, then diamond + activity + this-agent time), reverting MI-49's two-line split per John
 // DeepBench v6.3.143 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 3) -- both Column-2 interaction footers (qa-review, hyp-result) now render through the shared DecisionFooter standard; hyp-result gains a prompt, Priya CTA shortened
 // DeepBench v6.3.141 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.140 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 1) -- chat-header rename ("Chat with Marcus" + "Q&A · Corrections · Escalations" branding + "Question › Analysis › Theory › Forecast › Update" Process/Steps line), page subtitle -> "Apple channel performance analysis", hops summary on one line, "(expect" -> "(expected"
@@ -636,10 +637,11 @@ function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation 
       <FeatureBadge id="MI-47"/>
       <FeatureBadge id="MI-49"/>
       <FeatureBadge id="CHI-56"/>
-      <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>
-        elapsed {formatElapsed(now - turnStartedAt)}{expectation ? ` | ${expectation}` : ""}
-      </span>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
+      {/* FEATURE: CHI-71 -- re-merged onto ONE line (John's live call, reverting MI-49's two-line split):
+          total elapsed + estimate, then the diamond + activity message + this-agent time, all in one
+          right-aligned row that wraps only if it ever runs out of width. */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>elapsed {formatElapsed(now - turnStartedAt)}{expectation ? ` | ${expectation}` : ""}</span>
         <AIDiamond size="7px" color={T.brass}/>
         <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
         <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
