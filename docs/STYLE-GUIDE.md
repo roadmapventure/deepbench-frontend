@@ -98,6 +98,8 @@ Every card uses `<Corners />` from `SharedUI.jsx`.
 | Navy (`T.navy`) | `T.card` or `T.brassLight` | Default badge color (brass) works |
 | Transparent / card | `T.navy` or `T.brassDeep` | Default badge color works |
 
+**Primary/confirm CTA fill (Locked 2026-07-27, `S-CHI-80`):** decision and confirmation primary buttons use `T.navy`, not `T.brass` — the shared `DecisionFooter` primary ("Create Forecast" etc.), `ConfirmationCardActions`' Accept, and the Edit-mode "Resubmit" all fill navy. `T.brass` is an accent/border color, not a primary-action fill; a brass primary button is the outlier to fix, not a variant.
+
 **Implementation pattern for brass buttons:**
 ```jsx
 {/* ✦ AI badge placed OUTSIDE the button when button bg = brass */}
