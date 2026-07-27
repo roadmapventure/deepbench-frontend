@@ -1,4 +1,5 @@
 // DeepBench v6.3.147 | MarketIntelligenceScreen.jsx | S-CHI-73 -- CHI live-status expected-time fallback (centralized) + intent-branched hyp_entry ack tail + Column-2 waiting-state motion (Candidates/Result skeletons)
+// DeepBench v6.3.148 | MarketIntelligenceScreen.jsx | S-CHI-74 -- grounded-work chat bubbles (forecast/theory/correct routing ack, theory candidates) now carry their close status (elapsed vs expected + hops) via HopSummaryLine, same as the Q&A bubble; formatHopSummary/HopSummaryLine gain isAnswer flag so non-answer bubbles read "Full Agent Routing" (drop "& Answer")
 // DeepBench v6.3.146 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 4) -- AgentWorkingIndicator live status back to ONE line (elapsed + estimate, then diamond + activity + this-agent time), reverting MI-49's two-line split per John
 // DeepBench v6.3.143 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 3) -- both Column-2 interaction footers (qa-review, hyp-result) now render through the shared DecisionFooter standard; hyp-result gains a prompt, Priya CTA shortened
 // DeepBench v6.3.141 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
@@ -1074,10 +1075,12 @@ function NeedsDecisionBadge() {
 // to create, but the full agent routing took 9 hops," so the total stated here must match
 // Column 3's running count, not a per-answer span. A later message's own hopEnd will be higher;
 // this line is a fixed snapshot of the total as of when THIS message finished, not a live value.
-function formatHopSummary(hopEnd, totalElapsedMs) {
+function formatHopSummary(hopEnd, totalElapsedMs, isAnswer = true) {
   if (hopEnd == null || totalElapsedMs == null) return null;
   const hopWord = hopEnd === 1 ? "hop" : "hops";
-  return `Full Agent Routing & Answer in ${hopEnd} ${hopWord} total, ${formatElapsed(totalElapsedMs)}`;
+  // FEATURE: CHI-74 -- non-answer grounded-work bubbles (forecast ack, theory candidates) drop "& Answer"
+  const lead = isAnswer ? "Full Agent Routing & Answer" : "Full Agent Routing";
+  return `${lead} in ${hopEnd} ${hopWord} total, ${formatElapsed(totalElapsedMs)}`;
 }
 
 // FEATURE: CHI-21 — replaces the two previously-stacked <div>s (HopBadge alone, elapsed-time
@@ -1089,9 +1092,9 @@ function formatHopSummary(hopEnd, totalElapsedMs) {
 // muted line beneath the existing hop-badge/summary row so John can see whether the system's own
 // estimate was accurate. Absent (older messages, or a flow that doesn't snapshot one) renders
 // nothing extra, same as today.
-function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent, estimate }) {
+function HopSummaryLine({ hopStart, hopEnd, totalElapsedMs, accent, estimate, isAnswer = true }) {
   if (hopStart == null || hopEnd == null) return null;
-  const summary = formatHopSummary(hopEnd, totalElapsedMs);
+  const summary = formatHopSummary(hopEnd, totalElapsedMs, isAnswer);
   // FEATURE: CHI-71 -- badge + summary + estimate all on one line (was estimate on its own second line)
   return (
     <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
@@ -1585,7 +1588,8 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
       </div>
       {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs), same
           component as the qa branch above. */}
-      <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy}/>
+      {/* FEATURE: CHI-74 -- non-answer grounded-work bubbles carry their own close (elapsed vs expected); estimate + isAnswer=false threaded here */}
+      <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy} estimate={msg.estimate} isAnswer={false}/>
       {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
           non-qa needs_review case (no message today reaches this with needs_review true, but this
           keeps the treatment consistent should a future non-qa kind carry the flag). */}
@@ -3328,6 +3332,7 @@ export default function MarketIntelligenceScreen() {
       setStatus("Priya is generating hypotheses…", { expectation: est != null ? formatExpectation(est) : null });
     }
     try {
+      const hopBeforeGen = currentHopCount(pipelineEventsRef.current); // FEATURE: CHI-74 -- hop span start for the theory-candidates close line
       const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
       if (isStale()) return; // FEATURE: CHI-04
       logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, patterns_used }, Date.now() - t0));
@@ -3338,7 +3343,9 @@ export default function MarketIntelligenceScreen() {
       // has no candidates array, a single prefilled theory instead, a different UI affordance).
       const n = candidates?.length ?? 0;
       if (n > 0) {
-        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `You have ${n} theor${n === 1 ? "y" : "ies"} to choose from — select one or write your own for deeper analysis.` })]);
+        // FEATURE: CHI-74 -- theory candidates are grounded work (Priya's generation); carry their close (elapsed vs expected + hops)
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `You have ${n} theor${n === 1 ? "y" : "ies"} to choose from — select one or write your own for deeper analysis.`,
+          totalElapsedMs: Date.now() - t0, hopStart: hopBeforeGen + 1, hopEnd: currentHopCount(pipelineEventsRef.current), estimate: buildEndStatusEstimate("expected < 2m") })]);
       }
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
@@ -3455,7 +3462,9 @@ export default function MarketIntelligenceScreen() {
       } else if (result.kind === "hyp_entry") {
         // FEATURE: CHI-73 — tail now branches on intent (HYP_ENTRY_TAIL) instead of the old
         // "Pick or refine a hypothesis on the right." that referenced a not-yet-generated choice.
-        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. ${HYP_ENTRY_TAIL[result.intent] || "Building theories now..."}` })]);
+        // FEATURE: CHI-74 -- the forecast/theory/correct routing ack is grounded work; carry its close (elapsed vs expected + hops), same as the Q&A bubble, using this turn's own in-scope tracking
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. ${HYP_ENTRY_TAIL[result.intent] || "Building theories now..."}`,
+          totalElapsedMs: Date.now() - turnStart, hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current), estimate: expectationAtStart })]);
         await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, citations: [], reviewReason: null });
       } else {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
