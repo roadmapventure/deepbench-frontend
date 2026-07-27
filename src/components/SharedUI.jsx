@@ -570,7 +570,7 @@ export function ConfirmationCardActions({ onResolve }) {
         Edit
       </button>
       <button disabled={busy} onClick={()=>resolve("accept")}
-        style={{flex:1,padding:"8px 6px",background:T.brass,color:T.card,border:"none",fontFamily:body,fontSize:11,fontWeight:600,cursor:busy?"default":"pointer"}}>
+        style={{flex:1,padding:"8px 6px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11,fontWeight:600,cursor:busy?"default":"pointer"}}>
         Accept
       </button>
     </div>

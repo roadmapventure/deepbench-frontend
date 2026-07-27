@@ -3707,6 +3707,11 @@ export default function MarketIntelligenceScreen() {
     if (!hypFlow) return;
     // FEATURE: CHI-42 — instant "You" narration bubble, pushed before any state change or async call. See STYLE-GUIDE.md §36.
     setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You requested a forecast." })]);
+    // FEATURE: CHI-79 -- span start for the draft-ready bubble's close caption. Captured here (not
+    // the existing t0, which is reset between the Elena and Nadia hops) so the caption covers the
+    // whole commit sequence, mirroring the CHI-74 theory-candidates close line.
+    const commitStart = Date.now();
+    const hopBeforeCommit = currentHopCount(pipelineEventsRef.current);
     logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
@@ -3765,7 +3770,12 @@ export default function MarketIntelligenceScreen() {
       // read-only arrival), this moment requires a real decision (accept/edit/reject a Data
       // Room write) — worth more than a silent footer/drawer change. No new AI call, no new
       // intent — a plain static string.
-      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Nadia has a draft ready for your review — see the Draft Forecast panel below." })]);
+      // FEATURE: CHI-79 -- the one draft-ready bubble CHI-74/CHI-76's standardization missed: carry
+      // its close caption (elapsed vs expected + hops) like every other grounded-work bubble. No
+      // isAnswer -> HopSummaryLine's default (isAnswer=false) reads "Full Agent Routing" (no
+      // "& Answer") -- a draft-ready notice is a routing-completion ack, not an answer.
+      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Nadia has a draft ready for your review — see the Draft Forecast panel below.",
+        totalElapsedMs: Date.now() - commitStart, hopStart: hopBeforeCommit + 1, hopEnd: currentHopCount(pipelineEventsRef.current), estimate: buildEndStatusEstimate("expected < 2m") })]);
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
