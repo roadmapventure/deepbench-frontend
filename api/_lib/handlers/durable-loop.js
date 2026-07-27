@@ -5,19 +5,26 @@
 // this session's migration) so a resumed chain can forward the real structured task_context to a
 // delegate instead of losing it to a free-text task paraphrase. loadDurableHopRow() needs no change
 // (select=* already returns the new column).
+// FEATURE: LOO-20 — createDurableHopRow() now also accepts and persists the three confirmation-gate
+// override fields (requires_human_confirmation, critique_capability_slug, critique_intent_slug; new
+// columns, this session's migration) so a resumed chain re-reads the real confirmation gate instead
+// of the hardcoded requiresHumanConfirmation:false the three resume sites used to null it to. Same
+// persist-on-checkpoint/recover-on-resume pattern delegation_required/task_context already follow.
+// loadDurableHopRow() needs no change (select=* already returns the new columns).
 
 function headers(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
 }
 
-export async function createDurableHopRow({ tenant_id, capability_slug, intent_slug, agent_id, task_context, system_prompt, format_contract, llm, can_request_help, delegation_required, trace_id }) {
+export async function createDurableHopRow({ tenant_id, capability_slug, intent_slug, agent_id, task_context, system_prompt, format_contract, llm, can_request_help, delegation_required, requires_human_confirmation, critique_capability_slug, critique_intent_slug, trace_id }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   const res = await fetch(`${supabaseUrl}/rest/v1/durable_hops`, {
     method: 'POST', headers: { ...headers(supabaseKey), Prefer: 'return=representation' },
     body: JSON.stringify({
       tenant_id, capability_slug, intent_slug, agent_id, task_context,
-      system_prompt, format_contract, llm, can_request_help, delegation_required, trace_id, status: 'in_progress',
+      system_prompt, format_contract, llm, can_request_help, delegation_required,
+      requires_human_confirmation, critique_capability_slug, critique_intent_slug, trace_id, status: 'in_progress',
     }),
   });
   if (!res.ok) throw new Error(`Failed to create durable_hops row: ${res.status}`);

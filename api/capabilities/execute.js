@@ -1,3 +1,4 @@
+// DeepBench v6.3.154 | api/capabilities/execute.js | LOO-20 -- persists requires_human_confirmation + critique_capability_slug/critique_intent_slug across checkpoint/resume (durable_hops migration + checkpointAndReturn/resume plumbing) so a resumed confirmation-gated chain re-lands on the human-confirmation gate instead of the hardcoded requiresHumanConfirmation:false the three resume sites used -- restores the empty Draft Forecast card / bypassed Data Room gate; also patches the durable_hops row terminal when the gate fires on a resumed job so a stray re-resume can't write a duplicate pending_confirmations row
 // DeepBench v6.3.153 | api/capabilities/execute.js | LOG-49 -- completes the signature fact-half: threads span_id/parent_span_id chain links (one span per runCapability execution; a delegated child points parent_span_id at the caller's span; persisted across checkpoint/resume via durable_hops exactly as trace_id is), stamps input_references_other_deliverable once a delegate result is folded back into the loop's input, and captures the model's quarantined self_reported_claims -- all on the agent-turn write path
 // DeepBench v6.3.142 | api/capabilities/execute.js | LOG-67 -- config-half signature snapshot merged into call_facts on the agent-turn write path
 // DeepBench v6.3.133 | api/capabilities/execute.js | LOG-37b -- Layer A call-fact capture on the agent-turn write path: logAgentTurn() now records the real tool name the turn called (delegate_to_agent vs request_help vs a schema tool, plus web_search) in the new call_facts jsonb column, instead of only the frozen pattern slug derived from a boolean. patterns_used deliberately unchanged -- Layer A is purely additive, Layer B reclassifies at read time later.
@@ -432,7 +433,7 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id, span_id = null, parent_span_id = null }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id, span_id = null, parent_span_id = null }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -440,6 +441,11 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
       llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature }, can_request_help: canRequestHelp,
       delegation_required: delegationRequired === true,
+      // FEATURE: LOO-20 -- persist the confirmation-gate overrides so a resume re-reads the real
+      // gate instead of the hardcoded false; snake_case column names, same as delegation_required.
+      requires_human_confirmation: requiresHumanConfirmation === true,
+      critique_capability_slug: critiqueCapabilitySlug || null,
+      critique_intent_slug: critiqueIntentSlug || null,
       trace_id,
     });
     row_id = row.id;
@@ -700,6 +706,7 @@ async function runLoop({
     if (remainingMs < hopReserveMs) {
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+        requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: null,
         trace_id, span_id, parent_span_id,
@@ -820,6 +827,17 @@ async function runLoop({
           prompt_request: { system_prompt: enriched.system_prompt, format_contract: enriched.format_contract, llm: enriched.llm },
           delegation_occurred: delegationOccurred, depth,
         });
+        // FEATURE: LOO-20 -- on a resumed job (job_id set) the gate fires without any row patch,
+        // leaving the durable_hops row orphaned at 'in_progress' and re-resumable into a DUPLICATE
+        // pending_confirmations insert. Mark it terminal here, mirroring the plain terminal path's
+        // own patch below -- a stray re-resume then hits resumeCapability()'s already-terminal
+        // early-return and does nothing. (Fresh top-level calls have no job_id, unchanged.)
+        if (job_id) {
+          await patchDurableHopRow(job_id, {
+            status: 'complete',
+            result: { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug },
+          });
+        }
         return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
       }
 
@@ -882,6 +900,7 @@ async function runLoop({
     if (preDispatchRemainingMs < preDispatchReserveMs) {
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+        requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
         trace_id, span_id, parent_span_id,
@@ -900,6 +919,7 @@ async function runLoop({
     if (dispatchOutcome.outcome === 'nested_checkpoint') {
       return checkpointAndReturn({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+        requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
         pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
         trace_id, span_id, parent_span_id,
@@ -1031,11 +1051,13 @@ export async function runCapability({
 // from durable_hops (job_id is the only thing the caller needs to carry between invocations) and
 // hands off to the same runLoop() a fresh call uses -- no second loop implementation. Gets a
 // genuinely fresh deadline (this is a new invocation with its own real 60s budget), not the
-// exhausted one that triggered the checkpoint. `requires_human_confirmation`/critique/display
-// override fields are not persisted on durable_hops (schema from AA-138, unchanged) -- a resumed
-// chain runs without the consequential-action gate and without a display-card override, matching
-// AA-138's proven scope; no live path today reaches the gate via a chain that also risks the
-// budget ceiling (kickoff SCOPE RULES).
+// exhausted one that triggered the checkpoint.
+// FEATURE: LOO-20 -- requires_human_confirmation + critique_capability_slug/critique_intent_slug
+// ARE now persisted on durable_hops (this session's migration) and recovered on every resume
+// below, so a resumed confirmation-gated chain re-lands on the gate at execute.js's
+// requiresHumanConfirmation branch instead of silently skipping it (the empty-Draft-Forecast /
+// bypassed-Data-Room bug). The display_agent_id/display_agent_card override fields remain
+// un-persisted (a resumed chain runs without a display-card override) -- out of this fix's scope.
 export async function resumeCapability({ job_id, _onEvent = null }) {
   if (!job_id) throw new Error('job_id required');
   const row = await loadDurableHopRow(job_id);
@@ -1094,6 +1116,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         return checkpointAndReturn({
           job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug,
           agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true,
+          // FEATURE: LOO-20 -- recover the confirmation-gate overrides from the row so they survive
+          // multiple checkpoint->resume cycles (same pattern delegation_required already follows here).
+          requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
           task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
           delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
           pendingDelegation: row.pending_delegation,
@@ -1117,8 +1142,12 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       return await runLoop({
         capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
         task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
-        delegationRequired: row.delegation_required === true, requiresHumanConfirmation: false,
-        critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
+        delegationRequired: row.delegation_required === true,
+        // FEATURE: LOO-20 -- recover the confirmation gate from the persisted row (was hardcoded
+        // false, which silently dropped the human-confirmation card on any resumed gated chain).
+        requiresHumanConfirmation: row.requires_human_confirmation === true,
+        critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+        display_agent_id: null, display_agent_card: null,
         conversationHistory, delegationOccurred: true,
         lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
         deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
@@ -1136,7 +1165,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
       }
       // FEATURE: AI-46a -- this runLoop() continuation (the post-dispatch "continue" outcome, resumed
       // chain's own delegate hop having completed live above rather than checkpointing again) is not
@@ -1147,8 +1176,12 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       return await runLoop({
         capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
         task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
-        delegationRequired: row.delegation_required === true, requiresHumanConfirmation: false,
-        critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
+        delegationRequired: row.delegation_required === true,
+        // FEATURE: LOO-20 -- recover the confirmation gate from the persisted row (was hardcoded
+        // false, which silently dropped the human-confirmation card on any resumed gated chain).
+        requiresHumanConfirmation: row.requires_human_confirmation === true,
+        critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+        display_agent_id: null, display_agent_card: null,
         conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
         lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
         deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
@@ -1169,7 +1202,8 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       // its own future session") -- proven live-exploitable by this session's own reproduction
       // (see kickoff CONTEXT, Gap 2).
       delegationRequired: row.delegation_required === true,
-      requiresHumanConfirmation: false, critiqueCapabilitySlug: null, critiqueIntentSlug: null,
+      // FEATURE: LOO-20 -- recover the confirmation gate from the persisted row (was hardcoded false).
+      requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
       display_agent_id: null, display_agent_card: null,
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
