@@ -1507,6 +1507,22 @@ Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settle
   false `rag`); `patterns_used` is deliberately **not** a signature input. Write-path fix `LOG-63`
   unshipped.
 
+### Signature field value vocabulary [LOG-52, sourced from the Log Writer's emit contract, not from log sampling]
+
+The values a gold pattern's `criteria` may assert, per field. These are the **legal value strings the code emits** (definitional) — the Pattern Definer authors against these, never by sampling what log rows happen to contain (that would let the log choose the name). Fields with a **closed set** are what Susan authors most `criteria` against; a typo'd value silently matches nothing.
+
+**Closed sets:**
+- `retrieval_method`: `similarity-search` | `direct-lookup` | `mixed`. Source: `retrievalMethodFor()` in `api/prompt/ai-enrichment.js` (`roster` / `the_library_catalog` → `direct-lookup`, everything else → `similarity-search`) collapsed per call in `request-receivable.js` `buildCallFacts()` (one method → that method; more than one → `mixed`). **The key is omitted entirely when no context was fetched** — it is never written as `none`. "Fetched nothing" is the absence of the key, distinct from "not captured".
+- `model_modality`: `embedding` | `generative` | `none`. Read-time derivation from `ai_activity_log.model` (`text-embedding-*` → `embedding`, null → `none`, else `generative`) — not stored in `call_facts`. `none` doubles as the false-generation guard (a non-generative row can never match a generation pattern).
+- `execution_type`: `ai` | `deterministic`. Source: `capabilities.execution_type` (`select distinct` — exactly these two).
+
+**Open sets** (cite known members; new members appear without a schema change — do not assert an exhaustive `in [...]` against them):
+- `tool_calls`: intent slugs + tool names (e.g. `web_search`). Array; match presence with `@>` or `{ "in": [...] }` against known members.
+- `gated_subroutine_fired`: subroutine names — known member `guardrails`. This (not a skill type) is how the Output Guardrails pattern is decoded.
+
+**Numeric:**
+- `retrieved_chunk_ids`: an array; asserted only via the count operator on its length, `{ ">": N }` (e.g. `{ ">": 0 }` for "retrieval actually happened") — never by matching specific ids.
+
 ### Locked constraints (also in `.claude/rules/ai-pattern-signature.md`)
 
 1. The pattern **name is never written into the log** — derived at read time only.
