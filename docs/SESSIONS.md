@@ -2037,3 +2037,54 @@ ordered projection; LOG-66's `criteria` needs a bounded operator set beyond `@>`
 (`agent-selection-intent` + `ci-routing-intent` = Request Routing); LOG-65 resolves the pure-`@>`
 -per-intent vs `in`-operator choice while running the full anomaly set. No new backlog rows needed —
 all findings homed on existing tickets. No code, no version bump.
+
+---
+
+## S-CHI-73-design/S-CHI-73 (v6.3.147, `653f435`, 2026-07-27, worktree `chi-ui-0727`)
+
+`CHI-73` (UI) ✅ **Done, live-QA passed on the deployed dev preview.** Three Channel
+Intelligence live-status/waiting-state UX cleanups John reported off a single forecast-flow
+screenshot ("How do smartphone upgrade cycles vary by country…"). All three land in **single
+shared components** (`AgentWorkingIndicator`, `EvidenceColumn`) that render on both desktop and
+mobile, so one fix each covered both surfaces — no `MOB` row. 1 file
+(`MarketIntelligenceScreen.jsx`), no `api/`/schema/delegation touched.
+
+**Design conversation, the part worth keeping:** John's own question drove the shape of task 2.
+His first read was "we already have a standard activity timer — is this not centralized, and why
+isn't this one using its fallback?" Mapping every status call site confirmed his instinct exactly:
+the **display** is centralized (one `AgentWorkingIndicator`, so `elapsed` is universal — it's
+computed inside the component and no call site can forget it), but the **expected-time fallback was
+never centralized** — the `"< 2m"` ceiling was a literal that only the qa flow's call site passed,
+while the 2 hypothesis statuses passed a grounded estimate *or `null`* and 7 other statuses passed
+nothing. That's why the screenshot showed "Priya is generating hypotheses…" with no estimate. Fix
+became: move the fallback into the component (`LIVE_EXPECT_FALLBACK = "expect < 2m"`,
+`expectation || fallback`) and retire the per-call-site literal, so every status — present and
+future — inherits it; grounded `expect > Xs` still wins. John also chose intent-aware ack copy
+(option B): forecast/theory → "Building theories now...", correct → "Reviewing that correction
+now..." — a correction isn't a "theory." And for the column-2 motion he chose skeleton-shaped
+motion (option A) over a lighter dot, honoring the `CHI-58` governing principle (motion-as-skeleton,
+never re-add status *words* to column 2) while filling the Result `testing` state that previously
+rendered an entirely empty open box.
+
+**Shipped:** (1) `HYP_ENTRY_TAIL` map + intent-branched `hyp_entry` ack tail; (2)
+`LIVE_EXPECT_FALLBACK` centralized in `AgentWorkingIndicator`, qa live literal retired (retrospective
+past-tense `HopSummaryLine` estimate left untouched); (3) `CandidateRowSkeleton`/`ResultSkeleton`
+reusing `ShimmerSweep` + the existing `shimmer` keyframe (no new colors/keyframes) on the Candidates
+`generating` and Result `testing` waiting states. Node test 14/14, `npm run build` clean.
+
+**Live verification (design session, Step 5b, deployed dev preview — the forecast flow end to
+end):** ack rendered "Got it — treating that as a Forecast. Building theories now..." (old "Pick or
+refine…" gone); live status showed "elapsed X | expect > 35s/45s" through routing, generating, and
+testing; the `ResultSkeleton` shimmer was confirmed rendering *inside* the FORECAST RESULT drawer
+during testing (4 bars + `ShimmerSweep`, verified by ancestry), the Candidates static text was gone,
+and real result content (Supports/Complicates + data table) landed cleanly once testing finished —
+also confirmed rendering at mobile 375px via the shared `EvidenceColumn`. The Candidates
+*generating* skeleton and the `"expect < 2m"` *fallback* string specifically weren't frozen live
+(generation is too fast; Priya's chain had historical p90 data this run so the grounded estimate
+showed) — both are covered by the Node test plus the identical proven `ShimmerSweep` mechanism and
+the now-unconditional `| estimate` separator. Console showed only pre-existing `CHI-64`
+`delegation_complete` warnings (untouched by this change), no CHI-73 errors, no React crash.
+
+Note: browser text-entry into the chat input was flaky under the screen's frequent re-renders
+(news rotation / status ticks kept dropping keystrokes) — submitted reliably via a React
+value-tracker-reset + native input event, a QA-harness workaround, not an app defect.
