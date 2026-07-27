@@ -1,3 +1,4 @@
+// DeepBench v6.3.151 | MarketIntelligenceScreen.jsx | S-CHI-76 -- hyp-test completion status renders via the centralized HopSummaryLine caption (was a bare hand-formatted "…Given in Xs" bubble); isAnswer now message-driven
 // DeepBench v6.3.150 | MarketIntelligenceScreen.jsx | S-CHI-75 -- news-fetch status-clear is ownership-aware (chatTurnActiveRef) so a news fetch completing mid-question no longer blanks the question's in-flight live status
 // DeepBench v6.3.147 | MarketIntelligenceScreen.jsx | S-CHI-73 -- CHI live-status expected-time fallback (centralized) + intent-branched hyp_entry ack tail + Column-2 waiting-state motion (Candidates/Result skeletons)
 // DeepBench v6.3.148 | MarketIntelligenceScreen.jsx | S-CHI-74 -- grounded-work chat bubbles (forecast/theory/correct routing ack, theory candidates) now carry their close status (elapsed vs expected + hops) via HopSummaryLine, same as the Q&A bubble; formatHopSummary/HopSummaryLine gain isAnswer flag so non-answer bubbles read "Full Agent Routing" (drop "& Answer")
@@ -1024,7 +1025,7 @@ function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
 // hopStart/hopEnd but never totalElapsedMs before this fix (submission/info-only/resolution ack
 // bubbles). Sites that never carried hop data before this session still don't — this helper
 // enforces the pairing, it does not invent hop data for messages that never had it.
-function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalElapsedMs, needsReview, reviewReason, estimate }) {
+function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalElapsedMs, needsReview, reviewReason, estimate, isAnswer }) {
   const msg = { role, text };
   if (kind != null) msg.kind = kind;
   if (hopStart != null) {
@@ -1038,6 +1039,9 @@ function buildMessage({ role = "assistant", kind, text, hopStart, hopEnd, totalE
   // FEATURE: CHI-56 -- the estimate live at turn-start, shown by HopSummaryLine alongside the real
   // elapsed time above. Same != null guard pattern as hopStart/totalElapsedMs.
   if (estimate != null) msg.estimate = estimate;
+  // FEATURE: CHI-76 — lets a message opt into the "& Answer" close-status wording (HopSummaryLine's
+  // isAnswer). Absent on every existing message → the default branch keeps rendering isAnswer=false.
+  if (isAnswer != null) msg.isAnswer = isAnswer;
   if (needsReview) {
     msg.needs_review = true;
     msg.review_reason = reviewReason || "flagged for review";
@@ -1590,7 +1594,9 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
       {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs), same
           component as the qa branch above. */}
       {/* FEATURE: CHI-74 -- non-answer grounded-work bubbles carry their own close (elapsed vs expected); estimate + isAnswer=false threaded here */}
-      <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy} estimate={msg.estimate} isAnswer={false}/>
+      {/* FEATURE: CHI-76 -- isAnswer now message-driven: existing non-answer bubbles (ack, candidates)
+          carry no isAnswer field so this still defaults false; the hyp-test completion sets it true. */}
+      <HopSummaryLine hopStart={msg.hopStart} hopEnd={msg.hopEnd} totalElapsedMs={msg.totalElapsedMs} accent={T.navy} estimate={msg.estimate} isAnswer={msg.isAnswer ?? false}/>
       {/* FEATURE: MI-51 — mirrors the qa branch's universal 3-state guided prompt above, for the
           non-qa needs_review case (no message today reaches this with needs_review true, but this
           keeps the treatment consistent should a future non-qa kind carry the flag). */}
@@ -3608,10 +3614,19 @@ export default function MarketIntelligenceScreen() {
       // anticipated this exact chat push).
       const chiTestElapsedMs = Date.now() - turnStart;
       setHypFlow(prev => prev && ({ ...prev, stage:"result", chosenText: text, hypothesisTest: { ...st, hopStart: hopCountBeforeTurn + 1, hopEnd: currentHopCount(pipelineEventsRef.current) }, priorHypothesisTest: prev.hypothesisTest || null, testElapsedMs: chiTestElapsedMs }));
-      // FEATURE: CHI-58 — status narration moves to chat per this session's governing principle;
-      // replaces the Result drawer's own now-removed "Full Agent Routing & Answer Given in Xs" line
-      // (Task 3b). Same non_qa kind already used for other plain status/pointer bubbles on this screen.
-      setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Full Agent Routing & Answer Given in ${formatElapsed(chiTestElapsedMs)}` })]);
+      // FEATURE: CHI-76 — the test-completion status now renders via the centralized HopSummaryLine
+      // caption (hop badge + "Full Agent Routing & Answer in N hops total, Xs (expected < 2m)"), same
+      // as the Q&A completion bubble — was a bare hand-formatted "…Given in Xs" bubble (CHI-58), the
+      // last grounded-work bubble CHI-74 didn't convert. isAnswer:true → keeps the "& Answer" wording.
+      setMessages(prev => [...prev, buildMessage({
+        kind: "non_qa",
+        text: "Priya's tested your theory — the full breakdown is in the Evidence column to the right.",
+        hopStart: hopCountBeforeTurn + 1,
+        hopEnd: currentHopCount(pipelineEventsRef.current),
+        totalElapsedMs: chiTestElapsedMs,
+        estimate: buildEndStatusEstimate("expected < 2m"),
+        isAnswer: true,
+      })]);
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
