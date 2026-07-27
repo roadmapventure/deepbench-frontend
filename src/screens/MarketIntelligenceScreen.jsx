@@ -1,3 +1,4 @@
+// DeepBench v6.3.147 | MarketIntelligenceScreen.jsx | S-CHI-73 -- CHI live-status expected-time fallback (centralized) + intent-branched hyp_entry ack tail + Column-2 waiting-state motion (Candidates/Result skeletons)
 // DeepBench v6.3.146 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 4) -- AgentWorkingIndicator live status back to ONE line (elapsed + estimate, then diamond + activity + this-agent time), reverting MI-49's two-line split per John
 // DeepBench v6.3.143 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 3) -- both Column-2 interaction footers (qa-review, hyp-result) now render through the shared DecisionFooter standard; hyp-result gains a prompt, Priya CTA shortened
 // DeepBench v6.3.141 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
@@ -429,6 +430,13 @@ const ESCALATE_PLACEHOLDER =
 
 const INTENT_LABEL = { theory: "Theory", forecast: "Forecast", correct: "Correct" };
 
+// FEATURE: CHI-73 — the hyp_entry ack's tail sentence, branched on intent. Was a single hardcoded
+// "Pick or refine a hypothesis on the right." that pointed the user at a choice not yet built
+// (Priya is still generating candidates). forecast/theory describe the build in progress; correct
+// is a correction, not a theory, so it's worded for that. Falls back to the theory phrasing for any
+// unknown intent (defensive — forecast/theory/correct are the only intents that reach hyp_entry today).
+const HYP_ENTRY_TAIL = { forecast: "Building theories now...", theory: "Building theories now...", correct: "Reviewing that correction now..." };
+
 // FEATURE: AA-130 — Sam's intake-failure-intent schema (traits.schema, confirmed live in Supabase)
 // only ever outputs recommend_escalate/suggested_research_request, per the original spec
 // (APPLE-AGENT-1-v5-DESIGN.md §5.9) — he was never designed to produce an explanatory string, and
@@ -607,6 +615,14 @@ function formatExpectation(ms) {
   return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
 }
 
+// FEATURE: CHI-73 — the live working-indicator's expected-time fallback, centralized here so EVERY
+// status shows an estimate, not just the ones whose call site happened to pass one. Grounded
+// estimates (formatExpectation → "expect > Xs") still win; this is the floor when a chain has no
+// historical p90 data yet (e.g. Priya's hyp-generation) or a scripted sub-step passed nothing.
+// "< 2m" is the platform's stated ceiling — honest as an upper bound. Present tense: it's in-flight,
+// not the retrospective HopSummaryLine estimate (that one stays past-tense "expected < 2m", L3391).
+const LIVE_EXPECT_FALLBACK = "expect < 2m";
+
 // FEATURE: CHI-04 — caption for the question-boundary divider (QuestionDivider, below).
 function formatClockTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -637,11 +653,14 @@ function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation 
       <FeatureBadge id="MI-47"/>
       <FeatureBadge id="MI-49"/>
       <FeatureBadge id="CHI-56"/>
+      <FeatureBadge id="CHI-73"/>
       {/* FEATURE: CHI-71 -- re-merged onto ONE line (John's live call, reverting MI-49's two-line split):
           total elapsed + estimate, then the diamond + activity message + this-agent time, all in one
           right-aligned row that wraps only if it ever runs out of width. */}
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
-        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>elapsed {formatElapsed(now - turnStartedAt)}{expectation ? ` | ${expectation}` : ""}</span>
+        {/* FEATURE: CHI-73 — always show an estimate: grounded expectation when present, else the
+            centralized LIVE_EXPECT_FALLBACK ceiling. No status can silently render without one now. */}
+        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>elapsed {formatElapsed(now - turnStartedAt)} | {expectation || LIVE_EXPECT_FALLBACK}</span>
         <AIDiamond size="7px" color={T.brass}/>
         <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
         <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
@@ -1703,6 +1722,32 @@ function NewsCardSkeleton() {
   );
 }
 
+// FEATURE: CHI-73 — shimmering placeholders for a Column-2 drawer that's open but still waiting on
+// its content, shaped like the rows about to land (id-chip + text bar for a candidate; stacked bars
+// for a result). Reuses ShimmerSweep — same `shimmer` keyframe, same T.card/T.line tokens the News
+// drawer's NewsCardSkeleton already uses (no new keyframe, no new color). Parent has position:
+// relative + overflow:hidden so the sweep stays inside the card edges.
+function CandidateRowSkeleton() {
+  return (
+    <div style={{padding:"9px 11px",background:T.card,border:`1px solid ${T.lineSoft}`,position:"relative",overflow:"hidden",display:"flex",gap:8,alignItems:"center"}}>
+      <div style={{height:11,width:22,background:T.line,flexShrink:0}}/>
+      <div style={{height:11,width:"80%",background:T.line,opacity:0.7}}/>
+      <ShimmerSweep/>
+    </div>
+  );
+}
+function ResultSkeleton() {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8,padding:"9px 11px",background:T.card,border:`1px solid ${T.lineSoft}`,position:"relative",overflow:"hidden"}}>
+      <div style={{height:11,width:"55%",background:T.line}}/>
+      <div style={{height:10,width:"92%",background:T.line,opacity:0.6}}/>
+      <div style={{height:10,width:"88%",background:T.line,opacity:0.6}}/>
+      <div style={{height:10,width:"40%",background:T.line,opacity:0.6}}/>
+      <ShimmerSweep/>
+    </div>
+  );
+}
+
 // FEATURE: CHI-33 — Column 2 news card, true-empty-state only. Reuses EvidenceColumn's existing
 // card visual language (T.cardAlt background, T.lineSoft border, mono/body font tokens already in
 // scope in this file) -- no new colors, no new border styles, no new spacing scale, per this
@@ -2031,9 +2076,14 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
           </div>
         )}
 
+        {/* FEATURE: CHI-73 — motion while candidates generate: shimmering skeleton rows shaped like
+            the real candidate cards below, replacing the static "Generating candidate theories…"
+            text (Column 1 already narrates the state; Column 2 shows a live placeholder, not words). */}
         {hypFlow.stage === "generating" && (
-          <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,fontStyle:"italic"}}>
-            Generating candidate theories...
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <CandidateRowSkeleton/>
+            <CandidateRowSkeleton/>
+            <CandidateRowSkeleton/>
           </div>
         )}
 
@@ -2113,6 +2163,12 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
             removed: the testing stage's progress is already visible via Column 1's AgentWorkingIndicator
             strip, same governing principle CHI-58 already applied to the Candidates drawer's
             "generating"-stage narration. */}
+
+        {/* FEATURE: CHI-73 — the Result drawer auto-opens the instant testing starts (isHypInResultPhase
+            includes "testing"), but its only body block is gated on stage === "result", so during
+            "testing" it rendered an empty open box. Shimmering placeholder shaped like the result
+            content that's about to land. */}
+        {hypFlow.stage === "testing" && <ResultSkeleton/>}
 
         {st && hypFlow.stage === "result" && (
           <>
@@ -3335,7 +3391,11 @@ export default function MarketIntelligenceScreen() {
     // hopStart for this turn's message is this count + 1 (John's own framing: the label just
     // grabs the final gold number, and for a following question, subtracts the delta from it).
     const hopCountBeforeTurn = currentHopCount(pipelineEventsRef.current);
-    setStatus("Marcus is thinking…", { expectation: expectationAtStart }); // FEATURE: MI-49 -- reverted from "question < 2m"
+    // FEATURE: CHI-73 — no longer passes the live ceiling literal; the indicator's centralized
+    // LIVE_EXPECT_FALLBACK now supplies it (present-tense "expect < 2m"). The grounded upgrade
+    // below (L3349) still fires when the qa chain's p90 resolves. expectationAtStart is retained
+    // only for the retrospective message estimate at L3391 (past-tense, unchanged).
+    setStatus("Marcus is thinking…");
     try {
       // FEATURE: MI-35 — onEvent still does its existing logEvent(evt) behavior; additionally,
       // once intent_routing resolves to a qa question (a few seconds in, well before the rest of
@@ -3393,7 +3453,9 @@ export default function MarketIntelligenceScreen() {
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       } else if (result.kind === "hyp_entry") {
-        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. Pick or refine a hypothesis on the right.` })]);
+        // FEATURE: CHI-73 — tail now branches on intent (HYP_ENTRY_TAIL) instead of the old
+        // "Pick or refine a hypothesis on the right." that referenced a not-yet-generated choice.
+        setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `Got it — treating that as a ${INTENT_LABEL[result.intent] || result.intent}. ${HYP_ENTRY_TAIL[result.intent] || "Building theories now..."}` })]);
         await enterHypothesisFlow({ intent: result.intent, extractedHypothesis: result.extractedHypothesis, flaggedQuestion: result.flaggedQuestion, flaggedAnswer: null, citations: [], reviewReason: null });
       } else {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
