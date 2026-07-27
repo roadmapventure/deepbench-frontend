@@ -2236,3 +2236,24 @@ CHI-77` (the later ship yields) and the intermittent-failure row `CHI-77 → CHI
 comments, the kickoff, and all tracking docs read CHI-77; the one unavoidable artifact is the pushed
 commit `c7f2dc1`'s message, which still reads "S-CHI-76" (shared history not rewritten). Second
 recorded SES-18 collision after `CHI-42`→`CHI-53`.
+
+## S-LOG-49-design/S-LOG-49 (v6.3.153, `303c876`, 2026-07-27, worktree `log-49`)
+
+`LOG-49` ✅ **Done, live-verified.** Completed the runtime signature's **fact-half** — the last 3 §19i Layer A facts, all in one kickoff (John waived the 3-file cap).
+
+**How the scope was reached (a long discovery, worth recording).** The session opened on "get all 16 signature fields in." Establishing the real state showed 13 were already captured (LOG-37 + LOG-67 + read-time derivations + existing columns) and only the 3 `LOG-49` facts remained. Rather than build "completeness for its own sake," the session reframed to the one real problem: **orchestration is invisible** — the log can't tell a call that coordinated a team of specialists from one that handed a question off once; both look identical. That framing is what set the whole build:
+- `sub_calls_chained` → the missing piece is a **parent→child link** (`_hop_counter` is depth-only, `trace_id` is interaction-wide). Solved with the OpenTelemetry `span_id`/`parent_span_id` model as **real columns** (not `call_facts`), threaded exactly like `trace_id`. The chain/"orchestration" conclusion is **derived at read time** by the Displayer (`LOG-38`), never written — same posture as `model_modality`.
+- `input_references_other_deliverable` → the achievable, useful meaning today is "this call's input integrated an upstream sub-call's returned result" (the orchestration "integrate" signal). The stored-deliverable/CBR meaning would need `TI-16`, but capture ≠ use, so it lands now as a boolean.
+- `self_reported_claims` → allowlisted reference-ids the model declares (`source_chunk_ids`/`citation_ids`/…), captured verbatim into a **quarantined** `call_facts` key, never merged into proof-facts, "never trusted alone" (§19i).
+
+**Two mid-session corrections John forced, both right:** (1) don't spawn 2 new tickets for the deferred facts — they're one blocked concern; do all 3 in one kickoff instead. (2) Don't inherit `LOG-67`'s resume-path deferral — the span links are just two text fields and `durable_hops` already round-trips `trace_id` across a checkpoint, so persisting them now is the same proven pattern, no gap. Both adopted.
+
+**Ticket-wording divergences (deliberate, John-confirmed):** a migration IS now in scope (the original ticket assumed `call_facts`-only, no schema change); and `sub_calls_chained` is read-time-derived, not a `call_facts` fact.
+
+**Locked invariant (John's constraint):** the hops model is untouched — the Agent Routing drawer is built client-side from live delegation events (`turnTracking.js`), never reads `ai_activity_log`; orchestration is a label on top of hops, never a re-count. Confirmed structurally and re-checked live (hop count unchanged).
+
+**Build:** 4 files (`lib/activity-log.js`, `api/capabilities/execute.js`, `api/prompt/request-receivable.js`, `docs/ARCHITECTURE.md` §19i/§19k) + migration (`ai_activity_log` + `durable_hops`). Node 15/15, build clean. **Category L (coding agent) + independent design-session re-verify (live Supabase, deployed preview):** a real Owen Marsh — The Proofreader `qg-review-intent` orchestration produced one root span → **5 distinct child spans** (fan-out provable), the span **persisted intact across 3 checkpoint/resume cycles**; `input_references_other_deliverable` true only on integrating turns; `self_reported_claims` captured with **0 leaked into proof-facts**; `patterns_used`/`trace_id`/LOG-67 config-half regression clean.
+
+**Residuals → `LOG-74`:** (a) `ai-enrichment.js`'s reflect/synthesis `logActivity` writes carry `trace_id` but not span (5th file, out of the waived set); (b) `input_references_other_deliverable` is a `runLoop` local, so it resets per resumed segment. Neither breaks the orchestration signal. `LOG-71` untouched.
+
+**Process:** locked the **use-case-first problem-statement template** (Problem → Fix → Expected after → Example → Solution-last) into `docs/WORKING-WITH-JOHN.md` and Claude's memory, after John: "You keep failing, because you write too much technical at first and i can't follow."
