@@ -1,0 +1,1 @@
+chi-ui-0727 — worktree `chi-ui-0727`, branch `session/chi-ui-0727`. UI cleanup work on the CHI (Channel Intelligence) screen — scope TBD, awaiting John's specifics. Created 2026-07-27 from origin/dev.
