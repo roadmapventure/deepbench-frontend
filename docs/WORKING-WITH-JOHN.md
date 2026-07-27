@@ -112,6 +112,18 @@ Whenever explaining a problem, a proposed fix, or a design decision, always foll
 
 This defines the internal structure of each single explanation. It pairs with "one issue at a time" below, which governs pacing *between* separate issues — don't bundle multiple use-case-to-code walkthroughs into one message either.
 
+**The exact template — use it for every session's problem statement (added 2026-07-27, `log-49`).** John, verbatim: *"You keep failing, because you write too much technical at first and i can't follow."* This is a recurring failure — leading a fix/design with mechanism (columns, threading, files) loses him even in small doses. He asked for this precise format on every session going forward, after it finally landed cleanly. Plain language throughout; mechanism strictly last and brief:
+
+> ## Use case
+> **Problem.** (plain-language, real scenario — what can't be done today)
+> **Fix.** (the change, by what it does, not how)
+> **Expected after.** (what's different from John's view once it ships)
+> **Example.** (that same scenario walked through concretely — real agent, real before/after)
+> ## Solution (mechanism, brief)
+> (one short paragraph of the actual how — files/columns — only here, at the end)
+
+If a section names tables/functions/files before the "Solution" heading, it's already too technical — pull it down.
+
 ---
 
 ## Communication Pacing
