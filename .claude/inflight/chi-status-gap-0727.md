@@ -1,1 +1,0 @@
-chi-status-gap-0727 — worktree `chi-status-gap-0727`, branch `session/chi-status-gap-0727`. DISCOVERY: CHI working-status line goes blank for ~10s mid-flight when the on-load news web-search and a user question run concurrently. Investigating the shared workingStatus slot / multi-writer race. Created 2026-07-27 from origin/dev.

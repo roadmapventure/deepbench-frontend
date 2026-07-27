@@ -2088,3 +2088,48 @@ the now-unconditional `| estimate` separator. Console showed only pre-existing `
 Note: browser text-entry into the chat input was flaky under the screen's frequent re-renders
 (news rotation / status ticks kept dropping keystrokes) — submitted reliably via a React
 value-tracker-reset + native input event, a QA-harness workaround, not an app defect.
+
+---
+
+## S-CHI-75-design/S-CHI-75 (v6.3.150, `c3d9aca`, 2026-07-27, worktree `chi-status-gap-0727`)
+
+`CHI-75` (UI) ✅ **Done, live-QA passed on the deployed dev preview.** Immediate follow-up to
+`CHI-73`, off a second John screenshot of the same forecast flow.
+
+**Bug:** on page load the news web-search (`fetchNewsCards()`) fires automatically; asking a
+question *while it's still running* made the chat working-status line show, then **go blank for
+~10s, then re-appear**. John's read: "it almost seems like we can't run multi-agents — do the web
+search agents have to complete before the Q&A agents, or is the UI not keeping up?"
+
+**Diagnosis (verified by direct code read, not assumed):** it is **not** a concurrency limit. The
+news fetch and the question are two independent `callCapability()` → `/api/capabilities/execute`
+calls that genuinely run in parallel; neither awaits the other. The problem is a **single-slot UI
+ownership bug**: there is one `workingStatus` state slot, both flows drive it (both pass the shared
+`onDelegationProgress` as `onProgress`), and the news fetch's completion ran `setWorkingStatus(null)`
+unconditionally (`MarketIntelligenceScreen.jsx` L3294 success / L3301 failure), guarded only against
+a *Clear* (`isStale()`/`clearGenerationRef`), **not** against an in-flight question. `web-search-news`
+runs ~13–43s, so it routinely finishes mid-question and wiped the question's live status; the line
+stayed blank until the question's next hop fired its own `setStatus` — the ~10s gap. So the correct
+answer to John was his own third hypothesis: the UI wasn't keeping up with multi-agent work.
+
+**Fix (targeted — John chose option A over a general owner-token model):** a `chatTurnActiveRef`
+(`useRef(false)`) set `true` at the start of `submit()` (after `setLoading(true)`) and `false` in
+its `finally` (try/finally guarantees no leak); the news fetch's two `setWorkingStatus(null)` calls
+now run only `if (!chatTurnActiveRef.current)`. A ref, not state, because `fetchNewsCards` is async
+and closes over stale state — a ref read at completion time is always current. `submit()` is the only
+flow that overlaps the one-shot news fetch (it runs only on mount/Clear; by the time a
+hypothesis-test or commit is reachable it has long finished), so guarding `submit()` covers the real
+bug. `setNewsCards(...)` untouched — the news drawer still fills; only the chat status line is
+protected. 1 file, Node test 5/5, `npm run build` clean.
+
+**Live verification (Step 5b, deployed dev preview, John's exact repro via a 1s in-page poller):**
+navigated fresh so the news search was in flight, immediately submitted a question, and sampled the
+chat status line every second. Result — the news fetch completed at t≈9→10s (newsLoaded flipped) and
+the question's status line stayed **continuous** across that exact moment (`elapsed 9s → 14s |
+expect > 1m 25s`, no blank sample anywhere t=2…16). Control case (reload, no question): the news
+fetch's own status appeared near completion and then **cleared normally** (`chatWorkingLineNow:
+null`) — confirming the guard still allows the clear when no chat turn owns the slot, i.e. no
+stuck-status regression. Console: only pre-existing `CHI-64` `delegation_complete` noise.
+
+Deliberately not in scope: the general owner-token model that would protect *any* two concurrent
+flows (option B, deferred); the co-located `CHI-64` console-noise bug in the same function.
