@@ -1,3 +1,4 @@
+// DeepBench v6.3.155 | useAIActivity.js | LOG-38 -- Log Displayer read path: classification rollup + single reclassification count
 // DeepBench v6.3.134 | useAIActivity.js | LOG-36 -- pattern displays read from the log, not the static catalog
 // DeepBench v6.1.43 | MarketIntelligenceScreen.jsx / useAIActivity.js | S-MI-42 -- two-tone indicator, final-timeline caption, streaming/agent-delegation catalog fixes
 // DeepBench v6.0.21 | useAIActivity.js | S-MARKET-INTEL-01d — agent-delegation pattern catalog fix (replaces stale agent-orchestration), quality-gate/pipeline-triage/data-analysis patterns retrofit
@@ -568,6 +569,43 @@ export function usePatternVocabulary() {
     return () => { cancelled = true; };
   }, []);
   return { vocab, loading };
+}
+
+// FEATURE: LOG-38 -- the Log Displayer read path. Section 1 = ai_pattern_classification_rollup
+// (patterns whose pattern_vocabulary.criteria matched real logged signatures); Section 2 =
+// ai_pattern_reclassification_count (single total of everything unmatched). The pattern NAME is
+// derived in the view at read time (ARCHITECTURE.md §19k) -- this hook never classifies client-side.
+export async function fetchPatternClassification() {
+  try {
+    const [rollup, recl] = await Promise.all([
+      supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum'),
+      supabase.from('ai_pattern_reclassification_count').select('reclassification_count').single(),
+    ]);
+    if (rollup.error) throw rollup.error;
+    if (recl.error) throw recl.error;
+    const classified = (rollup.data || []).map(r => ({
+      slug: r.pattern_slug,
+      name: r.pattern_name,
+      desc: r.pattern_description,
+      total: r.call_count,
+      cost: Number(r.cost_sum) || 0,
+      active: true,
+    }));
+    return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
+  } catch (e) {
+    console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
+    return { classified: [], reclassificationCount: 0 };
+  }
+}
+
+export function usePatternClassification() {
+  const [state, setState] = useState({ classified: [], reclassificationCount: 0, loaded: false });
+  useEffect(() => {
+    let alive = true;
+    fetchPatternClassification().then(r => { if (alive) setState({ ...r, loaded: true }); });
+    return () => { alive = false; };
+  }, []);
+  return state;
 }
 
 export function useAIActivity() {

@@ -1,3 +1,4 @@
+// DeepBench v6.3.155 | AIActivityPanel.jsx | LOG-38 -- By Pattern body rewired: classified rows + single reclassification count
 // DeepBench v6.3.134 | AIActivityPanel.jsx | LOG-36 -- By Pattern is one flat log-driven list; "Patterns Logged" stat
 // DeepBench v6.2.9 | AIActivityPanel.jsx | AI-48 mobile-responsive AI Audit panel
 // FEATURE: AI-13 — AIActivityPanel — rename to AI Audit, add By LLM + By Agent sections
@@ -6,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { useAIActivity, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
+import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
 import { AGENTS } from "../data/agents.js";
 import { Corners } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
@@ -181,6 +182,10 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-36 -- patternsActiveCount/patternsCatalogTotal removed from the hook; the stat
   // strip now reads the live logged count.
   const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, servicesCatalogTotal, patternsLoggedCount, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
+  // single reclassification count). Independent of the legacy byPattern/patternsSorted above, which
+  // still feed the untouched "Patterns Logged" stat tile this session leaves alone.
+  const { classified, reclassificationCount } = usePatternClassification();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
   const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
@@ -255,11 +260,18 @@ export default function AIActivityPanel({ onClose }) {
                 halves of one binary) — choosing a real taxonomy is LOG-58. The AI-32 "Not yet active"
                 and LOG-31/LOG-32 "Uncatalogued" collapse cards go with it: with the catalog seed loop
                 deleted, every row here is a pattern that genuinely ran. */}
-            <SectionHeader label="By Pattern · Industry Catalog" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
+            <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
             {sections.pattern && (
-              patternsSorted.length === 0
-                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No pattern data yet.</div>
-                : patternsSorted.map(pat => <PatternRow key={pat.slug} d={pat}/>)
+              <>
+                {classified.length === 0
+                  ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No classified patterns yet.</div>
+                  : classified.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                {/* FEATURE: LOG-38 -- single unclassified count, no breakdown (John's call). Everything whose
+                    signature matched no gold pattern -- new or old, empty or rich -- rolled into one line. */}
+                <div style={{fontFamily:body,fontSize:11,color:T.muted,padding:"8px 0 2px",borderTop:`1px solid ${T.lineSoft}`,marginTop:6}}>
+                  {reclassificationCount.toLocaleString()} calls needing reclassification
+                </div>
+              </>
             )}
 
             {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
