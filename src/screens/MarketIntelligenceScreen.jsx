@@ -1,3 +1,4 @@
+// DeepBench v6.3.150 | MarketIntelligenceScreen.jsx | S-CHI-75 -- news-fetch status-clear is ownership-aware (chatTurnActiveRef) so a news fetch completing mid-question no longer blanks the question's in-flight live status
 // DeepBench v6.3.147 | MarketIntelligenceScreen.jsx | S-CHI-73 -- CHI live-status expected-time fallback (centralized) + intent-branched hyp_entry ack tail + Column-2 waiting-state motion (Candidates/Result skeletons)
 // DeepBench v6.3.148 | MarketIntelligenceScreen.jsx | S-CHI-74 -- grounded-work chat bubbles (forecast/theory/correct routing ack, theory candidates) now carry their close status (elapsed vs expected + hops) via HopSummaryLine, same as the Q&A bubble; formatHopSummary/HopSummaryLine gain isAnswer flag so non-answer bubbles read "Full Agent Routing" (drop "& Answer")
 // DeepBench v6.3.146 | MarketIntelligenceScreen.jsx | S-CHI-71 (pass 4) -- AgentWorkingIndicator live status back to ONE line (elapsed + estimate, then diamond + activity + this-agent time), reverting MI-49's two-line split per John
@@ -3138,6 +3139,10 @@ export default function MarketIntelligenceScreen() {
   // never a stale value from the closure captured when that async function started.
   const pipelineEventsRef = useRef([]);
   const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
+  // FEATURE: CHI-75 — "is a chat question currently in flight?" A ref, not state, because
+  // fetchNewsCards() is async and closes over stale state; this is read at the fetch's completion
+  // to decide whether it still owns the shared workingStatus line (see fetchNewsCards below).
+  const chatTurnActiveRef = useRef(false);
   // FEATURE: MI-51 — showAgentInfo lifted here (was MobileBody-local showActivity) so the trigger
   // button can live in the shared page-title block (Task 1b) instead of inside MobileBody.
   const [showAgentInfo, setShowAgentInfo] = useState(false);
@@ -3291,14 +3296,17 @@ export default function MarketIntelligenceScreen() {
       });
       if (isStale()) return;
       setNewsCards(Array.isArray(result?.cards) ? result.cards : []);
-      setWorkingStatus(null); // FEATURE: CHI-33-patch -- clear the "Jordan is routing..." status this fetch wrote via onDelegationProgress; every other capability call already does this on completion, this one didn't.
+      // FEATURE: CHI-75 — only clear if no chat question owns the status line right now; otherwise a
+      // news fetch finishing mid-question would blank the question's live status for ~10s (the gap
+      // John reported). The question clears its own status in submit()'s finally.
+      if (!chatTurnActiveRef.current) setWorkingStatus(null);
     } catch (e) {
       console.error("[MarketIntelligenceScreen] fetchNewsCards", e.message);
       // Fails open to the existing empty-state sentence (newsCards stays non-null-but-empty),
       // never a broken/blank card list and never a thrown error surfaced to the user.
       if (!isStale()) {
         setNewsCards([]);
-        setWorkingStatus(null); // FEATURE: CHI-33-patch -- same cleanup on the failure path, so a failed fetch doesn't leave a stuck status either.
+        if (!chatTurnActiveRef.current) setWorkingStatus(null); // FEATURE: CHI-75 — same ownership guard on the failure path
       }
     }
   };
@@ -3366,6 +3374,7 @@ export default function MarketIntelligenceScreen() {
     if (!clean || loading) return;
     setMessages(prev => [...prev, buildMessage({ role: "user", text: clean })]);
     setLoading(true);
+    chatTurnActiveRef.current = true; // FEATURE: CHI-75 — claim ownership of the status line for this turn
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
@@ -3474,6 +3483,7 @@ export default function MarketIntelligenceScreen() {
       console.error("[MarketIntelligenceScreen]", e.message);
     } finally {
       setLoading(false);
+      chatTurnActiveRef.current = false; // FEATURE: CHI-75 — release ownership (try/finally guarantees no leak)
       setWorkingStatus(null);
     }
   };
