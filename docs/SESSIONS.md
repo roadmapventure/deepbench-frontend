@@ -2179,3 +2179,60 @@ app rendered its **mobile tabbed layout** (Chat / News & Evidence tabs) — with
 and the first verification attempt looked like the messages had vanished. A 1440px reload gave the
 3-column desktop layout and the fix verified cleanly. Worth remembering for future CHI live-QA:
 confirm the pane is wide enough for the desktop layout before concluding chat state from the DOM.
+
+## S-CHI-77-design/S-CHI-77 (v6.3.152, `c7f2dc1`, 2026-07-27, worktree `chi-ux-0727`)
+
+`CHI-77` (UI) ✅ **Done, QA passed.** Started as "ux ui for chi". John's live screenshot: the chat
+showed **"Something went wrong reaching Marcus — try again"** even though the Agent Routing log
+(Column 3) showed all 7 hops of a Q&A completing (Marcus answer 35.1s → Owen quality gate → Michelle
+→ Eleanor → Owen routing back). His question: *"we have made several traps to capture this — is it
+defined why the user needs to start again?"*
+
+**Diagnosis.** No — the reason was undefined. `onSend`'s catch (`MarketIntelligenceScreen.jsx`) was
+the **one async catch on the screen that dropped the real reason**: it only `console.error`'d
+`e.message`, while the four sibling catches (hyp gen/test, commit, resolve) all emit an MI-29
+`"error"` Pipeline Log event that renders the reason in Column 3 ("Ran into a problem partway through
+— {reason}"). The thrown errors already carry structured detail (`callCapability`'s
+`"${capability} ${intent} failed: ${status}"`; the stream-error path's `.status`/`.detail`) — all
+reaching the catch and being discarded.
+
+**Vercel logs (this run).** All 6 `/api/capabilities/execute` calls returned **HTTP 200** — so the
+throw was a streamed `error` event, a stream ending without a `result`, or a client post-process
+error, never a non-2xx. The exact `e.message` was unrecoverable from Vercel: the per-request `logs`
+array was empty and the real cause was a **browser** `console.error`, which never reaches the server.
+The surface itself was the gap.
+
+**Live repro (4 runs, browser pane, console hooked).** Could not force the failure. The original
+question routed to the *theory* path twice (63s, clean); a forced Q&A ran the full qa→Owen→display
+path clean (63s); a 4th run fired *during* the on-load news pipeline (the one condition the screenshot
+had) and ran the exact screenshot hop-sequence (Marcus→Owen→Michelle→Eleanor→Alex display) — still
+clean, but took **108s vs the ~63s baseline**, ~2× latency under news-fetch concurrency. That
+latency-under-load is the leading (unproven) hypothesis for the intermittent timeout → `CHI-78`.
+Incidentally re-confirmed the existing `CHI-64` (`delegation_complete` durationMs warning on load)
+still fires — not a new row.
+
+**Fix (John-approved scope + copy).** Extend the proven MI-29 mechanism to `onSend`: a string-safe
+module-scope `describeCaughtError(e)` (surfaces `.status`/`.detail`; handles Error/string/object/
+undefined-message) + `onSend`'s catch now
+`logEvent(buildHopEvent("error", "marcus", { message: describeCaughtError(e) }, Date.now() - turnStart))`.
+Attribution is Marcus (front-door agent — the catch can't know which hop threw; the reason string
+names the real culprit, e.g. `quality-gate qg-review-intent failed: 500`). Honest copy: "…completing
+your answer…" replaces "reaching Marcus" (which was wrong — Marcus *was* reached, the break is
+downstream); "try again" stays because this failure is transient (unlike `CHI-66`'s deterministic
+drawer re-crash). Anchored on `ARCHITECTURE.md` §19j: a failure notice is a **fault report** (the
+platform reporting on itself), explicitly allowed, not screen-authored agent content. 1 file.
+
+**Verification.** Diff exactly the spec (helper + 3 sub-changes to the catch, nothing else). Node 9/9
+(String Safety: null/undefined/non-Error/status-0/object-detail). `npm run build` clean. Live
+happy-path on the deployed preview: a full Q&A completed cleanly (70s, Marcus→Owen→Eleanor→Michelle→
+Alex, 0 console errors) — the added helper/catch didn't regress the happy path. The failure path
+itself is unforceable; its runtime correctness rests on the diff + the four identical proven siblings.
+
+**ID collision (SES-18 recurred).** Claimed CHI-76 from the atomic `feature_id_counter` (it read
+`next_number=76`), but `chi-final-status-0727` had **already shipped a different `CHI-76`** (hyp-test
+completion caption, v6.3.151, `576cc5a`) — the counter was behind reality (the SES-18 desync); both
+shipped edits to the same file. Resolved at close-out by renaming this session's feature `CHI-76 →
+CHI-77` (the later ship yields) and the intermittent-failure row `CHI-77 → CHI-78`. In-file `FEATURE:`
+comments, the kickoff, and all tracking docs read CHI-77; the one unavoidable artifact is the pushed
+commit `c7f2dc1`'s message, which still reads "S-CHI-76" (shared history not rewritten). Second
+recorded SES-18 collision after `CHI-42`→`CHI-53`.

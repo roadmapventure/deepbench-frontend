@@ -1,4 +1,4 @@
-// DeepBench v6.3.152 | MarketIntelligenceScreen.jsx | S-CHI-76 -- onSend's catch now emits the MI-29 "error" Pipeline Log event (surfaces the real reason via describeCaughtError into Column 3) + honest bubble copy ("completing your answer", not "reaching Marcus"); the one async catch that dropped the reason
+// DeepBench v6.3.152 | MarketIntelligenceScreen.jsx | S-CHI-77 -- onSend's catch now emits the MI-29 "error" Pipeline Log event (surfaces the real reason via describeCaughtError into Column 3) + honest bubble copy ("completing your answer", not "reaching Marcus"); the one async catch that dropped the reason. (Renamed from CHI-76 at close-out -- collided with the concurrently-shipped CHI-76 hyp-test caption, SES-18 counter desync)
 // DeepBench v6.3.151 | MarketIntelligenceScreen.jsx | S-CHI-76 -- hyp-test completion status renders via the centralized HopSummaryLine caption (was a bare hand-formatted "…Given in Xs" bubble); isAnswer now message-driven
 // DeepBench v6.3.150 | MarketIntelligenceScreen.jsx | S-CHI-75 -- news-fetch status-clear is ownership-aware (chatTurnActiveRef) so a news fetch completing mid-question no longer blanks the question's in-flight live status
 // DeepBench v6.3.147 | MarketIntelligenceScreen.jsx | S-CHI-73 -- CHI live-status expected-time fallback (centralized) + intent-branched hyp_entry ack tail + Column-2 waiting-state motion (Candidates/Result skeletons)
@@ -1020,7 +1020,7 @@ function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
   return { type, agentId, data, durationMs: resolved, ...extra };
 }
 
-// FEATURE: CHI-76 — extracts a human-readable reason from a caught error for the Pipeline Log's
+// FEATURE: CHI-77 — extracts a human-readable reason from a caught error for the Pipeline Log's
 // "error" row. String-safe by construction (STANDARDS.md String Safety): the thrown value can be a
 // real Error, a bare string, or an arbitrary object, and .message can be undefined. Surfaces the
 // .status and .detail that callCapability's throws (L546 stream-error, L1265 resolve) already carry
@@ -3498,14 +3498,14 @@ export default function MarketIntelligenceScreen() {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       }
     } catch (e) {
-      // FEATURE: CHI-76 — the one async catch on this screen that dropped the real reason. Now emits
+      // FEATURE: CHI-77 — the one async catch on this screen that dropped the real reason. Now emits
       // the same MI-29 "error" Pipeline Log event the four sibling catches already do (renders in
       // Column 3 as "Ran into a problem partway through — {reason}", T.flag), so the cause is visible
       // where the audit trail lives instead of only in the browser console. agentId "marcus": onSend
       // can't know which hop threw; the reason string carries the real culprit. Duration is the real
       // time-to-failure. See ARCHITECTURE.md §19j — a fault report, not agent content.
       logEvent(buildHopEvent("error", "marcus", { message: describeCaughtError(e) }, Date.now() - turnStart));
-      // FEATURE: CHI-76 — honest copy: "reaching Marcus" was wrong (Marcus was reached; the break is
+      // FEATURE: CHI-77 — honest copy: "reaching Marcus" was wrong (Marcus was reached; the break is
       // downstream). "Try again" stays — this failure is transient, so retrying is correct advice.
       setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong completing your answer — try again." })]);
       console.error("[MarketIntelligenceScreen]", e);
