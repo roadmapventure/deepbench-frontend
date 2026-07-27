@@ -1,1 +1,0 @@
-chi-final-status-0727 — worktree `chi-final-status-0727`, branch `session/chi-final-status-0727`. DISCOVERY: the CHI hypothesis-test final status "Full Agent Routing & Answer Given in Xs" renders as a standalone chat BUBBLE, not the centralized HopSummaryLine close-status other messages use. Investigating why. Created 2026-07-27 from origin/dev.

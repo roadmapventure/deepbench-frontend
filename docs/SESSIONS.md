@@ -2133,3 +2133,49 @@ stuck-status regression. Console: only pre-existing `CHI-64` `delegation_complet
 
 Deliberately not in scope: the general owner-token model that would protect *any* two concurrent
 flows (option B, deferred); the co-located `CHI-64` console-noise bug in the same function.
+
+---
+
+## S-CHI-76-design/S-CHI-76 (v6.3.151, `576cc5a`, 2026-07-27, worktree `chi-final-status-0727`)
+
+`CHI-76` (UI) ✅ **Done, live-QA passed on the deployed dev preview.** Third CHI follow-up in a row
+off John's live screenshots of the forecast/theory flow.
+
+**Found:** the hypothesis-test completion rendered as a standalone chat bubble reading "Full Agent
+Routing & Answer **Given in** 1m 12s" — visibly inconsistent with every other message's close-status,
+which is the centralized `HopSummaryLine` **caption** ("[hop badge] Full Agent Routing & Answer **in**
+N hops total, Xs (expected < 2m)"). John: "why did the final status appear as a bubble? is it not
+using our centralized status timer?"
+
+**Diagnosis (verified by code read):** two mechanisms. The centralized one is
+`formatHopSummary`/`HopSummaryLine` (a caption under a message). But the hyp-test completion push
+(`MarketIntelligenceScreen.jsx` L3614) hand-formatted a bare string into a plain `non_qa` message
+body, carrying no `hopStart`/`hopEnd`/`estimate` — so no caption rendered, the status *was* the
+bubble. `CHI-58` created that bubble (moving the Result drawer's elapsed line into chat); `CHI-74`
+(v6.3.148) then standardized the *other* grounded-work bubbles (routing ack, theory candidates) onto
+`HopSummaryLine` but did not include this one — the last straggler. All the caption's data was
+already computed on the lines just above.
+
+**Fix (John's direction — "make it consistent with our centralized completion status, the single
+line under the bubble"):** the completion push now carries `hopStart`/`hopEnd`/`totalElapsedMs`/
+`estimate: buildEndStatusEstimate("expected < 2m")`/`isAnswer: true` plus a Marcus completion
+sentence ("Priya's tested your theory — the full breakdown is in the Evidence column to the right."),
+so it renders the centralized caption exactly like the Q&A completion. The test *is* an answer, so
+`isAnswer:true` keeps the "& Answer" wording — and because the default `MessageBubble` branch
+hardcoded `isAnswer={false}` (a `CHI-74` assumption), that was made **message-driven**
+(`buildMessage` gains an `isAnswer` field; the branch reads `msg.isAnswer ?? false`). Existing
+non-answer bubbles carry no `isAnswer` field → still read "Full Agent Routing in …", unchanged. 1
+file, Node 6/6, build clean, clean rebase (no conflict with the concurrent CHI-UX session).
+
+**Live verification (Step 5b, deployed dev preview, full forecast→theory-test flow):** the completion
+rendered the Marcus sentence + the caption "Full Agent Routing & Answer in 10 hops total, 1m 29s
+(expected < 2m)"; the old "…Given in" bubble was gone; a scan found exactly one `& Answer` caption
+(the completion) and three unchanged non-answer captions ("Full Agent Routing in N hops total, Ys"
+for the routing ack + candidates) — no regression. Console: only pre-existing `CHI-64` noise.
+
+**Live-QA environment note (not an app bug):** the browser pane defaulted to a narrow width, so the
+app rendered its **mobile tabbed layout** (Chat / News & Evidence tabs) — with the Chat tab inactive,
+`MobileBody` doesn't mount that tab's messages, so `document.body.textContent` read the chat as empty
+and the first verification attempt looked like the messages had vanished. A 1440px reload gave the
+3-column desktop layout and the fix verified cleanly. Worth remembering for future CHI live-QA:
+confirm the pane is wide enough for the desktop layout before concluding chat state from the DOM.
