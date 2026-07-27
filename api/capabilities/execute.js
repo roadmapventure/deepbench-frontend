@@ -1,3 +1,4 @@
+// DeepBench v6.3.153 | api/capabilities/execute.js | LOG-49 -- completes the signature fact-half: threads span_id/parent_span_id chain links (one span per runCapability execution; a delegated child points parent_span_id at the caller's span; persisted across checkpoint/resume via durable_hops exactly as trace_id is), stamps input_references_other_deliverable once a delegate result is folded back into the loop's input, and captures the model's quarantined self_reported_claims -- all on the agent-turn write path
 // DeepBench v6.3.142 | api/capabilities/execute.js | LOG-67 -- config-half signature snapshot merged into call_facts on the agent-turn write path
 // DeepBench v6.3.133 | api/capabilities/execute.js | LOG-37b -- Layer A call-fact capture on the agent-turn write path: logAgentTurn() now records the real tool name the turn called (delegate_to_agent vs request_help vs a schema tool, plus web_search) in the new call_facts jsonb column, instead of only the frozen pattern slug derived from a boolean. patterns_used deliberately unchanged -- Layer A is purely additive, Layer B reclassifies at read time later.
 // DeepBench v6.3.119 | LOO-19 -- Michelle's request_help dispatch passes task_context as a real object, not a stringified blob; JS's Object.entries() on a string iterates characters, which combined with HAR-06's new generic pass-through corrupted her prompt on every request_help call since 2026-07-18
@@ -51,7 +52,10 @@
 
 import { assemblePrompt, mergeCallFacts } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
-import { sendRequest, callModel } from '../prompt/request-receivable.js';
+// FEATURE: LOG-49 -- extractSelfReportedClaims + its allowlist live in request-receivable.js (a
+// single shared constant, extensible in one place); imported here so the agent-turn write path uses
+// the identical set as the model-call write path.
+import { sendRequest, callModel, extractSelfReportedClaims } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
@@ -218,7 +222,7 @@ function getSupabaseHeaders(key) {
 // would change patterns_used behavior and needs its own row. Layer A's job here is to capture the
 // real facts alongside it so Layer B can eventually reclassify at read time and ignore the
 // declaration; it is not to reclassify anything now.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -228,6 +232,15 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     ...tool_calls,
     ...(usedWebSearch ? ['web_search'] : []),
   ]));
+  // FEATURE: LOG-49 -- fact-half additions. self_reported_claims stays quarantined in its own key
+  // (never merged into tool_calls); input_references_other_deliverable is a boolean, both omitted
+  // when empty. Combined with the config-half via mergeCallFacts below, preserving the "null not {}"
+  // contract (mergeCallFacts returns null when the whole object is empty).
+  const factHalf = {
+    ...(toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : {}),
+    ...(inputReferencesOtherDeliverable ? { input_references_other_deliverable: true } : {}),
+    ...(selfReportedClaims && Object.keys(selfReportedClaims).length > 0 ? { self_reported_claims: selfReportedClaims } : {}),
+  };
   logActivity({
     tenantId: tenant_id || 'global',
     agentId: agent_id || null,
@@ -243,9 +256,13 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
       ...intent_technical_services,
     ])),
     traceId: trace_id,
-    // FEATURE: LOG-67 -- fact-half (tool_calls) + config-half (signature snapshot) in one call_facts.
-    // mergeCallFacts() returns null when both halves are empty, preserving LOG-37b's "null not {}" contract.
-    callFacts: mergeCallFacts(toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : null, signatureConfig),
+    // FEATURE: LOG-49 -- the chain links for this agent-turn row.
+    spanId,
+    parentSpanId,
+    // FEATURE: LOG-67 -- fact-half (tool_calls + LOG-49's input_references/self_reported_claims) +
+    // config-half (signature snapshot) in one call_facts. mergeCallFacts() returns null when both
+    // halves are empty, preserving LOG-37b's "null not {}" contract.
+    callFacts: mergeCallFacts(Object.keys(factHalf).length > 0 ? factHalf : null, signatureConfig),
   });
 }
 
@@ -415,7 +432,7 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id, span_id = null, parent_span_id = null }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -431,6 +448,12 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
     conversation_history: conversationHistory, hop_counter: depth,
     delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
     pending_delegation: pendingDelegation ?? null,
+    // FEATURE: LOG-49 -- persist the span across the checkpoint exactly as trace_id is persisted,
+    // so a resumed continuation keeps the SAME span identity (resumeCapability reads it back below)
+    // rather than minting a new one -- the parent->child tree stays intact across a checkpoint.
+    // Written via this always-run patch (durable_hops now carries these columns from Task 1's
+    // migration) rather than createDurableHopRow, so no separate handler change is needed.
+    span_id, parent_span_id,
   });
   return { status: 'in_progress', job_id: row_id };
 }
@@ -450,7 +473,7 @@ function formatErrorForPersistence(e) {
 // confirmed by direct read, not assumed). Creates a row first when job_id is null (fresh call),
 // otherwise patches the existing one (resumed call) -- same create-if-absent shape
 // checkpointAndReturn() already uses for the success/checkpoint path.
-async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id }) {
+async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id, span_id = null, parent_span_id = null }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -462,7 +485,9 @@ async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug,
     });
     row_id = row.id;
   }
-  await patchDurableHopRow(row_id, { status: 'failed', error: formatErrorForPersistence(e) });
+  // FEATURE: LOG-49 -- record the span on the failure row too (a failed row is never resumed, but
+  // this keeps its place in the parent->child tree honest).
+  await patchDurableHopRow(row_id, { status: 'failed', error: formatErrorForPersistence(e), span_id, parent_span_id });
   throw e;
 }
 
@@ -478,6 +503,10 @@ async function dispatchDelegation({
   via_tool, tool_input, tool_use_id, agent_id, capability_slug, intent_slug, tenant_id, task_context,
   delegationRequired, conversationHistory, hopCounter, deadline, job_id, delegationOccurred,
   lastHelpSelection, onEvent, trace_id,
+  // FEATURE: LOG-49 -- the dispatching execution's OWN span. Every nested runCapability() below
+  // passes _parent_span_id: span_id, so the child execution points its parent_span_id at this
+  // caller -- exactly parallel to the _trace_id: trace_id each already passes.
+  span_id = null,
 }) {
   let delegateResult;
   let returningFromAgentId = null;
@@ -511,7 +540,7 @@ async function dispatchDelegation({
     delegateResult = await runCapability({
       capability_slug: 'project-manager', intent_slug: 'agent-selection-intent', agent_id: pmAgentId,
       task_context: { ...tool_input, requesting_agent_id: agent_id }, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
-      _trace_id: trace_id,
+      _trace_id: trace_id, _parent_span_id: span_id,
     });
     // FEATURE: LOG-15 — lastHelpSelection never carried patterns_used, even though the real value
     // (delegateResult.patterns_used) was already computed one line above by the shared
@@ -551,7 +580,7 @@ async function dispatchDelegation({
       const autoResolvedResult = await runCapability({
         capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
-        _trace_id: trace_id,
+        _trace_id: trace_id, _parent_span_id: span_id,
       });
       if (autoResolvedResult.status === 'in_progress') {
         return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: autoResolvedResult.job_id, toolUseId: tool_use_id };
@@ -594,7 +623,7 @@ async function dispatchDelegation({
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
-      _trace_id: trace_id,
+      _trace_id: trace_id, _parent_span_id: span_id,
     });
     if (delegateResult.status === 'in_progress') {
       return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
@@ -639,6 +668,11 @@ async function runLoop({
   conversationHistory, delegationOccurred, lastHelpSelection, hopCounter, deadline,
   job_id = null, // set only when resuming -- lets a checkpoint on the very next hop update its own row instead of creating a duplicate
   trace_id, // FEATURE: AI-46a -- always supplied by both real callers (runCapability()/resumeCapability()); pure passthrough, same category as job_id/hopCounter/deadline
+  // FEATURE: LOG-49 -- this execution's own span (span_id) and its caller's span (parent_span_id),
+  // threaded exactly like trace_id: stamped on every row this loop writes, and handed to every
+  // nested runCapability() as the child's _parent_span_id. Recovered from durable_hops on resume so
+  // a resumed hop keeps its original span/parent, same category as trace_id above.
+  span_id = null, parent_span_id = null,
   onEvent, // FEATURE: MI-42 -- always a real function by the time this fires; runCapability()/resumeCapability() already default it to a no-op
   // FEATURE: LOG-67 -- the config-half signature snapshot from promptRequest (runCapability() reads it
   // off db-assembly's raw output, same reason canRequestHelp can't come from `enriched`). Null on the
@@ -647,6 +681,13 @@ async function runLoop({
   signatureConfig = null,
 }) {
   let delegationRetried = false;
+  // FEATURE: LOG-49 -- fact 2: flips true once a delegate's returned result has been folded back
+  // into conversationHistory (dispatchDelegation()'s 'continue' outcome below). From that point on
+  // in this loop, every logAgentTurn row -- and the terminal sendRequest write -- carries
+  // input_references_other_deliverable: true, because this turn's input now structurally embeds a
+  // prior sub-call's real output (the "integrate"/synthesis step). A pure final hand-off never
+  // reaches 'continue' (it returns 'final'), so it correctly never sets this.
+  let integratedDelegateResult = false;
   for (let depth = hopCounter.n; ; depth++) {
     // FEATURE: AA-139 -- the hybrid trigger. Checked before every hop, not just once: a chain
     // that's already spent most of its budget on earlier hops checkpoints here instead of risking
@@ -661,7 +702,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: null,
-        trace_id,
+        trace_id, span_id, parent_span_id,
       });
     }
 
@@ -697,6 +738,12 @@ async function runLoop({
       intent_technical_services: enriched.intent_technical_services || [],
       trace_id,
       usedWebSearch: turnUsedWebSearch,
+      // FEATURE: LOG-49 -- chain links for this row; the integrate flag (true once a delegate result
+      // was folded back into this turn's input); and the model's own declared reference-ids extracted
+      // from its structured output (turn.tool_input), quarantined into its own call_facts key.
+      spanId: span_id, parentSpanId: parent_span_id,
+      inputReferencesOtherDeliverable: integratedDelegateResult,
+      selfReportedClaims: extractSelfReportedClaims(turn.tool_input),
       // FEATURE: LOG-67 -- the config-half snapshot, threaded from runCapability() (off promptRequest),
       // merged into this row's call_facts alongside the fact-half tool_calls below.
       signatureConfig,
@@ -760,6 +807,11 @@ async function runLoop({
             _hop_counter: hopCounter,
             _deadline: deadline,
             _onEvent: onEvent,
+            // FEATURE: LOG-49 -- this nested call previously threaded no _trace_id, so its rows fell
+            // outside the interaction's trace; a bare parent_span_id link across a trace boundary is
+            // meaningless. Thread both, so the critique execution joins the same trace and points its
+            // parent_span_id at this execution -- consistent with dispatchDelegation()'s nested calls.
+            _trace_id: trace_id, _parent_span_id: span_id,
           });
         }
         const confirmation_id = await insertPendingConfirmation({
@@ -776,7 +828,10 @@ async function runLoop({
         prompt_request: enriched, agent_id, capability_slug, tenant_id,
         precomputed_turn: turn, delegation_occurred: delegationOccurred,
         turn_started_at: turnStart,
-        trace_id, deadline,
+        // FEATURE: LOG-49 -- the terminal model-call write gets the same span links and the
+        // integrate flag: if this final answer's input embedded a delegate's returned result, its
+        // row carries input_references_other_deliverable: true.
+        trace_id, span_id, parent_span_id, input_references_other_deliverable: integratedDelegateResult, deadline,
       });
       const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection };
       if (job_id) {
@@ -829,7 +884,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
-        trace_id,
+        trace_id, span_id, parent_span_id,
       });
     }
 
@@ -837,7 +892,9 @@ async function runLoop({
       via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id,
       agent_id, capability_slug, intent_slug, tenant_id, task_context, delegationRequired,
       conversationHistory, hopCounter, deadline, job_id, delegationOccurred, lastHelpSelection, onEvent,
-      trace_id,
+      // FEATURE: LOG-49 -- hand this execution's span down so nested delegate executions point their
+      // parent_span_id at it.
+      trace_id, span_id,
     });
     if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
     if (dispatchOutcome.outcome === 'nested_checkpoint') {
@@ -845,11 +902,15 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
         pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
-        trace_id,
+        trace_id, span_id, parent_span_id,
       });
     }
     conversationHistory = dispatchOutcome.conversationHistory;
     lastHelpSelection = dispatchOutcome.lastHelpSelection;
+    // FEATURE: LOG-49 -- a 'continue' outcome means dispatchDelegation() just folded the delegate's
+    // returned result into conversationHistory (execute.js's tool_result append). Every subsequent
+    // turn's input now embeds that real prior output -- set the fact-2 flag for the rest of the loop.
+    integratedDelegateResult = true;
   }
 }
 
@@ -874,6 +935,10 @@ export async function runCapability({
   _deadline = null,
   _onEvent = null,
   _trace_id = null,
+  // FEATURE: LOG-49 -- the caller's span, threaded in by every nested runCapability() dispatch
+  // (dispatchDelegation()'s 3 sites, the critique call). Null on a genuinely fresh top-level call,
+  // which is exactly a root span with no parent.
+  _parent_span_id = null,
 }) {
   if (!capability_slug) throw new Error('capability_slug required');
   if (!agent_id) throw new Error('agent_id required');
@@ -891,6 +956,14 @@ export async function runCapability({
   // hop and every nested delegate, regardless of how many separate durable_hops rows (job_ids) it
   // spans.
   const traceId = _trace_id || crypto.randomUUID();
+
+  // FEATURE: LOG-49 -- one span per capability EXECUTION (never per agent -- span_id identifies the
+  // call, not who ran it, keeping the signature agent-agnostic). Always freshly minted for this
+  // execution (unlike traceId, which is inherited across a whole interaction): every turn/row this
+  // execution writes shares this spanId, and a delegated child execution points its parent_span_id
+  // here. parentSpanId is the caller's span (null for a fresh top-level call = a root span).
+  const spanId = crypto.randomUUID();
+  const parentSpanId = _parent_span_id;
 
   const promptRequest = await assemblePrompt({
     capability_slug,
@@ -942,13 +1015,15 @@ export async function runCapability({
       conversationHistory: [], delegationOccurred: false, lastHelpSelection: null,
       hopCounter: _hop_counter || { n: 0 }, deadline, job_id: null,
       trace_id: traceId,
+      // FEATURE: LOG-49 -- this execution's span + its caller's span, threaded through the loop.
+      span_id: spanId, parent_span_id: parentSpanId,
       onEvent,
       // FEATURE: LOG-67 -- read the config-half off promptRequest (db-assembly's raw output), NOT
       // `enriched` -- keeps the agent-turn write path independent of the enrichment passthrough.
       signatureConfig: promptRequest.signature_config ?? null,
     });
   } catch (e) {
-    await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id: traceId });
+    await persistFailureAndRethrow(e, { job_id: null, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
   }
 }
 
@@ -972,6 +1047,11 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
   // FEATURE: AI-46a -- recovered from the persisted row, never freshly generated on resume, so a
   // resumed hop keeps the exact same identifier every prior hop in this chain already wrote.
   const traceId = row.trace_id;
+  // FEATURE: LOG-49 -- same round-trip as traceId: recover the span so a resumed continuation keeps
+  // its ORIGINAL span identity (and parent), rather than minting a new one -- the parent->child tree
+  // stays intact across a checkpoint. The || fallback covers only pre-migration rows (null span).
+  const spanId = row.span_id || crypto.randomUUID();
+  const parentSpanId = row.parent_span_id ?? null;
 
   const enriched = {
     system_prompt: row.system_prompt,
@@ -1017,7 +1097,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
           task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
           delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
           pendingDelegation: row.pending_delegation,
-          trace_id: traceId,
+          trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
         });
       }
       if (nestedRow.status === 'failed') {
@@ -1041,7 +1121,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
         conversationHistory, delegationOccurred: true,
         lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
-        deadline, job_id: row.id, trace_id: traceId, onEvent,
+        deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
       });
     }
 
@@ -1052,11 +1132,11 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         task_context: row.task_context ?? null, delegationRequired: row.delegation_required === true,
         conversationHistory: row.conversation_history || [], hopCounter: { n: row.hop_counter || 0 }, deadline,
         job_id: row.id, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null, onEvent,
-        trace_id: traceId,
+        trace_id: traceId, span_id: spanId,
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId });
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
       }
       // FEATURE: AI-46a -- this runLoop() continuation (the post-dispatch "continue" outcome, resumed
       // chain's own delegate hop having completed live above rather than checkpointing again) is not
@@ -1071,7 +1151,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         critiqueCapabilitySlug: null, critiqueIntentSlug: null, display_agent_id: null, display_agent_card: null,
         conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
         lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
-        deadline, job_id: row.id, trace_id: traceId, onEvent,
+        deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
       });
     }
     return await runLoop({
@@ -1093,7 +1173,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       display_agent_id: null, display_agent_card: null,
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
-      deadline, job_id: row.id, trace_id: traceId,
+      deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
       onEvent,
     });
   } catch (e) {
@@ -1105,7 +1185,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     // FEATURE: AA-195 (S-ARCH-FAILURE-DETAIL-01) -- now persists the full rejected-request detail
     // (formatErrorForPersistence()), not just e.message, so Supabase alone has enough evidence to
     // diagnose a failure like AA-195's without external Vercel log access.
-    await persistFailureAndRethrow(e, { job_id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, trace_id: traceId });
+    await persistFailureAndRethrow(e, { job_id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, task_context: row.task_context ?? null, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
   }
 }
 

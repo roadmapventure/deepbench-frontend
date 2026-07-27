@@ -1,3 +1,4 @@
+// DeepBench v6.3.153 | api/prompt/request-receivable.js | LOG-49 -- model-call write path completes the signature fact-half: span_id/parent_span_id chain links, input_references_other_deliverable, and quarantined self_reported_claims
 // DeepBench v6.3.145 | api/prompt/request-receivable.js | LOO-22 -- register library-lookup handler (Eleanor's record-level verification read)
 // DeepBench v6.3.142 | api/prompt/request-receivable.js | LOG-67 -- merge the config-half signature snapshot into call_facts on the model-call write path
 // DeepBench v6.3.136 | api/prompt/request-receivable.js | LOG-37a-patch -- record the retrieval method as its own Layer A fact
@@ -373,6 +374,32 @@ export function buildPatternsUsed(isJson, guardrailsRan, delegationOccurred = fa
 // conditionals anywhere in here (`.claude/rules/capabilities-are-data.md`) -- capture is generic.
 const RETRIEVED_CHUNK_ID_CAP = 50;
 
+// FEATURE: LOG-49 -- ARCHITECTURE.md §19k/§19i. The model's OWN declared reference-ids, captured
+// as an assertion and quarantined in its own call_facts key -- never merged into the trusted
+// fact-half (tool_calls/retrieved_chunk_ids/...), never trusted alone (corroboration is
+// LOG-38/read-time's job, not the writer's -- §19i "captured, never trusted alone"). A single
+// shared allowlist, extensible in exactly one place; imported by execute.js so both write paths
+// use the identical set. Bounded to reference-id-shaped fields only -- never the whole output.
+export const SELF_REPORTED_CLAIM_FIELDS = ['source_chunk_ids', 'citation_ids', 'citations', 'reasoning_entry_id', 'entry_id', 'case_id', 'deliverable_id', 'based_on'];
+
+// FEATURE: LOG-49 -- extract only the allowlisted reference-id fields the model actually declared,
+// verbatim. Captures the model's assertion; does NOT invent, normalize, or validate against reality.
+// Returns null when the output is not a structured object or declared none present-and-non-empty --
+// so the "omit the key entirely when empty" contract (mergeCallFacts's null handling) holds.
+export function extractSelfReportedClaims(structuredOutput) {
+  if (!structuredOutput || typeof structuredOutput !== 'object' || Array.isArray(structuredOutput)) return null;
+  const claims = {};
+  for (const field of SELF_REPORTED_CLAIM_FIELDS) {
+    const value = structuredOutput[field];
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (typeof value === 'string' && value === '') continue;
+    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+    claims[field] = value;
+  }
+  return Object.keys(claims).length > 0 ? claims : null;
+}
+
 // FEATURE: LOG-37 -- single source of truth for "which tools did this response actually invoke".
 // `usedWebSearch` (the pre-existing HAR-05 boolean feeding patterns_used) is now derived from this
 // same list rather than re-scanning rawContent with a second, drift-prone predicate. Equivalence
@@ -407,6 +434,12 @@ export function buildCallFacts({
   synthesisRan = false,
   ragChunkIdsBySection = null,
   ragMethodBySection = null,
+  // FEATURE: LOG-49 -- facts 2 & 3. inputReferencesOtherDeliverable: this call's input structurally
+  // embedded a prior sub-call's real returned result (the "integrate" step). selfReportedClaims: the
+  // model's own declared reference-ids, quarantined in its own key (never merged into the trusted
+  // fact-half above). Both omitted when empty, same "null not {}" contract as every other key here.
+  inputReferencesOtherDeliverable = false,
+  selfReportedClaims = null,
 } = {}) {
   const facts = {};
 
@@ -443,13 +476,22 @@ export function buildCallFacts({
   ];
   if (gates.length > 0) facts.gated_subroutine_fired = gates;
 
+  // FEATURE: LOG-49 -- fact 2: boolean, omitted when false/unknown.
+  if (inputReferencesOtherDeliverable) facts.input_references_other_deliverable = true;
+  // FEATURE: LOG-49 -- fact 3: the model's own declared reference-ids, quarantined in this key.
+  if (selfReportedClaims && Object.keys(selfReportedClaims).length > 0) facts.self_reported_claims = selfReportedClaims;
+
   return facts;
 }
 
 // FEATURE: HAR-04 -- deadline is a new optional param, same opt-in contract as callModel()'s own:
 // omitted by every caller that doesn't pass it (api/plan.js, confirmation.js) -- byte-identical
 // behavior. execute.js's runLoop() passes its own real deadline through.
-export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null, deadline = null }) {
+// FEATURE: LOG-49 -- span_id/parent_span_id thread through exactly the same passthrough that
+// already carries trace_id (runLoop() -> sendRequest()); input_references_other_deliverable is set
+// by runLoop() once a delegate's returned result has been folded back into this turn's input.
+// All three omitted by every non-loop caller (api/plan.js, confirmation.js) -- byte-identical.
+export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null, span_id = null, parent_span_id = null, input_references_other_deliverable = false, deadline = null }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -636,6 +678,10 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
           latencyMs: guardrailsLatency,
           patternsUsed: ['guardrails', 'prompt-chaining'],
           traceId: trace_id,
+          // FEATURE: LOG-49 -- this sub-write shares the enclosing execution's span (where trace_id
+          // reaches a write, span must too) so the guardrails row joins the same parent->child tree.
+          spanId: span_id,
+          parentSpanId: parent_span_id,
           // FEATURE: LOG-37 -- this call really did invoke a tool (the guardrails_check schema
           // tool, forced via tool_choice above) and recorded nothing about it until now.
           callFacts: { tool_calls: ['guardrails_check'] },
@@ -693,6 +739,11 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     ragChunkIdsBySection: enrichDebug.rag_chunk_ids_by_section,
     // FEATURE: LOG-37a-patch -- threaded off enrichDebug exactly like the ids above.
     ragMethodBySection: enrichDebug.rag_method_by_section,
+    // FEATURE: LOG-49 -- fact 2 threaded from runLoop() (true once this turn's input embedded a
+    // prior sub-call's returned result); fact 3 extracted from the model's own structured output
+    // (parsedResponse), quarantined into its own key by buildCallFacts().
+    inputReferencesOtherDeliverable: input_references_other_deliverable,
+    selfReportedClaims: extractSelfReportedClaims(parsedResponse),
   }), prompt_request?.signature_config ?? null);
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
@@ -710,6 +761,9 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     latencyMs: latency_ms,
     patternsUsed,
     traceId: trace_id,
+    // FEATURE: LOG-49 -- the chain links for this model-call row, threaded from runLoop().
+    spanId: span_id,
+    parentSpanId: parent_span_id,
     // FEATURE: LOG-37 -- additive; omitted-shape callers elsewhere still write call_facts: null.
     callFacts,
   });

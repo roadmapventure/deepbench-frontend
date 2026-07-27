@@ -1180,10 +1180,10 @@ Concretely: Nadia (Data Analyst) and the Reasoner (`AG-20`, once built) each wri
 Every call captures real, structural, checkable facts about what happened — independent of whether any pattern currently has a name for it:
 - `tool_calls[]` — real name/arguments/result per tool invocation, not a boolean
 - `retrieved_chunk_ids[]` — real ids if retrieval happened, not just a `rag_retrieved` boolean
-- `sub_calls_chained[]` — which other calls this one's output fed into, or was fed by
-- `input_references_other_deliverable` — did this call's input structurally embed another capability's real prior output
+- `sub_calls_chained[]` — which other calls this one's output fed into, or was fed by. **Built `LOG-49` (v6.3.153) as the OpenTelemetry-style `span_id`/`parent_span_id` links, not as a stored fact:** each capability execution mints one `span_id` (every row it writes shares it); a delegated child execution carries `parent_span_id` = the caller's `span_id`. The chain itself ("this call orchestrated N children") is **derived at read time** by the Displayer (`LOG-38`) from those two links — the same read-time-derivation posture as `model_modality`. The writer captures links, never the conclusion.
+- `input_references_other_deliverable` — did this call's input structurally embed another capability's real prior output. **Built `LOG-49` (v6.3.153):** set true once a delegate's returned result has been folded back into a turn's input within the same `runLoop` (the integrate/synthesis step); a pure single hand-off never sets it.
 - `gated_subroutine_fired[]` — which internal gates actually executed (e.g. the REFLECT sub-call)
-- `self_reported_claims` — whatever structured fields the model's own output declared (e.g. a case/reasoning-entry id) — captured, never trusted alone
+- `self_reported_claims` — whatever structured fields the model's own output declared (e.g. a case/reasoning-entry id) — captured, never trusted alone. **Built `LOG-49` (v6.3.153):** a bounded allowlist of reference-id-shaped fields, captured verbatim from the model's own structured output into its own quarantined `call_facts` key — never merged into the trusted fact-half, never validated at write time (corroboration is the Displayer's job).
 - **`retrieval_method` per context fetch — added 2026-07-23 (`design-log-23-0723`), John's explicit call.** Record *how* context was obtained, not just that it was: retrieved by similarity/embedding search vs. fetched by direct lookup (and any future mechanism on its own terms). A single "context was fetched" boolean is not a Layer A fact — it collapses two different mechanisms into one signal, and a Layer B rule reading it cannot be honest no matter how it is written. **Live proof this is not hypothetical:** `ai-enrichment.js`'s `rag_retrieved` is exactly that collapsed boolean, and Michelle Manning — Project Manager's `source: "roster"` profile resolves to `getRosterCandidates()` → a plain full-table read with no embedding anywhere — yet trips the flag, so 1,199 of her routing calls are permanently tagged `rag`. See `LOG-42`. Note the consequence for Layer B's own worked example above: `RAG = retrieved_chunk_ids.length > 0` inherits this bug as written, since a lookup also produces "chunks" — the rule must key on the retrieval method, not on chunk presence.
 
 None of this requires knowing a pattern name in advance. This is what makes a genuinely new model behavior show up automatically once someone writes a Layer B rule for it, instead of requiring new capture code at every call site first.
@@ -1380,8 +1380,19 @@ to a `§19i` layer, and each has a *different* caller:
     read: `knowledge`, `intent`, `format` only** — `identity` out (agent-ID, breaks agent-agnosticism),
     `behavior` out for now (no pattern-driving traits today).
   - Fact-half (from the Log Writer): `tool_calls`, `retrieved_chunk_ids`, `retrieval_method`,
-    `gated_subroutine_fired` (built, `LOG-37`); `input_references_other_deliverable`, `sub_calls_chained`
-    (+ `trace_id`), `self_reported_claims` (unbuilt, `LOG-49`).
+    `gated_subroutine_fired` (built, `LOG-37`); `input_references_other_deliverable`,
+    `self_reported_claims` (built, `LOG-49`, v6.3.153). `sub_calls_chained` is **not stored** — it is
+    derived at read time (the Displayer, `LOG-38`) from the `span_id`/`parent_span_id` plumbing columns
+    `LOG-49` added, the same read-time-derivation posture as `model_modality`. `span_id`/`parent_span_id`
+    join `trace_id` as **plumbing** backing the signature — never criteria keys themselves.
+  - **Two divergences from the original `LOG-49` ticket, both deliberate (confirmed with John,
+    `design-log-49`, and shipped v6.3.153):** (1) **a migration was in scope** — `span_id`/`parent_span_id`
+    are real, indexed `ai_activity_log` columns (and on `durable_hops`, persisted across checkpoint/resume
+    exactly as `trace_id` is), not `call_facts` jsonb keys, because the read-time chain reconstruction is a
+    self-join far cleaner as indexed columns; facts 2 and 3 stayed in `call_facts` with no schema change.
+    (2) **`sub_calls_chained` is read-time-derived, never written** — only the raw `span_id`/`parent_span_id`
+    links are captured; deriving/naming orchestration is the Displayer's job (`LOG-38`). Do not read the
+    old ticket's "no migration / `call_facts` fact" wording as current.
 - **`guardrails` is a per-skill *column*, not a skill type** (there are **5** skill types, not 6).
   Declared guardrails are on ~100% of skills → no signal; the Guardrails pattern is decoded from the
   **fact** `gated_subroutine_fired`.
