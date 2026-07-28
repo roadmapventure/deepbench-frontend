@@ -1,9 +1,0 @@
-Worktree `har-17-design` — design session on HAR-17 (Task Success Rate), transient-failure auto-recovery per §19o. Split approved by John 2026-07-28: S-HAR-17a → 17b → 17c, plain Fable 5 coding agents (John's call — no multi-agent orchestration on coding legs).
-
-Status:
-- **S-HAR-17a (v6.3.181) ✅ SHIPPED + QA PASS** (`a249fbf`): HAR-18 nested in_progress guards (broker + critique sites). HAR-18 archived. Residual: critique degrade has no live exercise path (no critique-configured intent exists live).
-- **S-HAR-17b (v6.3.182) — kickoff committed, coding session running**: recovery seam at runLoop's callModel catch only; consumes HAR-15's failureClass contract (shipped v6.3.180 by concurrent session — coordination note in HAR-17 row); recovery_ledger (checked write via new patchDurableHopRowChecked) keyed on conversationHistory.length (never depth); enable_web_search persisted; recovery payload rides in_progress body. Migration `har17b_recovery_ledger_enable_web_search` ALREADY APPLIED.
-- **S-HAR-17c — next**: client status line ("hit a snag…"), expectationMs raw storage + extension, throw on status==='failed', recovery continues excluded from MAX_CONTINUE_ITERATIONS. Read HAR-15's MarketIntelligenceScreen changes (43 lines, c3dc9a2) before writing kickoff.
-
-Decisions with John (fold into §19o + rule file at close-out): 3 transient classes only (AA-126/AA-142 stay permanent, 0 occurrences in 149 persisted failures); HAR-14 joins transient class in principle via its own session; visibility = CHAT status line + extended expectation, NO drawer row (supersedes §19o drawer wording); model = Fable 5 both legs.
-New rows this session: HAR-18 (archived ✅), HAR-19, LOO-25, CHI-86. Close-out still owed: CLAUDE-STATE/SESSIONS.md entries, §19o + transient-failure-recovery.md amendments (incl. fixing that rule file's stale `lib/durable-loop.js` frontmatter path → `api/_lib/handlers/durable-loop.js`), worktree removal.

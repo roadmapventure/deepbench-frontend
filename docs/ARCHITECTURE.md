@@ -1849,14 +1849,32 @@ hop is simply terminal; the change is classification + one resume, not new infra
 Build ticket: `HAR-17` (needs its own Architect Review before scoping — `execute.js` loop, high
 blast radius; not pre-approved by this section).
 
+**Amendments, 2026-07-28 (`S-HAR-17-design`, John live) — the constraint above is now BUILT:**
+- **Visibility surface changed (supersedes the drawer clause above):** a recovery surfaces in the
+  **chat working-status line** ("Hit a snag — recovered automatically, continuing…") and **extends
+  the displayed expectation** by the re-run's own p90 cost; the Agent Routing drawer deliberately
+  shows nothing. `.claude/rules/transient-failure-recovery.md` carries the amended wording.
+- **Shipped as three sessions (design audit: 92 failure paths, 3 adversarial lenses):** `HAR-18`
+  prerequisite nested-`in_progress` guards at the broker/critique dispatch sites (v6.3.181);
+  the server seam (v6.3.182) — classification consumed from `HAR-15`'s throw-site `failureClass`
+  contract (v6.3.180), recovery at `runLoop()`'s `callModel()` catch ONLY (dispatch-interior /
+  `sendRequest()`-stage / bookkeeping failures stay non-recoverable: re-rolling them can duplicate
+  stored deliverables), one recovery per hop via a checked-write `recovery_ledger` keyed on
+  conversation position (never depth), `enable_web_search` persisted across resume; client
+  visibility (v6.3.183) riding the `in_progress` response body — works on streamed and plain-JSON
+  call sites alike, recovery continues exempt from the client continuation cap, terminal
+  `failed` bodies throw instead of rendering.
+- **`HAR-14` open question answered in principle:** present-but-empty joins the transient class
+  *via `HAR-14`'s own session* — the classifier keys on validation-failure shape (422), so a
+  stricter validator inherits recovery with no rework here.
+
 **Open questions (questions, not tickets):**
 - Should the quality gate echo the full answer through its own structured output at all, or should
   the platform carry the pre/regenerated answer and take the model out of that orchestration
   (`LOO-24`'s direction)? `HAR-16`'s bump makes the echo survivable; it does not make it right.
-- Does `HAR-14`'s presence-only validation belong inside the same transient classification (a
-  present-but-empty required leaf is arguably the same dice-roll class)?
 - 57 `durable_hops` rows sit `in_progress` (14-day window) — abandoned checkpoints or a real leak?
-  Uninvestigated this session.
+  Uninvestigated (2026-07-28 note: `HAR-18`'s critique degrade adds a bounded, logged variant of
+  this family; the census question itself is still open).
 
 ## 19p. Hop-Event Span Identity — Identity Travels With the Event [discovery `michelle-patterns`, 2026-07-28]
 
