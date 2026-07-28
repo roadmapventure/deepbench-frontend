@@ -1,4 +1,4 @@
-// DeepBench v6.3.175 | platform-stats.js | ABT-1d -- attempt git fetch --unshallow so a CI checkout can report a real commit count
+// DeepBench v6.3.176 | platform-stats.js | ABT-1e -- always compute the commit count; the monotonic guard, not git's shallow flag, decides whether it is written
 // Runs automatically from package.json's `prebuild` on every Vercel build of dev/main, or
 // locally via `node --env-file=.env.local scripts/platform-stats.js`. Plain Node, no deps.
 // NEVER writes dev_toolchain_services -- that is a John-set value, preserved by omission.
@@ -6,8 +6,8 @@
 // --soft: every failure path logs one `platform-stats: skipped -- <reason>` line and exits 0,
 // so a stats refresh can never break a deploy. Without the flag, failures exit 1 (strict local
 // / manual invocation). Independently of the flag, commits_dev is omitted from the write
-// whenever it can't be trusted (shallow clone, git unavailable, or lower than the stored value)
-// -- a truncated count must never overwrite a good one.
+// whenever it can't be trusted (git unavailable, no usable count, or lower than the stored
+// value) -- a truncated count must never overwrite a good one.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -99,20 +99,21 @@ async function main() {
     );
   }
 
-  // commits_dev: only trustworthy from a full-depth checkout. A CI clone may be shallow, in
-  // which case `git rev-list --count HEAD` legitimately returns a small number -- writing that
-  // would visibly corrupt the "Commits to dev" tile, so we omit the field instead.
+  // ABT-1e: commits_dev is ALWAYS computed here -- the count is never gated on git's shallow
+  // flag. A truncated checkout is caught downstream by the monotonic comparison against the
+  // stored row (`computed < stored` -> omit the field), which is cause-agnostic: it protects the
+  // tile whether the truncation came from a shallow clone, a partial fetch, or anything else.
+  // Gating on the flag added no protection that comparison doesn't already give, and it actively
+  // discarded good counts -- in CI, `git rev-parse --is-shallow-repository` still reported `true`
+  // after a *successful* `git fetch --unshallow`, so a correct count was thrown away unread.
+  // That comparison below is now the single guard; it must not be weakened or reordered.
   let commits_dev = null;
   let commitsReason = "";
   try {
-    if (git("git rev-parse --is-shallow-repository") === "true") {
-      commitsReason = "shallow clone";
-    } else {
-      commits_dev = parseInt(git("git rev-list --count HEAD"), 10);
-      if (!Number.isFinite(commits_dev) || commits_dev <= 0) {
-        commits_dev = null;
-        commitsReason = "git returned no usable count";
-      }
+    commits_dev = parseInt(git("git rev-list --count HEAD"), 10);
+    if (!Number.isFinite(commits_dev) || commits_dev <= 0) {
+      commits_dev = null;
+      commitsReason = "git returned no usable count";
     }
   } catch (err) {
     commits_dev = null;
