@@ -2410,3 +2410,15 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 **Also verified:** `LOO-23`'s fix has held — the 07-28 01:00–01:05 FK recurrences all predate its 01:59 UTC commit. Post-deploy residue is exactly: 12 credit-balance rows, 1 `qg-review` truncation (now fixed), 1 `pattern-vocabulary-review` omission (Susan's flow, separate).
 
 **Open questions (in §19o, not ticketed):** gate-echoes-answer vs platform-carries-answer (`LOO-24` direction); `HAR-14` present-but-empty joining the transient class; 57 `in_progress` hops (leak?).
+
+## S-LOG-93-design / S-LOG-93 (v6.3.173, `f184da9`, 2026-07-28, worktree `design-ai-audit-agents`, 1 code file)
+
+**`LOG-93` (Observability) — "Active Agents" tile in the AI Audit header. John's follow-up ask right after `LOG-92`-done closed. Live-QA PASS desktop + mobile, 5/5.**
+
+**The decision (John, this session):** the tile shows the **full roster count**, not the count of agents with logged activity, with semantics **"active" = available for a routing call**. He asked directly what the difference between the two candidate numbers was; verified live and answered concretely — 22 on the Bench, 18 with logged calls, the 4 never routed to being Christy Park — Marketing Designer, Pat Smiley — Intern Researcher (deliberately untrained), Claire Sutton — PDF Assembly Editor, and Victoria Chen — Head of Product Strategy. Also checked the reverse direction: every `agent_id` in `ai_activity_log` maps to a real roster agent, so no ghost ids inflate the 18.
+
+**Implementation note that matters later:** `src/data/agents.js` has **no status/availability flag**, so roster membership IS availability today. The tile reads `AGENTS.length` (never a hardcoded 22), so adding or removing a Bench agent moves it automatically — but if a per-agent availability flag ever ships, this tile must switch to reading that flag. Recorded in the code comment, the kickoff, and here.
+
+**Verified at QA (deployed dev preview):** ACTIVE AGENTS = 22, positioned between Services and Patterns Logged, 6-tile order correct; 22 re-counted independently against `src/data/agents.js` in the pushed commit (two different greps, both 22) rather than trusting the design-time number; `LOG-92` no-regression — Total Calls 21,911 === `count(*)` and 3,183 classified + 18,728 reclassification = 21,911 exactly, Patterns Logged still equals the By Pattern row count; mobile 375px all 6 tiles wrap with no page overflow; only the pre-existing `CHI-64` console noise.
+
+**Process note:** the coding agent adapted the kickoff test''s two `readFileSync` relative paths to resolve from `import.meta.url`, because its shell cwd resets between calls and `cd && …` is banned — test semantics unchanged, flagged in its own report rather than silently.
