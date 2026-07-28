@@ -1,3 +1,4 @@
+// DeepBench v6.3.186 | src/lib/tracePatterns.js | LOG-95b -- needsSpanRefetch(): bounded span-miss refetch decision (§19p read side); a span still absent after the retry budget is honestly unclassified (§19l), never polled unboundedly
 // DeepBench v6.3.184 | src/lib/tracePatterns.js | LOG-95 -- pickCreditedSpan(): which endpoint's span a streamed delegation-family event's drawer row credits (§19p); pure, JSX-free, Node-importable
 // DeepBench v6.3.166 | src/lib/tracePatterns.js | LOG-79 -- per-hop governed pattern names from
 // the ai_call_patterns view (the Log Displayer, ARCHITECTURE.md §19k/§19l), joined to a trace's
@@ -19,6 +20,14 @@ export function pickCreditedSpan(evt) {
   if (!evt || typeof evt !== 'object') return { trace_id: null, span_id: null };
   const span = evt.type === 'delegation_complete' ? evt.to_span_id : evt.from_span_id;
   return { trace_id: evt.trace_id ?? null, span_id: span ?? null };
+}
+
+// LOG-95b -- bounded span-miss refetch decision (§19p read side). A span absent from the map
+// after maxTries refetches is honestly unclassified (§19l) -- stop, never poll unboundedly.
+export function needsSpanRefetch(map, spanId, tries, maxTries = 3) {
+  if (spanId == null || !map || typeof map !== 'object') return false;
+  if (Object.prototype.hasOwnProperty.call(map, spanId)) return false;
+  return tries < maxTries;
 }
 
 // Pure. activityRows: [{ id, span_id }] (a trace's ai_activity_log rows); patternRows:

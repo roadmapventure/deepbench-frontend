@@ -1,3 +1,4 @@
+// DeepBench v6.3.186 | MarketIntelligenceScreen.jsx | LOG-95b -- useTracePatterns refetches on span miss: streamed rows mount mid-flight (LOG-95), so the LOG-79 per-trace cache could freeze before late executions logged; now invalidates+refetches up to 3x2.5s per mounted span, then accepts honest-unclassified (§19l)
 // DeepBench v6.3.184 | MarketIntelligenceScreen.jsx | LOG-95 -- hop-event span identity (§19p): streamed delegation-family rows spread pickCreditedSpan(evt) into their stored data; failure_triage credits the picker with her own span when she's credited, the gate's when Owen is
 // DeepBench v6.3.183 | MarketIntelligenceScreen.jsx | HAR-17 -- recovery visibility: chat status "hit a snag" + expectation extension off the in_progress body's recovery payload; recovery continues exempt from the client cap; failed-status bodies throw
 // DeepBench v6.3.180 | MarketIntelligenceScreen.jsx | HAR-15 -- credit-exhaustion renders an honest, distinct fault report (no raw provider JSON, no "try again") at all 5 error surfaces
@@ -378,7 +379,7 @@ import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDurati
 // FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
-import { fetchTracePatterns, pickCreditedSpan } from "../lib/tracePatterns.js";
+import { fetchTracePatterns, needsSpanRefetch, pickCreditedSpan } from "../lib/tracePatterns.js";
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -2616,14 +2617,31 @@ function fetchTracePatternsCached(traceId) {
 // FEATURE: LOG-79 -- governed pattern names for one trace's hops. Returns the span->names map
 // ({} until resolved, or when the trace has no classified rows). A null/undefined traceId (an
 // in-flight hop whose rows aren't written yet, or a pre-LOG-79 event) fetches nothing.
-function useTracePatterns(traceId) {
+function useTracePatterns(traceId, spanId) {
   const [spanPatterns, setSpanPatterns] = useState(() => (traceId && _tracePatternCache.get(traceId)) || EMPTY_TRACE_PATTERNS);
   useEffect(() => {
     if (!traceId) { setSpanPatterns(EMPTY_TRACE_PATTERNS); return; }
     let cancelled = false;
-    fetchTracePatternsCached(traceId).then(map => { if (!cancelled) setSpanPatterns(map); });
-    return () => { cancelled = true; };
-  }, [traceId]);
+    let tries = 0;
+    let timer = null;
+    const attempt = () => {
+      fetchTracePatternsCached(traceId).then(map => {
+        if (cancelled) return;
+        setSpanPatterns(map);
+        // FEATURE: LOG-95b -- streamed rows mount mid-flight (LOG-95), so the trace map can be
+        // frozen before this row's execution logged. Bounded refetch: invalidate + retry up to
+        // 3 times, 2.5s apart, then accept honestly-unclassified (§19l). needsSpanRefetch is
+        // pure -- tests/regression/LOG-95b-span-refetch.js.
+        if (needsSpanRefetch(map, spanId, tries)) {
+          tries += 1;
+          _tracePatternCache.delete(traceId);
+          timer = setTimeout(attempt, 2500);
+        }
+      });
+    };
+    attempt();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [traceId, spanId]);
   return spanPatterns;
 }
 
@@ -2644,7 +2662,7 @@ function useTracePatterns(traceId) {
 // state, expressed structurally, no boundary/date copy -- John's §19l call).
 function RoutingActivityLine({ evt }) {
   const { summary, color } = describePipelineEvent(evt);
-  const spanPatterns = useTracePatterns(evt.data?.trace_id);
+  const spanPatterns = useTracePatterns(evt.data?.trace_id, evt.data?.span_id);
   const names = evt.data?.span_id != null ? spanPatterns[evt.data.span_id] : null;
   const patternLabel = names && names.length > 0 ? names.join(', ') : null;
   const [expanded, setExpanded] = useState(false);
