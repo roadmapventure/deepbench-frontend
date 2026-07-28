@@ -24,10 +24,14 @@ query path — semantics happen once, when the Pattern Definer (Susan) defines t
 The Displayer view stays a **plain view, never materialized**. Surface unclassifiable rows
 (`LEFT JOIN`), never silently drop them.
 The Displayer matches against the **full assembled §19k signature** (`call_facts` + derived
-`model_modality` + `intent` parsed from `feature` + span-derived `sub_calls_chained`) — never
-bare `call_facts`. A `SIGNATURE_FIELDS` entry with no writer and no Displayer derivation is
-dead — source it or strike it before criteria may reference it. Criteria writes go through
-Susan's review path (`reviewCandidate`) only — never a direct table PATCH, and never authored
-from values sampled out of `ai_activity_log` (the log must not shape the criteria).
+`model_modality` + `intent` parsed from `feature` + span-derived `sub_calls_chained` +
+span-derived `integration_followed`, explicit true/false when `span_id` is present, omitted
+when null — unknowable ≠ false) — never bare `call_facts`. A `SIGNATURE_FIELDS` entry with no
+writer and no Displayer derivation is dead — source it or strike it before criteria may
+reference it. Criteria writes go through Susan's review path (`reviewCandidate`) only — never
+a direct table PATCH, and never authored from values sampled out of `ai_activity_log` (the log
+must not shape the criteria). Renames/supersessions go through `reviewCandidate` only — never
+a direct PATCH; a superseded row is never deleted and never matches (the view's
+`superseded_by IS NULL` filter retires it, its criteria/citation stay frozen as history).
 
 Rationale: `docs/ARCHITECTURE.md` §19k, §19l (and §19i LOCKED).

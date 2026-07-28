@@ -1545,6 +1545,45 @@ The values a gold pattern's `criteria` may assert, per field. These are the **le
 7. Unclassifiable rows are surfaced (`LEFT JOIN`), never silently dropped; a **rich** unmatched signature
    is the review signal.
 
+### Rename/supersede path (`LOG-51`) [shipped v6.3.178 — closes §19l seal condition 2's rename half]
+
+A governed pattern name can be corrected. `reviewCandidate()`'s 5th branch **`rename`** (structural
+mirror of `amend`, `LOG-52`) retires an existing gold row's *identity* and creates its governed
+replacement, keeping history:
+
+- **Retire-with-pointer, never delete.** The new gold row is inserted (identity + citation +
+  validated criteria, exactly as on promote), then the old row gets
+  `superseded_by = <new pattern_slug>` — §19i's forward pointer, a **single** pointer per row. The
+  old row keeps its `criteria`/`citation` frozen as the historical record; no governed vocabulary
+  row is ever deleted.
+- **The view filter is what retires it from matching.** `ai_call_patterns`' join now carries
+  `pv.superseded_by IS NULL` — a superseded row matches nothing from the moment the pointer is set,
+  retroactively and with zero backfill (the model's standing self-cleanse property).
+- **A split = a `rename` + an ordinary `promote`.** The old row's pointer names the corrected
+  identity; the second name is just a new gold row. No multi-successor mechanism exists or is needed.
+- **Candidate outcome:** the reviewed candidate is marked `status='renamed'` (CHECK-constraint
+  member added alongside `LOG-52`'s `amended`). Renames go through Susan's `reviewCandidate` path
+  only — never a direct PATCH.
+
+**`integration_followed` — the delegation-family split's one derived signature field** (Displayer-
+derived, never written; joins `SIGNATURE_FIELDS` adjacent to `sub_calls_chained` — both span-derived
+read-time facts; per caveat (a) above the order is diagnostic, the matcher is order-independent):
+
+- Semantics: *does any strictly-later row in this same span carry
+  `input_references_other_deliverable: true`?* Strictly later = `(created_at, id)` greater — the
+  strictness is load-bearing: a delegating row whose *own* flag is true (a prior delegation
+  integrated) but that hands off terminally must still read `false`.
+- Emitted as explicit **`true`/`false`** whenever `span_id` is present; **omitted entirely** when
+  `span_id` is null (unknowable ≠ false). The explicit `false` is what makes the no-synthesis side
+  (Handoff) expressible at all — the grammar has no absence operator, but `@>` containment of
+  `false` works.
+- Pure span math in the view SQL — no tool name, no pattern name. Criteria compose it with
+  `tool_calls` to scope it to delegations; that composition is the Pattern Definer's data, not view
+  code.
+- **Unknowable floor:** 67 delegation rows predate span plumbing (`span_id` null, `LOG-49`
+  v6.3.153) and are permanently unsplittable for this family — they stay honestly unclassified,
+  standing §19k treatment (measured 2026-07-28: 205 delegation rows total, 67 span-less).
+
 ---
 
 ## 19l. AI Pattern Tracking — Chief-Architect Review Verdict & Approved Completion Scopes [discovery `log-52-0727`, 2026-07-28 — John approved all four scopes verbatim]
@@ -1590,6 +1629,9 @@ slug from the composite at read time; rows whose `feature` carries no intent get
 - The Displayer matches against the **full assembled signature** per §19k — never bare `call_facts`.
 - The vocabulary has a working correction loop: `amend` (shipped, `LOG-52`) **plus** the
   rename/supersede path (`LOG-51`'s blocker) so naming errors can converge without row deletion.
+  **Rename half shipped v6.3.178 (`S-LOG-51` — see the §19k "Rename/supersede path" subsection);
+  the delegation-family adjudication itself (Susan researches, John signs off on names) is still
+  pending as `LOG-51`'s part 2.**
 - Both consumer surfaces keep unclassified a **visible, honest state, never hidden** — expressed
   structurally, not in copy (amended 2026-07-28, John's call at `LOG-79`'s UI gate: no user-facing
   boundary/date label on either surface — "too much info for the user about back office things").
