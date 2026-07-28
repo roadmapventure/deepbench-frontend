@@ -1,1 +1,0 @@
-Worktree `log-95-design` — S-LOG-95-design: hop-event span identity threading (§19p), kickoff doc for LOG-95. Started 2026-07-28. NOTE: created during a GitHub outage — marker commit will be pushed as soon as network returns.
