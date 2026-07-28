@@ -40,18 +40,28 @@ the subset a reviewer on those two surfaces could actually hit or judge.
 
 ---
 
-## 2. The beta buckets (John, 2026-07-24)
+## 2. The five beta buckets (John, 2026-07-28 — CANONICAL)
 
-> "I see there are 5 buckets to concentrate on as we reach beta. TSR, UX/UI, Anonamolies,
-> AI Audit Log."
+Restated and settled by John 2026-07-28, superseding the four-bucket list from the 2026-07-24
+session (TSR / UX-UI / Anomalies / AI Audit Log — kept in §3's provenance only). Verbatim:
 
-| Bucket | Meaning (as drawn in that session) |
-|---|---|
-| **TSR** | A question reaches a complete, correct answer without human intervention (the `Type: Task Success Rate` definition in `docs/FEATURES.md`). |
-| **UX/UI** | The two beta surfaces look and behave like finished software. |
-| **Anomalies** | The logged AI data is wrong or misleading (decisions/diagnosis). |
-| **AI Audit Log** | The audit screen + Layer A/B/C pipeline and what renders (construction + display). |
-| **(5th — unnamed)** | John said five buckets but listed four. **Open: John to name or retract the fifth.** |
+> "The buckets are 1. full 24 regression pass 2. UX/UI is clean for chat, column 2 and the
+> user knows how to operate with minimal difficulty, 3. mobile works well, 4. AI Audit Log
+> screen is accurate, 5. Agent routing drawer works well, accurate, and all agents are
+> displaying at least 1 pattern in their hop - if appropriate. We can ship after that, but if
+> we have time, the extra bonus would be to get re-classify patterns below 10K"
+
+| # | Bucket | Ship bar |
+|---|---|---|
+| 1 | **Full 24-case regression pass** | The CHI true end-to-end regression runbook (`SES-29` (Task Success Rate), `docs/` CHI-TRUE-REGRESSION runbook, 23 questions + case 24 news door) completes clean. |
+| 2 | **UX/UI: chat + column 2** | Chat (column 1) and the numbered journey-step drawers (column 2, §19n) are clean, and a user can operate them with minimal difficulty. |
+| 3 | **Mobile works well** | The beta surfaces behave well on mobile (`MOB-*` rows). |
+| 4 | **AI Audit Log screen is accurate** | What the audit screen renders is true — counts reconcile, labels aren't invented or hardcoded. |
+| 5 | **Agent Routing drawer** | Works well, accurate, and every agent displays ≥1 pattern in its hop — where appropriate. |
+
+**Ship rule:** all five buckets green → ship beta.
+**Bonus (only if time remains after the five):** get the AI Audit "re-classify patterns"
+count below 10,000. Explicitly not a ship-gate.
 
 ---
 
@@ -111,13 +121,15 @@ Below the line (still open): `LOG-01`, `LOG-22`, `AI-46` (partial), `AI-52`, `CH
 Caveat carried from the session: `LOG-55`'s premise is stale (fold into `LOG-37c`); `LOG-37`
 (task 3 of 7) is still the open dependency under the Layer B tail.
 
-### 3d. TSR and UX/UI buckets — never ranked
+### 3d. How the recovered queues map to the canonical buckets
 
-The 2026-07-24 session only ranked Anomalies and AI Audit Log (John's pick that day). TSR and
-UX/UI have no recovered ranking. **Strong candidate anchor for TSR:** `SES-29` (Task Success
-Rate) — the true end-to-end 23-question CHI regression runbook (designed 2026-07-28) is, in
-effect, the beta acceptance test for the CHI surface: a clean run is the "no embarrassing bug"
-bar made mechanical. Needs John's confirmation to rank it #1 there.
+The 2026-07-24 session ranked only its Anomalies and AI Audit Log buckets. Under the
+canonical §2 buckets: **3b + 3c both serve bucket 4** (an audit screen showing falsely-tagged
+or invented-taxonomy data is inaccurate even when the rendering is right); routing-drawer rows
+(`LOG-95`-done shipped the per-hop pattern lines 2026-07-28) serve **bucket 5**; `SES-29`
+(Task Success Rate) **is bucket 1** — confirmed by John's own bucket wording. Buckets 2
+(chat + column 2 UX) and 3 (mobile) have no recovered ranking and need a row-mapping triage
+against the open backlog.
 
 ### 3e. Filed since 2026-07-24 — unranked, needs John's bucket/rank call
 
@@ -128,9 +140,13 @@ Open rows only: `LOG-77` (Architecture — signature capture roadmap, item 9 of 
 
 ---
 
-## 4. Open questions for John
+## 4. Open items
 
-1. **The fifth bucket** — name it or confirm there are four.
-2. **Ratify or reorder** the refreshed queues above (they are recommendations, not decisions).
+1. ~~The fifth bucket~~ — **RESOLVED 2026-07-28**: John restated all five canonically (§2).
+2. **Ratify or reorder** the refreshed queues in 3a–3c (they are recommendations, not
+   decisions), now read as the bucket-4/bucket-5 work lists.
 3. **`AGR-001`/`AGR-002`** sit in `FEATURES-LATER.md` but are on the Bench surface Apple will
-   see — promote to beta-gate or accept the risk?
+   see — promote to beta-gate or accept the risk? (Bench is not named in the §2 buckets —
+   possibly deliberately, since §1's definition includes "the sub screens under bench.")
+4. **Row-mapping triage for buckets 2, 3, and 5** — sweep the open backlog and give each
+   bucket its own queue in this file.
