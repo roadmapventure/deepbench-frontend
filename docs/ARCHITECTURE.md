@@ -1547,6 +1547,93 @@ The values a gold pattern's `criteria` may assert, per field. These are the **le
 
 ---
 
+## 19l. AI Pattern Tracking — Chief-Architect Review Verdict & Approved Completion Scopes [discovery `log-52-0727`, 2026-07-28 — John approved all four scopes verbatim]
+
+**Question put to this discovery (John, after a week on the model):** is the criteria/signature
+architecture going to work for pattern naming on the AI Audit screen and the Agent Routing drawer, or
+do we need a different architecture?
+
+**Verdict: KEEP. The architecture is sound and already working; what remains is finite completion, not
+redesign.** Evidence, verified live this session (2026-07-28): the deployed `ai_call_patterns` view
+names real activity through one generic matcher with zero per-pattern code — RAG 301, Output
+Guardrails 193, Agent Handoff 105 — and every criteria correction made during the week took effect
+instantly and retroactively with no backfill (the exact property write-time stamping structurally
+cannot provide; contrast the 1,199 frozen false-`rag` rows). Alternatives re-examined and ruled out:
+write-time stamping (already failed here), per-row LLM labeling (cost, drift, unauditable — banned by
+§19i), embedding similarity (unexplainable on an audit surface).
+
+**Why the week felt endless — three causes, none architectural:**
+1. **The live Displayer view is a partial implementation of §19k.** It assembles only
+   `call_facts` + derived `model_modality`. The spec's other two derivations were never wired:
+   the **`intent` anchor** (signature element #1) and **`sub_calls_chained`** (from
+   `span_id`/`parent_span_id`). Proven: with the full spec'd signature assembled, criteria referencing
+   those fields become evaluable (side-by-side run, this session). Susan-authored criteria keyed on
+   `intent` were not wrong — the view never supplies the field.
+2. **No consumer reads the view yet** (`LOG-70` unbuilt) — six files including both target surfaces
+   still read legacy `patterns_used`/`PATTERN_CATALOG`, so a week of real progress is invisible in
+   the product.
+3. **Coverage is honestly bounded** — a capturability pass (all 23 patterns vs. the real write paths)
+   found ~13 gold patterns describe behaviors the platform does not perform (no parallel tool use —
+   `disable_parallel_tool_use:true` unconditional; no token streaming; no debate; etc.). Those
+   correctly never match, permanently, unless the platform gains the behavior. Only 1 pattern needs a
+   genuinely new captured fact (Constrained Decoding — a generic `output_schema_forced` at the forced-
+   `tool_choice` site); a handful more are expressible from existing fields.
+
+**Doc-drift correction to §19k (recorded here, §19k text untouched):** §19k says the signature's
+intent anchor is seeded from `ai_activity_log.feature` "(the intent slug)". In reality `feature` holds
+a composite `capability:intent-slug:depthN` on agent-turn rows and the literal `request-receivable` on
+model-call-path rows (802 of 1,751 fact-carrying rows today). The Displayer must **parse** the intent
+slug from the composite at read time; rows whose `feature` carries no intent get `intent` = null
+(their signature simply lacks the element — normal sparse-fact behavior, not an error).
+
+**Conditions of the seal (all three must hold):**
+- The Displayer matches against the **full assembled signature** per §19k — never bare `call_facts`.
+- The vocabulary has a working correction loop: `amend` (shipped, `LOG-52`) **plus** the
+  rename/supersede path (`LOG-51`'s blocker) so naming errors can converge without row deletion.
+- Both consumer surfaces state the **capture-start boundary** (fact classification begins 2026-07-23);
+  unclassified is a visible, honest state, never hidden.
+
+**The four approved scopes (John, 2026-07-28: "approved — all four scopes"). Pre-authorization:**
+each scope below may run design→code→verify→push **without a fresh walkthrough**, citing this section
+— provided the session stays inside its written scope; anything outside it stops and asks. Ready-to-
+paste session prompts: `docs/harvests/LOG-52-discovery-0728.md`.
+
+1. **Displayer completion** (claimed as `LOG-85` — see reconciliation below): `ai_call_patterns`
+   gains the two missing derivations — `intent` parsed from the `feature` composite;
+   `sub_calls_chained` derived from `span_id`/`parent_span_id`. Wave 1 — runs first, alone.
+2. **Consumer rewire, audit surfaces** (subset of `LOG-70`): AI Audit screen + Agent Routing drawer
+   read `ai_call_patterns`; capture-start boundary displayed; legacy label display retired on those
+   two surfaces only. Wave 2.
+
+**Concurrency reconciliation (same day, at this section's own rebase-to-dev):** the concurrent
+`log-38-0727` session shipped `LOG-38` mid-discovery (v6.3.155, live-QA PASS — the `ai_call_patterns`
+view + the AI Audit "By Pattern" section, with the drawer slice split to `LOG-79` and `LOG-70`
+narrowed to 3 remaining consumers). The verdict above already reviewed that shipped view — the two
+missing derivations stand. Scope mapping onto the new reality: **scope 1 = `LOG-85`** (completion
+patch on the shipped view; also re-verifies/closes `LOG-76`); **scope 2's AI-Audit half is already
+delivered** by `LOG-38`-done — its remaining delivery is **`LOG-79`** (the drawer) plus the
+capture-start boundary on both surfaces; scopes 3 (`LOG-72`) and 4 (`LOG-69`) are unchanged. Wave 1
+= `LOG-85`; wave 2 = `LOG-79` + scope 3 + scope 4 in parallel. The boundary's **UI copy still needs
+John** — the UI-appearance approval gate survives this pre-authorization.
+3. **Pattern Definer cleanup run** (continues `LOG-72`): Susan re-authors `request-routing` to the
+   Shape B intent-list already locked by LOG-65, and tightens `prompt-chaining` (span-participation
+   alone over-matches — 827/1,751 on the spec-complete signature). Definition-grounded, amend path,
+   no log-sampled values. Wave 2.
+4. **Historic backfill** (`LOG-69`): intent-provability route per §19i's extension — config-half
+   facts only, provenance marked, contingent facts never invented, ~300-row permanent floor stated.
+   Wave 2.
+
+**Current gold-criteria state at this discovery's close (for the wave sessions' baseline):** 5 rows
+carry criteria — RAG (301), Output Guardrails (193), Agent Handoff (105), Request Routing (0 —
+pending scope 1 + 3), Prompt Chaining (0 — pending scope 1, then tightening in scope 3). Three
+non-distinguishing criteria authored-then-reverted during the week (`generative-prompt-compression`,
+`hypothetical-document-embeddings`, `multi-agent-debate`) are null again — the reverts were direct
+PATCHes (a governance breach, acknowledged; the `amend` path is the only legitimate criteria write
+going forward). 15 patterns remain honestly null. Full evidence and per-pattern detail:
+`docs/harvests/LOG-52-discovery-0728.md`.
+
+---
+
 ## 17. v4 Preservation [LOCKED]
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.

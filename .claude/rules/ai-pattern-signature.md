@@ -2,6 +2,7 @@
 paths:
   - api/prompt/*.js
   - lib/activity-log.js
+  - lib/pattern-vocabulary.js
   - src/hooks/useAIActivity.js
   - src/hooks/useAgents.js
   - src/screens/MarketIntelligenceScreen.jsx
@@ -22,5 +23,11 @@ write-time stamping. Pattern detection is **data** (`criteria` on the gold
 query path — semantics happen once, when the Pattern Definer (Susan) defines the pattern.
 The Displayer view stays a **plain view, never materialized**. Surface unclassifiable rows
 (`LEFT JOIN`), never silently drop them.
+The Displayer matches against the **full assembled §19k signature** (`call_facts` + derived
+`model_modality` + `intent` parsed from `feature` + span-derived `sub_calls_chained`) — never
+bare `call_facts`. A `SIGNATURE_FIELDS` entry with no writer and no Displayer derivation is
+dead — source it or strike it before criteria may reference it. Criteria writes go through
+Susan's review path (`reviewCandidate`) only — never a direct table PATCH, and never authored
+from values sampled out of `ai_activity_log` (the log must not shape the criteria).
 
-Rationale: `docs/ARCHITECTURE.md` §19k (and §19i LOCKED).
+Rationale: `docs/ARCHITECTURE.md` §19k, §19l (and §19i LOCKED).
