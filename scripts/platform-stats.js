@@ -1,4 +1,4 @@
-// DeepBench v6.3.176 | platform-stats.js | ABT-1e -- always compute the commit count; the monotonic guard, not git's shallow flag, decides whether it is written
+// DeepBench v6.3.177 | platform-stats.js | ABT-1f -- log a deepen only when it really deepened; record the Vercel shallow-clone finding
 // Runs automatically from package.json's `prebuild` on every Vercel build of dev/main, or
 // locally via `node --env-file=.env.local scripts/platform-stats.js`. Plain Node, no deps.
 // NEVER writes dev_toolchain_services -- that is a John-set value, preserved by omission.
@@ -76,21 +76,50 @@ async function main() {
 
   const git = (cmd) => execSync(cmd, { cwd: repoRoot, encoding: "utf8" }).trim();
 
-  // ABT-1d: Vercel clones with `git clone --depth=10`, so the count below would be ~10 in CI and
-  // the guard would (correctly) preserve the stored value forever, letting the tile go stale.
-  // Try ONCE, time-bounded, to deepen the repository first. If it succeeds the count that follows
-  // is real; if it fails for any reason -- no credentials in the build container, no network,
-  // already complete -- nothing changes and the guard below preserves the stored value exactly as
-  // it does today. The attempt cannot make anything worse, and is never fatal in either mode.
+  // ABT-1f -- established, do not re-investigate:
+  //   * Vercel clones at `--depth=10`, and there `git fetch --unshallow` EXITS 0 WITHOUT
+  //     DEEPENING anything (verified in the build log for commit 31b43f2, 2026-07-28: the
+  //     re-count immediately afterward was still 10). That silent no-op is also the whole
+  //     explanation for ABT-1d's puzzle -- the shallow flag stayed `true` after an
+  //     apparently-successful fetch because nothing about the repository had changed.
+  //   * Therefore commits_dev is EXPECTED to be preserved rather than refreshed on Vercel
+  //     builds; the monotonic guard below does that. Correct behavior, not a bug to fix.
+  //   * The attempt is kept because it does work from a full-depth/local checkout, which is
+  //     where the count actually advances. It is time-bounded, ~70 ms, and never fatal.
+  //   * `VERCEL_DEEP_CLONE` was considered and rejected -- it is not in Vercel's
+  //     documentation; do not add it.
+  // Because the exit code proves nothing here, the outcome is VERIFIED by counting before and
+  // after and logging only what the two numbers actually show.
+  const countCommits = () => {
+    try {
+      const n = parseInt(git("git rev-list --count HEAD"), 10);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+      return null; // never fatal -- fall through to the existing behavior silently
+    }
+  };
   try {
     if (git("git rev-parse --is-shallow-repository") === "true") {
+      const beforeCount = countCommits();
       execSync("git fetch --unshallow --quiet", {
         cwd: repoRoot,
         encoding: "utf8",
         stdio: "pipe",
         timeout: 20000, // a hanging fetch must never stall a deploy
       });
-      console.log("platform-stats: deepened shallow clone for an accurate commit count");
+      const afterCount = countCommits();
+      if (beforeCount !== null && afterCount !== null) {
+        if (afterCount > beforeCount) {
+          console.log(
+            `platform-stats: deepened shallow clone (${beforeCount} → ${afterCount} commits)`
+          );
+        } else {
+          console.log(
+            `platform-stats: unshallow reported success but did not deepen (still ${afterCount} commits) — this is the known Vercel behavior; the stored count will be preserved`
+          );
+        }
+      }
+      // If either count could not be obtained, say nothing -- the guard below still applies.
     }
   } catch (err) {
     const reason = String(err?.message || err).split("\n")[0].slice(0, 120);
