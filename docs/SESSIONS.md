@@ -2394,3 +2394,19 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 **Verified at QA (all live):** Total Calls 21,902 === `count(*)` exactly; identity 3,180 distinct classified + 18,722 reclassification = 21,902 exact; Total Cost $137.40 === By LLM cost sum on screen; reopen-freshness proven (panel showed 18,722 when the pre-open baseline read 18,720 — per-mount fetch, no cache); By Service still 31 rows; mobile 375px: 5 tiles wrap, backdrop-dismiss works. Console shows only the pre-existing `CHI-64`-tracked `delegation_complete` instrumentation errors (CHI screen, unrelated).
 
 **New rows:** `LOG-91` (Observability, now file, John's explicit "new now ticket") — the write path double-logs a terminal agent turn (`logAgentTurn()` + `sendRequest()`, 4,489 paired rows today; `AI-51`-done dedups cost only). Its design session also owns the historical-rows question. Deliberate consequence for `LOG-92`: Total Calls stays the raw row count so the reconciliation identity holds until `LOG-91` fixes the source.
+---
+
+## 2026-07-28 — chi-e2e-design (discovery — CHI end-to-end reliability; no version claimed, Supabase-config + docs only)
+
+**John's opener:** a month of trying has never produced one clean end-to-end run (23-question set + send-article); latest screenshot: `qg-review-intent` 422 truncation at hop 7.
+
+**Method:** failure census first — all 145 failed `durable_hops` rows from the last 14 days, grouped by cause, each cause then verified against harness code (`request-receivable.js`) and `skill_profiles` config. Full write-up: `ARCHITECTURE.md §19o`.
+
+**Findings/decisions (all confirmed with John live):**
+1. **Largest single cause was ops, not code:** 42/145 failures were Anthropic "credit balance too low" 400s (bursts 07-20 and 07-28 02:06 UTC), rendered as the same generic "Something went wrong" as real defects. John enabled auto-reload same session; distinct error surface logged as `HAR-15` (FEATURES.md).
+2. **The screenshot bug:** `qg-review-intent` still at `max_tokens:1500` — the `HAR-9-done` truncation class, missed by that pass; Owen's gate re-emits the full regenerated answer through that window. Fixed live as `HAR-16` (1500→3000 via Supabase MCP, `S-LOO-23` data-change precedent; archived row in FEATURES-ARCHIVE.md).
+3. **The systemic answer:** ~150+ calls/run × any-one-kills-its-question = compounding; per-cause fixes can't reach "never fails." Decided constraint (§19o + `.claude/rules/transient-failure-recovery.md`): one automatic checkpoint-resume recovery per transient hop failure before anything surfaces; permanent classes surface immediately per §19j. Build ticket `HAR-17` (design session + Architect Review required, not pre-approved).
+
+**Also verified:** `LOO-23`'s fix has held — the 07-28 01:00–01:05 FK recurrences all predate its 01:59 UTC commit. Post-deploy residue is exactly: 12 credit-balance rows, 1 `qg-review` truncation (now fixed), 1 `pattern-vocabulary-review` omission (Susan's flow, separate).
+
+**Open questions (in §19o, not ticketed):** gate-echoes-answer vs platform-carries-answer (`LOO-24` direction); `HAR-14` present-but-empty joining the transient class; 57 `in_progress` hops (leak?).

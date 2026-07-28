@@ -1753,3 +1753,55 @@ The NIGP analyzer is not replaced — it is a destination inside DeepBench via `
 | 2 | Trained | RAG docs added, knows a specific domain |
 | 3 | Expert | Deeply trained, specialized, self-improving |
 | 4 | Proprietary | User's own IP — private, chargeable to others |
+
+## 19o. End-to-End Reliability — Failure Compounding & the Transient-Recovery Constraint [discovery `chi-e2e-design`, 2026-07-28]
+
+**The problem this section decides.** John's standing acceptance test for the platform is one full
+end-to-end run of the Channel Sales Intelligence screen — the 23-question set plus the send-article
+use case — completing without a single user-visible failure. A month of real fixes (`HAR-9-done`,
+`LOO-20-done`, `LOO-22-done`, `LOO-23-done`, `CHI-77-done`, …) each removed a genuine cause, yet no
+run ever completed clean. The discovery's failure census (145 failed `durable_hops` rows over 14
+days, sorted by cause) explains why: a full run issues **~150+ model calls, and one failed call
+anywhere kills its whole question.** Run success is the *product* of per-call success — at even 1%
+residual per-call failure, a clean 150-call run happens ~1 time in 5. Per-cause fixes move the
+per-call rate; they can never, alone, deliver "never fails."
+
+**Census result (2026-07-28).** After the `LOO-23` deploy, exactly three live cause classes remained:
+1. **API credit exhaustion** — the single largest cause (42/145 rows; bursts 2026-07-20 and
+   2026-07-28). Ops half closed same day (John enabled Anthropic auto-reload); distinct error
+   surface is `HAR-15`. **Permanent-class: never auto-retried.**
+2. **`qg-review-intent` output truncation** — fixed same day as `HAR-16` (`max_tokens` 1500→3000,
+   the `HAR-9` class; Supabase config only).
+3. **The transient long tail** — nondeterministic required-field omissions (the parse retry is a
+   second dice roll, per `request-receivable.js`'s own `AA-151` note), 529-overload bursts outliving
+   the 3 harness attempts, and serverless time-budget starvation ("Retry skipped — insufficient
+   time remaining"). Individually rare; jointly, the compounding problem above.
+
+**DECIDED (John, live, 2026-07-28): reliability comes from recovery, not per-call perfection.**
+The platform's constraint, stated once here and enforced by `.claude/rules/transient-failure-recovery.md`:
+
+> **No transient hop failure may surface to the user until one automatic checkpoint-resume
+> recovery of that hop has been attempted.** Failures are classified first (transient vs.
+> permanent — the same classify-first posture as `postToAnthropicWithRetry()`'s 400-vs-529 rule and
+> `HAR-9`'s truncation branch); permanent causes surface immediately and honestly per §19j. One
+> recovery attempt per hop, from its `durable_hops` checkpoint, with a fresh time budget; the
+> retry must be visible in the Agent Routing drawer (§19h), never silent. A second failure of the
+> same hop surfaces as a real error.
+
+**Why hop-level resume, not question-level resubmit (ruled out).** Auto-resubmitting the whole
+question from the screen re-rolls all ~7 hops' dice, doubles cost/latency on every recovery, and
+discards completed work; hop-level resume re-runs only the failed call and gets a fresh ~60s
+window by construction (which also dissolves the time-starvation class). The checkpoint/resume
+machinery already exists (`resumeCapability()`, `LOO-20`'s persisted overrides) — today a failed
+hop is simply terminal; the change is classification + one resume, not new infrastructure.
+Build ticket: `HAR-17` (needs its own Architect Review before scoping — `execute.js` loop, high
+blast radius; not pre-approved by this section).
+
+**Open questions (questions, not tickets):**
+- Should the quality gate echo the full answer through its own structured output at all, or should
+  the platform carry the pre/regenerated answer and take the model out of that orchestration
+  (`LOO-24`'s direction)? `HAR-16`'s bump makes the echo survivable; it does not make it right.
+- Does `HAR-14`'s presence-only validation belong inside the same transient classification (a
+  present-but-empty required leaf is arguably the same dice-roll class)?
+- 57 `durable_hops` rows sit `in_progress` (14-day window) — abandoned checkpoints or a real leak?
+  Uninvestigated this session.
