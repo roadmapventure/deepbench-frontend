@@ -1,3 +1,4 @@
+// DeepBench v6.3.188 | useAIActivity.js | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.170 | useAIActivity.js | LOG-92 -- hydrateFromSupabase default = all tenants (null tenantId skips the filter; audit surface shows every real model call)
 // DeepBench v6.3.159 | useAIActivity.js | S-AI-AUDIT-SVCDIR -- Platform Services directory (platform_services) fetch + read-time join, unregistered detection, per-agent capability nesting (ARCHITECTURE.md §19m)
 // DeepBench v6.3.158 | useAIActivity.js | LOG-80 -- By LLM: null model no longer fabricated to Haiku; computeByLLM() extracted + alias-normalized so each model appears once
@@ -660,6 +661,13 @@ const MODEL_PROVIDER = {
 let _log    = [];
 let _listeners = [];
 
+// FEATURE: LOG-98 -- the panel had no way to tell "still fetching" from "genuinely empty", so it
+// rendered 0 / "no calls logged yet" for the several seconds the hydrate takes. Module-level (not
+// hook state) to match _log's own lifetime: a re-opened panel already holds data and must NOT
+// flash skeletons again.
+let _hydrated = false;
+export const isLogHydrated = () => _hydrated;
+
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
 // FEATURE: BUG-20 — normalize short-form model IDs to canonical versioned IDs at write time
@@ -736,49 +744,57 @@ const PAGE_SIZE = 1000;
 // FEATURE: LOG-92 -- tenantId null = all tenants (the AI Audit panel's read; John 2026-07-28:
 // test-tenant calls are real model calls and belong on an audit surface). A non-null tenantId
 // still scopes, preserving the original signature's behavior for any future scoped caller.
+// FEATURE: LOG-98 -- the whole body is wrapped in try/finally so `_hydrated` flips and listeners
+// are notified on EVERY exit path, success or the error early-return. A failed fetch must land the
+// panel on its honest empty state, never leave skeletons spinning forever. The finally block is the
+// single notify() for both paths.
 export async function hydrateFromSupabase(tenantId = null) {
-  const rows = [];
-  let from = 0;
-  while (true) {
-    let q = supabase
-      .from('ai_activity_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    if (tenantId) q = q.eq('tenant_id', tenantId);
-    const { data, error } = await q;
+  try {
+    const rows = [];
+    let from = 0;
+    while (true) {
+      let q = supabase
+        .from('ai_activity_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const { data, error } = await q;
 
-    if (error) {
-      console.warn('[AI log] Hydration failed:', error.message);
-      return;
+      if (error) {
+        console.warn('[AI log] Hydration failed:', error.message);
+        return;
+      }
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
     }
-    rows.push(...(data || []));
-    if (!data || data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+
+    // FEATURE: AI-51 — dedup agent-turn rows paired with a same-agent capability-wrapper row
+    // (see pairedAgentTurnIds()'s own comment) before mapping cost/patternsUsed.
+    const paired = pairedAgentTurnIds(rows);
+
+    // Replace store entirely with DB state — DB is authoritative on every panel open
+    _log = rows.map(row => ({
+      id:        row.id,
+      type:      row.ai_type,
+      model:     row.model || null,
+      tokens:    row.input_tokens || 0,
+      latencyMs: row.latency_ms || 0,
+      tier:      row.knowledge_tier || null,
+      location:  row.feature || '—',
+      agentId:   row.agent_id || null,
+      cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
+        ? parseFloat(row.cost_usd)
+        : computeCallCost(row.model, row.input_tokens, row.output_tokens)),
+      patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
+      ts:        row.created_at,
+      _fromDB:   true,
+    }));
+  } finally {
+    _hydrated = true;
+    notify();
   }
-
-  // FEATURE: AI-51 — dedup agent-turn rows paired with a same-agent capability-wrapper row
-  // (see pairedAgentTurnIds()'s own comment) before mapping cost/patternsUsed.
-  const paired = pairedAgentTurnIds(rows);
-
-  // Replace store entirely with DB state — DB is authoritative on every panel open
-  _log = rows.map(row => ({
-    id:        row.id,
-    type:      row.ai_type,
-    model:     row.model || null,
-    tokens:    row.input_tokens || 0,
-    latencyMs: row.latency_ms || 0,
-    tier:      row.knowledge_tier || null,
-    location:  row.feature || '—',
-    agentId:   row.agent_id || null,
-    cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
-      ? parseFloat(row.cost_usd)
-      : computeCallCost(row.model, row.input_tokens, row.output_tokens)),
-    patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
-    ts:        row.created_at,
-    _fromDB:   true,
-  }));
-  notify();
 }
 
 export function clearAILog() { _log = []; notify(); }
@@ -1055,7 +1071,9 @@ export function useAIActivity() {
   const platformServiceCount = (serviceDirectory || []).length;
   const assignedCapabilityCount = assignedCapabilitySlugs.size;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount };
+  // FEATURE: LOG-98 -- logLoaded is read at render time, not stored in hook state: notify()
+  // already re-renders every consumer the moment hydration completes, so the value is never stale.
+  return { log, logLoaded: isLogHydrated(), byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount };
 }
 
 export { MODEL_PROVIDER };

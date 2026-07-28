@@ -1,3 +1,4 @@
+// DeepBench v6.3.188 | SharedUI.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.143 | SharedUI.jsx | S-CHI-71 (pass 3) -- new shared DecisionFooter: the one standardized CHI user-interaction area (cream field + tan text + navy CTA), modeled on the chat input
 // DeepBench v6.3.141 | SharedUI.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
 // DeepBench v6.3.137 | SharedUI.jsx | CHI-66 — Drawer wraps its own children in an ErrorBoundary
@@ -42,6 +43,34 @@ export const Corners = ({ color = T.brass }) => (
     <svg width="10" height="10" style={{position:"absolute",bottom:4,left:4,color}} viewBox="0 0 10 10" fill="currentColor"><path d="M0 10h4v-1H1V6H0v4z"/></svg>
     <svg width="10" height="10" style={{position:"absolute",bottom:4,right:4,color}} viewBox="0 0 10 10" fill="currentColor"><path d="M10 10H6v-1h3V6h1v4z"/></svg>
   </>
+);
+
+// ── Shimmer loading primitives ────────────────────────────────────────────────
+// FEATURE: LOG-98 -- shared copy of the CHI-38/CHI-73 shimmer treatment so a second surface (the
+// AI Audit panel) can use it. MarketIntelligenceScreen.jsx still has its own private copy; folding
+// it onto this one is LOG-100 (kept out of scope here only by the 3-file cap). Reuses tokens.js's
+// existing `shimmer` keyframe -- no new keyframe, no new color. Absolutely positioned; the parent
+// must have position:"relative" and overflow:"hidden" so the sweep doesn't bleed past its edges.
+export const ShimmerSweep = () => (
+  <div style={{position:"absolute",inset:0,background:`linear-gradient(90deg,transparent 0%,rgba(182,135,58,0.28) 50%,transparent 100%)`,backgroundSize:"200% 100%",animation:"shimmer 1.2s linear infinite",pointerEvents:"none"}}/>
+);
+
+// FEATURE: LOG-98 -- a placeholder shaped like the audit panel's real rows (PatternRow / By-LLM /
+// By-Agent all share the same bordered box with a title line, a sub-line, and right-side stats) so
+// nothing jumps size when real data lands.
+export const AuditRowSkeleton = () => (
+  <div style={{border:`1px solid ${T.lineSoft}`,marginBottom:6,padding:"9px 12px",position:"relative",overflow:"hidden",display:"flex",alignItems:"center",gap:10}}>
+    <div style={{width:8,height:8,borderRadius:"50%",background:T.lineSoft,flexShrink:0}}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{height:11,width:"46%",background:T.line,marginBottom:5}}/>
+      <div style={{height:9,width:"72%",background:T.line,opacity:0.6}}/>
+    </div>
+    <div style={{display:"flex",gap:12,flexShrink:0}}>
+      <div style={{height:11,width:34,background:T.line,opacity:0.7}}/>
+      <div style={{height:11,width:34,background:T.line,opacity:0.7}}/>
+    </div>
+    <ShimmerSweep/>
+  </div>
 );
 
 // ── Card — standard Treasury card wrapper ─────────────────────────────────────

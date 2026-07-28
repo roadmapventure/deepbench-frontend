@@ -1,5 +1,6 @@
 // DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
 // DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
+// DeepBench v6.3.188 | AIActivityPanel.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.167 | AIActivityPanel.jsx | LOG-90 -- §19m unregistered-services line removed from the By Service drawer (detection stays in useAIActivity; residue tracked as LOG-89)
 // DeepBench v6.3.163 | AIActivityPanel.jsx | LOG-86 -- tab bar removed (MCP Roadmap + Architect Checklist hidden, content kept in-file), Platform Roadmap drawer deleted; drawers are the opening view
 // DeepBench v6.3.159 | AIActivityPanel.jsx | S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory (8 layer groups, muted function lists, no pattern names, closed by default); By Agent capability sub-rows; Services/Capabilities header stats; stray By Pattern top line removed (ARCHITECTURE.md §19m)
@@ -17,7 +18,7 @@ import { T, display, body, mono } from "../tokens.js";
 // LOG-86: the two shared catalogs (service/pattern) are no longer imported here — the Platform
 // Roadmap drawer is removed; the hidden MCP tab renders its own static MCP_SURFACES.
 import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase, humanizeSlug } from "../hooks/useAIActivity.js";
-import { Corners } from "./SharedUI.jsx";
+import { Corners, AuditRowSkeleton } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 // FEATURE: LOG-83 -- resolveAgent + its lookup maps extracted to a sibling module so the
 // Node regression test can import them without parsing this file's JSX. Re-exported below.
@@ -197,6 +198,50 @@ const MCP_SURFACES = [
   { tier:"Enterprise",    tierColor:"#fff",      tierBg:T.navy,                tierBorder:T.navy,                 name:"MCP Feedback",    desc:"Allow external systems to send approval or change-request signals via MCP — closes the feedback loop without requiring a DeepBench login. ⇐ Bidirectional.",                       caller:"External workflow systems" },
 ];
 
+// FEATURE: LOG-98 -- John's design: while data is loading the tile value rolls upward instead of
+// showing a 0 it doesn't mean; when the real value arrives it counts up to it and locks. Never
+// counts backwards (the reveal always runs 0 -> value). prefers-reduced-motion gets a static "—"
+// while loading and the plain value after -- no animation, and still no false zero.
+function RollingNumber({ value, loading, format }) {
+  const reduced = typeof window !== "undefined"
+    && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [display, setDisplay] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+
+  // Rolling phase — a fast upward count that wraps, so it reads as "working", not as data.
+  useEffect(() => {
+    if (!loading || reduced) return;
+    let n = 0;
+    const id = setInterval(() => {
+      n = (n + Math.max(1, Math.round(Math.random() * 400))) % 10000;
+      setDisplay(n);
+    }, 70);
+    return () => clearInterval(id);
+  }, [loading, reduced]);
+
+  // Reveal phase — one ease-out count-up from 0 to the real value, then lock.
+  useEffect(() => {
+    if (loading || reduced || revealed) return;
+    const target = Number(value) || 0;
+    const DURATION = 600;
+    const start = performance.now();
+    let raf;
+    const step = now => {
+      const t = Math.min(1, (now - start) / DURATION);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(target * eased);
+      if (t < 1) raf = requestAnimationFrame(step);
+      else { setDisplay(target); setRevealed(true); }
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [loading, reduced, revealed, value]);
+
+  if (reduced) return <>{loading ? "—" : format(Number(value) || 0)}</>;
+  if (loading) return <span style={{opacity:0.75}}>{format(display)}</span>;
+  return <>{format(revealed ? Number(value) || 0 : display)}</>;
+}
+
 export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-36 -- patternsActiveCount/patternsCatalogTotal removed from the hook; the stat
   // strip now reads the live logged count.
@@ -206,10 +251,13 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-92 -- patternsLoggedCount/assignedCapabilityCount dropped from this destructure
   // (the hook still exports both for other consumers): the Capabilities tile is removed and the
   // Patterns Logged tile now reads the LOG-38 classification view below, so tile and list agree.
-  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount } = useAIActivity();
+  // FEATURE: LOG-98 -- logLoaded distinguishes "still hydrating" from "genuinely empty"; every
+  // tile and drawer below gates its zero/empty-state copy on it.
+  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
-  const { classified, reclassificationCount } = usePatternClassification();
+  const { classified, reclassificationCount, loaded: patternsLoaded } = usePatternClassification();
+  const loading = !logLoaded;
   const tab = "activity"; // LOG-86: tab bar hidden — MCP Roadmap + Architect Checklist blocks below are intentionally kept (unreachable). To re-enable: restore useState + the tab-bar JSX (see git history, v6.3.160).
   // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)
   // FEATURE: S-AI-AUDIT-SVCDIR -- service now defaults closed too (§19m kickoff: By Service
@@ -254,17 +302,22 @@ export default function AIActivityPanel({ onClose }) {
           {/* FEATURE: LOG-92 -- 5 tiles: Capabilities removed (the capability story lives in the
               By Agent drawer, §19m); Patterns Logged reads the classification view so it always
               equals the By Pattern row count; Total Calls gains the thousands comma. */}
+          {/* FEATURE: LOG-98 -- labels, order, and styles are unchanged; only the value's render
+              path changes (RollingNumber). Services is loading only while the directory read has
+              returned nothing AND the log is still hydrating; Active Agents never loads (a static
+              import that is always correct); Patterns Logged uses the classification hook's own
+              `loaded` flag. */}
           {[
-            ["Total Calls",    totalCalls.toLocaleString()],
-            ["Total Cost",     fmt$(totalCost)],
-            ["Services",       platformServiceCount],
-            ["Active Agents",  AGENTS.length],
-            ["Patterns Logged",classified.length],
-            ["Models in Use",  modelsInUse],
-          ].map(([k,v])=>(
+            ["Total Calls",    totalCalls,           loading,                               v => Math.round(v).toLocaleString()],
+            ["Total Cost",     totalCost,            loading,                               v => fmt$(v)],
+            ["Services",       platformServiceCount, platformServiceCount === 0 && loading, v => Math.round(v).toLocaleString()],
+            ["Active Agents",  AGENTS.length,        false,                                 v => Math.round(v).toLocaleString()],
+            ["Patterns Logged",classified.length,    !patternsLoaded,                       v => Math.round(v).toLocaleString()],
+            ["Models in Use",  modelsInUse,          loading,                               v => Math.round(v).toLocaleString()],
+          ].map(([k,v,isLoading,format])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1}}>{k}</div>
-              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:T.brassLight}}>{v}</div>
+              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:T.brassLight}}><RollingNumber value={v} loading={isLoading} format={format}/></div>
             </div>
           ))}
         </div>
@@ -285,14 +338,23 @@ export default function AIActivityPanel({ onClose }) {
             <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')} first/>
             {sections.pattern && (
               <>
-                {classified.length === 0
-                  ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No classified patterns yet.</div>
-                  : classified.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                {/* FEATURE: LOG-98 -- the loading branch runs BEFORE the empty-state check, so
+                    "No classified patterns yet." can only appear once the classification read
+                    has actually returned. */}
+                {!patternsLoaded
+                  ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
+                  : classified.length === 0
+                    ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No classified patterns yet.</div>
+                    : classified.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
                 {/* FEATURE: LOG-38 -- single unclassified count, no breakdown (John's call). Everything whose
-                    signature matched no gold pattern -- new or old, empty or rich -- rolled into one line. */}
-                <div style={{fontFamily:body,fontSize:11,color:T.muted,padding:"8px 0 2px",borderTop:`1px solid ${T.lineSoft}`,marginTop:6}}>
-                  {reclassificationCount.toLocaleString()} calls needing reclassification
-                </div>
+                    signature matched no gold pattern -- new or old, empty or rich -- rolled into one line.
+                    FEATURE: LOG-98 -- hidden entirely while loading; it otherwise renders a false
+                    "0 calls needing reclassification". */}
+                {patternsLoaded && (
+                  <div style={{fontFamily:body,fontSize:11,color:T.muted,padding:"8px 0 2px",borderTop:`1px solid ${T.lineSoft}`,marginTop:6}}>
+                    {reclassificationCount.toLocaleString()} calls needing reclassification
+                  </div>
+                )}
               </>
             )}
 
@@ -300,7 +362,10 @@ export default function AIActivityPanel({ onClose }) {
                 after By Pattern (pure JSX move, no logic/state change; sections.llm key unchanged). */}
             <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')}/>
             {sections.llm && (
-              Object.values(byLLM).length === 0
+              // FEATURE: LOG-98 -- loading branch first; the empty-state copy is post-load only.
+              loading
+                ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
+                : Object.values(byLLM).length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No LLM calls logged yet.</div>
                 : Object.values(byLLM).map(d => (
                   <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
@@ -326,7 +391,10 @@ export default function AIActivityPanel({ onClose }) {
                 unchanged) and defaults collapsed. */}
             <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
             {sections.agent && (
-              agentsSorted.length === 0
+              // FEATURE: LOG-98 -- loading branch first; the empty-state copy is post-load only.
+              loading
+                ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
+                : agentsSorted.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
                 : agentsSorted.map(d => {
                   const info = resolveAgent(d.agentId);
@@ -386,7 +454,10 @@ export default function AIActivityPanel({ onClose }) {
                 docs/FEATURES-LATER.md LOG-89. */}
             <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
             {sections.service && (
-              platformServices.length === 0
+              // FEATURE: LOG-98 -- "Service directory not loaded yet." may only appear post-load.
+              (!platformServices.length && loading)
+                ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
+                : platformServices.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>Service directory not loaded yet.</div>
                 : platformServices.map((group, gi) => (
                     <div key={group.layer}>
