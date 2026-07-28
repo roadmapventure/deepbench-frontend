@@ -1,18 +1,19 @@
-# RUNBOOK — CHI 23-Question TRUE End-to-End Regression (`SES-29`)
+# RUNBOOK — CHI TRUE End-to-End Regression (`SES-29`) — 24 cases
 
-**Purpose.** John's standing acceptance test for the CHI screen, redefined 2026-07-28: every one of the 23 seed questions must be driven to a **final rendered outcome** — through Theories, Forecasts, review extensions, and every resolution terminal — and the content of those outcomes must be **channel-sales business content**, verified by a reviewing agent, not eyeballed. A question that dies mid-journey, gets rejected, or produces hollow content is a FAIL. This supersedes `HAR-17-23q-regression.md` as the general CHI regression (that runbook remains the HAR-17-specific recovery-census procedure).
+**Purpose.** John's standing acceptance test for the CHI screen, redefined 2026-07-28: every case — the 23 seed questions plus the live news-article case (#24) — must be driven to a **final rendered outcome** — through Theories, Forecasts, review extensions, and every resolution terminal — and the content of those outcomes must be **channel-sales business content**, verified by a reviewing agent, not eyeballed. A case that dies mid-journey, gets rejected, or produces hollow content is a FAIL. This supersedes `HAR-17-23q-regression.md` as the general CHI regression (that runbook remains the HAR-17-specific recovery-census procedure).
 
 **Who runs this:** any session, any driver model (a lower model is fine — every judgment call in this runbook is either pre-decided or delegated to Owen, Proofreader). This is an execution session — **no code changes** except building/maintaining the driver script per Appendix A. Normal session start per `CLAUDE.md` → `session-setup` skill (own worktree from `origin/dev`, `.env.local` copy, inflight marker staged+pushed). Read this runbook from your worktree.
 
 ---
 
-## 0. The five locked decisions (John, 2026-07-28 — do not re-litigate)
+## 0. The locked decisions (John, 2026-07-28 — do not re-litigate)
 
 1. **D1 — Theory selection:** when Priya (analyst) presents generated Theories, the driver always selects the **first-listed** Theory. Never write-your-own.
 2. **D2 — Review fork:** whenever a direct answer comes back flagged for review, the driver always takes the **review path** (flagged answer → Priya's Theories → first Theory → test → Forecast). Never "Good, thanks."
 3. **D3 — Expected-outcome baseline:** the table in §2 is the locked contract. Any deviation from a question's expected journey = FAIL to investigate. John approves all baseline changes.
 4. **D4 — Strict rejection line:** ANY rejection by Owen (Proofreader) = that question is red, and triggers the §4 five-try probe to measure why. No "majority accept" softening.
 5. **D5 — Content review by agent:** content quality is judged by Owen via the `AGT-35` content-context review capability (LLM-as-judge), never by the driver model's own reading. The 2-question live-browser leg (§6) additionally proves rendering.
+6. **D6 — News door (case 24, added same day):** every run also drives one **live web article** end-to-end through the news-card door — Jordan Ellsworth's (web-search agent) live card fetch → **first-listed card** (the D1 rule's analog) → article extraction → full analysis journey. The article's *content* varies run to run by nature; what's locked is the *procedure* and the *journey shape* (Direct answer — the routing rule that treats a delivered headline as an external fact is part of what this case protects). Owen judges the content as usual.
 
 ## 1. Prerequisites — check before starting, stop if missing
 
@@ -20,9 +21,9 @@
 2. **Driver script.** `SES-29`'s row records where the committed driver lives once it ships (proposed: `scripts/chi-true-regression.mjs`). Until then, build it in your scratchpad **exactly** per Appendix A — do not improvise the call sequences.
 3. **Endpoint + auth.** `POST https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/capabilities/execute`, header `x-vercel-protection-bypass` (value = `VERCEL_AUTOMATION_BYPASS_SECRET` in your worktree's `.env.local`; see `docs/ENV-VARS.md`). `tenant_id: "global"` on every call.
 
-## 2. The baseline table (D3) — 23 questions, expected journeys
+## 2. The baseline table (D3) — 24 cases, expected journeys
 
-Questions come verbatim from `src/screens/MarketIntelligenceScreen.jsx`: `STATIC_QUESTION` (#1), `ROTATING_POOL` (#2–11), `FIXED_DRAWER_TAIL` (#12–23), in that order. Grep those constants in your worktree — never retype from this table (labels below are abbreviated).
+Questions #1–23 come verbatim from `src/screens/MarketIntelligenceScreen.jsx`: `STATIC_QUESTION` (#1), `ROTATING_POOL` (#2–11), `FIXED_DRAWER_TAIL` (#12–23), in that order. Grep those constants in your worktree — never retype from this table (labels below are abbreviated). Case #24 has no fixed text — its question is built from whatever headline Jordan's first card carries that run (Appendix A4).
 
 | # | id | Question (abbreviated) | Expected journey | Fixed resolution |
 |---|---|---|---|---|
@@ -49,8 +50,9 @@ Questions come verbatim from `src/screens/MarketIntelligenceScreen.jsx`: `STATIC
 | 21 | training-turnover-benchmark | Training/turnover vs benchmarks | Direct answer | — |
 | 22 | latin-america | Outlook — Latin America | **Forecast journey** | **reject** |
 | 23 | south-korea-coop | South Korea co-op utilization | Direct answer | — |
+| 24 | news-first-card | Live news door: Jordan's first card → article → analysis (D6) | Direct answer (news door) | — |
 
-**17 direct answers + 6 Forecast journeys.** The six fixed resolutions deliberately cover every terminal the screen offers: accept ×3, edit-then-accept ×1, reject ×1, info-only ×1 — same question, same resolution, every run, so runs are comparable (per-question assignments are John-vetoable baseline content; corrected-baseline provenance in `docs/SESSIONS.md`, 2026-07-28 entries).
+**18 direct answers (17 typed + 1 news-door) + 6 Forecast journeys.** The six fixed resolutions deliberately cover every terminal the screen offers: accept ×3, edit-then-accept ×1, reject ×1, info-only ×1 — same question, same resolution, every run, so runs are comparable (per-question assignments are John-vetoable baseline content; corrected-baseline provenance in `docs/SESSIONS.md`, 2026-07-28 entries).
 
 **Review extensions (D2):** any direct-answer question whose final display sets `needs_review` extends into the review path (Appendix A §A3) — that extension is **part of** its expected journey, not a deviation. **First-run duty:** record which questions actually flag, append that flagged-set to this table (new column), and get John's approval — after that, a change in the flagged-set between runs is itself a deviation (FAIL to investigate).
 
@@ -91,7 +93,8 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 ## 7. Scoring
 
 - **Question PASS** = actual journey matches baseline (incl. approved flagged-set) AND all Owen content verdicts pass AND zero rejections AND no unrecovered infra death.
-- **Run PASS** = all 23 questions PASS AND browser leg passes. One automatic HAR-17 recovery inside a journey does not fail a question (it's designed behavior) — but report every recovery.
+- **Run PASS** = all 24 cases PASS AND browser leg passes. One automatic HAR-17 recovery inside a journey does not fail a case (it's designed behavior) — but report every recovery.
+- **Case 24 specifics:** the news fetch itself failing (no cards, or `fetch-article` failing on the first card) is an infra-class FAIL of case 24, not a skip — the door is part of the product. `fetch-article` failing *open* (screen behavior: proceeds without article text) = run the journey as the screen would, but report the degradation prominently; content verdicts then judge what the user actually got.
 - Anything else = run FAIL, with per-question causes.
 
 ## 8. Filing results (before the session ends)
@@ -101,7 +104,7 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 - Baseline changes (flagged-set, resolution reassignments, de-rejected questions) → proposed to John, applied to §2 only on his approval, in this runbook via normal edit+push.
 - Close out per `session-setup` (push `HEAD:dev`, delete inflight marker, remove worktree).
 
-**Budget:** ~60–90 min nominal (17 direct ≈ 1–2.5 min each; 6 Forecast journeys ≈ 3–5 min each), plus 5× question-time per rejection probe, plus ~30 judge calls, plus browser leg. Plan ~2h, ≈$5–10 platform cost.
+**Budget:** ~60–95 min nominal (18 direct ≈ 1–2.5 min each incl. the news door's card-fetch + article-extraction overhead; 6 Forecast journeys ≈ 3–5 min each), plus 5× question-time per rejection probe, plus ~30 judge calls, plus browser leg. Plan ~2h, ≈$5–10 platform cost.
 
 ---
 
@@ -129,3 +132,10 @@ All calls: `POST` to the §1 endpoint, JSON body, `tenant_id: "global"`, `stream
 
 ### A3. Review extension (from a flagged direct answer — D2)
 `{...hyp-generation-intent..., task_context:{flagged_question:<original question>, flagged_answer:<final display's plain text>, review_reason:<the flag's review_reason>}}` → then A2 steps 3–5 with `intent:"theory"`, `flagged_answer` carried through, resolution **accept**.
+
+### A4. News door — case 24 (D6; verified against `fetchNewsCards()`/`analyzeNewsCard()` 2026-07-28, v6.3.190 tree)
+1. `{capability_slug:"web-search-news", intent_slug:"ws-news-search-intent", agent_id:"jordan", task_context:{}}` → `cards[]` (Jordan real-delegates to the news-cards formatter via the ordinary harness loop — nothing special for the driver). Empty/no cards → infra-class FAIL of case 24 (§7).
+2. Pick `cards[0]` (D6). Record its `headline` and `url` in the run report — that's this run's article identity.
+3. `POST /api/fetch-article` `{url: cards[0].url}` → `{text, source}`. Non-OK → proceed with `article_content:null` (the screen's own fail-open) and report the degradation (§7).
+4. Build the question exactly as the screen does: `` `New industry development: ${headline}. What does this mean for our channel program positioning?` ``
+5. Run journey A1 with that question, spreading `{article_content:<text>, article_source:<source>, article_url:<url>}` into `task_context` of the **answer, gate, and display** calls (never the routing call — routing classifies the plain question text only). Expected: routes `qa` → full A1 → Owen content review on the final display. Flag → A3 extension as usual.
