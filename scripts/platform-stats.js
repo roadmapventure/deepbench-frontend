@@ -1,4 +1,4 @@
-// DeepBench v6.3.174 | platform-stats.js | ABT-1c -- --soft mode + shallow-clone guard; runs from prebuild on every Vercel build
+// DeepBench v6.3.175 | platform-stats.js | ABT-1d -- attempt git fetch --unshallow so a CI checkout can report a real commit count
 // Runs automatically from package.json's `prebuild` on every Vercel build of dev/main, or
 // locally via `node --env-file=.env.local scripts/platform-stats.js`. Plain Node, no deps.
 // NEVER writes dev_toolchain_services -- that is a John-set value, preserved by omission.
@@ -75,6 +75,29 @@ async function main() {
   const governance_docs = rootClaudeMd.length + docsMd.length;
 
   const git = (cmd) => execSync(cmd, { cwd: repoRoot, encoding: "utf8" }).trim();
+
+  // ABT-1d: Vercel clones with `git clone --depth=10`, so the count below would be ~10 in CI and
+  // the guard would (correctly) preserve the stored value forever, letting the tile go stale.
+  // Try ONCE, time-bounded, to deepen the repository first. If it succeeds the count that follows
+  // is real; if it fails for any reason -- no credentials in the build container, no network,
+  // already complete -- nothing changes and the guard below preserves the stored value exactly as
+  // it does today. The attempt cannot make anything worse, and is never fatal in either mode.
+  try {
+    if (git("git rev-parse --is-shallow-repository") === "true") {
+      execSync("git fetch --unshallow --quiet", {
+        cwd: repoRoot,
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 20000, // a hanging fetch must never stall a deploy
+      });
+      console.log("platform-stats: deepened shallow clone for an accurate commit count");
+    }
+  } catch (err) {
+    const reason = String(err?.message || err).split("\n")[0].slice(0, 120);
+    console.log(
+      `platform-stats: could not deepen shallow clone (${reason}) — commit count will be preserved`
+    );
+  }
 
   // commits_dev: only trustworthy from a full-depth checkout. A CI clone may be shallow, in
   // which case `git rev-list --count HEAD` legitimately returns a small number -- writing that
