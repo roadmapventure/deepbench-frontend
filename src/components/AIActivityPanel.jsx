@@ -1,3 +1,4 @@
+// DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
 // DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
 // DeepBench v6.3.167 | AIActivityPanel.jsx | LOG-90 -- §19m unregistered-services line removed from the By Service drawer (detection stays in useAIActivity; residue tracked as LOG-89)
 // DeepBench v6.3.163 | AIActivityPanel.jsx | LOG-86 -- tab bar removed (MCP Roadmap + Architect Checklist hidden, content kept in-file), Platform Roadmap drawer deleted; drawers are the opening view
@@ -22,6 +23,10 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 // Node regression test can import them without parsing this file's JSX. Re-exported below.
 import { resolveAgent } from "./resolveAgent.js";
 export { resolveAgent };
+// FEATURE: LOG-93 -- roster count for the Active Agents tile; "active" = available for a
+// routing call (John, 2026-07-28). No availability flag exists in the data, so roster
+// membership IS availability -- if such a flag ever ships, this tile reads it instead.
+import { AGENTS } from "../data/agents.js";
 
 const CHECKLIST = [
   ["Model selection",    "Haiku for routing/classification. Sonnet only for ReAct loops and long-form briefings."],
@@ -253,6 +258,7 @@ export default function AIActivityPanel({ onClose }) {
             ["Total Calls",    totalCalls.toLocaleString()],
             ["Total Cost",     fmt$(totalCost)],
             ["Services",       platformServiceCount],
+            ["Active Agents",  AGENTS.length],
             ["Patterns Logged",classified.length],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(
