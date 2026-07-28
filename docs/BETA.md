@@ -182,8 +182,10 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
    FEATURES tier files; no physical re-tier done.)
 2. ~~`CHI-70` (Architecture)~~ — **RESOLVED 2026-07-28, John: "later bucket not beta."**
    Refresh-loses-conversation is post-beta; accepted for the beta send.
-3. **`HAR-14` (Task Success Rate)** — validator accepts present-but-empty required fields;
-   ~8 user-visible holes vs. a huge-blast-radius harness change. In or out?
+3. ~~`HAR-14` (Task Success Rate)~~ — **RESOLVED 2026-07-28, John: conditional.** "Wait and
+   see if regression uncovers this. If not, it goes into next bucket - after beta release."
+   → Not queued now; if any 24-case run failure root-causes to an accepted empty required
+   field, `HAR-14` enters bucket 1 at that point. Otherwise post-beta (Next tier).
 4. **`AA-178` (Architecture)** — the standing Librarian-gatekeeper contradiction (which
    reading of "only Eleanor calls `queryLibrary()`" is the rule). Blocks `AA-179` and the
    `AA-99` violation's fix. Not new — this triage just re-surfaces that it's still unruled.
