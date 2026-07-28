@@ -1,0 +1,1 @@
+chi-e2e-design — discovery/design: CHI end-to-end reliability (23 questions + send-article use case fail inconsistently; latest symptom: qg-review-intent 422 truncation at max_tokens before final_answer).
