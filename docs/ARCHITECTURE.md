@@ -1633,6 +1633,65 @@ going forward). 15 patterns remain honestly null. Full evidence and per-pattern 
 `docs/harvests/LOG-52-discovery-0728.md`.
 
 ---
+## 19m. Platform Services Directory — Service vs. Capability [discovery `ai-audit-screen-0727`, 2026-07-28]
+
+**The problem this settles.** The AI Audit screen's "By Service" section was driven by `SERVICE_CATALOG`
+(`shared/ai-patterns.js`) — a hand-maintained list that conflated three different things under one word:
+harness/loop stages, agent Capabilities, and deterministic logic — and decorated them with pattern names
+from the frozen legacy `patterns_used` column. A ground-truth code inventory (three parallel sweeps of
+`api/`, `lib/`, `src/`, deliberately ignoring the catalog) found the real reusable modules, plus untracked
+model calls the catalog never knew about.
+
+**The definitions (John, live, 2026-07-28):**
+
+- **A Service is one reusable code module.** Its internal functions are attributes of the service
+  (rendered as a muted list under its title), never services themselves. This fixes the unit of count:
+  **31 services** exist today. A new service exists only when engineers write a new module.
+- **A Capability is not a Service.** A Capability is *data* — a `capabilities` row bundling Skills
+  (`capability_skill_profiles` → `skill_profiles`), assigned to an Agent (`agent_capability_assignments`)
+  — executed *through* the generic services (§19b's one-executor principle: new capabilities are new data,
+  not new routes). Capabilities are displayed under their **Agent** (the By Agent drawer), never in the
+  services list. Agent ownership of a service is itself expressed as a Capability (e.g. Dan Bingham's
+  `dan-db-assembly`, Eleanor Voss's `data-room-custody`) — so the Agent drawer tells the ownership story
+  from real data, and service rows carry no hand-written agent names.
+- **"Utilizes a Model" is an attribute of a service, not its identity.** Deterministic and frontend
+  services are first-class directory entries; model use is a flag.
+
+**The storage split — directory vs. event log:**
+
+| Table | Holds | Never holds |
+|---|---|---|
+| `platform_services` (new, 31 rows) | what things ARE: slug, branded name (≤4 words), layer, functions, `utilizes_model`, `tracking_status`, `match_keys`, `code_anchor` | counts, cost, latency |
+| `ai_activity_log` (existing, unchanged) | what HAPPENED: one row per call | names, layers, branding |
+
+The screen joins the two at read time via `match_keys` (`[{ai_type}...]` / `[{feature}...]`; a feature
+match takes precedence over an ai_type-only match, so e.g. `web-memory`-feature rows never double-count
+into Knowledge Writer's `reinforcement` match). Untracked services render "Not tracked at this time" —
+truthful, not a bug. `tracking_status: machinery` marks modules whose executions are attributed elsewhere
+(Agent Loop Engine → counted under Capabilities; Reasoning Store → under Knowledge Retriever) so nothing
+double-counts.
+
+**Layers (display grouping, from §1's model):** scaffold, harness, loop, platform, data-model,
+deterministic, screen-invoked (endpoints a screen calls directly via `fetch()`, bypassing the agent loop),
+frontend.
+
+**Self-maintenance:** any `ai_activity_log` activity whose resolved slug matches no directory row renders
+as an explicit "unregistered service" line — a new logging service can never silently vanish; it appears
+asking to be registered. (Reconciliation + code-anchor drift scripts: deliberately deferred to a
+follow-up session, John's call — not built here.)
+
+**Known drift recorded, not fixed here:** (1) `skill_profiles.technical_services` holds *pattern* names
+(`rag`, `tool-use`, …) under a "services" label — a §1 "Technical Services" legacy; rename is its own
+decision. (2) Real untracked model calls found by the inventory: `plan.js`'s plan/title actions,
+`brief.js`'s legacy/Pat paths, `agent-run.js`'s REFLECT on brief/web-memory paths, `fetch-article.js`'s
+primary path, Scaffold's prompt assembly. These are §1a coverage gaps, logged in the inventory
+(`docs/harvests/`), each needing its own session. (3) `SERVICE_CATALOG` remains only for the MCP Roadmap
+tab's tier list; the By Service display must never read it again.
+
+**Ruled out:** deleting the By Service section (its per-service cost/latency is the platform's only
+per-operation spend view — industry-standard GenAI observability); listing capabilities inline as service
+functions (they'd all collapse under one machinery row, losing per-capability numbers and ownership);
+a separate `ai_services` name (services are services; model use is a flag).
 
 ## 17. v4 Preservation [LOCKED]
 
