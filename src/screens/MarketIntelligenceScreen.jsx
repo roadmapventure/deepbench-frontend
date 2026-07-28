@@ -1,3 +1,4 @@
+// DeepBench v6.3.183 | MarketIntelligenceScreen.jsx | HAR-17 -- recovery visibility: chat status "hit a snag" + expectation extension off the in_progress body's recovery payload; recovery continues exempt from the client cap; failed-status bodies throw
 // DeepBench v6.3.180 | MarketIntelligenceScreen.jsx | HAR-15 -- credit-exhaustion renders an honest, distinct fault report (no raw provider JSON, no "try again") at all 5 error surfaces
 // DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
 // DeepBench v6.3.169 | MarketIntelligenceScreen.jsx | S-CHI-82b -- journey membership for the two residual sites CHI-82a's arrival-effect guard didn't cover (same presence-vs-membership root cause): (1) the breadcrumb stage highlight now feeds currentStage() membership-filtered inputs (qa iff it holds a step in the current journey, hypFlow iff journeySeq matches -- the pure function itself unchanged), so a lingering resolved flow no longer paints "Update" over a new journey's "Analysis"; (2) the three hyp "Needs Your Decision" badges (Candidates/Result/Draft Forecast) gate on a new hypIsCurrent prop, so an abandoned previous journey's ambient drawers stop soliciting decisions. Shared hypCurrent const hoisted; qa/Analysis badge untouched (slot overwritten each journey).
@@ -1270,11 +1271,21 @@ const MAX_CONTINUE_ITERATIONS = 10; // client-side safety cap -- generous headro
 // that don't care), checked before firing the next continuation fetch. When true, bails out
 // immediately with whatever result is on hand rather than continuing a chain the caller has already
 // abandoned (Clear fired mid-way) — see clearGenerationRef, below.
-async function resolveInProgress(result, onProgress = null, isStale = () => false) {
+// FEATURE: HAR-17 -- onRecovery is called with the in_progress body's `recovery` payload
+// ({fault, agent_id, capability_slug, intent_slug}, S-HAR-17b's server contract) whenever a hop
+// checkpoint-recovered from a transient failure — the response-body route is why recovery is
+// visible on EVERY call site, streamed and plain-JSON alike (an SSE-event route couldn't reach
+// workingStatus on non-streamed sites).
+async function resolveInProgress(result, onProgress = null, isStale = () => false, onRecovery = null) {
   let iterations = 0;
   while (result.status === "in_progress") {
     if (isStale()) return result; // FEATURE: CHI-04 — Clear fired mid-chain; caller already bails on this via its own isStale() check
-    if (++iterations > MAX_CONTINUE_ITERATIONS) {
+    // FEATURE: HAR-17 -- a recovery continue is not a budget checkpoint: it must not eat the cap
+    // sized for MAX_LOOP_DEPTH budget rounds (a successful recovery sequence could otherwise be
+    // killed client-side at 10 -- the exact outcome §19o forbids).
+    if (result.recovery) {
+      if (onRecovery && !isStale()) onRecovery(result.recovery);
+    } else if (++iterations > MAX_CONTINUE_ITERATIONS) {
       throw new Error(`Chain did not complete after ${MAX_CONTINUE_ITERATIONS} continuations (job_id: ${result.job_id})`);
     }
     const res = await fetch("/api/capabilities/execute", {
@@ -1284,6 +1295,11 @@ async function resolveInProgress(result, onProgress = null, isStale = () => fals
     });
     if (!res.ok) throw new Error(`continue (job_id: ${result.job_id}) failed: ${res.status}`);
     result = onProgress ? await readSSEResult(res, onProgress) : await res.json();
+  }
+  // FEATURE: HAR-17 -- an already-terminal failed row (duplicate/late continue) must never flow
+  // into result rendering as if it were content.
+  if (result.status === 'failed') {
+    throw Object.assign(new Error(result.error || 'chain failed'), { status: 500 });
   }
   return result;
 }
@@ -1297,7 +1313,7 @@ async function resolveInProgress(result, onProgress = null, isStale = () => fals
 // string, not a function, passed only by a caller whose own agent might legitimately answer
 // directly (qa_answer/proofreader — Jordan's news-search and the display call always delegate, so
 // neither needs one).
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null }) {
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
   const t0 = Date.now();
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
@@ -1311,7 +1327,7 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   });
   if (!res.ok) throw new Error(`${capability_slug} ${intent_slug} failed: ${res.status}`);
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
-  const result = await resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
+  const result = await resolveInProgress(first, onProgress, isStale, onRecovery); // FEATURE: CHI-04; HAR-17 -- recovery visibility
   // FEATURE: MI-67 — patterns_used was a real, already-computed sibling field on `result` that
   // this unwrap discarded; every event built from this return needs it for an accurate Agent
   // Routing log.
@@ -1347,7 +1363,7 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
 // capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
 // FEATURE: MI-42 — gains the identical onProgress/stream treatment for consistency (Nadia's
 // confirmation-resolve path); no live call site opts in this session (see Task 3g), future-proofing.
-async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null, onProgress = null, isStale = () => false }) {
+async function resolveConfirmation({ confirmation_id, resolution, edited_task_context = null, onProgress = null, isStale = () => false, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1362,7 +1378,7 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
     throw Object.assign(new Error(body.error || `resolve ${resolution} failed: ${res.status}`), { status: res.status, upstreamStatus: body.upstreamStatus, failureClass: body.failureClass, faultCode: body.faultCode, detail: body.detail || null });
   }
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
-  return resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
+  return resolveInProgress(first, onProgress, isStale, onRecovery); // FEATURE: CHI-04; HAR-17 -- recovery visibility
 }
 
 // FEATURE: MI-01d — Owen's own delegate_to_agent call replaces the screen-scripted retry
@@ -1379,7 +1395,9 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // from a news-card click, api/fetch-article.js) spread into this call's task_context only, never
 // into the visible chat bubble (that's built separately by the caller, submit() below, from the
 // plain confirmed question text). Unset (every existing caller) is byte-identical.
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null) {
+// FEATURE: HAR-17 -- onRecovery threaded into every user-visible-wait call in this pipeline so a
+// checkpoint-recovered hop annotates the live chat status line (Task 3's wire-up list).
+async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null, onRecovery = null) {
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
   // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
   // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
@@ -1392,7 +1410,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   // fires only when Marcus genuinely answered directly (no internal delegation resolved this call).
   const qa = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent", agent_id: "marcus",
-    task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale,
+    task_context: { goal: message, ...(backgroundContext || {}) }, runtime_context: conversationContext, onProgress, isStale, onRecovery,
     onEvent, hop_type: "qa_answer",
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
@@ -1415,7 +1433,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
       agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent",
       ...(backgroundContext || {}),
     },
-    onProgress, isStale,
+    onProgress, isStale, onRecovery,
     onEvent, hop_type: "proofreader",
   });
   if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
@@ -1474,7 +1492,7 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
   const display = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
     task_context: { answer: finalAnswer.answer, citations: finalAnswer.citations, confidence_tier: finalAnswer.confidence_tier, needs_review, review_reason, ...(backgroundContext || {}) },
-    onProgress, isStale,
+    onProgress, isStale, onRecovery,
   });
   if (isStale()) return display; // FEATURE: CHI-04
 
@@ -1514,11 +1532,11 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
 // FEATURE: CHI-33 — backgroundContext threaded straight through to runQaWithQualityGate() below,
 // never applied to the routing call above (routing only ever needs the plain question text to
 // classify intent). Unset (every existing caller) is byte-identical.
-async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null) {
+async function runIntentPipeline(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null, onRecovery = null) { // FEATURE: HAR-17
   const t0 = Date.now();
   const routing = await callCapability({
     capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent", agent_id: "marcus",
-    task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale,
+    task_context: { goal: message }, runtime_context: conversationContext, onProgress, isStale, onRecovery,
   });
   if (isStale()) return { kind: "non_qa", text: "" }; // FEATURE: CHI-04 — discarded by submit()'s own isStale() check regardless; value here is never rendered
   onEvent(buildHopEvent("intent_routing", "marcus", routing, Date.now() - t0));
@@ -1528,12 +1546,12 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext);
+  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext, onRecovery); // FEATURE: HAR-17
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
 // the picker, pre-filled, when the user already wrote their own claim.
-async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale = () => false }) {
+async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale = () => false, onRecovery = null }) { // FEATURE: HAR-17
   const gen = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
     task_context: {
@@ -1541,7 +1559,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
       flagged_answer: flaggedAnswer || "",
       review_reason: reviewReason || "user-initiated, no explicit claim extracted",
     },
-    isStale,
+    isStale, onRecovery,
   });
   // FEATURE: MI-67b — the pattern-line identity was being discarded here, one layer above
   // callCapability()'s own MI-67 fix; the caller needs both the hypotheses array (unchanged
@@ -1558,7 +1576,7 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
 // -> delegate_to_agent(is_final:true) hand-off via hyp-hypothesis-test-display-intent. Alex is one
 // candidate Michelle reasons over, not a guaranteed/hardcoded target — the old bundled
 // format_skill_profile_slug/display_agent_id override (AA-77 format-last pattern) is gone entirely.
-async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false }) {
+async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest, onEvent, setStatus, onProgress, isStale = () => false, onRecovery = null }) { // FEATURE: HAR-17
   const analysis = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-intent", agent_id: "priya",
     task_context: {
@@ -1566,7 +1584,7 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
       flagged_question: flaggedQuestion || "", flagged_answer: flaggedAnswer || "",
       prior_hypothesis_test: priorHypothesisTest || null,
     },
-    onProgress, isStale,
+    onProgress, isStale, onRecovery,
   });
   if (isStale()) return analysis; // FEATURE: CHI-04 — stop before the display hand-off hop
 
@@ -1574,7 +1592,7 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   const display = await callCapability({
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-hypothesis-test-display-intent", agent_id: "priya",
     task_context: { supports: analysis.supports, complicates: analysis.complicates, consider: analysis.consider, confidence: analysis.confidence },
-    onProgress, isStale,
+    onProgress, isStale, onRecovery,
   });
   if (isStale()) return display; // FEATURE: CHI-04
   // FEATURE: MI-52 -- same treatment as runQaWithQualityGate()'s Display-agent hand-off above:
@@ -3350,7 +3368,7 @@ export default function MarketIntelligenceScreen() {
   // runQaWithQualityGate/runHypothesisTest/ack-call chains always reads the true current count,
   // never a stale value from the closure captured when that async function started.
   const pipelineEventsRef = useRef([]);
-  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, kind } | null
+  const [workingStatus, setWorkingStatus] = useState(null); // { message, startedAt, turnStartedAt, expectation, expectationMs, kind } | null — FEATURE: HAR-17 -- expectationMs is the raw-ms twin of the formatted `expectation` string so the recovery writer can extend it arithmetically
   // FEATURE: CHI-75 — "is a chat question currently in flight?" A ref, not state, because
   // fetchNewsCards() is async and closes over stale state; this is read at the fetch's completion
   // to decide whether it still owns the shared workingStatus line (see fetchNewsCards below).
@@ -3447,12 +3465,16 @@ export default function MarketIntelligenceScreen() {
   // below) and this session's live micro-hop delegation events (via onDelegationProgress, forwarded
   // into every callCapability() call as onProgress) -- both write the same workingStatus, so they
   // can never drift into two different timers.
-  const setStatus = (message, { expectation, kind = 'scripted' } = {}) =>
+  const setStatus = (message, { expectation, expectationMs, kind = 'scripted' } = {}) =>
     setWorkingStatus(prev => ({
       message,
       startedAt: Date.now(),
       turnStartedAt: prev?.turnStartedAt ?? Date.now(),
       expectation: expectation !== undefined ? expectation : (prev?.expectation ?? null),
+      // FEATURE: HAR-17 -- raw-ms twin of `expectation`, same merge semantics (an omitted value
+      // carries the previous one forward). Fresh-turn sites with no grounded estimate store 120000
+      // -- LIVE_EXPECT_FALLBACK's "< 2m" ceiling as ms -- so no live status is ever string-only.
+      expectationMs: expectationMs !== undefined ? expectationMs : (prev?.expectationMs ?? 120000),
       kind,
     }));
   // FEATURE: MI-52 -- tracks still-pending in-flight delegation/delegation_return rows, keyed by the
@@ -3548,6 +3570,29 @@ export default function MarketIntelligenceScreen() {
     logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
+  // FEATURE: HAR-17 -- recovery visibility, John's exact design 2026-07-28: tell the user we hit a
+  // snag and self-recovered, keep the same turn/timer identity, and EXTEND the displayed
+  // expectation by the re-run's own p90 cost so the promise stays honest. Chat status only --
+  // the Agent Routing drawer deliberately shows nothing (supersedes §19o's drawer wording).
+  // Written via setWorkingStatus's functional update directly (not setStatus) because setStatus
+  // resets startedAt -- the snag message must NOT reset the timers; only a genuinely new hop does.
+  // No drawer write, no pendingDelegationsRef touch, no logEvent from this path. The no-live-status
+  // guard below is the same ownership posture as CHI-75's chatTurnActiveRef: only annotate a
+  // status line that actually exists, never conjure one. Subsequent normal status writes (the next
+  // hop's own message) naturally replace the snag message -- that is the "then back on the elapsed
+  // time and agent" part of John's design and needs no timer.
+  const onRecoveryStatus = (recovery) => {
+    setWorkingStatus(prev => {
+      if (!prev) return prev; // no live status line owns this turn -- nothing to annotate
+      const rerunMs = agentActivity?.[recovery.agent_id]?.byKind?.[recovery.intent_slug]?.byDepth?.depth0?.p90 || 60000;
+      const newMs = (prev.expectationMs || 120000) + rerunMs;
+      return { ...prev,
+        message: "Hit a snag — recovered automatically, continuing…",
+        expectation: formatExpectation(newMs), expectationMs: newMs,
+        kind: 'orchestration' };
+    });
+  };
+
   // FEATURE: CHI-33 — Column 2 live news feed. Jordan Ellsworth (web-search-news) real-delegates
   // to Alex Reeves (screen-controls/news-cards-format) via the ordinary harness delegation loop —
   // onProgress: onDelegationProgress is the same wiring every other capability call already uses to
@@ -3619,12 +3664,13 @@ export default function MarketIntelligenceScreen() {
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_generation, agentActivity);
       // FEATURE: CHI-82 — "hypotheses" -> "theories" (single vocabulary, chi-vocabulary.md)
-      setStatus("Priya is generating theories…", { expectation: est != null ? formatExpectation(est) : null });
+      // FEATURE: HAR-17 -- raw ms stored alongside the string: grounded est when present, else the 120s fallback ceiling
+      setStatus("Priya is generating theories…", { expectation: est != null ? formatExpectation(est) : null, expectationMs: est != null ? est : 120000 });
     }
     try {
       const hopBeforeGen = currentHopCount(pipelineEventsRef.current); // FEATURE: CHI-74 -- hop span start for the theory-candidates close line
       // FEATURE: LOG-79 -- trace_id/span_id (not legacy patterns_used) carry the pattern-line identity
-      const { hypotheses: candidates, trace_id, span_id } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
+      const { hypotheses: candidates, trace_id, span_id } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale, onRecovery: onRecoveryStatus }); // FEATURE: HAR-17
       if (isStale()) return; // FEATURE: CHI-04
       logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, trace_id, span_id }, Date.now() - t0));
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
@@ -3717,10 +3763,11 @@ export default function MarketIntelligenceScreen() {
           setWorkingStatus(prev => {
             if (!prev) return prev;
             const est = estimateChainMs(INTENT_CHAINS.qa, agentActivity);
-            return est != null ? { ...prev, expectation: formatExpectation(est) } : prev;
+            // FEATURE: HAR-17 -- the grounded upgrade also stores the raw ms twin
+            return est != null ? { ...prev, expectation: formatExpectation(est), expectationMs: est } : prev;
           });
         }
-      }, setStatus, onProgress, isStale, backgroundContext); // FEATURE: CHI-23 — getHopCount param removed, no longer threaded through. FEATURE: CHI-33 — backgroundContext threaded through
+      }, setStatus, onProgress, isStale, backgroundContext, onRecoveryStatus); // FEATURE: CHI-23 — getHopCount param removed, no longer threaded through. FEATURE: CHI-33 — backgroundContext threaded through. FEATURE: HAR-17 — recovery visibility threaded through
       if (isStale()) return; // FEATURE: CHI-04 — Clear fired while this question was in flight; discard silently (finally still runs, harmlessly re-sets already-null loading/workingStatus)
       if (result.kind === "qa") {
         // FEATURE: S-ARCH-DISPLAY-LOOP-01 — plainText stays the plain-text join of the formatted
@@ -3890,6 +3937,10 @@ export default function MarketIntelligenceScreen() {
     // FEATURE: CHI-23 — removed incorrect "+1"; this ack logs no event of its own, so it shares
     // whatever hop is already current, per this line's own pre-existing comment above.
     const submissionAckHop = currentHopCount(pipelineEventsRef.current);
+    // FEATURE: HAR-17 -- the fire-and-forget ack calls (this one and its .catch siblings below/in
+    // onDiscard/onResolveConfirmation) are deliberately NOT wired for onRecovery: no user-visible
+    // wait exists here, so there is no status line to annotate. Recovery still happens server-side.
+    // fetchNewsCards is likewise scoped out (CHI-86 owns its stream hygiene).
     callCapability({
       capability_slug: "channel-intelligence", intent_slug: "ci-submission-ack-intent", agent_id: "marcus",
       task_context: { submitted_theory: text },
@@ -3906,10 +3957,11 @@ export default function MarketIntelligenceScreen() {
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_test, agentActivity);
       // FEATURE: CHI-82 — "hypothesis test" -> "theory test" (single vocabulary, chi-vocabulary.md)
-      setStatus("Priya is running a theory test…", { expectation: est != null ? formatExpectation(est) : null });
+      // FEATURE: HAR-17 -- raw ms stored alongside the string: grounded est when present, else the 120s fallback ceiling
+      setStatus("Priya is running a theory test…", { expectation: est != null ? formatExpectation(est) : null, expectationMs: est != null ? est : 120000 });
     }
     try {
-      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale }); // FEATURE: CHI-23 — getHopCount param removed
+      const st = await runHypothesisTest({ hypothesis: text, intent, flaggedQuestion, flaggedAnswer, priorHypothesisTest: hypothesisTest || null, onEvent: logEvent, setStatus, onProgress, isStale, onRecovery: onRecoveryStatus }); // FEATURE: CHI-23 — getHopCount param removed. FEATURE: HAR-17 — recovery visibility
       if (isStale()) return; // FEATURE: CHI-04
       logEvent(buildHopEvent("hypothesis_test", "priya", st, Date.now() - t0));
       // FEATURE: MI-65 — no chat push here anymore. The raw test result stays in Evidence only
@@ -4092,7 +4144,7 @@ export default function MarketIntelligenceScreen() {
     const t0 = Date.now();
     setStatus("Nadia is processing your response…");
     try {
-      const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context, isStale });
+      const result = await resolveConfirmation({ confirmation_id, resolution, edited_task_context, isStale, onRecovery: onRecoveryStatus }); // FEATURE: HAR-17 — recovery visibility (still non-streamed — no onProgress, LOO-25 documents why)
       if (isStale()) return; // FEATURE: CHI-04
 
       if (resolution === "edit") {
