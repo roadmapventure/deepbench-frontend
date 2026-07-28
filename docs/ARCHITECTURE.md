@@ -1590,8 +1590,13 @@ slug from the composite at read time; rows whose `feature` carries no intent get
 - The Displayer matches against the **full assembled signature** per §19k — never bare `call_facts`.
 - The vocabulary has a working correction loop: `amend` (shipped, `LOG-52`) **plus** the
   rename/supersede path (`LOG-51`'s blocker) so naming errors can converge without row deletion.
-- Both consumer surfaces state the **capture-start boundary** (fact classification begins 2026-07-23);
-  unclassified is a visible, honest state, never hidden.
+- Both consumer surfaces keep unclassified a **visible, honest state, never hidden** — expressed
+  structurally, not in copy (amended 2026-07-28, John's call at `LOG-79`'s UI gate: no user-facing
+  boundary/date label on either surface — "too much info for the user about back office things").
+  The AI Audit screen keeps counting **every** unmatched call in its reclassification line (John:
+  the full number is the motivation to whittle it down); a drawer hop whose rows match no gold
+  pattern simply shows no pattern line (the LOG-15 "real data or nothing" rule). The capture-start
+  fact (classification begins 2026-07-23) stays documented here, not displayed.
 
 **The four approved scopes (John, 2026-07-28: "approved — all four scopes"). Pre-authorization:**
 each scope below may run design→code→verify→push **without a fresh walkthrough**, citing this section
