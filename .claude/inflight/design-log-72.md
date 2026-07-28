@@ -1,0 +1,1 @@
+Worktree `design-log-72` — LOG-72: Susan Smith (Trainer) criteria cleanup per ARCHITECTURE.md §19l scope 3 (request-routing → Shape B intent list; prompt-chaining tightening), via the live amend path against the dev preview.
