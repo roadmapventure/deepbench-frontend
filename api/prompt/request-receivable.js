@@ -1,3 +1,4 @@
+// DeepBench v6.3.190 | api/prompt/request-receivable.js | LOG-77-9 -- extractDelegationProvenanceFacts(): verbatim delegation_target/task_provenance backing facts for the read-time delegated_to_provenance derivation (§19k); no comparison, no conclusion
 // DeepBench v6.3.180 | api/prompt/request-receivable.js | HAR-15 -- classifyAnthropicFailure() stamps failureClass/faultCode/upstreamStatus on every thrown Anthropic failure; retry behavior byte-identical
 // DeepBench v6.3.153 | api/prompt/request-receivable.js | LOG-49 -- model-call write path completes the signature fact-half: span_id/parent_span_id chain links, input_references_other_deliverable, and quarantined self_reported_claims
 // DeepBench v6.3.145 | api/prompt/request-receivable.js | LOO-22 -- register library-lookup handler (Eleanor's record-level verification read)
@@ -426,6 +427,27 @@ export function extractSelfReportedClaims(structuredOutput) {
     claims[field] = value;
   }
   return Object.keys(claims).length > 0 ? claims : null;
+}
+
+// FEATURE: LOG-77-9 -- ARCHITECTURE.md §19k `delegated_to_provenance` backing facts. Verbatim
+// capture only, no comparison, no conclusion (§19i: the writer captures links, never the
+// conclusion) -- the derived boolean lives in the Displayer view, never here. The three keys are
+// the platform's own delegation vocabulary (delegate_to_agent's schema / §19d's task_context
+// candidate source) -- generic, never a capability-specific read.
+export const PROVENANCE_KEYS = ['agent_id', 'capability_slug', 'intent_slug'];
+
+// Returns { delegationTarget, taskProvenance }, each null when it has no string-valued keys --
+// preserving the "omit the key entirely when empty" contract (mergeCallFacts null handling).
+export function extractDelegationProvenanceFacts(toolInput, taskContext) {
+  const pick = (src) => {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+    const out = {};
+    for (const k of PROVENANCE_KEYS) {
+      if (typeof src[k] === 'string' && src[k] !== '') out[k] = src[k];
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  };
+  return { delegationTarget: pick(toolInput), taskProvenance: pick(taskContext) };
 }
 
 // FEATURE: LOG-37 -- single source of truth for "which tools did this response actually invoke".

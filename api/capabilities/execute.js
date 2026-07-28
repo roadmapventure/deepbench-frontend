@@ -1,3 +1,4 @@
+// DeepBench v6.3.190 | api/capabilities/execute.js | LOG-77-9 -- delegate_to_agent turn rows capture verbatim delegation_target/task_provenance call_facts (§19k backing facts for the read-time delegated_to_provenance derivation); request_help turns deliberately unchanged
 // DeepBench v6.3.184 | api/capabilities/execute.js | LOG-95 -- hop-event span identity (§19p): all 10 streamed delegation-family onEvent payloads carry trace_id + from_span_id/to_span_id; lastHelpSelection and buildFinalDelegationResult() carry the credited execution's trace_id/span_id
 // DeepBench v6.3.182 | api/capabilities/execute.js | HAR-17 -- transient model-call failures checkpoint-recover once per hop (recovery_ledger, checked write) before surfacing; enable_web_search persisted across resume
 // DeepBench v6.3.181 | api/capabilities/execute.js | HAR-18 -- nested in_progress guards at the broker and critique dispatch sites (the two of four nested call sites that lacked them)
@@ -61,7 +62,9 @@ import { enrichPrompt } from '../prompt/ai-enrichment.js';
 // FEATURE: LOG-49 -- extractSelfReportedClaims + its allowlist live in request-receivable.js (a
 // single shared constant, extensible in one place); imported here so the agent-turn write path uses
 // the identical set as the model-call write path.
-import { sendRequest, callModel, extractSelfReportedClaims } from '../prompt/request-receivable.js';
+// FEATURE: LOG-77-9 -- extractDelegationProvenanceFacts shares the same home (pure extractor,
+// generic delegation vocabulary, no capability-specific read). See request-receivable.js.
+import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationProvenanceFacts } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
@@ -251,7 +254,7 @@ function getSupabaseHeaders(key) {
 // would change patterns_used behavior and needs its own row. Layer A's job here is to capture the
 // real facts alongside it so Layer B can eventually reclassify at read time and ignore the
 // declaration; it is not to reclassify anything now.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -269,6 +272,11 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     ...(toolCallFacts.length > 0 ? { tool_calls: toolCallFacts } : {}),
     ...(inputReferencesOtherDeliverable ? { input_references_other_deliverable: true } : {}),
     ...(selfReportedClaims && Object.keys(selfReportedClaims).length > 0 ? { self_reported_claims: selfReportedClaims } : {}),
+    // FEATURE: LOG-77-9 -- §19k `delegated_to_provenance` backing facts, verbatim, no comparison,
+    // no conclusion (the derived boolean lives in the Displayer view only). Plumbing keys with
+    // literal agent ids in them -- never legal criteria keys (§19k locked constraint 2).
+    ...(delegationTarget ? { delegation_target: delegationTarget } : {}),
+    ...(taskProvenance ? { task_provenance: taskProvenance } : {}),
   };
   logActivity({
     tenantId: tenant_id || 'global',
@@ -870,6 +878,14 @@ async function runLoop({
       // different facts and collapsing them is the bug LOG-44 exists to fix. Null on a plain text
       // turn (parseModelTurn(), request-receivable.js:171), which correctly yields call_facts null.
       tool_calls: turn.tool_name ? [turn.tool_name] : [],
+      // FEATURE: LOG-77-9 -- §19k backing facts for the read-time `delegated_to_provenance`
+      // derivation, captured verbatim ONLY on a delegate_to_agent turn (a structural harness-tool
+      // check, never an agent/capability conditional). request_help turns deliberately get
+      // nothing: they carry no target. task_context is already in scope (it threads to
+      // persistFailureAndRethrow); resumed loops capture identically (AA-145 persists it).
+      ...(turn.tool_name === 'delegate_to_agent'
+        ? (() => { const f = extractDelegationProvenanceFacts(turn.tool_input, task_context); return { delegationTarget: f.delegationTarget, taskProvenance: f.taskProvenance }; })()
+        : {}),
     });
 
     if (!turn.is_delegate_call) {
