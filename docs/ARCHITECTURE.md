@@ -1857,3 +1857,48 @@ blast radius; not pre-approved by this section).
   present-but-empty required leaf is arguably the same dice-roll class)?
 - 57 `durable_hops` rows sit `in_progress` (14-day window) — abandoned checkpoints or a real leak?
   Uninvestigated this session.
+
+## 19p. Hop-Event Span Identity — Identity Travels With the Event [discovery `michelle-patterns`, 2026-07-28]
+
+**The problem this section decides.** The Agent Routing drawer's per-hop "AI patterns used:" line
+(`LOG-79`) is read-side generic — one gold `pattern_vocabulary`, one `ai_call_patterns` view, one
+drawer component, zero per-agent logic (§19k/§19l). But the line only renders when the hop event
+carries the `trace_id`/`span_id` of the model call it credits, and that identity was **hand-threaded
+per event shape**, not delivered mechanically. `LOG-79` wired only the plain top-level final-answer
+return. Three transport shapes were never wired, and hops built from them can never show a pattern
+line, for any agent, regardless of whether the underlying call classified:
+
+1. **Embedded selection object** (`lastHelpSelection`, `execute.js`) — carries the picker's
+   reasoning/candidates but not her span ids. Michelle Manning (PM) is 100% of this shape's traffic
+   on CHI, which is why she alone appeared "unclassified" — verified live 2026-07-28: her last 120
+   span-stamped `agent-selection-intent` calls ALL classify (pattern **Request Routing**).
+2. **Streamed progress events** (`delegation`/`delegation_complete`/`delegation_return` onEvent
+   payloads) — no identity fields at all; affects every agent's live hop rows.
+3. **Delegated final answers** (`buildFinalDelegationResult()`'s `final_delegation` shape) — returns
+   no top-level `trace_id`/`span_id`; affects every `display_format` hop (Alex Reeves, Riley Torres)
+   and any generic hop whose call resolved via delegation (e.g. Owen Marsh's gate when it escalates).
+
+**DECIDED (John, live, 2026-07-28): the write side must be as generic as the read side.**
+
+> **No hop event may be emitted, and no executor result shape returned, without the
+> `trace_id`/`span_id` of the execution it credits.** The identity travels with the event/result
+> mechanically — attached where the event or result shape is born in the executor — never
+> re-threaded caller-by-caller or shape-by-shape on the client. A hop row with no span identity is
+> the defect (it silently opts that hop out of pattern display forever), not a neutral default.
+> Enforced by `.claude/rules/hop-event-span-identity.md` on the build-site files.
+
+**Ruled out.** (a) Per-shape client-side threading as the fix (the `MI-67b`/`LOG-15` pattern — it
+is exactly what produced this gap: every new shape has to remember); (b) any per-agent or
+per-capability special case (Rule #1, §19d — the gap is keyed to event shape, agents are
+symptoms); (c) fabricating a pattern line when identity or classification is absent (§19l's honest
+unclassified state stands).
+
+**Attribution correctness note for the build session:** the identity attached must be the span of
+the execution the row *credits* — the picker's own child span on `agent_selection` rows, the
+formatter's child span on `display_format` rows — not the outer requester's span that happens to be
+in scope. Getting this wrong shows the requester's patterns on the delegate's hop, which is worse
+than blank.
+
+Build ticket: `LOG-95` (Platform-Logging) — thread span identity through the three unwired shapes
+(`execute.js` event/result construction + the drawer's hop-event build sites). Discovery only;
+needs its own design session + Architect Review before coding.
