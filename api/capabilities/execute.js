@@ -1,3 +1,4 @@
+// DeepBench v6.3.166 | api/capabilities/execute.js | LOG-79 -- runLoop()'s final-answer response now carries trace_id/span_id (one generic passthrough line) so the Agent Routing drawer can join its hop events to the ai_call_patterns view; error/pending_confirmation/depth_exceeded returns deliberately unchanged
 // DeepBench v6.3.154 | api/capabilities/execute.js | LOO-20 -- persists requires_human_confirmation + critique_capability_slug/critique_intent_slug across checkpoint/resume (durable_hops migration + checkpointAndReturn/resume plumbing) so a resumed confirmation-gated chain re-lands on the human-confirmation gate instead of the hardcoded requiresHumanConfirmation:false the three resume sites used -- restores the empty Draft Forecast card / bypassed Data Room gate; also patches the durable_hops row terminal when the gate fires on a resumed job so a stray re-resume can't write a duplicate pending_confirmations row
 // DeepBench v6.3.153 | api/capabilities/execute.js | LOG-49 -- completes the signature fact-half: threads span_id/parent_span_id chain links (one span per runCapability execution; a delegated child points parent_span_id at the caller's span; persisted across checkpoint/resume via durable_hops exactly as trace_id is), stamps input_references_other_deliverable once a delegate result is folded back into the loop's input, and captures the model's quarantined self_reported_claims -- all on the agent-turn write path
 // DeepBench v6.3.142 | api/capabilities/execute.js | LOG-67 -- config-half signature snapshot merged into call_facts on the agent-turn write path
@@ -851,7 +852,11 @@ async function runLoop({
         // row carries input_references_other_deliverable: true.
         trace_id, span_id, parent_span_id, input_references_other_deliverable: integratedDelegateResult, deadline,
       });
-      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection };
+      // FEATURE: LOG-79 -- the response now carries the loop's trace identity (generic, every
+      // capability identically) so the client can join hop events to the ai_call_patterns view.
+      // Deliberately NOT added to error/pending_confirmation/depth_exceeded returns -- those
+      // never display pattern lines.
+      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection, trace_id, span_id };
       if (job_id) {
         await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
       }

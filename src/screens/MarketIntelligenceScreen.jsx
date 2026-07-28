@@ -1,3 +1,4 @@
+// DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
 // DeepBench v6.3.162 | MarketIntelligenceScreen.jsx | S-CHI-82 -- CHI journey steps + single vocabulary (ARCHITECTURE.md §19n, .claude/rules/chi-vocabulary.md): fixed drawer titles (CHI-49's intent-dynamic titles overturned -- "Theories"/"Theory Result"), journey-relative step numbering by arrival order (assignStep/ensureStep, no path map), StepChip worn by drawer titles + echoed in handoff chat bubbles (stepRef), ambient flex-order sort, "News & Evidence" -> "Steps & Evidence", breadcrumb current-stage highlight (currentStage), hypothesis/candidate retired from all screen copy
 // DeepBench v6.3.152 | MarketIntelligenceScreen.jsx | S-CHI-77 -- onSend's catch now emits the MI-29 "error" Pipeline Log event (surfaces the real reason via describeCaughtError into Column 3) + honest bubble copy ("completing your answer", not "reaching Marcus"); the one async catch that dropped the reason. (Renamed from CHI-76 at close-out -- collided with the concurrently-shipped CHI-76 hyp-test caption, SES-18 counter desync)
 // DeepBench v6.3.151 | MarketIntelligenceScreen.jsx | S-CHI-76 -- hyp-test completion status renders via the centralized HopSummaryLine caption (was a bare hand-formatted "…Given in Xs" bubble); isAnswer now message-driven
@@ -369,6 +370,10 @@ import { SERVICE_CATALOG, usePatternVocabulary, humanizeSlug } from "../hooks/us
 // FEATURE: CHI-56 — shared turn-tracking service (hop-duration resolution, transaction-boundary
 // event builder); see src/lib/turnTracking.js for full rationale.
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
+// FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
+// Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
+// patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
+import { fetchTracePatterns } from "../lib/tracePatterns.js";
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -1294,7 +1299,12 @@ async function callCapability({ capability_slug, intent_slug, agent_id, task_con
   // visible diff — it took loading the real MI screen and watching hop 2 (Alex) never appear to
   // surface this. Return-value semantics for every existing caller are byte-identical to before
   // (same `result.status ? result : {...}` branch, just computed once instead of returned inline).
-  const finalResult = result.status ? result : { ...(result.content || {}), patterns_used: result.patterns_used || [] };
+  // FEATURE: LOG-79 -- the unwrap now threads the response's trace identity (trace_id/span_id,
+  // execute.js's generic passthrough) instead of the legacy patterns_used field: the Agent
+  // Routing drawer's pattern line joins to the ai_call_patterns view via these ids, so events
+  // whose data is this finalResult inherit them with no per-site change. The status branch
+  // (`result` as-is) already carries both ids top-level.
+  const finalResult = result.status ? result : { ...(result.content || {}), trace_id: result.trace_id, span_id: result.span_id };
   // FEATURE: LOO-010 — fires only when this call's own agent genuinely answered directly
   // (finalResult.display_agent_id is null/undefined — loose equality intentional, both mean "no
   // delegation resolved this call"). When a delegation DID resolve it, display_agent_id is always
@@ -1391,10 +1401,12 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // whatever the real delegate returned, copied verbatim by Owen; gate.last_help_selection
     // carries Michelle's own real reasoning for the pick, surfaced the same way AA-164 already
     // surfaces Marcus's own request_help hop above (qa.last_help_selection).
-    // FEATURE: LOG-15 — gate.triage never carried patterns_used; the real value lives one level up
-    // on gate itself (the shared callCapability() wrapper's top-level field), not nested inside
-    // gate.triage. Hoisted explicitly so failure_triage's pattern line shows real data.
-    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, patterns_used: gate.patterns_used || [] }, resolveEmbeddedDuration(Date.now() - t0)));
+    // FEATURE: LOG-15 — gate.triage never carried the pattern-line identity; the real value lives
+    // one level up on gate itself (the shared callCapability() wrapper's top-level fields), not
+    // nested inside gate.triage. Hoisted explicitly so failure_triage's pattern line shows real
+    // data. FEATURE: LOG-79 -- that identity is now trace_id/span_id (joined to the
+    // ai_call_patterns view at render time), not the legacy patterns_used array.
+    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, trace_id: gate.trace_id, span_id: gate.span_id }, resolveEmbeddedDuration(Date.now() - t0)));
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
   }
 
@@ -1502,10 +1514,12 @@ async function generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason
     },
     isStale,
   });
-  // FEATURE: MI-67b — patterns_used was being discarded here, one layer above callCapability()'s
-  // own MI-67 fix; the caller needs both the hypotheses array (unchanged shape/contract) and the
-  // real patterns for its Agent Routing log event.
-  return { hypotheses: gen.hypotheses || [], patterns_used: gen.patterns_used || [] };
+  // FEATURE: MI-67b — the pattern-line identity was being discarded here, one layer above
+  // callCapability()'s own MI-67 fix; the caller needs both the hypotheses array (unchanged
+  // shape/contract) and the real identity for its Agent Routing log event. FEATURE: LOG-79 --
+  // that identity is now trace_id/span_id (the render layer joins them to ai_call_patterns),
+  // not the legacy patterns_used array.
+  return { hypotheses: gen.hypotheses || [], trace_id: gen.trace_id, span_id: gen.span_id };
 }
 
 // FEATURE: S-ARCH-DISPLAY-LOOP-02 (AA-116) — real Display-agent hand-off for AI - Hypothesis
@@ -1555,15 +1569,17 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
   // html-display-format shape) rather than the pure-decline string-only case AA-137 already
   // handled.
   // FEATURE: MI-67b — this function's return value (`st`) becomes the "hypothesis_test" event's
-  // data — it must carry the ANALYSIS step's real patterns (this function's own hyp-hypothesis-
-  // test-intent call), not the DISPLAY step's (hyp-hypothesis-test-display-intent, already
-  // correctly attributed to the separate display_format event two lines above). Every branch below
-  // explicitly sets patterns_used from `analysis`, overriding whatever `display` itself carries.
+  // data — it must carry the ANALYSIS step's real pattern identity (this function's own hyp-
+  // hypothesis-test-intent call), not the DISPLAY step's (hyp-hypothesis-test-display-intent,
+  // already correctly attributed to the separate display_format event two lines above). Every
+  // branch below explicitly sets the identity from `analysis`, overriding whatever `display`
+  // itself carries. FEATURE: LOG-79 -- that identity is now trace_id/span_id (joined to the
+  // ai_call_patterns view at render time), not the legacy patterns_used array.
   return typeof display === "string"
-    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, patterns_used: analysis.patterns_used || [] }
+    ? { headline: display, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: null, display_agent_id: null, selection: null, trace_id: analysis.trace_id, span_id: analysis.span_id }
     : typeof display.content === "string"
-    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, patterns_used: analysis.patterns_used || [] }
-    : { ...display, patterns_used: analysis.patterns_used || [] }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, patterns_used overridden to the real analytical call's
+    ? { headline: display.content, supports: null, complicates: null, consider: null, confidence: null, display_agent_card: display.display_agent_card, display_agent_id: display.display_agent_id, selection: display.selection, trace_id: analysis.trace_id, span_id: analysis.span_id }
+    : { ...display, trace_id: analysis.trace_id, span_id: analysis.span_id }; // final_delegation shape: every intelligence-review-format field + display_agent_card/id/selection, trace/span identity overridden to the real analytical call's
 }
 
 // FEATURE: MI-51 — index/onGoodThanks added so a specific message's reviewChoice can be set
@@ -2514,6 +2530,41 @@ function RoutingHopCard({ hop, agentById }) {
   );
 }
 
+// FEATURE: LOG-79 -- module-level cache of span->pattern-name maps, keyed by trace id (mirrors
+// usePatternVocabulary's cache shape in useAIActivity.js): the first mount with a given trace
+// triggers fetchTracePatterns exactly once; every RoutingActivityLine for that trace shares the
+// result; state updates when the fetch resolves. fetchTracePatterns never rejects (LOG-38 fetch
+// posture -- warns and resolves {}), so a failure simply renders no pattern lines.
+const EMPTY_TRACE_PATTERNS = {};
+const _tracePatternCache = new Map();    // traceId -> resolved { [span_id]: [name, ...] }
+const _tracePatternPromises = new Map(); // traceId -> in-flight promise
+
+function fetchTracePatternsCached(traceId) {
+  if (_tracePatternCache.has(traceId)) return Promise.resolve(_tracePatternCache.get(traceId));
+  if (!_tracePatternPromises.has(traceId)) {
+    _tracePatternPromises.set(traceId, fetchTracePatterns(traceId).then(map => {
+      _tracePatternCache.set(traceId, map);
+      _tracePatternPromises.delete(traceId);
+      return map;
+    }));
+  }
+  return _tracePatternPromises.get(traceId);
+}
+
+// FEATURE: LOG-79 -- governed pattern names for one trace's hops. Returns the span->names map
+// ({} until resolved, or when the trace has no classified rows). A null/undefined traceId (an
+// in-flight hop whose rows aren't written yet, or a pre-LOG-79 event) fetches nothing.
+function useTracePatterns(traceId) {
+  const [spanPatterns, setSpanPatterns] = useState(() => (traceId && _tracePatternCache.get(traceId)) || EMPTY_TRACE_PATTERNS);
+  useEffect(() => {
+    if (!traceId) { setSpanPatterns(EMPTY_TRACE_PATTERNS); return; }
+    let cancelled = false;
+    fetchTracePatternsCached(traceId).then(map => { if (!cancelled) setSpanPatterns(map); });
+    return () => { cancelled = true; };
+  }, [traceId]);
+  return spanPatterns;
+}
+
 // FEATURE: CHI-01 — one activity line within a hop card (no header — RoutingHopCard owns
 // that). Replaces the per-row 3px left border with a small 6px color dot per line, since the
 // card itself now carries the border. FEATURE: CHI-02 — summary text is never hard-truncated
@@ -2521,17 +2572,19 @@ function RoutingHopCard({ hop, agentById }) {
 // lines) + a click-to-expand toggle, so the ellipsis lands at the true end of the last visible
 // line instead of wrapping alone, and the full text is always one click away.
 // FEATURE: LOG-15 — capability never displays here, ever (John's hard rule, 2026-07-17). One
-// generic line reads evt.data.patterns_used directly — no event-type branching, no capability
-// lookup. A hop with no real pattern data shows no line at all (never a fabricated placeholder) —
-// same "real data or nothing" principle MI-67 already established for this exact field.
+// generic line reads the event's trace/span identity directly — no event-type branching, no
+// capability lookup. A hop with no real pattern data shows no line at all (never a fabricated
+// placeholder) — same "real data or nothing" principle MI-67 already established here.
+// FEATURE: LOG-79 -- pattern names come from the ai_call_patterns view (read-time classification,
+// §19k) via useTracePatterns, replacing the frozen legacy evt.data.patterns_used read. The view's
+// pattern_name IS the governed vocabulary name, so no patternLabelFor/vocab resolution is needed.
+// A hop whose rows match no gold pattern gets no span entry -> no line (honest unclassified
+// state, expressed structurally, no boundary/date copy -- John's §19l call).
 function RoutingActivityLine({ evt }) {
   const { summary, color } = describePipelineEvent(evt);
-  // FEATURE: LOG-36 -- governed vocabulary name, else humanized slug, else the raw slug.
-  const { vocab } = usePatternVocabulary();
-  const realPatterns = Array.isArray(evt.data?.patterns_used) ? evt.data.patterns_used : null;
-  const patternLabel = realPatterns && realPatterns.length > 0
-    ? realPatterns.map(slug => patternLabelFor(vocab, slug)).join(', ')
-    : null;
+  const spanPatterns = useTracePatterns(evt.data?.trace_id);
+  const names = evt.data?.span_id != null ? spanPatterns[evt.data.span_id] : null;
+  const patternLabel = names && names.length > 0 ? names.join(', ') : null;
   const [expanded, setExpanded] = useState(false);
   const fullText = `${summary}${evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}`;
   const isLong = fullText.length > 160;
@@ -3492,9 +3545,10 @@ export default function MarketIntelligenceScreen() {
     }
     try {
       const hopBeforeGen = currentHopCount(pipelineEventsRef.current); // FEATURE: CHI-74 -- hop span start for the theory-candidates close line
-      const { hypotheses: candidates, patterns_used } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
+      // FEATURE: LOG-79 -- trace_id/span_id (not legacy patterns_used) carry the pattern-line identity
+      const { hypotheses: candidates, trace_id, span_id } = await generateHypotheses({ flaggedQuestion, flaggedAnswer, reviewReason, isStale });
       if (isStale()) return; // FEATURE: CHI-04
-      logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, patterns_used }, Date.now() - t0));
+      logEvent(buildHopEvent("hypothesis_generation", "priya", { candidates, trace_id, span_id }, Date.now() - t0));
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing", candidates }));
       // FEATURE: CHI-61 -- Marcus's instructive next-step bubble; candidates previously landed with
       // zero chat narration telling the user what to do with them. Only fires on the generated-
@@ -3969,10 +4023,11 @@ export default function MarketIntelligenceScreen() {
         // accepted narrower exception, see kickoff CONTEXT. See STYLE-GUIDE.md §36.
         setMessages(prev => [...prev, buildMessage({ kind: "user_action", text: "You edited the proposal." })]);
         logEvent(buildTransactionBoundaryEvent("start", Date.now())); // FEATURE: CHI-57
-        // FEATURE: LOG-15 — result.patterns_used exists (same shared mechanism, threaded through
-        // resolveConfirmation()) but wasn't hoisted to the top level the renderer reads; the
-        // {resolution, result} wrapper was silently dropping it.
-        logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, patterns_used: result.patterns_used || [] }, Date.now() - t0));
+        // FEATURE: LOG-15 — the pattern-line identity exists on `result` (same shared mechanism,
+        // threaded through resolveConfirmation()) but wasn't hoisted to the top level the renderer
+        // reads; the {resolution, result} wrapper was silently dropping it. FEATURE: LOG-79 --
+        // that identity is now trace_id/span_id (if present on this resolve path), not patterns_used.
+        logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, trace_id: result.trace_id, span_id: result.span_id }, Date.now() - t0));
         setHypFlow(prev => prev && ({
           ...prev,
           confirmation: { ...prev.confirmation, confirmation_id: result.confirmation_id, proposed_action: result.proposed_action, critique: result.critique },
@@ -3980,8 +4035,9 @@ export default function MarketIntelligenceScreen() {
         return;
       }
 
-      // FEATURE: LOG-15 — same wrapper-nesting fix as the edit branch above.
-      logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, patterns_used: result.patterns_used || [] }, Date.now() - t0));
+      // FEATURE: LOG-15 — same wrapper-nesting fix as the edit branch above. FEATURE: LOG-79 --
+      // same trace_id/span_id identity swap as the edit branch above.
+      logEvent(buildHopEvent("patch_resolved", "nadia", { resolution, result, trace_id: result.trace_id, span_id: result.span_id }, Date.now() - t0));
       // FEATURE: MI-51 — accept-branch copy now tells the user exactly where the saved item can be
       // found (was result.content?.confirmation_note || "Recorded."); Nadia's data-patch-intent write
       // already surfaces there today via groupDataSources()'s "Analysis" bucket, no backend change.
