@@ -1639,9 +1639,17 @@ slug from the composite at read time; rows whose `feature` carries no intent get
 - The Displayer matches against the **full assembled signature** per §19k — never bare `call_facts`.
 - The vocabulary has a working correction loop: `amend` (shipped, `LOG-52`) **plus** the
   rename/supersede path (`LOG-51`'s blocker) so naming errors can converge without row deletion.
-  **Rename half shipped v6.3.178 (`S-LOG-51` — see the §19k "Rename/supersede path" subsection);
-  the delegation-family adjudication itself (Susan researches, John signs off on names) is still
-  pending as `LOG-51`'s part 2.**
+  **Rename half shipped v6.3.178 (`S-LOG-51` — see the §19k "Rename/supersede path" subsection).
+  Part 2 COMPLETE same day (`S-LOG-51-design`, John live): Susan adjudicated the delegation family
+  from primary sources through the new path — `agent-handoff` → `agents-as-tools` (her research;
+  OpenAI SDK) → **`orchestrator-workers`** (John's governance override; Anthropic, *Building
+  Effective Agents*) for delegate-and-integrate, plus a fresh **`handoff`** row (OpenAI Agents SDK
+  "Handoffs") for transfer-without-synthesis, criteria `integration_followed` true/false
+  respectively. Request Routing unchanged. Historical rows re-derived instantly, zero backfill —
+  this condition is MET.** Known residue: `LOG-96` (rename may not overwrite a retired row's
+  pointer — guard) and `LOG-101` (`ai_pattern_classification_rollup` now brushes the anon 3s
+  statement timeout under panel concurrency, so the AI Audit By Pattern section intermittently
+  renders its honest-empty fallback — display only, classification data unaffected).
 - Both consumer surfaces keep unclassified a **visible, honest state, never hidden** — expressed
   structurally, not in copy (amended 2026-07-28, John's call at `LOG-79`'s UI gate: no user-facing
   boundary/date label on either surface — "too much info for the user about back office things").
