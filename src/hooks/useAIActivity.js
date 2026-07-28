@@ -1,4 +1,3 @@
-// DeepBench v6.3.187 | useAIActivity.js | LOG-97 -- By Pattern cost derived from tokens via the hydrated log (dedup-consistent), not the rollup's empty cost_usd column
 // DeepBench v6.3.170 | useAIActivity.js | LOG-92 -- hydrateFromSupabase default = all tenants (null tenantId skips the filter; audit surface shows every real model call)
 // DeepBench v6.3.159 | useAIActivity.js | S-AI-AUDIT-SVCDIR -- Platform Services directory (platform_services) fetch + read-time join, unregistered detection, per-agent capability nesting (ARCHITECTURE.md §19m)
 // DeepBench v6.3.158 | useAIActivity.js | LOG-80 -- By LLM: null model no longer fabricated to Haiku; computeByLLM() extracted + alias-normalized so each model appears once
@@ -11,7 +10,7 @@
 // Module-level AI call log. Any component calls logAICall() to record.
 // AIActivityPanel reads the same store — no context provider needed.
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from '../lib/supabase.js';
 // FEATURE: LOG-36 -- PATTERN_CATALOG is no longer read by anything in this file; it is imported
 // solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
@@ -834,36 +833,11 @@ export function usePatternVocabulary() {
 // (patterns whose pattern_vocabulary.criteria matched real logged signatures); Section 2 =
 // ai_pattern_reclassification_count (single total of everything unmatched). The pattern NAME is
 // derived in the view at read time (ARCHITECTURE.md §19k) -- this hook never classifies client-side.
-// FEATURE: LOG-97 -- the row->pattern mapping, so cost can be computed from the SAME per-row
-// values every other cost on this screen uses (computeCallCost via the hydrated log), instead of
-// the rollup view's sum(cost_usd) -- a column only 43 of 22k rows ever populate, and none of the
-// classified ones. Row-level (not a token aggregate) specifically so the AI-51 pairing dedup is
-// inherited: 66% of request-routing's rows are paired duplicates, so an aggregate would double it.
-async function fetchPatternRowMap() {
-  const bySlug = new Map();
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from('ai_call_patterns')
-      .select('ai_activity_log_id, pattern_slug')
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    for (const r of (data || [])) {
-      if (!bySlug.has(r.pattern_slug)) bySlug.set(r.pattern_slug, new Set());
-      bySlug.get(r.pattern_slug).add(r.ai_activity_log_id);
-    }
-    if (!data || data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-  return bySlug;
-}
-
 export async function fetchPatternClassification() {
   try {
-    const [rollup, recl, rowIdsBySlug] = await Promise.all([
+    const [rollup, recl] = await Promise.all([
       supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum'),
       supabase.from('ai_pattern_reclassification_count').select('reclassification_count').single(),
-      fetchPatternRowMap(),
     ]);
     if (rollup.error) throw rollup.error;
     if (recl.error) throw recl.error;
@@ -872,48 +846,24 @@ export async function fetchPatternClassification() {
       name: r.pattern_name,
       desc: r.pattern_description,
       total: r.call_count,
-      // FEATURE: LOG-97 -- kept as the FALLBACK value only; usePatternClassification() overrides it
-      // with the log-derived sum whenever the mapping and the hydrated log are both available.
       cost: Number(r.cost_sum) || 0,
       active: true,
     }));
-    return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0, rowIdsBySlug };
+    return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
   } catch (e) {
     console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
-    return { classified: [], reclassificationCount: 0, rowIdsBySlug: new Map() };
+    return { classified: [], reclassificationCount: 0 };
   }
 }
 
-export function usePatternClassification(log = []) {
-  const [state, setState] = useState({ classified: [], reclassificationCount: 0, rowIdsBySlug: new Map(), loaded: false });
+export function usePatternClassification() {
+  const [state, setState] = useState({ classified: [], reclassificationCount: 0, loaded: false });
   useEffect(() => {
     let alive = true;
     fetchPatternClassification().then(r => { if (alive) setState({ ...r, loaded: true }); });
     return () => { alive = false; };
   }, []);
-
-  // FEATURE: LOG-97 -- cost per pattern = sum of the hydrated log entries' own cost values, which
-  // computeCallCost() already derived from tokens at hydrate time AND which hydrateFromSupabase()
-  // already zeroed for AI-51-paired duplicates. Falls back to the view's cost_sum only when the
-  // mapping or the log is unavailable, so a fetch failure degrades to today's behavior, never to
-  // a wrong number. Recomputes when either input changes (the log arrives after this fetch).
-  const costBySlug = useMemo(() => {
-    const costById = new Map(log.map(e => [e.id, e.cost || 0]));
-    const out = new Map();
-    for (const [slug, ids] of state.rowIdsBySlug) {
-      let sum = 0;
-      for (const id of ids) sum += costById.get(id) || 0;
-      out.set(slug, sum);
-    }
-    return out;
-  }, [log, state.rowIdsBySlug]);
-
-  const classified = state.classified.map(p => ({
-    ...p,
-    cost: costBySlug.has(p.slug) && log.length > 0 ? costBySlug.get(p.slug) : p.cost,
-  }));
-
-  return { ...state, classified };
+  return state;
 }
 
 // FEATURE: LOG-80 -- By LLM aggregation, extracted from useAIActivity()'s inline loop into an

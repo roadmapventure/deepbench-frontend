@@ -1,4 +1,3 @@
-// DeepBench v6.3.187 | AIActivityPanel.jsx | LOG-97 -- By Pattern cost derived from tokens via the hydrated log (dedup-consistent), not the rollup's empty cost_usd column
 // DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
 // DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
 // DeepBench v6.3.167 | AIActivityPanel.jsx | LOG-90 -- §19m unregistered-services line removed from the By Service drawer (detection stays in useAIActivity; residue tracked as LOG-89)
@@ -207,12 +206,10 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-92 -- patternsLoggedCount/assignedCapabilityCount dropped from this destructure
   // (the hook still exports both for other consumers): the Capabilities tile is removed and the
   // Patterns Logged tile now reads the LOG-38 classification view below, so tile and list agree.
-  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount } = useAIActivity();
+  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
-  // FEATURE: LOG-97 -- the hydrated log is passed in so each pattern's cost is summed from the same
-  // per-row (token-derived, AI-51-deduped) values behind Total Cost / By LLM / By Agent / By Service.
-  const { classified, reclassificationCount } = usePatternClassification(log);
+  const { classified, reclassificationCount } = usePatternClassification();
   const tab = "activity"; // LOG-86: tab bar hidden — MCP Roadmap + Architect Checklist blocks below are intentionally kept (unreachable). To re-enable: restore useState + the tab-bar JSX (see git history, v6.3.160).
   // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)
   // FEATURE: S-AI-AUDIT-SVCDIR -- service now defaults closed too (§19m kickoff: By Service
