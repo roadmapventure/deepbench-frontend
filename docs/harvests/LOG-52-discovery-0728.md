@@ -107,6 +107,112 @@ history; no contingent pattern (RAG) asserts on any backfilled-only row.
 
 ---
 
+## Round 2 prompts — post-wave follow-ons (John-approved 2026-07-28, `log-52-0727` close)
+
+Written after all four §19l waves shipped and were re-verified live (3,127 named rows; breakdown
+below in "Round 2 evidence"). Prompts 5/7/8 carry the walkthrough in-prompt (stop and ask only on
+contradicting facts); prompt 6 is a LIVE session with John — naming is Tier 3, nothing autonomous.
+
+### Prompt 5 — Susan: LLM-as-Judge authoring + LOG-87 cleanup (~1,300 rows, zero code)
+
+```
+Continue LOG-72 (Architecture): Susan Smith — Trainer authors LLM-as-Judge criteria, plus the
+LOG-87 (Architecture) cleanup. John approved this scope 2026-07-28 (log-52-0727 close, followed
+the §19l scope-3 recipe); this prompt is the walkthrough — stop and ask only if live facts
+contradict it. Data-only, via the amend path live against the dev preview
+(x-vercel-protection-bypass header), same mechanics as the shipped scope-3 run.
+
+(a) llm-as-judge — Susan receives ONLY: the gold definition, the signature vocabulary, and the
+CONFIG description of the quality-gate intent (qg-review-intent's own skill_profiles method/
+purpose — config is definitional, never log-sampled). She adjudicates whether that intent
+structurally IS LLM-as-Judge (§19i intent-provability) and authors Shape B intent-keyed criteria
+(precedent: request-routing's {intent in [...]}, LOG-65 locked). If she rules the intent does not
+pin the pattern, record her reason and stop — do not force it.
+(b) LOG-87: the stale pending pattern_candidates row (id 0caee7d5-6084-4a38-8253-7ef47b1fbc3d,
+submitted_by log-52-0727-run) — resolve it through Susan's legitimate discard decision, never a
+raw delete. Close LOG-87.
+Hard rules: no values sampled from ai_activity_log; no direct criteria PATCH; confirm web_search
+fired before trusting any citation. Verify: llm-as-judge count in ai_call_patterns (expect
+~1,300 via qg-review-intent rows if she authors it); existing five patterns' counts unchanged.
+```
+
+### Prompt 6 — LIVE with John: rename path + orchestration/routing/handoff taxonomy
+
+```
+Discovery+design session WITH John live — nothing here is pre-approved to run autonomously;
+naming is Tier 3. Two halves, in order:
+
+(1) Build path for governed renames: LOG-51 (Architecture) is blocked because pattern_vocabulary
+has no rename/supersede mechanism (§19i designed superseded_by; nothing reads/writes it; §19l
+names this the last unmet seal condition). Design the rename decision for reviewCandidate
+(mirroring the shipped amend precedent), walk it with John, kickoff, code, verify.
+(2) With the mechanism live: Susan Smith — Trainer adjudicates the delegation-family taxonomy
+from primary sources — today's agent-handoff row carries an orchestration definition (delegate,
+await, integrate) under a vendor name that means the opposite (LOG-51's finding). The candidate
+model John raised 2026-07-28: Orchestration (delegate + integrate), Request Routing (classify +
+dispatch, no synthesis), Handoff (transfer control, no synthesis) — but the names and the split
+are Susan's research + John's sign-off, never the session's own invention. Data readiness: the
+integrate fact (input_references_other_deliverable) is captured and live; earlier measured split
+of delegation calls: 75 integrated vs 94 not. Verify after: the renamed/split patterns' counts in
+ai_call_patterns, and that historical rows re-derive under the new names automatically (the
+self-cleanse §19l's verdict promises).
+```
+
+### Prompt 7 — Schema-forced capture (the 52% lever) + Susan authoring
+
+```
+Work LOG-77 (Architecture)'s first item: the schema-forced output fact — the biggest unclassified
+lever (6,593 of 12,567 unmatched rows are request-receivable model calls, mostly forced-schema).
+John approved this scope 2026-07-28 (log-52-0727 close); this prompt is the walkthrough — stop
+and ask only if live facts contradict it. Standard design→code→verify loop.
+
+Capture: one generic fact (e.g. output_schema_forced: true) written into call_facts on the
+model-call write path when the call's tool_choice was forced to the schema tool — the exact
+condition is buildCallBody()'s needsAutoChoice===false branch (request-receivable.js ~L104/117).
+Generic call-shape property; no pattern name anywhere in code. Add the field to SIGNATURE_FIELDS
+(lib/pattern-vocabulary.js) — the dead-field rule requires writer + allowlist land together.
+NOTE (Tier 3, ask John once): this is the 17th signature field — present the proposed §19k
+field-order placement to John before amending the locked order (precedent: model_modality's
+LOG-65 insertion).
+Then Susan (amend path, definition-grounded): Constrained Decoding keyed on the new fact. Offer
+her Function Calling too but flag the capturability finding that it is near-universal on this
+platform (likely non-distinguishing — her call to author or discard).
+Verify: new rows carry the fact; constrained-decoding names real rows in ai_call_patterns;
+history correctly stays unmatched on this fact (never backfilled — it is not provable there).
+```
+
+### Prompt 8 — LOG-68: the self-maintenance trigger (make the loop self-sustaining)
+
+```
+Work LOG-68 (Architecture) per its FEATURES.md row + ARCHITECTURE.md §19k self-maintenance
+trigger + §19i Layer C. John approved this scope 2026-07-28 (log-52-0727 close). Design session
+first — this one has real open design decisions; walk the design with John before kickoff.
+
+Core: an unclassified RICH signature (LEFT JOIN miss with non-trivial facts) creates a
+pattern_candidates row stamped source_ai_activity_log_id and invokes Susan Smith — Trainer to
+name it. Async, off the critical path, never blocking a user response (§19i).
+Design decisions to settle with John (not unilaterally): (1) dedup/rate-limit — 12,567 unmatched
+rows already exist; the trigger must fire on NEW distinct signatures going forward, never sweep
+history into 12k candidates (dedupe by distinct signature, cap invocations); (2) what counts as
+"rich" (threshold); (3) whether LOG-78's structured missing-signal outcome (defer/needs_capture
+decision + missing_signal field) ships with it or after — read LOG-78's row first.
+Verify: a genuinely novel rich signature produces exactly one candidate + one Susan invocation;
+a repeat of the same signature does not; empty-fact rows never trigger.
+```
+
+## Round 2 evidence (2026-07-28, post-wave, verified live)
+
+- Waves shipped: `LOG-85` v6.3.161 (view completion; closed `LOG-76`), `LOG-72` v6.3.164 (Susan:
+  request-routing Shape B; prompt-chaining 833→149 keyed on the integrate fact; `LOG-87` logged),
+  `LOG-69` v6.3.165 (13,841 rows recovered; floor 374 legacy + 4,884 service), `LOG-79` v6.3.166
+  (drawer on the view; `LOG-88` logged; John amended seal condition 3 — no user-facing boundary label).
+- Live board: Request Routing 2,565 / RAG 312 / Guardrails 201 / Prompt Chaining 149 / Handoff 116
+  = 3,127 named of 21,744 total; 12,567 signatured-unmatched (all generative); 6,050 no-signature.
+- Unmatched top blocks: request-receivable 6,593; ci-answer-intent ~1,207; qg-review-intent ~1,300
+  (the Judge lever); display/format intents ~1,100+; ws-news-search 216.
+- §19 section numbering post-concurrency: §19l (this verdict) / §19m (Platform Services directory)
+  / §19n (CHI journey steps) — no collision.
+
 ## Evidence captured this discovery (2026-07-28, all verified live)
 
 - Live view def: `ai_call_patterns` = JOIN on `pattern_criteria_matches(call_facts || {model_modality}, criteria)` — modality derived in-view (`text-embedding-%` → embedding, null → none, else generative). Missing: intent, sub_calls_chained.
