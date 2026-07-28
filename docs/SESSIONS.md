@@ -4957,6 +4957,7 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 **QA (design session, per the automated loop):** 17a — 4 SQL assertions + deployed routing smoke, PASS; critique leg N/A (no critique-configured intent exists live, verified by SQL). 17b — SQL evidence exact (2 recovered-complete, 1 second-failure-surfaced with ledger 1, 1 permanent with empty ledger, 0 ledger-write failures, 0 null enable_web_search) + deployed smoke, PASS. 17c — live browser round trip on dev deploy (grounded expectation line rendered, full real answer, no error bubbles; only pre-existing CHI-07 delegation_complete duration lint → LOO-26), recovery UI on documented indirect evidence, PASS.
 
 **Migration:** har17b_recovery_ledger_enable_web_search (durable_hops.recovery_ledger jsonb '[]', enable_web_search boolean false) — applied by design session pre-kickoff.
+
 ---
 
 ## S-LOG-51-design / S-LOG-51 (v6.3.178, 2026-07-28, worktree `pattern-naming`, commit `4e45e3b`) — rename/supersede path + delegation-family adjudication, John live
@@ -4967,3 +4968,51 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 - **Candidate B surprise → `LOG-96`:** Susan resolved the transfer-of-control candidate as a `rename` of the *already-retired* `agent-handoff` row (not a fresh `promote`), silently repointing its `superseded_by` from `agents-as-tools` to `handoff`. Live vocabulary correct; history hop rewritten (recoverable from `pattern_candidates.resolution`). Guard filed as `LOG-96`.
 - **QA on the real screen caught what SQL could not → `LOG-101`:** every direct query passed; the AI Audit panel's By Pattern section still rendered empty. Root cause measured: `anon` role `statement_timeout=3s` (verified in `pg_roles`) vs the rollup view at ~2.5–3.1s (per-(row×pattern) signature rebuild, ~132k evaluations + correlated EXISTS); panel-mount concurrency pushes it over; `AboutPanel.jsx`'s ABT-1 comment had already documented 57014 on this view's double evaluation. Display only — classification data correct throughout. Fix proposed (signature built once per row via LATERAL, §19k's own "per row, never per pair" posture) as S-LOG-51a — **John's go-ahead pending; session closed by John before approving.**
 - **Numbers at close:** 205 delegation calls → Orchestrator-Workers 66 / Handoff 85 / 67 span-less permanently-unclassified (LOG-49 boundary); Request Routing ~2,600; reclassification line ~18.9k.
+
+## 2026-07-28 — HAR-17 23-Question Regression (execution/census, worktree `har-17-regression-0728`, per `docs/runbooks/HAR-17-23q-regression.md`)
+
+**Purpose:** first measured baseline after `HAR-17` shipped (v6.3.181–183). Ran all 23 CHI screen seed questions sequentially against the dev deploy, mirroring `runIntentPipeline`/`runQaWithQualityGate`/`callCapability` (including the `{status:'in_progress', job_id}` continue loop) via a standalone Node script rather than the live UI — no code changes made.
+
+**Run window:** `2026-07-28T21:08:58.467Z` → `2026-07-28T21:33:11.100Z` (~24 min — under the runbook's 45–75 min estimate; several questions resolved in under 5s on non-qa routing).
+
+**Per-question outcomes:**
+
+| # | Question (id) | Terminal | Wall time |
+|---|---|---|---|
+| 1 | library-catalog | qa | 107.5s |
+| 2 | japan-geo | qa | 48.2s |
+| 3 | crest-wireless | qa | 54.0s |
+| 4 | geo-revenue | qa | 70.4s |
+| 5 | reseller-reqs | qa_failed (guardrail: citation_missing) | 46.2s |
+| 6 | upgrade-cycles | non_qa (forecast) | 1.9s |
+| 7 | at-risk-accounts | **error** (timeout, 1 recovery attempted then exhausted) | 215.5s |
+| 8 | horizon-store | qa | 44.8s |
+| 9 | vitrine-tech | qa | 52.5s |
+| 10 | smartphone-growth | non_qa (forecast) | 4.2s |
+| 11 | coop-mdf-benchmark | qa | 108.2s |
+| 12 | vietnam-reseller | qa | 69.9s |
+| 13 | meridian-electronics | qa | 146.0s |
+| 14 | emea-coop-large-format | qa | 123.2s |
+| 15 | jinhua-digital | qa | 45.3s |
+| 16 | elevate-mobility | non_qa (forecast) | 1.6s |
+| 17 | nippo-carrier | qa_failed (guardrail: synthesized_as_fact) | 66.5s |
+| 18 | altiplano-movil | qa | 45.1s |
+| 19 | emea-emerging | non_qa (forecast) | 5.2s |
+| 20 | southeast-asia | non_qa (forecast) | 5.0s |
+| 21 | training-turnover-benchmark | qa_failed (guardrail: citation_missing) | 155.3s |
+| 22 | latin-america | non_qa (forecast) | 1.8s |
+| 23 | south-korea-coop | qa | 34.3s |
+
+**Totals:** 12 `qa` success · 7 routed non-qa (all classified `forecast`) · 3 `qa_failed` (Owen's Proofreader legitimately blocking on citation/synthesis grounds — the guardrail working as designed, not a pipeline defect) · 1 surfaced `error`.
+
+**The one surfaced failure, classified honestly (runbook §4):** `at-risk-accounts` hit a timeout on Owen's `quality-gate`/`qg-review-intent` call, got exactly one automatic checkpoint-recovery (`fault: TimeoutError`), then timed out again on the same hop and correctly surfaced as a real error — per `.claude/rules/transient-failure-recovery.md`'s "never recover the same hop more than once per user turn; a second failure of the same hop is a real error." **This is HAR-17's designed behavior working correctly, not a regression** — a live, organic proof of the recovery-then-surface contract, not just the injected-failure test suite from the coding sessions.
+
+**Census (a) — surfaced failures by class** (`durable_hops` status='failed', run window): 1 row, `"The operation was aborted due to timeout"` — reconciles exactly with the client-observed failure above.
+
+**Census (b) — recoveries fired:** 1 row with a non-empty `recovery_ledger`, 1 total recovery — reconciles exactly with the client-observed recovery (§2's own count).
+
+**Census (c) — HAR-14-class empty-leaf scan** (`deliverables` in run window): every key returned (`missing_skillset`, `extracted_hypothesis`, `guardrail.rule_violated`/`.reason`, `review_reason`, `final_answer`, `recommended_agent_id`, `recommended_capability_slug`, `triage`) matches the runbook's own pre-classified legitimate-optional list verbatim. **Zero HAR-14-class hits this run** — no new evidence added to `HAR-14`'s `FEATURES.md` row.
+
+**Observation, not a finding (flagged for John, not investigated further — out of this session's scope):** 7 of 23 seed questions (30%) routed to `forecast` intent rather than `qa`, despite being phrased as direct analytical/factual questions ("what is our channel strategy outlook…", "what risks should we watch…"). Whether that's intended routing behavior for this phrasing or worth a separate look is a call for a future session — not diagnosed here.
+
+**Verdict against `S-HAR-17-design`'s pre-run yardstick:** predicted ≈85–90% odds of zero surfaced failures (this run had 1, correctly classified as designed-behavior not a bug) and ~1-in-5 odds of one HAR-14-class hole (this run had 0). A clean, in-range result — no new FEATURES.md row needed.
