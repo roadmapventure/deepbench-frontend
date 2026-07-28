@@ -4928,7 +4928,6 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 
 **Process note worth repeating:** each of `1d`/`1e`/`1f` was a genuine correction driven by reading the *next* build log rather than assuming the previous fix worked. The temptation each time was to declare victory on a plausible-looking change; the build log disagreed twice.
 
-<<<<<<< HEAD
 ### S-HAR-15-design → S-HAR-15 (v6.3.180, 2026-07-28, worktree `har-15-design`)
 
 **`HAR-15` (Task Success Rate) ✅ Done — live-QA PASS 7/7, commit `c3dc9a2`.** The code half of `chi-e2e-design`'s #1 census cause: 42 of 145 failed `durable_hops` in 14 days were Anthropic 400 `"Your credit balance is too low"` (bursts 2026-07-20 ×30, 2026-07-28 02:06 UTC ×12). Census independently re-verified against Supabase this session rather than accepted from the discovery write-up. Ops half was already closed (auto-reload enabled).
@@ -4958,7 +4957,6 @@ Chief-architect review of the criteria/signature model → verdict KEEP + four J
 **QA (design session, per the automated loop):** 17a — 4 SQL assertions + deployed routing smoke, PASS; critique leg N/A (no critique-configured intent exists live, verified by SQL). 17b — SQL evidence exact (2 recovered-complete, 1 second-failure-surfaced with ledger 1, 1 permanent with empty ledger, 0 ledger-write failures, 0 null enable_web_search) + deployed smoke, PASS. 17c — live browser round trip on dev deploy (grounded expectation line rendered, full real answer, no error bubbles; only pre-existing CHI-07 delegation_complete duration lint → LOO-26), recovery UI on documented indirect evidence, PASS.
 
 **Migration:** har17b_recovery_ledger_enable_web_search (durable_hops.recovery_ledger jsonb '[]', enable_web_search boolean false) — applied by design session pre-kickoff.
-=======
 ---
 
 ## S-LOG-51-design / S-LOG-51 (v6.3.178, 2026-07-28, worktree `pattern-naming`, commit `4e45e3b`) — rename/supersede path + delegation-family adjudication, John live
