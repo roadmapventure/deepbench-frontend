@@ -180,8 +180,8 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
    post-beta; the Bench fabrications are accepted risk for the beta send. (Interpretation
    note, Tier 2: recorded as a beta-gate ruling only — the rows stay in their current
    FEATURES tier files; no physical re-tier done.)
-2. **`CHI-70` (Architecture)** — refresh or crash loses the whole conversation. Large scope;
-   a reviewer mid-session who refreshes starts over. Beta-gate or accept?
+2. ~~`CHI-70` (Architecture)~~ — **RESOLVED 2026-07-28, John: "later bucket not beta."**
+   Refresh-loses-conversation is post-beta; accepted for the beta send.
 3. **`HAR-14` (Task Success Rate)** — validator accepts present-but-empty required fields;
    ~8 user-visible holes vs. a huge-blast-radius harness change. In or out?
 4. **`AA-178` (Architecture)** — the standing Librarian-gatekeeper contradiction (which
