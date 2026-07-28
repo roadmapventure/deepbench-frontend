@@ -1,4 +1,5 @@
 // DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
+// DeepBench v6.3.168 | MarketIntelligenceScreen.jsx | S-CHI-82a -- journey-membership guard (QA FAIL patch on v6.3.162): journey state gains a monotonic `seq` (nextJourney), every fresh hypFlow is stamped `journeySeq` at creation, and the step-arrival effect numbers only current-journey hyp content -- a previous journey's persisted (CHI-51) drawers can no longer renumber into a new journey when an effect dep changes. qaEvidence stays unstamped by design (single overwritten slot, same key -- self-corrects). Mobile heads-up pointer retargeted to "Tap Steps & Evidence above..." (was pointing at the pre-CHI-82 tab name).
 // DeepBench v6.3.162 | MarketIntelligenceScreen.jsx | S-CHI-82 -- CHI journey steps + single vocabulary (ARCHITECTURE.md §19n, .claude/rules/chi-vocabulary.md): fixed drawer titles (CHI-49's intent-dynamic titles overturned -- "Theories"/"Theory Result"), journey-relative step numbering by arrival order (assignStep/ensureStep, no path map), StepChip worn by drawer titles + echoed in handoff chat bubbles (stepRef), ambient flex-order sort, "News & Evidence" -> "Steps & Evidence", breadcrumb current-stage highlight (currentStage), hypothesis/candidate retired from all screen copy
 // DeepBench v6.3.152 | MarketIntelligenceScreen.jsx | S-CHI-77 -- onSend's catch now emits the MI-29 "error" Pipeline Log event (surfaces the real reason via describeCaughtError into Column 3) + honest bubble copy ("completing your answer", not "reaching Marcus"); the one async catch that dropped the reason. (Renamed from CHI-76 at close-out -- collided with the concurrently-shipped CHI-76 hyp-test caption, SES-18 counter desync)
 // DeepBench v6.3.151 | MarketIntelligenceScreen.jsx | S-CHI-76 -- hyp-test completion status renders via the centralized HopSummaryLine caption (was a bare hand-formatted "…Given in Xs" bubble); isAnswer now message-driven
@@ -449,13 +450,23 @@ const INTENT_LABEL = { theory: "Theory", forecast: "Forecast", correct: "Correct
 // is extracted and executed directly by this session's Node test (chi-82-test.mjs), so it must stay
 // dependency-free (no imports, no JSX).
 // CHI-82-PURE-BEGIN
-const EMPTY_JOURNEY = () => ({ order: {}, next: 1 });
+const EMPTY_JOURNEY = () => ({ order: {}, next: 1, seq: 0 });
+// FEATURE: CHI-82a — advances to a fresh journey: numbering restarts and the monotonic `seq`
+// increments, so content stamped with an earlier journey's seq is recognizably NOT a member of
+// the new one. Root cause of the v6.3.162 QA FAIL this fixes: presence ≠ journey membership —
+// qaEvidence/hypFlow persist across journeys (CHI-51), so the arrival effect needs a membership
+// signal, not just presence.
+function nextJourney(prev) {
+  return { order: {}, next: 1, seq: (prev?.seq ?? 0) + 1 };
+}
 // Assigns the next arrival-order number to `key` if unassigned. Mutates nothing; returns
 // [journey, n] — same journey object back when already assigned (idempotent).
+// FEATURE: CHI-82a — spreads the whole journey (not just order/next) so `seq` carries through
+// every assignment.
 function assignStep(journey, key) {
   if (journey.order[key] != null) return [journey, journey.order[key]];
   const n = journey.next;
-  return [{ order: { ...journey.order, [key]: n }, next: n + 1 }, n];
+  return [{ ...journey, order: { ...journey.order, [key]: n }, next: n + 1 }, n];
 }
 // FEATURE: CHI-82 (T3) — which fixed-map breadcrumb stage the user is on right now. Deliberately
 // simple v1 mapping — do not invent finer-grained states. The map names stages/acts, not objects,
@@ -3217,9 +3228,11 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           completed fetch has zero usable cards (nothing to point at). */}
       {!newsLineDismissed && (newsCards === null || (newsCards && newsCards.length > 0)) && (
         <div style={{flexShrink:0,padding:"6px 14px",fontFamily:mono,fontSize:10.5,color:T.muted,background:T.cardAlt,borderTop:`1px solid ${T.lineSoft}`}}>
+          {/* FEATURE: CHI-82a — pointer retargeted to the tab CHI-82 renamed ("Steps & Evidence");
+              CHI-40's gating/dismiss logic untouched. */}
           {newsCards === null
             ? <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
-            : "Click News above for current headlines"}
+            : "Tap Steps & Evidence above for current headlines"}
         </div>
       )}
 
@@ -3341,7 +3354,10 @@ export default function MarketIntelligenceScreen() {
   };
   const getStep = (key) => journeyRef.current.order[key];
   const resetJourney = () => {
-    journeyRef.current = EMPTY_JOURNEY();
+    // FEATURE: CHI-82a — advance the seq (nextJourney), never back to EMPTY_JOURNEY(): content
+    // created in a prior journey carries that journey's seq stamp and can then never pass the
+    // membership check below.
+    journeyRef.current = nextJourney(journeyRef.current);
     setJourneyVersion(v => v + 1);
   };
 
@@ -3349,11 +3365,19 @@ export default function MarketIntelligenceScreen() {
   // lands, in an ordered if-chain so a single render satisfying several checks still assigns
   // numbers in the order the drawers arrive. "news" is deliberately absent — it is ensured only by
   // its own click handler (analyzeNewsCard), because ambient News at rest stays unnumbered (§19n).
+  // FEATURE: CHI-82a — journey-membership guard: the three hyp checks fire only for a hypFlow
+  // stamped with the CURRENT journey's seq. A previous journey's persisted (CHI-51) hypFlow —
+  // or one with no stamp at all (journeySeq undefined, e.g. hot-reload state; strict equality
+  // makes it non-current by default) — stays unnumbered ambient instead of renumbering into the
+  // new journey the next time an effect dep changes. The `qa` check stays unguarded by design:
+  // qaEvidence is a single overwritten slot, so the new journey's answer replaces it under the
+  // same key and a pre-arrival stale assignment self-corrects.
   useEffect(() => {
+    const hypCurrent = hypFlow && hypFlow.journeySeq === journeyRef.current.seq;
     if (qaEvidence) ensureStep("qa");
-    if (hypFlow) ensureStep("hyp-candidates");
-    if (isHypInResultPhase(hypFlow)) ensureStep("hyp-result");
-    if (isHypAwaitingConfirmation(hypFlow)) ensureStep("hyp-draft");
+    if (hypCurrent) ensureStep("hyp-candidates");
+    if (hypCurrent && isHypInResultPhase(hypFlow)) ensureStep("hyp-result");
+    if (hypCurrent && isHypAwaitingConfirmation(hypFlow)) ensureStep("hyp-draft");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qaEvidence, hypFlow?.stage, hypFlow?.confirmation]);
 
@@ -3530,13 +3554,21 @@ export default function MarketIntelligenceScreen() {
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
+    // FEATURE: CHI-82a — every fresh hypFlow is stamped with the journey it was created in
+    // (journeySeq); the arrival effect numbers only current-journey content. Both entry doors
+    // route through here: a routed question (journey just reset by submit) stamps the new seq;
+    // the Review/escalation path stamps the same continuing journey's seq (no reset happened),
+    // so escalation keeps numbering onward — exactly the §19n behavior. Stage-advance updates
+    // spread the existing object and carry the stamp automatically.
     if (extractedHypothesis) {
       setHypFlow({ stage:"choosing", intent, candidates:null, prefillText:extractedHypothesis, chosenText:null,
-        flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
+        flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null,
+        journeySeq: journeyRef.current.seq });
       return;
     }
     setHypFlow({ stage:"generating", intent, candidates:null, prefillText:null, chosenText:null,
-      flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null });
+      flaggedQuestion, flaggedAnswer, citations: citations || [], reviewReason, hypothesisTest:null, priorHypothesisTest:null, confirmation:null,
+      journeySeq: journeyRef.current.seq });
     const t0 = Date.now();
     {
       const est = estimateChainMs(INTENT_CHAINS.hypothesis_generation, agentActivity);
