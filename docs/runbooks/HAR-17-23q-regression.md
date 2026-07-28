@@ -1,5 +1,7 @@
 # RUNBOOK — 23-Question End-to-End Regression (post-HAR-17 baseline)
 
+> **Scope note (2026-07-28, John):** this runbook is **superseded as the general CHI regression** by `CHI-23Q-TRUE-REGRESSION.md` (`SES-29`) — this one measures harness survival (a question "routed to Forecast" counts as terminal), which is not an acceptance test. It remains valid only as the HAR-17-specific recovery-census procedure and the record of the 2026-07-28 baseline run.
+
 **Purpose.** First measured baseline after HAR-17 (Task Success Rate) shipped (v6.3.181–183, 2026-07-28): run John's standing acceptance test — the 23 CHI questions — against the dev deploy and census three things: (1) user-visible failures (expected ≈ 0), (2) automatic recoveries fired (countable for the first time via `durable_hops.recovery_ledger`), (3) HAR-14-class present-but-empty holes in this run's own deliverables (becomes the opening evidence for HAR-14's design session — read that row's **binding design constraint** before drawing conclusions). Platform token cost ≈ $3 (mostly Haiku input). This is an execution/census session — **no code changes**; any driver model is fine (Sonnet recommended).
 
 **Setup.** Normal session start per `CLAUDE.md` → `session-setup` skill (own worktree from `origin/dev`, `.env.local` copy, inflight marker staged). Read this runbook from your worktree, then execute.
