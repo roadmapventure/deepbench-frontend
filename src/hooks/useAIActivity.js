@@ -1,3 +1,4 @@
+// DeepBench v6.3.159 | useAIActivity.js | S-AI-AUDIT-SVCDIR -- Platform Services directory (platform_services) fetch + read-time join, unregistered detection, per-agent capability nesting (ARCHITECTURE.md §19m)
 // DeepBench v6.3.158 | useAIActivity.js | LOG-80 -- By LLM: null model no longer fabricated to Haiku; computeByLLM() extracted + alias-normalized so each model appears once
 // DeepBench v6.3.155 | useAIActivity.js | LOG-38 -- Log Displayer read path: classification rollup + single reclassification count
 // DeepBench v6.3.134 | useAIActivity.js | LOG-36 -- pattern displays read from the log, not the static catalog
@@ -357,6 +358,257 @@ export function humanizeSlug(slug) {
   return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+// ── Platform Services Directory (ARCHITECTURE.md §19m) ───────────────────────
+// FEATURE: S-AI-AUDIT-SVCDIR -- the By Service display is driven by the platform_services
+// Supabase table (31 seeded rows: what things ARE), joined at read time against ai_activity_log
+// (what HAPPENED) via each service's match_keys. SERVICE_CATALOG survives above solely for the
+// MCP/Platform Roadmap tier lists (rule: .claude/rules/platform-services-directory.md) -- the
+// By Service display never reads it again. Numbers are never written into platform_services.
+
+// Display order for the 8 layer groups (§19m's locked list).
+export const SERVICE_LAYER_ORDER = ['scaffold', 'harness', 'loop', 'platform', 'data-model', 'deterministic', 'screen-invoked', 'frontend'];
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- module-level directory cache, same fetch/cache shape as
+// fetchPatternVocabulary() above (one read per page load, retry allowed after a failure,
+// never cache a failure). platform_services has RLS off (verified this session), so the
+// ordinary anon client reads it with no policy work.
+let _svcDirCache = null;
+let _svcDirPromise = null;
+
+export function fetchPlatformServices() {
+  if (_svcDirCache) return Promise.resolve(_svcDirCache);
+  if (!_svcDirPromise) {
+    _svcDirPromise = supabase
+      .from('platform_services')
+      .select('slug, name, layer, functions, utilizes_model, tracking_status, match_keys, code_anchor, display_note, sort_order')
+      .order('sort_order', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[platform services] directory read failed:', error.message);
+          _svcDirPromise = null; // allow a later mount to retry; never cache a failure
+          return [];
+        }
+        _svcDirCache = data || [];
+        return _svcDirCache;
+      });
+  }
+  return _svcDirPromise;
+}
+
+export function usePlatformServiceDirectory() {
+  const [directory, setDirectory] = useState(() => _svcDirCache || []);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlatformServices().then(d => { if (!cancelled) setDirectory(d); });
+    return () => { cancelled = true; };
+  }, []);
+  return directory;
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- capability directory (agent_capability_assignments + the
+// capabilities slug→name lookup), fetched once per page load, same cache shape as above.
+// Capabilities are data, never services (§19b/§19m) -- they display under their Agent.
+let _capDirCache = null;
+let _capDirPromise = null;
+const EMPTY_CAP_DIR = { assignments: [], nameBySlug: new Map() };
+
+export function fetchCapabilityDirectory() {
+  if (_capDirCache) return Promise.resolve(_capDirCache);
+  if (!_capDirPromise) {
+    _capDirPromise = Promise.all([
+      supabase.from('agent_capability_assignments').select('agent_id, capability_slug'),
+      supabase.from('capabilities').select('slug, name'),
+    ]).then(([a, c]) => {
+      if (a.error || c.error) {
+        console.warn('[capability directory] read failed:', (a.error || c.error).message);
+        _capDirPromise = null; // allow a later mount to retry
+        return EMPTY_CAP_DIR;
+      }
+      _capDirCache = {
+        assignments: a.data || [],
+        nameBySlug: new Map((c.data || []).map(r => [r.slug, r.name])),
+      };
+      return _capDirCache;
+    });
+  }
+  return _capDirPromise;
+}
+
+export function useCapabilityDirectory() {
+  const [capDir, setCapDir] = useState(() => _capDirCache || EMPTY_CAP_DIR);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCapabilityDirectory().then(d => { if (!cancelled) setCapDir(d); });
+    return () => { cancelled = true; };
+  }, []);
+  return capDir;
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- match_keys matcher. Built once per compute pass from the
+// directory rows; keys are either {feature: <head>} or {ai_type: <slug>}.
+export function buildServiceMatcher(directory) {
+  const byFeature = new Map();
+  const byAiType = new Map();
+  for (const svc of directory || []) {
+    for (const key of (Array.isArray(svc.match_keys) ? svc.match_keys : [])) {
+      if (key.feature) byFeature.set(key.feature, svc.slug);
+      else if (key.ai_type) byAiType.set(key.ai_type, svc.slug);
+    }
+  }
+  return { byFeature, byAiType };
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- resolves one hydrated log entry ({type, location}) to a
+// directory service slug, or null when no directory row claims it. Precedence per §19m: a
+// feature-key match beats an ai_type-only match (e.g. a `feature: web-memory` row logged with
+// ai_type 'reinforcement' counts under Web Memory, never double-counts into Knowledge
+// Writer's `ai_type: reinforcement` match). The feature is compared against the ':'-head of
+// the entry's location (agent-turn features are 'capability:intent:depthN' composites).
+export function platformServiceForRow(entry, matcher) {
+  const head = (typeof entry.location === 'string' && entry.location.length > 0)
+    ? entry.location.split(':')[0]
+    : null;
+  if (head && matcher.byFeature.has(head)) return matcher.byFeature.get(head);
+  if (matcher.byAiType.has(entry.type)) return matcher.byAiType.get(entry.type);
+  return null;
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- the RAW capability-shaped slug for an entry: agent-turn rows
+// carry their capability as the feature head (logAgentTurn()'s format, same read LOG-12's
+// capabilitySlugForRow() starts from); every other row's ai_type IS its raw slug. Exposed
+// separately because capabilitySlugForRow() then remaps through AI_TYPE_TO_SERVICE -- and two
+// of those legacy remaps ('project-manager'→'task-planning' via AI-41, and the ci_*→
+// 'channel-intelligence' aliases) sit BETWEEN a row and its real assigned capability. The
+// capability-nesting and unregistered checks below must see the raw slug first, or Michelle
+// Manning (Project Manager)'s entire project-manager capability would resolve to the
+// nonexistent-capability 'task-planning' and flood the unregistered line (~3.3k rows,
+// confirmed against live data this session).
+export function rawCapabilitySlugForRow(entry) {
+  return (entry.type === 'agent-turn' && typeof entry.location === 'string' && entry.location.length > 0)
+    ? entry.location.split(':')[0]
+    : entry.type;
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- per-service read-time join. Returns the 8 layer groups in
+// SERVICE_LAYER_ORDER (any unknown layer appended last rather than dropped), each service in
+// sort_order, with calls/cost/avgLatency computed from its matched log entries. Only
+// tracked/partial services carry stats -- machinery/self/untracked render per their
+// tracking_status + display_note and get nulls here (their match_keys are empty anyway, so
+// nothing double-counts).
+export function computePlatformServices(log, directory) {
+  const matcher = buildServiceMatcher(directory);
+  const stats = new Map();
+  for (const e of log) {
+    const slug = platformServiceForRow(e, matcher);
+    if (!slug) continue;
+    if (!stats.has(slug)) stats.set(slug, { calls: 0, cost: 0, totalLatency: 0, latencyCount: 0 });
+    const s = stats.get(slug);
+    s.calls += 1;
+    s.cost += e.cost || 0; // reuses the per-entry cost hydrateFromSupabase() already resolved (incl. AI-51 pairing dedup)
+    if (e.latencyMs) { s.totalLatency += e.latencyMs; s.latencyCount += 1; }
+  }
+  const byLayer = new Map();
+  for (const svc of directory || []) {
+    const hasStats = svc.tracking_status === 'tracked' || svc.tracking_status === 'partial';
+    const s = stats.get(svc.slug);
+    const row = {
+      slug: svc.slug,
+      name: svc.name,
+      layer: svc.layer,
+      functions: Array.isArray(svc.functions) ? svc.functions : [],
+      utilizesModel: !!svc.utilizes_model,
+      trackingStatus: svc.tracking_status,
+      displayNote: svc.display_note || null,
+      sortOrder: svc.sort_order,
+      calls: hasStats ? (s ? s.calls : 0) : null,
+      cost: hasStats ? (s ? s.cost : 0) : null,
+      avgLatency: (hasStats && s && s.latencyCount) ? Math.round(s.totalLatency / s.latencyCount) : null,
+    };
+    if (!byLayer.has(svc.layer)) byLayer.set(svc.layer, []);
+    byLayer.get(svc.layer).push(row);
+  }
+  const orderedLayers = [
+    ...SERVICE_LAYER_ORDER,
+    ...[...byLayer.keys()].filter(l => !SERVICE_LAYER_ORDER.includes(l)),
+  ];
+  return orderedLayers
+    .filter(layer => byLayer.has(layer))
+    .map(layer => ({
+      layer,
+      services: byLayer.get(layer).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+    }));
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- §19m self-maintenance: activity matching no directory row AND
+// not attributable to an assigned capability aggregates into explicit unregistered lines
+// (slug + call count), never silently dropped. A row escapes "unregistered" if EITHER its raw
+// slug or its capabilitySlugForRow() resolution is an assigned capability -- the raw check
+// covers capabilities the legacy AI_TYPE_TO_SERVICE remap would misdirect (see
+// rawCapabilitySlugForRow()'s comment), the resolved check covers legacy aliases (ci_answer/
+// ci_routing → channel-intelligence, quality_gate_review → quality-gate) that only the remap
+// can attribute correctly.
+export function computeUnregisteredServices(log, directory, assignedCapabilitySlugs) {
+  const matcher = buildServiceMatcher(directory);
+  const counts = new Map();
+  for (const e of log) {
+    if (platformServiceForRow(e, matcher)) continue;
+    const raw = rawCapabilitySlugForRow(e);
+    const resolved = capabilitySlugForRow({ ai_type: e.type, feature: e.location });
+    if (assignedCapabilitySlugs.has(raw) || assignedCapabilitySlugs.has(resolved)) continue;
+    const slug = resolved || raw || 'unknown';
+    counts.set(slug, (counts.get(slug) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([slug, calls]) => ({ slug, calls }))
+    .sort((a, b) => b.calls - a.calls || a.slug.localeCompare(b.slug));
+}
+
+// FEATURE: S-AI-AUDIT-SVCDIR -- By Agent capability nesting. Groups each agent's log entries
+// by their capability slug (raw slug first, then the capabilitySlugForRow() resolution --
+// same two-level read as computeUnregisteredServices(), for the same AI-41-remap reason) and
+// keeps only groups that are REAL capabilities (a `capabilities` row exists), so service
+// activity an agent performed (e.g. Eleanor Voss (The Librarian)'s librarian rows -- Library
+// Custodian's numbers) never masquerades as a capability. Unions in the agent's ASSIGNED
+// capabilities so a never-logged assignment still appears with zero activity ("no activity
+// yet"). Returns { [agentId]: [{slug, name, calls, cost, avgLatency}] } sorted calls desc.
+export function computeByAgentCapabilities(log, assignments, nameBySlug) {
+  const grouped = new Map(); // agentId -> Map<capSlug, {calls, cost, totalLatency, latencyCount}>
+  for (const e of log) {
+    if (!e.agentId) continue;
+    const raw = rawCapabilitySlugForRow(e);
+    const resolved = capabilitySlugForRow({ ai_type: e.type, feature: e.location });
+    const capSlug = nameBySlug.has(raw) ? raw : (nameBySlug.has(resolved) ? resolved : null);
+    if (!capSlug) continue;
+    if (!grouped.has(e.agentId)) grouped.set(e.agentId, new Map());
+    const caps = grouped.get(e.agentId);
+    if (!caps.has(capSlug)) caps.set(capSlug, { calls: 0, cost: 0, totalLatency: 0, latencyCount: 0 });
+    const g = caps.get(capSlug);
+    g.calls += 1;
+    g.cost += e.cost || 0;
+    if (e.latencyMs) { g.totalLatency += e.latencyMs; g.latencyCount += 1; }
+  }
+  const agentIds = new Set([...grouped.keys(), ...(assignments || []).map(a => a.agent_id)]);
+  const out = {};
+  for (const agentId of agentIds) {
+    const caps = grouped.get(agentId) || new Map();
+    for (const a of assignments || []) {
+      if (a.agent_id === agentId && !caps.has(a.capability_slug)) {
+        caps.set(a.capability_slug, { calls: 0, cost: 0, totalLatency: 0, latencyCount: 0 });
+      }
+    }
+    out[agentId] = [...caps.entries()]
+      .map(([slug, g]) => ({
+        slug,
+        name: nameBySlug.get(slug) || humanizeSlug(slug),
+        calls: g.calls,
+        cost: g.cost,
+        avgLatency: g.latencyCount ? Math.round(g.totalLatency / g.latencyCount) : null,
+      }))
+      .sort((a, b) => b.calls - a.calls || a.name.localeCompare(b.name));
+  }
+  return out;
+}
+
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
 export const AI_TYPES = {
   rag_briefing:       { label:"RAG-Augmented Briefing",      desc:"Pulls agent role prompt + training docs, calls Claude to generate procurement briefing",                             model:"claude-haiku-4-5",      location:"AI Review tab",                  phase:1 },
@@ -645,6 +897,10 @@ export function useAIActivity() {
   // FEATURE: LOG-36 -- Layer C names for both pattern display sites in this hook (byPattern and
   // byService's observed-pattern list). Cached module-level, so this is one read per page load.
   const { vocab } = usePatternVocabulary();
+  // FEATURE: S-AI-AUDIT-SVCDIR -- the two §19m directory reads (both cached module-level, one
+  // Supabase read each per page load, same shape as usePatternVocabulary()'s cache).
+  const serviceDirectory = usePlatformServiceDirectory();
+  const { assignments: capabilityAssignments, nameBySlug: capabilityNameBySlug } = useCapabilityDirectory();
 
   // Aggregate by type
   const byType = {};
@@ -690,6 +946,10 @@ export function useAIActivity() {
     turnTimestampsByAgentForSummary.get(row.agent_id).push(new Date(row.created_at).getTime());
   }
   const agentSummary = buildActivitySummary(rawRowsForAgentSummary, turnTimestampsByAgentForSummary);
+  // FEATURE: S-AI-AUDIT-SVCDIR -- per-agent capability nesting (Task 2). Purely additive: the
+  // agent-level totals below still come from buildActivitySummary()'s LOG-21 shared core,
+  // byte-identical to before -- only the new `.capabilities` key is added per agent.
+  const capabilitiesByAgent = computeByAgentCapabilities(log, capabilityAssignments, capabilityNameBySlug);
   const byAgent = {};
   for (const [agentId, d] of Object.entries(agentSummary)) {
     const allLatencies = rawRowsForAgentSummary.filter(r => r.agent_id === agentId && r.latency_ms).map(r => r.latency_ms);
@@ -698,6 +958,7 @@ export function useAIActivity() {
       calls: d.calls,
       cost: d.totalCost,
       avgLatency: allLatencies.length ? Math.round(allLatencies.reduce((a,b)=>a+b,0)/allLatencies.length) : null,
+      capabilities: capabilitiesByAgent[agentId] || [],
     };
   }
 
@@ -779,7 +1040,17 @@ export function useAIActivity() {
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
   const totalCalls = log.length;
 
-  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted };
+  // FEATURE: S-AI-AUDIT-SVCDIR -- the §19m directory join (Task 1): layer-grouped services with
+  // read-time stats, plus the self-maintaining unregistered aggregation. The assigned-capability
+  // set is Task 2's own data, reused here so capability activity (counted under its Agent) is
+  // never misreported as an unregistered service.
+  const assignedCapabilitySlugs = new Set((capabilityAssignments || []).map(a => a.capability_slug));
+  const platformServices = computePlatformServices(log, serviceDirectory);
+  const unregisteredServices = computeUnregisteredServices(log, serviceDirectory, assignedCapabilitySlugs);
+  const platformServiceCount = (serviceDirectory || []).length;
+  const assignedCapabilityCount = assignedCapabilitySlugs.size;
+
+  return { log, byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount };
 }
 
 export { MODEL_PROVIDER };

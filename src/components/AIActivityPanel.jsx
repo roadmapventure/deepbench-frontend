@@ -1,3 +1,4 @@
+// DeepBench v6.3.159 | AIActivityPanel.jsx | S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory (8 layer groups, muted function lists, no pattern names, closed by default); By Agent capability sub-rows; Services/Capabilities header stats; stray By Pattern top line removed (ARCHITECTURE.md §19m)
 // DeepBench v6.3.160 | AIActivityPanel.jsx | LOG-83 -- By Agent defaults collapsed + moved under By LLM + line 2 shows role title (not code); resolveAgent extracted to ./resolveAgent.js
 // DeepBench v6.3.158 | AIActivityPanel.jsx | LOG-80 -- By LLM drawer moved directly under By Pattern (pure JSX reorder)
 // DeepBench v6.3.155 | AIActivityPanel.jsx | LOG-38 -- By Pattern body rewired: classified rows + single reclassification count
@@ -9,7 +10,10 @@
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
-import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
+// FEATURE: S-AI-AUDIT-SVCDIR -- SERVICE_CATALOG remains imported ONLY for the roadmap tier lists
+// below (rule: .claude/rules/platform-services-directory.md); the By Service body now renders the
+// platform_services directory (platformServices/unregisteredServices from the hook) instead.
+import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase, humanizeSlug } from "../hooks/useAIActivity.js";
 import { Corners } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 // FEATURE: LOG-83 -- resolveAgent + its lookup maps extracted to a sibling module so the
@@ -31,36 +35,46 @@ const CHECKLIST = [
 const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(2)}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
 
-// FEATURE: AI-23 — Service row: type badge + name + patterns + stats (no expand)
-function ServiceRow({ d }) {
-  const hasData = d.total > 0;
-  const TYPE_BADGE = {
-    ai:     { label:'AI',     bg:`rgba(90,117,56,.12)`,  color:T.moss,     border:`rgba(90,117,56,.3)`  },
-    hybrid: { label:'Hybrid', bg:`rgba(182,135,58,.12)`, color:T.brassDeep,border:`rgba(182,135,58,.3)` },
-    logic:  { label:'Logic',  bg:`rgba(120,109,82,.12)`, color:T.muted,    border:`rgba(120,109,82,.3)` },
-  };
-  const badge = TYPE_BADGE[d.serviceType] || TYPE_BADGE.ai;
-
+// FEATURE: S-AI-AUDIT-SVCDIR -- one platform_services directory row (replaces the old
+// SERVICE_CATALOG-driven ServiceRow, deleted this session -- verified unshared: the roadmap tier
+// list renders its own plain divs). Branded name + muted functions list (where pattern badges
+// used to render -- no pattern names anywhere in this section, per §19m), right side driven by
+// tracking_status. `✦ Utilizes a Model` is an attribute chip, not an identity split.
+function PlatformServiceRow({ d }) {
+  const showStats = d.trackingStatus === 'tracked' || d.trackingStatus === 'partial';
   return (
-    <div style={{border:`1px solid ${hasData?T.line:T.lineSoft}`,marginBottom:5,padding:"8px 12px",display:"flex",alignItems:"center",gap:10,opacity:hasData?1:.55}}>
-      <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,padding:"2px 6px",background:badge.bg,color:badge.color,border:`1px solid ${badge.border}`,flexShrink:0}}>{badge.label}</span>
+    <div style={{border:`1px solid ${T.line}`,marginBottom:5,padding:"8px 12px",display:"flex",alignItems:"center",gap:10}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:hasData?T.navy:T.muted,marginBottom:1}}>{d.name}</div>
-        {d.patterns.length > 0 && (
-          <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{d.patterns.join(' · ')}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:1}}>
+          <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.name}</div>
+          {d.utilizesModel && (
+            <span style={{fontFamily:mono,fontSize:8,color:T.brassDeep,border:`1px solid ${T.brass}40`,padding:"1px 5px",flexShrink:0,whiteSpace:"nowrap"}}>✦ Utilizes a Model</span>
+          )}
+        </div>
+        {d.functions.length > 0 && (
+          <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{d.functions.join(' · ')}</div>
         )}
       </div>
-      {hasData ? (
-        <div style={{display:"flex",gap:12,flexShrink:0}}>
-          {[["Calls",d.total],[d.serviceType==='logic'?null:"Cost",d.serviceType!=='logic'?fmt$(d.cost):null],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].filter(x=>x[0]).map(([k,v])=>(
-            <div key={k} style={{textAlign:"right"}}>
-              <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-              <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
-            </div>
-          ))}
+      {showStats ? (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+          <div style={{display:"flex",gap:12}}>
+            {[["Calls",d.calls.toLocaleString()],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+              <div key={k} style={{textAlign:"right"}}>
+                <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {d.trackingStatus === 'partial' && (
+            <div style={{fontFamily:mono,fontSize:8,color:T.brass,border:`1px solid ${T.brass}40`,padding:"1px 5px"}}>⚠ some calls untracked</div>
+          )}
         </div>
+      ) : d.trackingStatus === 'machinery' ? (
+        <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0,textAlign:"right"}}>{d.displayNote || 'Counted elsewhere'}</div>
+      ) : d.trackingStatus === 'self' ? (
+        <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0,textAlign:"right"}}>{d.displayNote || 'The tracker itself'}</div>
       ) : (
-        <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>No calls yet</div>
+        <div style={{fontFamily:body,fontSize:10,fontStyle:"italic",color:T.muted,flexShrink:0}}>Not tracked at this time</div>
       )}
     </div>
   );
@@ -151,11 +165,13 @@ function McpCard({ item }) {
 }
 
 // FEATURE: AI-23 patch — reusable collapsible section header
-function SectionHeader({ label, open, onToggle }) {
+// FEATURE: S-AI-AUDIT-SVCDIR -- `first` drops the borderTop on the topmost header only (the
+// stray horizontal line above "By Pattern"); every subsequent header keeps its divider.
+function SectionHeader({ label, open, onToggle, first = false }) {
   return (
     <div
       onClick={onToggle}
-      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 2px",cursor:"pointer",borderTop:`1px solid ${T.lineSoft}`,marginTop:18,userSelect:"none"}}
+      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 2px",cursor:"pointer",borderTop: first ? "none" : `1px solid ${T.lineSoft}`,marginTop:18,userSelect:"none"}}
     >
       <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>{label}</div>
       <div style={{fontFamily:mono,fontSize:16,color:T.brassDeep,lineHeight:1,marginRight:2}}>{open ? "▲" : "▼"}</div>
@@ -176,15 +192,19 @@ const MCP_SURFACES = [
 export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-36 -- patternsActiveCount/patternsCatalogTotal removed from the hook; the stat
   // strip now reads the live logged count.
-  const { byService, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, servicesActive, servicesCatalogTotal, patternsLoggedCount, servicesSorted, patternsSorted, agentsSorted } = useAIActivity();
+  // FEATURE: S-AI-AUDIT-SVCDIR -- servicesActive/servicesCatalogTotal/servicesSorted dropped from
+  // this destructure (the hook still exports them for other consumers); the By Service body and
+  // the header stats now read the §19m directory join instead.
+  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsLoggedCount, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). Independent of the legacy byPattern/patternsSorted above, which
   // still feed the untouched "Patterns Logged" stat tile this session leaves alone.
   const { classified, reclassificationCount } = usePatternClassification();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
-  const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:false, roadmap:false });
-  const [zeroClosed, setZeroClosed] = useState(true);
+  // FEATURE: S-AI-AUDIT-SVCDIR -- service now defaults closed too (§19m kickoff: By Service
+  // drawer closed on open). The zeroClosed state is gone with the "Not yet called" collapse card.
+  const [sections, setSections] = useState({ pattern:true, service:false, llm:true, agent:false, roadmap:false });
   // FEATURE: LOG-36 -- inactivePtnClosed/uncatalogedPtnClosed removed with the collapse cards they
   // drove: with the catalog seed loop gone there is no "not yet active" bucket to collapse, and
   // every row is by definition uncatalogued-or-governed real activity, one flat list.
@@ -218,10 +238,14 @@ export default function AIActivityPanel({ onClose }) {
         </div>
         {/* Total strip — FEATURE: AI-48 — wraps on mobile instead of overflowing, no stat dropped */}
         <div style={{display:"flex",gap:16,marginTop:10,flexWrap: isMobile ? "wrap" : "nowrap",rowGap: isMobile ? 6 : 0}}>
+          {/* FEATURE: S-AI-AUDIT-SVCDIR -- "Services Active X/39" replaced by the directory count
+              (a service EXISTS whether or not it logged today, §19m), plus the assigned-capability
+              count from the same read Task 2's By Agent nesting uses. */}
           {[
             ["Total Calls",    totalCalls],
             ["Total Cost",     fmt$(totalCost)],
-            ["Services Active",`${servicesActive}/${servicesCatalogTotal}`],
+            ["Services",       platformServiceCount],
+            ["Capabilities",   assignedCapabilityCount],
             ["Patterns Logged",patternsLoggedCount],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(
@@ -255,7 +279,7 @@ export default function AIActivityPanel({ onClose }) {
                 halves of one binary) — choosing a real taxonomy is LOG-58. The AI-32 "Not yet active"
                 and LOG-31/LOG-32 "Uncatalogued" collapse cards go with it: with the catalog seed loop
                 deleted, every row here is a pattern that genuinely ran. */}
-            <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')}/>
+            <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')} first/>
             {sections.pattern && (
               <>
                 {classified.length === 0
@@ -303,71 +327,78 @@ export default function AIActivityPanel({ onClose }) {
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
                 : agentsSorted.map(d => {
                   const info = resolveAgent(d.agentId);
+                  // FEATURE: S-AI-AUDIT-SVCDIR -- capability sub-rows (Task 4). The agent-level
+                  // totals row is untouched (same content, now the first row inside the border);
+                  // beneath it, the agent's capabilities from agent_capability_assignments +
+                  // real log numbers -- an assigned-but-never-logged capability renders
+                  // "no activity yet". Capabilities display under their Agent, never in the
+                  // services list (§19m). No pattern text anywhere in this section.
+                  const caps = d.capabilities || [];
                   return (
-                    <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
-                        {/* FEATURE: LOG-83 -- line 2 shows the agent's human role title, not an internal code. Styling unchanged (value swap only). */}
-                        <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.role}</div>
+                    <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
+                          {/* FEATURE: LOG-83 -- line 2 shows the agent's human role title, not an internal code. Styling unchanged (value swap only). */}
+                          <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.role}</div>
+                        </div>
+                        <div style={{display:"flex",gap:14,flexShrink:0}}>
+                          {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                            <div key={k} style={{textAlign:"right"}}>
+                              <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                              <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div style={{display:"flex",gap:14,flexShrink:0}}>
-                        {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
-                          <div key={k} style={{textAlign:"right"}}>
-                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-                            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
+                      {caps.length > 0 && (
+                        <div style={{marginTop:6,paddingLeft:18}}>
+                          {caps.map(c => (
+                            <div key={c.slug} style={{display:"flex",alignItems:"center",gap:10,padding:"3px 0",borderTop:`1px solid ${T.lineSoft}`}}>
+                              <div style={{flex:1,minWidth:0,fontFamily:body,fontSize:11,color:T.mutedDeep}}>{c.name}</div>
+                              {c.calls > 0 ? (
+                                <div style={{fontFamily:mono,fontSize:9,color:T.muted,flexShrink:0}}>{c.calls.toLocaleString()} calls · {fmt$(c.cost)} · {c.avgLatency ? fmtMs(c.avgLatency) : "—"}</div>
+                              ) : (
+                                <div style={{fontFamily:body,fontSize:10,fontStyle:"italic",color:T.muted,flexShrink:0}}>no activity yet</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })
             )}
 
-            {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
+            {/* FEATURE: S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory
+                (ARCHITECTURE.md §19m): 8 layer group headers (same visual style as the old
+                "AI Services" sub-header), each service a PlatformServiceRow (branded name + muted
+                functions list, stats only for tracked/partial). The old serviceType grouping,
+                TYPE_BADGE, pattern strips, and the "Not yet called" collapse card are deleted --
+                every directory row renders, truthfully labeled by its tracking_status. Any logged
+                activity claiming no directory row and no assigned capability surfaces below as an
+                unregistered line -- never silently dropped (§19m self-maintenance). */}
             <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
-            {sections.service && (() => {
-              const withCalls = servicesSorted.filter(s => s.total > 0);
-              const zeroCalls = servicesSorted.filter(s => s.total === 0);
-              const aiSvcs     = withCalls.filter(s => s.serviceType === 'ai');
-              const hybridSvcs = withCalls.filter(s => s.serviceType === 'hybrid');
-              const logicSvcs  = withCalls.filter(s => s.serviceType === 'logic');
-
-              return (
-                <>
-                  {aiSvcs.length > 0 && (
-                    <>
-                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4}}>AI Services</div>
-                      {aiSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
-                    </>
-                  )}
-                  {hybridSvcs.length > 0 && (
-                    <>
-                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Hybrid Services</div>
-                      {hybridSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
-                    </>
-                  )}
-                  {logicSvcs.length > 0 && (
-                    <>
-                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop:8}}>Logic Services</div>
-                      {logicSvcs.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
-                    </>
-                  )}
-                  {zeroCalls.length > 0 && (
-                    <div style={{border:`1px solid ${T.lineSoft}`,marginTop:8,marginBottom:4}}>
-                      <div
-                        onClick={()=>setZeroClosed(o=>!o)}
-                        style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer"}}
-                      >
-                        <div style={{fontFamily:body,fontSize:12,color:T.muted,fontStyle:"italic"}}>Not yet called · {zeroCalls.length} services</div>
-                        <div style={{fontFamily:mono,fontSize:14,color:T.muted}}>{zeroClosed?"▼":"▲"}</div>
+            {sections.service && (
+              platformServices.length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>Service directory not loaded yet.</div>
+                : (
+                  <>
+                    {platformServices.map((group, gi) => (
+                      <div key={group.layer}>
+                        <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop: gi===0 ? 0 : 8}}>{humanizeSlug(group.layer)}</div>
+                        {group.services.map(svc => <PlatformServiceRow key={svc.slug} d={svc}/>)}
                       </div>
-                      {!zeroClosed && zeroCalls.map(svc => <ServiceRow key={svc.slug} d={svc}/>)}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+                    ))}
+                    {unregisteredServices.length > 0 && (
+                      <div style={{fontFamily:mono,fontSize:9,color:T.brass,padding:"8px 0 2px",borderTop:`1px solid ${T.lineSoft}`,marginTop:6,lineHeight:1.6}}>
+                        ⚠ {unregisteredServices.length} unregistered service{unregisteredServices.length === 1 ? "" : "s"} — logging as {unregisteredServices.map(u => `"${u.slug}" (${u.calls.toLocaleString()} call${u.calls === 1 ? "" : "s"})`).join(", ")}
+                      </div>
+                    )}
+                  </>
+                )
+            )}
 
             {/* FEATURE: AI-23 patch — Roadmap collapsible; Patterns Now tier removed */}
             <SectionHeader label="Platform Roadmap" open={sections.roadmap} onToggle={()=>toggle('roadmap')}/>
