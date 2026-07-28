@@ -1,3 +1,4 @@
+// DeepBench v6.3.182 | api/capabilities/execute.js | HAR-17 -- transient model-call failures checkpoint-recover once per hop (recovery_ledger, checked write) before surfacing; enable_web_search persisted across resume
 // DeepBench v6.3.181 | api/capabilities/execute.js | HAR-18 -- nested in_progress guards at the broker and critique dispatch sites (the two of four nested call sites that lacked them)
 // DeepBench v6.3.180 | api/capabilities/execute.js | HAR-15 -- both error paths forward failureClass/faultCode/upstreamStatus
 // DeepBench v6.3.166 | api/capabilities/execute.js | LOG-79 -- runLoop()'s final-answer response now carries trace_id/span_id (one generic passthrough line) so the Agent Routing drawer can join its hop events to the ai_call_patterns view; error/pending_confirmation/depth_exceeded returns deliberately unchanged
@@ -61,7 +62,7 @@ import { enrichPrompt } from '../prompt/ai-enrichment.js';
 // the identical set as the model-call write path.
 import { sendRequest, callModel, extractSelfReportedClaims } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
-import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow } from '../_lib/handlers/durable-loop.js';
+import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
@@ -98,6 +99,29 @@ let __testPreDispatchBudgetMs = null;
 export function __setTestPreDispatchBudgetMs(ms) {
   __testPreDispatchBudgetMs = ms;
 }
+
+// FEATURE: HAR-17 -- classify a MODEL-CALL failure for the one-recovery rule (§19o). Consumes
+// HAR-15's failureClass contract verbatim; adds only the classes HAR-15's throw sites don't
+// stamp. Scoped to runLoop()'s callModel() catch ONLY -- at any other site a raw TypeError is
+// as likely a Supabase/bookkeeping fault (deliverable-duplication risk, see kickoff §2), which
+// is why this helper must never be called from dispatch/sendRequest catch paths.
+function classifyModelCallFailure(e) {
+  if (e?.failureClass === 'transient' || e?.failureClass === 'permanent') return e.failureClass;
+  if (e?.status === 422) return 'transient'; // schema dice-roll: "Parse failed" / "Retry skipped" (request-receivable.js)
+  const name = e?.name || '';
+  // name-based match alongside instanceof: cross-realm errors (and deterministic test injections,
+  // which are plain Errors with a name prop) must classify identically to the real thing.
+  if (name === 'TimeoutError' || name === 'AbortError' || name === 'TypeError' || name === 'SyntaxError'
+    || e instanceof TypeError || e instanceof SyntaxError) {
+    return 'transient'; // raw fetch/abort/body-stream failures of the model call itself
+  }
+  return 'permanent'; // statusless default is SURFACE, never recover (config faults, unknown throws)
+}
+
+// FEATURE: HAR-17 -- deterministic failure injection for the Category L tests; inert (null) in
+// production. Matches the __setTestBudgetMs precedent (same inert-by-default reasoning above).
+let __testModelCallFailure = null; // { times: N, props: {...} } | null
+export function __setTestModelCallFailure(cfg) { __testModelCallFailure = cfg; }
 
 // FEATURE: AA-196 -- per-capability/intent hop budget estimate, replacing the flat
 // HOP_BUDGET_RESERVE_MS constant used for every hop type regardless of real latency shape.
@@ -436,7 +460,12 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // and persists task_context (durable_hops didn't capture it before this session), so a resumed chain
 // can forward the real structured task_context to a delegate instead of falling back to task-string-
 // only forwarding.
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, trace_id, span_id = null, parent_span_id = null }) {
+// FEATURE: HAR-17 -- gains enableWebSearch (persisted on create AND on the always-run patch, so a
+// resumed chain recovers the real flag instead of HAR-05's accepted silent-false gap) and
+// recoveryLedger (null everywhere except the model-call recovery seam: null -> ordinary
+// fire-and-forget patch, byte-identical budget-path behavior; non-null -> patchDurableHopRowChecked,
+// because an unpersisted ledger entry would make "recover once per hop" unbounded).
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, enableWebSearch = false, recoveryLedger = null, trace_id, span_id = null, parent_span_id = null }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -449,11 +478,13 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
       requires_human_confirmation: requiresHumanConfirmation === true,
       critique_capability_slug: critiqueCapabilitySlug || null,
       critique_intent_slug: critiqueIntentSlug || null,
+      // FEATURE: HAR-17 -- same persist-on-checkpoint pattern as delegation_required above.
+      enable_web_search: enableWebSearch === true,
       trace_id,
     });
     row_id = row.id;
   }
-  await patchDurableHopRow(row_id, {
+  const patchFields = {
     conversation_history: conversationHistory, hop_counter: depth,
     delegation_occurred: delegationOccurred, last_help_selection: lastHelpSelection,
     pending_delegation: pendingDelegation ?? null,
@@ -463,7 +494,17 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
     // Written via this always-run patch (durable_hops now carries these columns from Task 1's
     // migration) rather than createDurableHopRow, so no separate handler change is needed.
     span_id, parent_span_id,
-  });
+    // FEATURE: HAR-17 -- included on the always-run patch too, so a pre-existing row (resume-path
+    // re-checkpoint, whose create ran before this session's column existed) still carries the flag.
+    enable_web_search: enableWebSearch === true,
+  };
+  if (recoveryLedger !== null) {
+    // FEATURE: HAR-17 -- the recovery seam's write MUST be confirmed persisted before the caller
+    // returns in_progress; a silent failure here would allow unbounded re-recovery of one hop.
+    await patchDurableHopRowChecked(row_id, { ...patchFields, recovery_ledger: recoveryLedger });
+  } else {
+    await patchDurableHopRow(row_id, patchFields);
+  }
   return { status: 'in_progress', job_id: row_id };
 }
 
@@ -483,6 +524,13 @@ function formatErrorForPersistence(e) {
 // otherwise patches the existing one (resumed call) -- same create-if-absent shape
 // checkpointAndReturn() already uses for the success/checkpoint path.
 async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id, span_id = null, parent_span_id = null }) {
+  // FEATURE: HAR-17 -- this function is now also called from runLoop()'s model-call seam (with the
+  // live job_id), and the rethrown error still propagates up to runCapability()'s/resumeCapability()'s
+  // existing outer catch, which calls here again. For a resumed row that second call would be a
+  // harmless re-patch to status:'failed'; on a FRESH call (job_id null at both sites) it would
+  // create a duplicate failed row. This marker guard makes the second call a pure rethrow either
+  // way -- the row the seam already persisted is the record.
+  if (e && e.__failurePersisted) throw e;
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -497,6 +545,7 @@ async function persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug,
   // FEATURE: LOG-49 -- record the span on the failure row too (a failed row is never resumed, but
   // this keeps its place in the parent->child tree honest).
   await patchDurableHopRow(row_id, { status: 'failed', error: formatErrorForPersistence(e), span_id, parent_span_id });
+  try { e.__failurePersisted = row_id; } catch { /* frozen/exotic error object: fall back to the harmless re-persist */ }
   throw e;
 }
 
@@ -678,11 +727,16 @@ async function runLoop({
   // FEATURE: HAR-05 -- enableWebSearch threaded through runLoop() the same explicit-param way
   // canRequestHelp already is (read from promptRequest in runCapability(), below -- ai-enrichment.js
   // drops unknown fields from `enriched`, same reason canRequestHelp can't be read from there either).
-  // Not persisted to durable_hops (no new column this session) -- same accepted-gap precedent as
-  // requiresHumanConfirmation/critique*/display_agent_* below: a resumed chain runs without this
-  // flag, matching AA-138's proven scope. A single web-search-then-delegate hop is not expected to
-  // ever hit the checkpoint/resume path in practice.
+  // FEATURE: HAR-17 -- now persisted to durable_hops (enable_web_search, this session's migration)
+  // at every checkpointAndReturn() site and recovered by resumeCapability()'s three runLoop()
+  // re-entries, closing HAR-05's accepted gap: the recovery seam makes checkpoint/resume a normal
+  // path for ANY hop, including a web-search one, so the flag can no longer be silently dropped.
+  // (display_agent_*/signatureConfig remain documented residuals -- HAR-17 row in FEATURES.md.)
   enableWebSearch = false,
+  // FEATURE: HAR-17 -- the per-hop recovery ledger (§19o): [{ o, fault, at }] entries keyed by hop
+  // ordinal (conversationHistory.length at the top of the hop). [] on a fresh call; recovered from
+  // durable_hops.recovery_ledger on resume. Only the model-call seam below ever appends to it.
+  recoveryLedger = [],
   delegationRequired,
   requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
   display_agent_id, display_agent_card,
@@ -723,7 +777,7 @@ async function runLoop({
         job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
         requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
-        pendingDelegation: null,
+        pendingDelegation: null, enableWebSearch,
         trace_id, span_id, parent_span_id,
       });
     }
@@ -733,17 +787,51 @@ async function runLoop({
     // no new computation) one level deeper into callModel()'s internal Anthropic call(s), so a
     // hop that passes the pre-hop budget check can't still blow the shared maxDuration ceiling
     // from inside callModel()'s own parse-failure retry. AA-69/S-SES003-TSR-design.
-    const turn = await callModel({
-      systemPrompt: enriched.system_prompt,
-      model: enriched.llm.model,
-      max_tokens: enriched.llm.max_tokens,
-      temperature: enriched.llm.temperature,
-      format_contract: enriched.format_contract,
-      canRequestHelp,
-      enableWebSearch,
-      conversation_history: conversationHistory,
-      deadline,
-    });
+    let turn;
+    try {
+      // FEATURE: HAR-17 -- deterministic failure injection for the Category L tests; inert (null) in production.
+      if (__testModelCallFailure && __testModelCallFailure.times > 0) {
+        __testModelCallFailure.times--;
+        throw Object.assign(new Error(__testModelCallFailure.props.message || 'injected model-call failure'), __testModelCallFailure.props);
+      }
+      turn = await callModel({
+        systemPrompt: enriched.system_prompt,
+        model: enriched.llm.model,
+        max_tokens: enriched.llm.max_tokens,
+        temperature: enriched.llm.temperature,
+        format_contract: enriched.format_contract,
+        canRequestHelp,
+        enableWebSearch,
+        conversation_history: conversationHistory,
+        deadline,
+      });
+    } catch (e) {
+      // FEATURE: HAR-17 -- §19o: classify first; a transient model-call failure gets exactly one
+      // checkpoint-resume recovery per hop before surfacing. Hop identity = conversationHistory.length
+      // at the top of the hop -- stable across checkpoint/resume (depth is NOT: a resumed continuation
+      // re-enters at the decision hop's depth), monotonic within a chain.
+      const hopOrdinal = conversationHistory.length;
+      const alreadyRecovered = recoveryLedger.some(r => r.o === hopOrdinal);
+      if (classifyModelCallFailure(e) === 'transient' && !alreadyRecovered) {
+        try {
+          const newLedger = [...recoveryLedger, { o: hopOrdinal, fault: e.faultCode || e.name || String(e.status || 'unknown'), at: new Date().toISOString() }];
+          const checkpoint = await checkpointAndReturn({
+            job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+            requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+            task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
+            pendingDelegation: null, enableWebSearch, recoveryLedger: newLedger,
+            trace_id, span_id, parent_span_id,
+          });
+          // FEATURE: HAR-17 -- the recovery payload rides the in_progress response body: every call
+          // site's resolveInProgress() sees it (streamed or not) -- the client half is S-HAR-17c.
+          return { ...checkpoint, recovery: { fault: e.faultCode || e.name || 'transient', agent_id, capability_slug, intent_slug } };
+        } catch (ledgerWriteError) {
+          // Checked ledger write failed -- recovering anyway would be unbounded. Fail safe: surface.
+          console.error(`[execute] recovery ledger write failed (${ledgerWriteError.message}); surfacing original failure`);
+        }
+      }
+      return await persistFailureAndRethrow(e, { job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, task_context, trace_id, span_id, parent_span_id });
+    }
     // FEATURE: HAR-05 -- same mechanical-only shape as request-receivable.js's sendRequest()
     // detection: only true when this turn's own raw response actually contains a server-executed
     // web_search block. See logAgentTurn()'s own comment for why this call site needs its own
@@ -933,6 +1021,7 @@ async function runLoop({
         requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
+        enableWebSearch,
         trace_id, span_id, parent_span_id,
       });
     }
@@ -952,6 +1041,7 @@ async function runLoop({
         requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection: dispatchOutcome.lastHelpSelection,
         pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
+        enableWebSearch,
         trace_id, span_id, parent_span_id,
       });
     }
@@ -1152,6 +1242,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
           task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
           delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
           pendingDelegation: row.pending_delegation,
+          // FEATURE: HAR-17 -- re-persist the recovered flag so it survives multiple checkpoint->
+          // resume cycles (same pattern delegation_required already follows here).
+          enableWebSearch: row.enable_web_search === true,
           trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
         });
       }
@@ -1160,7 +1253,10 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         // instead of feeding Anthropic a conversation history with an unresolved tool_use block
         // (the exact defect this session fixes).
         await patchDurableHopRow(row.id, { status: 'failed', error: `Nested delegation (job ${waitingOnId}) failed: ${nestedRow.error || 'unknown error'}` });
-        throw new Error(`Nested delegation failed: ${nestedRow.error || 'unknown error'}`);
+        // FEATURE: HAR-17 -- terminal stamp (audit hardening): the nested job already spent its own
+        // recovery inside its own runLoop() (§19o recursion); this synthesized error is permanent by
+        // construction, so no present or future catch site can ever classify it transient.
+        throw Object.assign(new Error(`Nested delegation failed: ${nestedRow.error || 'unknown error'}`), { failureClass: 'permanent', faultCode: 'nested-terminal' });
       }
       // nestedRow.status === 'complete' -- build the same tool_result shape dispatchDelegation()
       // already builds on a live 'continue' outcome (execute.js:386-389), then resume the loop
@@ -1177,6 +1273,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         // false, which silently dropped the human-confirmation card on any resumed gated chain).
         requiresHumanConfirmation: row.requires_human_confirmation === true,
         critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+        // FEATURE: HAR-17 -- recover the web-search flag and the per-hop recovery ledger from the
+        // persisted row, so a resumed hop keeps §19o's once-per-hop bound and its real search flag.
+        enableWebSearch: row.enable_web_search === true, recoveryLedger: row.recovery_ledger || [],
         display_agent_id: null, display_agent_card: null,
         conversationHistory, delegationOccurred: true,
         lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
@@ -1195,7 +1294,7 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, enableWebSearch: row.enable_web_search === true, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
       }
       // FEATURE: AI-46a -- this runLoop() continuation (the post-dispatch "continue" outcome, resumed
       // chain's own delegate hop having completed live above rather than checkpointing again) is not
@@ -1211,6 +1310,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         // false, which silently dropped the human-confirmation card on any resumed gated chain).
         requiresHumanConfirmation: row.requires_human_confirmation === true,
         critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+        // FEATURE: HAR-17 -- recover the web-search flag and the per-hop recovery ledger from the
+        // persisted row, so a resumed hop keeps §19o's once-per-hop bound and its real search flag.
+        enableWebSearch: row.enable_web_search === true, recoveryLedger: row.recovery_ledger || [],
         display_agent_id: null, display_agent_card: null,
         conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
         lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
@@ -1234,6 +1336,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       delegationRequired: row.delegation_required === true,
       // FEATURE: LOO-20 -- recover the confirmation gate from the persisted row (was hardcoded false).
       requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+      // FEATURE: HAR-17 -- recover the web-search flag and the per-hop recovery ledger from the
+      // persisted row, so a resumed hop keeps §19o's once-per-hop bound and its real search flag.
+      enableWebSearch: row.enable_web_search === true, recoveryLedger: row.recovery_ledger || [],
       display_agent_id: null, display_agent_card: null,
       conversationHistory: row.conversation_history || [], delegationOccurred: !!row.delegation_occurred,
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
