@@ -1693,6 +1693,31 @@ per-operation spend view — industry-standard GenAI observability); listing cap
 functions (they'd all collapse under one machinery row, losing per-capability numbers and ownership);
 a separate `ai_services` name (services are services; model use is a flag).
 
+---
+
+## 19n. CHI Journey Steps & Single Vocabulary [discovery `ui-updates-0727`, 2026-07-28]
+
+**Problem (John's live screenshot, 2026-07-27):** one forecast flow on the Channel Sales Intelligence screen showed the user six nouns for one object — "Forecast" (drawer titles), "theories"/"theory" (chat), "thesis" (model-generated), "hypothesis" (footer prompt), "candidates" — and the chat's "You have 4 theories to choose from" pointed at a drawer titled "Forecast Candidates," which John read as a missing drawer. The root cause is structural, not sloppy copy: the screen pulls its nouns from three unreconciled sources (`INTENT_LABEL`-dynamic drawer titles, hardcoded chat strings, live model-generated text), and the *intent* that names the drawers is not the *step* the user is on.
+
+**The settled product model (John, this session): Theory and Forecast are sequential steps, not synonyms** — the user requests theories, then forms a forecast on the theory of their choice. The existing chat-header process line `Question › Analysis › Theory › Forecast › Update` (`CHI-71`) is the correct spine and becomes the fixed map, with the current stage highlighted.
+
+**Decision 1 — journey-relative step numbering, with no path logic anywhere.** A journey starts when the user acts (typing a question, clicking a news article). The first drawer that appears in service of that journey is step 1, the next step 2, and so on — **arrival order is the numbering.** The design never needs to know in advance whether Marcus will answer directly, build theories, or route a correction; whatever drawers arrive number themselves. A new journey resets the numbers. Ambient drawers (News at rest) are unnumbered and sort below the active journey's steps until one of them starts a journey. This replaces any per-path enumeration — earlier drafts that tried to enumerate paths ("path A/B/C") collapsed under exactly the ambiguity this rule dissolves. The column's header renames "News & Evidence" → "Steps & Evidence" to match its new role.
+
+**Decision 2 — one noun per object, everywhere on this screen:** **Theory** (the explanation you pick and test — retires *hypothesis*, *thesis*, *candidate*), **Forecast** (the committed record created from a validated theory — as the *object's* name it never appears before the "Create Forecast" act; the fixed stage map — the `CHI-71` breadcrumb — and the "Create Forecast" control itself name the *stage/act*, not the object, and are exempt), **Analysis** (Marcus's read on a question or article), **News** (source articles). Drawer titles become fixed — "Theories" / "Theory Result" — never intent-dynamic. **This overturns `CHI-49`'s locked intent-dynamic titles (`STYLE-GUIDE.md` §40) — John's explicit supersession, 2026-07-28.** The routing intent (`theory`/`forecast`/`correct`) survives internally; it just no longer names drawers.
+
+**Decision 3 — directive chat, exactly one step per handoff.** Any chat message that hands control back to the user names exactly one step, as number + name together (e.g. "2 · Theory Result"), rendered as the same visual step chip the drawer header carries — never a bare number, never a bare name. (The backlog's own ID+Type convention, applied to UI.)
+
+**Ruled out:**
+- **Pre-rendered ghost drawers** for future steps — clutter, and contradicts the render-what-exists posture (§19j).
+- **A muted "Up next: …" caption** after the active step (proposed in this session's own mockup as the ghost-drawer compromise, then killed by its verification pass — John's call, 2026-07-28): naming the next step requires predicting a drawer that hasn't arrived, contradicting Decision 1, and the prediction can be flatly wrong (choosing "Store as Info Only" ends the journey — no Draft Forecast ever arrives). Chat's step chip (Decision 3) carries the entire directive job, consistent with §40/`CHI-58`'s "Column 2 shows content, chat shows status."
+- **Keeping intent-dynamic titles** — the single biggest source of the observed confusion; "Forecast" smeared backward onto the Theory step whenever Marcus classified a request as `forecast`.
+
+**Scope split:** the screen-side build is `CHI-82` (`docs/FEATURES.md`). The model-generated vocabulary ("thesis" is Marcus's own live text — verified absent from `MarketIntelligenceScreen.jsx`'s user-facing strings; its sole occurrence in the file is a code comment at L164) can only be fixed by a vocabulary constraint in the CHI intents' instructions in Supabase — `CHI-83`, a separate follow-up, since no screen edit can reach it.
+
+Enforceable subset: `.claude/rules/chi-vocabulary.md` (path-scoped to the CHI screen).
+
+---
+
 ## 17. v4 Preservation [LOCKED]
 
 v4.x lives at `nigp.roadmapventure.com` — preserved as-is, not modified.
