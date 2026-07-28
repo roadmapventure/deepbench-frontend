@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/platform-stats.js --soft",
     "build": "vite build",
     "preview": "vite preview"
   },
