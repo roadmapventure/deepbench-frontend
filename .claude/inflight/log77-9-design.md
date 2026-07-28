@@ -1,1 +1,0 @@
-log77-9-design — S-LOG-77-9-design (v6.3.190) — LOG-77 item 9 (`delegated_to_provenance`): shape+placement approved by John 2026-07-28; kickoff `docs/kickoffs/v6.3.190-LOG-77-9-delegated-to-provenance.md` committed; coding agent phase next (branch switched to session/log77-9-coding).
