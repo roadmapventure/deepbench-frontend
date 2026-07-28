@@ -1,3 +1,4 @@
+// DeepBench v6.3.167 | AIActivityPanel.jsx | LOG-90 -- §19m unregistered-services line removed from the By Service drawer (detection stays in useAIActivity; residue tracked as LOG-89)
 // DeepBench v6.3.163 | AIActivityPanel.jsx | LOG-86 -- tab bar removed (MCP Roadmap + Architect Checklist hidden, content kept in-file), Platform Roadmap drawer deleted; drawers are the opening view
 // DeepBench v6.3.159 | AIActivityPanel.jsx | S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory (8 layer groups, muted function lists, no pattern names, closed by default); By Agent capability sub-rows; Services/Capabilities header stats; stray By Pattern top line removed (ARCHITECTURE.md §19m)
 // DeepBench v6.3.160 | AIActivityPanel.jsx | LOG-83 -- By Agent defaults collapsed + moved under By LLM + line 2 shows role title (not code); resolveAgent extracted to ./resolveAgent.js
@@ -195,7 +196,7 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: S-AI-AUDIT-SVCDIR -- servicesActive/servicesCatalogTotal/servicesSorted dropped from
   // this destructure (the hook still exports them for other consumers); the By Service body and
   // the header stats now read the §19m directory join instead.
-  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsLoggedCount, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount } = useAIActivity();
+  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsLoggedCount, patternsSorted, agentsSorted, platformServices, platformServiceCount, assignedCapabilityCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). Independent of the legacy byPattern/patternsSorted above, which
   // still feed the untouched "Patterns Logged" stat tile this session leaves alone.
@@ -366,28 +367,21 @@ export default function AIActivityPanel({ onClose }) {
                 "AI Services" sub-header), each service a PlatformServiceRow (branded name + muted
                 functions list, stats only for tracked/partial). The old serviceType grouping,
                 TYPE_BADGE, pattern strips, and the "Not yet called" collapse card are deleted --
-                every directory row renders, truthfully labeled by its tracking_status. Any logged
-                activity claiming no directory row and no assigned capability surfaces below as an
-                unregistered line -- never silently dropped (§19m self-maintenance). */}
+                every directory row renders, truthfully labeled by its tracking_status. Activity
+                claiming no directory row and no assigned capability is still detected by the hook
+                (computeUnregisteredServices) but no longer rendered here -- LOG-90 (John,
+                2026-07-28); the residue and the tripwire's ongoing home is
+                docs/FEATURES-LATER.md LOG-89. */}
             <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
             {sections.service && (
               platformServices.length === 0
                 ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>Service directory not loaded yet.</div>
-                : (
-                  <>
-                    {platformServices.map((group, gi) => (
-                      <div key={group.layer}>
-                        <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop: gi===0 ? 0 : 8}}>{humanizeSlug(group.layer)}</div>
-                        {group.services.map(svc => <PlatformServiceRow key={svc.slug} d={svc}/>)}
-                      </div>
-                    ))}
-                    {unregisteredServices.length > 0 && (
-                      <div style={{fontFamily:mono,fontSize:9,color:T.brass,padding:"8px 0 2px",borderTop:`1px solid ${T.lineSoft}`,marginTop:6,lineHeight:1.6}}>
-                        ⚠ {unregisteredServices.length} unregistered service{unregisteredServices.length === 1 ? "" : "s"} — logging as {unregisteredServices.map(u => `"${u.slug}" (${u.calls.toLocaleString()} call${u.calls === 1 ? "" : "s"})`).join(", ")}
-                      </div>
-                    )}
-                  </>
-                )
+                : platformServices.map((group, gi) => (
+                    <div key={group.layer}>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4,marginTop: gi===0 ? 0 : 8}}>{humanizeSlug(group.layer)}</div>
+                      {group.services.map(svc => <PlatformServiceRow key={svc.slug} d={svc}/>)}
+                    </div>
+                  ))
             )}
 
           </>

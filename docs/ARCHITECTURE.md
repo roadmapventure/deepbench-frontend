@@ -1683,7 +1683,11 @@ frontend.
 **Self-maintenance:** any `ai_activity_log` activity whose resolved slug matches no directory row renders
 as an explicit "unregistered service" line — a new logging service can never silently vanish; it appears
 asking to be registered. (Reconciliation + code-anchor drift scripts: deliberately deferred to a
-follow-up session, John's call — not built here.)
+follow-up session, John's call — not built here.) **Amended 2026-07-28 (`LOG-90`, John's call):** the
+line is no longer rendered on the AI Audit screen — it is a user surface, not an engineering console.
+The detection (`computeUnregisteredServices()`) remains in code as the tripwire; the verified residue
+breakdown and fix scope live in `docs/FEATURES-LATER.md` `LOG-89`, which also owns the follow-up
+decision of whether an admin-only surface should re-expose the line.
 
 **Known drift recorded, not fixed here:** (1) `skill_profiles.technical_services` holds *pattern* names
 (`rag`, `tool-use`, …) under a "services" label — a §1 "Technical Services" legacy; rename is its own

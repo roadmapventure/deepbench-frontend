@@ -15,7 +15,11 @@ write counts/cost/latency into `platform_services` — numbers live only in
 ai_type-only). Never hand-write an agent name on a service row — ownership is
 expressed by Capability assignment and shown in the By Agent drawer. A service
 is one reusable module; its functions are a muted list under the title, never
-their own rows. Activity matching no directory row must render as an
-"unregistered service" line, never be silently dropped.
+their own rows. Activity matching no directory row and no assigned capability
+must still be *detected* — `computeUnregisteredServices()` (`useAIActivity.js`)
+stays live — but is not rendered to end users (`LOG-90`, John, 2026-07-28); the
+residue is tracked as `LOG-89` (`docs/FEATURES-LATER.md`). Removing the
+detection itself, or leaving newly-detected unattributed activity with no
+backlog row, is the violation.
 
 Rationale: `docs/ARCHITECTURE.md` §19m.
