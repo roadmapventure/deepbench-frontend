@@ -1,3 +1,4 @@
+// DeepBench v6.3.158 | useAIActivity.js | LOG-80 -- By LLM: null model no longer fabricated to Haiku; computeByLLM() extracted + alias-normalized so each model appears once
 // DeepBench v6.3.155 | useAIActivity.js | LOG-38 -- Log Displayer read path: classification rollup + single reclassification count
 // DeepBench v6.3.134 | useAIActivity.js | LOG-36 -- pattern displays read from the log, not the static catalog
 // DeepBench v6.1.43 | MarketIntelligenceScreen.jsx / useAIActivity.js | S-MI-42 -- two-tone indicator, final-timeline caption, streaming/agent-delegation catalog fixes
@@ -507,7 +508,7 @@ export async function hydrateFromSupabase(tenantId = 'global') {
   _log = rows.map(row => ({
     id:        row.id,
     type:      row.ai_type,
-    model:     row.model || 'claude-haiku-4-5',
+    model:     row.model || null,
     tokens:    row.input_tokens || 0,
     latencyMs: row.latency_ms || 0,
     tier:      row.knowledge_tier || null,
@@ -608,6 +609,33 @@ export function usePatternClassification() {
   return state;
 }
 
+// FEATURE: LOG-80 -- By LLM aggregation, extracted from useAIActivity()'s inline loop into an
+// exported pure function so it is unit-testable, mirroring computeByPattern()'s shape. Two
+// accuracy fixes fold in here (vs. the pre-LOG-80 inline loop): (1) the key is normalized through
+// MODEL_ID_NORMALIZE first, so a legacy short-form id (claude-haiku-4-5, claude-sonnet-4-5) folds
+// into its canonical model (claude-haiku-4-5-20251001, claude-sonnet-4-6) instead of splitting into
+// a duplicate row; (2) a model-less row (row.model IS NULL -- deterministic librarian/directory
+// lookups, no longer fabricated as 'claude-haiku-4-5' since Task 1) resolves to "unknown" and is
+// dropped by the existing claude-/text-embedding- prefix filter, so it never appears as an LLM.
+// All cost/tokensIn/latency + avgLatency math is byte-identical to the prior inline loop.
+export function computeByLLM(log) {
+  const byLLM = {};
+  for (const e of log) {
+    const m = MODEL_ID_NORMALIZE[e.model] || e.model || "unknown";
+    // FEATURE: BUG-20 — only aggregate real LLM model strings; filter service names and junk values
+    if (!m.startsWith('claude-') && !m.startsWith('text-embedding-')) continue;
+    if (!byLLM[m]) byLLM[m] = { model: m, calls: 0, cost: 0, tokensIn: 0, latencies: [] };
+    byLLM[m].calls++;
+    byLLM[m].cost += e.cost || 0;
+    byLLM[m].tokensIn += e.tokens || 0;
+    if (e.latencyMs) byLLM[m].latencies.push(e.latencyMs);
+  }
+  Object.values(byLLM).forEach(d => {
+    d.avgLatency = d.latencies.length ? Math.round(d.latencies.reduce((a,b)=>a+b,0)/d.latencies.length) : null;
+  });
+  return byLLM;
+}
+
 export function useAIActivity() {
   const [log, setLog] = useState([..._log]);
   useEffect(() => {
@@ -635,20 +663,7 @@ export function useAIActivity() {
   }
 
   // Aggregate by LLM model
-  const byLLM = {};
-  for (const e of log) {
-    const m = e.model || "unknown";
-    // FEATURE: BUG-20 — only aggregate real LLM model strings; filter service names and junk values
-    if (!m.startsWith('claude-') && !m.startsWith('text-embedding-')) continue;
-    if (!byLLM[m]) byLLM[m] = { model: m, calls: 0, cost: 0, tokensIn: 0, latencies: [] };
-    byLLM[m].calls++;
-    byLLM[m].cost += e.cost || 0;
-    byLLM[m].tokensIn += e.tokens || 0;
-    if (e.latencyMs) byLLM[m].latencies.push(e.latencyMs);
-  }
-  Object.values(byLLM).forEach(d => {
-    d.avgLatency = d.latencies.length ? Math.round(d.latencies.reduce((a,b)=>a+b,0)/d.latencies.length) : null;
-  });
+  const byLLM = computeByLLM(log);
 
   // FEATURE: LOG-21 -- byAgent now runs through the same buildActivitySummary() core
   // useAgentActivitySummary() (useAgents.js) uses for calls/cost, instead of an independently

@@ -1,3 +1,4 @@
+// DeepBench v6.3.158 | AIActivityPanel.jsx | LOG-80 -- By LLM drawer moved directly under By Pattern (pure JSX reorder)
 // DeepBench v6.3.155 | AIActivityPanel.jsx | LOG-38 -- By Pattern body rewired: classified rows + single reclassification count
 // DeepBench v6.3.134 | AIActivityPanel.jsx | LOG-36 -- By Pattern is one flat log-driven list; "Patterns Logged" stat
 // DeepBench v6.2.9 | AIActivityPanel.jsx | AI-48 mobile-responsive AI Audit panel
@@ -274,6 +275,31 @@ export default function AIActivityPanel({ onClose }) {
               </>
             )}
 
+            {/* By LLM — collapsible, unchanged data. FEATURE: LOG-80 -- moved up to sit directly
+                after By Pattern (pure JSX move, no logic/state change; sections.llm key unchanged). */}
+            <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')}/>
+            {sections.llm && (
+              Object.values(byLLM).length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No LLM calls logged yet.</div>
+                : Object.values(byLLM).map(d => (
+                  <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:d.calls>0?T.moss:T.lineSoft,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.model}</div>
+                      <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
+                    </div>
+                    <div style={{display:"flex",gap:14,flexShrink:0}}>
+                      {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                        <div key={k} style={{textAlign:"right"}}>
+                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                          <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+            )}
+
             {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
             <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
             {sections.service && (() => {
@@ -318,30 +344,6 @@ export default function AIActivityPanel({ onClose }) {
                 </>
               );
             })()}
-
-            {/* By LLM — collapsible, unchanged data */}
-            <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')}/>
-            {sections.llm && (
-              Object.values(byLLM).length === 0
-                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No LLM calls logged yet.</div>
-                : Object.values(byLLM).map(d => (
-                  <div key={d.model} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:d.calls>0?T.moss:T.lineSoft,flexShrink:0}}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{d.model}</div>
-                      <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
-                    </div>
-                    <div style={{display:"flex",gap:14,flexShrink:0}}>
-                      {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
-                        <div key={k} style={{textAlign:"right"}}>
-                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-                          <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-            )}
 
             {/* By Agent — collapsible, sorted by calls desc */}
             <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
