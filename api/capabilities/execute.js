@@ -1,3 +1,4 @@
+// DeepBench v6.3.181 | api/capabilities/execute.js | HAR-18 -- nested in_progress guards at the broker and critique dispatch sites (the two of four nested call sites that lacked them)
 // DeepBench v6.3.180 | api/capabilities/execute.js | HAR-15 -- both error paths forward failureClass/faultCode/upstreamStatus
 // DeepBench v6.3.166 | api/capabilities/execute.js | LOG-79 -- runLoop()'s final-answer response now carries trace_id/span_id (one generic passthrough line) so the Agent Routing drawer can join its hop events to the ai_call_patterns view; error/pending_confirmation/depth_exceeded returns deliberately unchanged
 // DeepBench v6.3.154 | api/capabilities/execute.js | LOO-20 -- persists requires_human_confirmation + critique_capability_slug/critique_intent_slug across checkpoint/resume (durable_hops migration + checkpointAndReturn/resume plumbing) so a resumed confirmation-gated chain re-lands on the human-confirmation gate instead of the hardcoded requiresHumanConfirmation:false the three resume sites used -- restores the empty Draft Forecast card / bypassed Data Room gate; also patches the durable_hops row terminal when the gate fires on a resumed job so a stray re-resume can't write a duplicate pending_confirmations row
@@ -550,6 +551,18 @@ async function dispatchDelegation({
       task_context: { ...tool_input, requesting_agent_id: agent_id }, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       _trace_id: trace_id, _parent_span_id: span_id,
     });
+    // FEATURE: HAR-18 -- the broker call can checkpoint (budget today; transient recovery after
+    // HAR-17b), exactly like the two nested dispatch calls below. Same handling as L592/L635:
+    // convert to a nested_checkpoint outcome so runLoop() persists pending_delegation
+    // {waiting_on_job_id, tool_use_id} and resumeCapability()'s waiting branch drives the broker
+    // job to completion, then feeds its result back as this request_help turn's tool_result.
+    // Before this guard, an in_progress return fell through to the L558 .content reads (nulls),
+    // then either the L569 throw (delegationRequired -- a healthy checkpoint surfaced as
+    // "no valid recommended_agent_id") or the L650 tool_result append (the model received a raw
+    // {"status":"in_progress"} blob as its help result).
+    if (delegateResult?.status === 'in_progress') {
+      return { outcome: 'nested_checkpoint', lastHelpSelection, waitingOnJobId: delegateResult.job_id, toolUseId: tool_use_id };
+    }
     // FEATURE: LOG-15 — lastHelpSelection never carried patterns_used, even though the real value
     // (delegateResult.patterns_used) was already computed one line above by the shared
     // buildPatternsUsed() mechanism (request-receivable.js) — this is a thread-the-value fix, not new
@@ -822,6 +835,17 @@ async function runLoop({
             // parent_span_id at this execution -- consistent with dispatchDelegation()'s nested calls.
             _trace_id: trace_id, _parent_span_id: span_id,
           });
+        }
+        // FEATURE: HAR-18 -- the critique dispatch can checkpoint mid-flight. There is no tool_use
+        // in conversationHistory for a critique (it fires in the terminal text branch), so the
+        // waiting_on_job_id resume shape cannot carry it. Deliberate v1 degrade: proceed to the
+        // confirmation gate without a critique rather than storing a {status:'in_progress'} job
+        // stub into pending_confirmations.critique (the corruption this fixes). The orphaned
+        // nested critique row is bounded, logged here, and tracked under HAR-18's residual note
+        // in docs/FEATURES.md.
+        if (critique?.status === 'in_progress') {
+          console.error(`[execute] critique dispatch checkpointed mid-flight (job ${critique.job_id}); proceeding without critique`);
+          critique = null;
         }
         const confirmation_id = await insertPendingConfirmation({
           tenant_id, agent_id, capability_slug, intent_slug,
