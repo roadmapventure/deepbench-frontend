@@ -1,4 +1,5 @@
 // DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
+// DeepBench v6.3.169 | MarketIntelligenceScreen.jsx | S-CHI-82b -- journey membership for the two residual sites CHI-82a's arrival-effect guard didn't cover (same presence-vs-membership root cause): (1) the breadcrumb stage highlight now feeds currentStage() membership-filtered inputs (qa iff it holds a step in the current journey, hypFlow iff journeySeq matches -- the pure function itself unchanged), so a lingering resolved flow no longer paints "Update" over a new journey's "Analysis"; (2) the three hyp "Needs Your Decision" badges (Candidates/Result/Draft Forecast) gate on a new hypIsCurrent prop, so an abandoned previous journey's ambient drawers stop soliciting decisions. Shared hypCurrent const hoisted; qa/Analysis badge untouched (slot overwritten each journey).
 // DeepBench v6.3.168 | MarketIntelligenceScreen.jsx | S-CHI-82a -- journey-membership guard (QA FAIL patch on v6.3.162): journey state gains a monotonic `seq` (nextJourney), every fresh hypFlow is stamped `journeySeq` at creation, and the step-arrival effect numbers only current-journey hyp content -- a previous journey's persisted (CHI-51) drawers can no longer renumber into a new journey when an effect dep changes. qaEvidence stays unstamped by design (single overwritten slot, same key -- self-corrects). Mobile heads-up pointer retargeted to "Tap Steps & Evidence above..." (was pointing at the pre-CHI-82 tab name).
 // DeepBench v6.3.162 | MarketIntelligenceScreen.jsx | S-CHI-82 -- CHI journey steps + single vocabulary (ARCHITECTURE.md §19n, .claude/rules/chi-vocabulary.md): fixed drawer titles (CHI-49's intent-dynamic titles overturned -- "Theories"/"Theory Result"), journey-relative step numbering by arrival order (assignStep/ensureStep, no path map), StepChip worn by drawer titles + echoed in handoff chat bubbles (stepRef), ambient flex-order sort, "News & Evidence" -> "Steps & Evidence", breadcrumb current-stage highlight (currentStage), hypothesis/candidate retired from all screen copy
 // DeepBench v6.3.152 | MarketIntelligenceScreen.jsx | S-CHI-77 -- onSend's catch now emits the MI-29 "error" Pipeline Log event (surfaces the real reason via describeCaughtError into Column 3) + honest bubble copy ("completing your answer", not "reaching Marcus"); the one async catch that dropped the reason. (Renamed from CHI-76 at close-out -- collided with the concurrently-shipped CHI-76 hyp-test caption, SES-18 counter desync)
@@ -1974,7 +1975,11 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
 
 // FEATURE: CHI-82 — getStep reads the parent's journey (arrival-order step numbers, §19n): drawer
 // titles wear the number via StepChip, and the ambient flex-order sort keys off it.
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep }) {
+// FEATURE: CHI-82b — hypIsCurrent (the top-level hypCurrent membership signal) gates the three
+// hyp "Needs Your Decision" badges: an abandoned previous journey's ambient drawers must not
+// keep soliciting a decision. The qa/Analysis badge is deliberately NOT gated (qaEvidence is a
+// single slot overwritten each journey — no stale case).
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep, hypIsCurrent }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -2190,7 +2195,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         <Drawer title={<span style={{display:"inline-flex",alignItems:"center",gap:6}}><StepChip n={getStep("hyp-candidates")}/>Theories</span>} scrollKey="hyp-candidates"
           count={!hypChosen ? (hypFlow.candidates?.length ?? null) : null}
           open={isDrawerOpen("hyp-candidates")} onToggle={handleDrawerToggle("hyp-candidates")}
-          headerRight={hypFlow.stage === "choosing" ? <NeedsDecisionBadge/> : null}>
+          /* FEATURE: CHI-82b — badge gated on journey membership (hypIsCurrent) */
+          headerRight={hypFlow.stage === "choosing" && hypIsCurrent ? <NeedsDecisionBadge/> : null}>
 
         {hypChosen && (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>
@@ -2280,7 +2286,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         {isHypInResultPhase(hypFlow) && (
         <div style={{order: getStep("hyp-result") ?? 90}}>
         <Drawer title={<span style={{display:"inline-flex",alignItems:"center",gap:6}}><StepChip n={getStep("hyp-result")}/>Theory Result</span>} scrollKey="hyp-result" open={isDrawerOpen("hyp-result")} onToggle={handleDrawerToggle("hyp-result")}
-          headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{hypFlow.stage === "result" && !hypFlow.resolution && <NeedsDecisionBadge/>}<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/></div>}>
+          /* FEATURE: CHI-82b — badge additionally gated on journey membership (hypIsCurrent) */
+          headerRight={<div style={{display:"flex",alignItems:"center",gap:6}}>{hypFlow.stage === "result" && !hypFlow.resolution && hypIsCurrent && <NeedsDecisionBadge/>}<HopBadge hopStart={st?.hopStart} hopEnd={st?.hopEnd} accent={T.moss}/></div>}>
 
         {/* FEATURE: CHI-58 — the submitted-theory recap block previously here was removed: the
             (still-visible, collapsed) Candidates drawer's own chosen-summary already shows this
@@ -2353,7 +2360,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         {isHypAwaitingConfirmation(hypFlow) && (
         <div style={{order: getStep("hyp-draft") ?? 90}}>
         <Drawer title={<span style={{display:"inline-flex",alignItems:"center",gap:6}}><StepChip n={getStep("hyp-draft")}/>Draft Forecast</span>} scrollKey="hyp-draft" open={isDrawerOpen("hyp-draft")} onToggle={handleDrawerToggle("hyp-draft")}
-          headerRight={<NeedsDecisionBadge/>}>
+          /* FEATURE: CHI-82b — was unconditional (CHI-50); now gated on journey membership */
+          headerRight={hypIsCurrent ? <NeedsDecisionBadge/> : null}>
           <div style={{fontFamily:body,fontSize:12,fontStyle:"italic",color:T.mutedDeep}}>
             Nadia (Data Expert) drafted this Data Room entry — accept, edit, or reject below.
           </div>
@@ -2886,10 +2894,13 @@ function DataSourceRow({ row }) {
 // region + its own input row, no outer bordered card/avatar-name-caption header/AgentWorkingIndicator
 // (MobileBody renders the permanent status strip and input/Clear separately, tab-independent). When
 // bare is falsy (every pre-existing call site — desktop's grid), behavior is byte-identical to before.
-// FEATURE: CHI-82 — hypFlow added (alongside the pre-existing qaEvidence) so the chat header's
-// breadcrumb can highlight the current stage via currentStage(); bare (mobile) branch has no
-// header and never reads it.
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, hypFlow }) {
+// FEATURE: CHI-82 — breadcrumb stage highlight in the chat header.
+// FEATURE: CHI-82b — the raw hypFlow prop is replaced by crumbStage: the stage is now computed at
+// the top-level screen from membership-FILTERED inputs (a stale previous-journey flow must not
+// drive the crumb), and this component just renders it. qaEvidence stays a raw prop — it is also
+// consumed by MessageBubble's review-outcome note, which must not be membership-filtered. The
+// bare (mobile) branch has no header and never reads crumbStage.
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, crumbStage }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -3036,13 +3047,15 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
             <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>Chat with Marcus</div>
             <div style={{fontFamily:mono,fontSize:9.5,color:T.muted}}>Q&A · Corrections · Escalations</div>
             {/* FEATURE: CHI-82 (T3) — the CHI-71 breadcrumb becomes the fixed stage map (§19n): 5
-                spans joined by " › ", the current stage highlighted navy via the pure currentStage()
-                helper; the other stages keep the line's existing muted styling untouched. */}
+                spans joined by " › ", the current stage highlighted navy; the other stages keep
+                the line's existing muted styling untouched.
+                FEATURE: CHI-82b — highlight driven by the membership-filtered crumbStage prop
+                (computed top-level), never raw hypFlow/qaEvidence presence. */}
             <div style={{fontFamily:mono,fontSize:9.5,color:T.muted,marginTop:2}}>
               {["Question", "Analysis", "Theory", "Forecast", "Update"].map((s, i) => (
                 <span key={s}>
                   {i > 0 && " › "}
-                  <span style={s === currentStage({ qaEvidence, hypFlow }) ? {background:T.navy,color:T.paper ?? T.card,padding:"1px 6px"} : undefined}>{s}</span>
+                  <span style={s === crumbStage ? {background:T.navy,color:T.paper ?? T.card,padding:"1px 6px"} : undefined}>{s}</span>
                 </span>
               ))}
             </div>
@@ -3085,7 +3098,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep }) { // FEATURE: CHI-82 — getStep passed through to EvidenceColumn
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep, hypIsCurrent }) { // FEATURE: CHI-82/CHI-82b — getStep + hypIsCurrent passed through to EvidenceColumn
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -3212,7 +3225,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent}/>
           </div>
         )}
       </div>
@@ -3361,25 +3374,41 @@ export default function MarketIntelligenceScreen() {
     setJourneyVersion(v => v + 1);
   };
 
+  // FEATURE: CHI-82b — the journey-membership signal, hoisted to ONE shared const (was computed
+  // inside the arrival effect): the effect, the breadcrumb stage filter, and the three decision
+  // badges all consume the same expression, so the membership definition can't drift across
+  // sites. Safe to read at render time: every seq change is paired with a journeyVersion bump in
+  // the same batch, so a render always sees the current seq. An unstamped hypFlow
+  // (journeySeq undefined) is non-current by strict equality — the CHI-82a defensive default.
+  const hypCurrent = !!(hypFlow && hypFlow.journeySeq === journeyRef.current.seq);
+
   // FEATURE: CHI-82 — arrival wiring: idempotent ensureStep calls as each drawer's backing state
   // lands, in an ordered if-chain so a single render satisfying several checks still assigns
   // numbers in the order the drawers arrive. "news" is deliberately absent — it is ensured only by
   // its own click handler (analyzeNewsCard), because ambient News at rest stays unnumbered (§19n).
   // FEATURE: CHI-82a — journey-membership guard: the three hyp checks fire only for a hypFlow
-  // stamped with the CURRENT journey's seq. A previous journey's persisted (CHI-51) hypFlow —
-  // or one with no stamp at all (journeySeq undefined, e.g. hot-reload state; strict equality
-  // makes it non-current by default) — stays unnumbered ambient instead of renumbering into the
+  // stamped with the CURRENT journey's seq (hypCurrent, hoisted above in CHI-82b). A previous
+  // journey's persisted (CHI-51) hypFlow stays unnumbered ambient instead of renumbering into the
   // new journey the next time an effect dep changes. The `qa` check stays unguarded by design:
   // qaEvidence is a single overwritten slot, so the new journey's answer replaces it under the
   // same key and a pre-arrival stale assignment self-corrects.
   useEffect(() => {
-    const hypCurrent = hypFlow && hypFlow.journeySeq === journeyRef.current.seq;
     if (qaEvidence) ensureStep("qa");
     if (hypCurrent) ensureStep("hyp-candidates");
     if (hypCurrent && isHypInResultPhase(hypFlow)) ensureStep("hyp-result");
     if (hypCurrent && isHypAwaitingConfirmation(hypFlow)) ensureStep("hyp-draft");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qaEvidence, hypFlow?.stage, hypFlow?.confirmation]);
+
+  // FEATURE: CHI-82b (T1) — breadcrumb stage from current-journey content only. currentStage()
+  // itself is unchanged (pure, sentinel block); its INPUTS are membership-filtered here: qa's
+  // membership test is "does qa hold a step in the current journey" (getStep), hypFlow's is the
+  // shared hypCurrent above. Fixes QA's repro: stale resolved flow + new Analysis → "Analysis"
+  // (not "Update"); right after a news-click reset with a stale unresolved flow → "Question".
+  const crumbStage = currentStage({
+    qaEvidence: getStep("qa") != null ? qaEvidence : null,
+    hypFlow: hypCurrent ? hypFlow : null,
+  });
 
   // FEATURE: MI-51 — Clear resets chat + any active flow back to the seed-question empty state,
   // same end state as a page refresh, no confirm dialog (this session's explicit design decision).
@@ -4166,14 +4195,14 @@ export default function MarketIntelligenceScreen() {
             hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation}
             events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo} onAgentsDrawerOpen={onAgentsDrawerOpen}
             newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}
-            getStep={getStep}
+            getStep={getStep} hypIsCurrent={hypCurrent}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
-            {/* FEATURE: CHI-82 — hypFlow threaded so the chat header's breadcrumb can highlight the current stage */}
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} hypFlow={hypFlow}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep}/>
+            {/* FEATURE: CHI-82b — breadcrumb stage arrives pre-filtered (crumbStage, top-level membership filter), replacing CHI-82's raw hypFlow prop */}
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} crumbStage={crumbStage}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep} hypIsCurrent={hypCurrent}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}
