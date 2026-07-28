@@ -26,7 +26,10 @@ The Displayer view stays a **plain view, never materialized**. Surface unclassif
 The Displayer matches against the **full assembled §19k signature** (`call_facts` + derived
 `model_modality` + `intent` parsed from `feature` + span-derived `sub_calls_chained` +
 span-derived `integration_followed`, explicit true/false when `span_id` is present, omitted
-when null — unknowable ≠ false) — never bare `call_facts`. A `SIGNATURE_FIELDS` entry with no
+when null — unknowable ≠ false; + derived `delegated_to_provenance`, explicit true/false only
+when the row carries both `delegation_target` and `task_provenance` backing facts, omitted
+otherwise — those two backing facts are plumbing with literal agent ids in them, never
+criteria keys) — never bare `call_facts`. A `SIGNATURE_FIELDS` entry with no
 writer and no Displayer derivation is dead — source it or strike it before criteria may
 reference it. Criteria writes go through Susan's review path (`reviewCandidate`) only — never
 a direct table PATCH, and never authored from values sampled out of `ai_activity_log` (the log

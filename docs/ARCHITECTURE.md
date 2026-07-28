@@ -1533,6 +1533,7 @@ Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settle
 The values a gold pattern's `criteria` may assert, per field. These are the **legal value strings the code emits** (definitional) — the Pattern Definer authors against these, never by sampling what log rows happen to contain (that would let the log choose the name). Fields with a **closed set** are what Susan authors most `criteria` against; a typo'd value silently matches nothing.
 
 **Closed sets:**
+- `delegated_to_provenance`: `true` | `false`. Read-time derivation (see the field's own block below) — asserted with a bare boolean; the key is **absent** when the row has no delegation target or its task declared no provenance (absent = unknowable, never false). The backing facts `delegation_target`/`task_provenance` are plumbing and never legal criteria keys.
 - `retrieval_method`: `similarity-search` | `direct-lookup` | `mixed`. Source: `retrievalMethodFor()` in `api/prompt/ai-enrichment.js` (`roster` / `the_library_catalog` → `direct-lookup`, everything else → `similarity-search`) collapsed per call in `request-receivable.js` `buildCallFacts()` (one method → that method; more than one → `mixed`). **The key is omitted entirely when no context was fetched** — it is never written as `none`. "Fetched nothing" is the absence of the key, distinct from "not captured".
 - `model_modality`: `embedding` | `generative` | `none`. Read-time derivation from `ai_activity_log.model` (`text-embedding-*` → `embedding`, null → `none`, else `generative`) — not stored in `call_facts`. `none` doubles as the false-generation guard (a non-generative row can never match a generation pattern).
 - `execution_type`: `ai` | `deterministic`. Source: `capabilities.execution_type` (`select distinct` — exactly these two).
@@ -1593,6 +1594,36 @@ read-time facts; per caveat (a) above the order is diagnostic, the matcher is or
 - **Unknowable floor:** 67 delegation rows predate span plumbing (`span_id` null, `LOG-49`
   v6.3.153) and are permanently unsplittable for this family — they stay honestly unclassified,
   standing §19k treatment (measured 2026-07-28: 205 delegation rows total, 67 span-less).
+
+**`delegated_to_provenance` — the verdict-gated-retry capture's one new signature field** [added
+`log77-9-design` (LOG-77 item 9), 2026-07-28, John's approval — resolves Susan Smith — Trainer's
+Evaluator-Optimizer MISSING SIGNAL from `design-log-72b-0728`]. Slotted **#7, directly after
+`integration_followed`** (John's placement call; same insertion precedent as `model_modality`/LOG-65 —
+the numbered list above is not renumbered; per caveat (a) the order is diagnostic, the matcher
+order-independent). `SIGNATURE_FIELDS` goes 16 → 17 entries.
+
+- **Two verbatim backing facts, written by the Log Writer on every `delegate_to_agent` turn row —
+  no comparison, no conclusion** (§19i: the writer captures links, never the conclusion):
+  `call_facts.delegation_target` — the `agent_id`/`capability_slug`/`intent_slug` the model actually
+  dispatched to, recorded the same way `tool_calls` records tool names; and
+  `call_facts.task_provenance` — the producer keys (`agent_id`/`capability_slug`/`intent_slug`) this
+  execution's own `task_context` arrived carrying, captured verbatim only when present. Both are
+  **plumbing, never criteria keys** — they contain literal agent ids and the signature is
+  agent-agnostic (locked constraint 2); same allowlist-exclusion treatment as `span_id`/`parent_span_id`.
+- **The derived field (Displayer view SQL, never written):** *did this delegation dispatch the very
+  producer of the artifact this execution was given to work on* — `delegation_target` equals
+  `task_provenance` on `agent_id` AND `capability_slug` (intent granularity deliberately excluded:
+  `delegate_to_agent.intent_slug` is nullable, and the producer is an agent acting under a
+  capability). Emitted explicit **`true`/`false` only when both sides carry both keys; omitted
+  otherwise** — a task with no declared provenance is unknowable, never false (same posture as
+  `integration_followed`'s null-`span_id` case).
+- **What it distinguishes:** a linear chain never re-dispatches its own input's producer; an
+  evaluation-gated loop is defined by exactly that hop. Whether that behavior is named
+  Evaluator-Optimizer (or anything at all) is the Pattern Definer's data — the view knows no pattern,
+  and no verdict is read anywhere in the write path (the verdict postdates the delegation and, on a
+  successful retry, is never declared as a fail at all — measured live, trace `3559ac69`).
+- **Contingent fact, forward-only:** never backfilled (§19i bounds); the ~1,510 historical
+  quality-gate review rows stay honestly unclassified.
 
 ---
 
