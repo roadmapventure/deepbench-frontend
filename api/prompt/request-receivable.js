@@ -1,3 +1,4 @@
+// DeepBench v6.3.180 | api/prompt/request-receivable.js | HAR-15 -- classifyAnthropicFailure() stamps failureClass/faultCode/upstreamStatus on every thrown Anthropic failure; retry behavior byte-identical
 // DeepBench v6.3.153 | api/prompt/request-receivable.js | LOG-49 -- model-call write path completes the signature fact-half: span_id/parent_span_id chain links, input_references_other_deliverable, and quarantined self_reported_claims
 // DeepBench v6.3.145 | api/prompt/request-receivable.js | LOO-22 -- register library-lookup handler (Eleanor's record-level verification read)
 // DeepBench v6.3.142 | api/prompt/request-receivable.js | LOG-67 -- merge the config-half signature snapshot into call_facts on the model-call write path
@@ -202,6 +203,24 @@ const TRANSIENT_ANTHROPIC_STATUS = new Set([429, 500, 502, 503, 529]);
 const MAX_ANTHROPIC_ATTEMPTS = 3;
 const API_RETRY_BACKOFF_MS = [1000, 3000];
 
+// FEATURE: HAR-15 -- classify an Anthropic HTTP failure once, at the only place that has the real
+// status AND the real body, so no consumer downstream has to re-derive it from an English message.
+// Pure and exported so the Node test can import the real implementation (STANDARDS.md Section 5).
+//
+// Matching on the credit-balance phrase rather than on error.type: `invalid_request_error` covers
+// every malformed-request rejection too, so the type alone cannot single this class out. The phrase
+// is the actual discriminator; all 42 real rows verified 2026-07-28 carry it verbatim.
+export function classifyAnthropicFailure(status, bodyText) {
+  const body = typeof bodyText === 'string' ? bodyText : '';
+  if (status === 400 && /credit balance is too low/i.test(body)) {
+    return { failureClass: 'permanent', faultCode: 'anthropic-credit-exhausted' };
+  }
+  if (TRANSIENT_ANTHROPIC_STATUS.has(status)) {
+    return { failureClass: 'transient', faultCode: 'anthropic-transient' };
+  }
+  return { failureClass: 'permanent', faultCode: 'anthropic-request-rejected' };
+}
+
 // FEATURE: HAR-04 -- deadline-aware timeout floor. Below this much real remaining time, don't
 // attempt an Anthropic call at all (Vercel would very likely kill it mid-flight with zero trace
 // anyway) -- fail fast with a clear, immediate error instead. Shared by the main call
@@ -216,7 +235,10 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
   for (let attempt = 0; ; attempt++) {
     const remainingMs = deadline - Date.now();
     if (remainingMs < MIN_VIABLE_CALL_MS) {
-      throw Object.assign(new Error(`Insufficient time remaining for Anthropic call (${remainingMs}ms left)`), { status: 504 });
+      // FEATURE: HAR-15 -- §19o names time-budget starvation a transient class; stamping it here
+      // leaves HAR-17 a complete classification contract rather than a half-populated one.
+      throw Object.assign(new Error(`Insufficient time remaining for Anthropic call (${remainingMs}ms left)`),
+        { status: 504, failureClass: 'transient', faultCode: 'time-budget-exhausted' });
     }
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
@@ -224,7 +246,13 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
     if (res.ok) return { res, apiRetryCount: attempt };
     if (attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
       const text = await res.text();
-      throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), { status: 502, detail: text });
+      // FEATURE: HAR-15 -- status stays 502 (honest for OUR api: an upstream dependency failed).
+      // upstreamStatus carries Anthropic's real status; failureClass is what HAR-17 must gate its
+      // one auto-resume on -- never `status`, which is 502 for every upstream failure incl. 400s.
+      const { failureClass, faultCode } = classifyAnthropicFailure(res.status, text);
+      throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), {
+        status: 502, upstreamStatus: res.status, failureClass, faultCode, detail: text,
+      });
     }
     await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS[attempt]));
   }

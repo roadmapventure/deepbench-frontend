@@ -1,3 +1,4 @@
+// DeepBench v6.3.180 | api/capabilities/execute.js | HAR-15 -- both error paths forward failureClass/faultCode/upstreamStatus
 // DeepBench v6.3.166 | api/capabilities/execute.js | LOG-79 -- runLoop()'s final-answer response now carries trace_id/span_id (one generic passthrough line) so the Agent Routing drawer can join its hop events to the ai_call_patterns view; error/pending_confirmation/depth_exceeded returns deliberately unchanged
 // DeepBench v6.3.154 | api/capabilities/execute.js | LOO-20 -- persists requires_human_confirmation + critique_capability_slug/critique_intent_slug across checkpoint/resume (durable_hops migration + checkpointAndReturn/resume plumbing) so a resumed confirmation-gated chain re-lands on the human-confirmation gate instead of the hardcoded requiresHumanConfirmation:false the three resume sites used -- restores the empty Draft Forecast card / bypassed Data Room gate; also patches the durable_hops row terminal when the gate fires on a resumed job so a stray re-resume can't write a duplicate pending_confirmations row
 // DeepBench v6.3.153 | api/capabilities/execute.js | LOG-49 -- completes the signature fact-half: threads span_id/parent_span_id chain links (one span per runCapability execution; a delegated child points parent_span_id at the caller's span; persisted across checkpoint/resume via durable_hops exactly as trace_id is), stamps input_references_other_deliverable once a delegate result is folded back into the loop's input, and captures the model's quarantined self_reported_claims -- all on the agent-turn write path
@@ -1290,7 +1291,14 @@ async function streamResult(res, run) {
     const result = await run((evt) => res.write(`data: ${JSON.stringify(evt)}\n\n`));
     res.write(`data: ${JSON.stringify({ type: 'result', result })}\n\n`);
   } catch (e) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: e.message, status: e.status || 500, ...(e.detail ? { detail: e.detail } : {}) })}\n\n`);
+    // FEATURE: HAR-15 -- forward the harness's fault classification so the screen can render an
+    // honest reason instead of pattern-matching the English message. Conditional spreads keep
+    // every non-classified throw byte-identical to pre-HAR-15 behavior.
+    res.write(`data: ${JSON.stringify({ type: 'error', message: e.message, status: e.status || 500,
+      ...(e.upstreamStatus ? { upstreamStatus: e.upstreamStatus } : {}),
+      ...(e.failureClass ? { failureClass: e.failureClass } : {}),
+      ...(e.faultCode ? { faultCode: e.faultCode } : {}),
+      ...(e.detail ? { detail: e.detail } : {}) })}\n\n`);
   }
   res.write('data: [DONE]\n\n');
   res.end();
@@ -1412,6 +1420,15 @@ export default async function handler(req, res) {
     // .detail field anywhere in the runCapability() call graph (AA-157's retry-rejection detail,
     // AA-147's schema-validation errors, any future .detail-carrying throw) was silently dropped on
     // the only response path that matters, since before .detail existed anywhere in this codebase.
-    return res.status(e.status || 500).json({ error: e.message, ...(e.detail ? { detail: e.detail } : {}) });
+    // FEATURE: HAR-15 -- same conditional forward as the SSE path above; the HTTP status argument
+    // is deliberately unchanged (our API's own semantic), the provider's real status rides along
+    // as upstreamStatus instead.
+    return res.status(e.status || 500).json({
+      error: e.message,
+      ...(e.upstreamStatus ? { upstreamStatus: e.upstreamStatus } : {}),
+      ...(e.failureClass ? { failureClass: e.failureClass } : {}),
+      ...(e.faultCode ? { faultCode: e.faultCode } : {}),
+      ...(e.detail ? { detail: e.detail } : {}),
+    });
   }
 }

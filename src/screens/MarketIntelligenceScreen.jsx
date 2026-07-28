@@ -1,3 +1,4 @@
+// DeepBench v6.3.180 | MarketIntelligenceScreen.jsx | HAR-15 -- credit-exhaustion renders an honest, distinct fault report (no raw provider JSON, no "try again") at all 5 error surfaces
 // DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
 // DeepBench v6.3.169 | MarketIntelligenceScreen.jsx | S-CHI-82b -- journey membership for the two residual sites CHI-82a's arrival-effect guard didn't cover (same presence-vs-membership root cause): (1) the breadcrumb stage highlight now feeds currentStage() membership-filtered inputs (qa iff it holds a step in the current journey, hypFlow iff journeySeq matches -- the pure function itself unchanged), so a lingering resolved flow no longer paints "Update" over a new journey's "Analysis"; (2) the three hyp "Needs Your Decision" badges (Candidates/Result/Draft Forecast) gate on a new hypIsCurrent prop, so an abandoned previous journey's ambient drawers stop soliciting decisions. Shared hypCurrent const hoisted; qa/Analysis badge untouched (slot overwritten each journey).
 // DeepBench v6.3.168 | MarketIntelligenceScreen.jsx | S-CHI-82a -- journey-membership guard (QA FAIL patch on v6.3.162): journey state gains a monotonic `seq` (nextJourney), every fresh hypFlow is stamped `journeySeq` at creation, and the step-arrival effect numbers only current-journey hyp content -- a previous journey's persisted (CHI-51) drawers can no longer renumber into a new journey when an effect dep changes. qaEvidence stays unstamped by design (single overwritten slot, same key -- self-corrects). Mobile heads-up pointer retargeted to "Tap Steps & Evidence above..." (was pointing at the pre-CHI-82 tab name).
@@ -599,7 +600,9 @@ async function readSSEResult(res, onProgress) {
       let evt;
       try { evt = JSON.parse(data); } catch { continue; }
       if (evt.type === 'result') { final = evt.result; gotResult = true; }
-      else if (evt.type === 'error') { throw Object.assign(new Error(evt.message), { status: evt.status, detail: evt.detail }); }
+      // FEATURE: HAR-15 -- carry the harness's classification onto the thrown error; without this
+      // the fields never reach any catch block.
+      else if (evt.type === 'error') { throw Object.assign(new Error(evt.message), { status: evt.status, upstreamStatus: evt.upstreamStatus, failureClass: evt.failureClass, faultCode: evt.faultCode, detail: evt.detail }); }
       else { onProgress(evt); }
     }
   }
@@ -1078,7 +1081,19 @@ function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
 // real Error, a bare string, or an arbitrary object, and .message can be undefined. Surfaces the
 // .status and .detail that callCapability's throws (L546 stream-error, L1265 resolve) already carry
 // and that onSend's catch currently drops on the floor. Pure string in, pure string out.
+// FEATURE: HAR-15 -- a credit-exhausted account fails identically forever, so "try again" is
+// actively wrong advice. Same shape as DAT-7's denied-write branch below, keyed on the harness's
+// own classification instead of a string match. Platform fault report, not agent content (§19j).
+const CREDIT_EXHAUSTED_TEXT = "The platform's AI account is out of credits — not a bug, and no retry will help.";
+function faultAdvice(e, fallback) {
+  return (e && e.faultCode === "anthropic-credit-exhausted") ? CREDIT_EXHAUSTED_TEXT : fallback;
+}
+
 function describeCaughtError(e) {
+  // FEATURE: HAR-15 -- a classified credit exhaustion returns the honest sentence and nothing
+  // else; this is what keeps the raw Anthropic JSON blob (and its request_id) out of the
+  // Pipeline Log. Every other error keeps CHI-77's exact format below, byte-identical.
+  if (e && e.faultCode === "anthropic-credit-exhausted") return CREDIT_EXHAUSTED_TEXT;
   const base = (e && typeof e.message === "string" && e.message) ? e.message : String(e);
   const status = (e && e.status != null) ? ` (status ${e.status})` : "";
   const detail = (e && typeof e.detail === "string" && e.detail) ? ` — ${e.detail}` : "";
@@ -1342,7 +1357,9 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
   // onResolveConfirmation()'s catch can branch on a real denial tier instead of a generic message.
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(body.error || `resolve ${resolution} failed: ${res.status}`), { status: res.status, detail: body.detail || null });
+    // FEATURE: HAR-15 -- forward the same classification fields the SSE path carries, so a
+    // credit-exhausted failure reads identically on the non-streamed resolve path.
+    throw Object.assign(new Error(body.error || `resolve ${resolution} failed: ${res.status}`), { status: res.status, upstreamStatus: body.upstreamStatus, failureClass: body.failureClass, faultCode: body.faultCode, detail: body.detail || null });
   }
   const first = onProgress ? await readSSEResult(res, onProgress) : await res.json();
   return resolveInProgress(first, onProgress, isStale); // FEATURE: CHI-04
@@ -3628,8 +3645,8 @@ export default function MarketIntelligenceScreen() {
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] generateHypotheses", e.message);
-      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_generation", message: e.message }, Date.now() - t0));
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong generating theories — try again." })]); // FEATURE: CHI-82 — vocabulary sweep
+      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_generation", message: describeCaughtError(e) }, Date.now() - t0)); // FEATURE: HAR-15 — was a bare e.message
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultAdvice(e, "Something went wrong generating theories — try again.") })]); // FEATURE: CHI-82 — vocabulary sweep; HAR-15 — honest fault copy
       setHypFlow(null);
     } finally {
       setWorkingStatus(null);
@@ -3771,7 +3788,7 @@ export default function MarketIntelligenceScreen() {
       logEvent(buildHopEvent("error", "marcus", { message: describeCaughtError(e) }, Date.now() - turnStart));
       // FEATURE: CHI-77 — honest copy: "reaching Marcus" was wrong (Marcus was reached; the break is
       // downstream). "Try again" stays — this failure is transient, so retrying is correct advice.
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong completing your answer — try again." })]);
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultAdvice(e, "Something went wrong completing your answer — try again.") })]); // FEATURE: HAR-15
       console.error("[MarketIntelligenceScreen]", e);
     } finally {
       setLoading(false);
@@ -3925,8 +3942,8 @@ export default function MarketIntelligenceScreen() {
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] runHypothesisTest", e.message);
-      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_test_display", message: e.message }, Date.now() - t0));
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong running that theory test — try again." })]); // FEATURE: CHI-82 — vocabulary sweep
+      logEvent(buildHopEvent("error", "priya", { step: "hypothesis_test_display", message: describeCaughtError(e) }, Date.now() - t0)); // FEATURE: HAR-15 — was a bare e.message
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultAdvice(e, "Something went wrong running that theory test — try again.") })]); // FEATURE: CHI-82 — vocabulary sweep; HAR-15 — honest fault copy
       setHypFlow(prev => prev && ({ ...prev, stage:"choosing" }));
     } finally {
       setWorkingStatus(null);
@@ -4055,8 +4072,8 @@ export default function MarketIntelligenceScreen() {
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
-      logEvent(buildHopEvent("error", step === "memory_consolidation" ? "elena" : "nadia", { step, message: e.message }, Date.now() - t0));
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: "Something went wrong committing that — try again." })]);
+      logEvent(buildHopEvent("error", step === "memory_consolidation" ? "elena" : "nadia", { step, message: describeCaughtError(e) }, Date.now() - t0)); // FEATURE: HAR-15 — was a bare e.message
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultAdvice(e, "Something went wrong committing that — try again.") })]); // FEATURE: HAR-15
       setHypFlow(prev => prev && ({ ...prev, stage: "result" }));
     } finally {
       setWorkingStatus(null);
@@ -4158,14 +4175,16 @@ export default function MarketIntelligenceScreen() {
       // S-AA-189-design) — the drafted confirmation is still valid, only the resolve action failed,
       // so the user can retry Accept/Reject on the same card instead of losing the draft.
       console.error("[MarketIntelligenceScreen] onResolveConfirmation", e.message);
-      logEvent(buildHopEvent("error", "nadia", { step: "resolve_confirmation", resolution, message: e.message }, Date.now() - t0));
+      logEvent(buildHopEvent("error", "nadia", { step: "resolve_confirmation", resolution, message: describeCaughtError(e) }, Date.now() - t0)); // FEATURE: HAR-15 — was a bare e.message
       // FEATURE: DAT-7 -- a denied write (bad chunk_id baked into proposed_action) will fail
       // identically forever; the generic "try again" message is actively wrong advice for it.
       // Only Edit/Reject actually unblock the user in that case.
       const isDeniedWrite = typeof e.detail?.tier === "string" && e.detail.tier.startsWith("denied-");
-      setMessages(prev => [...prev, buildMessage({ kind: "error", text: isDeniedWrite
+      // FEATURE: HAR-15 -- credit exhaustion takes precedence, then DAT-7's denied-write branch,
+      // then the generic fallback (faultAdvice returns its fallback untouched for both other cases).
+      setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultAdvice(e, isDeniedWrite
         ? "This proposal's Data Room reference no longer resolves — use Edit to redraft it, or Reject."
-        : "Something went wrong resolving that — try again." })]);
+        : "Something went wrong resolving that — try again.") })]);
     } finally {
       setWorkingStatus(null);
     }
