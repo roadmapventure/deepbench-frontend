@@ -1,3 +1,4 @@
+// DeepBench v6.3.191 | AIActivityPanel.jsx | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.189 | AIActivityPanel.jsx | LOG-98a -- RollingNumber reveal no longer depends on requestAnimationFrame (hidden tabs froze tiles on fabricated values)
 // DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
 // DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
@@ -264,10 +265,14 @@ export default function AIActivityPanel({ onClose }) {
   // Patterns Logged tile now reads the LOG-38 classification view below, so tile and list agree.
   // FEATURE: LOG-98 -- logLoaded distinguishes "still hydrating" from "genuinely empty"; every
   // tile and drawer below gates its zero/empty-state copy on it.
-  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded } = useAIActivity();
+  // FEATURE: LOG-97 -- `log` is destructured purely to hand the already-hydrated entries to
+  // usePatternClassification(), which sums each pattern's cost from them. No new fetch.
+  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
-  const { classified, reclassificationCount, loaded: patternsLoaded } = usePatternClassification();
+  // FEATURE: LOG-97 -- passing `log` overrides each row's cost with the in-memory sum (the view's
+  // cost_sum is empty for every classified row); falls back to cost_sum when log/ids are absent.
+  const { classified, reclassificationCount, loaded: patternsLoaded } = usePatternClassification(log);
   const loading = !logLoaded;
   const tab = "activity"; // LOG-86: tab bar hidden — MCP Roadmap + Architect Checklist blocks below are intentionally kept (unreachable). To re-enable: restore useState + the tab-bar JSX (see git history, v6.3.160).
   // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)

@@ -1,3 +1,4 @@
+// DeepBench v6.3.191 | useAIActivity.js | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.188 | useAIActivity.js | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.170 | useAIActivity.js | LOG-92 -- hydrateFromSupabase default = all tenants (null tenantId skips the filter; audit surface shows every real model call)
 // DeepBench v6.3.159 | useAIActivity.js | S-AI-AUDIT-SVCDIR -- Platform Services directory (platform_services) fetch + read-time join, unregistered detection, per-agent capability nesting (ARCHITECTURE.md §19m)
@@ -11,7 +12,7 @@
 // Module-level AI call log. Any component calls logAICall() to record.
 // AIActivityPanel reads the same store — no context provider needed.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from '../lib/supabase.js';
 // FEATURE: LOG-36 -- PATTERN_CATALOG is no longer read by anything in this file; it is imported
 // solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
@@ -852,7 +853,10 @@ export function usePatternVocabulary() {
 export async function fetchPatternClassification() {
   try {
     const [rollup, recl] = await Promise.all([
-      supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum'),
+      // FEATURE: LOG-97 -- log_ids rides along on this read that already happens (+~1%, no new
+      // round trip). It is NOT a second query against ai_call_patterns -- that was the first
+      // attempt, and it blew the anon role's 3s statement_timeout.
+      supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum, log_ids'),
       supabase.from('ai_pattern_reclassification_count').select('reclassification_count').single(),
     ]);
     if (rollup.error) throw rollup.error;
@@ -863,6 +867,7 @@ export async function fetchPatternClassification() {
       desc: r.pattern_description,
       total: r.call_count,
       cost: Number(r.cost_sum) || 0,
+      logIds: r.log_ids || [],
       active: true,
     }));
     return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
@@ -872,14 +877,43 @@ export async function fetchPatternClassification() {
   }
 }
 
-export function usePatternClassification() {
+export function usePatternClassification(log = []) {
   const [state, setState] = useState({ classified: [], reclassificationCount: 0, loaded: false });
   useEffect(() => {
     let alive = true;
     fetchPatternClassification().then(r => { if (alive) setState({ ...r, loaded: true }); });
     return () => { alive = false; };
   }, []);
-  return state;
+
+  // FEATURE: LOG-97 -- cost per pattern = sum of the hydrated log entries' own `cost` values, which
+  // computeCallCost() derived from tokens at hydrate time and which hydrateFromSupabase() already
+  // zeroed for AI-51-paired duplicates -- so these totals reconcile with Total Cost by construction.
+  // The ids ride along on the rollup read that already happens (+~1%, no new round trip); the first
+  // attempt at this feature paged ai_call_patterns separately and blew the anon 3s statement timeout.
+  // Summing here rather than in SQL keeps computeCallCost() the single source of pricing truth and
+  // inherits the AI-51 dedup for free (66% of request-routing's rows are paired duplicates -- a naive
+  // SQL token-sum would report ~$26 against a ~$10 Total-Cost basis).
+  // Per-source fallback, never all-or-nothing: no ids or no log => the view's own cost_sum, i.e.
+  // exactly today's behavior. usePatternClassification() with no argument is unchanged.
+  const costBySlug = useMemo(() => {
+    if (!log.length) return new Map();
+    const costById = new Map(log.map(e => [e.id, e.cost || 0]));
+    const out = new Map();
+    for (const p of state.classified) {
+      if (!Array.isArray(p.logIds) || p.logIds.length === 0) continue;
+      let sum = 0;
+      for (const id of p.logIds) sum += costById.get(id) || 0;
+      out.set(p.slug, sum);
+    }
+    return out;
+  }, [log, state.classified]);
+
+  const classified = useMemo(() => state.classified.map(p => ({
+    ...p,
+    cost: costBySlug.has(p.slug) ? costBySlug.get(p.slug) : p.cost,
+  })), [state.classified, costBySlug]);
+
+  return { ...state, classified };
 }
 
 // FEATURE: LOG-80 -- By LLM aggregation, extracted from useAIActivity()'s inline loop into an
