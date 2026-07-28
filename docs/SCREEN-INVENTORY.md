@@ -47,6 +47,8 @@ More dashboards expected here over time as new work-types are built — this lis
 | AI Audit | `AIActivityPanel.jsx` | Hamburger/nav → Platform → AI Audit |
 | About DeepBench | `AboutPanel.jsx` | Hamburger/nav → Platform → About |
 
+Screen code for About DeepBench items: **`ABT`** — first claimed 2026-07-28 (`S-ABT-1a-design`, rows `ABT-1`/`ABT-2` in `docs/FEATURES-LATER.md`); the code was already anticipated in `FEATURES-LATER.md`'s ID-format legend. AI Audit items continue under the `LOG` platform-layer code (the screen is the AI Audit layer's display surface).
+
 ---
 
 ## Open items

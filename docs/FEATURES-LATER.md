@@ -18,13 +18,22 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 ---
 
+## ABOUT DEEPBENCH SCREEN — ABT
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| ABT-1 | About screen rebuilt as a single Architecture tab for skeptical technical audiences (chief architects, senior devs, senior PMs). Tabs: Architecture only visible + default; Purpose/Quick Start/Revenue/Showcase/Who-is-John hidden (code kept); Roadmap deleted. New content grounded in `ARCHITECTURE.md` §0/§0b/§1/§19d/§19k; 11 metric tiles all live-wired (Supabase on open — `platform_stats` table + `platform_schema_stats()` RPC added). Resolves `LOG-56` Sites 2+4 and `LOG-70`'s AboutPanel consumer. Split a (screen, v6.3.171) / b (stats-refresh GitHub Action, v6.3.172 — supersedes `SH-13`). | 🔶 Designed | S-ABT-1a / S-ABT-1b (in flight, `about-screen-design`) |
+| ABT-2 | Hidden About tabs (Purpose, Quick Start, Revenue, Showcase, Who is John) contain stale facts — "five Skill types" (now six), the pre-§1 layer list, old NIGP-era step references. Content refresh required before any of them is ever unhidden. Deliberately untouched by `ABT-1` (John: hide, keep content). | ❌ Missing | S-future (before unhiding any tab) |
+
+---
+
 ## SHELL & INFRASTRUCTURE — SH
 
 > **`SH` (shell-wide) bugs have no single mapping in the new taxonomy** — `AppShell.jsx` is cross-screen, not one Screen or listed Platform Layer in `docs/SCREEN-INVENTORY.md` — flag for a design session before assigning a new ID; a bug scoped to one specific screen should use that screen's own code instead. This section's existing `SH-` rows are legacy and stay as-is.
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SH-13 | About panel: GitHub Action auto-update stats.json on push to dev. **Cross-referenced 2026-07-17 (`mobile-ui-audit-0717`, `MOB-001`):** this is the exact permanent-fix mechanism for the 6 filesystem/DB-schema-fact numbers in the "By the Numbers" grid (source files, lines of code, API routes, DB tables/cols, arch docs, session specs) — a full mobile-viewport sweep found all 6 badly stale (e.g. "61 Session specs" vs. 269 real, "11 DB tables" vs. 23 real), confirming this row's value concretely. `MOB-001` snapshot-corrects the displayed numbers to today's real values as an interim fix; this row remains the tracked permanent (build-time) mechanism. | ❌ Missing | S-ABOUT-STATS-01 (future, separate session) |
+| SH-13 | About panel: GitHub Action auto-update stats.json on push to dev. **Cross-referenced 2026-07-17 (`mobile-ui-audit-0717`, `MOB-001`):** this is the exact permanent-fix mechanism for the 6 filesystem/DB-schema-fact numbers in the "By the Numbers" grid (source files, lines of code, API routes, DB tables/cols, arch docs, session specs) — a full mobile-viewport sweep found all 6 badly stale (e.g. "61 Session specs" vs. 269 real, "11 DB tables" vs. 23 real), confirming this row's value concretely. `MOB-001` snapshot-corrects the displayed numbers to today's real values as an interim fix; this row remains the tracked permanent (build-time) mechanism. **⟳ SUPERSEDED 2026-07-28 (`S-ABT-1b-design`, v6.3.172, John's direction "make sure those metrics are live wired"):** `ABT-1` (below) implements this row's mechanism upgraded from stats.json to a live `platform_stats` Supabase table refreshed by a GitHub Action on push to dev — archive this row when `S-ABT-1b` ships. | ❌ Missing | S-ABT-1b (v6.3.172, in flight) |
 | SH-06 | Supabase tasks table integration | ❌ Missing | S-future |
 | SH-07 | Supabase Storage CSV | ❌ Missing | S-future (pair with SH-06) |
 | SH-08 | Landing screen | ❌ Missing | DECISION NEEDED |
