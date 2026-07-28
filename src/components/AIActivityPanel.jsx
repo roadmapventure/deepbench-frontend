@@ -1,3 +1,4 @@
+// DeepBench v6.3.160 | AIActivityPanel.jsx | LOG-83 -- By Agent defaults collapsed + moved under By LLM + line 2 shows role title (not code); resolveAgent extracted to ./resolveAgent.js
 // DeepBench v6.3.158 | AIActivityPanel.jsx | LOG-80 -- By LLM drawer moved directly under By Pattern (pure JSX reorder)
 // DeepBench v6.3.155 | AIActivityPanel.jsx | LOG-38 -- By Pattern body rewired: classified rows + single reclassification count
 // DeepBench v6.3.134 | AIActivityPanel.jsx | LOG-36 -- By Pattern is one flat log-driven list; "Patterns Logged" stat
@@ -9,19 +10,12 @@
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase } from "../hooks/useAIActivity.js";
-import { AGENTS } from "../data/agents.js";
 import { Corners } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
-
-// FEATURE: BUG-21 — self-maintaining agent lookup derived from AGENTS; never hand-maintained again
-const _agentById   = Object.fromEntries(AGENTS.map(a => [a.id,                    { name: a.name, code: a.code }]));
-const _agentByCode = Object.fromEntries(AGENTS.map(a => [a.code.toUpperCase(),    { name: a.name, code: a.code }]));
-function resolveAgent(agentId) {
-  if (!agentId) return { name: '—', code: '—' };
-  return _agentById[agentId]
-    || _agentByCode[agentId.toUpperCase()]
-    || { name: agentId, code: '?' };
-}
+// FEATURE: LOG-83 -- resolveAgent + its lookup maps extracted to a sibling module so the
+// Node regression test can import them without parsing this file's JSX. Re-exported below.
+import { resolveAgent } from "./resolveAgent.js";
+export { resolveAgent };
 
 const CHECKLIST = [
   ["Model selection",    "Haiku for routing/classification. Sonnet only for ReAct loops and long-form briefings."],
@@ -189,7 +183,7 @@ export default function AIActivityPanel({ onClose }) {
   const { classified, reclassificationCount } = usePatternClassification();
   const [tab, setTab] = useState("activity");
   // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
-  const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:true, roadmap:false });
+  const [sections, setSections] = useState({ pattern:true, service:true, llm:true, agent:false, roadmap:false });
   const [zeroClosed, setZeroClosed] = useState(true);
   // FEATURE: LOG-36 -- inactivePtnClosed/uncatalogedPtnClosed removed with the collapse cards they
   // drove: with the catalog seed loop gone there is no "not yet active" bucket to collapse, and
@@ -300,6 +294,36 @@ export default function AIActivityPanel({ onClose }) {
                 ))
             )}
 
+            {/* By Agent — collapsible, sorted by calls desc. FEATURE: LOG-83 -- moved up to sit
+                directly under By LLM (pure JSX move, no logic/state change; sections.agent key
+                unchanged) and defaults collapsed. */}
+            <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
+            {sections.agent && (
+              agentsSorted.length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
+                : agentsSorted.map(d => {
+                  const info = resolveAgent(d.agentId);
+                  return (
+                    <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
+                        {/* FEATURE: LOG-83 -- line 2 shows the agent's human role title, not an internal code. Styling unchanged (value swap only). */}
+                        <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.role}</div>
+                      </div>
+                      <div style={{display:"flex",gap:14,flexShrink:0}}>
+                        {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                          <div key={k} style={{textAlign:"right"}}>
+                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+                            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+
             {/* FEATURE: AI-23 patch — Service section, grouped by type, collapsible */}
             <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
             {sections.service && (() => {
@@ -344,33 +368,6 @@ export default function AIActivityPanel({ onClose }) {
                 </>
               );
             })()}
-
-            {/* By Agent — collapsible, sorted by calls desc */}
-            <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
-            {sections.agent && (
-              agentsSorted.length === 0
-                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No agent calls logged yet.</div>
-                : agentsSorted.map(d => {
-                  const info = resolveAgent(d.agentId);
-                  return (
-                    <div key={d.agentId} style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:T.moss,flexShrink:0}}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{info.name}</div>
-                        <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.code}</div>
-                      </div>
-                      <div style={{display:"flex",gap:14,flexShrink:0}}>
-                        {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
-                          <div key={k} style={{textAlign:"right"}}>
-                            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-                            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })
-            )}
 
             {/* FEATURE: AI-23 patch — Roadmap collapsible; Patterns Now tier removed */}
             <SectionHeader label="Platform Roadmap" open={sections.roadmap} onToggle={()=>toggle('roadmap')}/>
