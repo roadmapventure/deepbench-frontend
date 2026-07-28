@@ -7,10 +7,12 @@
 // pattern COUNT from the static PATTERN_CATALOG — doing so is the reconciliation
 // artifact §19i bans, just wearing a nicer coat.
 //
-// Deliberate, named allowances (both out of scope for LOG-36, each its own session):
-//   - AIActivityPanel.jsx's "Platform Roadmap" section (LOG-56) renders patterns
-//     *because* they have no logs. Intent, not activity — it legitimately reads the
-//     catalog, but only through the one roadmap filter expression asserted below.
+// Deliberate, named allowances (out of scope for LOG-36, each its own session):
+//   - AIActivityPanel.jsx's "Platform Roadmap" section WAS an allowance here (LOG-56
+//     Site 1) — LOG-86 (v6.3.163) removed that drawer entirely, so the allowance was
+//     deliberately retired per this test's own instruction, not deleted as a shortcut.
+//     The file no longer imports PATTERN_CATALOG at all.
+//   - AboutPanel.jsx's stat tile (LOG-56) remains the one allowed display expression.
 //   - src/aiPatterns.js (LOG-57) hand-declared AI_PAT / AGENT_PATTERNS badges. Not a
 //     PATTERN_CATALOG consumer today; asserted here so a future session can't quietly
 //     make it one without tripping this test.
@@ -27,16 +29,10 @@ const ROOT = path.resolve(__dirname, "../..");
 const SCAN_ROOTS = ["src/components", "src/screens"];
 
 // The single expression in src/ that may still read PATTERN_CATALOG for display:
-// AIActivityPanel.jsx's Platform Roadmap tier filter. Note it selects !p.active
-// entries only — patterns with no calls — which is exactly why it is not a
-// log-driven display and not LOG-36's business.
+// AboutPanel.jsx's stat tile. (AIActivityPanel.jsx's Platform Roadmap tier filter was
+// the other allowance until LOG-86 (v6.3.163) removed that drawer — allowance retired
+// deliberately, per the assertion message below.)
 const ALLOWANCES = [
-  {
-    file: "src/components/AIActivityPanel.jsx",
-    expr: "PATTERN_CATALOG.filter(p => !p.active && p.roadmap === key)",
-    why: "Platform Roadmap tier filter (LOG-56) — selects !p.active entries, i.e. patterns with " +
-         "no calls. Intent, not activity, so not a log-driven display.",
-  },
   {
     // Added when LOG-36's About-panel change was REVERTED mid-session (John's explicit call).
     // The tile is knowingly still catalog-driven and knowingly disagrees with the AI Audit

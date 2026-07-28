@@ -1,3 +1,4 @@
+// DeepBench v6.3.163 | AIActivityPanel.jsx | LOG-86 -- tab bar removed (MCP Roadmap + Architect Checklist hidden, content kept in-file), Platform Roadmap drawer deleted; drawers are the opening view
 // DeepBench v6.3.159 | AIActivityPanel.jsx | S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory (8 layer groups, muted function lists, no pattern names, closed by default); By Agent capability sub-rows; Services/Capabilities header stats; stray By Pattern top line removed (ARCHITECTURE.md §19m)
 // DeepBench v6.3.160 | AIActivityPanel.jsx | LOG-83 -- By Agent defaults collapsed + moved under By LLM + line 2 shows role title (not code); resolveAgent extracted to ./resolveAgent.js
 // DeepBench v6.3.158 | AIActivityPanel.jsx | LOG-80 -- By LLM drawer moved directly under By Pattern (pure JSX reorder)
@@ -10,10 +11,9 @@
 
 import { useState, useEffect } from "react";
 import { T, display, body, mono } from "../tokens.js";
-// FEATURE: S-AI-AUDIT-SVCDIR -- SERVICE_CATALOG remains imported ONLY for the roadmap tier lists
-// below (rule: .claude/rules/platform-services-directory.md); the By Service body now renders the
-// platform_services directory (platformServices/unregisteredServices from the hook) instead.
-import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, SERVICE_CATALOG, PATTERN_CATALOG, hydrateFromSupabase, humanizeSlug } from "../hooks/useAIActivity.js";
+// LOG-86: the two shared catalogs (service/pattern) are no longer imported here — the Platform
+// Roadmap drawer is removed; the hidden MCP tab renders its own static MCP_SURFACES.
+import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase, humanizeSlug } from "../hooks/useAIActivity.js";
 import { Corners } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 // FEATURE: LOG-83 -- resolveAgent + its lookup maps extracted to a sibling module so the
@@ -36,8 +36,8 @@ const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(2)}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
 
 // FEATURE: S-AI-AUDIT-SVCDIR -- one platform_services directory row (replaces the old
-// SERVICE_CATALOG-driven ServiceRow, deleted this session -- verified unshared: the roadmap tier
-// list renders its own plain divs). Branded name + muted functions list (where pattern badges
+// static-catalog-driven ServiceRow, deleted that session; LOG-86 later removed the roadmap tier
+// list too). Branded name + muted functions list (where pattern badges
 // used to render -- no pattern names anywhere in this section, per §19m), right side driven by
 // tracking_status. `✦ Utilizes a Model` is an attribute chip, not an identity split.
 function PlatformServiceRow({ d }) {
@@ -200,11 +200,11 @@ export default function AIActivityPanel({ onClose }) {
   // single reclassification count). Independent of the legacy byPattern/patternsSorted above, which
   // still feed the untouched "Patterns Logged" stat tile this session leaves alone.
   const { classified, reclassificationCount } = usePatternClassification();
-  const [tab, setTab] = useState("activity");
-  // FEATURE: AI-23 patch — per-section collapse state; roadmap collapsed by default
+  const tab = "activity"; // LOG-86: tab bar hidden — MCP Roadmap + Architect Checklist blocks below are intentionally kept (unreachable). To re-enable: restore useState + the tab-bar JSX (see git history, v6.3.160).
+  // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)
   // FEATURE: S-AI-AUDIT-SVCDIR -- service now defaults closed too (§19m kickoff: By Service
   // drawer closed on open). The zeroClosed state is gone with the "Not yet called" collapse card.
-  const [sections, setSections] = useState({ pattern:true, service:false, llm:true, agent:false, roadmap:false });
+  const [sections, setSections] = useState({ pattern:true, service:false, llm:true, agent:false });
   // FEATURE: LOG-36 -- inactivePtnClosed/uncatalogedPtnClosed removed with the collapse cards they
   // drove: with the catalog seed loop gone there is no "not yet active" bucket to collapse, and
   // every row is by definition uncatalogued-or-governed real activity, one flat list.
@@ -255,16 +255,6 @@ export default function AIActivityPanel({ onClose }) {
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Tabs — FEATURE: AI-48 — flex:1 kept on mobile, 3 tabs judged to fit at 340px without scroll */}
-      <div style={{display:"flex",borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
-        {[["activity","Activity Log"],["mcp","MCP Roadmap"],["checklist","Architect Checklist"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)}
-            style={{flex:1,padding: isMobile ? "8px 3px" : "9px",fontFamily:mono,fontSize: isMobile ? 8 : 9,textTransform:"uppercase",letterSpacing:1,border:"none",background:"transparent",cursor:"pointer",color:tab===id?T.navy:T.muted,fontWeight:tab===id?700:400,borderBottom:`2px solid ${tab===id?T.brass:"transparent"}`,marginBottom:-1}}>
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Content — FEATURE: AI-48 — mobile padding delta only, all content/data unchanged */}
@@ -400,39 +390,6 @@ export default function AIActivityPanel({ onClose }) {
                 )
             )}
 
-            {/* FEATURE: AI-23 patch — Roadmap collapsible; Patterns Now tier removed */}
-            <SectionHeader label="Platform Roadmap" open={sections.roadmap} onToggle={()=>toggle('roadmap')}/>
-            {/* FEATURE: AI-33 — Platform Roadmap: Next + Later only, 2-column AI Patterns × DeepBench Services */}
-            {sections.roadmap && (
-              <div style={{paddingBottom:12}}>
-                {[
-                  { key:'next',  label:'Next',  color:T.brass },
-                  { key:'later', label:'Later',  color:T.muted },
-                ].map(({ key, label, color }) => {
-                  const tierPats = PATTERN_CATALOG.filter(p => !p.active && p.roadmap === key);
-                  const tierSvcs = SERVICE_CATALOG.filter(s => s.roadmap === key);
-                  return (
-                    <div key={key} style={{marginBottom:16}}>
-                      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color,textTransform:"uppercase",letterSpacing:1.2,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${T.lineSoft}`}}>{label}</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-                        <div>
-                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:5}}>AI Patterns</div>
-                          {tierPats.map(p => (
-                            <div key={p.slug} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:8,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:4}}>{p.name}</div>
-                          ))}
-                        </div>
-                        <div>
-                          <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:5}}>DeepBench Services</div>
-                          {tierSvcs.map(s => (
-                            <div key={s.slug} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,paddingLeft:8,borderLeft:`2px solid ${color}30`,marginLeft:2,marginBottom:4}}>{s.name}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </>
         )}
 
