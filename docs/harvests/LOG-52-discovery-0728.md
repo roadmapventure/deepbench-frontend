@@ -229,6 +229,10 @@ a repeat of the same signature does not; empty-fact rows never trigger.
 *(added 2026-07-28, `design-log-72b-0728` follow-up — John approved scope and this prompt verbatim)*
 
 ```
+MODEL: run this session on Fable 5 (Opus 5 if Fable is not in the picker) — design session
+with an open §19d-sensitive decision; the spawned coding agent inherits it. The later
+separate Susan data-only promote run: Sonnet 5 is sufficient.
+
 Work LOG-77 (Architecture)'s ninth item: the evaluation-verdict-gated-retry fact — Susan
 Smith — Trainer's formal MISSING SIGNAL from the Evaluator-Optimizer adjudication
 (design-log-72b-0728, v6.3.185; see LOG-72's row). John approved this scope 2026-07-28.

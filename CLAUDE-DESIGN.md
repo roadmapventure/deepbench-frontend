@@ -75,6 +75,17 @@ Applies from S-APPLE-01a-design (v5.3.0) onward.
 
 ---
 
+## Standing Rule — Every Ticket/Prompt Names Its Model (added 2026-07-28, John's explicit call)
+
+**Every ready-to-paste session prompt, kickoff doc, and backlog row that will become a session states which Claude model the session should run on — and whenever a session hands John a prompt to kick off, it tells him the model explicitly in chat, not just inside the doc.** A prompt without a model line is incomplete from 2026-07-28 onward; add one when touching any older prompt a session is about to hand to John.
+
+Initial defaults (John can override per ticket; verify the current model lineup rather than trusting this list as permanent):
+- **Design / discovery sessions, and anything touching LOCKED architecture, naming, or taxonomy** → the most capable model available (today: **Fable 5**; **Opus 5** if Fable isn't in the picker). Judgment density is the driver, not code volume.
+- **Coding sessions executing a well-specified kickoff doc** → **Opus 5**. (In the Automated Design→Code→Verify Loop the spawned coding agent inherits the design session's model — one model line per pasted prompt covers both.)
+- **Data-only / mechanical runs** (Susan Smith — Trainer governance invocations, seeds, doc-only bookkeeping) → **Sonnet 5** is sufficient.
+
+---
+
 ## Standing Rule — Skill/Capability Disclosure When Updating Agent Competencies
 
 **Moved 2026-07-17 to `docs/WORKING-WITH-JOHN.md`** (`SES-003`) — same consolidation as Decision Autonomy Tiers. Read it there; it's already a mandatory Step 1 read below.
