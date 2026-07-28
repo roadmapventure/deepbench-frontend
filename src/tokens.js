@@ -1,3 +1,4 @@
+// DeepBench v6.3.171 | tokens.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.138 | tokens.js | S-SH-23 -- focus-area release-status labels
 // DeepBench v5.1.15 | tokens.js | Treasury design system — colors, fonts, formatters
 // FEATURE: SH-01 — Treasury design tokens
@@ -23,6 +24,8 @@ export const T = {
   brassDeep:  "#886224",
   brassLight: "#e4c786",
   brassGlow:  "#f0d99a", // FEATURE: CHI-05 — gold gradient start, "needs your input" card only (not brassLight)
+  navyTextHi: "#b8c5d8", // FEATURE: ABT-1 — body text on navy surfaces (promoted from AboutPanel literals)
+  navyTextLo: "#8fa3bf", // FEATURE: ABT-1 — body text on navy surfaces (promoted from AboutPanel literals)
   moss:       "#5a7538",
   mossLight:  "#a6bc82",
   flag:       "#a83319",

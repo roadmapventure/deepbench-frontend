@@ -1,3 +1,4 @@
+// DeepBench v6.3.171 | tests/regression/LOG-36-pattern-display-sources.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.134 | tests/regression/LOG-36-pattern-display-sources.js | LOG-36
 // FEATURE: LOG-36 — Category M (cross-reference consistency), persisted per SES-009a.
 //
@@ -12,7 +13,11 @@
 //     Site 1) — LOG-86 (v6.3.163) removed that drawer entirely, so the allowance was
 //     deliberately retired per this test's own instruction, not deleted as a shortcut.
 //     The file no longer imports PATTERN_CATALOG at all.
-//   - AboutPanel.jsx's stat tile (LOG-56) remains the one allowed display expression.
+//   - AboutPanel.jsx's stat tile WAS the one allowed display expression (LOG-56 Site 4) —
+//     allowance retired by S-ABT-1a (v6.3.171): the About panel now reads
+//     ai_pattern_classification_rollup live (the same view the AI Audit panel's By Pattern
+//     section reads) and imports no catalog at all. Retired deliberately per this test's own
+//     instruction, not deleted as a shortcut.
 //   - src/aiPatterns.js (LOG-57) hand-declared AI_PAT / AGENT_PATTERNS badges. Not a
 //     PATTERN_CATALOG consumer today; asserted here so a future session can't quietly
 //     make it one without tripping this test.
@@ -28,23 +33,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
 const SCAN_ROOTS = ["src/components", "src/screens"];
 
-// The single expression in src/ that may still read PATTERN_CATALOG for display:
-// AboutPanel.jsx's stat tile. (AIActivityPanel.jsx's Platform Roadmap tier filter was
-// the other allowance until LOG-86 (v6.3.163) removed that drawer — allowance retired
-// deliberately, per the assertion message below.)
-const ALLOWANCES = [
-  {
-    // Added when LOG-36's About-panel change was REVERTED mid-session (John's explicit call).
-    // The tile is knowingly still catalog-driven and knowingly disagrees with the AI Audit
-    // panel's "Patterns Logged" stat. It could not be made log-driven cheaply: useAIActivity()'s
-    // _log is filled only by hydrateFromSupabase(), whose sole src/ caller is AIActivityPanel's
-    // mount effect, so About rendered a confident "0". Folded into LOG-56 so the whole About
-    // panel (this tile + the SVG diagram + the glossary) is decided as one screen.
-    file: "src/components/AboutPanel.jsx",
-    expr: '[String(PATTERN_CATALOG.length),"AI Patterns"]',
-    why: "About panel stat tile (LOG-56) — deliberate, tracked exception, not an oversight.",
-  },
-];
+// No expression in src/ may read PATTERN_CATALOG for display anymore. The last allowance
+// (AboutPanel.jsx's stat tile) was retired by S-ABT-1a (v6.3.171) — the panel's "AI patterns
+// used" tile now counts ai_pattern_classification_rollup rows live. (AIActivityPanel.jsx's
+// Platform Roadmap tier filter was retired earlier, LOG-86 / v6.3.163.) Assertion 1 below now
+// enforces zero PATTERN_CATALOG references in every scanned display file.
+const ALLOWANCES = [];
 const ALLOWANCE_FILES = new Set(ALLOWANCES.map(a => a.file));
 
 function listFiles(dir) {

@@ -1,8 +1,15 @@
-// DeepBench v6.3.134 | AboutPanel.jsx | LOG-36 -- "AI Patterns" stat tile reads the live logged count, not PATTERN_CATALOG.length
+// DeepBench v6.3.171 | AboutPanel.jsx | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
+// DeepBench v6.3.134 | AboutPanel.jsx | LOG-36 -- "AI Patterns" stat tile reads the live logged count, not the static catalog length
 // DeepBench v6.2.13 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel + scroll hint
 // FEATURE: SH-05 — About panel replacing Help modal
 // FEATURE: SH-21 — mobile-responsive layout (82% drawer width, scrollable tab bar, grid column drops)
 // FEATURE: SH-21 — mobile tab-bar scroll hint (fade gradient + chevron, John's follow-up request)
+// FEATURE: ABT-1 — Architecture is the only visible tab and the default (John's call, S-ABT-1a-design
+//   2026-07-28). Purpose/Quick Start/Revenue/Showcase/Who-is-John are hidden but kept in-file (see
+//   HIDDEN_TABS); Roadmap is deleted outright. The new Architecture content is a from-scratch,
+//   under-5-minute read grounded in ARCHITECTURE.md §0/§0b/§1/§19d/§19k — every displayed number is
+//   read live (Supabase on panel open), never hand-maintained. Resolves LOG-56 Sites 2+4 and retires
+//   the LOG-70 AboutPanel consumer (the static pattern/service catalog imports are gone entirely).
 
 import { useState, useEffect } from "react"; // was: import { useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
@@ -10,27 +17,25 @@ import { APP_VERSION } from "../config.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { supabase } from "../lib/supabase.js";
 import { useAgents } from "../hooks/useAgents.js";
-// FEATURE: LOG-36 -- this file was briefly retargeted onto a live logged-pattern count, then
-// reverted to PATTERN_CATALOG within the same session (John's explicit call). Reason: useAIActivity()
-// reads an in-memory _log that ONLY hydrateFromSupabase() fills, and its only caller in all of src/
-// is AIActivityPanel.jsx's mount effect -- so opening About without opening AI Audit first rendered
-// a confident "0", which is worse than the stale 24. Fixing it properly needs either a Supabase
-// aggregate object or a row-cap-exposed single-column scan over 16k+ rows for one number. Deferred
-// to LOG-56, which owns the rest of this panel's pattern content (the SVG diagram and glossary) --
-// so the whole About panel gets decided as one screen instead of being touched twice.
-// This tile is therefore KNOWINGLY still catalog-driven. Do not "fix" it in isolation.
-import { SERVICE_CATALOG, PATTERN_CATALOG } from "../hooks/useAIActivity.js";
 
 // ── Tab definitions ─────────────────────────────────────────────────────────────
+// FEATURE: ABT-1 — the tab bar renders from TABS exactly as before; only Architecture is visible.
 const TABS = [
-  { id: "purpose",      label: "Purpose"      },
   { id: "architecture", label: "Architecture" },
-  { id: "quickstart",   label: "Quick Start"  },
-  { id: "revenue",      label: "Revenue"      },
-  { id: "roadmap",      label: "Roadmap"      },
-  { id: "showcase",     label: "Showcase"     },
-  { id: "john",         label: "Who is John"  },
 ];
+
+// FEATURE: ABT-1 — hidden, not deleted. Restoring one of these later is a one-line move into TABS
+// above (its component function is still in this file; its render line must also be re-added to the
+// content switch at the bottom). Stale facts inside these components are tracked as ABT-2
+// (docs/FEATURES-LATER.md) — do not edit their content here.
+const HIDDEN_TABS = [
+  { id: "purpose",    label: "Purpose"     },
+  { id: "quickstart", label: "Quick Start" },
+  { id: "revenue",    label: "Revenue"     },
+  { id: "showcase",   label: "Showcase"    },
+  { id: "john",       label: "Who is John" },
+];
+void HIDDEN_TABS; // deliberately unreferenced — kept as the restoration manifest
 
 // ── Shared sub-components ───────────────────────────────────────────────────────
 function SH({ children, mt = 18 }) {
@@ -54,6 +59,8 @@ function BulletItem({ children }) {
   );
 }
 
+// FEATURE: ABT-1 — kept (kickoff listed LayerRow as old-Architecture-only, but PurposeTab — hidden,
+// unmodified — still renders it; deleting it would break a deliberately-kept component).
 function LayerRow({ name, desc, status }) {
   const dot = status === "Solved" ? T.moss : status === "Unsolved" ? T.flag : T.brass;
   const bg  = status === "Solved" ? `${T.moss}22` : status === "Unsolved" ? `${T.flag}22` : `${T.brass}22`;
@@ -66,90 +73,6 @@ function LayerRow({ name, desc, status }) {
         <div style={{ fontSize: 10, color: T.muted, marginTop: 1, lineHeight: 1.3 }}>{desc}</div>
       </div>
       <div style={{ fontFamily: mono, fontSize: 7, padding: "2px 5px", background: bg, color: col, flexShrink: 0, borderRadius: 2, marginTop: 1 }}>{status}</div>
-    </div>
-  );
-}
-
-function BuzzRow({ term, desc, status }) {
-  const isLive     = status === "✅ Live";
-  const isDesigned = status === "🔶 Designed";
-  const bg  = isLive ? `${T.moss}18` : isDesigned ? `${T.brass}15` : T.lineSoft;
-  const col = isLive ? T.moss : isDesigned ? T.brassDeep : T.muted;
-  return (
-    <div style={{ display: "flex", gap: 8, padding: "5px 8px", border: `1px solid ${T.lineSoft}`, marginBottom: 3, alignItems: "flex-start" }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: T.navy }}>{term}</div>
-        <div style={{ fontSize: 10, color: T.muted, marginTop: 1, lineHeight: 1.3 }}>{desc}</div>
-      </div>
-      <div style={{ fontFamily: mono, fontSize: 7, color: col, background: bg, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0, borderRadius: 2 }}>{status}</div>
-    </div>
-  );
-}
-
-function DecisionItem({ title, desc }) {
-  return (
-    <div style={{ padding: "7px 10px", border: `1px solid ${T.lineSoft}`, marginBottom: 5, borderLeft: `3px solid ${T.brass}` }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: T.navy, marginBottom: 2 }}>{title}</div>
-      <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.4 }}>{desc}</div>
-    </div>
-  );
-}
-
-function AIStackDiagram() {
-  return (
-    <svg viewBox="0 0 520 292" style={{ width: "100%", maxWidth: 600, display: "block", margin: "10px 0 14px" }} role="img">
-      {/* Layer 6 — Governance */}
-      <rect x={8} y={8} width={440} height={42} fill="#1e3556"/>
-      <rect x={8} y={8} width={440} height={2} fill="#b6873a"/>
-      <text x={20} y={23} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2465;  GOVERNANCE LAYER  &#x25C0; DeepBench AI Audit</text>
-      <text x={20} y={38} fontFamily="monospace" fontSize={9} fill="#b8c5d8">Audit  ·  Guardrails Enforcement  ·  Cost Controls  ·  Behavioral Prompts</text>
-
-      {/* Layer 5 — Platform */}
-      <rect x={8} y={56} width={440} height={42} fill="#1e3556"/>
-      <rect x={8} y={56} width={440} height={2} fill="#b6873a"/>
-      <text x={20} y={71} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2464;  PLATFORM LAYER  &#x25C0; DeepBench agent workforce</text>
-      <text x={20} y={86} fontFamily="monospace" fontSize={9} fill="#b8c5d8">Named Agents  ·  Skill Profiles  ·  Capabilities  ·  Orchestration  ·  HITL</text>
-
-      {/* Layer 4 — Harness */}
-      <rect x={8} y={104} width={440} height={42} fill="#1e3556"/>
-      <rect x={8} y={104} width={440} height={2} fill="#b6873a"/>
-      <text x={20} y={119} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#c4953e" letterSpacing="1.5">&#x2463;  HARNESS LAYER  &#x25C0; DeepBench Prompt Service</text>
-      <text x={20} y={134} fontFamily="monospace" fontSize={9} fill="#b8c5d8">DB Assembly  ·  AI Enrichment  ·  Grounding  ·  Context Assembly</text>
-
-      {/* Layer 3 — Patterns */}
-      <rect x={8} y={152} width={440} height={42} fill="#162840"/>
-      <text x={20} y={167} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2462;  PATTERN LAYER</text>
-      <text x={20} y={182} fontFamily="monospace" fontSize={9} fill="#3d5060">RAG  ·  ReAct  ·  Prompt Chaining  ·  Reflection  ·  Streaming  ·  Tool Use</text>
-
-      {/* Layer 2 — Tooling */}
-      <rect x={8} y={200} width={440} height={42} fill="#162840"/>
-      <text x={20} y={215} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2461;  TOOLING LAYER</text>
-      <text x={20} y={230} fontFamily="monospace" fontSize={9} fill="#3d5060">Function Calling  ·  MCP  ·  Browser Automation  ·  External APIs</text>
-
-      {/* Layer 1 — Foundation */}
-      <rect x={8} y={248} width={440} height={42} fill="#162840"/>
-      <text x={20} y={263} fontFamily="monospace" fontSize={8} fontWeight="700" fill="#4a6278" letterSpacing="1.5">&#x2460;  FOUNDATION LAYER</text>
-      <text x={20} y={278} fontFamily="monospace" fontSize={9} fill="#3d5060">Models (Claude)  ·  Embeddings  ·  pgvector</text>
-
-      {/* DeepBench bracket — layers 4–6, y=8 to y=146 */}
-      <line x1={456} y1={8} x2={456} y2={146} stroke="#b6873a" strokeWidth={2}/>
-      <line x1={456} y1={8} x2={462} y2={8} stroke="#b6873a" strokeWidth={2}/>
-      <line x1={456} y1={146} x2={462} y2={146} stroke="#b6873a" strokeWidth={2}/>
-      <text x={474} y={77} fontFamily="monospace" fontSize={7} fontWeight="700" fill="#b6873a"
-        transform="rotate(-90, 474, 77)" textAnchor="middle" letterSpacing="2">DEEPBENCH</text>
-
-      {/* Infrastructure label */}
-      <text x={474} y={221} fontFamily="monospace" fontSize={7} fill="#2d4050"
-        transform="rotate(-90, 474, 221)" textAnchor="middle" letterSpacing="1.5">INFRASTRUCTURE</text>
-    </svg>
-  );
-}
-
-function GlossaryRow({ term, definition }) {
-  return (
-    <div style={{ display: "flex", gap: 10, padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}` }}>
-      <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: T.navy, width: 120, flexShrink: 0 }}>{term}</div>
-      <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.45, flex: 1 }}>{definition}</div>
     </div>
   );
 }
@@ -183,6 +106,11 @@ function NigpStep({ n, name, desc }) {
     </div>
   );
 }
+
+// FEATURE: ABT-1 — fallback rule for every live-read tile: a source that errored or hasn't resolved
+// renders "—" (em dash), never a hardcoded number and never 0. LOG-36's revert was caused by a
+// confident wrong "0"; "—" is honest, "0" is a lie.
+const fmtStat = (v) => (v == null ? "—" : Number(v) >= 1000 ? Number(v).toLocaleString() : String(v));
 
 // ── Tab content ─────────────────────────────────────────────────────────────────
 function PurposeTab() {
@@ -231,110 +159,139 @@ function PurposeTab() {
   );
 }
 
-function ArchitectureTab() {
+// FEATURE: ABT-1 — from-scratch Architecture tab for a skeptical technical audience (chief
+// architects, senior developers, senior product managers). Copy is canonical from the S-ABT-1a
+// kickoff doc — do not paraphrase or retitle. Every number in the metric grid is read live on
+// panel open (see the stats effect in AboutPanel below); the fallback for an unresolved source is
+// "—", never a hardcoded value.
+function ArchitectureTab({ displayVersion, stats }) {
   const isMobile = useIsMobile();
-  const agents = useAgents(); // FEATURE: MOB-001 -- live roster count, was hardcoded "13"
+  const agents = useAgents();
+
+  const tiles = [
+    [String(displayVersion), "Live version"],
+    [String(agents.length), "Agents on bench"],
+    [fmtStat(stats.loggedCalls), "Logged AI calls"],
+    [fmtStat(stats.patternsUsed), "AI patterns used"],
+    [stats.schema ? `${fmtStat(stats.schema.table_count)} · ${fmtStat(stats.schema.column_count)}` : "—", "DB tables · columns"],
+    [fmtStat(stats.schema?.rag_table_count), "RAG databases"],
+    [fmtStat(stats.services), "Platform services"],
+    [fmtStat(stats.platform?.lines_of_code), "Lines of code"],
+    [fmtStat(stats.platform?.governance_docs), "Governance docs"],
+    [fmtStat(stats.platform?.commits_dev), "Commits to dev"],
+    [fmtStat(stats.platform?.dev_toolchain_services), "Dev toolchain services"],
+  ];
+
   return (
     <>
-      <SH mt={0}>The DEEP / BENCH Model</SH>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-        <div style={{ background: "#1a2e4a", padding: "11px 13px", borderTop: `3px solid ${T.brass}` }}>
-          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.brassLight, letterSpacing: 1.5, marginBottom: 8 }}>DEEP</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>① Services</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>② Skills</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf" }}>③ Capabilities</div>
-          <div style={{ fontSize: 9, color: T.muted, marginTop: 8, lineHeight: 1.4 }}>The engine — builds and trains expertise</div>
+      {/* 1 — Pitch block */}
+      <div style={{ background: T.cardAlt, borderLeft: `3px solid ${T.brass}`, padding: "12px 14px", marginBottom: 4 }}>
+        <div style={{ fontFamily: display, fontStyle: "italic", fontSize: 13, color: T.navy, lineHeight: 1.6 }}>
+          An AI workforce platform where improving agent quality is a training operation, not a software release — the routing, attribution, and feedback loop are built into the data model itself.
         </div>
-        <div style={{ background: "#1a2e4a", padding: "11px 13px", borderTop: `3px solid ${T.moss}` }}>
-          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: "#7ec8a0", letterSpacing: 1.5, marginBottom: 8 }}>BENCH</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf", marginBottom: 4 }}>④ Agents</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8fa3bf" }}>⑤ Deliverables</div>
-          <div style={{ fontSize: 9, color: T.muted, marginTop: 8, lineHeight: 1.4 }}>The workforce — deployed and producing</div>
+        <div style={{ fontFamily: mono, fontSize: 8, textTransform: "uppercase", letterSpacing: 1.5, color: T.brassDeep, marginTop: 8 }}>
+          Your team, without the headcount
         </div>
       </div>
-      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: "0 0 12px" }}>
-        <strong style={{ fontWeight: 500 }}>Skills are the atomic unit.</strong> Skill Profiles — configured instances of a Skill — are independent of agents. An agent is authorized to use a Skill Profile at a specific depth; it does not own it. The same Skill Profile can be shared, upgraded, and priced independently of any individual agent.
+
+      {/* 2 — The name is the architecture */}
+      <SH>The name is the architecture</SH>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 4 }}>
+        <div style={{ background: T.navyMid, padding: "11px 13px", borderTop: `3px solid ${T.brass}` }}>
+          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.brassLight, letterSpacing: 1.5, marginBottom: 6 }}>DEEP</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: T.navyTextHi, marginBottom: 3 }}>Competencies &amp; Services</div>
+          <div style={{ fontSize: 9, color: T.navyTextLo, lineHeight: 1.4 }}>The engine that builds and trains expertise</div>
+        </div>
+        <div style={{ background: T.navyMid, padding: "11px 13px", borderTop: `3px solid ${T.moss}` }}>
+          <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.mossLight, letterSpacing: 1.5, marginBottom: 6 }}>BENCH</div>
+          <div style={{ fontFamily: mono, fontSize: 9, color: T.navyTextHi, marginBottom: 3 }}>Agents · Deliverables</div>
+          <div style={{ fontSize: 9, color: T.navyTextLo, lineHeight: 1.4 }}>The workforce you deploy, the work it produces</div>
+        </div>
+      </div>
+
+      {/* 3 — The platform stack */}
+      <SH>The platform stack — 5 layers, 1 loop</SH>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ background: T.navy, padding: "10px 12px" }}>
+            <div style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: 1.5, color: T.brassLight }}>PRODUCT FOCUS AREAS</div>
+            <div style={{ fontSize: 9, color: T.navyTextLo, marginTop: 4, lineHeight: 1.45 }}>Channel Intelligence · Project Management · Spend Analysis — the human-facing dashboards</div>
+          </div>
+          <div style={{ background: T.navyMid, padding: "10px 12px", flex: 1 }}>
+            <div style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: 1.5, color: T.brassLight, marginBottom: 8 }}>PLATFORM</div>
+            {/* FEATURE: ABT-1 — Platform grid drops 2→1 column on mobile (STYLE-GUIDE §26) */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 6 }}>
+              {[
+                ["Data model",        "Competency · Library · Reasoning"],
+                ["Platform services", "AI Audit · knowledge plumbing"],
+                ["Scaffold",          "what an agent is given, once"],
+                ["Harness",           "one agent's OS for one turn"],
+              ].map(([name, sub]) => (
+                <div key={name} style={{ background: T.navy, padding: "8px 10px" }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: T.navyTextHi }}>{name}</div>
+                  <div style={{ fontSize: 9, color: T.navyTextLo, marginTop: 2, lineHeight: 1.35 }}>{sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Right-side full-height LOOP column — same navy as the stack boxes (John's explicit call) */}
+        <div style={{ background: T.navy, width: 34, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <div style={{ color: T.brassLight, fontSize: 14, lineHeight: 1 }}>⟳</div>
+          <div style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassLight, letterSpacing: 2, writingMode: "vertical-rl" }}>LOOP</div>
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: T.muted, fontStyle: "italic", lineHeight: 1.5 }}>
+        The Loop is cross-cutting: work repeats through Scaffold + Harness until a gate passes — stop, continue, or checkpoint.
+      </div>
+
+      {/* 4 — Is it actually agentic? */}
+      <SH>Is it actually agentic? Check for yourself</SH>
+      {[
+        ["No agent's data ever names another agent", "Delegation is a tool call the model chooses to emit, with its reasoning logged — never a hardcoded route or a static capability-to-agent lookup. Enforced by an automated code check."],
+        ["A real agent loop, serverless-safe", "Each turn ends three ways: stop (a gate passed), continue, or checkpoint — state persists to a durable store and a later invocation resumes exactly where it left off."],
+        ["Guardrails enforced after generation", "Every capability declares must / must-not rules as data; a separate model call checks each output against them and records the verdict."],
+        ["Humans gate consequential actions", "Actions flagged as consequential pause the loop for accept, reject, or edit — with an optional critique pass by a reviewing agent first."],
+      ].map(([claim, how]) => (
+        <div key={claim} style={{ display: "flex", gap: 9, padding: "7px 10px", border: `1px solid ${T.lineSoft}`, marginBottom: 4, alignItems: "flex-start" }}>
+          <span style={{ color: T.moss, fontSize: 11, flexShrink: 0, marginTop: 1 }}>✓</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: T.navy, lineHeight: 1.4 }}>{claim}</div>
+            <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.45, marginTop: 2 }}>{how}</div>
+          </div>
+        </div>
+      ))}
+
+      {/* 5 — Every call is on the record */}
+      <SH>Every call is on the record</SH>
+      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: "0 0 10px" }}>
+        One central activity log receives every AI call the platform makes — model, tokens, cost, latency, guardrail verdict, delegation reasoning. Every number below is read live when this panel opens; none is hand-maintained.
       </p>
-
-      <SH>Platform Architecture</SH>
-      <div style={{ background: "#1a2e4a", padding: "11px 13px", fontFamily: mono, fontSize: 9, lineHeight: 1.7, marginBottom: 10, borderRadius: 2 }}>
-        <div style={{ color: T.brassLight }}>Layer 4 — Platform Services &nbsp;&nbsp;&nbsp;Auth · Multi-tenancy · Security</div>
-        <div style={{ color: "#8fa3bf" }}>Layer 2 — Product Modules &nbsp;&nbsp;&nbsp;&nbsp;Work Dashboard · Bench Dashboard</div>
-        <div style={{ color: "#8fa3bf" }}>Layer 3 — Capability Services &nbsp;Planning · RAG · Chat · Analysis · Web…</div>
-        <div style={{ color: "#8fa3bf" }}>Layer 1 — Shared Foundation &nbsp;&nbsp;&nbsp;Tokens · Agents · Supabase · Config</div>
-      </div>
-      <AIStackDiagram />
-      <SH>AI Industry Glossary</SH>
-      <GlossaryRow term="Platform"       definition="Infrastructure that wraps LLMs — handles routing, memory, governance, and output. DeepBench is a platform, not a model." />
-      <GlossaryRow term="Pattern"        definition="A reusable AI architectural approach: RAG, ReAct, Prompt Chaining, etc. Patterns are how you use models, not which model." />
-      <GlossaryRow term="Loop"           definition="The agent execution cycle: Perceive → Reason → Act → Observe → Repeat. Brent's ReAct loop is the live example." />
-      <GlossaryRow term="Harness"        definition="Scaffolding around an LLM call: prompt assembly, tool definitions, response parsing, error handling. DeepBench's Prompt Service is a harness." />
-      <GlossaryRow term="Grounding"      definition="Connecting a model to factual, domain-specific knowledge at call time — what RAG does. Without grounding, models hallucinate on domain questions." />
-      <GlossaryRow term="Governance"     definition="Audit trails, guardrails, cost controls, and accountability over AI decisions. The 'can we trust this output?' layer." />
-      <GlossaryRow term="Tooling"        definition="External capabilities an agent can invoke mid-reasoning — web search, database queries, APIs. Claude's tool use schema is the mechanism." />
-      <GlossaryRow term="Orchestration"  definition="One agent coordinating other agents — delegating subtasks and synthesizing results. Michelle delegating to Brent is the live example." />
-      <GlossaryRow term="Context Window" definition="How much text a model can process in one call. Prompt engineering is largely the art of fitting the right information into this space efficiently." />
-      <GlossaryRow term="Embeddings"     definition="Vector representations of text for semantic search. The foundation of RAG — find knowledge chunks closest in meaning to the query." />
-      <GlossaryRow term="Chain"          definition="Sequential prompts where output of one feeds as input to the next. DeepBench's Prompt Service pipeline (DB Assembly → AI Enrichment → Request) is a chain." />
-      <GlossaryRow term="HITL"           definition="Human-in-the-Loop — agent pauses at a defined step gate and waits for human review before continuing." />
-
-      <Divider />
-      <SH>By the Numbers</SH>
-      {/* FEATURE: SH-21 — stat grid drops 3→2 columns on mobile */}
-      {/* FEATURE: MOB-001 -- AI Patterns/AI Services/Bench agents now read live from the same
-          sources the AI Audit panel and Roster screen already use (PATTERN_CATALOG.length,
-          SERVICE_CATALOG.length, AGENTS.length via useAgents()) -- can no longer contradict those
-          other panels.
-          FEATURE: LOG-36 -- "AI Patterns" still reads PATTERN_CATALOG.length, KNOWINGLY: it counts
-          24 static file entries, true regardless of whether any of them ever ran, and so it does
-          NOT agree with the AI Audit panel's "Patterns Logged" stat (11 as of 2026-07-23). That
-          disagreement is deliberate and tracked -- see the import comment at the top of this file
-          and LOG-56, which owns this panel's pattern content as one screen. Do not fix in isolation.
-          The remaining 6 numbers are filesystem/DB-schema facts a browser can't
-          compute at runtime; snapshot-corrected to their real values as of 2026-07-17
-          (mobile-ui-audit-0717) but will drift again over time -- a permanent fix needs build-time
-          codegen or a schema-introspection RPC, deliberately out of scope this session (see kickoff
-          doc SCOPE RULES). If you're reading this after a future session and these look stale
-          again, that's expected -- check docs/FEATURES.md's MOB-001 row before re-deriving numbers
-          by hand. */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-        {[["59","Source files"],["~29,500","Lines of code"],["11","API routes"],["23","DB tables (281 cols)"],["33","Arch docs"],["269","Session specs"],[String(PATTERN_CATALOG.length),"AI Patterns"],[String(SERVICE_CATALOG.length),"AI Services"],[String(agents.length),"Bench agents"]].map(([n, l]) => (
+      {/* FEATURE: ABT-1 — metric grid drops 3→2 columns on mobile (STYLE-GUIDE §26) */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 6 }}>
+        {tiles.map(([n, l]) => (
           <div key={l} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, padding: 7, textAlign: "center" }}>
             <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.brass }}>{n}</div>
             <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{l}</div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Frontend:</strong> React 18 + Vite · React Router 6 · Recharts · PapaParse · PDF-parse</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>API:</strong> 12 Vercel serverless routes — task planning, RAG query, doc extraction + ingestion, agent configs, self-learning write-back, Prompt Service (DB Assembly · AI Enrichment · Request &amp; Receivable) · Railway (Node.js + Playwright) for browser automation only</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5, marginBottom: 3 }}><strong style={{ fontWeight: 500 }}>Database:</strong> Supabase Postgres + pgvector · 11 tables · 154 total columns · tenant_id on every table · Storage bucket for CSV</div>
-      <div style={{ fontSize: 10, color: T.navy, lineHeight: 1.5 }}><strong style={{ fontWeight: 500 }}>AI:</strong> Anthropic claude-haiku-4-5-20251001 (routing, classification, reflection, guardrails) · claude-sonnet-4-6 (planning, enrichment, ReAct loops) · OpenAI text-embedding-3-small (RAG embeddings)</div>
 
-      <Divider />
-      <SH>AI Capability Status</SH>
-      <BuzzRow term="RAG + Vector Embeddings"             desc="pgvector · Supabase · OpenAI text-embedding-3-small — live at query time"      status="✅ Live"     />
-      <BuzzRow term="ReAct Agent Loop"                    desc="Brent — Railway/Playwright — reason + act + observe cycles"                     status="✅ Live"     />
-      <BuzzRow term="Guardrails"                          desc="Per-agent always/never rules in Supabase + post-generation Haiku enforcement check in Request & Receivable"  status="✅ Live"     />
-      <BuzzRow term="AI Cost Audit"                       desc="Per-call: model, tokens, cost, latency → Supabase ai_activity_log"             status="✅ Live"     />
-      <BuzzRow term="Self-Learning / Knowledge Reinforcement" desc="Brent writes back fetch results as training entries automatically"          status="✅ Live"     />
-      <BuzzRow term="Structured Tool Use"                 desc="Claude tool use everywhere — no free-text JSON parsing anywhere"                status="✅ Live"     />
-      <BuzzRow term="Prompt Caching"                      desc="Anthropic caching on system prompts — up to 90% cost reduction"                status="✅ Live"     />
-      <BuzzRow term="Prompt Service Pipeline"   desc="DB Assembly → AI Enrichment → Request & Receivable — full 3-stage prompt construction pipeline"  status="✅ Live" />
-      <BuzzRow term="Reflection"                desc="Dan Bingham (PS-01) self-review pass — Haiku critiques assembled prompt before synthesis"           status="✅ Live" />
-      <BuzzRow term="Per-Agent Behavioral Prompts"        desc="Personality, tone, reasoning style stored in Supabase — not in code"           status="✅ Live"     />
-      <BuzzRow term="Capability Depth Spectrum"           desc="4-level model — General → Trained → Expert → Proprietary"                      status="🔶 Designed" />
-      <BuzzRow term="HITL (Human-in-the-Loop)"            desc="Step execution gates — agent pauses for human review"                          status="🔶 Designed" />
-      <BuzzRow term="BYOK + Per-Agent LLM"                desc="Tenant API keys, per-agent model assignment"                                   status="🔶 Later"    />
-      <BuzzRow term="Multi-tenancy"                       desc="tenant_id on every table · Clerk auth stub in place"                           status="🔶 Later"    />
-
-      <Divider />
-      <SH>My Product Architectural Decisions</SH>
-      <DecisionItem title="Skills are the atomic unit — independent of agents"   desc="The single most important call. Skill Profiles are not hardwired to agents — they are configurable instances that can be shared, priced, and exposed via MCP independently of any individual agent." />
-      <DecisionItem title="No AI logic inside React components"      desc="Every AI call lives in a serverless route named for the capability. Prevents agent-specific tangle; enables independent pricing and reuse." />
-      <DecisionItem title="Supabase as behavioral prompt storage"    desc="Agent prompts live in a database, not code. Versioned, auditable, tenant-scoped. No deployment needed to change agent behavior." />
-      <DecisionItem title="tenant_id on every table from day one"    desc="Multi-tenancy stubs in place with one tenant today. Adding Clerk in v6 is a wrapping layer — not a schema rewrite." />
-      <DecisionItem title="Treasury design system from day one"      desc="Single tokens.js — every color, font, and spacing value. Zero hardcoded hex in the codebase. The V1 call most solo builders skip." />
-      <DecisionItem title="17 written session specs before any code" desc="Each kickoff doc covers scope, constraints, data contracts, and QA checklist. What keeps 20,000 lines coherent across 50+ sessions." />
+      {/* 6 — Unusual in the industry */}
+      <SH>Unusual in the industry</SH>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 6 }}>
+        {[
+          ["Training is the release cycle", "Agent quality improves by training data, not code deploys — the same model that governs the product governs its own intelligence."],
+          ["Routing bans are structural", "\"No hardcoded agent routing\" isn't a style guide — it's an enforced platform rule with an automated check."],
+          ["Patterns classified at read time", "Which AI pattern a call used is derived from its logged facts by versioned rules — never stamped as a label at write time."],
+          ["Skills are the atomic unit", "Expertise lives as data — shareable, priceable, independently upgradable — not welded into any one agent."],
+        ].map(([title, line]) => (
+          <div key={title} style={{ padding: "8px 11px", border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.brass}` }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{title}</div>
+            <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.45 }}>{line}</div>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
@@ -387,47 +344,6 @@ function RevenueTab() {
         <div style={{ fontFamily: mono, fontSize: 7, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 }}>The Moat</div>
         <div style={{ fontSize: 11, color: T.navy, lineHeight: 1.5 }}>A deeply trained agent built over 12 months is not easily replaced. Switching cost is the compounding advantage — the more a tenant trains, the more they own, and the less they want to leave.</div>
       </div>
-    </>
-  );
-}
-
-function RoadmapTab() {
-  const isMobile = useIsMobile();
-  const accentColor = (label) => {
-    if (label.startsWith("Now"))   return T.moss;
-    if (label.startsWith("Next"))  return T.brass;
-    return T.muted;
-  };
-  const cols = [
-    { label: "Now · v5.x",  sub: "POC coded · porting", items: ["Capability Registry", "Live Step Execution", "Test Team", "Auto-Training Service"] },
-    { label: "Next · v6.x", sub: "",                     items: ["Multi-tenancy + Clerk Auth", "Agent Marketplace"] },
-    { label: "Later · v7.x",sub: "",                     items: ["BYOK + Per-Agent LLM", "MCP — Agent Integration"] },
-  ];
-  return (
-    <>
-      {/* FEATURE: SH-21 — Now/Next/Later comparison grid drops 3→1 column on mobile */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
-        {cols.map(c => (
-          <div key={c.label} style={{ background: T.cardAlt, border: `1px solid ${T.line}`, borderTop: `3px solid ${accentColor(c.label)}`, padding: 11 }}>
-            <div style={{ fontFamily: mono, fontSize: 8, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, color: accentColor(c.label), marginBottom: 4 }}>{c.label}</div>
-            {c.sub && <div style={{ fontFamily: mono, fontSize: 7, color: T.muted, marginBottom: 8 }}>{c.sub}</div>}
-            {c.items.map(i => <div key={i} style={{ fontSize: 9, color: T.navy, padding: "4px 6px", border: `1px solid ${T.lineSoft}`, marginBottom: 3, background: T.card, lineHeight: 1.3 }}>{i}</div>)}
-          </div>
-        ))}
-      </div>
-
-      <SH>Skills — The Heart of the Platform</SH>
-      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: "0 0 8px" }}>
-        Skills are the atomic unit of DeepBench. Five types — Identity, Behavior, Knowledge, Intent, Format — are configured into Skill Profiles: proprietary, measurable, deployable instances that agents hold Seniority in at specific depth levels (1–4). Skills combine into Capabilities, which assemble into Agents. Every level is independently configurable, priceable, and MCP-accessible. This is what makes the marketplace, depth pricing, and measurable output quality possible.
-      </p>
-      <div style={{ fontSize: 10, color: T.muted, lineHeight: 1.5, padding: "8px 10px", border: `1px solid ${T.lineSoft}`, background: T.cardAlt }}>
-        Phase 1: Task Planning · Title Generation · Agent Routing · RAG Query · Chat Response · Data Analysis · Document Extraction · Web Research (ReAct) · Knowledge Reinforcement · Capability Audit · Procurement Flags · Vendor Concentration · Column Detection / NIGP Lookup · Identity / Persona Replication
-      </div>
-
-      <SH>MCP — Agent Integration (v7.x)</SH>
-      <p style={{ fontSize: 11, color: T.navy, lineHeight: 1.6, margin: 0 }}>
-        Model Context Protocol support: expose DeepBench agents and capability services as MCP servers callable by external AI tools, IDEs, and orchestrators. A DeepBench-trained procurement agent becomes callable from Claude Desktop, Cursor, or any MCP-compatible environment — a distribution channel that doesn't require the DeepBench UI at all.
-      </p>
     </>
   );
 }
@@ -511,7 +427,7 @@ function JohnTab() {
 
 // ── Main panel ───────────────────────────────────────────────────────────────────
 export default function AboutPanel({ onClose }) {
-  const [tab, setTab] = useState("purpose");
+  const [tab, setTab] = useState("architecture");
   // FEATURE: SH-21 — mobile-responsive layout, gated by useIsMobile(); desktop path unchanged
   const isMobile = useIsMobile();
   // FEATURE: MOB-001 -- live version read from dev_version_counter (the same table every session
@@ -524,6 +440,38 @@ export default function AboutPanel({ onClose }) {
       .then(({ data, error }) => { if (data && !error) setLiveVersion(`${data.major}.${data.minor}.${data.patch}`); });
   }, []);
   const displayVersion = liveVersion || APP_VERSION;
+
+  // FEATURE: ABT-1 -- all Architecture metric-grid sources fetched in parallel on panel open.
+  // A source that errors (or hasn't resolved yet) stays null and its tile renders "—" -- never a
+  // hardcoded number, never 0 (LOG-36's revert was caused by a confident wrong "0"). Tile 4
+  // ("AI patterns used") deliberately reads the same ai_pattern_classification_rollup view the AI
+  // Audit panel's By Pattern section reads (fetchPatternClassification(), useAIActivity.js), so
+  // the two screens cannot disagree.
+  // DEVIATION from the S-ABT-1a kickoff's Task 3 snippet, measured live this session: a
+  // count:'exact' query on the rollup view makes PostgREST evaluate the expensive view a second
+  // time for the count and deterministically hits the anon statement timeout (Postgres 57014,
+  // 3/3 attempts ~3.1s), so that wiring would have rendered "—" forever. The tile instead fetches
+  // the view's pattern_slug rows (the same cheap shape fetchPatternClassification() uses, ~2.3s,
+  // one row per classified pattern) and counts them client-side -- identical semantics, and still
+  // structurally incapable of disagreeing with By Pattern, which counts the same fetched rows.
+  const [stats, setStats] = useState({ loggedCalls: null, patternsUsed: null, services: null, schema: null, platform: null });
+  useEffect(() => {
+    Promise.all([
+      supabase.from("ai_activity_log").select("*", { count: "exact", head: true }),
+      supabase.from("ai_pattern_classification_rollup").select("pattern_slug"),
+      supabase.from("platform_services").select("*", { count: "exact", head: true }),
+      supabase.rpc("platform_schema_stats").single(),
+      supabase.from("platform_stats").select("*").eq("id", 1).single(),
+    ]).then(([calls, rollup, services, schema, platform]) => {
+      setStats({
+        loggedCalls: calls.error ? null : calls.count,
+        patternsUsed: rollup.error || !rollup.data ? null : rollup.data.length,
+        services: services.error ? null : services.count,
+        schema: schema.error ? null : schema.data,
+        platform: platform.error ? null : platform.data,
+      });
+    });
+  }, []);
 
   return (
     <>
@@ -553,7 +501,9 @@ export default function AboutPanel({ onClose }) {
 
         {/* Tab bar — FEATURE: SH-21 — horizontal scroll on mobile instead of flex:1 squeeze.
             FEATURE: SH-21 — mobile scroll hint: fade gradient + chevron on the trailing edge,
-            static (not scroll-position-aware), same treatment as MI-44's Work-dropdown arrow hint. */}
+            static (not scroll-position-aware), same treatment as MI-44's Work-dropdown arrow hint.
+            FEATURE: ABT-1 — the bar stays and keeps rendering from TABS (John's explicit call),
+            now showing the single Architecture tab. */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <div style={{ display: "flex", borderBottom: `1px solid ${T.line}`, background: T.cardAlt, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
             {TABS.map(t => (
@@ -583,15 +533,10 @@ export default function AboutPanel({ onClose }) {
           )}
         </div>
 
-        {/* Content */}
+        {/* Content — FEATURE: ABT-1 — hidden tabs' render lines removed (their ids are unreachable
+            from TABS); their component functions stay in-file above for one-line restoration. */}
         <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 16px" : "16px 24px", minHeight: 0 }}>
-          {tab === "purpose"      && <PurposeTab />}
-          {tab === "architecture" && <ArchitectureTab />}
-          {tab === "quickstart"   && <QuickStartTab />}
-          {tab === "revenue"      && <RevenueTab />}
-          {tab === "roadmap"      && <RoadmapTab />}
-          {tab === "showcase"     && <ShowcaseTab />}
-          {tab === "john"         && <JohnTab />}
+          {tab === "architecture" && <ArchitectureTab displayVersion={displayVersion} stats={stats} />}
         </div>
 
       </div>
