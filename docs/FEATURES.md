@@ -5,6 +5,7 @@
 >
 > **Split 2026-07-07 into 3 files by priority (John's criterion, updated 2026-07-17 — same CI/MI scope, criterion re-worded/expanded): "Any enhancement for the CI page to work before showing to Apple, to keep from an architect's scrutiny or enduser frustration: from backend to frontend, that is task success rate, end-end q&a, speed, loop, harness, agent model, AI auditing/log, UX/UI, db data model cleanup or seeding, goes to Now. Anything for the CI page outside of the previous is Next, and anything not related to making CI successful goes to Later."** This file holds only **now** — read this one by default at design-session Step 1. `docs/FEATURES-NEXT.md` (other CI backlog) and `docs/FEATURES-LATER.md` (everything else) are read only when scoping work in those areas.
 >
+> **Beta definition + beta-gate execution queue** → `docs/BETA.md` (added 2026-07-28). When filing any new row, declare `Beta-gate (<bucket>)` or `Post-beta` in the row per that file's maintenance rules.
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
 > **✅ Done rows archived:** if a feature isn't listed in any of the 3 files, check `docs/FEATURES-ARCHIVE.md` before assuming it's missing.
