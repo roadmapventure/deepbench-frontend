@@ -1,3 +1,4 @@
+// DeepBench v6.3.189 | AIActivityPanel.jsx | LOG-98a -- RollingNumber reveal no longer depends on requestAnimationFrame (hidden tabs froze tiles on fabricated values)
 // DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
 // DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
 // DeepBench v6.3.188 | AIActivityPanel.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
@@ -220,6 +221,12 @@ function RollingNumber({ value, loading, format }) {
   }, [loading, reduced]);
 
   // Reveal phase — one ease-out count-up from 0 to the real value, then lock.
+  // FEATURE: LOG-98a -- requestAnimationFrame is suspended for hidden/backgrounded/occluded tabs,
+  // and rAF was previously the ONLY path that set the final value, so a panel that finished loading
+  // while the tab was hidden froze forever on a fabricated rolling number displayed as real data
+  // (confirmed live: document.hidden === true, no rAF callback within 1200ms). The animation is
+  // decorative; landing on the true value is not. This timer fires regardless of frames and is the
+  // authoritative finish; the rAF loop only smooths the way there.
   useEffect(() => {
     if (loading || reduced || revealed) return;
     const target = Number(value) || 0;
@@ -234,11 +241,15 @@ function RollingNumber({ value, loading, format }) {
       else { setDisplay(target); setRevealed(true); }
     };
     raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    const backstop = setTimeout(() => { setDisplay(target); setRevealed(true); }, DURATION + 150);
+    return () => { cancelAnimationFrame(raf); clearTimeout(backstop); };
   }, [loading, reduced, revealed, value]);
 
   if (reduced) return <>{loading ? "—" : format(Number(value) || 0)}</>;
   if (loading) return <span style={{opacity:0.75}}>{format(display)}</span>;
+  // FEATURE: LOG-98a -- second guard for the same failure class: once loading is over, a
+  // not-yet-revealed tile shows the mid-animation `display` only while it is still plausibly
+  // animating. `display` is never allowed to outlive the reveal window as the visible value.
   return <>{format(revealed ? Number(value) || 0 : display)}</>;
 }
 
