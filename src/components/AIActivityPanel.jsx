@@ -1,3 +1,4 @@
+// DeepBench v6.3.196 | AIActivityPanel.jsx | LOG-105 -- By Pattern row Calls/Cost render through RollingNumber; cost rolls until the log hydrates instead of showing a false <$0.01
 // DeepBench v6.3.191 | AIActivityPanel.jsx | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.189 | AIActivityPanel.jsx | LOG-98a -- RollingNumber reveal no longer depends on requestAnimationFrame (hidden tabs froze tiles on fabricated values)
 // DeepBench v6.3.173 | AIActivityPanel.jsx | LOG-93 -- Active Agents tile (roster count; active = available for routing)
@@ -93,7 +94,13 @@ function PlatformServiceRow({ d }) {
 
 // FEATURE: AI-23 patch — PatternRow with "more" text expand
 // FEATURE: AI-30 — PatternRow HITL special columns + Parallelization partial badge
-function PatternRow({ d }) {
+// FEATURE: LOG-105 -- the row's Cost depends on the hydrated log (LOG-97 sums per-row costs),
+// which lands ~5s after LOG-99 made the pattern rows themselves near-instant. Until then the
+// view's structurally-empty cost_sum rendered as a confident "<$0.01" -- the same false-zero
+// class LOG-98 removed from the header tiles. Cost rolls until the log is in; Calls is already
+// correct when the row first renders (same read as the row itself), so it only does the
+// count-up reveal. Reuses LOG-98's RollingNumber, including its rAF-independent LOG-98a backstop.
+function PatternRow({ d, costLoading = false }) {
   const [showFull, setShowFull] = useState(false);
   const hasData = d.total > 0;
   const isLong  = d.desc && d.desc.length > 72;
@@ -130,10 +137,13 @@ function PatternRow({ d }) {
       ) : d.active ? (
         hasData ? (
           <div style={{display:"flex",gap:12,flexShrink:0}}>
-            {[["Calls",d.total.toLocaleString()],["Cost",fmt$(d.cost)]].map(([k,v])=>(
+            {[["Calls", d.total, false, v => Math.round(v).toLocaleString()],
+              ["Cost",  d.cost,  costLoading, v => fmt$(v)]].map(([k,v,isLoading,format])=>(
               <div key={k} style={{textAlign:"right"}}>
                 <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-                <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+                <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>
+                  <RollingNumber value={v} loading={isLoading} format={format}/>
+                </div>
               </div>
             ))}
           </div>
@@ -361,7 +371,7 @@ export default function AIActivityPanel({ onClose }) {
                   ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
                   : classified.length === 0
                     ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No classified patterns yet.</div>
-                    : classified.map(pat => <PatternRow key={pat.slug} d={pat}/>)}
+                    : classified.map(pat => <PatternRow key={pat.slug} d={pat} costLoading={loading}/>)}
                 {/* FEATURE: LOG-38 -- single unclassified count, no breakdown (John's call). Everything whose
                     signature matched no gold pattern -- new or old, empty or rich -- rolled into one line.
                     FEATURE: LOG-98 -- hidden entirely while loading; it otherwise renders a false
