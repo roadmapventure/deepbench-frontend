@@ -1,3 +1,4 @@
+// DeepBench v6.3.170 | AIActivityPanel.jsx | LOG-92 -- header all-tenants + Capabilities tile removed + Patterns Logged reads classification view + thousands-comma sweep
 // DeepBench v6.3.167 | AIActivityPanel.jsx | LOG-90 -- §19m unregistered-services line removed from the By Service drawer (detection stays in useAIActivity; residue tracked as LOG-89)
 // DeepBench v6.3.163 | AIActivityPanel.jsx | LOG-86 -- tab bar removed (MCP Roadmap + Architect Checklist hidden, content kept in-file), Platform Roadmap drawer deleted; drawers are the opening view
 // DeepBench v6.3.159 | AIActivityPanel.jsx | S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory (8 layer groups, muted function lists, no pattern names, closed by default); By Agent capability sub-rows; Services/Capabilities header stats; stray By Pattern top line removed (ARCHITECTURE.md §19m)
@@ -33,7 +34,8 @@ const CHECKLIST = [
   ["Structured output",  "Tool use / response_format for all structured data. Never parse free-text JSON."],
 ];
 
-const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toFixed(2)}`;
+// FEATURE: LOG-92 -- thousands separator for >= $1,000 (John's 0,000 spec); two decimals kept.
+const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
 
 // FEATURE: S-AI-AUDIT-SVCDIR -- one platform_services directory row (replaces the old
@@ -120,7 +122,7 @@ function PatternRow({ d }) {
       ) : d.active ? (
         hasData ? (
           <div style={{display:"flex",gap:12,flexShrink:0}}>
-            {[["Calls",d.total],["Cost",fmt$(d.cost)]].map(([k,v])=>(
+            {[["Calls",d.total.toLocaleString()],["Cost",fmt$(d.cost)]].map(([k,v])=>(
               <div key={k} style={{textAlign:"right"}}>
                 <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
                 <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
@@ -196,10 +198,12 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: S-AI-AUDIT-SVCDIR -- servicesActive/servicesCatalogTotal/servicesSorted dropped from
   // this destructure (the hook still exports them for other consumers); the By Service body and
   // the header stats now read the §19m directory join instead.
-  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsLoggedCount, patternsSorted, agentsSorted, platformServices, platformServiceCount, assignedCapabilityCount } = useAIActivity();
+  // FEATURE: LOG-92 -- patternsLoggedCount/assignedCapabilityCount dropped from this destructure
+  // (the hook still exports both for other consumers): the Capabilities tile is removed and the
+  // Patterns Logged tile now reads the LOG-38 classification view below, so tile and list agree.
+  const { byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
-  // single reclassification count). Independent of the legacy byPattern/patternsSorted above, which
-  // still feed the untouched "Patterns Logged" stat tile this session leaves alone.
+  // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
   const { classified, reclassificationCount } = usePatternClassification();
   const tab = "activity"; // LOG-86: tab bar hidden — MCP Roadmap + Architect Checklist blocks below are intentionally kept (unreachable). To re-enable: restore useState + the tab-bar JSX (see git history, v6.3.160).
   // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)
@@ -242,12 +246,14 @@ export default function AIActivityPanel({ onClose }) {
           {/* FEATURE: S-AI-AUDIT-SVCDIR -- "Services Active X/39" replaced by the directory count
               (a service EXISTS whether or not it logged today, §19m), plus the assigned-capability
               count from the same read Task 2's By Agent nesting uses. */}
+          {/* FEATURE: LOG-92 -- 5 tiles: Capabilities removed (the capability story lives in the
+              By Agent drawer, §19m); Patterns Logged reads the classification view so it always
+              equals the By Pattern row count; Total Calls gains the thousands comma. */}
           {[
-            ["Total Calls",    totalCalls],
+            ["Total Calls",    totalCalls.toLocaleString()],
             ["Total Cost",     fmt$(totalCost)],
             ["Services",       platformServiceCount],
-            ["Capabilities",   assignedCapabilityCount],
-            ["Patterns Logged",patternsLoggedCount],
+            ["Patterns Logged",classified.length],
             ["Models in Use",  modelsInUse],
           ].map(([k,v])=>(
             <div key={k}>
@@ -298,7 +304,7 @@ export default function AIActivityPanel({ onClose }) {
                       <div style={{fontFamily:body,fontSize:10,color:T.muted}}>{MODEL_PROVIDER[d.model]||"Unknown provider"}</div>
                     </div>
                     <div style={{display:"flex",gap:14,flexShrink:0}}>
-                      {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                      {[["Total",d.calls.toLocaleString()],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
                         <div key={k} style={{textAlign:"right"}}>
                           <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
                           <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
@@ -335,7 +341,7 @@ export default function AIActivityPanel({ onClose }) {
                           <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{info.role}</div>
                         </div>
                         <div style={{display:"flex",gap:14,flexShrink:0}}>
-                          {[["Total",d.calls],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
+                          {[["Total",d.calls.toLocaleString()],["Cost",fmt$(d.cost)],["Avg",d.avgLatency?fmtMs(d.avgLatency):"—"]].map(([k,v])=>(
                             <div key={k} style={{textAlign:"right"}}>
                               <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
                               <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>

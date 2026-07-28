@@ -1,3 +1,4 @@
+// DeepBench v6.3.170 | useAIActivity.js | LOG-92 -- hydrateFromSupabase default = all tenants (null tenantId skips the filter; audit surface shows every real model call)
 // DeepBench v6.3.159 | useAIActivity.js | S-AI-AUDIT-SVCDIR -- Platform Services directory (platform_services) fetch + read-time join, unregistered detection, per-agent capability nesting (ARCHITECTURE.md §19m)
 // DeepBench v6.3.158 | useAIActivity.js | LOG-80 -- By LLM: null model no longer fabricated to Haiku; computeByLLM() extracted + alias-normalized so each model appears once
 // DeepBench v6.3.155 | useAIActivity.js | LOG-38 -- Log Displayer read path: classification rollup + single reclassification count
@@ -732,16 +733,20 @@ export function logAICall({ type, model, tokens = 0, latencyMs = 0, tier = null,
 const PAGE_SIZE = 1000;
 
 // FEATURE: AI-16 — Hydrate in-memory store from Supabase on panel mount
-export async function hydrateFromSupabase(tenantId = 'global') {
+// FEATURE: LOG-92 -- tenantId null = all tenants (the AI Audit panel's read; John 2026-07-28:
+// test-tenant calls are real model calls and belong on an audit surface). A non-null tenantId
+// still scopes, preserving the original signature's behavior for any future scoped caller.
+export async function hydrateFromSupabase(tenantId = null) {
   const rows = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
+    let q = supabase
       .from('ai_activity_log')
       .select('*')
-      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { data, error } = await q;
 
     if (error) {
       console.warn('[AI log] Hydration failed:', error.message);
