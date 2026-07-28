@@ -223,3 +223,51 @@ a repeat of the same signature does not; empty-fact rows never trigger.
 - Consumers on legacy naming (grep, none read the view): `src/aiPatterns.js`, `AboutPanel.jsx`, `AIActivityPanel.jsx`, `useAgents.js`, `useAIActivity.js`, `MarketIntelligenceScreen.jsx`.
 - Capturability pass (per-pattern buckets + code evidence file:line): bucket A (existing fields suffice) — RAG, prompt-chaining, react-loop, function-calling, llm-as-judge, request-routing; bucket B (one new generic fact, honestly available) — constrained-decoding (`output_schema_forced` from forced tool_choice, request-receivable.js:104/117); bucket C (platform does not perform; stays unclassified) — parallel-tool-calling (`disable_parallel_tool_use:true` unconditional, request-receivable.js:117), token-streaming (non-streaming Anthropic calls), hypothetical-document-embeddings, adaptive-retrieval-depth, browser-agent, self-consistency, self-verification-via-claim-questions, reflection, multi-agent-debate, persistent-advice-storage, persistent-user-context-memory, case-based-reasoning, few-shot-prompting; bucket D (would require a pattern flag — breaks guardrail) — none.
 - Governance breaches this week, acknowledged for the record: 3 direct criteria PATCH reverts (bypassing Susan); 1 log-shaped criteria (request-routing's capability_slug version — since removed); agent-handoff's citation overwritten by an amend run (original promotion citation: OpenAI Agents SDK "Agent orchestration"; the promotion history in pattern_candidates preserves it). The orchestration/routing/handoff naming question stays Susan's/John's — LOG-51's path, not any session's unilateral call.
+
+### Prompt 9 — LOG-77 slice: the verdict-gated-retry fact (unlocks Evaluator-Optimizer)
+
+*(added 2026-07-28, `design-log-72b-0728` follow-up — John approved scope and this prompt verbatim)*
+
+```
+Work LOG-77 (Architecture)'s ninth item: the evaluation-verdict-gated-retry fact — Susan
+Smith — Trainer's formal MISSING SIGNAL from the Evaluator-Optimizer adjudication
+(design-log-72b-0728, v6.3.185; see LOG-72's row). John approved this scope 2026-07-28.
+Standard design→code→verify loop; design session first — this one has a real open design
+decision (below), walk it with John before kickoff.
+
+Capture: one generic call-shape fact written into call_facts when a turn's delegation was
+triggered by that same turn's failed evaluation — the "regenerate because the verdict said
+fail" link that distinguishes a gated loop from a linear chain. Generic property of the
+call, no pattern name anywhere in code. Add the field to SIGNATURE_FIELDS
+(lib/pattern-vocabulary.js) in the same session — the dead-field rule requires writer +
+allowlist land together. Also extend the SIGNATURE FIELD VALUE REFERENCE inside Susan's
+pattern-vocabulary-review-intent skill row (data) so she can legally author against it.
+
+THE OPEN DESIGN DECISION (settle with John, not unilaterally): how the harness knows a
+delegation is verdict-gated WITHOUT capability-specific logic. The retry site lives in the
+agent loop (a delegate_to_agent dispatched from a review turn whose own structured output
+declared a failing verdict) — but reading qg-review-intent's schema fields by name in
+execute.js would violate capabilities-are-data (.claude/rules/). Candidate shapes to
+evaluate against §19b/§19d, neither pre-chosen: (a) a generic trait on the Skill declaring
+its evaluation contract (which output field is the verdict), read generically like
+traits.schema already is; (b) a generic marker derived from loop structure alone (delegation
+whose task follows a self-declared block/fail in the same turn's quarantined
+self_reported_claims). If neither survives the sniff test, stop and bring it back to John.
+
+Tier 3, ask John once: the new field's placement in §19k's locked signature field order
+(precedent: model_modality's LOG-65 insertion; output_schema_forced's Prompt-7 note).
+
+Hard rules: no pattern name in the write path; no per-capability conditional; the fact is
+contingent — NEVER backfilled onto history (§19i bounds; the ~1,425 existing qg rows stay
+honestly unclassified). LOG-94 (Susan's stale Skill NOTE) is adjacent but stays its own
+item — do not fold in without John.
+
+Verify: a live quality-gate run that triggers a real regeneration writes the fact
+(Category L — one live proof of the novel path); a run with no retry does not; existing
+patterns' counts unchanged.
+
+Then, separate cheap data-only session (same mechanics as design-log-72b-0728): a fresh
+Evaluator-Optimizer promote candidate through Susan — she authors criteria with the new
+field in her vocabulary, web_search-cited; expect the new gold row to name quality-gate
+retry calls going forward only.
+```
