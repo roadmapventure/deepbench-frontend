@@ -174,13 +174,12 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
 
 ## 4. Contested — John's call, nothing proceeds on these without him
 
-1. **The Bench fabrication group.** Your five buckets name CHI surfaces only, but §1's
-   definition includes "the sub screens under bench," and these are live fabrications there:
-   `LOG-57` (Architecture — fictional pattern badges on 3 Bench screens, live-verified),
-   `LOG-70` (Architecture — same class), `AGR-01` (Architecture — hardcoded `susan`
-   mis-attributing Bench training data), `AGR-001`/`AGR-002` (Architecture/Data — "mock data"
-   tile + fabricated Training-invested dollars on Personnel), `MI-03` (Feature — static
-   pre-built Data Room charts). **Sixth bucket, fold into bucket 4, or accepted risk?**
+1. ~~The Bench fabrication group~~ — **RESOLVED 2026-07-28, John: "those go in the later
+   bucket and not for beta."** `LOG-57` (Architecture), `LOG-70` (Architecture), `AGR-01`
+   (Architecture), `AGR-001`/`AGR-002` (Architecture/Data), `MI-03` (Feature) are all
+   post-beta; the Bench fabrications are accepted risk for the beta send. (Interpretation
+   note, Tier 2: recorded as a beta-gate ruling only — the rows stay in their current
+   FEATURES tier files; no physical re-tier done.)
 2. **`CHI-70` (Architecture)** — refresh or crash loses the whole conversation. Large scope;
    a reviewer mid-session who refreshes starts over. Beta-gate or accept?
 3. **`HAR-14` (Task Success Rate)** — validator accepts present-but-empty required fields;
