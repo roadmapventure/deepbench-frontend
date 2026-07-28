@@ -1,3 +1,4 @@
+// DeepBench v6.3.184 | api/capabilities/execute.js | LOG-95 -- hop-event span identity (§19p): all 10 streamed delegation-family onEvent payloads carry trace_id + from_span_id/to_span_id; lastHelpSelection and buildFinalDelegationResult() carry the credited execution's trace_id/span_id
 // DeepBench v6.3.182 | api/capabilities/execute.js | HAR-17 -- transient model-call failures checkpoint-recover once per hop (recovery_ledger, checked write) before surfacing; enable_web_search persisted across resume
 // DeepBench v6.3.181 | api/capabilities/execute.js | HAR-18 -- nested in_progress guards at the broker and critique dispatch sites (the two of four nested call sites that lacked them)
 // DeepBench v6.3.180 | api/capabilities/execute.js | HAR-15 -- both error paths forward failureClass/faultCode/upstreamStatus
@@ -413,6 +414,8 @@ export function buildFinalDelegationResult({ delegateResult, targetAgentId, targ
     display_agent_card: displayAgentCard,
     display_agent_id: targetAgentId,
     selection: lastHelpSelection,
+    trace_id: delegateResult.trace_id ?? null,  // LOG-95 (§19p): the delegate's own execution
+    span_id: delegateResult.span_id ?? null,    // LOG-95 (§19p) -- recursion: nested final_delegation results carry ids by this same line
   };
 }
 
@@ -588,9 +591,9 @@ async function dispatchDelegation({
     // parity-restoration principle: tool_input.task_description/skill_needed is the same real field
     // the delegateTaskContext below already reads, not new data.
     if (delegationRequired) {
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null });
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p)
     }
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help' });
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): PM's execution not started yet -- null, never fabricated
     // FEATURE: LOO-001 -- requesting_agent_id threaded into Michelle's task_context (generic,
     // always-present field, never omitted) so her own reasoning can recognize and reject a
     // self-referral, per the no_match output LOO-002 adds. tool_input itself never carries this
@@ -623,6 +626,8 @@ async function dispatchDelegation({
       reasoning: delegateResult?.content?.reasoning ?? null,
       candidates_considered: delegateResult?.content?.candidates ?? null,
       patterns_used: delegateResult?.patterns_used || [],
+      trace_id: delegateResult?.trace_id ?? trace_id ?? null,   // LOG-95 (§19p)
+      span_id: delegateResult?.span_id ?? null,                 // LOG-95 (§19p): the picker's own span, never the requester's
     };
 
     if (delegationRequired) {
@@ -642,11 +647,11 @@ async function dispatchDelegation({
       // via lastHelpSelection) to this event, restoring the content the old Shape-2 "agent_selection"
       // declaration used to carry before LOO-009b removed it as a redundant crediting mechanism —
       // redundant for crediting, not for content, which is the gap this closes.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null });
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the PM -- her own resolved span
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
         : { delegation_task: tool_input.task_description || tool_input.skill_needed };
-      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null });
+      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
       const autoResolvedResult = await runCapability({
         capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -661,7 +666,7 @@ async function dispatchDelegation({
       // terminal agent. Nested is_final-in-is_final chains need no special handling: _onEvent is
       // already threaded into the nested runCapability() call above, so a deeper final hand-off
       // fires its OWN delegation_complete at its own level automatically.
-      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent' });
+      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: autoResolvedResult?.span_id ?? null }); // LOG-95 (§19p): credits the recommended target's own execution
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = pmAgentId;
@@ -687,9 +692,9 @@ async function dispatchDelegation({
       // genuinely happens first — while the 'delegation' placeholder (and the target's later claim
       // on it) correctly becomes the second, later hop. Content unchanged from LOO-011/LOO-012 — only
       // the firing point moved.
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null });
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p): credits the current agent's own execution
     }
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -700,7 +705,7 @@ async function dispatchDelegation({
     }
     if (willResolveFinal) {
       // FEATURE: LOO-009 — unchanged: credits the target, claiming the 'delegation' placeholder above.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent' });
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = targetAgentId;
@@ -708,7 +713,7 @@ async function dispatchDelegation({
   }
 
   if (returningFromAgentId) {
-    onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug });
+    onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: span_id }); // LOG-95 (§19p): row credits the returning delegate
   }
   conversationHistory = [
     ...conversationHistory,
@@ -907,7 +912,7 @@ async function runLoop({
           const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
           // FEATURE: MI-42 -- fires the instant the target is resolved, before the nested call's own
           // latency -- never speculative, the critique agent is always real by the time this fires.
-          onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: critiqueAgentId, toCapabilitySlug: critiqueCapabilitySlug, toIntentSlug: critiqueIntentSlug, viaTool: 'critique' });
+          onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: critiqueAgentId, toCapabilitySlug: critiqueCapabilitySlug, toIntentSlug: critiqueIntentSlug, viaTool: 'critique', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): critique execution not started yet
           critique = await runCapability({
             capability_slug: critiqueCapabilitySlug,
             intent_slug: critiqueIntentSlug,

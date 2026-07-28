@@ -1,3 +1,4 @@
+// DeepBench v6.3.184 | src/lib/tracePatterns.js | LOG-95 -- pickCreditedSpan(): which endpoint's span a streamed delegation-family event's drawer row credits (§19p); pure, JSX-free, Node-importable
 // DeepBench v6.3.166 | src/lib/tracePatterns.js | LOG-79 -- per-hop governed pattern names from
 // the ai_call_patterns view (the Log Displayer, ARCHITECTURE.md §19k/§19l), joined to a trace's
 // own ai_activity_log rows via trace_id -> id/span_id. Extracted as a JSX-free sibling module
@@ -10,6 +11,15 @@
 // the drawer expresses "unclassified" structurally by rendering no line at all.
 
 import { supabase } from './supabase.js';
+
+// LOG-95 (§19p) -- which endpoint's span a streamed delegation-family event's drawer row
+// credits: delegation_complete rows credit toAgentId (to_span_id); delegation and
+// delegation_return rows credit fromAgentId (from_span_id). Pure; null-safe; never fabricates.
+export function pickCreditedSpan(evt) {
+  if (!evt || typeof evt !== 'object') return { trace_id: null, span_id: null };
+  const span = evt.type === 'delegation_complete' ? evt.to_span_id : evt.from_span_id;
+  return { trace_id: evt.trace_id ?? null, span_id: span ?? null };
+}
 
 // Pure. activityRows: [{ id, span_id }] (a trace's ai_activity_log rows); patternRows:
 // [{ ai_activity_log_id, pattern_name }] (the Displayer view's matches for those ids).

@@ -1,3 +1,4 @@
+// DeepBench v6.3.184 | MarketIntelligenceScreen.jsx | LOG-95 -- hop-event span identity (§19p): streamed delegation-family rows spread pickCreditedSpan(evt) into their stored data; failure_triage credits the picker with her own span when she's credited, the gate's when Owen is
 // DeepBench v6.3.183 | MarketIntelligenceScreen.jsx | HAR-17 -- recovery visibility: chat status "hit a snag" + expectation extension off the in_progress body's recovery payload; recovery continues exempt from the client cap; failed-status bodies throw
 // DeepBench v6.3.180 | MarketIntelligenceScreen.jsx | HAR-15 -- credit-exhaustion renders an honest, distinct fault report (no raw provider JSON, no "try again") at all 5 error surfaces
 // DeepBench v6.3.166 | MarketIntelligenceScreen.jsx | LOG-79 -- Agent Routing drawer's per-hop "AI patterns used:" line now reads the ai_call_patterns view (read-time classification, §19k) via trace_id/span_id threaded off each callCapability result, replacing the frozen legacy patterns_used field on this surface; a hop whose rows match no gold pattern shows no line at all (honest unclassified state, no boundary/date copy -- John's §19l call)
@@ -377,7 +378,7 @@ import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDurati
 // FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
-import { fetchTracePatterns } from "../lib/tracePatterns.js";
+import { fetchTracePatterns, pickCreditedSpan } from "../lib/tracePatterns.js";
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -1453,7 +1454,14 @@ async function runQaWithQualityGate(message, conversationContext, onEvent, setSt
     // nested inside gate.triage. Hoisted explicitly so failure_triage's pattern line shows real
     // data. FEATURE: LOG-79 -- that identity is now trace_id/span_id (joined to the
     // ai_call_patterns view at render time), not the legacy patterns_used array.
-    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, trace_id: gate.trace_id, span_id: gate.span_id }, resolveEmbeddedDuration(Date.now() - t0)));
+    // FEATURE: LOG-95 (§19p) -- the row credits the picker when she made the pick, Owen otherwise;
+    // its span identity must match: the picker's own span (now carried on last_help_selection via
+    // Task 1a's executor threading) when she's credited, the gate execution's when Owen is. A
+    // wrong-agent span is worse than a missing one (.claude/rules/hop-event-span-identity.md).
+    const triageCredited = gate.last_help_selection?.selected_by_agent_id
+      ? { trace_id: gate.last_help_selection.trace_id ?? gate.trace_id, span_id: gate.last_help_selection.span_id ?? null }
+      : { trace_id: gate.trace_id, span_id: gate.span_id };
+    onEvent(buildHopEvent("failure_triage", gate.last_help_selection?.selected_by_agent_id || "owen", { ...gate.triage, ...triageCredited }, resolveEmbeddedDuration(Date.now() - t0)));
     return { kind: "qa_failed", text: buildFailureText(gate.guardrail, gate.triage) };
   }
 
@@ -3563,11 +3571,15 @@ export default function MarketIntelligenceScreen() {
       // FEATURE: LOO-012 — reasoning/task/toCapabilitySlug now carried into the stored event's data
       // (previously dropped — only message/viaTool survived), so describePipelineEvent below can
       // render real content instead of always falling through to the bare "has finished." template.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null }, durationMs, {}));
+      // FEATURE: LOG-95 (§19p) -- the stored event's data spreads the credited endpoint's span
+      // identity (pickCreditedSpan handles delegation_complete AND delegation_return correctly --
+      // no branch-local span logic), so RoutingActivityLine's ai_call_patterns join works on
+      // live streamed rows too, not only the result-shape-built ones.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 -- recovery visibility, John's exact design 2026-07-28: tell the user we hit a
