@@ -17,18 +17,20 @@
 
 ---
 
-> ## ⚠️ Cross-cutting blocker, open as of 2026-07-28 22:30 CST — `SES-33` (Tooling)
+> ## ✅ Cleared 2026-07-29 08:45 CST — `SES-33` (Tooling), kept as a recurrence warning
 >
-> **The GitHub→Vercel `dev` auto-deploy has stopped firing.** Last git-triggered `dev`
-> deployment: `b309da8` (21:55 CST). `origin/dev` is **14 commits** past it. Production
-> (`main`) is unaffected and fully current — this is `dev`-preview only.
+> **Was:** the GitHub→Vercel `dev` auto-deploy stopped firing 2026-07-28 ~21:55, leaving
+> `origin/dev` **14 commits** past its last build. Production (`main`) was never affected.
+> Every bucket's ship bar is confirmed by live QA against the dev preview, so while it was
+> down, no session could honestly close an item on deployed evidence.
 >
-> **Why it belongs on this board:** every bucket's ship bar is confirmed by live QA against
-> the dev preview. Until this is fixed, no session can honestly close an item on deployed
-> evidence, and any that does is testing a stale build. Not new — `8fbfdd4`'s own commit
-> message records another session hitting it and working around it with a manual poke, which
-> produced a deployment carrying **no git metadata at all** (untraceable to a commit).
-> Needs the integration re-checked at the Vercel/GitHub end, not another poke.
+> **Now:** firing again, one deployment per commit, backlog drained (verified via the Vercel
+> API, 2026-07-29 08:45). **It self-resolved — no fix was applied and no root cause was
+> established.** It had also happened at least once before (`8fbfdd4`'s commit message).
+>
+> **What to do if the board looks stale again:** check deployment freshness *before* trusting
+> any live-QA result, and re-open `SES-33` rather than working around it with a manual poke —
+> a poke deploy carries no git metadata and cannot be traced back to a commit.
 
 ## 1. What beta means (John, verbatim)
 
