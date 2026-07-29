@@ -1,1 +1,0 @@
-ses29-fix-kickoffs — design session for the S-SES-29-rca ticket set: FEATURES rows SES-31/HAR-20/DAT-11/AGT-36/LOG-109, runbook write-backs, kickoffs + Sonnet 5 coding sessions for SES-31 and HAR-20 (John go, 2026-07-28 ~21:45 CST).
