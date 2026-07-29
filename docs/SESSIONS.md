@@ -5376,3 +5376,23 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 **Open, deliberately undiagnosed residue (no blind fixes):** case 5's stuck `in_progress` qg-review/data-escalate chain (hops a2af5af1/349574a6); two `ws-news-search` executions in-window outside case 24 (23:19:12, 23:35:35 — possible cross-traffic during the census); what grounded the morning-census "rich" Korea answer.
 
 **Rerun expectation:** `SES-31` + `HAR-20` alone should clear the entire infra-death class (12 cases) and decontaminate the six poisoned judge verdicts — only then does a run measure real content quality. `DAT-11` restores case 8's designed comparison. Cases 12/23 stay red until the `AGT-36` decision.
+
+---
+
+## S-SES-32 (v6.3.206, 2026-07-28 night, worktree `design-log-60`, docs-only) — secondary backlog IDs need a closure gate
+
+**How it started.** John opened a design session on `LOG-60` (Observability). Orientation found `LOG-60` had no design work left in it: a 2026-07-28 sweep had marked its original dropped-rows mechanism stale (it predates the Layer B rearchitecture), and the `design-log-81` conversation had already settled the live question — every AI Audit count is real model calls only. `LOG-60`'s row ends with "Close this row when `LOG-81`'s QA passes."
+
+**The coordination call (John's, option 3 of 3 offered).** `LOG-81`'s coding commit `5c69eb0` was already on `origin/dev` and its session was live (last activity minutes earlier, `CLAUDE-STATE.md` still at v6.3.200, close-out not yet run). Rather than verify and close `LOG-60` in parallel — which would have run this session's edits into `docs/FEATURES.md` underneath an active close-out — the row was handed to the `Design log-81` session via `send_message`, tied to its own **QA checklist item 4** ("classified distinct + not yet classified = header Total Calls exactly"), which is `LOG-60`'s reconciliation question restated. Pass → close and archive `LOG-60`; fail → leave open with the measured delta. This session wrote nothing to `docs/FEATURES.md`'s `LOG-60` row.
+
+**The process gap this exposed (the actual deliverable).** `LOG-81`'s kickoff named `LOG-60` exactly once — in its Section 1 Feature line, "also settles `LOG-60` (Observability)'s denominator question" — and nowhere in Sections 9–12. No gate, no close-out step. `LOG-60`'s row pointed at `LOG-81`; `LOG-81`'s kickoff pointed at `LOG-60`; neither pointed at an action. Nothing in `CLAUDE-DESIGN.md` required the kickoff to discharge an ID it adopted, and Step 5c's All-PASS branch archives only "the feature ID's row," singular. The miss was caught by luck — John opened a session on the orphaned row itself.
+
+**Rule shipped** (`CLAUDE-DESIGN.md`, 2 insertions):
+- **Step 4 Architect Review, new bullet "Secondary backlog IDs need a closure gate"** — naming another ID as settled/folded-in/superseded obliges the kickoff to (a) name the QA item that gates it and (b) list it in the close-out step. If no gate can be named that would prove it resolved, don't claim it settled; leave it open and say what it waits on.
+- **Step 5c All-PASS branch** — discharge every secondary ID the kickoff named, each against its stated gate; passed → close and archive in the same commit, failed → stays open with the measured reason on its row. Never inherit the primary's ✅ by adjacency, never silently stay open; state which happened.
+
+**Back-check (partial, and logged as partial).** Swept `docs/kickoffs/` for adoption language. `AA-83` and `AA-135` were verified correctly archived. **One live pre-existing instance found: `MI-41` (UI)**, still `❌ Missing`, while kickoff `v6.2.18-MI-51` states `MI-42` (archived ✅) "supersedes/folds in the standalone `MI-41` idea." The descriptions don't match — the kickoff describes a chat-timer/Agent-Routing-drawer idea, `MI-41`'s row is Column 3's `flex`/`minHeight`/`overflowY` chain — so it's either a mis-cited ID or two items sharing one number (`SES-30`'s collision family). ~15 other matching kickoffs were **not** individually confirmed. Tracked on `SES-32`'s row as 🔶 Partial rather than claimed as a completed sweep.
+
+**Relationship to `SES-27`.** Same close-out-leak family, different mechanism: `SES-27` is one row's own scope outrunning its checkmark; `SES-32` is a second row that no session's close-out owns. Both left open work wearing a resolved label.
+
+**Not done here, deliberately:** `LOG-60` itself was not closed (belongs to `design-log-81`), and `CLAUDE-STATE.md`'s "Version in dev" line was not touched — v6.3.203 (`LOG-81`) is the real pending app version and rewriting that header mid-close-out would have clobbered a live session's work. This session is docs-only; no code, no app behavior change.
