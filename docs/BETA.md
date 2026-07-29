@@ -168,7 +168,7 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
 | 10 | `CHI-64` (Observability) | News delegation hops resolve null durations + console errors on load. |
 | 11 | `LOO-003` (Observability) | Multi-hop delegation reason overwritten — drawer shows the wrong why. *(triage call)* |
 | 12 | `AI-52` (Observability) | Verify two legacy intents' `patterns_used` — the "if appropriate" check. *(triage call)* |
-| 13 | `AA-179` (Architecture) | Prompt-assembly work (Eleanor/Michelle/Dan) never appears as a routing event — **blocked on the `AA-178` ruling (§4 Q4)**. |
+| ~~13~~ | ~~`AA-179` (Architecture)~~ | Dropped from beta 2026-07-28 — its blocker `AA-178`'s ruling was deferred post-beta (§4 Q4). |
 
 ---
 
@@ -186,9 +186,13 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
    see if regression uncovers this. If not, it goes into next bucket - after beta release."
    → Not queued now; if any 24-case run failure root-causes to an accepted empty required
    field, `HAR-14` enters bucket 1 at that point. Otherwise post-beta (Next tier).
-4. **`AA-178` (Architecture)** — the standing Librarian-gatekeeper contradiction (which
-   reading of "only Eleanor calls `queryLibrary()`" is the rule). Blocks `AA-179` and the
-   `AA-99` violation's fix. Not new — this triage just re-surfaces that it's still unruled.
+4. ~~`AA-178` (Architecture)~~ — **RESOLVED for beta 2026-07-28, John: defer the ruling
+   post-beta.** Fresh code read this session: the direct `queryLibrary()` call no longer
+   exists — since `AA-106`/`AA-107`, `ai-enrichment.js` routes `the_library` fetches through
+   `queryContent()`'s single broker path, credential-checked per requesting agent. No live
+   failure, no regression impact; the caller-identity-vs-code-path meaning question stays
+   open but unscheduled. Consequence: `AA-179` (Architecture) **drops out of bucket 5** for
+   beta (it was item 13, blocked on this ruling).
 5. **`MI-69` (Architecture)** — hardcoded routing-row narration "looks scripted" (the exact
    anti-claim of §1), but the fix is a screen-wide redesign. Scope call.
 
