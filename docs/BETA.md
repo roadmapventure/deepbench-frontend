@@ -195,8 +195,8 @@ fixed, 2 re-scoped, 1 standing gate.
 
 | # | ID (Type) | Defect (verified evidence) |
 |---|---|---|
-| 1 | `LOG-91` (Observability) | **ESCALATED — the double-write is active:** 1,186 new `agent-turn`+`request-receivable` pairs in the last 24 h (4,291 total by trace-pairing). Entangled with `LOG-81` (its zero-token halves are part of that population). |
-| 2 | `LOG-81` (Observability) | Confirmed at scale: ~5,800 zero-token rows in Total Calls (`librarian` 2,404, `agent-directory` 1,734, `agent-turn` 1,439). **Needs John — scope with `LOG-91` + `LOG-60`'s denominator as ONE counting conversation.** |
+| 1 | `LOG-91` (Observability) | **ESCALATED — the double-write is active:** 1,186 new `agent-turn`+`request-receivable` pairs in the last 24 h (4,291 total by trace-pairing). Entangled with `LOG-81` (its zero-token halves are part of that population). **Update 2026-07-28: `LOG-81`-done makes the display immune** — every AI Audit count now excludes the duplicate half, so this is no longer distorting an on-screen number. It remains #1 as a **write-path/data-hygiene** defect (the DB keeps accruing double rows), not a reporting one. Designed, kickoff v6.3.204. |
+| ~~2~~ | ~~`LOG-81` (Observability)~~ | ✅ **DONE 2026-07-28 (`S-LOG-81`, v6.3.203) — off the queue.** John's Option A: every AI Audit count (header Total Calls, By Agent, By LLM, both By Pattern numbers) means real model calls only, via one shared `isCountableCall` predicate; By Service deliberately keeps operations semantics (§12). Live-QA verified against SQL: header 15,405 === SQL countable 15,405, By Pattern 2,110 + 13,295 = 15,405 exactly. **`LOG-60` closed on the same gate.** |
 | 3 | `LOG-42`→`63`→`59`→`53` (Architecture) | False-`rag` family, all write sites confirmed live: ungated `rag_retrieved` flag; `conversations.js`/`rag.js` stamp `rag` on pure writes / pre-search; catalog reads tagged `rag` with zero chunk ids; **380 false-tagged agent-selection rows in the last 7 days** (latest 20 min before the check). Write-time stamping was never replaced — it runs parallel to the §19k signature track. |
 | 4 | `LOG-102` (Observability) | Dishonest catch (`0` / "No classified patterns yet." as fact) confirmed in source — **now unblocked**, its "after `LOG-99`" gate cleared today. |
 | 5 | `LOG-106` (Feature) | By Service raw-render confirmed (no rolling counters; skeleton gate releases at directory load). By Agent confirmed already covered (gated on `logLoaded`). |
@@ -211,9 +211,10 @@ source), `AA-177` (Architecture — `the_reasoning` reads/writes now log via `lo
 (LOG-09c); small residue noted on the row).
 
 **Re-scoped (cheaper than their rows describe):**
-`LOG-60` (Observability — original dropped-rows mechanism is stale; the live question is
-denominator honesty: 4,538 classified rows vs 24,639 raw — folds into the counting
-conversation), `LOG-56` (Architecture — visible defect gone; close as a small dead-code
+~~`LOG-60`~~ (Observability — ✅ **DONE 2026-07-28, closed by `LOG-81`'s QA gate**, per `SES-32`'s
+secondary-ID discharge rule; the denominator question is settled — By Pattern and the header now
+count the same countable-call set, verified live at 2,110 + 13,295 = 15,405 = header),
+`LOG-56` (Architecture — visible defect gone; close as a small dead-code
 deletion), `LOG-48` (Architecture — catalog half done: "Prompt Compression" rename shipped
 (AA-190b) and `pattern_vocabulary` has a governed "Generative Prompt Compression"; remaining:
 map 25 frozen historical rows, decide `embeddings`' vocabulary destination — 2,191 rows,
@@ -308,7 +309,7 @@ only for lack of matching criteria.
 | 1 | **Criteria authoring through Susan Smith — Trainer's governed path** (= bucket 5's `LOG-72` (Architecture), quantified there: 27 vocabulary entries, only 9 with criteria). Target the top facts-bearing populations: `agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753. | Top-6 alone = **12,776 → count lands ~7,951 ✓ under 10K.** |
 | 2 | `LOG-71` (Architecture, bucket 5 #1) — resumed hops regain the config-half. **Designed, kickoff v6.3.205.** | Stops the unclassifiable pool *growing*; small immediate effect. |
 | 2b | **`LOG-111`** (Architecture, new 2026-07-28) — backfill the **2,738** all-time rows `LOG-69` structurally missed (fact-half present, so outside its null-`call_facts` `WHERE`). 657 recover from a same-`span_id` sibling holding the genuine frozen original. | Direct one-for-one reduction; run **after** `LOG-71` or it refills. |
-| 3 | The counting conversation (`LOG-91`/`LOG-81`/`LOG-60`, bucket 4) — if John rules non-model ops out of the log/count (`librarian` 3,554 + `agent-directory` 1,745 unclassified, almost all facts-less), the floor itself drops. | Denominator change, John's call — not required for <10K. |
+| 3 | ~~The counting conversation~~ — **RESOLVED 2026-07-28.** John ruled non-model ops out of the *count* (not the log — they stay logged per §12): `LOG-81`-done + `LOG-60`-done shipped it, `LOG-91` still open for the write path. **The floor did drop:** "needing reclassification" went 20,729 → **13,295** live, because the denominator is now countable model calls only. Note the remaining pool is all real model calls, incl. John's ~2,571 empty-signature backfill set (`LOG-42`/`LOG-111` thread). | Done — the <10K target is now measured against 13,295, not 20,729. |
 | 4 | Minor: `LOG-73` (embedding-orphan naming decision), `LOG-77` (future capture facts), `LOG-55` (verify-then-close, likely mooted by `LOG-37a-patch`). | Marginal. |
 
 **One session shape, mostly data:** lever 1 is Susan's promote/criteria runs (Supabase data
