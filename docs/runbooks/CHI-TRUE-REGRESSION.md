@@ -20,6 +20,7 @@
 1. **`AGT-35` (Owen content-context review Skill) must be live.** Check `docs/FEATURES.md`'s `AGT-35` row for Status ✅ and the shipped capability/intent slugs, and verify the rows exist in Supabase (project `rallojeqnkgtxgsdsnqm`). If not shipped: **stop** — run `AGT-35`'s design/data session first. Do not substitute your own content judgment (D5).
 2. **Driver script.** `SES-29`'s row records where the committed driver lives once it ships (proposed: `scripts/chi-true-regression.mjs`). Until then, build it in your scratchpad **exactly** per Appendix A — do not improvise the call sequences.
 3. **Endpoint + auth.** `POST https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/capabilities/execute`, header `x-vercel-protection-bypass` (value = `VERCEL_AUTOMATION_BYPASS_SECRET` in your worktree's `.env.local`; see `docs/ENV-VARS.md`). `tenant_id: "global"` on every call.
+4. **Baseline corpus integrity (added 2026-07-28, S-SES-29 root-cause findings).** Verify every `the_library` row with `is_baseline=true` has `status='active'` (Supabase, project `rallojeqnkgtxgsdsnqm`) before starting. A baseline row sitting superseded/archived is an instant retrieval hole (`match_the_library` filters `status='active'`) that fails its dependent cases — found live in the first run: the orphan-superseded Signal Mobile scenario broke case 8's designed Horizon-vs-Signal comparison. Any flipped row: **stop** — repair first (`DAT-11` owns enforcement).
 
 ## 2. The baseline table (D3) — 24 cases, expected journeys
 
@@ -61,6 +62,8 @@ Questions #1–23 come verbatim from `src/screens/MarketIntelligenceScreen.jsx`:
 ## 3. What the driver measures per question
 
 Per question record: expected vs actual journey; terminal state; wall time; every `trace_id`/`span_id`; recovery payloads seen on `in_progress` continues (HAR-17 contract — count them); Owen's content verdicts (§5) for each final artifact; probe data (§4) if any rejection occurred. Sequential, one question at a time — never parallelize (distorts the overload/recovery census).
+
+**Failure attribution (added 2026-07-28, S-SES-29 root-cause findings):** when recording a failure cause, cite the failing hop's `durable_hops` `intent_slug` — never the error string alone. The shared "reasoning-write handler" prefix is emitted by every intent reaching that handler and misattributed 2 of the first run's 8 denial deaths (Nadia — Data Analyst's `data-patch-execute-intent` deaths read as Elena — Reasoner `reasoner-intent` deaths).
 
 ## 4. The rejection probe (D4)
 
@@ -110,6 +113,8 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 
 ## Appendix A — Driver call sequences (verified against `MarketIntelligenceScreen.jsx` 2026-07-28, v6.3.189 tree)
 
+**Driver-maintenance QA rule (added 2026-07-28, S-SES-29 root-cause findings):** any change to the driver script must self-test at least one full **Forecast journey** end-to-end (a §2 `accept` or `edit` case) before commit — not only a direct case. The v6.3.193 build QA'd only a direct case, so the entire A2.5 commit path shipped broken (object-vs-`.text` payload divergence) and cost the first full run 8 cases.
+
 All calls: `POST` to the §1 endpoint, JSON body, `tenant_id: "global"`, `stream: false`, plus the bypass header. **Continue loop (every call):** any `{status:'in_progress', job_id}` response → `POST {action:'continue', job_id}` until terminal; a body carrying `recovery` is a HAR-17 recovery — record it, and it does not count against the continue cap (10). A terminal `{status:'failed'}` = throw. Terminal results unwrap as `result.status ? result : {...result.content, trace_id, span_id}`. The screen's fire-and-forget narration acks (`ci-submission-ack-intent`, `ci-resolution-ack-intent`) are **skipped** by the driver — not load-bearing, not part of any journey's gate; the browser leg covers their rendering.
 
 ### A1. Direct answer
@@ -119,7 +124,7 @@ All calls: `POST` to the §1 endpoint, JSON body, `tenant_id: "global"`, `stream
 4. `{...ci-answer-display-intent..., task_context:{answer, citations, confidence_tier, needs_review: qa.needs_review || gate.eval?.result==="revise", review_reason}}` → final display. `needs_review` on the final → A3 extension (D2).
 
 ### A2. Forecast journey (routing intent ∈ {theory, forecast, correct})
-1. Routing as A1-1. If `extracted_hypothesis` is non-null the screen would prefill it — the driver still follows D1 semantics: treat it as candidate #1.
+1. Routing as A1-1. If `extracted_hypothesis` is non-null the screen would prefill it — the driver still follows D1 semantics: treat it as candidate #1. **`<picked>` everywhere below means the picked hypothesis's `text` string (`hypotheses[0].text`) — never the hypothesis object.** The screen's own `chosenText` is that `.text`; passing the object leaks its `id` ("H1") and rationale into commit payloads, where the Data Room UUID guards correctly deny them (first-run root cause, S-SES-29 findings, `SES-31`).
 2. `{capability_slug:"hypothesis-evaluation", intent_slug:"hyp-generation-intent", agent_id:"priya", task_context:{flagged_question:<question>, flagged_answer:"", review_reason:"user-initiated, no explicit claim extracted"}}` → `hypotheses[]`; pick `[0]` (D1).
 3. `{...hyp-hypothesis-test-intent..., agent_id:"priya", task_context:{hypothesis:<picked>, intent:<routing intent>, flagged_question:<question>, flagged_answer:"", prior_hypothesis_test:null}}` → analysis (supports/complicates/consider/confidence).
 4. `{...hyp-hypothesis-test-display-intent..., agent_id:"priya", task_context:{supports, complicates, consider, confidence}}` → Theory Result display.
