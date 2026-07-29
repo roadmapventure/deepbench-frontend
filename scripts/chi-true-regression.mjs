@@ -1,4 +1,4 @@
-// DeepBench v6.3.210 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
+// DeepBench v6.3.220 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
 // driver (24 cases): walks routing->answer->gate->display for direct answers, the full Forecast
 // journey (Theories->Theory Result->commit->resolve) for the 6 Forecast questions, the D2 review
 // extension on any flagged direct answer, the D6 live news door as case 24, the D4 five-try
@@ -21,6 +21,15 @@
 // MarketIntelligenceScreen.jsx:1519's screen parity (swap the WHOLE triple, not just .answer) at
 // both call sites, and a cheap assertString() runtime guard throws (never silently coerces) if a
 // judge/display payload is ever handed a non-string again.
+// AGT-36 (v6.3.220): runbook D7/§5b's `honest-gap` outcome class is now scored, not just described.
+// Every case carries an `outcome_class` tagged by QUESTION ID (never case number), and the new pure,
+// exported scoreVerdict() decides pass/fail: the rich-answer branch is byte-equivalent to the old
+// inline scoring (still Owen's own overall `pass` flag), while the honest-gap branch implements §5b's
+// table -- quantitative_content_present must be EXPLICITLY false, guidance required, platform
+// language still barred, named entities informational only. Cases 12 (vietnam-reseller) and 23
+// (south-korea-coop) exist to prove the agents REFUSE to produce a metric, so Owen's rich-answer
+// rubric structurally could never pass them (runbook §7's exception). The class rides on ctx so no
+// judgeArtifact call site changed, and it is recorded on every case record + the progress line.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -110,7 +119,13 @@ const RESOLUTIONS = {
   "latin-america": "reject",
 };
 
-function extractCases() {
+// FEATURE: AGT-36 -- D7/§5b locked baseline (runbook §5b): the questions the Data Room is DESIGNED
+// not to answer. Keyed by question id, never by case number: `n` is assigned from screen-extraction
+// order, so a screen reorder would silently re-tag a different question. Adding or removing an id
+// here is a baseline change -- runbook §8 rules apply (John's approval, in the runbook).
+export const HONEST_GAP_IDS = new Set(["vietnam-reseller", "south-korea-coop"]);
+
+export function extractCases() {
   if (!existsSync(SCREEN_PATH)) {
     console.error(`FATAL: screen source not found at ${SCREEN_PATH}`);
     process.exit(1);
@@ -130,9 +145,11 @@ function extractCases() {
     label: q.label,
     expected_journey: RESOLUTIONS[q.id] ? "forecast" : "direct",
     resolution: RESOLUTIONS[q.id] || null,
+    // FEATURE: AGT-36 -- runbook §5b outcome class, tagged by question id (see HONEST_GAP_IDS).
+    outcome_class: HONEST_GAP_IDS.has(q.id) ? "honest-gap" : "rich-answer",
   }));
   // Case 24 -- the news door (D6). No fixed text; built at runtime from Jordan's first live card.
-  cases.push({ n: 24, id: "news-first-card", label: null, expected_journey: "direct", resolution: null, isNewsDoor: true });
+  cases.push({ n: 24, id: "news-first-card", label: null, expected_journey: "direct", resolution: null, isNewsDoor: true, outcome_class: "rich-answer" });
   return { cases, extractedCount: ordered.length };
 }
 
@@ -272,6 +289,35 @@ function assertString(value, fieldName) {
   }
 }
 
+// FEATURE: AGT-36 -- runbook §5b's outcome-class scoring, pure and exported so it is testable
+// without a live run. The rich-answer branch is byte-equivalent to what judgeArtifact() did
+// before this function existed: `pass` still comes from Owen's own overall flag, and
+// failed_criteria is still built the same way. The honest-gap branch implements §5b's table and
+// deliberately DOES NOT read verdict.pass -- that flag encodes the rich-answer rubric, which
+// structurally cannot pass a correct refusal (runbook §7's exception).
+export function scoreVerdict(verdict, outcomeClass) {
+  const failed_criteria = [];
+  const isTrue  = k => verdict?.[k]?.result === true;
+  const isFalse = k => verdict?.[k]?.result === false;
+
+  if (outcomeClass === "honest-gap") {
+    // named_entities_present is informational only in this class -- never scored.
+    // quantitative_content_present must be EXPLICITLY false. An absent or malformed key fails:
+    // treating "not true" as "correctly refused" would turn a shape drift in Owen's verdict into
+    // a silent pass for this entire class -- the vacuous-pass failure mode AGT-37 already hit.
+    if (!isFalse("quantitative_content_present")) failed_criteria.push("quantitative_content_present");
+    if (!isTrue("actionable_guidance_present"))   failed_criteria.push("actionable_guidance_present");
+    if (isTrue("platform_language_detected"))     failed_criteria.push("platform_language_detected");
+    return { pass: failed_criteria.length === 0, failed_criteria };
+  }
+
+  for (const k of ["named_entities_present", "quantitative_content_present", "actionable_guidance_present"]) {
+    if (!isTrue(k)) failed_criteria.push(k);
+  }
+  if (isTrue("platform_language_detected")) failed_criteria.push("platform_language_detected");
+  return { pass: verdict?.pass === true, failed_criteria };
+}
+
 // ---- Owen's AGT-35 content-context judge (D5) -- the only content judgment anywhere here ----
 async function judgeArtifact({ artifact_type, artifact_content, question, ctx }) {
   // FEATURE: SES-31a (Task 2) -- covers every judgeArtifact call site generically (one enforcement
@@ -282,12 +328,10 @@ async function judgeArtifact({ artifact_type, artifact_content, question, ctx })
     capability_slug: "quality-gate", intent_slug: "qg-content-context-intent", agent_id: "owen",
     task_context: { artifact_type, artifact_content, question },
   }, ctx);
-  const failed_criteria = [];
-  for (const k of ["named_entities_present", "quantitative_content_present", "actionable_guidance_present"]) {
-    if (!verdict[k] || verdict[k].result !== true) failed_criteria.push(k);
-  }
-  if (verdict.platform_language_detected && verdict.platform_language_detected.result === true) failed_criteria.push("platform_language_detected");
-  return { artifact: artifact_type, pass: verdict.pass === true, failed_criteria, evidence: verdict };
+  // FEATURE: AGT-36 -- the class rides on ctx (created per case, already passed to every one of the
+  // six call sites), so scoring became class-aware without touching a single caller.
+  const { pass, failed_criteria } = scoreVerdict(verdict, ctx?.outcome_class);
+  return { artifact: artifact_type, outcome_class: ctx?.outcome_class || "rich-answer", pass, failed_criteria, evidence: verdict };
 }
 
 // FEATURE: SES-31 (Task 1) -- D1 semantics unchanged (still `[0]`, first-listed): pick the picked
@@ -510,6 +554,9 @@ function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_
   return {
     n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied,
     recoveries: ctx.recoveries, trace_ids: ctx.trace_ids,
+    // FEATURE: AGT-36 -- runbook §5b's class on the record itself, so a reader of REPORT_JSON can
+    // see which bar this case was scored against without re-deriving it from the question id.
+    outcome_class: ctx?.outcome_class || "rich-answer",
     probe, judge_verdicts: judgeVerdicts, case_pass: fail_causes.length === 0, fail_causes,
     // FEATURE: SES-31 (Task 3) -- case 24's news-door identity/degradation fields, dropped by the
     // previous version of this function (S-SES-29 finding, a runbook §7 "report the degradation
@@ -531,13 +578,14 @@ async function runOneCase(caseObj) {
   // judgeVerdicts (both are mutated by reference inside executeCaseJourney, so whatever accumulated
   // before the throw survives) instead of a fresh empty ctx -- infra-death records must carry the
   // trace_ids/recoveries that actually accumulated before the death (S-SES-29 finding).
-  let lastCtx = { recoveries: [], trace_ids: [] };
+  // FEATURE: AGT-36 -- the class is on BOTH ctx objects, so an infra-death record carries it too.
+  let lastCtx = { recoveries: [], trace_ids: [], outcome_class: caseObj.outcome_class || "rich-answer" };
   let lastJudge = [];
   // Transient-death handling (runbook §4 tail note): one fresh full re-run of the whole case on any
   // thrown error; a second death is an infra-class FAIL, no probe.
   while (attempt < 2 && !outcome) {
     attempt++;
-    const ctx = { recoveries: [], trace_ids: [] };
+    const ctx = { recoveries: [], trace_ids: [], outcome_class: caseObj.outcome_class || "rich-answer" };
     const judgeVerdicts = [];
     lastCtx = ctx;
     lastJudge = judgeVerdicts;
@@ -568,7 +616,9 @@ async function runOneCase(caseObj) {
   // FEATURE: SES-31 (Task 3) -- loud degradation marker on the per-case progress line (runbook §7
   // "report the degradation prominently").
   const degradedMarker = record.article_degraded ? " *** ARTICLE DEGRADED ***" : "";
-  console.log(`[${caseObj.n}/24] ${caseObj.id} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${degradedMarker}`);
+  // FEATURE: AGT-36 -- so a reader can see why a pass:false verdict from Owen did not fail the case.
+  const classMarker = caseObj.outcome_class === "honest-gap" ? " [honest-gap]" : "";
+  console.log(`[${caseObj.n}/24] ${caseObj.id}${classMarker} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${degradedMarker}`);
   return record;
 }
 
