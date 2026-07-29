@@ -272,3 +272,8 @@ rendered — their population sizes moved them to the §5 bonus instead.
    ratification of the recommended order (maintenance rule 3).
 3. **§4's five contested calls** — open, John's.
 4. **Bucket 3 mobile QA sweep** — needs scheduling; the bucket is untested, not green.
+5. **Source-verify buckets 4 and 5 before scheduling sessions from them** — the bucket-2
+   sweep (2026-07-28) found 4 of 20 rows already fixed and 1 duplicate, all dead the same
+   way: a session fixed the thing and never updated the row (the `SES-27` (Architecture)
+   drift class). Assume the same ~25% staleness in buckets 4/5 until swept; the sweep is
+   cheap (read-only sub-agents, ~1 hour) and prevents whole wasted fix sessions.
