@@ -1,3 +1,4 @@
+// DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
 // DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
 // DeepBench v6.3.201 | api/prompt/request-receivable.js | HAR-20 -- disable_parallel_tool_use on both forced tool_choice sites (buildCallBody's forced branch + the guardrails inline call); buildParseRetryCorrection() covers every tool_use id, not just the first
 // DeepBench v6.3.190 | api/prompt/request-receivable.js | LOG-77-9 -- extractDelegationProvenanceFacts(): verbatim delegation_target/task_provenance backing facts for the read-time delegated_to_provenance derivation (§19k); no comparison, no conclusion
@@ -574,7 +575,15 @@ export function buildCallFacts({
 // already carries trace_id (runLoop() -> sendRequest()); input_references_other_deliverable is set
 // by runLoop() once a delegate's returned result has been folded back into this turn's input.
 // All three omitted by every non-loop caller (api/plan.js, confirmation.js) -- byte-identical.
-export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null, span_id = null, parent_span_id = null, input_references_other_deliverable = false, deadline = null }) {
+// FEATURE: AGT-37 -- handler_context is a harness-generic, HANDLER-FACING envelope: facts the caller
+// already knows to be true, carried to the write handler and never to the model. It is deliberately
+// NOT merged into prompt_request and never reaches assemblePrompt()/enrichPrompt() -- that separation
+// is the whole point of it being a sibling field rather than another task_context key (task_context is
+// prompt material: db-assembly.js serializes every non-empty key into the agent's prompt). This file
+// treats it as opaque -- it is never read, inspected, or conditioned on here; only the handler that
+// receives it knows what is inside. Null for every existing caller (api/plan.js, confirmation.js,
+// request-receivable.js's own HTTP handler) -- byte-identical behavior when omitted.
+export async function sendRequest({ prompt_request, agent_id, capability_slug, tenant_id, precomputed_turn = null, delegation_occurred = false, turn_started_at = null, trace_id = null, span_id = null, parent_span_id = null, input_references_other_deliverable = false, deadline = null, handler_context = null }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -790,6 +799,9 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     handler: handlerSlug,
     supabaseUrl,
     supabaseHeaders,
+    // FEATURE: AGT-37 -- forwarded verbatim and unopened. Every existing handler ignores an extra
+    // field it does not destructure, so this is byte-identical for all of them.
+    handler_context,
   });
   deliverable_id = result.deliverable_id;
 

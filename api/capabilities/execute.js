@@ -1,3 +1,4 @@
+// DeepBench v6.3.224 | api/capabilities/execute.js | AGT-37 -- handler_context: a handler-facing envelope threaded runCapability() -> runLoop() -> sendRequest() only, never to assemblePrompt()/enrichPrompt(); resolveAccept() supplies the confirmed action's own chunk_id. Opaque throughout -- this file never opens it
 // DeepBench v6.3.205 | api/capabilities/execute.js | LOG-71 -- durable_hops now persists LOG-67's config-half snapshot and all three resumeCapability() re-entries recover it, so a resumed hop logs the same frozen signature its first hop did instead of a fact-half-only row
 // DeepBench v6.3.204 | api/capabilities/execute.js | LOG-91 -- terminal (non-delegating) turn writes exactly one ai_activity_log row: the agent-turn row, held until sendRequest() returns and merged with its _terminal_log wrapper facts (task_id, patterns union, call_facts); dispatch latency rides its own dispatch_latency_ms column, never call_facts; delegating turns log immediately, unchanged
 // DeepBench v6.3.190 | api/capabilities/execute.js | LOG-77-9 -- delegate_to_agent turn rows capture verbatim delegation_target/task_provenance call_facts (§19k backing facts for the read-time delegated_to_provenance derivation); request_help turns deliberately unchanged
@@ -773,6 +774,12 @@ async function dispatchDelegation({
 // job_id: row.id) share this one implementation. No second copy of the loop logic anywhere.
 async function runLoop({
   capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+  // FEATURE: AGT-37 -- pure passthrough to sendRequest(), same category as trace_id/job_id. Never
+  // inspected, never logged, never merged into `enriched` (which is what reaches the model). It is
+  // deliberately NOT persisted to durable_hops: a checkpoint/resume therefore drops it and the write
+  // degrades to HAR-21's honest behavior (the model's claim, format-filtered, or []) rather than
+  // failing -- a documented residual in the same class as display_agent_*, not a silent wrong answer.
+  handler_context = null,
   // FEATURE: HAR-05 -- enableWebSearch threaded through runLoop() the same explicit-param way
   // canRequestHelp already is (read from promptRequest in runCapability(), below -- ai-enrichment.js
   // drops unknown fields from `enriched`, same reason canRequestHelp can't be read from there either).
@@ -1055,6 +1062,9 @@ async function runLoop({
           // integrate flag: if this final answer's input embedded a delegate's returned result, its
           // row carries input_references_other_deliverable: true.
           trace_id, span_id, parent_span_id, input_references_other_deliverable: integratedDelegateResult, deadline,
+          // FEATURE: AGT-37 -- the envelope's only destination. sendRequest() forwards it to the
+          // write handler unopened; nothing on the prompt-assembly path ever sees it.
+          handler_context,
         });
       } catch (e) {
         logAgentTurn(heldTurnLog);
@@ -1174,6 +1184,13 @@ export async function runCapability({
   intent_slug = null,
   agent_id,
   task_context,
+  // FEATURE: AGT-37 -- the handler-facing sibling of task_context. task_context is PROMPT material
+  // (db-assembly.js serializes every non-empty key into the agent's prompt: HAR-06's .goal branch and
+  // AI-44's TASK DETAILS fallback); handler_context is not, and deliberately never reaches
+  // assemblePrompt()/enrichPrompt(). It is threaded to sendRequest() and nowhere else. Opaque here:
+  // this file never reads inside it, and adds no conditional keyed to what it might contain
+  // (.claude/rules/capabilities-are-data.md). Null for every existing caller -- byte-identical.
+  handler_context = null,
   runtime_context = null,
   tenant_id = 'global',
   enrichment_capability_slug = null,
@@ -1256,6 +1273,9 @@ export async function runCapability({
   try {
     return await runLoop({
       capability_slug, intent_slug, agent_id, tenant_id, task_context, enriched, canRequestHelp,
+      // FEATURE: AGT-37 -- note this is threaded ONLY here, after assemblePrompt()/enrichPrompt()
+      // have already run above without it. That ordering is the invariant, not an accident.
+      handler_context,
       enableWebSearch,
       delegationRequired,
       requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
@@ -1517,6 +1537,12 @@ export async function resolveAccept({ confirmation_id, _onEvent = null }) {
       intent_slug: onAcceptIntentSlug,
       agent_id: row.agent_id,
       task_context: row.proposed_action,
+      // FEATURE: AGT-37 -- the confirmed action's own reference id, handed to the write handler as a
+      // FACT rather than being retyped by the next model in the chain. Generic: proposed_action is
+      // whatever intent produced this confirmation, and an intent whose action carries no chunk_id
+      // simply supplies null, which resolveReferenceIds() treats as "nothing supplied" and falls
+      // through to the claim exactly as before. No capability or agent is named to achieve it.
+      handler_context: { chunk_id: row.proposed_action?.chunk_id ?? null },
       tenant_id: row.tenant_id,
       _onEvent,
     });
@@ -1656,18 +1682,18 @@ export default async function handler(req, res) {
     // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
     // _hop_counter so no external caller can seed or override the platform's hop ceiling.
     const {
-      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
       tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id, stream,
     } = req.body || {};
     if (stream === true) {
       return streamResult(res, (emit) => runCapability({
-        capability_slug, intent_slug, agent_id, task_context, runtime_context,
+        capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
         tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
         _onEvent: emit,
       }));
     }
     const result = await runCapability({
-      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
       tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
     });
     return res.status(200).json(result);

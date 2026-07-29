@@ -1,3 +1,4 @@
+// DeepBench v6.3.224 | MarketIntelligenceScreen.jsx | AGT-37 -- Store as Forecast supplies the full-UUID citations it already holds (the flagged answer's plus the three theory-test sections' previously-discarded citations halves) on a new handler_context sibling field, never inside task_context; callCapability() relays it. No UI change, no id rendered
 // DeepBench v6.3.218 | MarketIntelligenceScreen.jsx | LOG-112 -- the Agents drawer's per-agent sub-rows show VERIFIED pattern names only: they no longer read buildActivitySummary()'s patterns_used-derived byPattern bucket, but join the agent's own rows to the Log Displayer's read-time classification (usePatternClassification's log_ids + buildAgentPatternRows) -- so a sub-row can no longer exceed its agent's own CALLS headline, and an agent with nothing verified renders no sub-rows at all. patternLabelFor()/usePatternVocabulary/humanizeSlug deleted here (no slug reaches this file any more)
 // DeepBench v6.3.200 | MarketIntelligenceScreen.jsx | S-CHI-88a -- CHI-88 QA follow-ups: AgentWorkingIndicator gains an opt-in one-line `compact` variant (mobile status stops wrapping to 2 lines), the input row moves into the Chat branch only (Steps & Evidence reclaims ~66px), and the mobile pinned decision footer renders compact via the existing `bare` flag
 // DeepBench v6.3.198 | MarketIntelligenceScreen.jsx | S-CHI-88 -- mobile cleanup: terse feed, one-line title chrome, soft status line, 16px input, pinned decision footer
@@ -1365,13 +1366,17 @@ async function resolveInProgress(result, onProgress = null, isStale = () => fals
 // string, not a function, passed only by a caller whose own agent might legitimately answer
 // directly (qa_answer/proofreader — Jordan's news-search and the display call always delegate, so
 // neither needs one).
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
+// FEATURE: AGT-37 -- handler_context is a sibling of task_context, never a key inside it. task_context
+// is prompt material (db-assembly.js serializes every non-empty key into the agent's prompt);
+// handler_context reaches the capability's write handler and stops there, so the caller can hand over
+// facts the model must not see. Null for every existing call site -- byte-identical.
+async function callCapability({ capability_slug, intent_slug, agent_id, task_context, handler_context = null, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
   const t0 = Date.now();
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      capability_slug, intent_slug, agent_id, task_context, runtime_context,
+      capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
       format_skill_profile_slug, display_agent_id,
       tenant_id: TENANT_ID,
       stream: !!onProgress,
@@ -4218,6 +4223,18 @@ export default function MarketIntelligenceScreen() {
       const hypothesisTestText = hypothesisTest
         ? [hypothesisTest.supports?.text, hypothesisTest.complicates?.text, hypothesisTest.consider?.text].filter(Boolean).join(" ")
         : "";
+      // FEATURE: AGT-37 -- every real citation this flow is already holding, gathered once and
+      // de-duplicated (order preserved). Two sources, both already in scope and both already correct:
+      // hypFlow.citations, the flagged answer's own full 36-character UUIDs (ci-answer-intent's
+      // verified live shape), and the citations halves of the three theory-test sections, which arrive
+      // as {text, citations} (CHI-65) and which the hypothesisTestText join directly above deliberately
+      // discards. Nothing new is fetched, computed, or asked of a model -- the correct value was
+      // already known here, which is exactly why no model should be producing it (HAR-21's principle).
+      const commitCitationIds = [...new Set([
+        ...(Array.isArray(citations) ? citations : []),
+        ...[hypothesisTest?.supports, hypothesisTest?.complicates, hypothesisTest?.consider]
+          .flatMap(s => (Array.isArray(s?.citations) ? s.citations : [])),
+      ])].filter(id => typeof id === "string" && id.length > 0);
 
       setStatus("Elena is consolidating this into memory…");
       const elenaResult = await callCapability({
@@ -4227,6 +4244,14 @@ export default function MarketIntelligenceScreen() {
           committed_hypothesis: chosenText, intent, hypothesis_test: hypothesisTestText,
           was_override: !!hypothesisTest?.override_warning,
         },
+        // FEATURE: AGT-37 -- the ids go HERE, as a sibling field, and never into task_context above.
+        // task_context is prompt material -- db-assembly.js serializes every non-empty key into the
+        // agent's prompt (HAR-06's .goal branch; this intent carries no goal so it takes AI-44's TASK
+        // DETAILS fallback, where every key lands). Putting a real chunk id there would render one in
+        // front of the single agent this change exists to keep away from ids, and AGT-39 records that
+        // these agents write ids they can see into their own prose -- which becomes the next step's
+        // decoy. handler_context reaches the write handler and stops; it never reaches assemblePrompt().
+        handler_context: { source_chunk_ids: commitCitationIds },
         onProgress, isStale,
       });
       if (isStale()) return; // FEATURE: CHI-04

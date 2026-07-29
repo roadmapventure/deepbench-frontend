@@ -1,3 +1,4 @@
+// DeepBench v6.3.224 | api/_lib/handlers/reasoning-write.js | AGT-37 -- caller-supplied reference ids arrive on handler_context and become resolveReferenceIds()'s `supplied` argument, replacing HAR-21's placeholder null; the model is no longer asked for an id
 // DeepBench v6.3.222 | api/_lib/handlers/reasoning-write.js | HAR-21 -- reference ids resolve through lib/claim-resolver.js; a malformed claim degrades to an honest empty link and is logged, never a 422
 // DeepBench v6.3.112 | api/_lib/handlers/reasoning-write.js | DAT-7 -- graceful denial: status:422 + detail.tier instead of a bare throw
 // DeepBench v6.0.13 | api/_lib/handlers/reasoning-write.js | S-APPLE-04b re-scope -- Nadia's the_reasoning write handler
@@ -18,7 +19,7 @@ import { writeContent } from '../../../lib/search-harness.js';
 import { resolveReferenceIds } from '../../../lib/claim-resolver.js';
 import { logActivity } from '../../../lib/activity-log.js';
 
-export async function handle({ agent_id, tenant_id, content }) {
+export async function handle({ agent_id, tenant_id, content, handler_context = null }) {
   const { action, content: reasoningContent, confidence, source_chunk_ids, source_question } = content || {};
   if (!action) throw new Error('reasoning-write handler: action required in structured output');
 
@@ -35,11 +36,20 @@ export async function handle({ agent_id, tenant_id, content }) {
   // taking the caller's next step down with it. Two instruction-only fixes have now lost to this class
   // (DAT-7, then v6.3.214), so the rule is structural instead: resolve through the shared service, keep
   // what is well-formed, drop what is not, and write an honest [] rather than dying.
-  // `supplied: null` is deliberate and temporary -- AGT-37 (session 2) threads the screen's real full
-  // UUIDs in here, changing this one argument rather than the shape. The AA-189 guard is untouched and
-  // still denies a well-formed-but-nonexistent id; this only stops malformed ids from ever reaching it.
+  // FEATURE: AGT-37 -- HAR-21's placeholder `supplied: null` is now the real thing: the caller's own
+  // already-known ids, arriving on handler_context (a handler-facing envelope that never reaches the
+  // model -- api/prompt/request-receivable.js's sendRequest()). This is what removes the model step
+  // that two instruction-only fixes lost to; docs/harvests/AGT-37.md records why a third wording is
+  // forbidden. Read as a small ordered allowlist rather than one key, mirroring SELF_REPORTED_CLAIM_
+  // FIELDS in request-receivable.js:445 -- both write paths into this handler supply their ids under
+  // their own natural name, and neither is named here. NEVER read task_context for this: task_context
+  // is prompt material (db-assembly.js serializes every key into the agent's prompt), so an id placed
+  // there would be handed to the very model this change exists to keep away from ids.
+  // The AA-189 guard in lib/search-harness.js is untouched and still denies a well-formed-but-
+  // nonexistent or cross-room id, supplied or claimed: caller-supplied does not mean caller-trusted.
+  const suppliedIds = handler_context?.source_chunk_ids ?? handler_context?.chunk_id ?? null;
   const resolveStart = Date.now();
-  const resolved = resolveReferenceIds({ supplied: null, claimed: source_chunk_ids });
+  const resolved = resolveReferenceIds({ supplied: suppliedIds, claimed: source_chunk_ids });
   const resolveLatency = Date.now() - resolveStart;
 
   // FEATURE: HAR-21 -- a dropped id must be visible, not silent (.claude/rules/capability-logging.md:
