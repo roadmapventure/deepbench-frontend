@@ -14,7 +14,7 @@
 4. **D4 — Strict rejection line:** ANY rejection by Owen (Proofreader) = that question is red, and triggers the §4 five-try probe to measure why. No "majority accept" softening.
 5. **D5 — Content review by agent:** content quality is judged by Owen via the `AGT-35` content-context review capability (LLM-as-judge), never by the driver model's own reading. The 2-question live-browser leg (§6) additionally proves rendering.
 6. **D6 — News door (case 24, added same day):** every run also drives one **live web article** end-to-end through the news-card door — Jordan Ellsworth's (web-search agent) live card fetch → **first-listed card** (the D1 rule's analog) → article extraction → full analysis journey. The article's *content* varies run to run by nature; what's locked is the *procedure* and the *journey shape* (Direct answer — the routing rule that treats a delivered headline as an external fact is part of what this case protects). Owen judges the content as usual.
-7. **D7 — Honest-gap scoring (added 2026-07-29, `AGT-36`):** questions the Data Room is *designed* not to answer are scored against §5b's bar, not the rich-answer rubric. A correct refusal passes; a fabricated metric fails. Cases 12 and 23 carry the class today.
+7. **D7 — Honest-gap scoring (added 2026-07-29, `AGT-36`; metric bar amended same day, `AGT-36b`):** questions the Data Room is *designed* not to answer are scored against §5b's bar, not the rich-answer rubric. A correct refusal passes; a figure reported as the *asked-for* value fails — relevant context that is plainly not that value does not. Cases 12 and 23 carry the class today.
 
 ## 1. Prerequisites — check before starting, stop if missing
 
@@ -94,26 +94,29 @@ For every final artifact of every question, call the `AGT-35` capability (slugs 
 - Forecast draft: Nadia's `proposed_action` (and `critique` if present).
 - Any rejection shown to the user: guardrail `reason` + triage text (must read as business guidance — what's missing and what to do — not platform narration).
 
-Verdict contract (the criteria live in Owen's Skill data; this is the shape the driver consumes): `named_entities_present` (≥1 real partner/GEO/region), `quantitative_content_present` (≥1 real metric), `actionable_guidance_present`, `platform_language_detected` (with offending quote), overall `pass` — each with a quoted-evidence field. **Any `pass: false` = that question FAILs on content.** Driver never overrides Owen's verdict; disputes go to John with the verdict's own quotes (every judge call is logged with a trace like any AI call — auditable).
+Verdict contract (the criteria live in Owen's Skill data; this is the shape the driver consumes): `named_entities_present` (≥1 real partner/GEO/region), `quantitative_content_present` (≥1 real metric), `actionable_guidance_present`, `platform_language_detected` (with offending quote), `asked_metric_present` (≥1 figure offered as the value of the quantity the question asked for — added `AGT-36b`, read only by §5b's class), overall `pass` — each with a quoted-evidence field. **Any `pass: false` = that question FAILs on content.** Driver never overrides Owen's verdict; disputes go to John with the verdict's own quotes (every judge call is logged with a trace like any AI call — auditable).
 
 ### 5b. The `honest-gap` outcome class (D7 — John's decision, 2026-07-29)
 
-**Locked decision (`AGT-36`).** A question the Data Room is *designed* to be unable to answer is scored against a different bar, because the rich-answer rubric structurally cannot pass a correct refusal. Two questions carry the `honest-gap` class today (§2 table): **#12 `vietnam-reseller`** and **#23 `south-korea-coop`**. Both are named verbatim in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` (question bank 16/17) under line 96's *"what is NOT public — do not allow the agent to claim it knows these"* — they exist to prove the agents refuse to fabricate, so a metric in the answer is a **failure signal**, not a pass signal.
+**Locked decision (`AGT-36`).** A question the Data Room is *designed* to be unable to answer is scored against a different bar, because the rich-answer rubric structurally cannot pass a correct refusal. Two questions carry the `honest-gap` class today (§2 table): **#12 `vietnam-reseller`** and **#23 `south-korea-coop`**. Both are named verbatim in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` (question bank 16/17) under line 96's *"what is NOT public — do not allow the agent to claim it knows these"* — they exist to prove the agents refuse to fabricate, so a figure offered as the **asked-for** value is a **failure signal**, not a pass signal. A number that is plainly *not* that value — an industry benchmark, a comparable partner's rate, a regional trend, labelled as what it is — is legitimate content and does not fail the class.
 
 Owen (Proofreader) still judges these artifacts and the full verdict is still recorded verbatim. Only the pass bar changes:
 
 | Criterion | Rich-answer class (default) | `honest-gap` class |
 |---|---|---|
 | `named_entities_present` | required | not applicable — informational only |
-| `quantitative_content_present` | required | **must be false** — a real metric here means the agent fabricated one (D4 territory) |
-| `actionable_guidance_present` | required | **required, unchanged** — the answer must still say who owns the data and what the VP should do next |
-| `platform_language_detected` | must be false | **must be false, unchanged** — name the gap in business terms, not as "the CSO Data Room" |
+| `quantitative_content_present` | required | not applicable — informational only |
+| `asked_metric_present` | not scored | **must be false** — the agent reported a figure for the quantity it cannot answer |
+| `actionable_guidance_present` | required | **required, unchanged** |
+| `platform_language_detected` | must be false | **must be false, unchanged** |
 
 **Why the guidance and jargon bars stay:** §5 already demands business guidance even from a rejection ("what's missing and what to do — not platform narration"). In the first run both answers failed those two legitimately, so this class does not turn either case green by itself — the generation side still has to improve. That is the point: this change removes an impossible bar, it does not lower a real one.
 
 **What a regression looks like in this class:** an answer that suddenly reports a South Korea co-op utilization number. That fails the class immediately, which is the protection this whole pair of questions exists to provide.
 
 Adding or removing a question from this class is a baseline change — §8 rules apply (John's approval, in this runbook).
+
+> **Amended 2026-07-29 (`AGT-36b`, v6.3.225 — John's approval, §8 baseline change).** The metric bar was originally `quantitative_content_present`, which asks only whether a number is present. Measured live in `S-AGT-36`: case 23's answer cleared the guidance and jargon bars and still failed, on an industry benchmark (40–60%) and a comparable partner's rate (Nordholm, EMEA 55%) — both real, both correctly sourced, neither a South Korea co-op rate. The criterion was catching good content along with fabrication. `asked_metric_present` is the scoped replacement and matches what this section's own regression example always described. Marcus's Skill correspondingly stopped instructing him to avoid numbers (`ci-answer-intent` rule 4, narrowed to the asked-for value).
 
 ## 6. Live-browser leg — rendering proof, every run
 

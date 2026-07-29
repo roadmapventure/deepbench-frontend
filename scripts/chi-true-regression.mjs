@@ -1,4 +1,4 @@
-// DeepBench v6.3.220 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
+// DeepBench v6.3.225 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
 // driver (24 cases): walks routing->answer->gate->display for direct answers, the full Forecast
 // journey (Theories->Theory Result->commit->resolve) for the 6 Forecast questions, the D2 review
 // extension on any flagged direct answer, the D6 live news door as case 24, the D4 five-try
@@ -30,6 +30,14 @@
 // (south-korea-coop) exist to prove the agents REFUSE to produce a metric, so Owen's rich-answer
 // rubric structurally could never pass them (runbook §7's exception). The class rides on ctx so no
 // judgeArtifact call site changed, and it is recorded on every case record + the progress line.
+// AGT-36b (v6.3.225): the honest-gap metric bar is now `asked_metric_present` -- does the artifact
+// report a figure for the quantity the QUESTION asked about -- not the blunt
+// quantitative_content_present, which only asks whether any number is present. Measured live in
+// S-AGT-36: case 23's answer cleared the guidance and jargon bars and still failed, on an industry
+// benchmark and a comparable partner's rate -- both real, correctly sourced, neither a South Korea
+// co-op rate. quantitative_content_present becomes informational in this class; the rich-answer
+// branch never reads the new key, so the other 22 cases score byte-identically. Owen judges the new
+// criterion blind: his Skill is deliberately never told which questions carry the class.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -301,13 +309,13 @@ export function scoreVerdict(verdict, outcomeClass) {
   const isFalse = k => verdict?.[k]?.result === false;
 
   if (outcomeClass === "honest-gap") {
-    // named_entities_present is informational only in this class -- never scored.
-    // quantitative_content_present must be EXPLICITLY false. An absent or malformed key fails:
-    // treating "not true" as "correctly refused" would turn a shape drift in Owen's verdict into
-    // a silent pass for this entire class -- the vacuous-pass failure mode AGT-37 already hit.
-    if (!isFalse("quantitative_content_present")) failed_criteria.push("quantitative_content_present");
-    if (!isTrue("actionable_guidance_present"))   failed_criteria.push("actionable_guidance_present");
-    if (isTrue("platform_language_detected"))     failed_criteria.push("platform_language_detected");
+    // FEATURE: AGT-36b -- the metric bar asks whether the ASKED-FOR figure is present.
+    // named_entities_present and quantitative_content_present are informational only in this class.
+    // asked_metric_present must be EXPLICITLY false -- an absent or malformed key fails, never
+    // silently passes (the vacuous-pass guard, unchanged from v6.3.220).
+    if (!isFalse("asked_metric_present"))        failed_criteria.push("asked_metric_present");
+    if (!isTrue("actionable_guidance_present"))  failed_criteria.push("actionable_guidance_present");
+    if (isTrue("platform_language_detected"))    failed_criteria.push("platform_language_detected");
     return { pass: failed_criteria.length === 0, failed_criteria };
   }
 
