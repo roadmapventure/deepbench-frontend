@@ -161,6 +161,18 @@ for tooling the ship-gate itself depends on:
    0 of 95 substantive clauses lost, verified per-clause.** Residue: `LOG-37`'s own status
    chain, still over cap. Efficiency, not
    correctness — still skippable for beta.
+5. **`SES-57` (Tech Debt) — ❌ OPEN, filed 2026-07-29 (`log-109-followup`), cheap (one line).**
+   The regression driver stopped matching the screen the moment `CHI-91` shipped:
+   `scripts/chi-true-regression.mjs:540` spreads 3 `extraFields` into case 24's answer/gate/display
+   calls, and `analyzeNewsCard()` now spreads 4 — `article_unavailable_reason` is missing. On a
+   failed article fetch the run therefore asks Marcus Webb — GEO CSO Expert a question the product
+   would never ask: no reason reaches him, so he cannot produce the gap acknowledgment
+   `ci-answer-intent` now instructs, and the judge scores an answer the shipped screen does not
+   generate. **Belongs here on exactly the §2b test** — it doesn't change the product, it
+   silently invalidates a bucket-1 gate's evidence, and case 24 *is* a bucket-1 gate. Same drift
+   `SES-31` (regression-driver-payload-parity) was created to prevent, recurring because nothing
+   structurally couples the two payloads; the fix should consider a shared helper so the next
+   added field cannot diverge. **Self-caught by the session that introduced it, same day.**
 
 ---
 
@@ -278,6 +290,7 @@ re-traced through current source + Supabase. 12 confirmed live, 4 likely already
 | 10 | `CHI-67` (Observability) | Agent Reasoning drawer still renders "`N` patterns" / "No patterns synthesized yet." |
 | 11 | `MI-41` (UI) | Column 3 root still has no `overflowY`/`minHeight` — column 2's fix was never copied over. |
 | 12 | `CHI-87` (Observability) | Mount-path news fetch still unseeded → null duration → `console.error`. **`LOO-26` (Tech Debt) is effectively a duplicate** — its chat-path trigger was already seeded; propose merging into `CHI-87` (John's call per merge precedent). |
+| 13 | `CHI-91` (Feature) | 🔶 **Mostly shipped** v6.3.216 — a failed news-card article fetch now explains itself in chat instead of producing a blank non-answer, and Marcus Webb — GEO CSO Expert names the gap in his own words (both live-verified). **Remaining: nobody has seen the fault bubble actually render** — `SES-47`'s deploy cap blocked it (129 deploys/24h, zero builds) and a local Vite server has no `/api`, so no news cards load (`SES-55`). One news-card click on the dev URL after any future build closes items 6/7/11 together. *(promoted into this queue 2026-07-29, `log-109-followup` — the row's `Beta-gate (bucket 2)` declaration was missing at filing time and is now added.)* |
 
 **Likely already fixed — verify on screen, then close the row (5-minute pass):**
 `CHI-29` (UI — `ScrollFadeHint` shipped and wired into column 2 + mobile), `CHI-26` (UI —
