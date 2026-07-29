@@ -5149,3 +5149,23 @@ LOG-77 (Architecture) item 9 — the evaluation-verdict-gated-retry fact, resolv
 **Process finding worth keeping — Vercel silently skipped a push.** The first QA run still showed the old behaviour. Rather than conclude the fix failed, the deployed bundle was fetched and grepped for the new code: absent. Vercel's API confirmed its most recent build was the *preceding* commit (`b594dcb`, 18:21) while the fix committed at 18:24 — no build was ever triggered, and none appeared for 12 minutes. A subsequent unrelated push triggered a build **immediately**, which then included the fix. Lesson for any live QA in this repo: **"deployed" is an assumption until the served bundle is checked**; a stale-bundle QA run looks exactly like a failed fix. Verify by fetching the asset and searching for a string unique to the change.
 
 **New row `LOG-106` (Feature)** — found while verifying this one: **By Service has the identical false-zero.** Its rows render as soon as the `platform_services` directory loads, but Calls/Cost come from the log, so every service reads `0 calls / <$0.01` for ~4 s before jumping to real values (measured: `0 calls / <$0.01` at 0–1.0 s → `48 calls / $0.21` at 4.5 s). Same treatment applies; By Agent should be confirmed at the same time rather than assumed covered.
+
+---
+
+## beta-doc-0728 — Beta definition recovery, canonical buckets, full bucket triage (2026-07-28, docs-only, no version bump)
+
+**Session:** `beta-doc-0728` (worktree `beta-doc-0728`, docs-only — no application code, no version bump). Started from John's question: sessions keep spawning tickets, he can't tell goal-completion from residue, and "what do I execute for beta" had no durable answer.
+
+**Root finding:** John's beta definition and prioritization were stated live in the 2026-07-23/24 "beta prioritization" session but that session **never committed its output** — its worktree (`design-session-0723e`) had zero work commits; the content existed only in the conversation transcript. Recovered verbatim from the transcript and committed as **`docs/BETA.md`** (definition, buckets, queues). This is the exact failure the "log session-only findings" rule exists to prevent, at its largest scale yet — the governing document for the entire beta effort.
+
+**John then restated the buckets canonically (2026-07-28, supersedes 2026-07-24):** 1. full 24-case regression pass, 2. UX/UI chat + column 2, 3. mobile, 4. AI Audit Log accuracy, 5. Agent Routing drawer (≥1 pattern per hop where appropriate). Ship after all five; bonus (not a gate): re-classify count below 10K.
+
+**Full bucket triage:** every open row in `FEATURES.md` + `FEATURES-NEXT.md` (~170) classified against the five buckets via 4 parallel sub-agents reading **full row text** (per the 2026-07-17 sweep rule). Result: bucket 1 = 16 rows, bucket 2 = 20, bucket 3 = **empty (zero open `MOB-*` rows anywhere — mobile is untested, not green; a mobile QA sweep is the queue)**, bucket 4 = 15, bucket 5 = 12. Statuses of the recovered 07-24 rankings refreshed same day (7 items had already shipped).
+
+**Five contested calls isolated and ruled by John live (all recorded in `BETA.md` §4):** (1) Bench fabrication group (`LOG-57`/`LOG-70`/`AGR-01`/`AGR-001`/`AGR-002`/`MI-03`) → post-beta, accepted risk; (2) `CHI-70` refresh-loses-conversation → post-beta; (3) `HAR-14` presence-only validation → conditional: enters bucket 1 only if a regression failure root-causes to it, else Next; (4) `AA-178` Librarian-rule reading → ruling deferred post-beta (fresh code read this session: the old direct `queryLibrary()` call no longer exists — `ai-enrichment.js` brokers via `queryContent()` since `AA-106`/`AA-107`; no live failure) → `AA-179` drops from bucket 5; (5) `MI-69` scripted-looking narration → post-beta (Next).
+
+**Also this session:** `SES-30` (Tooling) filed — live ID collision, two open rows both carry `CHI-48` (`SES-18` class). `FEATURES.md` header gained the `docs/BETA.md` pointer + the filing rule: every new row declares `Beta-gate (<bucket>)` or `Post-beta`. Mid-session dev movement absorbed per BETA.md's maintenance rules (`LOG-99`-done likely moots `LOG-101` — flagged verify-then-close; `LOG-106` added to bucket 4).
+
+**Proposed, not yet adopted (John hasn't ruled):** a close-out verdict-line rule — every session close-out leads with `GOAL MET/NOT MET — residue: <IDs> (blocking|non-blocking)` so goal-vs-residue is scannable. Filed nowhere yet; raise again when John wants it.
+
+**Close-out:** docs touched: `docs/BETA.md` (new), `docs/FEATURES.md` (pointer + `SES-30`), `docs/SESSIONS.md`, `CLAUDE-STATE.md` (rolling window). Inflight marker removed in this commit.

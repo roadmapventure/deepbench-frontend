@@ -1,1 +1,0 @@
-beta-doc-0728 — worktree `beta-doc-0728`, branch `session/beta-doc-0728`. Docs-only design session: recover John's beta definition + bucket rankings from the uncommitted 2026-07-23/24 beta-prioritization session transcript and commit them as a governed doc, rankings refreshed against the current backlog.

@@ -138,7 +138,8 @@ rows:
 | 2 | `LOG-91` (Observability) | 4,489 paired duplicate rows inflate call counts at the source. |
 | 3 | `LOG-104` (Data) | Non-deterministic paging can skip rows — audit totals inexact. |
 | 4 | `LOG-102` (Observability) | Fetch failure renders "Patterns Logged 0" as fact — observed live. |
-| 5 | `LOG-101` (Observability) | By Pattern renders empty on the rollup timeout (correct data, false display). |
+| 5 | `LOG-101` (Observability) | By Pattern renders empty on the rollup timeout — **likely mooted by `LOG-99`-done (v6.3.194, rollup 3,407→289 ms); verify on the live screen, then close.** |
+| 5b | `LOG-106` (Feature) | By Service rows show `0 calls / <$0.01` for ~4 s before real values — same false-zero class as `LOG-105`-done; By Agent to be confirmed in the same pass. *(added 2026-07-28 per maintenance rule 1)* |
 | 6 | `LOG-42` → `LOG-63` → `LOG-59` → `LOG-53` (Architecture) | The false-`rag` family — 63 is the write-path gate that stops new bad rows accruing; 42 unblocked via `LOG-69`-done's read-time re-derivation. |
 | 7 | `LOG-48` (Architecture) | Invented `intelligent-synthesis` pattern name + ungoverned `embeddings` slug. |
 | 8 | `LOG-56` (Architecture) 🔶 | Zero-call services fall back to declared catalog patterns — one site left (`useAIActivity.js:585`). |
