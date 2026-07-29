@@ -5215,3 +5215,19 @@ Recorded because this cost two QA cycles and produced one false "the fix didn't 
 **0728d — persistence of the above.** Verify-then-close annotations written onto the 4 likely-fixed `FEATURES.md` rows + the `LOO-26` duplicate note (so no session starts a fix from a stale claim); `BETA.md` §8 gains open item 5: source-verify buckets 4/5 before scheduling from them — bucket 2's measured staleness was 25% (4 fixed + 1 dup of 20), all dead the same way: **a session fixed the thing and never updated the row** (the `SES-27` (Architecture) drift class, now with a measured rate).
 
 **Close-out:** docs touched across the three passes: `docs/BETA.md`, `docs/FEATURES.md` (5 row annotations), `docs/SESSIONS.md` (this entry). No `CLAUDE-STATE.md` window change (the parent `beta-doc-0728` entry stands for the whole conversation). Inflight markers removed per pass.
+
+---
+
+## beta-doc-0728e — Bucket-4 (AI Audit accuracy) staleness sweep (2026-07-28 late evening, addendum to beta-doc-0728, docs-only, no version bump)
+
+**John's ask, same conversation:** sweep bucket 4 the way bucket 2 was swept. All 15 rows re-traced through current source (4 read-only sub-agents) + live Supabase (direct SQL). Results recorded in `docs/BETA.md` §3 bucket 4 and as row annotations in `FEATURES.md`/`FEATURES-NEXT.md`.
+
+**Confirmed (8), one escalated:** `LOG-91` — the agent-turn/request-receivable double-write is ACTIVE, 1,186 new pairs in 24 h (4,291 total by trace-pairing; the row's own naive same-timestamp key finds zero — the pairing is by trace, a measurement-method note worth keeping). `LOG-81` confirmed at scale (~5,800 zero-token rows: librarian 2,404, agent-directory 1,734, agent-turn 1,439 — the last being LOG-91's other halves; LOG-91 + LOG-81 + LOG-60's denominator = one counting conversation with John). False-`rag` family (`LOG-42`/`63`/`59`/`53`) all write sites live, 380 false-tagged agent-selection rows in the last 7 days; write-time pattern stamping runs parallel to §19k, never replaced (LOG-65's own text confirms). `LOG-102` (unblocked — its "after LOG-99" gate cleared today), `LOG-106`, `LOG-104`, `LOG-82`, `CHI-15` (near-dup of `CHI-67`, merge proposed — second cross-row dup found today after LOO-26→CHI-87).
+
+**Likely fixed (3):** `LOG-101` (LOG-99-done shipped its exact fix), `LOG-61` ("Industry Catalog" label absent from source), `AA-177` (LOG-09c logging shipped; residue: conditional query-side log, no separate insert row).
+
+**Re-scoped (3):** `LOG-60` (dropped-rows mechanism stale; live question is denominator honesty — 4,538 classified vs 24,639 raw), `LOG-56` (visible defect gone; close as dead-code deletion), `LOG-48` (catalog half done — "Prompt Compression" rename + governed "Generative Prompt Compression" vocabulary entry; remaining: 25 frozen rows' mapping + `embeddings` destination, 2,191 rows still accruing).
+
+**Bucket-4 staleness rate: 6 of 15 rows (40%) were stale or over-scoped** — higher than bucket 2's 25%, consistent with the audit screen being today's hottest surface. Bucket 5 remains unswept (§8 item 5).
+
+**Close-out:** docs touched: `docs/BETA.md`, `docs/FEATURES.md` (7 row annotations), `docs/FEATURES-NEXT.md` (CHI-15), `docs/SESSIONS.md`. Inflight marker removed in the close-out commit.

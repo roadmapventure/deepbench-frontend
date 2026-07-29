@@ -148,26 +148,40 @@ the bucket or populate it** — that sweep is the queue.
 
 ### Bucket 4 — AI Audit Log screen accuracy
 
-Absorbs the still-open items of the recovered 2026-07-24 Anomalies/Audit lists (§7) plus new
-rows:
+**Source + Supabase verified 2026-07-28 late evening (`beta-doc-0728e`, John's ask):** every
+row re-traced through current source and live data. 8 confirmed (one escalated), 3 likely
+fixed, 2 re-scoped, 1 standing gate.
 
-| # | ID (Type) | Defect |
+**Confirmed still valid (the real queue):**
+
+| # | ID (Type) | Defect (verified evidence) |
 |---|---|---|
-| 1 | `LOG-60` (Observability) | By Pattern counts don't reconcile to the raw log — measure before theorizing. |
-| 2 | `LOG-91` (Observability) | 4,489 paired duplicate rows inflate call counts at the source. |
-| 3 | `LOG-104` (Data) | Non-deterministic paging can skip rows — audit totals inexact. |
-| 4 | `LOG-102` (Observability) | Fetch failure renders "Patterns Logged 0" as fact — observed live. |
-| 5 | `LOG-101` (Observability) | By Pattern renders empty on the rollup timeout — **likely mooted by `LOG-99`-done (v6.3.194, rollup 3,407→289 ms); verify on the live screen, then close.** |
-| 5b | `LOG-106` (Feature) | By Service rows show `0 calls / <$0.01` for ~4 s before real values — same false-zero class as `LOG-105`-done; By Agent to be confirmed in the same pass. *(added 2026-07-28 per maintenance rule 1)* |
-| 6 | `LOG-42` → `LOG-63` → `LOG-59` → `LOG-53` (Architecture) | The false-`rag` family — 63 is the write-path gate that stops new bad rows accruing; 42 unblocked via `LOG-69`-done's read-time re-derivation. |
-| 7 | `LOG-48` (Architecture) | Invented `intelligent-synthesis` pattern name + ungoverned `embeddings` slug. |
-| 8 | `LOG-56` (Architecture) 🔶 | Zero-call services fall back to declared catalog patterns — one site left (`useAIActivity.js:585`). |
-| 9 | `LOG-61` (Observability) | "By Pattern · Industry Catalog" header is factually false. |
-| 10 | `LOG-82` (Tech Debt) | Stale hardcoded model ids mislabel model/provider rows. |
-| 11 | `AA-177` (Architecture) | `the_reasoning` reads/writes have zero `ai_activity_log` attribution — audit undercounts. |
-| 12 | `CHI-15` (Observability) | Two adjacent Audit drawers label unrelated counts "patterns." |
-| 13 | `LOG-81` (Observability) | Total Calls/By Agent inflated by non-model ops — needs John's counting decision. |
-| 14 | `LOG-01` (Architecture) | Standing end-to-end audit accuracy sweep — run **last**, as this bucket's own QA gate. |
+| 1 | `LOG-91` (Observability) | **ESCALATED — the double-write is active:** 1,186 new `agent-turn`+`request-receivable` pairs in the last 24 h (4,291 total by trace-pairing). Entangled with `LOG-81` (its zero-token halves are part of that population). |
+| 2 | `LOG-81` (Observability) | Confirmed at scale: ~5,800 zero-token rows in Total Calls (`librarian` 2,404, `agent-directory` 1,734, `agent-turn` 1,439). **Needs John — scope with `LOG-91` + `LOG-60`'s denominator as ONE counting conversation.** |
+| 3 | `LOG-42`→`63`→`59`→`53` (Architecture) | False-`rag` family, all write sites confirmed live: ungated `rag_retrieved` flag; `conversations.js`/`rag.js` stamp `rag` on pure writes / pre-search; catalog reads tagged `rag` with zero chunk ids; **380 false-tagged agent-selection rows in the last 7 days** (latest 20 min before the check). Write-time stamping was never replaced — it runs parallel to the §19k signature track. |
+| 4 | `LOG-102` (Observability) | Dishonest catch (`0` / "No classified patterns yet." as fact) confirmed in source — **now unblocked**, its "after `LOG-99`" gate cleared today. |
+| 5 | `LOG-106` (Feature) | By Service raw-render confirmed (no rolling counters; skeleton gate releases at directory load). By Agent confirmed already covered (gated on `logLoaded`). |
+| 6 | `LOG-104` (Data) | Pagination still `.order('created_at')` with no tie-break and no dedup on append. |
+| 7 | `LOG-82` (Tech Debt) | Stale model ids confirmed (`claude-sonnet-4-5` literal; private cost/provider maps that never import `shared/models.js`). |
+| 8 | `CHI-15` (Observability) | Still valid — **near-duplicate of `CHI-67` (bucket 2), same drawer, same label collision; merge proposed, John's call.** |
+
+**Likely already fixed — verify on screen, then close:**
+`LOG-101` (Observability — `LOG-99`-done shipped its exact proposed fix, rollup ~289 ms),
+`LOG-61` (Observability — header now plain "By Pattern"; "Industry Catalog" absent from
+source), `AA-177` (Architecture — `the_reasoning` reads/writes now log via `logActivity`
+(LOG-09c); small residue noted on the row).
+
+**Re-scoped (cheaper than their rows describe):**
+`LOG-60` (Observability — original dropped-rows mechanism is stale; the live question is
+denominator honesty: 4,538 classified rows vs 24,639 raw — folds into the counting
+conversation), `LOG-56` (Architecture — visible defect gone; close as a small dead-code
+deletion), `LOG-48` (Architecture — catalog half done: "Prompt Compression" rename shipped
+(AA-190b) and `pattern_vocabulary` has a governed "Generative Prompt Compression"; remaining:
+map 25 frozen historical rows, decide `embeddings`' vocabulary destination — 2,191 rows,
+still accruing).
+
+**Standing gate:** `LOG-01` (Architecture) — the end-to-end audit accuracy sweep, run
+**last**, after the counting conversation settles what the numbers should mean.
 
 ### Bucket 5 — Agent Routing drawer
 
