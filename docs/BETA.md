@@ -17,6 +17,19 @@
 
 ---
 
+> ## ⚠️ Cross-cutting blocker, open as of 2026-07-28 22:30 CST — `SES-33` (Tooling)
+>
+> **The GitHub→Vercel `dev` auto-deploy has stopped firing.** Last git-triggered `dev`
+> deployment: `b309da8` (21:55 CST). `origin/dev` is **14 commits** past it. Production
+> (`main`) is unaffected and fully current — this is `dev`-preview only.
+>
+> **Why it belongs on this board:** every bucket's ship bar is confirmed by live QA against
+> the dev preview. Until this is fixed, no session can honestly close an item on deployed
+> evidence, and any that does is testing a stale build. Not new — `8fbfdd4`'s own commit
+> message records another session hitting it and working around it with a manual poke, which
+> produced a deployment carrying **no git metadata at all** (untraceable to a commit).
+> Needs the integration re-checked at the Vercel/GitHub end, not another poke.
+
 ## 1. What beta means (John, verbatim)
 
 Stated 2026-07-22, restated 2026-07-23 — never previously captured in any doc:
@@ -219,7 +232,7 @@ bucket swept; every queue on this board now carries verified-current evidence.**
 
 | # | ID (Type) | Defect (verified evidence) |
 |---|---|---|
-| 1 | `LOG-71` (Architecture) 📐 | **Designed 2026-07-28 (`design-log-71`, kickoff v6.3.205).** Resume paths pass no `signatureConfig` — **three** `resumeCapability`→`runLoop` re-entries, not two. Measured: 221 of 1,979 `agent-turn` rows since 07-26 (11.2%) lack the config-half, 214 of them (97%) resume-caused. John's call: persist the frozen snapshot on `durable_hops`, never recompute. **`LOG-103` merged in** (John approved). Historical rows split to new `LOG-111`. |
+| 1 | ~~`LOG-71` (Architecture)~~ ✅ | **DONE 2026-07-28 (`S-LOG-71`, v6.3.205, `eab4b46`) — Category L PASS against real Supabase + real Anthropic.** Resume paths passed no `signatureConfig` — **three** `resumeCapability`→`runLoop` re-entries, not two as this table said. Measured before: 221 of 1,979 `agent-turn` rows since 07-26 (11.2%) lacked the config-half, 214 (97%) resume-caused. John's call: persist the frozen snapshot on `durable_hops`, never recompute. Live proof: resumed row `#24861` carries the config-half byte-identical to the frozen original. **This bucket's own bar — "every agent displays ≥1 pattern in its hop" — is what this closed for resumed hops**; the remaining blank hops are `LOG-72`'s criteria gap (item 2), not a capture gap. **`LOG-103` merged in** (John approved). Historical rows split to `LOG-111` (Post-beta, bucket 6). |
 | 2 | `LOG-72` (Architecture) 🔶 | Criteria authoring, now quantified: **27 vocabulary entries, only 9 with matching criteria** — 16 active patterns can't match any hop. Headline MISSING SIGNAL already resolved by `LOG-77`-item-9-done. |
 | 3 | `LOG-39` (Architecture) | Shrunk: the Layer A fact half largely exists (`tool_calls` records `request_help`); remaining work is the Layer B criteria row for routing. |
 | 4 | `LOO-005` (Observability) | Pre-delegation *reasoning* still uncaptured — `LOG-77`-item-9's provenance capture is deliberately facts-only (`delegation_target`/`task_provenance`, no reasoning field). First routing hop still missing. |
