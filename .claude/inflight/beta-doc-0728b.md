@@ -1,1 +1,0 @@
-beta-doc-0728b — worktree `beta-doc-0728b`, branch `session/beta-doc-0728b`. Continuation of `beta-doc-0728` (same conversation): recording John's regression-first bucket-1 strategy into docs/BETA.md. Single-edit session, removed at close.
