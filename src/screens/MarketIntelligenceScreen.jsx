@@ -1,3 +1,4 @@
+// DeepBench v6.3.200 | MarketIntelligenceScreen.jsx | S-CHI-88a -- CHI-88 QA follow-ups: AgentWorkingIndicator gains an opt-in one-line `compact` variant (mobile status stops wrapping to 2 lines), the input row moves into the Chat branch only (Steps & Evidence reclaims ~66px), and the mobile pinned decision footer renders compact via the existing `bare` flag
 // DeepBench v6.3.198 | MarketIntelligenceScreen.jsx | S-CHI-88 -- mobile cleanup: terse feed, one-line title chrome, soft status line, 16px input, pinned decision footer
 // DeepBench v6.3.186 | MarketIntelligenceScreen.jsx | LOG-95b -- useTracePatterns refetches on span miss: streamed rows mount mid-flight (LOG-95), so the LOG-79 per-trace cache could freeze before late executions logged; now invalidates+refetches up to 3x2.5s per mounted span, then accepts honest-unclassified (§19l)
 // DeepBench v6.3.184 | MarketIntelligenceScreen.jsx | LOG-95 -- hop-event span identity (§19p): streamed delegation-family rows spread pickCreditedSpan(evt) into their stored data; failure_triage credits the picker with her own span when she's credited, the gate's when Owen is
@@ -707,32 +708,65 @@ function formatClockTime(ts) {
 // is the total elapsed + estimate on its own row, no diamond; line 2 is the diamond + activity
 // message + bare per-agent time (drops the old "(...this Agent)" parenthetical, no label — line 1
 // already carries the explicit "elapsed"/"expect" labels).
-function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation }) {
+// FEATURE: CHI-88a — opt-in `compact` one-line variant, default false (every existing caller,
+// desktop included, renders byte-identically). CHI-88 moved this indicator into a full-width mobile
+// slot under the input row, where CHI-56's chat-pane geometry (alignItems:"flex-end", maxWidth:"85%")
+// plus the row's flexWrap:"wrap" made it wrap to ~53px/2 lines — measured live on the deployed build.
+// Compact drops that geometry, forbids wrapping, ellipsizes the activity message, and omits the
+// per-agent time only (the feed's hop rows already carry per-agent durations). The elapsed/expect
+// span keeps its exact text: §19o requires the expectation and its recovery extensions to stay visible.
+function AgentWorkingIndicator({ message, startedAt, turnStartedAt, expectation, compact = false }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  // FEATURE: CHI-73 — always show an estimate: grounded expectation when present, else the
+  // centralized LIVE_EXPECT_FALLBACK ceiling. No status can silently render without one now.
+  const elapsedExpect = (
+    <span style={compact
+      ? {fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}
+      : {fontFamily:mono,fontSize:10,color:T.brassDeep}}>elapsed {formatElapsed(now - turnStartedAt)} | {expectation || LIVE_EXPECT_FALLBACK}</span>
+  );
+  const activity = (
+    <span style={compact
+      ? {fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0,flexShrink:1}
+      : {fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
+  );
   return (
     // FEATURE: CHI-56 — alignItems:"flex-end" + maxWidth:"85%" added: Live status always reports
     // on the User prompt's own action, which is always right-aligned (John's confirmed terminology,
     // kickoff CONTEXT) — matches MessageBubble's own bubble width (~L1447/1482) exactly, no second
-    // width constant introduced.
-    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,position:"relative",alignItems:"flex-end",maxWidth:"85%"}}>
+    // width constant introduced. Compact (CHI-88a) opts out: its slot is full-width, not the chat pane.
+    <div style={compact
+      ? {display:"flex",flexDirection:"column",gap:4,position:"relative",alignItems:"stretch",maxWidth:"100%",marginBottom:0}
+      : {display:"flex",flexDirection:"column",gap:4,marginBottom:12,position:"relative",alignItems:"flex-end",maxWidth:"85%"}}>
       <FeatureBadge id="MI-47"/>
       <FeatureBadge id="MI-49"/>
       <FeatureBadge id="CHI-56"/>
       <FeatureBadge id="CHI-73"/>
       {/* FEATURE: CHI-71 -- re-merged onto ONE line (John's live call, reverting MI-49's two-line split):
           total elapsed + estimate, then the diamond + activity message + this-agent time, all in one
-          right-aligned row that wraps only if it ever runs out of width. */}
-      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
-        {/* FEATURE: CHI-73 — always show an estimate: grounded expectation when present, else the
-            centralized LIVE_EXPECT_FALLBACK ceiling. No status can silently render without one now. */}
-        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>elapsed {formatElapsed(now - turnStartedAt)} | {expectation || LIVE_EXPECT_FALLBACK}</span>
-        <AIDiamond size="7px" color={T.brass}/>
-        <span style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",fontWeight:400}}>{message}</span>
-        <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+          right-aligned row that wraps only if it ever runs out of width.
+          FEATURE: CHI-88a -- compact reverses the order (diamond first, per John's approved mock) and
+          sets flexWrap:"nowrap" so the fixed mobile chrome height can never grow. */}
+      <div style={compact
+        ? {display:"flex",alignItems:"center",gap:8,flexWrap:"nowrap",overflow:"hidden",justifyContent:"flex-start"}
+        : {display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+        {compact ? (
+          <>
+            <AIDiamond size="7px" color={T.brass}/>
+            {activity}
+            {elapsedExpect}
+          </>
+        ) : (
+          <>
+            {elapsedExpect}
+            <AIDiamond size="7px" color={T.brass}/>
+            {activity}
+            <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{formatElapsed(now - startedAt)}</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1831,7 +1865,9 @@ function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
 // FEATURE: CHI-13 — extracted from QaEvidenceCard's old inline footer (see STYLE-GUIDE.md §35,
 // unchanged) so EvidenceColumn can render it in its own pinned footer slot instead of wherever
 // QaEvidenceCard's content happens to end.
-function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
+// FEATURE: CHI-88a -- `compact` is a pure passthrough to DecisionFooter's own opt-in variant; this
+// component holds no layout of its own, so there is nothing here to branch on.
+function QaEvidenceCardFooter({ qa, onGoodThanks, onReview, compact }) {
   // FEATURE: CHI-71 -- standardized via the shared DecisionFooter (cream field + tan text + navy CTA)
   return (
     <DecisionFooter
@@ -1840,6 +1876,7 @@ function QaEvidenceCardFooter({ qa, onGoodThanks, onReview }) {
       onSecondary={onGoodThanks}
       primaryLabel="Have Priya generate theories →"
       onPrimary={onReview}
+      compact={compact}
     />
   );
 }
@@ -2444,8 +2481,14 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
         {footerKind && (
           <div style={{padding:"10px 14px",borderTop:`1px solid ${T.line}`,position:"relative"}}>
             <FeatureBadge id="CHI-13"/>
+            {/* FEATURE: CHI-88a — `bare` is this column's existing mobile flag and is true only at the
+                MobileBody call site by construction, so it doubles as the compact gate with zero new
+                conditionals and zero desktop reachability. CHI-88 pinned this footer on mobile, where
+                it then took 126px of the 200px steps wrapper (39px left for the answer). The
+                hyp-confirmation kind (ConfirmationCardActions) is deliberately NOT compacted — out of
+                this session's scope, left exactly as-is. */}
             {footerKind === "qa-review" && (
-              <QaEvidenceCardFooter qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview}/>
+              <QaEvidenceCardFooter qa={qaEvidence} onGoodThanks={onGoodThanks} onReview={onReview} compact={bare}/>
             )}
             {footerKind === "hyp-result" && (
               // FEATURE: CHI-71 -- standardized via the shared DecisionFooter
@@ -2457,6 +2500,7 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
                 onSecondary={onDiscard}
                 primaryLabel="Create Forecast"
                 onPrimary={() => onCommit()}
+                compact={bare}
               />
             )}
             {footerKind === "hyp-confirmation" && (
@@ -3312,9 +3356,41 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         </button>
       </div>
 
+      {/* FEATURE: CHI-88a — the input row (input + Send + Clear) now lives inside the Chat branch of
+          the tab body below, NOT in its old global slot under both tabs: John's call — Steps & Evidence
+          was spending ~66px of a 667px screen on an affordance that tab has no use for. Pure relocation;
+          every id, handler and style inside it is byte-identical to the global row it replaces, and the
+          working-status line stays global (it reads under the input row on Chat, directly above the
+          Agent Routing feed on Steps & Evidence).
+          FEATURE: MI-56 — input+Send+Clear are one merged row (was two stacked rows; Clear read as a
+          stray orphan underneath). STYLE-GUIDE.md §21, 2026-07-14 amendment: the divider does double
+          duty as visual grouping + accidental-tap mitigation for the no-confirm-dialog Clear action
+          (that S-MI-51 decision is unchanged here).
+          FEATURE: CHI-88 — the input's fontSize 16 is the root-cause fix for iOS Safari zooming the
+          whole app on focus (it auto-zooms any focused input under 16px and never zooms back out —
+          confirmed on John's actual phone); no viewport-meta change, no JS zoom-reset hack. Both submit
+          paths blur the input so the on-screen keyboard drops on send.
+          FEATURE: MOB-001 — Clear's vertical padding matches Send's own 9px in this same row, taking its
+          measured 36×13px tap target (mobile-ui-audit-0717) to ~30px+; font/color/weight and the
+          no-confirm-dialog Clear behavior are unchanged. */}
       <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
         {mobileTab === "chat" ? (
+          <>
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
+          <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
+            <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
+              onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
+              style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:16,background:T.card,color:T.ink}}/>
+            <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; el.blur(); }} disabled={loading}
+              style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
+              Send
+            </button>
+            <div style={{width:1,alignSelf:"stretch",background:T.lineSoft,flexShrink:0}}/>
+            <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"9px 10px"}}>
+              Clear
+            </button>
+          </div>
+          </>
         ) : (
           /* FEATURE: CHI-88 — this wrapper used to be the scroller (overflowY:"auto"). An auto-scroll
              parent gives its children unbounded height, so EvidenceColumn's flex column inflated to
@@ -3335,44 +3411,21 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           Its dismiss state and both dismiss effects are gone with it — no dead gating code left
           behind. NewsCardsLoadingLine survives: EvidenceColumn still calls it.
           FEATURE: CHI-88 — the working-status line also left this slot; it now renders as a soft
-          one-line strip directly under the input row (below). */}
-
-      {/* FEATURE: MI-56 — merged input+Send+Clear into one row (was two stacked rows, Clear read as a
-          stray orphaned element on its own near-empty row underneath). See STYLE-GUIDE.md §21's
-          2026-07-14 MI-56 amendment: divider does double duty as visual grouping + accidental-tap
-          mitigation for the no-confirm-dialog Clear action (that S-MI-51 decision unchanged here). */}
-      <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
-        {/* FEATURE: CHI-88 — fontSize 13 -> 16 is the root-cause fix for iOS Safari zooming the whole
-            app on focus (it auto-zooms any focused input under 16px and never zooms back out —
-            confirmed on John's actual phone). No viewport-meta change, no JS zoom-reset hack.
-            Both submit paths also blur the input so the on-screen keyboard drops on send. */}
-        <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
-          onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
-          style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:16,background:T.card,color:T.ink}}/>
-        <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; el.blur(); }} disabled={loading}
-          style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
-          Send
-        </button>
-        {/* FEATURE: MOB-001 — Clear's mobile tap target measured 36×13px live (confirmed, mobile-ui-audit-0717)
-            -- reused desktop's MI-57 mouse-oriented sizing verbatim, never given real touch-target padding
-            when adapted for mobile (MI-56). Vertical padding now matches Send's own 9px in this same row
-            (visual consistency, not an arbitrary new number) -- real height goes from ~13px to ~30px+.
-            Font size, color, weight, and the no-confirm-dialog Clear behavior are all unchanged. */}
-        <div style={{width:1,alignSelf:"stretch",background:T.lineSoft,flexShrink:0}}/>
-        <button onClick={onClear} style={{background:"none",border:"none",color:T.muted,fontFamily:mono,fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",cursor:"pointer",flexShrink:0,padding:"9px 10px"}}>
-          Clear
-        </button>
-      </div>
+          one-line strip below the tab body (see the CHI-88a note there). */}
 
       {/* FEATURE: CHI-88 — the live working status moves out from between the chat body and the input
           row (where it was a boxed strip with its own background + top border) to a soft, unboxed
-          single line directly under Send, above AGENT ROUTING. It reports on the question just sent,
-          so it now sits with the send affordance rather than splitting the reading surface. One line
-          always: it ellipsizes, never wraps, so the fixed chrome height can't grow. AgentWorkingIndicator
-          itself is untouched (already a one-line renderer per S-CHI-71 pass 4) — only this wrapper. */}
+          single line, above AGENT ROUTING. It reports on the question just sent, so it sits with the
+          send affordance rather than splitting the reading surface. One line always: it ellipsizes,
+          never wraps, so the fixed chrome height can't grow.
+          FEATURE: CHI-88a — this slot stays GLOBAL now that the input row is Chat-only: on Chat it
+          still reads directly under Send, on Steps & Evidence it sits directly above the feed. The
+          wrapper's own single-line clamp was not enough — AgentWorkingIndicator's inner row is a
+          wrapping flex (CHI-56 chat-pane geometry) and wrapped to ~53px here, so it now renders in
+          its `compact` variant, which is the one-line renderer this full-width slot needs. */}
       {workingStatus && (
         <div style={{flexShrink:0,padding:"2px 14px 4px",fontStyle:"italic",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-          <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>
+          <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation} compact/>
         </div>
       )}
 

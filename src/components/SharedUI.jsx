@@ -1,3 +1,4 @@
+// DeepBench v6.3.200 | SharedUI.jsx | S-CHI-88a -- DecisionFooter gains an opt-in, default-off `compact` variant (one ellipsized prompt line, content-sized secondary + flexed primary side by side, >=30px touch floor) for CHI-88's pinned mobile footer slot; all desktop callers byte-identical
 // DeepBench v6.3.199 | SharedUI.jsx | LOG-107a -- ScrollFadeHint gains an opt-in, default-off `depth` variant (soft navy edge) so the fade reads as depth over a background it would otherwise match
 // DeepBench v6.3.188 | SharedUI.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.143 | SharedUI.jsx | S-CHI-71 (pass 3) -- new shared DecisionFooter: the one standardized CHI user-interaction area (cream field + tan text + navy CTA), modeled on the chat input
@@ -464,12 +465,25 @@ export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight,
 // chat input row: a cream field wrapper, a tan prompt, a light "field-style" secondary option on the
 // left, and one navy CTA on the right. Every Column-2 interaction footer renders through this so they
 // can't drift apart again.
-export const DecisionFooter = ({ prompt, secondaryLabel, onSecondary, primaryLabel, onPrimary }) => (
-  <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 16px"}}>
-    {prompt && <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.4,marginBottom:10}}>{prompt}</div>}
+// FEATURE: CHI-88a — opt-in `compact` variant, default false (every desktop caller renders
+// byte-identically). CHI-88 pinned this footer on mobile, where it then took 126px of a 200px steps
+// wrapper — measured live — leaving the answer a 39px reading window. The height was mostly the
+// secondary button: at flex:1 with a 13px font, "Good, thanks" wrapped to 52px. Compact keeps every
+// element (the prompt is never dropped, just clamped to one ellipsized line) and instead sizes the
+// secondary to its content, gives the primary the remaining width, and trims padding/type. minHeight
+// 30 holds both buttons at the touch floor Clear already set (MOB-001).
+export const DecisionFooter = ({ prompt, secondaryLabel, onSecondary, primaryLabel, onPrimary, compact = false }) => (
+  <div style={{background:T.card,border:`1px solid ${T.line}`,padding:compact?"8px 12px":"14px 16px"}}>
+    {prompt && <div style={compact
+      ? {fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.4,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
+      : {fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.4,marginBottom:10}}>{prompt}</div>}
     <div style={{display:"flex",alignItems:"center",gap:8}}>
-      <button onClick={onSecondary} style={{flex:1,textAlign:"left",padding:"9px 12px",border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:13,cursor:"pointer"}}>{secondaryLabel}</button>
-      <button onClick={onPrimary} style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>{primaryLabel}</button>
+      <button onClick={onSecondary} style={compact
+        ? {flex:"0 0 auto",textAlign:"left",padding:"7px 10px",minHeight:30,border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}
+        : {flex:1,textAlign:"left",padding:"9px 12px",border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:13,cursor:"pointer"}}>{secondaryLabel}</button>
+      <button onClick={onPrimary} style={compact
+        ? {flex:1,minWidth:0,textAlign:"center",padding:"7px 10px",minHeight:30,background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:12,cursor:"pointer",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
+        : {padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>{primaryLabel}</button>
     </div>
   </div>
 );
