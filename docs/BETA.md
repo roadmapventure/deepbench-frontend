@@ -90,9 +90,10 @@ count below 10,000. Explicitly not a ship-gate.
 
 ## 2b. Pre-regression prep (John-approved 2026-07-28)
 
-Three `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
-they were triaged Post-beta on the "reviewer never sees it" test, which is the wrong test
-for tooling the ship-gate itself depends on:
+These items protect the regression run's *evidence* and run **before** bucket 1 — they were
+triaged Post-beta on the "reviewer never sees it" test, which is the wrong test for tooling the
+ship-gate itself depends on. (Opened with three; the list has grown as sessions found more of
+the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in this sentence again.)
 
 1. **`SES-28` (Tooling) — ✅ DONE 2026-07-28 (`S-SES-28`, v6.3.208, `e96f2ee`).** Plain
    `node tests/regression/<file>.js` used to pass vacuously (exit 0 testing nothing — only
@@ -173,6 +174,17 @@ for tooling the ship-gate itself depends on:
    `SES-31` (regression-driver-payload-parity) was created to prevent, recurring because nothing
    structurally couples the two payloads; the fix should consider a shared helper so the next
    added field cannot diverge. **Self-caught by the session that introduced it, same day.**
+6. **`SES-58` (Tooling) — ❌ OPEN, filed 2026-07-29 (`S-DAT-12-design`), cheap.** The half
+   `SES-015` above left open: its gate runs **once, before case 1**, and the driver never calls it
+   again, so nothing detects a build landing during cases 2-24. Measured — the only
+   full-run-length attempt on record ran **134 minutes** (2026-07-28 18:07-20:22 CST) and **38
+   commits landed on `dev` inside that window**, 3 touching `src`/`api`/`lib`; `dev` takes 11–30
+   commits/hour during working hours. So a run's 24 cases can straddle several builds while the
+   report attributes them all to one commit. **Belongs here on the §2b test** — it changes nothing
+   about the product and silently invalidates the bucket-1 gate's evidence, exactly like `SES-57`
+   above. Fix is small: the driver already resolves the serving commit at start; record it per case
+   and flag a change in `REPORT_JSON`. Not to be confused with `SES-33` (Vercel producing no build
+   at all) or `DAT-12` (which *data* a run read).
 
 ---
 
@@ -228,7 +240,8 @@ known defect that would break or dirty that run:
 | 13 | `AI-45` (Task Success Rate) | Verify CHI capability actually reasons over `task_context`; answer-correctness risk. |
 | 14 | `AA-78` (Task Success Rate) | Off-topic hypothesis accepted silently; a probing reviewer hits it. *(triage call)* |
 | 15 | `AGT-34` (Data) | Contradictory `final_answer` rule could blank a blocked answer — rare path, verify first. *(triage call)* |
-| 16 | `DAT-8` (Tech Debt) | Test-artifact rows inflate Compliance counts a catalog question can surface. *(triage call)* |
+| 16 | `DAT-8` (Tech Debt) | Test-artifact rows inflate Compliance counts a catalog question can surface. *(triage call)* **Escalated 2026-07-29 (`S-DAT-12-design`): 2 of them are `status='active'` and the CHI Data Sources drawer renders their titles — `DAT-7 End-to-End Live Test`, `DAT-11 atomicity target` — verbatim to the Apple audience. Same class as `AGT-38`-done, so no longer a triage call on the surface test.** |
+| 17 | `DAT-12` (Data) | **Added to this table 2026-07-29 (`S-DAT-12-design`) — the row declared bucket 1 on 2026-07-29 and was never listed here, so it read as open in `FEATURES.md` and absent from the queue.** The run isn't repeatable: 4 of the 20 seed scenarios are currently unreachable and 14 leftover rows are retrievable, five of them copies of one prior answer. A "clean run" against a corpus that changes every run is not evidence. **Designed, kickoff `v6.3.228`** — `retrieval_scope: "baseline"`, read-scoped, zero writes. |
 | 17 | `AGT-39` (Task Success Rate) | Nadia Farouk — Data Expert writes 8-character pseudo-ids into her drafted patch prose ("entries, with IDs 2479db72, 9e3c8eb8"), rendered on the CHI screen. Same bar as row 12 — an id-shaped string that is not an id. *(added 2026-07-29, `S-AGT-37`)* |
 | 18 | `AGT-46` (Task Success Rate) | Priya Nair — Forecast/Theory/Performance Expert does the same in theory-test prose — the original decoy source behind `AGT-37`. Correctness is now handled (`HAR-21` + `AGT-37`); what remains is a reviewer reading `(id: 0cecd001)` and seeing a fabricated citation. *(added 2026-07-29, `S-AGT-37`)* |
 | 19 | `DAT-14` (Data) | ~10 QA-authored rows written into `the_reasoning` / `apple-cso-data-room` by this session's own live tests. Same class as row 16 — synthetic content a catalog question can surface. *(added 2026-07-29, `S-AGT-37`)* |
