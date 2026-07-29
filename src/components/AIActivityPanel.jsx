@@ -1,3 +1,4 @@
+// DeepBench v6.3.197 | AIActivityPanel.jsx | LOG-107 -- scroll-fade hint, per-drawer item counts, header hover affordance
 // DeepBench v6.3.196 | AIActivityPanel.jsx | LOG-105 -- By Pattern row Calls/Cost render through RollingNumber; cost rolls until the log hydrates instead of showing a false <$0.01
 // DeepBench v6.3.191 | AIActivityPanel.jsx | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.189 | AIActivityPanel.jsx | LOG-98a -- RollingNumber reveal no longer depends on requestAnimationFrame (hidden tabs froze tiles on fabricated values)
@@ -16,12 +17,15 @@
 // FEATURE: AI-10 — AIActivityPanel hydrate on mount
 // FEATURE: AI-48 — mobile-responsive layout (82% drawer width, backdrop-dismiss, STYLE-GUIDE.md §26)
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { T, display, body, mono } from "../tokens.js";
 // LOG-86: the two shared catalogs (service/pattern) are no longer imported here — the Platform
 // Roadmap drawer is removed; the hidden MCP tab renders its own static MCP_SURFACES.
 import { useAIActivity, usePatternClassification, AI_TYPES, MODEL_PROVIDER, hydrateFromSupabase, humanizeSlug } from "../hooks/useAIActivity.js";
-import { Corners, AuditRowSkeleton } from "./SharedUI.jsx";
+// FEATURE: LOG-107 -- useScrollFadeHint/ScrollFadeHint are CONSUMED from SharedUI, never
+// reimplemented here: they carry the CHI-29/S-CHI-26c MutationObserver + document.fonts.ready
+// recovery logic that a local copy would silently lose.
+import { Corners, AuditRowSkeleton, useScrollFadeHint, ScrollFadeHint } from "./SharedUI.jsx";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 // FEATURE: LOG-83 -- resolveAgent + its lookup maps extracted to a sibling module so the
 // Node regression test can import them without parsing this file's JSX. Re-exported below.
@@ -188,14 +192,29 @@ function McpCard({ item }) {
 // FEATURE: AI-23 patch — reusable collapsible section header
 // FEATURE: S-AI-AUDIT-SVCDIR -- `first` drops the borderTop on the topmost header only (the
 // stray horizontal line above "By Pattern"); every subsequent header keeps its divider.
-function SectionHeader({ label, open, onToggle, first = false }) {
+// FEATURE: LOG-107 -- a collapsed drawer gave no indication whether it held 31 rows or none, and
+// the row itself didn't read as a control (John: "the closed drawers can be open" wasn't obvious).
+// Two additions, no geometry change beyond the 2px -> 6px horizontal padding that keeps the hover
+// tint from clipping to the text: an optional numeric `count` between label and chevron, and a
+// hover tint on the whole row. `count` renders only when it is genuinely a number -- callers pass
+// `undefined` while their own data is still loading, because a `0` there is exactly the false zero
+// LOG-98/LOG-105 removed. A real, loaded `0` IS shown: "this drawer is empty" is honest information.
+function SectionHeader({ label, open, onToggle, first = false, count = undefined }) {
+  const [hover, setHover] = useState(false);
   return (
     <div
       onClick={onToggle}
-      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 2px",cursor:"pointer",borderTop: first ? "none" : `1px solid ${T.lineSoft}`,marginTop:18,userSelect:"none"}}
+      onMouseEnter={()=>setHover(true)}
+      onMouseLeave={()=>setHover(false)}
+      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 6px",cursor:"pointer",borderTop: first ? "none" : `1px solid ${T.lineSoft}`,marginTop:18,userSelect:"none",background: hover ? `${T.brass}0f` : "transparent",transition:"background 120ms ease"}}
     >
       <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>{label}</div>
-      <div style={{fontFamily:mono,fontSize:16,color:T.brassDeep,lineHeight:1,marginRight:2}}>{open ? "▲" : "▼"}</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+        {typeof count === "number" && (
+          <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted}}>{count.toLocaleString()}</span>
+        )}
+        <div style={{fontFamily:mono,fontSize:16,color:T.brassDeep,lineHeight:1,marginRight:2}}>{open ? "▲" : "▼"}</div>
+      </div>
     </div>
   );
 }
@@ -301,6 +320,14 @@ export default function AIActivityPanel({ onClose }) {
     hydrateFromSupabase();
   }, []);
 
+  // FEATURE: LOG-107 -- bottom-edge fade + bouncing chevron so the panel visibly continues below
+  // the fold (John: "not easy to tell you can scroll down"). Reuses the CHI-29 shared hook --
+  // no new keyframe, no new scroll math, no new effect of our own. Expanding/collapsing a drawer
+  // changes content height without firing a scroll event, which is why `sections` leads the deps
+  // array; the hook's own MutationObserver covers content swaps as well.
+  const scrollRef = useRef(null);
+  const { canScrollMore, onScroll } = useScrollFadeHint(scrollRef, [sections, classified.length, agentsSorted.length, platformServices.length]);
+
   return (
     <>
       {/* FEATURE: AI-48 — mobile-only backdrop, tap to dismiss; desktop has no backdrop (unchanged) */}
@@ -350,7 +377,12 @@ export default function AIActivityPanel({ onClose }) {
       </div>
 
       {/* Content — FEATURE: AI-48 — mobile padding delta only, all content/data unchanged */}
-      <div style={{flex:1,overflowY:"auto",padding: isMobile ? "12px 14px" : "14px 16px"}}>
+      {/* FEATURE: LOG-107 -- this wrapper exists only to give the absolutely-positioned
+          ScrollFadeHint a correctly-bounded relative ancestor matching the visible viewport; it
+          takes over `flex:1` and the scroll moves inward. `minHeight:0` is required or the flex
+          child will not scroll inside a column flex parent. */}
+      <div style={{flex:1,position:"relative",minHeight:0,display:"flex"}}>
+      <div ref={scrollRef} onScroll={onScroll} style={{flex:1,overflowY:"auto",padding: isMobile ? "12px 14px" : "14px 16px"}}>
         {tab === "activity" && (
           <>
             {/* FEATURE: AI-23 patch — Pattern section first, collapsible */}
@@ -361,7 +393,7 @@ export default function AIActivityPanel({ onClose }) {
                 halves of one binary) — choosing a real taxonomy is LOG-58. The AI-32 "Not yet active"
                 and LOG-31/LOG-32 "Uncatalogued" collapse cards go with it: with the catalog seed loop
                 deleted, every row here is a pattern that genuinely ran. */}
-            <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')} first/>
+            <SectionHeader label="By Pattern" open={sections.pattern} onToggle={()=>toggle('pattern')} first count={patternsLoaded ? classified.length : undefined}/>
             {sections.pattern && (
               <>
                 {/* FEATURE: LOG-98 -- the loading branch runs BEFORE the empty-state check, so
@@ -386,7 +418,7 @@ export default function AIActivityPanel({ onClose }) {
 
             {/* By LLM — collapsible, unchanged data. FEATURE: LOG-80 -- moved up to sit directly
                 after By Pattern (pure JSX move, no logic/state change; sections.llm key unchanged). */}
-            <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')}/>
+            <SectionHeader label="By LLM" open={sections.llm} onToggle={()=>toggle('llm')} count={logLoaded ? Object.values(byLLM).length : undefined}/>
             {sections.llm && (
               // FEATURE: LOG-98 -- loading branch first; the empty-state copy is post-load only.
               loading
@@ -415,7 +447,7 @@ export default function AIActivityPanel({ onClose }) {
             {/* By Agent — collapsible, sorted by calls desc. FEATURE: LOG-83 -- moved up to sit
                 directly under By LLM (pure JSX move, no logic/state change; sections.agent key
                 unchanged) and defaults collapsed. */}
-            <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')}/>
+            <SectionHeader label="By Agent" open={sections.agent} onToggle={()=>toggle('agent')} count={logLoaded ? agentsSorted.length : undefined}/>
             {sections.agent && (
               // FEATURE: LOG-98 -- loading branch first; the empty-state copy is post-load only.
               loading
@@ -478,7 +510,9 @@ export default function AIActivityPanel({ onClose }) {
                 (computeUnregisteredServices) but no longer rendered here -- LOG-90 (John,
                 2026-07-28); the residue and the tripwire's ongoing home is
                 docs/FEATURES-LATER.md LOG-89. */}
-            <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')}/>
+            {/* FEATURE: LOG-107 -- platformServices is layer GROUPS ({layer, services[]}), so the
+                count sums each group's services (31 today), not the group count. */}
+            <SectionHeader label="By Service" open={sections.service} onToggle={()=>toggle('service')} count={platformServices.length ? platformServices.reduce((n, g) => n + g.services.length, 0) : undefined}/>
             {sections.service && (
               // FEATURE: LOG-98 -- "Service directory not loaded yet." may only appear post-load.
               (!platformServices.length && loading)
@@ -538,6 +572,8 @@ export default function AIActivityPanel({ onClose }) {
             </div>
           </div>
         )}
+      </div>
+      <ScrollFadeHint show={canScrollMore} bg={T.card}/>
       </div>
       </div>
     </>
