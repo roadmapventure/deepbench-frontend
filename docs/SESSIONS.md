@@ -5,6 +5,87 @@
 
 ---
 
+## S-CHI-92-design / S-CHI-92 (v6.3.227, `61a941c`, 2026-07-29, worktree `design-news-drawer`) — the screen was always the content bus
+
+**`CHI-92` (Task Success Rate) ✅ done + archived, self-verified QA 12/12 PASS.** John opened with a
+screenshot: three News cards on Channel Sales Intelligence, every field reading `<UNKNOWN>`, and
+"Alex does not know how to populate the news drawer."
+
+**Alex did know.** The first thing this session did was isolate him — called
+`screen-controls`/`news-cards-format` directly with three real stories in
+`task_context.delegation_task`, and Alex Reeves — Screen Controls Editor returned three flawless
+cards in 1.5 s, `guardrails_passed: true`. That single call reframed the whole session: the defect
+was upstream, and it was measured rather than reasoned about from then on.
+
+**Root cause.** `ws-news-search-intent` carried `traits.delegation_required: true`. When Jordan
+Ellsworth — Web Search Expert called `request_help`, `execute.js`'s `dispatchDelegation()` took the
+`delegationRequired` branch and auto-dispatched straight to whoever Michelle Manning — Project
+Manager picked, building the delegate's envelope from
+`{...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed}`. His
+`task_context` was `{}` and `task_description` was a description of the job, so Alex received the
+job and not the stories. Jordan never got a turn to call `delegate_to_agent` at all —
+`call_facts.tool_calls` on his row was `["request_help","web_search"]`. Token evidence, same trace:
+Jordan 49,770 in, Alex 1,223.
+
+**Why Jordan was the only capability affected.** Exactly three intents platform-wide declare
+`delegation_required`. The other two — `ci-answer-display-intent`,
+`hyp-hypothesis-test-display-intent` — are display requests whose content the *screen* places in
+`task_context` before the call starts, so the `{...task_context}` spread delivers it for free.
+Marcus Webb — GEO CSO Expert's display request is likewise instructed to call `delegate_to_agent`
+and likewise never reaches it; it simply never mattered for him. Jordan was the only capability
+that *produced* what it handed off, inside the same call that handed off. This is the same
+assumption `LOO-011` baked in and `LOO-013`/`LOO-015` already found false for this capability —
+"a `delegationRequired` requester does no real work by definition."
+
+**Two proposals of mine John overturned, both correctly.** (1) Forward `request_help`'s unused
+`context` field to the delegate — his question, *"you are passing the article information on the
+harness now? in the envelope? why did this not needed before?"*, was the right instinct: that
+invents a second content channel when one already exists. (2) A one-row edit to Jordan's `method`
+pointing him at `task_description` — his reply, *"why would we have to create a new one for one
+agent?"*, correctly named it a per-agent patch that leaves the hole where it is.
+
+**The answer to "how do all the other agents pass their content" is that the screen does it.**
+`MarketIntelligenceScreen.jsx` reads each call's return and types it into the next call's envelope
+by hand — `qa.answer` into Owen Brennan — Quality Gate Reviewer's `candidate_answer`, then the
+final answer into Alex's display call. There is **no** content service and no `ARCHITECTURE.md`
+section governing content hand-off between agents (grepped — none). `deliverables` is the one real
+content store: every `store`-handler capability writes a row and returns a `deliverable_id`, and
+**nothing anywhere reads one back**; `WORK-ORDER-MODEL.md`'s `prior_deliverables` is unimplemented.
+
+**John's shape, which is what shipped:** *agent finds data, states done, project manager finds the
+next agent to display.* Split Jordan's one call into the two the platform already runs — a search
+call returning structured stories, then a display request with those stories in `task_context`.
+3 Supabase rows + 1 screen file, **zero harness change**, no agent named anywhere.
+
+**QA 12/12, live against `61a941c`** (deploy gate exit 0). API leg 9/9: 3 stories → 3 cards, no
+`UNKNOWN`, 3 distinct urls, every card url traceable to a searched story, `display_agent_id: alex`
+resolved live by Michelle. Screen leg: 3 real headlines, 2 real publications, real dates; 3 hops
+unchanged (Jordan → Michelle → Alex) with Michelle's live reasoning intact; Alex's turn 1,223 →
+1,618 input and 188 → 444 output tokens; a card click drove the full news-door journey to a
+rendered answer in **10 hops / 1m39s**. One console error, the pre-existing `CHI-87`
+`delegation_complete` durationMs warning — nothing new.
+
+**Record correction.** `BETA.md` bucket 1 said case 24 was "no longer the known-bad one" because
+`LOO-013` verified `jordan → michelle → michelle → alex, 3 cards, no errors`. That routing fix was
+real, but the check **counted cards without reading them** — all three were `<UNKNOWN>` then and
+still were when reproduced today. Same lesson as `STANDARDS.md` §7: an assertion that would pass
+unchanged if the fix did nothing is not a gate. `CHI-92`'s QA asserts on card contents and on the
+delegate's token count.
+
+**Filed:** `CHI-93` (Speed — the split costs ~22 s → ~58 s end to end, Jordan's search turn
+49,770 → 261,284 input tokens once he must emit structured stories; do **not** revert the split to
+recover the 22 s, it produced `<UNKNOWN>`), `CHI-94` (Task Success Rate — a story dated
+`MAR 21, 2026` renders under "Today's top channel sales news"; newly *visible*, since every
+`published_at` was null before). Both bucket 2.
+
+**Process note:** this session wrote the kickoff doc and then asked John whether to spawn the
+coding agent instead of spawning it. He had to ask *"did you write the kickoff for this session and
+not start the coding?"* — the Automated Design→Code→Verify Loop means the design session spawns it,
+runs QA itself, and closes out; handing him a prompt to paste is the failure mode that rule exists
+to remove.
+
+---
+
 ## S-LOG-109-design / S-LOG-109 (v6.3.216, `e89d465`, 2026-07-29, worktree `design-log-109`) — the article fetch says what happened
 
 **`LOG-109` ✅ Done + archived. `CHI-91` 🔶 Partial — shipped and live-verified, one render gate unseen. `SES-54` filed, deliberately not folded in.** Self-verified QA 10/12 PASS, 2 blocked on infrastructure.
