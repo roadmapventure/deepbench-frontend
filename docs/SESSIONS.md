@@ -5,6 +5,57 @@
 
 ---
 
+## S-SES-25a-design / S-SES-25a (v6.3.207) — 2026-07-28 — FEATURES row-length ratchet
+
+**Worktree:** `design-ses-25` · **Commits:** `84e4db8` (design) + `c9e9c28` (coding) · **Kickoff:** `docs/kickoffs/v6.3.207-SES-25a-features-row-cap.md`
+
+### The row was wrong, and that was the finding
+
+`SES-25` (Tech Debt) prescribed two things. Measured fresh, neither held:
+
+- **`CLAUDE-STATE.md` at 29.7 KB** — it was **4.0 KB**, already under its own ~4.6 KB post-cleanup baseline. Fixed by some earlier session that never updated the row.
+- **Sweep `✅ Done` rows to `FEATURES-ARCHIVE.md`** — only **7 of 175** rows were Done. The archive discipline was already working; the sweep recovers almost nothing.
+
+Real cause: `docs/FEATURES.md` was 290 KB with **278 KB inside the table rows**, 175 open rows averaging 1.6 KB. The control case is in the same repo — `FEATURES-LATER.md` holds **229 rows in 83 KB** (372 bytes/row). Same table, same purpose, rows written ~4x shorter. Because `FEATURES.md` is item 3 of `CLAUDE-DESIGN.md`'s **mandatory** Step 1 reads, that was ~73k tokens spent by every design session before starting work.
+
+**The rule against it already existed and was never enforced.** `CLAUDE-DESIGN.md` line 214 (added 2026-07-07, John's call) has required "2-4 sentences" per row all along. Nothing in `check-session-docs.js` looked at row length: check 3 caps the *file*, which fires forever with no actionable target and gets tuned out.
+
+### Ratchet, not a bulk pass
+
+A bulk prune of 115 rows would be performed by a session with no context on any of them — `SES-27` (Architecture) is an open row about exactly that failure mode. Instead: cap now, prune-as-you-touch, pruning done by the session that actually picks the item up.
+
+**Evidence that bulk editing here is genuinely unsafe.** Three rows carry inline `BACKLOG INTAKE` blocks and claim the content is "retained verbatim in `docs/harvests/…`". Diffed per clause:
+
+```
+LOO-21   14 of 17 substantive clauses present in its harvest file
+LOG-23   18 of 27
+LOG-37    7 of 20   <- entire VERIFIED vs ASSUMED list (2,228 chars) exists NOWHERE else
+```
+
+A "delete the duplicate block" instruction — which is what the design session was about to write — would have destroyed unique content on `LOG-37`. Caught before the kickoff was written. That migration is `SES-25b`, and it is specified as a **move**: append the remainder to the harvest, confirm, then trim.
+
+### Shipped
+
+- `scripts/check-session-docs.js` — **check 3d**, per-row 2000-char cap, report-only. Set at 2000 (flags 38) not the prose's ~1000 (would flag 122 and be ignored as day-one noise); documented in-code as a ratchet to tighten later.
+- `CLAUDE-DESIGN.md` — names `docs/harvests/<ID>.md` as the destination for over-cap detail, **a move, never a delete**, citing `LOG-37`'s 7-of-20 as the reason.
+
+**Coding agent's one deviation, correct and kept:** it measured row length with the trailing `\r` stripped. This repo checks out CRLF, so a raw `line.length` reported `LOG-37` as 11009 rather than 11008 and would differ on an LF checkout. The number is `SES-25b`'s baseline, so it has to be content length.
+
+### QA — 8/8 PASS, verified by the design session, not accepted from the report
+
+Two claims in the coding agent's report were checked and one was wrong:
+
+- **"`SES-25`/`SES-25b` rows are themselves over cap"** — **false.** They measure 1,137 and 916 chars. The 33→38 rise came from five other concurrent sessions (v6.3.201–206) committing to `FEATURES.md` between the design session's baseline and the coding run — `LOG-72` shifted 8,999→8,656 with nobody here touching it.
+- **Check parity** — verified by extracting the pre-change script at `84e4db8` and running both against the same worktree: 15 findings before, 15 non-3d findings after, **0 lost, 0 added**, plus 38 new 3d findings.
+
+Also confirmed: `node --check` clean; `LOG-37` reported at exactly 11008 matching an independent recompute; zero false positives (nothing at or under 2000 flagged); coding commit touched exactly 2 files with `docs/FEATURES.md` untouched; both commits ancestors of `origin/dev`; no mojibake (the single `â€"` hit is the literal search string inside the kickoff's own QA checklist).
+
+### New backlog
+
+- **`SES-36` (Tooling)** — found live when this session's own mandatory hygiene run under-reported. `check-session-docs.js` defaults its target to `process.cwd()`, but a session's cwd is `C:/Projects` (the repo's parent), so the invocation Step 1 prescribes makes every doc lookup miss. Measured both ways: no flag → `4 flagged, 2 warning`; `--worktree=<path>` → `53 flagged, 0 warning`. Every session running it as documented has been getting a false all-clear.
+- **`SES-25b` (Tech Debt)** — migrate the three intake blocks + collapse `LOG-72`'s stacked status chain ("Prior state below" appears 4x in one cell).
+
+
 ## The Two-Window Workflow
 
 | Window | Tool | Reads | Does |
