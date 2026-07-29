@@ -5299,3 +5299,50 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 **Headline finding — the old lever list aimed at the wrong metric.** `LOG-45`/`LOG-46`/`LOG-47`/`LOG-44` (slug renames/destinations) move NONE of this count; they remain label-honesty backlog but are out of bucket 6. The real structure: **6,818 rows have no `call_facts` — honestly unclassifiable forever (§19k no-backfill), so the floor is ~6.8K**; the other **13,909 carry signature material and fail only for lack of matching criteria** (only 9 of 27 vocabulary entries have criteria). Verified levers: (1) criteria authoring through Susan Smith — Trainer's governed path against the top facts-bearing populations (`agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753 — top-6 = 12,776, landing the count ~7,951, under goal); (2) `LOG-71` resume config fix stops pool growth; (3) the bucket-4 counting conversation can legitimately drop the floor further (librarian/agent-directory facts-less ops); (4) minor: `LOG-73`/`LOG-77`/`LOG-55`. Recorded as `docs/BETA.md` §5 (Bucket 6). Ship rule unchanged — bonus starts after the five gates are green.
 
 **Close-out:** docs touched: `docs/BETA.md`, `docs/SESSIONS.md`. Inflight marker removed in close-out commit.
+
+---
+
+## S-SES-29 execution (v6.3.193, 2026-07-29, worktree `chi-regression-24case`, Haiku model) — first full 24-case CHI true-regression run, run FAIL (infra class + content quality class)
+
+**Run verdict: ❌ FAIL.** Execution completed 24/24 cases; 0/24 PASS. Run time: 2h 2m 19s (2026-07-28 23:19:12 to 2026-07-29 01:21:31 UTC). Systematic infrastructure and content-quality failures identified per runbook §7 unrecovered-death rule and judge verdicts (Owen's AGT-35 content-context review).
+
+**Failure summary (all 24 cases):** 11 infrastructure deaths (Data Room write-access denials), 11 content quality failures (judge verdicts), 1 rejection with 5-try probe, 1 flagged review-extension (case 21, took D2 review path as designed).
+
+**Root causes identified (three distinct platform gaps, blocking all 24 PASS status):**
+
+1. **Data Room write-access gates** (11 infra deaths: cases 1, 3, 5, 7, 9, 10, 14, 15, 16, 17, 18, 19)
+   - reasoning-write denials: "denied-source-chunk-cross-room-or-missing" (Elena's `reasoner-intent` on cases 9, 10, 15, 17, 18, 19)
+   - library-write denials: "denied-row-not-in-data-room" (Nadia's `data-patch-intent` on cases 14, 16)
+   - Parse failures with retry exhausted (cases 1, 3, 5, 7): routing/answer call initial parse died
+   - **Mechanism:** Agents attempt write operations to Data Room cells that the access policy denies. Schema, permissions, or lane/room/cross-room rules misaligned with agent journeys.
+
+2. **Object serialization in artifact rendering** (6 unrendered cases: 2, 4, 6, 20, 21, 22)
+   - Theory_test, forecast_draft, display artifacts contain `[object Object]` placeholders instead of rendered text
+   - JSON.stringify'd objects arriving at judge/display instead of business prose
+   - **Mechanism:** Handoff bug between agents or between agent result and display formatter; objects not introspected/rendered before passing downstream.
+
+3. **Hollow/missing answers despite successful routing** (11 content failures + cases 2, 4, 6, 8, 11, 12, 20, 21, 22, 23, 24)
+   - Missing quantitative content: answers name partners/GEOs but no concrete metrics/percentages/trends
+   - Missing actionable guidance: facts stated without next-step recommendations for VP of Channel Sales
+   - Data unavailable: cases 12, 23, 24 surrender with "data not in Data Room" / "available context" (platform language)
+   - **Mechanism:** Business-facing prose not generated or not delivered; Data Room may lack source material for seed questions.
+
+**Flagged-set (§2 review-extension tracking, first-run baseline for John's approval):** Only case 21 (`training-turnover-benchmark`). Set `needs_review=true`, followed D2 review path (direct → Theories → Theory Result). All other 23 cases completed base journey without flagging.
+
+**Case 13 (meridian-electronics) rejection probe (D4, §4):**
+- Original answer rejected for `synthesized_as_fact` (unsupported numerical claims, confidence_tier=inferred without data)
+- 5-try re-run: Try 1 rejected (synthesized_as_fact), Try 2 accepted ✓, Try 3 rejected (citation_missing), Try 4 accepted ✓, Try 5 accepted ✓
+- **Verdict:** 3/5 accepted (60%); guardrail non-deterministic (flakiness range 2–4/5 per runbook). Accepted tries passed Owen's content judge (all 4 criteria met).
+- **Case FAIL per strict rejection line** (D4: ANY rejection = FAIL), but probe shows content exists and behavior is unstable.
+
+**Browser leg (§6):** Not yet run. Runbook requires live-browser rendering of cases #12 (direct answer) and #10 (Forecast journey). Case #12 reached display but judge_fail; case #10 hit infra_death before display. Deferring to second pass after infrastructure fixes.
+
+**Owen's AGT-35 judge verdicts (D5):** All 24 cases ran through content-context review. 0/24 passed (every artifact failed ≥1 of 4 criteria: named_entities_present, quantitative_content_present, actionable_guidance_present, platform_language_detected). Quoted evidence captured per criterion, per artifact, per case.
+
+**Next steps (John's approval required before rerun):**
+1. Audit Data Room schema, permissions, cross-room rules. Agent lane/room assignments misaligned with journey write operations.
+2. Trace case #6 (simplest Forecast fail) backwards from unrendered theory_test to agent output. Identify JSON.stringify marshaling bug.
+3. Verify case #24 fetch-article call logged non-empty response body.
+4. Spot-check Data Room source coverage for seed questions. Confirm Japan segment revenue history exists for case #2.
+
+**Recommendation:** Investigate root causes 1–4 before second run. This 0/24 FAIL is not fluke — it's evidence of three systematic platform gaps. Once infrastructure is fixed, a second run will measure real content quality and journey stability.
