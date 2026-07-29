@@ -1,0 +1,1 @@
+beta-doc-0728e — worktree `beta-doc-0728e`, branch `session/beta-doc-0728e`. Continuation of `beta-doc-0728` (same conversation): bucket-4 (AI Audit accuracy) staleness sweep — source verification of the code-claim rows via read-only sub-agents + direct Supabase checks of the data-claim rows (LOG-60/91/81/48). BETA.md + row annotations updated at close.
