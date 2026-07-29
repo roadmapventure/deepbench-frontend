@@ -5,6 +5,90 @@
 
 ---
 
+## S-DAT-11-design / S-DAT-11 (v6.3.223, `3d9b312`, 2026-07-29, worktree `design-dat-11`) — one root cause behind both directions of the corpus drift
+
+**`DAT-11` ✅ Done + archived. Self-verified QA 12/12 PASS.**
+
+### The root cause was one thing, not two
+
+`DAT-11` had been carrying two symptoms that looked opposite. `59eede59` (Signal Mobile) was
+orphan-superseded — retired with nothing replacing it, an instant retrieval hole since
+`match_the_library` filters `status='active'`. Separately, five rows sat superseded-but-still-active,
+both copies retrievable. The repair half (2026-07-29, earlier) fixed the first by hand.
+
+Both are the same defect: **retiring a fact took two independent model-issued operations** — an
+`insert` carrying `supersedes_id`, then a separate `update_status` — with nothing binding them, so
+either half could land alone. Flip-alone produced the hole; insert-alone produced the duplicates.
+Live evidence of the asymmetry: 102 `librarian-write:insert` rows against 43
+`librarian-write:update_status`. Atomicity fixes both directions at once, which is why the fix is one
+operation and not two guards.
+
+### John's call: gate, don't hard-block
+
+Enforcement semantics were explicitly his. The decision — an agent may retire an `is_baseline` row,
+but only through an operation that lands a replacement in the same transaction — rests on two facts
+verified this session rather than recalled: `is_baseline` is the **Demo Reset marker** (§19f,
+`archive where is_baseline=false` / `restore where is_baseline=true`), not a permission flag; and
+§19c already states *"Rows are never overwritten, only ever inserted — a correction always supersedes
+via a new row."* A hard block would contradict locked architecture and would convert every legitimate
+correction — the real Vitrine correction among them — into a permanent duplicate, i.e. into the exact
+defect being fixed.
+
+### Service, not harness guardrail
+
+John asked directly whether this was hardcoding routing behavior. It is not: the new `supersede` verb
+sits inside `writeLibrary()`'s existing `operation` dispatch, names no agent and no capability, and
+none of the four harness files were touched. It landed in `lib/librarian.js` — the registered
+platform service **Library Custodian** (`library-custodian`, layer `data-model`) — because the
+invariant is about one store's content model and means nothing for `knowledge_entries` or
+`the_reasoning`.
+
+**That question did surface something real**, filed as `LOG-114`: `lib/librarian.js` hardcodes
+`agentId: 'eleanor'` at 17 `logActivity()` sites while the actual caller sits in scope as
+`requestingAgentId` and is discarded. It decides nothing, but `lib/search-harness.js` passes
+`requestingAgentId` through to `queryLibrary()`, so any agent whose Skill sets `store: 'the_library'`
+reaches these primitives — which is exactly the live §19c violation `AA-99` tracks. Every such call
+logs as Eleanor Voss — The Librarian, so **no query against `ai_activity_log` can ever reveal it**;
+the evidence is overwritten at write time. Deliberately not folded in — the fix changes agent-level
+attribution on the AI Audit screen and needs its own QA.
+
+### Two things this session got wrong, both caught by verifying instead of assuming
+
+1. **Both Manual QA invariants I wrote were false, and the code was right.** Item 11 asserted
+   `is_baseline AND status='active'` = 20 — which can only hold if a baseline row is never retired,
+   contradicting this ticket's own decision, and which was already false before the session started
+   (19 active + 1 superseded). Item 10 omitted `s.status='active'`, so it counted superseders that are
+   themselves archived and therefore not retrievable. Caught by the coding session; corrected in the
+   kickoff doc. Durable forms: `count(*) WHERE is_baseline` = 20, and the duplicate join requires
+   **both** rows active.
+2. **The coding session's own headline warning was wrong.** It reported that a Demo Reset would
+   resurrect the four newly-superseded baseline rows and "re-create the exact five-row condition",
+   making `DAT-12` load-bearing for this fix. Simulated against live data rather than reasoned about:
+   `bulk_reset` archives every non-baseline row as it restores the baselines, so a reset leaves
+   exactly **one** live version per topic. The imprecise item-10 query would report 4; the corrected
+   one reports 0. `DAT-12` is independent.
+
+### Result
+
+Live duplicates **5 → 0**; rows **95 → 95** — nothing deleted, including the DAT-7 test-residue row,
+which keeps its content and stays active with only its `supersedes_id` cleared (same treatment
+`b1daf789` got in the repair half). 20 baseline rows total: 16 active, 4 legitimately superseded.
+Independently re-verified at close-out, not accepted from the coding report: the baseline retirement
+gate denies with `denied-baseline-retire-requires-supersede` while reactivation still succeeds, and
+the atomicity case rolls back **both** halves with the guarded branch demonstrably firing
+(`supersede-postcondition-failed` returned) — not a vacuous pass.
+
+Filed: `DAT-12` (Demo Reset is unreachable — implemented in `lib/librarian.js` but absent from
+`library-write-intent`'s operation enum and called by no file; last executed 2026-07-02),
+`DAT-13` (the ~50 archived non-baseline rows, an item carried unresolved in `DAT-11`'s original fix
+list and split out so it could not leak past close-out), `LOG-114` (above).
+
+**Process note:** the coding session was specced for Fable 5 and had to be re-spawned on Opus 5 —
+Fable was out of usage credits. Opus 5 is `CLAUDE-DESIGN.md`'s own documented default for a coding
+session executing a well-specified kickoff doc, so the swap cost nothing.
+
+---
+
 ## S-AGT-38 (v6.3.221) — 2026-07-29 — engineering notes rendered as product copy
 
 **Worktree:** `audit-rule1-code` · data-only (6 Supabase `capabilities` rows) + doc updates

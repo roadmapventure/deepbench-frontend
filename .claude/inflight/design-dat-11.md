@@ -1,1 +1,0 @@
-design-dat-11 — design session, started 2026-07-29 10:00 CST. Scoping the enforcement half of `DAT-11` (repair half already shipped) plus the five superseded-but-still-active FEATURES.md rows. Model: Fable 5.
