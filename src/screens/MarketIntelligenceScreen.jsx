@@ -1,3 +1,4 @@
+// DeepBench v6.3.198 | MarketIntelligenceScreen.jsx | S-CHI-88 -- mobile cleanup: terse feed, one-line title chrome, soft status line, 16px input, pinned decision footer
 // DeepBench v6.3.186 | MarketIntelligenceScreen.jsx | LOG-95b -- useTracePatterns refetches on span miss: streamed rows mount mid-flight (LOG-95), so the LOG-79 per-trace cache could freeze before late executions logged; now invalidates+refetches up to 3x2.5s per mounted span, then accepts honest-unclassified (§19l)
 // DeepBench v6.3.184 | MarketIntelligenceScreen.jsx | LOG-95 -- hop-event span identity (§19p): streamed delegation-family rows spread pickCreditedSpan(evt) into their stored data; failure_triage credits the picker with her own span when she's credited, the gate's when Owen is
 // DeepBench v6.3.183 | MarketIntelligenceScreen.jsx | HAR-17 -- recovery visibility: chat status "hit a snag" + expectation extension off the in_progress body's recovery payload; recovery continues exempt from the client cap; failed-status bodies throw
@@ -383,6 +384,11 @@ import { fetchTracePatterns, needsSpanRefetch, pickCreditedSpan } from "../lib/t
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
+
+// FEATURE: CHI-88 — the page subtitle, hoisted to module scope so the desktop title block and
+// mobile's "Agent & Data Info" overlay render the same string from one source. Mobile drops it from
+// the title block entirely (single-line title chrome) and shows it at the top of the overlay instead.
+const CHI_SUBTITLE = "LLM Wiki - Apple channel performance analysis - agent-orchestrated";
 
 // FEATURE: CHI-30 — static seed question, always slot 2, never rotates.
 const STATIC_QUESTION = { id: "library-catalog", label: "What data is in the library and how can i use it?" };
@@ -905,7 +911,11 @@ function TheorizedDataPointsTable({ rows }) {
 // FEATURE: LOG-15 — capability field removed from every case's return object (John's hard rule,
 // 2026-07-17: no capability may ever display in the Agent Routing drawer). Same 12 cases, same
 // summary text, same colors — only the capability attribution is dropped.
-function describePipelineEvent(evt) {
+// FEATURE: CHI-88 — optional second param `opts`. Today it carries one flag, `terse`, threaded from
+// the mobile Agent Routing feed only (MobileBody -> RoutingHopCard -> RoutingActivityLine). Every
+// existing call site passes nothing and is behaviorally byte-identical; see the delegation_complete
+// case for what terse actually elides.
+function describePipelineEvent(evt, opts = {}) {
   switch (evt.type) {
     case "intent_routing":
       return { summary: "Reading the question, deciding how to route it", color: T.navyMid };
@@ -979,7 +989,13 @@ function describePipelineEvent(evt) {
         // "agent_selection" text.
         return { capability: null, summary: `Deciding who should handle this next — ${evt.data.reasoning}`, color: T.moss };
       }
-      if (evt.data.task) {
+      // FEATURE: CHI-88 — opts.terse (mobile Agent Routing feed only) falls through to the service
+      // completion label below instead of rendering the originating agent's raw task prompt. Measured
+      // at 375×667: those prompts ran 1,607 chars behind a 3-line clamp in a 176px feed, burying the
+      // routing story the feed exists to tell. A render-layer field choice only (§19j) — the event
+      // still carries evt.data.task, desktop's AuditColumn still renders it (John's explicit call),
+      // and no placeholder copy is ever written in its place.
+      if (evt.data.task && !opts.terse) {
         // Originating agent's own hand-off summary (LOO-011's self-credit case).
         return { capability: null, summary: evt.data.task, color: T.moss };
       }
@@ -1645,6 +1661,7 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
 // (Good, thanks / Sent to Priya) can still render in chat, sourced from the shared qaEvidence
 // state slot instead of msg.reviewChoice (onGoodThanks/onReview no longer index into messages).
 function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
+  const isMobile = useIsMobile(); // FEATURE: CHI-88 — the qa pointer sentence below is surface-specific
   // FEATURE: CHI-42 — kind:"user_action" narration bubbles (pushed synchronously at the moment of
   // a user decision, before any async ack) render as "You" bubbles too, via kind rather than role —
   // see STYLE-GUIDE.md §36 for the full rationale (role:"user" would leak into conversationContext()).
@@ -1673,9 +1690,17 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
           {/* FEATURE: CHI-36 — pointer sentence always renders first; when needs_review is set, its own
               wording changes to lead into the flag narrative below it instead of closing the thought.
               Reverses CHI-08's original narrative-first order (John's direct call, live walkthrough). */}
-          {msg.needs_review
-            ? "I've pulled together an answer — review the full breakdown in the Evidence column to the right. Before you do, let me give you a quick background about the data ..."
-            : "I've pulled together an answer — review the full breakdown in the Evidence column to the right. Let me know if you have questions."}
+          {/* FEATURE: CHI-88 — the pointer has to be true on the surface it renders on. Mobile has no
+              "right" (Steps & Evidence is a tab above the chat), so mobile points at the tap; desktop
+              keeps its wording but names the column correctly — it was renamed to "Steps & Evidence"
+              by CHI-82 and this copy still said "Evidence column" (.claude/rules/chi-vocabulary.md). */}
+          {isMobile
+            ? (msg.needs_review
+              ? "I've pulled together an answer — tap Steps & Evidence above for the full breakdown. Before you do, let me give you a quick background about the data ..."
+              : "I've pulled together an answer — tap Steps & Evidence above for the full breakdown. Let me know if you have questions.")
+            : (msg.needs_review
+              ? "I've pulled together an answer — review the full breakdown in the Steps & Evidence column to the right. Before you do, let me give you a quick background about the data ..."
+              : "I've pulled together an answer — review the full breakdown in the Steps & Evidence column to the right. Let me know if you have questions.")}
           {msg.needs_review && (
             <div style={{color:T.brassDeep,marginTop:8}}>
               ⚑ {msg.review_reason || "flagged for review"}
@@ -2575,9 +2600,12 @@ function QuestionDivider({ evt }) {
   );
 }
 
-function RoutingHopCard({ hop, agentById }) {
+// FEATURE: CHI-88 — `terse` is opt-in and set only by MobileBody's pinned feed; it is forwarded to
+// each activity line, which passes it on to describePipelineEvent. Desktop's AuditColumn renders this
+// card with no terse prop, so its rows are unchanged.
+function RoutingHopCard({ hop, agentById, terse }) {
   const primary = agentById(hop.agentId);
-  const lastColor = describePipelineEvent(hop.events[0]).color;
+  const lastColor = describePipelineEvent(hop.events[0], { terse }).color;
   return (
     <div style={{borderLeft:`3px solid ${lastColor}`,paddingLeft:10,display:"flex",flexDirection:"column",gap:8}}>
       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6}}>
@@ -2587,7 +2615,7 @@ function RoutingHopCard({ hop, agentById }) {
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {hop.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt}/>)}
+        {hop.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt} terse={terse}/>)}
       </div>
     </div>
   );
@@ -2660,8 +2688,11 @@ function useTracePatterns(traceId, spanId) {
 // pattern_name IS the governed vocabulary name, so no patternLabelFor/vocab resolution is needed.
 // A hop whose rows match no gold pattern gets no span entry -> no line (honest unclassified
 // state, expressed structurally, no boundary/date copy -- John's §19l call).
-function RoutingActivityLine({ evt }) {
-  const { summary, color } = describePipelineEvent(evt);
+// FEATURE: CHI-88 — `terse` (mobile feed only) is forwarded straight to describePipelineEvent; the
+// "Read more" toggle also gains a real touch target on mobile (it measured 53×13px live at 375×667).
+function RoutingActivityLine({ evt, terse }) {
+  const isMobile = useIsMobile();
+  const { summary, color } = describePipelineEvent(evt, { terse });
   const spanPatterns = useTracePatterns(evt.data?.trace_id, evt.data?.span_id);
   const names = evt.data?.span_id != null ? spanPatterns[evt.data.span_id] : null;
   const patternLabel = names && names.length > 0 ? names.join(', ') : null;
@@ -2685,8 +2716,13 @@ function RoutingActivityLine({ evt }) {
           {fullText}
         </div>
         {isLong && (
+          /* FEATURE: CHI-88 — mobile only: 11px of vertical padding cancelled by an equal negative
+             margin, so the label sits exactly where it does today (marginTop 2 == -9 + 11) while the
+             hit box grows from the measured 53×13px to ~35px tall. Desktop style byte-identical. */
           <button onClick={() => setExpanded(e => !e)}
-            style={{background:"none",border:"none",padding:0,marginTop:2,fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}}>
+            style={isMobile
+              ? {background:"none",border:"none",padding:"11px 14px 11px 0",margin:"-9px 0 -9px",fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}
+              : {background:"none",border:"none",padding:0,marginTop:2,fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}}>
             {expanded ? "Show less" : "Read more"}
           </button>
         )}
@@ -3163,14 +3199,9 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
-  const [newsLineDismissed, setNewsLineDismissed] = useState(false);
-  // FEATURE: CHI-40 — resets every time a fresh fetch starts (mount + every Clear-triggered
-  // refire), same signal fetchNewsCards() already stamps for NewsCardsLoadingLine's own timer.
-  useEffect(() => { setNewsLineDismissed(false); }, [newsCardsStartedAt]);
-  // FEATURE: CHI-40 — dismissed for good (until the next refresh) the moment the user actually
-  // opens the News & Evidence tab; John's exact ask, "once they click News & Evidence, that
-  // line is gone until the news is refreshed."
-  useEffect(() => { if (mobileTab === "evidence") setNewsLineDismissed(true); }, [mobileTab]);
+  // FEATURE: CHI-88 — CHI-40's news heads-up dismiss state and its two effects are removed along with
+  // the banner they gated (see the render below). newsCardsStartedAt is still a prop: EvidenceColumn's
+  // own NewsCardsLoadingLine timer reads it.
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   // FEATURE: CHI-03c — was `hasActiveFlow = !!hypFlow`, blind to CHI-03a's qaEvidence: a plain Q&A
@@ -3285,40 +3316,40 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         {mobileTab === "chat" ? (
           <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
         ) : (
-          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
+          /* FEATURE: CHI-88 — this wrapper used to be the scroller (overflowY:"auto"). An auto-scroll
+             parent gives its children unbounded height, so EvidenceColumn's flex column inflated to
+             2,236px inside a 210px viewport and its own CHI-13/CHI-18 anatomy — the MI-54 internal
+             scroll region + the pinned DecisionFooter slot — never engaged; the decision buttons sat
+             ~3 window-heights down the document. Bounding this wrapper (overflow hidden + flex column)
+             activates the desktop-proven mechanism on mobile too. Nothing inside EvidenceColumn changes,
+             and no parallel mobile footer exists. */
+          <div style={{flex:1,minHeight:0,overflow:"hidden",padding:14,display:"flex",flexDirection:"column"}}>
             <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent}/>
           </div>
         )}
       </div>
 
-      {workingStatus && (
-        <div style={{flexShrink:0,padding:"8px 14px",background:"#fbf6ea",borderTop:`1px solid ${T.lineSoft}`}}>
-          <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>
-        </div>
-      )}
-
-      {/* FEATURE: CHI-40 — mobile-only heads-up that news is loading/available without asking a
-          question first. Hidden once the user visits News & Evidence (see effect above), or once a
-          completed fetch has zero usable cards (nothing to point at). */}
-      {!newsLineDismissed && (newsCards === null || (newsCards && newsCards.length > 0)) && (
-        <div style={{flexShrink:0,padding:"6px 14px",fontFamily:mono,fontSize:10.5,color:T.muted,background:T.cardAlt,borderTop:`1px solid ${T.lineSoft}`}}>
-          {/* FEATURE: CHI-82a — pointer retargeted to the tab CHI-82 renamed ("Steps & Evidence");
-              CHI-40's gating/dismiss logic untouched. */}
-          {newsCards === null
-            ? <NewsCardsLoadingLine startedAt={newsCardsStartedAt}/>
-            : "Tap Steps & Evidence above for current headlines"}
-        </div>
-      )}
+      {/* FEATURE: CHI-88 — CHI-40's mobile news heads-up banner is deliberately SUPERSEDED and
+          removed (John-approved): at 375×667 fixed chrome left content ~176-210px, and the flashing
+          Steps & Evidence tab (CHI-03c's gate, tab bar above) is now the only at-rest news signal.
+          Its dismiss state and both dismiss effects are gone with it — no dead gating code left
+          behind. NewsCardsLoadingLine survives: EvidenceColumn still calls it.
+          FEATURE: CHI-88 — the working-status line also left this slot; it now renders as a soft
+          one-line strip directly under the input row (below). */}
 
       {/* FEATURE: MI-56 — merged input+Send+Clear into one row (was two stacked rows, Clear read as a
           stray orphaned element on its own near-empty row underneath). See STYLE-GUIDE.md §21's
           2026-07-14 MI-56 amendment: divider does double duty as visual grouping + accidental-tap
           mitigation for the no-confirm-dialog Clear action (that S-MI-51 decision unchanged here). */}
       <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
+        {/* FEATURE: CHI-88 — fontSize 13 -> 16 is the root-cause fix for iOS Safari zooming the whole
+            app on focus (it auto-zooms any focused input under 16px and never zooms back out —
+            confirmed on John's actual phone). No viewport-meta change, no JS zoom-reset hack.
+            Both submit paths also blur the input so the on-screen keyboard drops on send. */}
         <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
-          onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; } }}
-          style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:13,background:T.card,color:T.ink}}/>
-        <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; }} disabled={loading}
+          onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
+          style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:16,background:T.card,color:T.ink}}/>
+        <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; el.blur(); }} disabled={loading}
           style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
           Send
         </button>
@@ -3333,6 +3364,18 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
         </button>
       </div>
 
+      {/* FEATURE: CHI-88 — the live working status moves out from between the chat body and the input
+          row (where it was a boxed strip with its own background + top border) to a soft, unboxed
+          single line directly under Send, above AGENT ROUTING. It reports on the question just sent,
+          so it now sits with the send affordance rather than splitting the reading surface. One line
+          always: it ellipsizes, never wraps, so the fixed chrome height can't grow. AgentWorkingIndicator
+          itself is untouched (already a one-line renderer per S-CHI-71 pass 4) — only this wrapper. */}
+      {workingStatus && (
+        <div style={{flexShrink:0,padding:"2px 14px 4px",fontStyle:"italic",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+          <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>
+        </div>
+      )}
+
       {/* FEATURE: CHI-25 — height 118->176: the old height only ever showed one hop card
           (often not even a full one), so the existing MI-50 fade/chevron sat below something
           that already looked complete rather than visibly cut off. 176px was measured live
@@ -3344,10 +3387,12 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
         </div>
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
-          {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped". */}
+          {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped".
+              FEATURE: CHI-88 — `terse` is set here and only here: this pinned mobile feed drops raw
+              agent task prompts in favour of the routing story. Desktop's AuditColumn passes nothing. */}
           {ordered.length === 0
             ? <div style={{fontFamily:body,fontSize:11,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
-            : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[hop.events.length - 1].id} hop={hop} agentById={agentById}/>)}
+            : groupEventsIntoHops(ordered).map(hop => <RoutingHopCard key={hop.events[hop.events.length - 1].id} hop={hop} agentById={agentById} terse/>)}
         </div>
         <ScrollFadeHint show={routingCanScrollMore} bg={T.cardAlt}/>
       </div>
@@ -3358,6 +3403,9 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
             <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Agent &amp; Data Info</span>
             <button onClick={()=>setShowAgentInfo(false)} style={backBtnStyle}>← Back to Chat</button>
           </div>
+          {/* FEATURE: CHI-88 — the page subtitle mobile's title block no longer carries; same
+              CHI_SUBTITLE constant the desktop title block renders, no duplicate literal. */}
+          <div style={{fontFamily:body,fontSize:11,color:T.muted,padding:"10px 14px 0"}}>{CHI_SUBTITLE}</div>
           <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
             <AuditDrawersBody agentActivity={agentActivity} agents={agents} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
@@ -4277,16 +4325,22 @@ export default function MarketIntelligenceScreen() {
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,background:T.paperDeep,padding: isMobile ? "14px 14px 16px" : "20px 28px 28px"}}>
         <FeatureBadge id="MI-01"/>
         {/* FEATURE: MI-51 — "Agent & Data Info" (renamed from "Activity") relocates here, next to the
-            page title, mobile-only — was a small button inside MobileBody's own pane-button row. */}
-        <div style={{marginBottom: isMobile ? 12 : 18, display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:10}}>
+            page title, mobile-only — was a small button inside MobileBody's own pane-button row.
+            FEATURE: CHI-88 — mobile title chrome goes minimal: the row becomes a flex COLUMN so the
+            title owns a full-width single line (19px wrapped "(Beta)" at 375px; 17px does not) and the
+            trigger drops its box to become a right-aligned text CTA on its own line below. The
+            subtitle leaves the mobile title block entirely — it renders at the top of the
+            "Agent & Data Info" overlay instead (CHI_SUBTITLE, one source). Desktop keeps the exact
+            side-by-side row, 24px title and inline subtitle it has today. */}
+        <div style={{marginBottom: isMobile ? 12 : 18, display:"flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-end", justifyContent:"space-between", gap: isMobile ? 0 : 10}}>
           <div>
             {/* FEATURE: SH-23 */}
-            <div style={{fontFamily:display,fontSize: isMobile ? 19 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence{FOCUS_AREA_STATUS.channelSales && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.channelSales})</span>}</div>
-            <div style={{fontFamily:body,fontSize: isMobile ? 11 : 13,color:T.muted,marginTop:2}}>LLM Wiki - Apple channel performance analysis - agent-orchestrated</div>
+            <div style={{fontFamily:display,fontSize: isMobile ? 17 : 24,fontWeight:700,color:T.navy}}>Channel Sales Intelligence{FOCUS_AREA_STATUS.channelSales && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.channelSales})</span>}</div>
+            {!isMobile && <div style={{fontFamily:body,fontSize:13,color:T.muted,marginTop:2}}>{CHI_SUBTITLE}</div>}
           </div>
           {isMobile && (
-            <button onClick={() => setShowAgentInfo(true)} style={{flexShrink:0,fontFamily:mono,fontSize:9,letterSpacing:"0.05em",textTransform:"uppercase",padding:"6px 10px",border:`1px solid ${T.brass}`,color:T.brassDeep,background:T.card,cursor:"pointer",whiteSpace:"nowrap"}}>
-            Agent &amp; Data Info
+            <button onClick={() => setShowAgentInfo(true)} style={{alignSelf:"flex-end",flexShrink:0,background:"none",border:"none",fontFamily:body,fontSize:12,color:T.brassDeep,whiteSpace:"nowrap",padding:"8px 0 8px 12px",cursor:"pointer"}}>
+            Agent &amp; Data Info ›
             </button>
           )}
         </div>
