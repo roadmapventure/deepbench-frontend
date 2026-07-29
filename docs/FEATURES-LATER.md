@@ -671,6 +671,7 @@ Batch-run all bench agents against a sample dataset to compare output quality si
 | ID | Type | Feature | Status | Session |
 |----|------|---------|--------|---------|
 | DAT-9 | Architecture | **Found 2026-07-21/22, surfaced by Supabase's own advisory during `investigate-marcus-error-0721`/`investigate-marcus-timeout-0722` (unrelated to either session's actual scope — flagged in passing, not investigated further).** All 25 public-schema tables have Row Level Security disabled — the anon key can read or modify every row in every table. Needs its own design session: enabling RLS blindly would block all access with no policies in place, so this needs deliberate per-table policy design (which tables are genuinely public-readable via the anon key vs. service-key-only), not a blanket `ENABLE ROW LEVEL SECURITY`. No owner, no prior ID — this is the first time it's been logged. | ❌ Missing | S-future (design required) |
+| LOG-110 | Observability | **New 2026-07-28 (`design-log-81`, idea logged during the `LOG-81` By Agent decision — not requested, just preserved).** With every AI Audit count now meaning real model calls only, agents' deterministic workload (Eleanor Voss — The Librarian's ~2.4k library reads, the ~1.7k `agent-directory` lookups) has no dedicated surface — it's visible only inside By Service rows. If John ever wants an "operations by agent" view (a different metric than calls, per his explicit framing), this is that idea's row. Not CI-critical; do nothing until asked. | ❌ Missing | S-future (only if John asks for it) |
 
 ---
 
