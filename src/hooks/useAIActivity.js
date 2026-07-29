@@ -1,3 +1,4 @@
+// DeepBench v6.3.203 | useAIActivity.js | LOG-81 -- every AI Audit count is real model calls only (isCountableCall gates Total Calls/By Agent/By LLM/By Pattern); By Service stays operations-based by design (§12)
 // DeepBench v6.3.191 | useAIActivity.js | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.188 | useAIActivity.js | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.170 | useAIActivity.js | LOG-92 -- hydrateFromSupabase default = all tenants (null tenantId skips the filter; audit surface shows every real model call)
@@ -150,6 +151,16 @@ export function pairedAgentTurnIds(rows) {
     }
   }
   return paired;
+}
+
+// FEATURE: LOG-81 -- the one definition of a countable call for every AI Audit count
+// (header Total Calls, By Agent, By LLM, By Pattern denominators). A countable call names a
+// model and is not the duplicate agent-turn half of an AI-51 pair. By Service deliberately
+// does NOT use this -- it measures service usage (operations), deterministic included (§12).
+// Entries pushed live by logAICall() never set isPairedDup -> undefined -> countable, which is
+// correct: they are real calls made this session.
+export function isCountableCall(e) {
+  return !!e.model && !e.isPairedDup;
 }
 
 // FEATURE: LOG-21 -- classifyRow()/buildActivitySummary()/percentile() moved here from
@@ -790,6 +801,9 @@ export async function hydrateFromSupabase(tenantId = null) {
         : computeCallCost(row.model, row.input_tokens, row.output_tokens)),
       patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
       ts:        row.created_at,
+      // FEATURE: LOG-81 -- stamped here so isCountableCall() can stay a pure per-entry predicate
+      // (the pairing decision needs the whole row set, which only this hydrate pass has).
+      isPairedDup: paired.has(row.id),
       _fromDB:   true,
     }));
   } finally {
@@ -908,12 +922,41 @@ export function usePatternClassification(log = []) {
     return out;
   }, [log, state.classified]);
 
-  const classified = useMemo(() => state.classified.map(p => ({
-    ...p,
-    cost: costBySlug.has(p.slug) ? costBySlug.get(p.slug) : p.cost,
-  })), [state.classified, costBySlug]);
+  // FEATURE: LOG-81 -- By Pattern counts real model calls too, derived client-side from the same
+  // rollup log_ids LOG-97 already rides in on (no new query, no view change -- §19k keeps the views
+  // plain). The view's own call_count still counts every classified log row, including the AI-51
+  // duplicate agent-turn halves, so a classified pattern's displayed total must be re-derived
+  // against the countable set. Same per-source fallback philosophy as costBySlug, never
+  // all-or-nothing: a row with no ids, or a log that has not hydrated yet, keeps the view's number.
+  const countableIds = useMemo(
+    () => new Set(log.filter(isCountableCall).map(e => e.id)),
+    [log]
+  );
 
-  return { ...state, classified };
+  const classified = useMemo(() => state.classified.map(p => {
+    const derivable = log.length > 0 && Array.isArray(p.logIds) && p.logIds.length > 0;
+    return {
+      ...p,
+      cost: costBySlug.has(p.slug) ? costBySlug.get(p.slug) : p.cost,
+      total: derivable ? p.logIds.filter(id => countableIds.has(id)).length : p.total,
+    };
+  }), [state.classified, costBySlug, countableIds, log.length]);
+
+  // FEATURE: LOG-81 -- "needing reclassification" = every countable call not covered by any
+  // classified pattern. Union of the classified ids, never a sum: one call can carry multiple
+  // patterns, and summing would subtract the overlap twice and under-report the remainder.
+  // Invariant, by construction: distinct classified-countable ids + this = totalCalls.
+  const reclassificationCount = useMemo(() => {
+    if (log.length === 0) return state.reclassificationCount;
+    const union = new Set();
+    for (const p of state.classified) {
+      if (!Array.isArray(p.logIds)) continue;
+      for (const id of p.logIds) if (countableIds.has(id)) union.add(id);
+    }
+    return countableIds.size - union.size;
+  }, [log.length, state.classified, state.reclassificationCount, countableIds]);
+
+  return { ...state, classified, reclassificationCount };
 }
 
 // FEATURE: LOG-80 -- By LLM aggregation, extracted from useAIActivity()'s inline loop into an
@@ -928,6 +971,9 @@ export function usePatternClassification(log = []) {
 export function computeByLLM(log) {
   const byLLM = {};
   for (const e of log) {
+    // FEATURE: LOG-81 -- real model calls only; also stops tokensIn double-counting (pair halves
+    // carry identical tokens).
+    if (!isCountableCall(e)) continue;
     const m = MODEL_ID_NORMALIZE[e.model] || e.model || "unknown";
     // FEATURE: BUG-20 — only aggregate real LLM model strings; filter service names and junk values
     if (!m.startsWith('claude-') && !m.startsWith('text-embedding-')) continue;
@@ -1005,12 +1051,21 @@ export function useAIActivity() {
   // agent-level totals below still come from buildActivitySummary()'s LOG-21 shared core,
   // byte-identical to before -- only the new `.capabilities` key is added per agent.
   const capabilitiesByAgent = computeByAgentCapabilities(log, capabilityAssignments, capabilityNameBySlug);
+  // FEATURE: LOG-81 -- calls = countable model calls; cost/avgLatency semantics unchanged.
+  // Counted here, NOT inside buildActivitySummary() (shared with useAgents.js / CHI drawer).
+  // An agent whose rows are all deterministic (e.g. agent-directory only) legitimately shows
+  // calls: 0 while still appearing with its cost and capabilities -- expected, not filtered out.
+  const countableCallsByAgent = {};
+  for (const e of log) {
+    if (!e.agentId || !isCountableCall(e)) continue;
+    countableCallsByAgent[e.agentId] = (countableCallsByAgent[e.agentId] || 0) + 1;
+  }
   const byAgent = {};
   for (const [agentId, d] of Object.entries(agentSummary)) {
     const allLatencies = rawRowsForAgentSummary.filter(r => r.agent_id === agentId && r.latency_ms).map(r => r.latency_ms);
     byAgent[agentId] = {
       agentId,
-      calls: d.calls,
+      calls: countableCallsByAgent[agentId] || 0,
       cost: d.totalCost,
       avgLatency: allLatencies.length ? Math.round(allLatencies.reduce((a,b)=>a+b,0)/allLatencies.length) : null,
       capabilities: capabilitiesByAgent[agentId] || [],
@@ -1093,7 +1148,10 @@ export function useAIActivity() {
 
   const modelsInUse = Object.values(byLLM).filter(d => d.calls > 0).length;
   const totalCost = log.reduce((s,e)=>s+(e.cost||0),0);
-  const totalCalls = log.length;
+  // FEATURE: LOG-81 -- header "Total Calls" is real model calls, not log rows. totalCost above is
+  // deliberately still every row: AI-51 already zeroed the duplicate half's cost at hydrate, and
+  // deterministic rows cost nothing, so the sum is already correct and unchanged by this fix.
+  const totalCalls = log.filter(isCountableCall).length;
 
   // FEATURE: S-AI-AUDIT-SVCDIR -- the §19m directory join (Task 1): layer-grouped services with
   // read-time stats, plus the self-maintaining unregistered aggregation. The assigned-capability
