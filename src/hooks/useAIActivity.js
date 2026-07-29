@@ -1,3 +1,4 @@
+// DeepBench v6.3.218 | useAIActivity.js | LOG-112 -- buildActivitySummary() stops reading the frozen legacy patterns_used field: its per-agent byPattern bucket is replaced by a plain `rows` list of each included row's id + latency, and the new exported buildAgentPatternRows() joins those ids to the VERIFIED pattern names the Log Displayer derived at read time (ai_pattern_classification_rollup.log_ids, LOG-97's existing read -- no new query). An agent whose rows matched no gold pattern gets no buckets at all
 // DeepBench v6.3.211 | useAIActivity.js | CHI-90 -- buildActivitySummary()'s per-agent `calls` is now gated by isCountableCall(), so the CHI Agents drawer counts real model calls exactly as AI Audit's byAgent does; the raw every-logged-row count it used to hold moves to a new `operations` field (drives the drawer's active/potential split only, never rendered)
 // DeepBench v6.3.204 | useAIActivity.js | LOG-91 -- AI-51 timestamp-pairing heuristic scoped to the pre-trace legacy window (PAIR_LEGACY_CUTOFF_MS); the write path no longer produces agent-turn/wrapper duplicates, so fresh rows are never paired
 // DeepBench v6.3.203 | useAIActivity.js | LOG-81 -- every AI Audit count is real model calls only (isCountableCall gates Total Calls/By Agent/By LLM/By Pattern); By Service stays operations-based by design (§12)
@@ -257,26 +258,15 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
       k.maxLatency = k.maxLatency == null ? row.latency_ms : Math.max(k.maxLatency, row.latency_ms);
     }
 
-    // FEATURE: MI-72a -- parallel per-agent, per-pattern bucket (byPattern), gated by the same
-    // `include` flag classifyRow() already returns so a row excluded from byKind as a duplicate
-    // wrapper row is also excluded here. Unlike byKind (one row -> one kind), a single row can
-    // carry multiple patterns (row.patterns_used is an array) -- it contributes to every pattern
-    // bucket in that array, not just one. Zero visible effect this session -- MI-72b renders it.
-    if (Array.isArray(row.patterns_used)) {
-      if (!d.byPattern) d.byPattern = {};
-      for (const patternSlug of row.patterns_used) {
-        if (!d.byPattern[patternSlug]) {
-          d.byPattern[patternSlug] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
-        }
-        const p = d.byPattern[patternSlug];
-        p.calls++;
-        if (row.latency_ms) {
-          p.totalLatency += row.latency_ms;
-          p.latencyCount++;
-          p.maxLatency = p.maxLatency == null ? row.latency_ms : Math.max(p.maxLatency, row.latency_ms);
-        }
-      }
-    }
+    // FEATURE: LOG-112 -- the per-agent pattern breakdown no longer reads row.patterns_used:
+    // that field is frozen legacy and is never read for classification
+    // (.claude/rules/ai-pattern-signature.md, ARCHITECTURE.md §19k/§19l). This records only each
+    // included row's identity and latency; the verified pattern NAME is joined on afterwards by
+    // buildAgentPatternRows() from the Log Displayer rollup's log_ids. Position matters: staying
+    // inside the `include` region preserves MI-72a's guarantee that a row excluded from byKind as
+    // a duplicate wrapper half is excluded here too.
+    if (!d.rows) d.rows = [];
+    d.rows.push({ id: row.id, latencyMs: row.latency_ms || null });
 
     if (row.ai_type === 'agent-turn') {
       const depthSeg = row.feature ? row.feature.split(':')[2] : null;
@@ -314,12 +304,38 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
         delete bd.latencies;
       });
     });
-    // FEATURE: MI-72a -- finalize byPattern's avgLatency, mirroring byKind's own finalization above.
-    Object.values(d.byPattern || {}).forEach(p => {
-      p.avgLatency = p.latencyCount ? Math.round(p.totalLatency / p.latencyCount) : null;
-    });
   });
   return map;
+}
+
+// FEATURE: LOG-112 -- joins an agent's included rows to the VERIFIED pattern names the Log
+// Displayer derived at read time, carried on ai_pattern_classification_rollup.log_ids (the
+// array LOG-97 already rides in on the read that happens anyway -- no new query, and never a
+// direct ai_call_patterns read, which is what blew the anon 3s statement timeout on LOG-38's
+// first attempt). No slugs, no per-pattern branches, no vocabulary lookup: the rollup's
+// pattern_name IS the governed name, the same posture lib/tracePatterns.js already uses for
+// the Agent Routing drawer. A row no gold pattern matched contributes to nothing at all --
+// honest unclassified expressed structurally, never a fabricated or empty bucket (§19l).
+export function buildAgentPatternRows(rows, patternNamesByLogId) {
+  const out = {};
+  for (const r of rows || []) {
+    const names = patternNamesByLogId?.get(r.id);
+    if (!names) continue;
+    for (const name of names) {
+      if (!out[name]) out[name] = { calls: 0, totalLatency: 0, latencyCount: 0, maxLatency: null };
+      const p = out[name];
+      p.calls++;
+      if (r.latencyMs) {
+        p.totalLatency += r.latencyMs;
+        p.latencyCount++;
+        p.maxLatency = p.maxLatency == null ? r.latencyMs : Math.max(p.maxLatency, r.latencyMs);
+      }
+    }
+  }
+  Object.values(out).forEach(p => {
+    p.avgLatency = p.latencyCount ? Math.round(p.totalLatency / p.latencyCount) : null;
+  });
+  return out;
 }
 
 // FEATURE: AI-23 — Remap old ai_type strings to service slugs (DB rows keep old values; remapped at read time)

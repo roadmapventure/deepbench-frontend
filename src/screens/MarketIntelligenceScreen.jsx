@@ -1,3 +1,4 @@
+// DeepBench v6.3.218 | MarketIntelligenceScreen.jsx | LOG-112 -- the Agents drawer's per-agent sub-rows show VERIFIED pattern names only: they no longer read buildActivitySummary()'s patterns_used-derived byPattern bucket, but join the agent's own rows to the Log Displayer's read-time classification (usePatternClassification's log_ids + buildAgentPatternRows) -- so a sub-row can no longer exceed its agent's own CALLS headline, and an agent with nothing verified renders no sub-rows at all. patternLabelFor()/usePatternVocabulary/humanizeSlug deleted here (no slug reaches this file any more)
 // DeepBench v6.3.200 | MarketIntelligenceScreen.jsx | S-CHI-88a -- CHI-88 QA follow-ups: AgentWorkingIndicator gains an opt-in one-line `compact` variant (mobile status stops wrapping to 2 lines), the input row moves into the Chat branch only (Steps & Evidence reclaims ~66px), and the mobile pinned decision footer renders compact via the existing `bare` flag
 // DeepBench v6.3.198 | MarketIntelligenceScreen.jsx | S-CHI-88 -- mobile cleanup: terse feed, one-line title chrome, soft status line, 16px input, pinned decision footer
 // DeepBench v6.3.186 | MarketIntelligenceScreen.jsx | LOG-95b -- useTracePatterns refetches on span miss: streamed rows mount mid-flight (LOG-95), so the LOG-79 per-trace cache could freeze before late executions logged; now invalidates+refetches up to 3x2.5s per mounted span, then accepts honest-unclassified (§19l)
@@ -363,7 +364,7 @@
 // retry hand-off, AI - Hypothesis Test, Memory Consolidation, Data Integrity Patch, Failure Triage, and now
 // (S-ARCH-DISPLAY-LOOP-01) Agent Selection + Display Format for Marcus's real Display-agent hand-off)
 // FEATURE: MI-13 — Theory Evidence renders via the generic visualization mechanism, not a hardcoded chart
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { T, display, body, mono, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
@@ -371,10 +372,11 @@ import { Card, Corners, FeatureBadge, AgentAvatar, ConfirmationCardContent, Conf
 import { useAgents, useLearnedContext, useAgentActivitySummary, useDataSources } from "../hooks/useAgents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 import AIDiamond from "../components/AIDiamond.jsx";
-// FEATURE: LOG-36 -- PATTERN_CATALOG import dropped; pattern names come from the governed
-// vocabulary (usePatternVocabulary) with humanizeSlug as the fallback. SERVICE_CATALOG is
-// untouched (LOO-012, unrelated).
-import { SERVICE_CATALOG, usePatternVocabulary, humanizeSlug } from "../hooks/useAIActivity.js"; // FEATURE: LOG-36/LOO-012
+// FEATURE: LOG-112 -- usePatternVocabulary/humanizeSlug dropped: no slug ever reaches this file
+// now, so there is nothing left to resolve a name for. The Agents drawer's pattern rows come
+// pre-named from the Log Displayer rollup (usePatternClassification + buildAgentPatternRows).
+// SERVICE_CATALOG is untouched (LOO-012, unrelated -- SERVICE_NAME below still needs it).
+import { SERVICE_CATALOG, usePatternClassification, buildAgentPatternRows } from "../hooks/useAIActivity.js"; // FEATURE: LOG-112/LOO-012
 // FEATURE: CHI-56 — shared turn-tracking service (hop-duration resolution, transaction-boundary
 // event builder); see src/lib/turnTracking.js for full rationale.
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
@@ -531,12 +533,10 @@ function buildFailureText(guardrail, triage) {
 // humanizeSlug() -> raw slug, the same order every other pattern display uses. It cannot be a
 // module constant any more because the vocabulary is read from Supabase, not from a static file.
 
-// FEATURE: LOG-36 -- one shared resolver so both call sites in this file (RoutingActivityLine and
-// the per-agent/per-pattern rollup) degrade identically. Never maps a legacy slug to a catalog
-// name -- ARCHITECTURE.md §19i's corollary bans that outright.
-function patternLabelFor(vocab, slug) {
-  return vocab.get(slug)?.name || humanizeSlug(slug) || slug;
-}
+// FEATURE: LOG-112 -- patternLabelFor() (LOG-36's shared slug -> name resolver) is deleted. Both
+// of its call sites are gone: RoutingActivityLine moved to the ai_call_patterns view (LOG-79) and
+// the per-agent rollup moved to the classification rollup this session. Every pattern name on this
+// screen now arrives already governed, so there is no slug left to resolve.
 
 // FEATURE: LOO-012 — slug -> human label, same data-driven shape the deleted PATTERN_NAME map had,
 // reusing SERVICE_CATALOG (already platform-wide) instead of a new dictionary. Restores a
@@ -2787,8 +2787,23 @@ function RoutingActivityLine({ evt, terse }) {
 function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
   const learned = useLearnedContext();
   const dataSources = useDataSources();
-  // FEATURE: LOG-36 -- governed pattern names for the per-agent/per-pattern rollup below.
-  const { vocab } = usePatternVocabulary();
+  // FEATURE: LOG-112 -- verified pattern names for the per-agent rollup below, from the Log
+  // Displayer rollup (the same read AI Audit's By Pattern section makes). Called with no
+  // argument on purpose: this drawer needs name + log_ids only, not LOG-81's countable/cost
+  // re-derivation, which is what the `log` argument drives. On fetch failure the hook resolves
+  // to an empty list and these rows simply do not render -- LOG-102 tracks making that failure
+  // state honest rather than indistinguishable from "nothing verified yet".
+  const { classified } = usePatternClassification();
+  const patternNamesByLogId = useMemo(() => {
+    const m = new Map();
+    for (const p of classified) {
+      for (const id of p.logIds || []) {
+        const names = m.get(id);
+        if (names) names.push(p.name); else m.set(id, [p.name]);
+      }
+    }
+    return m;
+  }, [classified]);
   // FEATURE: MI-31 — separate hook instance (own useState/useEffect), scoped to the
   // 'speed-baseline-test' tenant, unfiltered by MI_LOOP_SCOPE (scope: null) since those rows are
   // already fully isolated deliberate test data, not production MI-loop traffic.
@@ -2819,6 +2834,7 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
           if (!agent) return null;
           const stats = agentActivity[id];
           const baseline = rollupBaseline(baselineActivity[id]);
+          const patternRows = buildAgentPatternRows(stats?.rows, patternNamesByLogId);
           return (
             <div key={id} style={{display:"flex",flexDirection:"column",gap:6,paddingBottom:10,borderBottom:`1px dashed ${T.lineSoft}`}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2837,7 +2853,7 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
                 <StatCell val={stats?.calls ?? 0} label="Calls"/>
                 <StatCell val={stats?.avgCost != null ? `$${stats.avgCost.toFixed(2)}` : "—"} label="Avg Cost"/>
               </div>
-              {(baseline || (stats?.byPattern && Object.keys(stats.byPattern).length > 0)) && (
+              {(baseline || Object.keys(patternRows).length > 0) && (
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   {baseline && (
                     <LatencyStatRow
@@ -2846,19 +2862,16 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
                       restText={`s avg (${baseline.calls} call${baseline.calls === 1 ? "" : "s"}, max ${(baseline.maxLatency/1000).toFixed(1)}s)`}
                     />
                   )}
-                  {/* FEATURE: MI-72b — replaces the byKind capability-type breakdown (known
-                      placeholder, S-MI-20) with the real per-agent, per-pattern breakdown added by
-                      MI-72a. FEATURE: LOG-36 -- patternLabelFor() is the same resolver
-                      RoutingActivityLine uses for Agent Routing's pattern labels — one source of
-                      truth platform-wide: governed vocabulary name, else humanized slug, else the
-                      raw slug. No byModel sub-rows here (byPattern has no byModel sub-bucket) —
-                      out of scope to add one. */}
-                  {stats?.byPattern && Object.entries(stats.byPattern)
+                  {/* FEATURE: LOG-112 -- rows are keyed and labelled by the Displayer's own verified
+                      pattern_name; there is no slug and no vocabulary resolution left on this surface.
+                      An agent with nothing verified yet renders no rows at all (§19l honest-unclassified,
+                      expressed structurally). Sort order, row shape and LatencyStatRow are unchanged. */}
+                  {Object.entries(patternRows)
                     .sort((a, b) => (b[1].avgLatency || 0) - (a[1].avgLatency || 0))
-                    .map(([patternSlug, p]) => (
+                    .map(([patternName, p]) => (
                       <LatencyStatRow
-                        key={patternSlug}
-                        label={patternLabelFor(vocab, patternSlug)}
+                        key={patternName}
+                        label={patternName}
                         valueNumber={p.avgLatency != null ? (p.avgLatency/1000).toFixed(1) : "—"}
                         restText={`${p.avgLatency != null ? "s avg" : ""} (${p.calls} call${p.calls === 1 ? "" : "s"}${p.latencyCount > 1 ? `, max ${(p.maxLatency/1000).toFixed(1)}s` : ""})`}
                       />
