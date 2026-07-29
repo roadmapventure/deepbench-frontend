@@ -5,6 +5,93 @@
 
 ---
 
+## S-LOO-013-design (v6.3.219) — 2026-07-29 — the hardcode was in the field nobody reads
+
+**Worktree:** `design-loo-013` · data-only (3 Supabase Skill rows + 1 deleted `agent_configs` row), no code, no kickoff doc
+
+### What LOO-013 actually was
+
+The row had it wrong, and its own proposed fix would have made things worse. It framed the bug as
+"Michelle recommends Brent Matthews — Data Research Specialist, who has zero capabilities" and asked
+whether `fetchRoster()` should filter zero-capability agents out of her candidate list.
+
+Verified live instead: **Michelle Manning — Project Manager was never called at all.** The trace for a
+real news run held exactly two rows — `jordan` then `alex` — with no broker leg. Jordan Ellsworth —
+Web Search Expert's own Intent Skill, `ws-news-search-intent`, carried this in its **`method`** field:
+
+> "...call delegate_to_agent targeting agent_id \"alex\", capability_slug \"screen-controls\",
+> intent_slug \"news-cards-format\"... Alex's formatted output is the end result."
+
+A Rule #1 violation sitting in shipped Skill data, naming the agent, the capability and the intent.
+Filtering the roster would have changed nothing, because the roster was never consulted.
+
+### The mistake worth recording
+
+The first fix removed the same name from `.objective` and shipped. The live run then returned 3 cards
+with `display_agent_id: alex` and no errors — **and it was a false pass.** `objective` and `method` are
+separate authored columns, and `db-assembly.js`'s intent branch concatenates both into the prompt, so
+the model simply followed the more specific instruction that was still there. Two of the Skill's three
+fields read correctly (the capability description says "delegates to a display agent"), which is
+exactly why a spot-check cleared it.
+
+**The generalisable lesson:** "3 cards rendered" was never the assertion that could catch this.
+"Michelle appears in the trace" was. A QA assertion that passes equally whether the fix worked or the
+hardcode worked is not a test.
+
+### The fix — 3 Skill rows
+
+1. `ws-news-search-intent.method` → the `request_help` → broker → `delegate_to_agent` pattern already
+   proven in production by `qg-review-intent`. Not invented here.
+2. `ws-news-search-intent.objective` → name removed.
+3. `news-cards-format.objective` → **was NULL, now populated.** This one is load-bearing:
+   `rosterToContext()` filters out Skills with no objective, so the single Skill identifying Alex
+   Reeves — Screen Controls Editor as the news-card formatter was invisible to the broker. Removing
+   the hardcode without this would have left Michelle nothing to find him by.
+
+### Verification — 5 live runs
+
+| | Before | After |
+|---|---|---|
+| Chain | `jordan → alex` | `jordan → michelle → michelle (agent-selection-intent) → alex` |
+| Michelle in trace | absent | **present 5/5** |
+| Cards | 3 | 3, 5/5 |
+| Errors | none | none |
+
+Alex won the selection on merit all 5 runs. Run against the dev URL; data-only, so no deploy was
+involved and `SES-33`'s Vercel cap was never a factor.
+
+### Platform-wide Rule #1 audit (John's ask: "100% surety")
+
+Swept every authored config field — `skill_profiles` (all 8 text fields incl. every trait subfield),
+`agent_configs`, `agents`, `capabilities`, `pattern_vocabulary`, `platform_services` — matching agent
+**ids** as well as names. 41 raw name-mentions, of which:
+
+- **`PRO-3`** — `solution-catalog.traits.solutions` (16 ids: `pm_agent_id: michelle` ×8,
+  `display_agent_id: alex` ×8) and `execution-plan.traits.deliverables` (7 × `display_agent_id: alex`).
+  Live, not dormant: `CreateWorkOrderScreen.jsx:295` filters on `s.pm_agent_id === agent.id`, and
+  `display_agent_id` flows through `api/plan.js:241` into `execute.js`. John's explicit call: Later
+  bucket — Work Order screen, not CI.
+- **Deleted this session** — an `agent_configs` `role_prompt` on Susan Smith — Trainer Agent reading, in
+  full, "you are bob and need something". `buildSections` concatenates *every* role_prompt, not just the
+  default, so she was told she was Bob Whitfield — Professional Procurement Analyst on every call.
+  Confirmed single-agent (`agent_configs` has no join table, unlike Skills) before deleting.
+- **`AGT-38`** — one borderline: `capabilities.data-analysis.description` names Eleanor Voss — The
+  Librarian as the delegation target. Encodes a real locked rule (§19c) in Rule-#1-violating form.
+  John's decision, not taken unilaterally.
+- **Cleared:** 6 Identity Skills naming their own agent (correct by definition), ~7 descriptive prose
+  mentions in prompt fields, ~27 in `description`/`notes` — verified against `db-assembly.js` as never
+  prompt-reaching.
+
+### Process gaps filed
+
+- **`SES-51`** — Rule #1 is enforced on code (rules file, PreToolUse hook, Architect Review, `npm run
+  build`) and **not at all on Skill data**, which lives in Supabase with no git, no diff, no review.
+  Needs a mechanical check matching ids as well as names — a Skill hardcoding `agent_id 'riley'` with
+  no "Riley Torres" anywhere would pass a name-only sweep. `the_library`/`knowledge_entries` RAG
+  content remains unswept and in scope.
+- **`SES-52`** — `FEATURES-ARCHIVE.md` is duplicated: **478 of 502 IDs appear 2+ times**, the whole
+  taxonomy block copied. Found because archiving `LOO-013` hit a section header that exists twice, so
+  the new row landed in one copy only. De-dupe needs John's deletion approval and a per-row diff.
 ## S-SES-25 close-out (v6.3.217) — 2026-07-29 — SES-25 + SES-25b done and archived
 
 **Worktree:** `ses-25-close` · docs-only
