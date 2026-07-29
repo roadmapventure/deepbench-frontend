@@ -105,28 +105,39 @@ known defect that would break or dirty that run:
 
 ### Bucket 2 — UX/UI: chat + column 2
 
-| # | ID (Type) | Defect |
+**Source-verified 2026-07-28 evening (`beta-doc-0728c`, John's ask):** every row's claim was
+re-traced through current source + Supabase. 12 confirmed live, 4 likely already fixed
+(rows never updated — verify on screen, then close), 4 only decidable live.
+
+**Confirmed still valid (the real queue):**
+
+| # | ID (Type) | Defect (evidence in current source) |
 |---|---|---|
-| 1 | `AA-153` (Task Success Rate) | Raw HTML tags shown as literal text in the chat answer card. |
-| 2 | `CHI-72` (UI) | Genuine block leaks raw triage text and `the_library` UUIDs into chat. |
-| 3 | `AA-161` (Speed) | Column 2 charts render in <10% of runs (token budget). |
-| 4 | `CHI-47` (Architecture) | Second question discards first answer's evidence; chat pointer links to nothing. |
-| 5 | `CHI-85` (UI) | Stray late completion can stamp an old drawer into the new journey numbering. |
-| 6 | `CHI-86` (Tech Debt) | Stale news chain writes chat lines and drawer events after Clear. |
-| 7 | `MI-53` (Architecture) | Raw unformatted markdown renders in the chat ConfirmationCard (patch flow). |
-| 8 | `CHI-19` (Feature) | Answers never name the resolved entity; question and answer read disconnected. |
-| 9 | `AA-146` (Task Success Rate) | Missing "Formatted by" byline on the chat answer card. |
-| 10 | `MI-70` (Architecture) | Two confidence badges on related cards use mismatched vocabularies. |
-| 11 | `CHI-83` (Feature) | Marcus Webb — GEO CSO Expert says "thesis"/"hypothesis" inconsistently in chat. |
-| 12 | `CHI-22` (Feature) | Abbreviations never expanded on first use. |
-| 13 | `CHI-48` (Data) | Analysis drawer hop-range badge always empty (`hopStart`/`hopEnd` never wired). ⚠️ ID collision — see `SES-30` (Tooling). |
-| 14 | `CHI-29` (UI) | Column 2 scrollable content lacks any scroll affordance. |
-| 15 | `CHI-26` (UI) | Column 2 duplicates column 1's live status strip. |
-| 16 | `CHI-28` (UI) | Column 3 header rename to "Focus Area Audit." |
-| 17 | `CHI-62` (Architecture) | Escalate confirmation card would dump raw JSON — reachability unconfirmed, verify first. |
-| 18 | `CHI-67` (Observability) | CHI Agent Reasoning drawer mislabels reasoning entries as "patterns." |
-| 19 | `MI-41` (UI) | Column 3 drawers blow past the viewport. *(triage call — nearest bucket)* |
-| 20 | `LOO-26` (Tech Debt) + `CHI-87` (Observability) | Console errors on every CHI question / on load — devtools assumed open (§1). *(triage call)* |
+| 1 | `AA-153` (Task Success Rate) | Raw HTML tags as literal text — body packed raw, rendered escaped; no sanitizer in the repo. |
+| 2 | `CHI-72` (UI) | Block path returns before the Display hop and pushes raw triage text + `the_library` UUIDs to chat. |
+| 3 | `CHI-47` (Architecture) | Evidence is a single replace-on-write state slot — second answer overwrites the first's evidence. |
+| 4 | `CHI-85` (UI) | Three chat handlers still call `ensureStep` unguarded — a late completion can stamp an old drawer. |
+| 5 | `CHI-86` (Tech Debt) | The news `onProgress` callback is the one site not wrapped in `isStale()` (comment in file defers to this row). |
+| 6 | `MI-53` (Architecture) | ConfirmationCard still `String(v)`/`JSON.stringify(v)`-dumps fields; the display-intent fix was fully reverted. |
+| 7 | `AA-146` (Task Success Rate) | `fetchAgentCard()` still swallows failure to `null` with no retry — byline drops intermittently. |
+| 8 | `CHI-48` (Data) | Hop-range badge: `setQaEvidence` still omits `hopStart`/`hopEnd`; badge renders null. ⚠️ ID collision — `SES-30` (Tooling). |
+| 9 | `MI-70` (Architecture) | Confirmed in live Supabase: `high/medium/low` vs `sourced/inferred/synthesized/na`. Caveat: only one badge currently has a render site — data-model inconsistency more than a visible dual-badge bug. |
+| 10 | `CHI-67` (Observability) | Agent Reasoning drawer still renders "`N` patterns" / "No patterns synthesized yet." |
+| 11 | `MI-41` (UI) | Column 3 root still has no `overflowY`/`minHeight` — column 2's fix was never copied over. |
+| 12 | `CHI-87` (Observability) | Mount-path news fetch still unseeded → null duration → `console.error`. **`LOO-26` (Tech Debt) is effectively a duplicate** — its chat-path trigger was already seeded; propose merging into `CHI-87` (John's call per merge precedent). |
+
+**Likely already fixed — verify on screen, then close the row (5-minute pass):**
+`CHI-29` (UI — `ScrollFadeHint` shipped and wired into column 2 + mobile), `CHI-26` (UI —
+duplicate status strip removed from `EvidenceColumn`, removal noted in comments), `CHI-28`
+(UI — header already renders "Focus Area Audit"), `AA-161` (Speed — Supabase now has
+`intelligence-review-format.max_tokens = 3000`, the row's named cause; re-measure chart
+render-rate during regression).
+
+**Only decidable live — fold into the regression run's observation list, no separate sessions:**
+`CHI-19` (Feature — weakened: `ci-answer-intent` now instructs entity naming; watch compliance),
+`CHI-83` (Feature — vocabulary consistency in real answers), `CHI-22` (Feature — abbreviation
+expansion), `CHI-62` (Architecture — the escalate path has **zero traversals ever** in
+`durable_hops`; lowest priority in the bucket).
 
 ### Bucket 3 — mobile
 
