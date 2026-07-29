@@ -266,7 +266,66 @@ Complete every item before committing. This is the canonical "standing checklist
 
 ## Section 6: Browser Test Checklist
 
-After every Vercel deploy:
+**Rewritten 2026-07-28 (`SES-015`, v6.3.209).** This section used to open *"After every Vercel deploy:"* — an assumption that does not hold. A push to `dev` is not a deploy.
+
+### Step 0 — Confirm the preview is current (before every other step)
+
+```
+node scripts/check-deploy-current.js
+```
+
+**It must exit 0.** A non-zero exit means **stop**: do not run any of the remaining checks, and do not report PASS or FAIL for the feature. A run against a stale preview is not a weaker result, it is a result about a different build — and it is indistinguishable from a real one in either direction, so it can fake a green just as easily as a red.
+
+Exit codes: `0` the serving deployment contains your commit · `1` not covered (stale preview / no build fired / poll budget expired) · `2` the check could not run at all (no `VERCEL_TOKEN`, Vercel API unreachable). **Exit 2 is not a pass** — the deploy was never checked.
+
+Useful arguments: `--worktree=<path>` (default `process.cwd()`), `--sha=<sha>` (default `HEAD`), `--timeout=<seconds>` (default 300), `--json`.
+
+Coverage is an **ancestor** test, not equality: the gate passes when the serving commit *contains* yours. With 5–7 concurrent sessions the deployed tip is normally ahead of your commit, and an equality check would fail almost always — a gate that fails almost always gets ignored within a day.
+
+### Why this is step 0 — the measured reality
+
+Across the 156 commits on `origin/dev` since 2026-07-28 12:00 CST, compared against every `dev` deployment Vercel actually produced:
+
+| Metric | Value |
+|---|---|
+| Median lag from commit → first build containing it | 37 s |
+| p90 lag | 852 s (14 min) |
+| Max lag | 2,973 s (49.5 min) |
+| Commits waiting > 5 min | 44 / 156 (28%) |
+| Commits waiting > 10 min | 31 / 156 (20%) |
+
+A ~46-minute window that evening produced no `dev` build at all, covering ~8 commits from six different sessions.
+
+### Two QA paths, different sufficiency — do not collapse them
+
+| QA path | Edge cache? | What is sufficient |
+|---|---|---|
+| `api/` route (e.g. the CHI regression driver's `POST /api/capabilities/execute`) | **No** — measured `X-Vercel-Cache: MISS` on POST | The step 0 SHA gate alone |
+| Frontend screen (visual QA) | **Yes** — measured `X-Vercel-Cache: HIT`, `Age: 298`; `Cache-Control: no-cache` and `Pragma: no-cache` both failed to bust it | The SHA gate **plus** the bundle-grep second layer below |
+
+### Frontend second layer — bundle grep
+
+The edge cache on the HTML document is real and header-proof, so for **frontend visual QA only**, after step 0 passes, also confirm the bundle you are actually served contains your change:
+
+1. Fetch `location.origin` with `{ cache: 'reload' }`.
+2. Extract the bundle path with `assets/index-[A-Za-z0-9_-]+\.js`.
+3. Fetch that asset and assert it `.includes('<a string unique to your change>')`.
+
+JSX prop names survive minification and make reliable markers. (This supersedes `docs/BETA.md` §2b's prescription, which listed bundle-grep *alone* — insufficient for the serverless regression path it was listed to protect, because that driver calls a function and there is no static asset to grep.)
+
+### When step 0 fails
+
+A manual API trigger is not available on this plan — `POST /v13/deployments` returns **402 Payment Required**. Waiting does not help once nothing is queued (observed to persist 46 minutes). The working remedy is to push another commit, which triggers a build containing yours:
+
+```
+git -C "<worktree>" commit --allow-empty -m "chore: poke Vercel dev webhook (no build fired for <sha7>)"
+git -C "<worktree>" push origin HEAD:dev
+```
+
+The script prints this remedy itself on the `no-build-fired` verdict.
+
+### Browser steps (only after step 0 exits 0)
+
 1. Open dev URL
 2. DevTools → Console → zero red errors
 3. Navigate to screen being tested
@@ -352,6 +411,7 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 | 2026-07-02 | Category L scoping breadth guidance added — full live round trips required for genuinely novel mechanism paths, not one-for-one for every data row reapplying an already-proven mechanism to a structurally identical shape. Root cause: `S-ARCH-AGENT-LOOP-03` ran 4 full live tests (25 min, repeated 55s-timeout retries) for a 4-row data-only session where 3 rows re-exercised a mechanism already proven live twice by prior sessions — only 1 row (`qg-review-intent`'s `delegate_to_agent`-from-`task_context` path) was actually novel. |
 | 2026-07-07 | Mandatory root cause protocol gains Step 1 (renumbering the rest) — check `https://status.claude.com/api/v2/summary.json` for an Anthropic-side incident (Claude API / Claude Sonnet / Claude Code) overlapping the failure's timestamp before doing any code-level root-causing. Root cause: John gets Claude status-page incident emails and had no standing step connecting them to QA-failure diagnosis — an upstream incident could otherwise get root-caused as a DeepBench code defect. |
 | 2026-07-08 | Category L strengthened — loop-closure proof specificity requirement. Root cause: `AA-110`/`S-APPLE-05`'s "enablement" keyword check was satisfiable from pre-existing seeded content, not uniquely tied to the new write being tested. |
+| 2026-07-28 | Section 6 rewritten (`SES-015`, v6.3.209) — `node scripts/check-deploy-current.js` becomes step 0 of every browser test, and a non-zero exit stops the run rather than warning. Root cause: the section assumed "after every Vercel deploy," but Vercel does not reliably build every push to `dev` — measured p90 lag 852 s, max 2,973 s, 20% of 156 commits waiting >10 min, plus a ~46-minute window that produced no `dev` build at all. Section now also carries the two-path sufficiency split (`api/` routes are never edge-cached, so the SHA gate alone suffices; frontend HTML *is* edge-cached and needs the bundle-grep second layer) and the 402 / poke-commit remedy. Supersedes `docs/BETA.md` §2b's bundle-grep-only prescription, which cannot cover the serverless regression path it was listed to protect. |
 | 2026-07-16 | Section 7 gains a Status column vocabulary rule — `docs/FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`'s Status cell must be exactly `✅ Done` / `🔶 Partial` / `❌ Missing`, no appended descriptive text. Root cause: free-texted completion phrasing (`✅ Fixed and verified`, `✅ Closed`, etc.) evaded the `session-hygiene` skill's literal `✅ Done` Done-row check for weeks; 12 rows recovered in a broadened sweep. `session-hygiene` SKILL.md Section 3 updated to match any `✅`-prefixed Status cell going forward. |
 
 ---

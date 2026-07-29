@@ -17,6 +17,14 @@
 
 ## 1. Prerequisites — check before starting, stop if missing
 
+**Step 0 — Confirm the preview is current (added 2026-07-28, `SES-015`, v6.3.209 — do this before every step below).**
+
+Run `node scripts/check-deploy-current.js`. It must exit 0 before invoking any case.
+
+A non-zero exit invalidates the entire run — the 24 cases would execute against a build that does not contain the code under test, and the result would be reported against the wrong commit. Do not start the run; resolve the deploy first (the script prints the remedy). Exit 2 means the check itself could not run (no `VERCEL_TOKEN`) — that is not a pass either.
+
+The driver posts to `/api/capabilities/execute`, which is never edge-cached — so this gate is sufficient on its own here. The bundle-grep second layer in `STANDARDS.md` Section 6 applies only to frontend visual QA, such as this runbook's own deployed-preview spot-check (§6).
+
 1. **`AGT-35` (Owen content-context review Skill) must be live.** Check `docs/FEATURES.md`'s `AGT-35` row for Status ✅ and the shipped capability/intent slugs, and verify the rows exist in Supabase (project `rallojeqnkgtxgsdsnqm`). If not shipped: **stop** — run `AGT-35`'s design/data session first. Do not substitute your own content judgment (D5).
 2. **Driver script.** `SES-29`'s row records where the committed driver lives once it ships (proposed: `scripts/chi-true-regression.mjs`). Until then, build it in your scratchpad **exactly** per Appendix A — do not improvise the call sequences.
 3. **Endpoint + auth.** `POST https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/capabilities/execute`, header `x-vercel-protection-bypass` (value = `VERCEL_AUTOMATION_BYPASS_SECRET` in your worktree's `.env.local`; see `docs/ENV-VARS.md`). `tenant_id: "global"` on every call.
