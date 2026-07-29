@@ -5,6 +5,78 @@
 
 ---
 
+## design-log-72 (v6.3.226) — 2026-07-29 — the authoring lever was already exhausted
+
+**Worktree:** `design-log-72` · docs-only — zero code, zero Supabase writes, no kickoff doc, no
+Susan Smith — Trainer Agent run, no coding session spawned.
+
+### The finding
+
+`LOG-72` (Architecture) was open on two beta queues as "author `criteria` for the gold patterns that
+don't have any." It read as un-started work waiting for a Pattern Definer session. It was not.
+
+Verified live against `pattern_vocabulary` joined to `pattern_candidates`:
+
+- **27 vocabulary rows; 2 retired** (`agent-handoff`→`handoff`, `agents-as-tools`→`orchestrator-workers`,
+  both via `superseded_by`) → **25 active. 7 carry `criteria`, 18 do not.**
+- **0 of those 18 are unadjudicated.** Every one has already been through Susan Smith — Trainer Agent
+  and been turned down: **15 formally `discarded`** (MISSING SIGNAL — the distinguishing fact isn't
+  captured — or the platform doesn't perform the behavior at all), and **3** (`generative-prompt-compression`,
+  `hypothetical-document-embeddings`, `multi-agent-debate`) showing `amended` on the candidate record
+  against a null vocabulary row, which is the direct-PATCH revert residue `§19l` already acknowledges.
+
+The three `§19l` explicitly listed as *still authorable from existing fields* were the last to fall, and
+all three fell before this session opened: `react-loop` and `function-calling` discarded by
+`log-72-0728-run`, `llm-as-judge` by `design-log-72-0728` ("the quality-gate intent does not
+structurally pin the pattern — its deliverable is a pass/block verdict, not a separate model's
+judgment"). Nothing was left for a Susan run to do.
+
+### Why the row could not simply be marked done
+
+Closing it meant recording *cannot proceed*, not *delivered* — and that distinction only matters if the
+beta consequence is checked rather than assumed. `BETA.md` bucket 5 item 1 attributed the drawer's
+remaining blank hops to this row's criteria gap "not a capture gap." If that were true, closing the row
+would have left bucket 5's own bar unowned and required a new beta ticket.
+
+Measured on the real surface instead of inferred from the doc — rows inside traces that actually carry a
+`channel-intelligence:*` feature:
+
+| Agent | Named | Blank |
+|---|---|---|
+| Marcus Webb — GEO CSO Expert | 285 | 128 |
+| Michelle Manning — Project Manager | 119 | 119 |
+| Alex Reeves — Screen Controls Editor | 82 | 84 |
+| Owen Marsh — The Proofreader | 54 | 45 |
+| Eleanor Voss — The Librarian | 21 | 8 |
+| Nadia Farouk — Data Expert | 5 | 4 |
+
+Every agent on that drawer clears "≥1 pattern in its hop." The three agents with **zero** named rows
+platform-wide — Susan Smith — Trainer Agent (79 rows, all `pattern-vocabulary-review-intent`), Elena Cho —
+The Reasoner (54), Sam Reyes — The Intake Assistant (5) — appear in **no** Channel Intelligence trace
+(Elena's 48 traces share none with Marcus or Michelle), so none of them render there. **No new beta row.**
+
+### The doc correction this forced
+
+`BETA.md` bucket 6 lever 1 named this row as the bonus bucket's path under 10,000, quantified as
+"top-6 populations = 12,776 → count lands ~7,951 ✓". That lever moves **0 rows** — the arithmetic
+assumed patterns were merely un-authored, and no session had re-checked the assumption after the
+adjudications landed. Corrected in place rather than deleted, so a future session doesn't re-scope it.
+John's framing this session, which is what kept the correction proportionate: bucket 6 is a **bonus,
+not a ship gate**, so the exhausted lever costs nothing on the beta path.
+
+Live coverage for the record: 21,780 log rows; 3,133 named; 6,943 carry no signature at all; **11,704
+carry a signature and match nothing** — top blocks 5,331 model-call rows, `qg-review-intent` 1,530,
+`ci-answer-intent` 1,407. All a capture gap, owned by `LOG-77` (Architecture), bonus/post-beta.
+
+### Process note
+
+The session-only finding that would otherwise have died in conversation is filed as **`LOG-115`**
+(Architecture, non-beta): three candidate rows claim an `amend` their vocabulary rows never received, and
+`buildReviewContext()` feeds candidate state to Susan — the same stale-state shape as `LOG-87`-done.
+Resolve through a legitimate `reviewCandidate()` decision, never a raw delete or a second PATCH.
+
+---
+
 ## S-DAT-11-design / S-DAT-11 (v6.3.223, `3d9b312`, 2026-07-29, worktree `design-dat-11`) — one root cause behind both directions of the corpus drift
 
 **`DAT-11` ✅ Done + archived. Self-verified QA 12/12 PASS.**
