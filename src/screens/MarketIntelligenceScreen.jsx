@@ -1,3 +1,9 @@
+// DeepBench v6.3.216 | MarketIntelligenceScreen.jsx | LOG-109/CHI-91 -- analyzeNewsCard()'s fetch
+// now reads the error body instead of discarding it, classifies WHY the primary path failed
+// (articleFaultText, src/lib/articleFaultText.js), and pushes an HAR-15-style platform fault
+// bubble before the analysis runs; fail-open (CHI-58) unchanged -- a null article still submits.
+// The reason also rides submit()'s backgroundContext as article_unavailable_reason so ci-answer-
+// intent can acknowledge the gap in Marcus's own words (Supabase-only change, no code here).
 // DeepBench v6.3.224 | MarketIntelligenceScreen.jsx | AGT-37 -- Store as Forecast supplies the full-UUID citations it already holds (the flagged answer's plus the three theory-test sections' previously-discarded citations halves) on a new handler_context sibling field, never inside task_context; callCapability() relays it. No UI change, no id rendered
 // DeepBench v6.3.218 | MarketIntelligenceScreen.jsx | LOG-112 -- the Agents drawer's per-agent sub-rows show VERIFIED pattern names only: they no longer read buildActivitySummary()'s patterns_used-derived byPattern bucket, but join the agent's own rows to the Log Displayer's read-time classification (usePatternClassification's log_ids + buildAgentPatternRows) -- so a sub-row can no longer exceed its agent's own CALLS headline, and an agent with nothing verified renders no sub-rows at all. patternLabelFor()/usePatternVocabulary/humanizeSlug deleted here (no slug reaches this file any more)
 // DeepBench v6.3.200 | MarketIntelligenceScreen.jsx | S-CHI-88a -- CHI-88 QA follow-ups: AgentWorkingIndicator gains an opt-in one-line `compact` variant (mobile status stops wrapping to 2 lines), the input row moves into the Chat branch only (Steps & Evidence reclaims ~66px), and the mobile pinned decision footer renders compact via the existing `bare` flag
@@ -381,6 +387,7 @@ import { SERVICE_CATALOG, usePatternClassification, buildAgentPatternRows } from
 // FEATURE: CHI-56 — shared turn-tracking service (hop-duration resolution, transaction-boundary
 // event builder); see src/lib/turnTracking.js for full rationale.
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
+import { articleFaultText } from "../lib/articleFaultText.js"; // FEATURE: LOG-109/CHI-91
 // FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
@@ -1142,6 +1149,12 @@ const CREDIT_EXHAUSTED_TEXT = "The platform's AI account is out of credits — n
 function faultAdvice(e, fallback) {
   return (e && e.faultCode === "anthropic-credit-exhausted") ? CREDIT_EXHAUSTED_TEXT : fallback;
 }
+
+// FEATURE: LOG-109/CHI-91 -- articleFaultText (the analogous platform-fault-report helper for a
+// news-card article that could not be read) lives in ../lib/articleFaultText.js, not here: plain
+// Node cannot import a .jsx file at all, so a JSX-free module is what lets the regression test
+// import the real implementation (LOG-83/resolveAgent.js precedent). Imported above with this
+// file's other src/lib/ pure-function helpers.
 
 function describeCaughtError(e) {
   // FEATURE: HAR-15 -- a classified credit exhaustion returns the honest sentence and nothing
@@ -4014,30 +4027,39 @@ export default function MarketIntelligenceScreen() {
     resetJourney();
     ensureStep("news");
     setNewsCardLoadingUrl(card.url);
-    let articleText = null, articleSource = null;
+    let articleText = null, articleSource = null, articleFailure = null;
     try {
       const res = await fetch("/api/fetch-article", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: card.url }),
       });
+      const data = await res.json().catch(() => null); // FEATURE: LOG-109 -- an error body is still a body
       if (res.ok) {
-        const data = await res.json();
-        articleText = data.text || null;
-        articleSource = data.source || null;
+        articleText = data?.text || null;
+        articleSource = data?.source || null;
       } else {
-        console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article failed:", res.status);
+        // FEATURE: LOG-109/CHI-91 -- the route now classifies WHY the primary path failed; this
+        // branch used to drop that on the floor into console.error and submit a bare null.
+        articleFailure = data?.primary_failure || { http_status: res.status, extraction_outcome: "not_attempted" };
+        console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article failed:", res.status, articleFailure);
       }
     } catch (e) {
+      articleFailure = { http_status: null, extraction_outcome: "not_attempted" }; // FEATURE: LOG-109 -- network/abort: no response at all
       console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article", e.message);
     } finally {
       setNewsCardLoadingUrl(null);
     }
+    // FEATURE: CHI-91 -- platform fault report before the analysis runs. Fail-open is unchanged
+    // (CHI-58, :4032): the question is still submitted with a null article. This only stops the
+    // non-answer from being unexplained.
+    const faultText = articleFaultText(articleFailure);
+    if (faultText) setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultText })]);
     const visibleMessage = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`; // FEATURE: CHI-33-patch2 -- reworded again to present the headline as delivered news (a given fact), not a causal test, matching ci-routing-intent's new EXTERNAL-FACT QUESTIONS rule; see kickoff CONTEXT.
     // FEATURE: CHI-58 — article_url threaded through so submit()'s qa branch can persist which
     // article this answer came from onto qaEvidence (Task 1b), independent of whether the fetch
     // itself succeeded (a card can still be "the one analyzed" even if fetch-article failed open).
-    submit(visibleMessage, { article_content: articleText, article_source: articleSource, article_url: card.url }, { skipJourneyReset: true }); // FEATURE: CHI-82 — see reset above
+    submit(visibleMessage, { article_content: articleText, article_source: articleSource, article_url: card.url, article_unavailable_reason: articleFailure }, { skipJourneyReset: true }); // FEATURE: CHI-82 — see reset above; CHI-91 — the reason rides the same backgroundContext spread as article_source
   };
 
   // FEATURE: CHI-03a — onGoodThanks/onReview now operate on qaEvidence directly (were
