@@ -219,7 +219,7 @@ bucket swept; every queue on this board now carries verified-current evidence.**
 
 | # | ID (Type) | Defect (verified evidence) |
 |---|---|---|
-| 1 | `LOG-71` (Architecture) | Resume paths pass no `signatureConfig` (both `resumeCapability`→`runLoop` re-entries) → resumed hops show no pattern. **`LOG-103` verified as its duplicate** (same gap, observed-row side) — merge proposed. |
+| 1 | `LOG-71` (Architecture) 📐 | **Designed 2026-07-28 (`design-log-71`, kickoff v6.3.205).** Resume paths pass no `signatureConfig` — **three** `resumeCapability`→`runLoop` re-entries, not two. Measured: 221 of 1,979 `agent-turn` rows since 07-26 (11.2%) lack the config-half, 214 of them (97%) resume-caused. John's call: persist the frozen snapshot on `durable_hops`, never recompute. **`LOG-103` merged in** (John approved). Historical rows split to new `LOG-111`. |
 | 2 | `LOG-72` (Architecture) 🔶 | Criteria authoring, now quantified: **27 vocabulary entries, only 9 with matching criteria** — 16 active patterns can't match any hop. Headline MISSING SIGNAL already resolved by `LOG-77`-item-9-done. |
 | 3 | `LOG-39` (Architecture) | Shrunk: the Layer A fact half largely exists (`tool_calls` records `request_help`); remaining work is the Layer B criteria row for routing. |
 | 4 | `LOO-005` (Observability) | Pre-delegation *reasoning* still uncaptured — `LOG-77`-item-9's provenance capture is deliberately facts-only (`delegation_target`/`task_provenance`, no reasoning field). First routing hop still missing. |
@@ -235,7 +235,7 @@ span-write *timing* only, settled by the §19k span-less-delegation count on rec
 `CHI-27` (UI — the within-hop reversal was reverted in-code; both levels newest-first).
 
 **Dropped/absorbed:** `AA-179` (blocked ruling deferred post-beta, §4 Q4), `LOG-103` (dup of
-`LOG-71`), `AI-52` (folds into `CHI-11`).
+`LOG-71` — **merge confirmed by John 2026-07-28**), `AI-52` (folds into `CHI-11`).
 
 ---
 
@@ -293,7 +293,8 @@ only for lack of matching criteria.
 | # | Lever | Moves the count by |
 |---|---|---|
 | 1 | **Criteria authoring through Susan Smith — Trainer's governed path** (= bucket 5's `LOG-72` (Architecture), quantified there: 27 vocabulary entries, only 9 with criteria). Target the top facts-bearing populations: `agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753. | Top-6 alone = **12,776 → count lands ~7,951 ✓ under 10K.** |
-| 2 | `LOG-71` (Architecture, bucket 5 #1) — resumed hops regain the config-half. | Stops the unclassifiable pool *growing*; small immediate effect. |
+| 2 | `LOG-71` (Architecture, bucket 5 #1) — resumed hops regain the config-half. **Designed, kickoff v6.3.205.** | Stops the unclassifiable pool *growing*; small immediate effect. |
+| 2b | **`LOG-111`** (Architecture, new 2026-07-28) — backfill the **2,738** all-time rows `LOG-69` structurally missed (fact-half present, so outside its null-`call_facts` `WHERE`). 657 recover from a same-`span_id` sibling holding the genuine frozen original. | Direct one-for-one reduction; run **after** `LOG-71` or it refills. |
 | 3 | The counting conversation (`LOG-91`/`LOG-81`/`LOG-60`, bucket 4) — if John rules non-model ops out of the log/count (`librarian` 3,554 + `agent-directory` 1,745 unclassified, almost all facts-less), the floor itself drops. | Denominator change, John's call — not required for <10K. |
 | 4 | Minor: `LOG-73` (embedding-orphan naming decision), `LOG-77` (future capture facts), `LOG-55` (verify-then-close, likely mooted by `LOG-37a-patch`). | Marginal. |
 
