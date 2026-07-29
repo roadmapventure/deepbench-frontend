@@ -1,0 +1,1 @@
+beta-doc-0728h — worktree `beta-doc-0728h`, branch `session/beta-doc-0728h`. Continuation of `beta-doc-0728` (same conversation): promoting the sub-10K reclassify bonus to BETA.md bucket 6 — grounding the live "re-classify" metric, verifying each lever row's population against current Supabase data, and recording the verified queue.
