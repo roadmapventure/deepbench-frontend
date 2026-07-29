@@ -126,21 +126,40 @@ is claimed the same way — never by reading the highest existing number in the 
 and incrementing. Same race, same fix (real collisions this closed: `AA-197`/`AA-198`,
 `CHI-13`/`CHI-14`, `HAR-02`/`AA-197`):
 
+**Claim all of a prefix's IDs in one call — set `<N>` to how many rows you're about to file** (`1`
+for a single row; `8` if you're logging eight `LOG-` findings at once). One call, one contiguous
+block:
+
 ```sql
-INSERT INTO feature_id_counter (prefix, next_number, updated_by_session)
-VALUES ('<PREFIX>', 1, '<short-session-name>')
+INSERT INTO feature_id_counter (prefix, last_issued_number, updated_by_session)
+VALUES ('<PREFIX>', <N>, '<short-session-name>')
 ON CONFLICT (prefix) DO UPDATE
-  SET next_number = feature_id_counter.next_number + 1,
+  SET last_issued_number = feature_id_counter.last_issued_number + <N>,
       updated_at = now(),
       updated_by_session = EXCLUDED.updated_by_session
-RETURNING next_number;
+RETURNING last_issued_number;
 ```
 
-The returned `next_number` is the ID (`<PREFIX>-<next_number>`) — works whether the prefix is new
-(lazily starts at 1) or already has rows. Confirm the prefix itself is legitimate against
-`docs/SCREEN-INVENTORY.md`'s taxonomy first; this table governs the number, not which prefixes are
-valid. Legacy area prefixes (`AA`, `MI`, `AI`, etc.) are frozen — never claim a new legacy-prefixed
-ID through this or any other mechanism.
+The returned `last_issued_number` is the **last** ID of your block; the block is
+`<PREFIX>-(returned − N + 1)` through `<PREFIX>-returned`. With `<N> = 1` that's just
+`<PREFIX>-returned`. Works whether the prefix is new (lazily starts at 1) or already has rows.
+
+**Never hand-count the second and later IDs of a multi-row filing** — claim once with the real `<N>`
+instead. That is the single mechanism behind every recorded collision this counter exists to prevent
+(`CHI-42`, `CHI-48`, `CHI-76`; earlier `AA-197`/`AA-198`, `CHI-13`/`CHI-14`, `HAR-02`/`AA-197`): a
+session files a block of rows, claims one number, and counts up from it by hand while a concurrent
+session claims the numbers it's counting into. Filing 2+ rows at once is the *normal* case, not the
+exception — 51 commits in this repo's history have done it — which is exactly why the batch form is
+the default shape above rather than a variant mentioned at the end.
+
+**`last_issued_number` holds the number already handed out, not the next free one** (renamed from
+`next_number` 2026-07-28, `SES-18` — the old name asserted the opposite of its contents and invited
+exactly the read-and-file mistake this section forbids). Reading this table is never how you get an
+ID; the `INSERT … ON CONFLICT` above is, because the write *is* the reservation.
+
+Confirm the prefix itself is legitimate against `docs/SCREEN-INVENTORY.md`'s taxonomy first; this
+table governs the number, not which prefixes are valid. Legacy area prefixes (`AA`, `MI`, `AI`, etc.)
+are frozen — never claim a new legacy-prefixed ID through this or any other mechanism.
 
 ---
 

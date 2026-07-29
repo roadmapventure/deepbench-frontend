@@ -101,7 +101,10 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 > (`dev_version_counter`) and feature/backlog IDs (`feature_id_counter`) are both claimed
 > atomically from Supabase, never by reading the highest existing value and incrementing it
 > yourself — that races under concurrent sessions and has caused real version/ID collisions. Exact
-> SQL and project ID: `session-setup` skill.
+> SQL and project ID: `session-setup` skill. **Filing more than one row at once claims one block of
+> that size in one call — never claim a single ID and hand-count the rest (2026-07-28, `SES-18`:
+> that hand-count is the mechanism behind every recorded ID collision, including one that reached
+> shipped Supabase content).**
 
 > **Hooks are a local backstop, not the source of truth (2026-07-21, `SES-010`):** Six of the
 > rules above / in `STANDARDS.md` — no `cd && …` compounds, no bare `git push origin dev`, no

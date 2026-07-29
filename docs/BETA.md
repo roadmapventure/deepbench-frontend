@@ -94,11 +94,16 @@ for tooling the ship-gate itself depends on. Items 1-3 are **required**, item 4
    push (proven live in `S-LOG-105`, 2026-07-28); a stale-bundle pass is indistinguishable
    from a real pass. Write the deploy-verify step (fetch the served bundle, grep for a
    string unique to the build) into `STANDARDS.md` + the regression runbook.
-3. **`SES-18` (Tooling) — reseed half ✅ DONE 2026-07-28 (`beta-doc-0728f`).** All 15
-   `feature_id_counter` prefixes audited against the real doc maxima: only `ABT` was
-   desynced (counter 1 vs real max `ABT-2`) — reseeded to 2 via `GREATEST`. Collision risk
-   for the high-volume regression filing window is cleared. The row's remaining scope
-   (drift *detection* mechanism) stays post-beta.
+3. **`SES-18` (Tooling) — ✅ DONE 2026-07-28, both halves.** Reseed (`beta-doc-0728f`): all
+   15 `feature_id_counter` prefixes audited against the real doc maxima; only `ABT` was
+   desynced (counter 1 vs real max `ABT-2`) — reseeded to 2 via `GREATEST`. Bypass closure
+   (`design-ses-18`): root-caused to the claim rule living only in the session-*setup*
+   skill while `CLAUDE-DESIGN.md`'s filing rules covered the prefix and not the number,
+   plus a one-ID-per-call claim that made hand-counting the easy path for multi-row
+   filings. Claims now take an `<N>` and return a contiguous block; the rule moved to the
+   point of filing; `next_number` renamed `last_issued_number`. Collision risk for the
+   high-volume regression filing window is cleared. Drift *detection* was deliberately
+   scoped out and is now **`SES-38`** (Tooling, post-beta).
 4. **`SES-36` (Tooling) — RECOMMENDED before the regression filing window.** Same
    false-green class as `SES-28` and `SES-015` above, one step down: `check-session-docs.js`
    resolves its target as `arg("worktree", process.cwd())`, but a session's cwd is
