@@ -5,6 +5,41 @@
 
 ---
 
+## S-LOG-109-design / S-LOG-109 (v6.3.216, `e89d465`, 2026-07-29, worktree `design-log-109`) — the article fetch says what happened
+
+**`LOG-109` ✅ Done + archived. `CHI-91` 🔶 Partial — shipped and live-verified, one render gate unseen. `SES-54` filed, deliberately not folded in.** Self-verified QA 10/12 PASS, 2 blocked on infrastructure.
+
+### The problem
+Clicking a news card on Channel Intelligence posts the URL to `api/fetch-article`, which tries a real fetch + Readability extraction and falls back to a Claude web-search summary. Only the **fallback** path logged. So when the analysis came back "Article text needed…", four causes were indistinguishable: the publisher blocked us, the page loaded but yielded 80 characters of nav chrome, the request never completed, or the route was never called. Each needs a different fix. That is `S-SES-29`'s case 24. Measured before the fix: **9 rows for `feature='article-extraction'`, all fallback, zero primary.**
+
+### Two corrections the ticket's own text needed — both found by measuring, not by reading
+1. **`ai_type: 'deterministic'` would have shipped the gap it was meant to close.** The row proposed it, citing `.claude/rules/capability-logging.md`. Live: that value has **6 rows platform-wide, none written since 2026-07-17**, and matches **no** `platform_services.match_keys` — so the rows would have written successfully and landed in the unregistered bucket, exactly `LOG-14`'s defect. The shipped convention is `aiType: SERVICE_SLUG.X` (`api/extract.js:116`/`:184`, `AI-53`'s generated constant). Because `article-extraction` **equals its own catalog slug**, `capabilitySlugForRow()`'s `|| rawSlug` fallback resolves it with **no `AI_TYPE_TO_SERVICE` entry at all** — which removed a whole file from the change (3 → 2 source files) and avoided adding a second hand-written literal that would have to agree with the first forever.
+2. **The requested "byte count" is banded, never raw.** `ai_call_patterns` assembles `COALESCE(call_facts,'{}')` **whole** into the §19k signature, `SELECT DISTINCT`s it, and matches every distinct value against every gold pattern (read the view definition to confirm). A per-call value therefore adds one permanent signature per fetch — `LOG-91` measured that exact mistake at **720 → 24,826** distinct signatures and a blown 3 s statement timeout. Live baseline: 14,750 rows with facts collapse to **651** distinct sets. So `extraction_outcome` is four values (`full_text`/`below_threshold`/`empty`/`not_attempted`) and `http_status` is orthogonal — status describes the *request*, outcome describes the *extraction*, which is what makes `403 + not_attempted` (blocked) and `200 + empty` (extractor broke) different readings instead of one blur.
+
+### `CHI-91` — folded in on John's explicit call
+John asked whether the new data ever finishes the Q&A or is "just a logging service." Answered honestly: as scoped, logging only. That surfaced the real gap — the route knows the cause at the instant it fails and throws it away, so the user gets an unexplained non-answer and the agent gets no explanation either. John chose to fold it in. Split along §19j: **the screen reports a platform fault** (`HAR-15`'s `CREDIT_EXHAUSTED_TEXT` carve-out — DeepBench reporting its own failure is not putting words in an agent's mouth), and **the agent authors his own sentence** from facts passed on `task_context`, never a prewritten string.
+
+### Verified live
+- **The route, against real systems.** 3 primary rows + 1 fallback row from real fetches: Wikipedia → `200/full_text` (2,125 chars returned), example.com → `200/below_threshold` **plus a separate `fallback-summary` row** (two rows, not one merged), httpbin 403 → `403/not_attempted` with `primary_failure` on the error body. 11/11 assertions.
+- **Marcus Webb — GEO CSO Expert, both directions.** Given the facts he opens *"The source article on EMEA distributor consolidation could not be retrieved, so I cannot ground this analysis in the specific industry trend"* — his own words, no status code, no field name. Given a **real article** plus `article_unavailable_reason: null` he cites the article normally and claims no gap, identical to the no-key control. **That second test was run because the screen spreads the key unconditionally (`{ goal, ...backgroundContext }`, no null-stripping), so it is present-but-null on every success** — a suspected defect, measured and disproved rather than "fixed" blind.
+- **AI Audit.** `article-extractor` flipped `partial` → `tracked`; the drawer reads **`CALLS 13`** (9 pre-existing + 4 new) and the `⚠ some calls untracked` warning is gone, while neighbours Task Planner and Research Briefer still show it.
+- **`articleFaultText` in the live browser bundle** — all three approved sentences exact, retry advice honest per cause (`may work` only for a timeout), null renders nothing.
+- Regression suite **20/20** including the new `LOG-109` file.
+
+### A vacuous pass I caught in my own QA
+My first Marcus test regexed the *JSON envelope*, not the answer — the text lives in a stored deliverable — so all three cases returned "false" and the verdict printed `item 9 PASS` meaninglessly. Worse, all three passed `article_content: null`, so even the **control** announced a missing article: the test could not have detected the thing it existed to detect. Re-run against the deliverables with real article content, which is what produced the result above.
+
+### What is not verified, and why
+**Seeing the fault bubble render (QA 6, 7, 11).** `SES-47`'s Vercel cap: **129 deploys in the rolling 24 h window**, and no build fired for `e89d465` or for a follow-up poke commit — 17 minutes, zero builds. A local Vite server has no `/api`, so no news cards load (`SES-55`'s gap). The copy, the classification and the module are all proven; only the one-line `setMessages(buildMessage({kind:"error"}))` render — the same mechanism four existing error bubbles on that screen already use — is unseen. One click on the dev URL after any future build closes it; `CHI-91`'s row carries that.
+
+**A detour worth recording:** trying to close that gap, I ran `vercel link --yes`, which **created a new Vercel project** (`design-log-109`) rather than linking to the existing one, and rewrote `.gitignore` and `.env.local`. All reverted — project deleted and confirmed gone via the API, `.vercel`/`.env` removed, `.gitignore` restored. `vercel link` needs an explicit `--project`; `--yes` means "create without asking," not "link to the obvious one."
+
+### Filed
+- **`CHI-91`** (Feature) 🔶 Partial — shipped, gate items 8/9 pass, 6/7/11 pending one render.
+- **`SES-54`** (Tech Debt) — `.claude/rules/capability-logging.md` still documents the `'deterministic'` convention that misrouted this ticket, and its `paths:` front-matter (`api/capabilities/**`, `api/prompt/**`) never scoped it to `api/fetch-article.js`. Deliberately excluded from this session: a standing convention doc gets its own review, not a fold-in.
+
+---
+
 ## S-AGT-36-design / S-AGT-36 / S-AGT-36b (v6.3.220 + v6.3.225, `6a775c8` / `715301a`, 2026-07-29, worktree `design-agt-36`) — a scoring rule that failed correct answers
 
 **`AGT-36` ✅ Done + archived.** Full technical detail: `docs/harvests/AGT-36.md`.
