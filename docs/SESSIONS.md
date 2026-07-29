@@ -5,6 +5,52 @@
 
 ---
 
+## S-AGT-36-design / S-AGT-36 / S-AGT-36b (v6.3.220 + v6.3.225, `6a775c8` / `715301a`, 2026-07-29, worktree `design-agt-36`) — a scoring rule that failed correct answers
+
+**`AGT-36` ✅ Done + archived.** Full technical detail: `docs/harvests/AGT-36.md`.
+
+### What shipped
+
+John's `D7`/§5b decision — the `honest-gap` outcome class for the two questions the Data Room is *designed* not to answer — existed only as runbook prose. Two halves implemented together, because neither is provable alone: the scorer can only be tested by running cases 12 and 23, and those runs only mean anything once the answer side has changed.
+
+- **Driver** (`scripts/chi-true-regression.mjs`): cases tagged by **question id, never case number** (`n` comes from screen-extraction order, so a reorder would silently re-tag a different question). A pure exported `scoreVerdict()` applies §5b's table instead of Owen — Proofreader's overall `pass` flag, with an explicit-`false` guard so an absent or malformed criterion **fails** rather than silently reading as "correctly refused."
+- **Marcus Webb — GEO CSO Expert** (`ci-answer-intent`): a designed-gap instruction — name the gap in business terms, route by function not by name, one concrete next step.
+
+### The measured flaw, and the §8 amendment
+
+The v6.3.220 run failed both cases on `quantitative_content_present` — **with both originally-broken bars fixed.** Case 23 went from *"South Korea co-op utilization data does not exist in the CSO Data Room"*, crediting an agent to the user and routing them to "whoever manages Data Room content updates", to `platform_language_detected: false` and guidance pointing at *"your regional channel manager or the partner operations team covering that geography."*
+
+What failed it was an industry benchmark (40–60%) and a comparable partner's rate (Nordholm, EMEA 55%) — both real, both correctly sourced, neither a South Korea co-op rate. **The criterion asked whether a number was present, not whether the agent reported a figure for the quantity it had just said it could not answer.** §5b's own regression example was already that narrow; the criterion beside it was not.
+
+John approved the §8 baseline change. Owen gained `asked_metric_present` — **judged blind, he is never told which questions carry the class**, since a judge that knows the expected outcome grades toward it — and Marcus's rule 4 narrowed from "carry no number" to "do not supply the missing value."
+
+### A spec error caught in QA, not shipped
+
+The `AGT-36b` kickoff specced the new criterion into Owen's `method` and **said nothing about `traits.schema`**. The coding session followed it exactly. Owen's output schema still declared five keys, so the model structurally could not emit `asked_metric_present`; the explicit-`false` guard then failed *every* case in the class. **Every text-level check still passed** — `method` grepped clean, build green, 18/18 regression green — and the defect was only visible as an `undefined` in live output. Found by making direct API calls during close-out QA; fixed in-session by adding the key to `traits.schema.properties` and `required`. Generalized into a standing `STANDARDS.md` Section 5 check: a Skill's instruction text and its output schema are one change, proven with one real live call.
+
+### Close-out QA — the class proven doing real work
+
+Direct calls against the deployed API (deploy gate LIVE on `715301a`), bypassing `qg-review-intent` because `AGT-43` was intercepting the answer:
+
+- **Case 12 `vietnam-reseller` — PASS.** All three binding §5b bars, **while Owen's own overall verdict was `pass: false`**. That is the rich-answer rubric rejecting a correct refusal — precisely the failure `D7` exists to fix — so the exception is load-bearing, not cosmetic. Owen also reasoned his way to `asked_metric_present: false` unaided (*"a qualitative health assessment, not a specific metric"*), never having been told the class exists.
+- **Case 23 `south-korea-coop` — FAIL on one bar.** Clears `asked_metric_present` and `actionable_guidance_present`; fails `platform_language_detected` because Marcus opened *"I don't have data… in the retrieved context. The Data Room contains…"*. Filed `AGT-45`, with the likely interaction noted: narrowing rule 4 to permit context citation gave him a new sentence in which to name the source.
+
+Consistent with §5b's own wording — *"Deliberately does not turn either case green."*
+
+### The serious finding: a guardrail rejecting correct content
+
+The first close-out attempt via the driver died at **532 s**, `infra_death`. Root cause, traced: Owen's **production** `qg-review-intent` blocked Marcus `synthesized_as_fact`, claiming the cited record *"does not actually contain these specific benchmark numbers."* Verified false — `8975cc4f-a002-4b04-bf8f-c89409e51293` is titled "Industry Benchmark Data (Training/Turnover + Co-op/MDF)", `data_type: sourced`, `active`, `is_baseline`, and contains both figures.
+
+**`LOO-006`'s verification step ran and still reached the wrong answer** — trace `0e4e73e1-f835-4be7-9620-cde70ca78f52` shows `request_help` → Michelle Manning — Project Manager brokering → `delegate_to_agent` → Eleanor Voss — The Librarian's record lookup. Not a skipped check; an unsound one. The false block then triggered §4's probe, whose retry path escalated into Nadia Rahman — Data Analyst's `data-patch-intent` twice (each pulling in Michelle and Alex Reeves) plus a Marcus regenerate, exhausting the 10-continue cap.
+
+This is the inverse of the risk the whole ticket guarded against: not an agent fabricating a number, but the guardrail rejecting one that was properly sourced.
+
+### Filed
+
+`AGT-43` 🚨, `AGT-44` 🚨, `AGT-45` 🚨, `LOO-27` 🚨 — all beta gates against bucket 1 (a clean 24-case regression run). Plus `AGT-41` (the content-context judge is test-only and never runs in production), `AGT-42` (should an agent ever name another agent to a user), `SES-56` (the driver records no artifact text, so a run cannot be quoted afterwards — this session had to make direct API calls to read what Marcus actually said).
+
+---
+
 ## design-log-72 (v6.3.226) — 2026-07-29 — the authoring lever was already exhausted
 
 **Worktree:** `design-log-72` · docs-only — zero code, zero Supabase writes, no kickoff doc, no

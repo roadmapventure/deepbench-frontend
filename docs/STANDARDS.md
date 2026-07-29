@@ -202,6 +202,7 @@ Complete every item before committing. This is the canonical "standing checklist
 - [ ] Node.js test — ALL TESTS PASS
 - [ ] `npm run build` — zero errors
 - [ ] Zero red errors in browser console after deploy
+- [ ] **A Skill's instruction text and its output schema change together** — any session adding, removing or renaming a field an agent is told to produce must edit **both** `skill_profiles.method`/`objective` **and** `traits.schema` (`properties` *and* `required`), then prove the field arrives with one real live call. *(Added 2026-07-29, `AGT-36b`.)* An instruction naming a field the schema does not declare is one the model structurally cannot obey, and **every string-level check still passes** — the `method` text greps clean, the build is green, the unit tests are green, and the missing field only shows up as a `undefined` in live output. Found live: `qg-content-context-intent` gained a fifth criterion in `method` while its schema still declared five keys, so Owen — Proofreader emitted nothing for it; the driver's explicit-`false` guard then failed *every* case in the class, i.e. the change silently accomplished the opposite of its purpose. The kickoff doc that specced it named only `method` — so this check belongs here, where a session looks before committing, not in any one kickoff.
 
 ### Feature ID Badge Audit (every session)
 - [ ] FeatureBadge added for this session's feature ID

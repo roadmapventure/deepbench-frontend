@@ -67,6 +67,37 @@ The mitigation is that the instruction is not trusted on its own — §5b's `qua
 - **`AGT-41` (Architecture)** — Owen — Proofreader's `qg-content-context-intent` is test-scoped and never runs in production, so a badly-phrased answer only surfaces on the next regression run.
 - **`AGT-42` (Architecture)** — whether any agent should ever name another agent to the end user. Scoped to gap answers only in this session's Skill edit; note that `qg-content-context-intent` explicitly rules conversational first-name mentions *not* a platform-language violation, so the judge and the proposed rule currently disagree.
 
+## `AGT-36b` — the amendment (v6.3.225, `715301a`) and the close-out QA
+
+`S-AGT-36`'s live run failed both cases on `quantitative_content_present`, with the two originally-broken bars measured **fixed** (case 23: `platform_language_detected` false, `actionable_guidance_present` true, routing to *"your regional channel manager or the partner operations team covering that geography"*). Root cause was the criterion, not the implementation — it asks whether a number is present, not whether the agent reported a figure for the quantity it just said it could not answer. Case 23 was failing on a real industry benchmark (40–60%) and a comparable partner's rate (Nordholm, EMEA 55%).
+
+John approved the §8 baseline change. `asked_metric_present` replaced it as the binding bar; `quantitative_content_present` became informational; Marcus's rule 4 narrowed from "carry no number" to "do not supply the missing value."
+
+### A defect in the amendment, found and fixed during QA
+
+The `AGT-36b` kickoff specced the new criterion into Owen's `method` **and said nothing about `traits.schema`**. That is a spec error, not a build error — the coding session followed it exactly. Owen's output schema still listed five keys, so the model structurally could not emit `asked_metric_present`; both QA calls returned it `undefined`, the vacuous-pass guard failed it, and every honest-gap case would have failed forever while every text-level check passed. Fixed in-session by adding the key to `traits.schema.properties` (cloned from `quantitative_content_present`'s shape) and to `required`.
+
+**Process gap this closes:** a Skill's instruction text and its output schema are one change. Adding a criterion to `method` without adding it to `traits.schema` produces an instruction the model cannot obey, and every string-level verification still passes — the failure is invisible to exactly the checks a session is most likely to run. Now a standing check in `docs/STANDARDS.md` Section 5.
+
+### Close-out QA — measured, design session, 2026-07-29
+
+Run directly against the deployed API (`check-deploy-current`: LIVE, serving `715301a`), bypassing `qg-review-intent` because `AGT-43`'s false-positive block was intercepting the answer before it could be judged.
+
+| Bar (§5b binding) | Case 12 `vietnam-reseller` | Case 23 `south-korea-coop` |
+|---|---|---|
+| `asked_metric_present` must be false | **false** ✅ | **false** ✅ |
+| `actionable_guidance_present` required | **true** ✅ | **true** ✅ |
+| `platform_language_detected` must be false | **false** ✅ | **true** ❌ |
+| **§5b result** | **PASS** | **FAIL** (one bar) |
+
+Case 12 is the proof the whole class works: Owen's own overall verdict was `pass: false` — the rich-answer rubric rejecting a correct refusal, exactly as `D7` predicted — while the `honest-gap` class passed it. Owen also returned `asked_metric_present: false` with real reasoning of his own (*"a qualitative health assessment, not a specific metric"*), having never been told the class exists.
+
+Case 23's single remaining failure is Marcus opening *"I don't have data… in the retrieved context. The Data Room contains industry benchmarks…"* — rule 1 not holding. Filed as `AGT-45`, with the likely interaction noted: narrowing rule 4 to permit context citation gave him a new sentence in which to name the source.
+
+### Residue filed, none of it `AGT-36`'s own scope
+
+`AGT-41`, `AGT-42`, `AGT-43` (beta gate), `AGT-44` (beta gate), `AGT-45` (beta gate), `LOO-27` (beta gate), `SES-56`.
+
 ### Correction recorded
 
 The row previously referred to "Marcus — Channel Intelligence." `src/data/agents.js` gives his role as **GEO CSO Expert** (`id: marcus`, `code: CI-01`); Channel Intelligence is the Capability he holds, not his title.
