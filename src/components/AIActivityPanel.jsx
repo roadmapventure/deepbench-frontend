@@ -1,3 +1,4 @@
+// DeepBench v6.3.199 | AIActivityPanel.jsx | LOG-107a -- scroll fade uses the depth variant (a same-colour fade was invisible on this panel)
 // DeepBench v6.3.197 | AIActivityPanel.jsx | LOG-107 -- scroll-fade hint, per-drawer item counts, header hover affordance
 // DeepBench v6.3.196 | AIActivityPanel.jsx | LOG-105 -- By Pattern row Calls/Cost render through RollingNumber; cost rolls until the log hydrates instead of showing a false <$0.01
 // DeepBench v6.3.191 | AIActivityPanel.jsx | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
@@ -573,7 +574,7 @@ export default function AIActivityPanel({ onClose }) {
           </div>
         )}
       </div>
-      <ScrollFadeHint show={canScrollMore} bg={T.card}/>
+      <ScrollFadeHint show={canScrollMore} bg={T.card} depth/>
       </div>
       </div>
     </>

@@ -1,3 +1,4 @@
+// DeepBench v6.3.199 | SharedUI.jsx | LOG-107a -- ScrollFadeHint gains an opt-in, default-off `depth` variant (soft navy edge) so the fade reads as depth over a background it would otherwise match
 // DeepBench v6.3.188 | SharedUI.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
 // DeepBench v6.3.143 | SharedUI.jsx | S-CHI-71 (pass 3) -- new shared DecisionFooter: the one standardized CHI user-interaction area (cream field + tan text + navy CTA), modeled on the chat input
 // DeepBench v6.3.141 | SharedUI.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
@@ -512,8 +513,21 @@ export function useScrollFadeHint(scrollRef, deps) {
   return { canScrollMore, onScroll: check };
 }
 
-export const ScrollFadeHint = ({ show, bg }) => !show ? null : (
-  <div style={{position:"absolute",left:0,right:0,bottom:0,height:26,background:`linear-gradient(to bottom, transparent, ${bg} 70%)`,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
+// FEATURE: LOG-107a -- `depth` variant. The default gradient fades to the caller's own background
+// colour, which is invisible wherever that background is what sits behind it -- fine on CHI (dense
+// prose is always dissolving under the edge) but a no-op on the AI Audit panel, whose bordered rows
+// leave blank T.card in the last 26px (John: "i don't see the gradient"; measured: gradient fades to
+// rgb(248,242,226) on a rgb(248,242,226) panel). `depth` instead darkens the edge with a soft navy,
+// so it reads as "content continues under here" regardless of what is behind it. Opt-in and
+// default-off: MarketIntelligenceScreen keeps its existing look untouched.
+export const ScrollFadeHint = ({ show, bg, depth = false, height = undefined }) => !show ? null : (
+  <div style={{
+    position:"absolute",left:0,right:0,bottom:0,
+    height: height ?? (depth ? 48 : 26),
+    background: depth
+      ? `linear-gradient(to bottom, ${T.navy}00, ${T.navy}1a)`
+      : `linear-gradient(to bottom, transparent, ${bg} 70%)`,
+    display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
     <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
   </div>
 );
