@@ -1,4 +1,4 @@
-// DeepBench v6.3.193 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
+// DeepBench v6.3.202 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
 // driver (24 cases): walks routing->answer->gate->display for direct answers, the full Forecast
 // journey (Theories->Theory Result->commit->resolve) for the 6 Forecast questions, the D2 review
 // extension on any flagged direct answer, the D6 live news door as case 24, the D4 five-try
@@ -9,6 +9,11 @@
 // mirrors the verified shape from AGT-35's own kickoff test (docs/kickoffs/v6.3.192-AGT-35-...md),
 // with span_id added alongside trace_id. This is an execution HELPER only -- it does not run the
 // browser leg (runbook §6) and does not decide pass/fail beyond the runbook's own mechanical rules.
+// SES-31 (v6.3.202): payload-shape parity fixes -- pick hypotheses[0].text (never the object),
+// screen-idiom sectionText()/plainDisplayText() unwraps in the flatten layer so no artifact can
+// collapse to "[object Object]", news-door degradation threaded into the case record + a loud
+// progress-line marker, and infra-death records now carry the last attempt's real ctx/judgeVerdicts
+// instead of a fresh empty one. Root cause: docs/SESSIONS.md S-SES-29-rca findings 1-2.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -167,24 +172,77 @@ async function call(payload, ctx) {
 }
 
 // ---- artifact flattening (§5 -- fixed field order, every run, so runs are comparable) ----
-function flattenDisplay(display) {
-  const parts = [display.headline, display.body];
+// FEATURE: SES-31 (Task 2) -- mirrors the screen's own sectionText() (MarketIntelligenceScreen.jsx
+// ~576-580): the Result drawer's sections arrive as {text, citations} (both hyp-hypothesis-test-
+// intent's and intelligence-review-format's schemas), except on the AA-135/AA-137 string-content
+// paths where the whole value is a plain string. String-coercing the object (the old `+ test.` /
+// bare join bug, S-SES-29 finding #2) produced "[object Object]" straight into Elena's/Owen's
+// payloads. Returns usable text or "", never an object.
+export function sectionText(v) {
+  if (typeof v === "string") return v.trim();
+  if (v && typeof v.text === "string") return v.text.trim();
+  return "";
+}
+
+// FEATURE: SES-31 (Task 2) -- key_data_points real field names verified live 2026-07-28 (Supabase
+// `skill_profiles` qa-answer-format/intelligence-review-format schemas: {label, value, source,
+// data_type, is_baseline[, reasoned_from_section]}, matching the screen's groupKeyDataPoints()/
+// ActualDataPointsTable consumption at MarketIntelligenceScreen.jsx ~856-865). Formats "label:
+// value" per point -- source/data_type are table-column metadata, not judge-readable prose. Also
+// tolerates a plain-string point and a title/amount-keyed point (same defensive posture as
+// sectionText(): never crash or blank on shape drift, never guess-fabricate content).
+function formatKeyDataPoint(p) {
+  if (typeof p === "string") return p.trim();
+  if (!p || typeof p !== "object") return "";
+  const label = typeof p.label === "string" ? p.label : (typeof p.title === "string" ? p.title : "");
+  const value = typeof p.value === "string" ? p.value : (typeof p.amount === "string" ? p.amount : "");
+  return [label, value].filter(Boolean).join(": ");
+}
+
+export function flattenDisplay(display) {
+  const bodyText = Array.isArray(display.body)
+    ? display.body.map(sectionText).filter(Boolean).join("\n\n")
+    : sectionText(display.body);
+  const parts = [display.headline, bodyText];
   if (Array.isArray(display.key_data_points) && display.key_data_points.length) {
-    parts.push("Key data points: " + display.key_data_points.map(String).join("; "));
-  } else if (display.key_data_points) {
-    parts.push("Key data points: " + String(display.key_data_points));
+    const formatted = display.key_data_points.map(formatKeyDataPoint).filter(Boolean).join("; ");
+    if (formatted) parts.push("Key data points: " + formatted);
   }
   return parts.filter(Boolean).join("\n");
 }
-function flattenTheoryTest(test) {
+
+// FEATURE: SES-31 (Task 2) -- screen `plainText` parity (MarketIntelligenceScreen.jsx ~3907):
+// headline + body texts only, NO key_data_points. This is what flows into `flagged_answer`
+// (hyp-generation-intent / the A3 review-extension thread) -- flattenDisplay (with key_data_points)
+// stays the judge input for the `answer` artifact itself.
+export function plainDisplayText(display) {
+  const bodyText = Array.isArray(display.body)
+    ? display.body.map(sectionText).filter(Boolean).join("\n\n")
+    : sectionText(display.body);
+  return [display.headline, bodyText].filter(Boolean).join("\n\n");
+}
+
+export function flattenTheoryTest(test) {
   const parts = [];
-  if (test.supports) parts.push("Supports: " + test.supports);
-  if (test.complicates) parts.push("Complicates: " + test.complicates);
-  if (test.consider) parts.push("Consider: " + test.consider);
+  const supports = sectionText(test.supports);
+  const complicates = sectionText(test.complicates);
+  const consider = sectionText(test.consider);
+  if (supports) parts.push("Supports: " + supports);
+  if (complicates) parts.push("Complicates: " + complicates);
+  if (consider) parts.push("Consider: " + consider);
   return parts.join("\n");
 }
-function flattenForecastDraft(patch) {
-  const parts = [patch.proposed_action];
+
+// FEATURE: SES-31 (Task 2) -- `proposed_action` is a 5-key object {action, content, chunk_id,
+// confidence, version_note} (S-SES-29 finding #2), not a string -- read `.content` through
+// sectionText()'s guard and prefix with the action verb when present (e.g. "[update] ...") so the
+// edit/accept/reject distinction survives into judge-readable text. Critique line unchanged.
+export function flattenForecastDraft(patch) {
+  const action = patch.proposed_action;
+  const content = sectionText(action && typeof action === "object" ? action.content : action);
+  const actionLabel = action && typeof action.action === "string" ? action.action : null;
+  const parts = [];
+  if (content) parts.push(actionLabel ? `[${actionLabel}] ${content}` : content);
   if (patch.critique) parts.push("Critique: " + patch.critique);
   return parts.filter(Boolean).join("\n");
 }
@@ -210,6 +268,22 @@ async function judgeArtifact({ artifact_type, artifact_content, question, ctx })
   return { artifact: artifact_type, pass: verdict.pass === true, failed_criteria, evidence: verdict };
 }
 
+// FEATURE: SES-31 (Task 1) -- D1 semantics unchanged (still `[0]`, first-listed): pick the picked
+// hypothesis's TEXT string, never the whole {id, text, rationale} object. The screen's own
+// `chosenText` is exactly that `.text` (MarketIntelligenceScreen.jsx ~4197/4208); passing the
+// object leaked the "H1" id label and the rationale's truncated chunk refs into Elena's/Nadia's
+// commit payloads, where the Data Room UUID guards correctly denied them (S-SES-29 finding #1 --
+// the guards are not the bug). A shape change (hypotheses[0] present but no string .text) is
+// itself a finding -- fail loudly rather than silently passing null.
+function pickHypothesisText(hyp) {
+  const first = hyp.hypotheses?.[0];
+  if (first === undefined) return null;
+  if (typeof first.text !== "string") {
+    throw new Error(`hyp-generation-intent returned hypotheses[0] with no string .text -- shape: ${JSON.stringify(first)}`);
+  }
+  return first.text;
+}
+
 // ---- A2 steps 3-5 + A3's shared tail (Theory Result -> commit -> resolve) ----
 async function runHypTail({ flaggedQuestion, flaggedAnswer, intentForTest, picked, resolution, ctx, judgeVerdicts }) {
   const test = await call({
@@ -224,7 +298,7 @@ async function runHypTail({ flaggedQuestion, flaggedAnswer, intentForTest, picke
 
   if (resolution === "info_only") return { terminal: "info_only" };
 
-  const jointText = [test.supports, test.complicates, test.consider].filter(Boolean).join("\n");
+  const jointText = [test.supports, test.complicates, test.consider].map(sectionText).filter(Boolean).join("\n");
   await call({
     capability_slug: "memory-consolidation", intent_slug: "reasoner-intent", agent_id: "elena",
     task_context: { original_question: flaggedQuestion, flagged_answer: flaggedAnswer, committed_hypothesis: picked, intent: intentForTest, hypothesis_test: jointText, was_override: false },
@@ -296,12 +370,16 @@ async function runDirectCaseJourney(question, ctx, judgeVerdicts, extraFields = 
 
   let resolution_applied = null;
   if (flaggedOut) {
-    const flaggedAnswerText = flattenDisplay(display);
+    // FEATURE: SES-31 (Task 2) -- A3's `flagged_answer` is the final display's PLAIN text (runbook
+    // A3), headline+body only, never key_data_points -- plainDisplayText() parity with the screen's
+    // own `plainText` (MarketIntelligenceScreen.jsx ~3907). flattenDisplay() above stays the judge
+    // input for the `answer` artifact; this is a separate, narrower string.
+    const flaggedAnswerText = plainDisplayText(display);
     const hyp = await call({
       capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
       task_context: { flagged_question: question, flagged_answer: flaggedAnswerText, review_reason: display.review_reason ?? qa.review_reason ?? null },
     }, ctx);
-    const picked = hyp.hypotheses?.[0] ?? null;
+    const picked = pickHypothesisText(hyp);
     await runHypTail({ flaggedQuestion: question, flaggedAnswer: flaggedAnswerText, intentForTest: "theory", picked, resolution: "accept", ctx, judgeVerdicts });
     resolution_applied = "accept";
   }
@@ -318,7 +396,7 @@ async function runForecastCaseJourney(caseObj, ctx, judgeVerdicts) {
     capability_slug: "hypothesis-evaluation", intent_slug: "hyp-generation-intent", agent_id: "priya",
     task_context: { flagged_question: question, flagged_answer: "", review_reason: "user-initiated, no explicit claim extracted" },
   }, ctx);
-  const picked = hyp.hypotheses?.[0] ?? null;
+  const picked = pickHypothesisText(hyp);
   const tail = await runHypTail({ flaggedQuestion: question, flaggedAnswer: "", intentForTest: routing.intent, picked, resolution: caseObj.resolution, ctx, judgeVerdicts });
   return { actual_journey: routing.intent === "qa" ? "direct" : "forecast", terminal: tail.terminal, flagged: false, resolution_applied: caseObj.resolution, probe: null, rejectionOccurred: false };
 }
@@ -336,6 +414,10 @@ async function runNewsDoorCaseJourney(_caseObj, ctx, judgeVerdicts) {
     const data = await artRes.json();
     articleContent = data.text || null;
     articleSource = data.source || null;
+    // FEATURE: SES-31 (Task 3) -- an OK response with an empty/missing body is degraded too, not
+    // just a non-OK response (S-SES-29 finding, case 24: fetch-article returning 200 with no text
+    // silently left articleDegraded false).
+    if (!articleContent) articleDegraded = true;
   } else {
     articleDegraded = true; // fail-open, matches the screen's own behavior -- not an infra death
   }
@@ -356,7 +438,7 @@ function executeCaseJourney(caseObj, ctx, judgeVerdicts) {
 // Task 3 -- the report.
 // ================================================================================================
 
-function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError }) {
+function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError, card_headline, card_url, article_source, article_degraded }) {
   const fail_causes = [];
   if (infraDeath) fail_causes.push(`infra_death: ${infraError || "unrecovered transient failure"}`);
   if (rejectionOccurred) fail_causes.push("rejection");
@@ -367,6 +449,14 @@ function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_
     n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied,
     recoveries: ctx.recoveries, trace_ids: ctx.trace_ids,
     probe, judge_verdicts: judgeVerdicts, case_pass: fail_causes.length === 0, fail_causes,
+    // FEATURE: SES-31 (Task 3) -- case 24's news-door identity/degradation fields, dropped by the
+    // previous version of this function (S-SES-29 finding, a runbook §7 "report the degradation
+    // prominently" breach). Present only on case 24's record; every other case's outcome never sets
+    // these, so they stay correctly absent rather than showing up as literal `undefined` keys.
+    ...(card_headline !== undefined ? { card_headline } : {}),
+    ...(card_url !== undefined ? { card_url } : {}),
+    ...(article_source !== undefined ? { article_source } : {}),
+    ...(article_degraded !== undefined ? { article_degraded } : {}),
   };
 }
 
@@ -374,12 +464,21 @@ async function runOneCase(caseObj) {
   console.log(`[${caseObj.n}/24] ${caseObj.id} -- running...`);
   const t0 = Date.now();
   let attempt = 0, lastError = null, outcome = null;
+  // FEATURE: SES-31 (Task 4) -- hoisted above the loop and reassigned at the TOP of each attempt
+  // (before the try), so if every attempt throws, these still hold the LAST attempt's real ctx/
+  // judgeVerdicts (both are mutated by reference inside executeCaseJourney, so whatever accumulated
+  // before the throw survives) instead of a fresh empty ctx -- infra-death records must carry the
+  // trace_ids/recoveries that actually accumulated before the death (S-SES-29 finding).
+  let lastCtx = { recoveries: [], trace_ids: [] };
+  let lastJudge = [];
   // Transient-death handling (runbook §4 tail note): one fresh full re-run of the whole case on any
   // thrown error; a second death is an infra-class FAIL, no probe.
   while (attempt < 2 && !outcome) {
     attempt++;
     const ctx = { recoveries: [], trace_ids: [] };
     const judgeVerdicts = [];
+    lastCtx = ctx;
+    lastJudge = judgeVerdicts;
     try {
       const result = await executeCaseJourney(caseObj, ctx, judgeVerdicts);
       outcome = { ...result, ctx, judgeVerdicts };
@@ -395,14 +494,19 @@ async function runOneCase(caseObj) {
         flagged: outcome.flagged, resolution_applied: outcome.resolution_applied,
         ctx: outcome.ctx, probe: outcome.probe || null, judgeVerdicts: outcome.judgeVerdicts,
         rejectionOccurred: !!outcome.rejectionOccurred, infraDeath: false,
+        card_headline: outcome.card_headline, card_url: outcome.card_url,
+        article_source: outcome.article_source, article_degraded: outcome.article_degraded,
       })
     : finalizeCase({
         n: caseObj.n, id: caseObj.id, expected_journey: caseObj.expected_journey,
         actual_journey: null, terminal: "infra_death", wall_ms, flagged: false,
-        resolution_applied: caseObj.resolution || null, ctx: { recoveries: [], trace_ids: [] },
-        probe: null, judgeVerdicts: [], rejectionOccurred: false, infraDeath: true, infraError: lastError?.message,
+        resolution_applied: caseObj.resolution || null, ctx: lastCtx,
+        probe: null, judgeVerdicts: lastJudge, rejectionOccurred: false, infraDeath: true, infraError: lastError?.message,
       });
-  console.log(`[${caseObj.n}/24] ${caseObj.id} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}`);
+  // FEATURE: SES-31 (Task 3) -- loud degradation marker on the per-case progress line (runbook §7
+  // "report the degradation prominently").
+  const degradedMarker = record.article_degraded ? " *** ARTICLE DEGRADED ***" : "";
+  console.log(`[${caseObj.n}/24] ${caseObj.id} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${degradedMarker}`);
   return record;
 }
 
@@ -447,4 +551,9 @@ async function main() {
   console.log("REPORT_JSON_END");
 }
 
-main().catch(e => { console.error("FATAL:", e); process.exit(1); });
+// FEATURE: SES-31 -- gate top-level execution so the flatten helpers stay importable (Part 1 Node
+// test, Category N, imports them directly) without also kicking off a live 24-case run on import.
+const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+if (isMainModule) {
+  main().catch(e => { console.error("FATAL:", e); process.exit(1); });
+}
