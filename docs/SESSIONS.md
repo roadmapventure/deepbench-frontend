@@ -5,6 +5,124 @@
 
 ---
 
+## S-DAT-12-design / S-DAT-12 (v6.3.228, `9706ce4`, 2026-07-29, worktree `design-dat-12`) — the tag was already there; retrieval just never read it
+
+**`DAT-12` ✅ Done + archived. Self-verified QA 8/8 PASS.**
+
+### The ticket's own framing was the first thing that had to go
+
+`DAT-12` was filed (by `S-DAT-11-design`, hours earlier) as *"Demo Reset is unreachable"* — the seed
+corpus has no recovery path because `bulk_reset` exists in `lib/librarian.js` but nothing can invoke
+it. Every factual claim in that row checked out. The framing still had to be retired, for three
+reasons found by reading rather than reasoning:
+
+1. **The tag already existed.** `is_baseline = true` marks exactly the 20 seed rows, seeded
+   2026-07-01. Nothing needed tagging. `match_the_library` filters `status = 'active'` and never
+   reads the tag — which is precisely why a still-tagged row disappears the moment its status flips.
+   The row described a missing *restore mechanism*; the actual gap was a *read filter*.
+2. **One of its three proposed fixes contradicted a locked decision.** "An exposed operation" meant
+   adding `bulk_reset` to Eleanor Voss — The Librarian's Intent enum.
+   `docs/kickoffs/v6.0.5-S-LIBRARIAN-04-eleanor-write-capability.md:39` excluded it deliberately:
+   Demo Reset is human-triggered, "not something an agent's own reasoning should ever be able to
+   decide to fire."
+3. **The operator half was already filed.** `MI-08` (Feature) has carried "Demo Reset UI control
+   ❌ Missing" since 2026-07-17. John confirmed it stays there: *"don't want mi-08 - that is later."*
+
+The retired text and every measurement live in `docs/harvests/DAT-12.md` — a move, not a delete.
+
+### John was right about reset twice, and I argued past him both times
+
+His instinct, first pass: *tag the original data and tell the regression to only use that.* My
+answer was a reset — first as a stop-gate, then (after he pushed) as auto-reset-per-run. He came
+back a third time and made the constraint explicit: **"We don't want to change existing data flow
+that is working data. That will be a fail."**
+
+He was right, and the reason is stronger than "don't mutate things." A read scope makes a regression
+run **non-exclusive**: concurrent sessions can write to The Library during a run without affecting
+it (the run reads tagged rows; every agent write lands untagged), and nobody has to take the demo
+offline. Under any reset variant, the run rewrites the corpus a live screen is reading — anyone on
+CHI would watch their Data Room drop from 30 rows to 20 mid-session. That property was available the
+whole time and I only articulated it after he'd insisted twice. **Cost: several exchanges and one
+"i am not getting it."** The `feedback-adopt-instinct-concede-fast` rule names exactly this failure
+and I ran it anyway — the tell was re-explaining my own answer instead of evaluating his.
+
+One thing my resistance did produce, worth keeping: **the tag alone genuinely is not sufficient**,
+and saying so was correct. The drift is expressed in `status`, so "read only tagged rows" returns 16
+of 20 unless it *also* ignores status. That correction is what made the final design right.
+
+### What shipped
+
+`retrieval_scope: "baseline"` — an additive, default-absent request parameter threaded
+`execute.js` → `db-assembly.js` → `ai-enrichment.js` → `search-harness.js` → `librarian.js` →
+`vector-search.js`, plus one optional param on `match_the_library` whose `case` reads
+`is_baseline is true` instead of `status = 'active'` when set. Absent means today's behavior, at
+every hop, forever. Validation lives in `queryLibrary()` (not SQL) because the RPC's `case` treats an
+unrecognized value exactly like an absent one — a typo would silently return the unscoped corpus and
+a scoped run would look like it worked.
+
+**Not a test hook.** `lib/vector-search.js` is the registered platform service **Embedding Engine**,
+and `SCA-1` had already generalized it to a `scopeParam`/`scopeValue` pair so one primitive could
+back several kinds of scoping; `lib/conversations.js` (`p_session_id`) was the second consumer, this
+is the third.
+
+### The measurements that made the case
+
+`the_library` / `apple-cso-data-room`: of 20 seed rows, **4 sat `superseded`** (Elevate Mobility,
+Horizon Store, Nordholm, Vitrine — the last retired at 17:24 that same day) and **14 non-baseline
+rows were retrievable**, every one test residue or run exhaust, **five of them near-duplicate copies
+of a single `upgrade-cycles` answer**. With `match_count` at 5, run N+1 competed against run N's own
+output. Two of the leftovers are titled `DAT-7 End-to-End Live Test` and `DAT-11 atomicity target`
+and render **by title** in the CHI Data Sources drawer — `DAT-8`, escalated.
+
+**A full run takes over two hours, and no full run has ever completed.** Owen Marsh — Proofreader's
+`qg-content-context-intent` is driver-only, so its call clusters are runs: eight since it shipped,
+seven of them 3–12 judge calls, one at **134 minutes / 75 calls** (2026-07-28 18:07–20:22 CST).
+**38 commits landed on `dev` inside that window**, 3 touching `src`/`api`/`lib` — `SES-58`.
+
+Also measured, and it happened *during this session*: the corpus drifted from 96 rows to 97 at
+16:02 CST from another session's write. The kickoff doc's own numbers were stale by close-out. That
+is the problem this ticket fixes, demonstrating itself.
+
+### `SES-59` — the kickoff's SQL was wrong and it broke live retrieval for ~90 seconds
+
+`CREATE OR REPLACE FUNCTION` with an appended parameter **creates an overload, it does not replace**.
+Both signatures existed, PostgREST could no longer resolve a call omitting the new param, and every
+unscoped retrieval — all live CHI answers — returned **0 chunks** until the stale 5-param version was
+dropped. The coding session caught it immediately by measuring the omitted-parameter path, which is
+the only place the break is visible.
+
+The kickoff's Section 4 reasoning is what led into it: *"appended last; existing callers unaffected."*
+That argument is about positional compatibility and says nothing about overload resolution. Invariant
+written to `.claude/rules/supabase-function-signature.md`; the open half (a `check-*` gate asserting
+one signature per `match_*`) is `SES-59`.
+
+### Verification — what I checked rather than accepted
+
+The coding report was honest on every point I tested, but the load-bearing ones I re-ran myself:
+exactly **one** `match_the_library` now exists; scoped retrieval returns `fe58cadd…` (Elevate
+Mobility, `superseded` — unreachable by construction before this) while unscoped returns 11 chunks
+without it; the typo guard denies with **no `usage` object**, proving it short-circuits ahead of the
+embed rather than merely returning the right shape. Zero rows written — 16/4/50/12 unchanged.
+
+**One check the kickoff never asked for.** The driver deliberately omits the scope on its
+`action: "continue"` posts, with a comment asserting a resume "carries its own scope with it." That
+claim, if wrong, would mean any recovered hop silently reads the unscoped corpus — a partial-scope
+run that reports as clean. It holds: there is exactly one `assemblePrompt()` call site, and
+`resumeCapability()` rebuilds `enriched` from the persisted `durable_hops` row, so retrieval never
+re-runs on a resume.
+
+### Filed / amended
+
+`DAT-15` (Data, post-beta — The Reasoning store: 85 active rows, **no Skill points any capability at
+it**, no `is_baseline` column, so it has no baseline concept to scope by if a reader is ever wired),
+`SES-58` (Tooling, beta-gate — nothing detects a build landing mid-run), `SES-59` (Tooling,
+post-beta — the overload guard). Amended `DAT-8` (its "not blocking anything" clause was wrong) and
+`DAT-13` (widened to cover active run exhaust, not only archived rows). Added `DAT-12` to
+`BETA.md`'s bucket-1 table — it had declared bucket 1 that morning and was never listed there, so it
+read as open in `FEATURES.md` and absent from the queue.
+
+---
+
 ## S-CHI-92-design / S-CHI-92 (v6.3.227, `61a941c`, 2026-07-29, worktree `design-news-drawer`) — the screen was always the content bus
 
 **`CHI-92` (Task Success Rate) ✅ done + archived, self-verified QA 12/12 PASS.** John opened with a
