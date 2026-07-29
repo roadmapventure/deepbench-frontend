@@ -5,6 +5,81 @@
 
 ---
 
+## S-LOG-37c-design / S-LOG-37c (v6.3.215) — 2026-07-29 — `LOG-37` finished: Layer A facts on the embedding path
+
+**Worktree:** `design-log-37` · 3 code files (`lib/vector-search.js`, `lib/librarian.js`, `lib/rag.js`), 4 tasks, commit `efa244e`
+
+### The scoping call that did most of the work
+
+The session opened on `LOG-37c`'s written scope: *"the `lib/*`/`api/web-memory.js` writers, 26.5%,
+7 sites."* Measured live instead of trusting it — 6,658 rows in a 30-day window carried no
+`call_facts`. Then John set the criterion: **"we only need to track ai pattern calls."**
+
+Applied through `LOG-81`-done's already-shipped `isCountableCall` (a real call names a model), that
+single sentence cut the scope by 64%: **4,268 of the 6,658 name no model** — Michelle Manning —
+Project Manager's roster reads and plain table reads. They are not AI calls, they are already
+excluded from every AI Audit count, and they needed **no ticket at all**. What remained was **2,390
+real AI calls**, and **2,236 of those (94%) were one class**: the embedding/vector-search path.
+
+The lesson worth keeping: the row's "7 sites / 26.5%" framing described *files*, not *calls*. One
+measurement against the right denominator turned a 7-file sprawl into a 3-file session.
+
+### Two code findings that shaped the spec, both caught before any code was written
+
+1. **`embedAndSearch()` early-returns without embedding anything** (`lib/vector-search.js:40`) when
+   `queryText`/`scopeValue` is missing — while its callers log `model: 'text-embedding-3-small'`
+   regardless. Some existing rows therefore already claim an embedding that never ran. So the facts
+   are gated on proof the embed executed (`usage !== null`), never on caller intent. Same defect
+   class as `a-patch`'s `getRosterCandidates()` returning roster rows in a field named `chunks`.
+2. **`lib/rag.js` logs before its vector RPC**, and the RPC has two early-return failure paths.
+   Relocating the log call to reach the chunk ids would have silently stopped logging those calls —
+   `.claude/rules/capability-logging.md` forbids it outright. `queryRAG()` therefore records
+   `retrieval_method` only; chunk ids went to `LOG-113`. Not a consolation: §19i states the Layer B
+   rule *"must key on the retrieval method, not on chunk presence."*
+
+### The `LOG-112` collision, found because John asked
+
+John flagged mid-session that he had `LOG-112` (Observability) running in another session and it
+"seemed similar." It was the same rows from the opposite end — `LOG-112` is the **read** side (the
+CHI Agents drawer still reads frozen `patterns_used`), `LOG-37c` the **write** side. Not duplicates,
+but shipping `LOG-112` first would have been visibly harmful: `ai_call_patterns` classified only
+**153** of Eleanor Voss — The Librarian's **2,016** real AI calls, so her `Rag — 3,450 calls` row
+would have become ~153 with nothing to refill it. The ordering plus its measurement was written onto
+**both** rows (commit `fe9df36`) before any code was written, so the concurrent session would see it.
+
+### QA — 8 PASS, 2 accepted on documented indirect evidence
+
+Deploy gate passed first (`scripts/check-deploy-current.js --worktree=…` — note the flag; run from
+`C:/Projects` it cannot resolve HEAD at all). Then one real end-to-end run against the **deployed**
+preview, plus one direct `api/rag-query` call:
+
+- Row `25276` — Eleanor Voss — The Librarian, `librarian`: `retrieval_method: "similarity-search"`
+  with **6 real chunk ids**, all 6 resolving to genuine `the_library` rows, **0 fabricated**, under a
+  `patterns_used` of `["rag","embeddings"]` that is now checkable rather than asserted.
+- Row `25278` — `similarity`/`knowledge-retrieval`: `{retrieval_method:"similarity-search"}` with
+  **no** `retrieved_chunk_ids` key, exactly as specified.
+- 4/4 post-deploy real AI calls carry facts; `patterns_used` byte-unchanged (0 such lines in the diff).
+- **Accepted on indirect evidence, stated rather than skipped:** (a) the `librarian-write:insert`
+  regression — no post-deploy write occurred and the session deliberately did not write into
+  `the_library` for QA; the diff confirms `embedContent()` and the write-side path are untouched.
+  (b) the 30-day coverage number — it **cannot** drop today. §19i forbids backfill, so historical
+  rows keep their nulls and the window converges only as they age out. The kickoff's "drops toward
+  ~229" wording implied a same-day check and was wrong; the honest check is the forward path, which
+  passed 4/4.
+
+Also verified beyond the checklist: adding `callFacts` to `embedAndSearch()`'s return leaks the key
+into `search-harness.js`/`conversations.js` spread returns, but `ai-enrichment.js`'s `fetchSection()`
+picks fields explicitly rather than spreading, so no API response shape changed.
+
+### Residue
+
+`LOG-113` (Observability) — the write-side embed (`embedContent()` indexes for storage; §19i defines
+**no** Layer A key for that, and inventing one is John's call), `rag.js`'s chunk ids, and the 6-call
+`conversations.js`/`search-harness.js` tail. `AA-105` (Tech Debt) stays deferred — `rag.js` was
+passed an argument, not ported onto the shared primitive.
+
+---
+
 ## S-SES-33-design (v6.3.213) — 2026-07-29 — a session that built nothing, and the rule that would have prevented it
 
 **Worktree:** `design-ses-33` · docs-only, kickoff written then discarded unpushed
