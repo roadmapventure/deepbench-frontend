@@ -51,3 +51,17 @@ Options (a) and (b) turned out not to compete, and (b) was cheaper than the orig
 - **`AGT-37` (session 2)** — thread the real ids through `execute.js` → `request-receivable.js` → the handler, and drop `source_chunk_ids` from Elena Cho — The Reasoner's output contract so no model is asked for an id at all.
 
 **John's calls in the walkthrough:** the rule covers **both** write paths, not just Elena's (`data-patch-execute-intent` routes to the same handler — verified in Supabase, contradicting `reasoning-write.js:7`'s stale comment). And it is a **service, not an agent action** — the principle recorded is *if the correct value is already known, no model touches it*.
+
+## QA result 2026-07-29 (`S-AGT-37`, v6.3.224, `42f805e`) — 6 of 7, gate unmet
+
+Code shipped. `handler_context` carries the ids past Elena Cho — The Reasoner to the write handler; `source_chunk_ids` removed from her output contract.
+
+| Check | Result |
+|---|---|
+| real id supplied + truncated `(id: 0cecd001)` decoy in prose | row `6760642e` carries the **real** id |
+| nothing supplied, no decoy | `[]`, no error |
+| nothing supplied, decoy present | `[]`, no error — `HAR-21` not regressed |
+| **fabricated** id *supplied* by the caller | **422 denied** — caller-supplied is not caller-trusted |
+| observed consolidate | `self_reported_claims: null`, supplied id absent from `call_facts`, row still carried it |
+
+**Unmet: QA 2, the real Store as Forecast click** — the only item that exercises Task 1 (the screen gathering the ids), and the stated closure gate. Blocked because Vercel's free-tier 100-deploy/day cap was exhausted (exactly 100 in the trailing 24h; `42f805e` never built) and no local full-stack path exists (`SES-55`). Row left `🔶 Partial` and unarchived deliberately — six green checks are not the gate.

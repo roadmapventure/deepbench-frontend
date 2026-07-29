@@ -6307,3 +6307,27 @@ Caught by John immediately after the kickoff was pushed, from a one-line compreh
 **What this establishes beyond `AGT-37`:** the platform had no distinction between *agent-facing context* and *handler-facing facts* — `task_context` was silently both. That absence is precisely what made the wrong design look obvious. `handler_context` is a general harness capability any write handler can now use.
 
 **Process note:** the near-miss came from assuming a parameter's purpose from its name and its position in the call chain, without reading what the assembly layer does with it. `task_context` was verified to *reach* the handler-dispatch boundary; it was never verified for what else it touches on the way. Verifying where a value travels is not the same as verifying who reads it.
+
+---
+
+## 2026-07-29 — S-AGT-37 (v6.3.224, `42f805e`, worktree `agt-37-coding`) — **the envelope shipped; the closure gate did not get to run**
+
+`handler_context` is now a real harness capability: a handler-facing envelope threaded `runCapability() -> runLoop() -> sendRequest() -> handler`, never to `assemblePrompt()`/`enrichPrompt()`. `source_chunk_ids` is gone from Elena Cho — The Reasoner's output contract entirely — she is not asked for an id, so there is no model step left to get wrong. 5 tasks, 4 files + a persisted Category M test, regression suite 19/19.
+
+**Verified live against real Supabase, 6 of 7 QA items:**
+
+| Check | Result |
+|---|---|
+| real id supplied + truncated `(id: 0cecd001)` decoy in prose | row `6760642e` carries the **real** id — the envelope beat the decoy |
+| nothing supplied, no decoy | `[]`, no error |
+| nothing supplied, decoy present | `[]`, no error — `HAR-21` not regressed |
+| **fabricated** id *supplied* by the caller | **422 denied** — caller-supplied is not caller-trusted |
+| observed consolidate | `self_reported_claims: null` and the supplied id absent from `call_facts`, while the row still carried it — she never touched it |
+
+**The one unmet item is the gate itself.** QA 2 — the real Store as Forecast click — is what closes `AGT-37`, and Task 1 (the screen gathering the ids) is the only task no API-level test exercises. It could not be run: Vercel's free-tier **100-deploy/day cap was exhausted** (measured: exactly 100 in the trailing 24h, first slot freeing ~2h out with other sessions contending), so `42f805e` never built. `SES-33`'s root cause, hit again. **The row is left `🔶 Partial` and unarchived on purpose — six green checks are not the gate, and this session already caught one vacuous pass the day before.**
+
+**The local-QA path was half-found, and the half that was missing is worth keeping.** `vercel dev` *does* run the `api/` functions locally, and the reason it appeared not to is that it reads **`.env`, not `.env.local`** — copying one to the other made every API-level test above run with no deploy at all. That is what unblocked 6 of the 7 items. It still does not serve the frontend (`/src/main.jsx` 404s through its vite proxy), and `vite.config.js` proxies `/api` to `http://localhost:5173` — itself — so `npm run dev` has never been able to reach an API either. That combination is why no session has ever QA`d a full-stack change locally, and why every prior local QA in this repo was frontend-only. Filed as `SES-55`; the fix is likely one line.
+
+**Three findings from the coding agent, all correct, two of them bugs in this session's own kickoff.** (1) Section 10's commit message still said `task_context`, the exact wording Task 1's correction block forbids — it wrote the accurate message and flagged it; corrected in the doc. (2) Design Rule 3 ("no citation vocabulary in `execute.js`") contradicted Task 2, which prescribes exactly that on the accept path — it followed the Task and reported the conflict, which is what the rule asks for; the rule's real intent is no agent-id/capability-slug conditional, now clarified in the doc. (3) Task 5 named two `source_chunk_ids` mentions in the Skill; there was a third in the `no_action` bullet, which would have instructed her to emit a field no longer in her schema. Also filed `HAR-24` — `api/` is at **12/12** serverless functions, zero headroom, and the kickoff had stated 8 from a stale count.
+
+**Deliberate residual:** `handler_context` is not persisted to `durable_hops`, so a checkpoint/resume drops it and the write degrades to `HAR-21`'s honest behavior rather than failing (`HAR-25`). QA residue rows in the demo data room filed as `DAT-14` rather than deleted — `DAT-11` had just shipped the gate governing that table.
