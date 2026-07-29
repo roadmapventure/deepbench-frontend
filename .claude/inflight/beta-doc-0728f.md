@@ -1,1 +1,0 @@
-beta-doc-0728f — worktree `beta-doc-0728f`, branch `session/beta-doc-0728f`. Continuation of `beta-doc-0728` (same conversation): recording the John-approved pre-regression prep list (SES-28, SES-015, SES-18 reseed, SES-25 optional) into docs/BETA.md, and executing the SES-18 counter reseed against Supabase in the same pass. Doc edits only in this repo.
