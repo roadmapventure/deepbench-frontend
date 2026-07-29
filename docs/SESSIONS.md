@@ -5265,3 +5265,13 @@ The gradient faded to **exactly the colour it was painted on**. Such a fade is o
 **QA discipline note:** first-pass live QA was 10/12. The 2 FAILs were both my kickoff's spec assumptions, not the coding agent's execution: `AgentWorkingIndicator` reused unmodified still wraps (`flexWrap:"wrap"` + CHI-56 `maxWidth:85%`) → 53px; and the pinned footer at 126px left a 39px reading window. Patch `S-CHI-88a` (Option A of three rendered mocks, John's pick; his own catch added Chat-only input row): `compact` props on `AgentWorkingIndicator` (14px one-liner, per-agent time dropped, `elapsed | expect` kept per §19o recovery-visibility) and `DecisionFooter` (one-line ellipsized prompt, side-by-side ≥30px buttons, gated `compact={bare}` so desktop is byte-identical), input row moved into the Chat branch. Patch QA 8/8 PASS; reading window 39→161px measured. Coding agent's defensive additions accepted: `minHeight:30` touch floor + primary-button ellipsis guard.
 
 **Also of note:** Vercel served both pushes honestly (bundle grepped before both QA passes, per the LOG-105 stale-bundle precedent). CHI-89 (Feature) filed — `ConfirmationCardActions` (hyp-confirmation footer kind) deliberately not compacted, measure before extending. `docs/BETA.md` landed mid-session from a concurrent worktree; CHI-89 filed with its new `Beta-gate (mobile)` tag — this whole session is bucket-3 (mobile) work.
+
+---
+
+## beta-doc-0728f — Pre-regression prep list + SES-18 reseed (2026-07-28 night, addendum to beta-doc-0728, docs-only, no version bump)
+
+John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vacuous-pass regression idiom — REQUIRED before any run; until fixed, invoke only via `run-all.js`), `SES-015` (deploy-verify guidance — REQUIRED; stale-bundle pass is indistinguishable from a real pass, proven in `S-LOG-105`), `SES-18` reseed, `SES-25` optional. Rationale recorded in §2b: these were Post-beta on the "reviewer never sees it" test, but that is the wrong test for tooling the ship-gate's evidence depends on.
+
+**`SES-18` reseed executed this session (Supabase, `beta-doc-0728f-ses18-reseed`):** all 15 `feature_id_counter` prefixes audited against real doc maxima (grep across all four FEATURES files). Only `ABT` was desynced — counter `next_number=1` vs real `ABT-2` live in `FEATURES-LATER.md`; the next claim would have minted a duplicate `ABT-2`. Reseeded to 2 via `GREATEST`. All other prefixes (AGR, AGT, AIA, CHI, DAT, HAR, LOG, LOO, MCP, MOB, PRO, SCA, SES, SH) verified in sync. `SES-18`'s remaining scope (drift-detection mechanism) stays post-beta.
+
+**Close-out:** docs touched: `docs/BETA.md` (§2b), `docs/SESSIONS.md`. One Supabase counter UPDATE. Inflight marker removed in close-out commit.

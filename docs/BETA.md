@@ -64,6 +64,32 @@ count below 10,000. Explicitly not a ship-gate.
 
 ---
 
+## 2b. Pre-regression prep (John-approved 2026-07-28)
+
+Three `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
+they were triaged Post-beta on the "reviewer never sees it" test, which is the wrong test
+for tooling the ship-gate itself depends on:
+
+1. **`SES-28` (Tooling) — REQUIRED before any regression invocation.** Plain
+   `node tests/regression/<file>.js` passes vacuously (exits 0 testing nothing — only
+   `run-all.js` actually calls the exported function). A false-green here fakes the entire
+   bucket-1 ship bar. Fix: self-executing guard per file or a lint against the bare-`node`
+   idiom. Until fixed, the runbook must invoke ONLY via `run-all.js`.
+2. **`SES-015` (Tooling) — REQUIRED before the first QA leg.** Vercel can silently skip a
+   push (proven live in `S-LOG-105`, 2026-07-28); a stale-bundle pass is indistinguishable
+   from a real pass. Write the deploy-verify step (fetch the served bundle, grep for a
+   string unique to the build) into `STANDARDS.md` + the regression runbook.
+3. **`SES-18` (Tooling) — reseed half ✅ DONE 2026-07-28 (`beta-doc-0728f`).** All 15
+   `feature_id_counter` prefixes audited against the real doc maxima: only `ABT` was
+   desynced (counter 1 vs real max `ABT-2`) — reseeded to 2 via `GREATEST`. Collision risk
+   for the high-volume regression filing window is cleared. The row's remaining scope
+   (drift *detection* mechanism) stays post-beta.
+4. *(Optional)* **`SES-25` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline;
+   an archive pass before the push starts cuts every session's read cost and lowers the
+   adjacent-append collision rate. Efficiency, not correctness — skippable.
+
+---
+
 ## 3. Per-bucket queues (triage 2026-07-28, `beta-doc-0728`)
 
 Full-row-text triage of every open row in `FEATURES.md` + `FEATURES-NEXT.md` against the §2
