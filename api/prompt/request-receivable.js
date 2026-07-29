@@ -1,3 +1,4 @@
+// DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
 // DeepBench v6.3.201 | api/prompt/request-receivable.js | HAR-20 -- disable_parallel_tool_use on both forced tool_choice sites (buildCallBody's forced branch + the guardrails inline call); buildParseRetryCorrection() covers every tool_use id, not just the first
 // DeepBench v6.3.190 | api/prompt/request-receivable.js | LOG-77-9 -- extractDelegationProvenanceFacts(): verbatim delegation_target/task_provenance backing facts for the read-time delegated_to_provenance derivation (§19k); no comparison, no conclusion
 // DeepBench v6.3.180 | api/prompt/request-receivable.js | HAR-15 -- classifyAnthropicFailure() stamps failureClass/faultCode/upstreamStatus on every thrown Anthropic failure; retry behavior byte-identical
@@ -833,22 +834,30 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   // for either) instead of the hardcoded 'request-receivable' literal, which previously collapsed
   // every capability's calls into one undifferentiated AI Audit bucket. Fallback preserved for the
   // unreachable case where capability_slug is somehow absent.
-  logActivity({
-    tenantId: tenant_id || 'global',
-    aiType: capability_slug || 'request-receivable',
-    feature: 'request-receivable',
-    model, agentId: agent_id || null, taskId: task_id || null,
-    inputTokens: usage.input_tokens ?? null,
-    outputTokens: usage.output_tokens ?? null,
-    latencyMs: latency_ms,
-    patternsUsed,
-    traceId: trace_id,
-    // FEATURE: LOG-49 -- the chain links for this model-call row, threaded from runLoop().
-    spanId: span_id,
-    parentSpanId: parent_span_id,
-    // FEATURE: LOG-37 -- additive; omitted-shape callers elsewhere still write call_facts: null.
-    callFacts,
-  });
+  // FEATURE: LOG-91 -- write only when this function made the model call itself (precomputed_turn
+  // null: api/plan.js, confirmation.js -- byte-identical for them). On the precomputed path,
+  // runLoop() already logged/holds the SAME model call's agent-turn row; writing here too was the
+  // double-write (1,154 live span-paired duplicates, 100% identical tokens). The facts this row
+  // uniquely carried now ride back to the caller as _terminal_log (STEP 5) and merge into the
+  // surviving agent-turn row instead.
+  if (!precomputed_turn) {
+    logActivity({
+      tenantId: tenant_id || 'global',
+      aiType: capability_slug || 'request-receivable',
+      feature: 'request-receivable',
+      model, agentId: agent_id || null, taskId: task_id || null,
+      inputTokens: usage.input_tokens ?? null,
+      outputTokens: usage.output_tokens ?? null,
+      latencyMs: latency_ms,
+      patternsUsed,
+      traceId: trace_id,
+      // FEATURE: LOG-49 -- the chain links for this model-call row, threaded from runLoop().
+      spanId: span_id,
+      parentSpanId: parent_span_id,
+      // FEATURE: LOG-37 -- additive; omitted-shape callers elsewhere still write call_facts: null.
+      callFacts,
+    });
+  }
 
   // ── STEP 5: Return response ──────────────────────────────────────────────────
   // FEATURE: SK-20 — content returned in response for frontend plan rendering
@@ -873,6 +882,20 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
       retry_count: retryCount,
     },
     content: parsedResponse,
+    // FEATURE: LOG-91 -- precomputed path only: the facts STEP 4's suppressed write would have
+    // recorded, handed back so runLoop() merges them into the single surviving agent-turn row.
+    // runLoop() strips this key before the result reaches any client. patternsUsed/callFacts are
+    // the exact same values STEP 4 builds today -- only the destination changed. dispatch_latency_ms
+    // preserves AI-43's model-through-dispatch measurement (the turn row's own latency_ms stays the
+    // model-call latency the screen displays).
+    ...(precomputed_turn ? {
+      _terminal_log: {
+        task_id: task_id || null,
+        patterns_used: patternsUsed,
+        call_facts: callFacts,
+        dispatch_latency_ms: latency_ms,
+      },
+    } : {}),
   };
 }
 

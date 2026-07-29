@@ -1,3 +1,4 @@
+// DeepBench v6.3.204 | useAIActivity.js | LOG-91 -- AI-51 timestamp-pairing heuristic scoped to the pre-trace legacy window (PAIR_LEGACY_CUTOFF_MS); the write path no longer produces agent-turn/wrapper duplicates, so fresh rows are never paired
 // DeepBench v6.3.203 | useAIActivity.js | LOG-81 -- every AI Audit count is real model calls only (isCountableCall gates Total Calls/By Agent/By LLM/By Pattern); By Service stays operations-based by design (§12)
 // DeepBench v6.3.191 | useAIActivity.js | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
 // DeepBench v6.3.188 | useAIActivity.js | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
@@ -30,6 +31,13 @@ export const CAPABILITY_WRAPPER_TYPES = new Set([
   "html-display",
 ]);
 export const PAIR_WINDOW_MS = 2000;
+
+// FEATURE: LOG-91 -- the write path stopped producing agent-turn/wrapper duplicates in
+// v6.3.204, and the provable historical pairs (trace era, >= this date) were merged away.
+// The timestamp-pairing heuristic below only remains valid for the pre-trace era it can't
+// be proven against -- scoping it here stops it from ever wrongly pairing a fresh
+// single-record wrapper row (api/plan.js path) with an unrelated same-agent turn.
+export const PAIR_LEGACY_CUTOFF_MS = Date.parse('2026-07-16T00:00:00Z');
 
 // FEATURE: LOG-36 -- PATTERN_NAME_BY_SLUG (AI-53, built from PATTERN_CATALOG) deleted. Every
 // pattern NAME on every display now resolves through pattern_vocabulary first and humanizeSlug()
@@ -137,6 +145,9 @@ export function pairedAgentTurnIds(rows) {
   for (const row of rows) {
     if (CAPABILITY_WRAPPER_TYPES.has(row.ai_type) && row.feature === 'request-receivable') {
       const t = new Date(row.created_at).getTime();
+      // FEATURE: LOG-91 -- only legacy-era wrapper rows participate in pairing; a fresh wrapper
+      // row (api/plan.js path) is a single record by construction and must never absorb a turn.
+      if (t >= PAIR_LEGACY_CUTOFF_MS) continue;
       if (!wrapperTimesByAgent.has(row.agent_id)) wrapperTimesByAgent.set(row.agent_id, []);
       wrapperTimesByAgent.get(row.agent_id).push(t);
     }
@@ -145,6 +156,8 @@ export function pairedAgentTurnIds(rows) {
   for (const row of rows) {
     if (row.ai_type !== 'agent-turn') continue;
     const rowTime = new Date(row.created_at).getTime();
+    // FEATURE: LOG-91 -- post-cutoff agent-turn rows always count (never pairing candidates).
+    if (rowTime >= PAIR_LEGACY_CUTOFF_MS) continue;
     const wrapperTimes = wrapperTimesByAgent.get(row.agent_id) || [];
     if (wrapperTimes.some(t => Math.abs(t - rowTime) < PAIR_WINDOW_MS)) {
       paired.add(row.id);
@@ -195,6 +208,9 @@ export function classifyRow(row, turnTimestampsByAgent) {
   }
   if (CAPABILITY_WRAPPER_TYPES.has(row.ai_type) && row.feature === 'request-receivable') {
     const rowTime = new Date(row.created_at).getTime();
+    // FEATURE: LOG-91 -- pairing is a legacy-window heuristic only; a post-cutoff wrapper row is
+    // a single record by construction (the loop no longer writes a sibling) and always counts.
+    if (rowTime >= PAIR_LEGACY_CUTOFF_MS) return { kind: row.ai_type, include: true };
     const turnTimes = turnTimestampsByAgent.get(row.agent_id) || [];
     const paired = turnTimes.some(t => Math.abs(t - rowTime) < PAIR_WINDOW_MS);
     return { kind: row.ai_type, include: !paired };

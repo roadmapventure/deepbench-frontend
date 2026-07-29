@@ -1,4 +1,5 @@
 // DeepBench v6.3.205 | api/capabilities/execute.js | LOG-71 -- durable_hops now persists LOG-67's config-half snapshot and all three resumeCapability() re-entries recover it, so a resumed hop logs the same frozen signature its first hop did instead of a fact-half-only row
+// DeepBench v6.3.204 | api/capabilities/execute.js | LOG-91 -- terminal (non-delegating) turn writes exactly one ai_activity_log row: the agent-turn row, held until sendRequest() returns and merged with its _terminal_log wrapper facts (task_id, patterns union, call_facts); dispatch latency rides its own dispatch_latency_ms column, never call_facts; delegating turns log immediately, unchanged
 // DeepBench v6.3.190 | api/capabilities/execute.js | LOG-77-9 -- delegate_to_agent turn rows capture verbatim delegation_target/task_provenance call_facts (§19k backing facts for the read-time delegated_to_provenance derivation); request_help turns deliberately unchanged
 // DeepBench v6.3.184 | api/capabilities/execute.js | LOG-95 -- hop-event span identity (§19p): all 10 streamed delegation-family onEvent payloads carry trace_id + from_span_id/to_span_id; lastHelpSelection and buildFinalDelegationResult() carry the credited execution's trace_id/span_id
 // DeepBench v6.3.182 | api/capabilities/execute.js | HAR-17 -- transient model-call failures checkpoint-recover once per hop (recovery_ledger, checked write) before surfacing; enable_web_search persisted across resume
@@ -255,7 +256,18 @@ function getSupabaseHeaders(key) {
 // would change patterns_used behavior and needs its own row. Layer A's job here is to capture the
 // real facts alongside it so Layer B can eventually reclassify at read time and ignore the
 // declaration; it is not to reclassify anything now.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null }) {
+// FEATURE: LOG-91 -- three additive optional params: task_id (threaded to logActivity's taskId;
+// every pre-existing caller passed none, byte-identical), wrapperFacts (the _terminal_log object
+// sendRequest() returns on the precomputed path), and dispatchLatencyMs (passed straight through
+// to logActivity's own column). When wrapperFacts is present this one agent-turn row absorbs the
+// suppressed wrapper row's unique facts: patterns_used union, and call_facts merged with turn-half
+// precedence (identical keys carry identical values by construction anyway). The wrapper's
+// model-through-dispatch latency is preserved in the dispatch_latency_ms COLUMN and never in
+// call_facts -- call_facts is the base of the §19k signature, so a per-call millisecond value
+// there would make every row's signature distinct (720 -> 24,826 measured live) and re-cross the
+// 3 s anon statement timeout LOG-99 just fixed. latency_ms itself stays the turn's model-call
+// latency (what the screen displays today via classifyRow()).
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -279,19 +291,33 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     ...(delegationTarget ? { delegation_target: delegationTarget } : {}),
     ...(taskProvenance ? { task_provenance: taskProvenance } : {}),
   };
+  // FEATURE: LOG-91 -- the turn's own call_facts exactly as before (fact-half + config-half);
+  // when wrapperFacts rides along, layer it UNDER the turn half (mergeCallFacts's second arg wins,
+  // so turn-half precedence is kept). Nothing per-call/numeric is ever added here -- the wrapper's
+  // dispatch latency goes to its own column via dispatchLatencyMs below, NOT into call_facts.
+  const turnCallFacts = mergeCallFacts(Object.keys(factHalf).length > 0 ? factHalf : null, signatureConfig);
+  const mergedCallFacts = wrapperFacts
+    ? mergeCallFacts(wrapperFacts.call_facts ?? null, turnCallFacts)
+    : turnCallFacts;
   logActivity({
     tenantId: tenant_id || 'global',
     agentId: agent_id || null,
     aiType: 'agent-turn',
     feature: `${capability_slug || 'unknown'}:${intent_slug || 'none'}:depth${depth}${api_retry_count ? `:apiRetry${api_retry_count}` : ''}`,
     model: model || null,
+    // FEATURE: LOG-91 -- task link the suppressed wrapper row used to carry; null for every
+    // pre-existing caller (byte-identical to today's no-taskId write).
+    taskId: task_id || null,
     latencyMs: latency_ms,
     inputTokens: input_tokens ?? null,
     outputTokens: output_tokens ?? null,
+    // FEATURE: LOG-91 -- union of the turn's own computed list and the wrapper's patterns_used
+    // (empty spread when wrapperFacts is null -- byte-identical for every pre-existing caller).
     patternsUsed: Array.from(new Set([
       ...(is_delegate_call ? ['agent-delegation'] : []),
       ...(usedWebSearch ? ['tool-use'] : []),
       ...intent_technical_services,
+      ...(wrapperFacts?.patterns_used || []),
     ])),
     traceId: trace_id,
     // FEATURE: LOG-49 -- the chain links for this agent-turn row.
@@ -300,7 +326,10 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // FEATURE: LOG-67 -- fact-half (tool_calls + LOG-49's input_references/self_reported_claims) +
     // config-half (signature snapshot) in one call_facts. mergeCallFacts() returns null when both
     // halves are empty, preserving LOG-37b's "null not {}" contract.
-    callFacts: mergeCallFacts(Object.keys(factHalf).length > 0 ? factHalf : null, signatureConfig),
+    callFacts: mergedCallFacts,
+    // FEATURE: LOG-91 -- the absorbed wrapper's model-through-dispatch latency, into its own
+    // column (never call_facts). Null for every pre-existing caller.
+    dispatchLatencyMs,
   });
 }
 
@@ -868,7 +897,13 @@ async function runLoop({
     const turnUsedWebSearch = (turn.raw_content || []).some(
       b => (b.type === 'server_tool_use' && b.name === 'web_search') || b.type === 'web_search_tool_result'
     );
-    logAgentTurn({
+    // FEATURE: LOG-91 -- the turn-row payload is built once, unchanged in shape, but only a
+    // DELEGATING turn logs it immediately. A terminal (non-delegating) turn's row is HELD: its
+    // model call is about to be handed to sendRequest() as precomputed_turn, whose own STEP 4
+    // write this session suppressed -- the held row becomes the single record for that call,
+    // merged with the wrapper facts sendRequest() now returns (_terminal_log). Every terminal
+    // sub-branch below writes the held payload exactly once, success or throw.
+    const heldTurnLog = {
       capability_slug, intent_slug, agent_id, tenant_id,
       model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
       is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
@@ -902,7 +937,11 @@ async function runLoop({
       ...(turn.tool_name === 'delegate_to_agent'
         ? (() => { const f = extractDelegationProvenanceFacts(turn.tool_input, task_context); return { delegationTarget: f.delegationTarget, taskProvenance: f.taskProvenance }; })()
         : {}),
-    });
+    };
+    if (turn.is_delegate_call) {
+      // Delegating turn: sole record of this call, log immediately -- exactly as before LOG-91.
+      logAgentTurn(heldTurnLog);
+    }
 
     if (!turn.is_delegate_call) {
       // FEATURE: AA-142 -- delegationRequired intents (ci-answer-display-intent,
@@ -918,6 +957,9 @@ async function runLoop({
       // declares delegation_required -- a capability that can legitimately answer in text (no
       // schema, can_request_help, delegation_required NOT set) is completely unaffected.
       if (delegationRequired && !delegationRetried) {
+        // FEATURE: LOG-91 -- this text turn never reaches sendRequest() (the loop retries instead),
+        // so the held row is this real API call's only possible record: write it now, unchanged shape.
+        logAgentTurn(heldTurnLog);
         delegationRetried = true;
         conversationHistory = [
           ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
@@ -927,6 +969,8 @@ async function runLoop({
         continue;
       }
       if (delegationRequired && delegationRetried) {
+        // FEATURE: LOG-91 -- the API call really happened; log the held row before failing loudly.
+        logAgentTurn(heldTurnLog);
         throw new Error(`${capability_slug}/${intent_slug}: agent ended its turn with a text response instead of completing a required delegation, twice in a row (depth ${depth})`);
       }
 
@@ -935,6 +979,10 @@ async function runLoop({
       // Critique dispatch resolves live via resolveCapabilityHolder(), same as request_help
       // below -- never a named agent anywhere in this mechanism. ARCHITECTURE.md §19d.
       if (requiresHumanConfirmation) {
+        // FEATURE: LOG-91 -- the confirmation gate returns without ever calling sendRequest()
+        // (no wrapper write existed on this path even before this session), so the held row is
+        // written now, unchanged shape, before the critique/confirmation logic runs.
+        logAgentTurn(heldTurnLog);
         let critique = null;
         if (critiqueCapabilitySlug) {
           if (hopCounter.n >= MAX_LOOP_DEPTH) {
@@ -993,20 +1041,39 @@ async function runLoop({
       }
 
       // FEATURE: HAR-04 -- same deadline passthrough as the callModel() call above.
-      const result = await sendRequest({
-        prompt_request: enriched, agent_id, capability_slug, tenant_id,
-        precomputed_turn: turn, delegation_occurred: delegationOccurred,
-        turn_started_at: turnStart,
-        // FEATURE: LOG-49 -- the terminal model-call write gets the same span links and the
-        // integrate flag: if this final answer's input embedded a delegate's returned result, its
-        // row carries input_references_other_deliverable: true.
-        trace_id, span_id, parent_span_id, input_references_other_deliverable: integratedDelegateResult, deadline,
+      // FEATURE: LOG-91 -- the held turn row is written exactly once, success or throw. On a
+      // sendRequest() throw it's written plain (exactly what the old pre-branch write recorded)
+      // before the error propagates; on success it's merged with the wrapper's returned
+      // _terminal_log facts, which are then stripped so they never leak to a client.
+      let result;
+      try {
+        result = await sendRequest({
+          prompt_request: enriched, agent_id, capability_slug, tenant_id,
+          precomputed_turn: turn, delegation_occurred: delegationOccurred,
+          turn_started_at: turnStart,
+          // FEATURE: LOG-49 -- the terminal model-call write gets the same span links and the
+          // integrate flag: if this final answer's input embedded a delegate's returned result, its
+          // row carries input_references_other_deliverable: true.
+          trace_id, span_id, parent_span_id, input_references_other_deliverable: integratedDelegateResult, deadline,
+        });
+      } catch (e) {
+        logAgentTurn(heldTurnLog);
+        throw e;
+      }
+      const { _terminal_log, ...resultSansTerminalLog } = result;
+      logAgentTurn({
+        ...heldTurnLog,
+        task_id: _terminal_log?.task_id ?? null,
+        wrapperFacts: _terminal_log || null,
+        // FEATURE: LOG-91 -- AI-43's model-through-dispatch measurement into its own column;
+        // deliberately not merged into call_facts (§19k signature cardinality, see logAgentTurn).
+        dispatchLatencyMs: _terminal_log?.dispatch_latency_ms ?? null,
       });
       // FEATURE: LOG-79 -- the response now carries the loop's trace identity (generic, every
       // capability identically) so the client can join hop events to the ai_call_patterns view.
       // Deliberately NOT added to error/pending_confirmation/depth_exceeded returns -- those
       // never display pattern lines.
-      const finalResult = { ...result, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection, trace_id, span_id };
+      const finalResult = { ...resultSansTerminalLog, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection, trace_id, span_id };
       if (job_id) {
         await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
       }
