@@ -14,6 +14,7 @@
 4. **D4 — Strict rejection line:** ANY rejection by Owen (Proofreader) = that question is red, and triggers the §4 five-try probe to measure why. No "majority accept" softening.
 5. **D5 — Content review by agent:** content quality is judged by Owen via the `AGT-35` content-context review capability (LLM-as-judge), never by the driver model's own reading. The 2-question live-browser leg (§6) additionally proves rendering.
 6. **D6 — News door (case 24, added same day):** every run also drives one **live web article** end-to-end through the news-card door — Jordan Ellsworth's (web-search agent) live card fetch → **first-listed card** (the D1 rule's analog) → article extraction → full analysis journey. The article's *content* varies run to run by nature; what's locked is the *procedure* and the *journey shape* (Direct answer — the routing rule that treats a delivered headline as an external fact is part of what this case protects). Owen judges the content as usual.
+7. **D7 — Honest-gap scoring (added 2026-07-29, `AGT-36`):** questions the Data Room is *designed* not to answer are scored against §5b's bar, not the rich-answer rubric. A correct refusal passes; a fabricated metric fails. Cases 12 and 23 carry the class today.
 
 ## 1. Prerequisites — check before starting, stop if missing
 
@@ -47,7 +48,7 @@ Questions #1–23 come verbatim from `src/screens/MarketIntelligenceScreen.jsx`:
 | 9 | vitrine-tech | Vitrine Tech training gap + cert risk | Direct answer | — |
 | 10 | smartphone-growth | Emerging-market growth → investment | **Forecast journey** | **accept** |
 | 11 | coop-mdf-benchmark | Co-op/MDF vs benchmarks | Direct answer | — |
-| 12 | vietnam-reseller | Vietnam reseller performance | Direct answer | — |
+| 12 | vietnam-reseller | Vietnam reseller performance | Direct answer — **`honest-gap` class (§5b)** | — |
 | 13 | meridian-electronics | Meridian digital-shelf compliance FR/IT | Direct answer | — |
 | 14 | emea-coop-large-format | EMEA large-format co-op low — why | Direct answer | — |
 | 15 | jinhua-digital | Jinhua recovery in Greater China | Direct answer | — |
@@ -58,7 +59,7 @@ Questions #1–23 come verbatim from `src/screens/MarketIntelligenceScreen.jsx`:
 | 20 | southeast-asia | Outlook — Southeast Asia | **Forecast journey** | **info-only** |
 | 21 | training-turnover-benchmark | Training/turnover vs benchmarks | Direct answer | — |
 | 22 | latin-america | Outlook — Latin America | **Forecast journey** | **reject** |
-| 23 | south-korea-coop | South Korea co-op utilization | Direct answer | — |
+| 23 | south-korea-coop | South Korea co-op utilization | Direct answer — **`honest-gap` class (§5b)** | — |
 | 24 | news-first-card | Live news door: Jordan's first card → article → analysis (D6) | Direct answer (news door) | — |
 
 **18 direct answers (17 typed + 1 news-door) + 6 Forecast journeys.** The six fixed resolutions deliberately cover every terminal the screen offers: accept ×3, edit-then-accept ×1, reject ×1, info-only ×1 — same question, same resolution, every run, so runs are comparable (per-question assignments are John-vetoable baseline content; corrected-baseline provenance in `docs/SESSIONS.md`, 2026-07-28 entries).
@@ -95,6 +96,25 @@ For every final artifact of every question, call the `AGT-35` capability (slugs 
 
 Verdict contract (the criteria live in Owen's Skill data; this is the shape the driver consumes): `named_entities_present` (≥1 real partner/GEO/region), `quantitative_content_present` (≥1 real metric), `actionable_guidance_present`, `platform_language_detected` (with offending quote), overall `pass` — each with a quoted-evidence field. **Any `pass: false` = that question FAILs on content.** Driver never overrides Owen's verdict; disputes go to John with the verdict's own quotes (every judge call is logged with a trace like any AI call — auditable).
 
+### 5b. The `honest-gap` outcome class (D7 — John's decision, 2026-07-29)
+
+**Locked decision (`AGT-36`).** A question the Data Room is *designed* to be unable to answer is scored against a different bar, because the rich-answer rubric structurally cannot pass a correct refusal. Two questions carry the `honest-gap` class today (§2 table): **#12 `vietnam-reseller`** and **#23 `south-korea-coop`**. Both are named verbatim in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` (question bank 16/17) under line 96's *"what is NOT public — do not allow the agent to claim it knows these"* — they exist to prove the agents refuse to fabricate, so a metric in the answer is a **failure signal**, not a pass signal.
+
+Owen (Proofreader) still judges these artifacts and the full verdict is still recorded verbatim. Only the pass bar changes:
+
+| Criterion | Rich-answer class (default) | `honest-gap` class |
+|---|---|---|
+| `named_entities_present` | required | not applicable — informational only |
+| `quantitative_content_present` | required | **must be false** — a real metric here means the agent fabricated one (D4 territory) |
+| `actionable_guidance_present` | required | **required, unchanged** — the answer must still say who owns the data and what the VP should do next |
+| `platform_language_detected` | must be false | **must be false, unchanged** — name the gap in business terms, not as "the CSO Data Room" |
+
+**Why the guidance and jargon bars stay:** §5 already demands business guidance even from a rejection ("what's missing and what to do — not platform narration"). In the first run both answers failed those two legitimately, so this class does not turn either case green by itself — the generation side still has to improve. That is the point: this change removes an impossible bar, it does not lower a real one.
+
+**What a regression looks like in this class:** an answer that suddenly reports a South Korea co-op utilization number. That fails the class immediately, which is the protection this whole pair of questions exists to provide.
+
+Adding or removing a question from this class is a baseline change — §8 rules apply (John's approval, in this runbook).
+
 ## 6. Live-browser leg — rendering proof, every run
 
 Server-mirror proves the content is right; this proves the screen shows it. On the deployed dev preview, drive **#12 (vietnam-reseller — direct)** and **#10 (smartphone-growth — Forecast journey: Theories drawer → click first Theory → Theory Result → Create Forecast → Accept)**. Verify: chat bubbles + Column 2 drawers render the journey's content (spot-match a couple of phrases against the server-mirror payloads); Column 3 Audit Pipeline Log shows the hops; console clean of new errors.
@@ -103,7 +123,7 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 
 ## 7. Scoring
 
-- **Question PASS** = actual journey matches baseline (incl. approved flagged-set) AND all Owen content verdicts pass AND zero rejections AND no unrecovered infra death.
+- **Question PASS** = actual journey matches baseline (incl. approved flagged-set) AND all Owen content verdicts pass AND zero rejections AND no unrecovered infra death. **Exception — `honest-gap` questions (§5b, cases 12 and 23):** the content bar is §5b's table, not Owen's overall `pass` flag; everything else in this line still applies unchanged.
 - **Run PASS** = all 24 cases PASS AND browser leg passes. One automatic HAR-17 recovery inside a journey does not fail a case (it's designed behavior) — but report every recovery.
 - **Case 24 specifics:** the news fetch itself failing (no cards, or `fetch-article` failing on the first card) is an infra-class FAIL of case 24, not a skip — the door is part of the product. `fetch-article` failing *open* (screen behavior: proceeds without article text) = run the journey as the screen would, but report the degradation prominently; content verdicts then judge what the user actually got.
 - Anything else = run FAIL, with per-question causes.
