@@ -5,6 +5,43 @@
 
 ---
 
+## S-SES-25b (v6.3.212) — 2026-07-29 — move the historical blocks out of FEATURES.md's worst rows
+
+**Worktree:** `ses-25b` · **Commit:** `05f079b` · docs-only, no kickoff (same shape as `S-SES-32`)
+
+### Result
+
+```
+docs/FEATURES.md   298.7 KB -> 282.4 KB
+LOO-21   5383 -> 2283   BACKLOG INTAKE block  -> docs/harvests/LOO-21-0723.md
+LOG-23  10491 -> 6945   BACKLOG INTAKE block  -> docs/harvests/LOG-23-0723.md
+LOG-37  11008 -> 7160   BACKLOG INTAKE block  -> docs/harvests/LOG-37-0723.md
+LOG-72   8656 -> 2582   3 superseded status generations -> docs/harvests/LOG-72-status-history.md (new)
+```
+
+**A move, never a delete.** Verified per-clause against `git HEAD`: every substantive clause of each original row is present either in the trimmed row or in its harvest file. **0 of 95 lost.** Whole-file integrity checked too — 183 rows before and after, none removed, and the only rows whose text changed were the 4 targets plus `SES-36` (the BETA revert).
+
+### Two boundary bugs caught by the dry run, before anything was written
+
+Both would have destroyed live content. Neither was predicted by the design pass.
+
+**1. The cut must stop at `**FEATURE DETAIL`, not at end-of-cell.** The obvious implementation — "everything from the `BACKLOG INTAKE` marker to the end of the feature cell is historical" — is wrong. On `LOG-23`, content *after* the intake block includes `**— TASK 1 DONE 2026-07-23, John present —**` and `**this row is NOT archivable: it still holds…**`. That is live status, and burying it in a harvest file is exactly the failure `SES-27` (Architecture) exists to describe. `**FEATURE DETAIL` also carries the distilled "Delta essence" and later John calls, so it stays in the row too.
+
+**2. `LOG-72`'s markers were stale within the same session.** The design pass measured the row at 8,999 chars leading with a `⚠️ RE-SCOPED + QUANTIFIED` block. By the time this session ran, another concurrent session had changed it to 8,656 chars with that block **gone** — the current state was now the `EVALUATOR-OPTIMIZER` block. The stale marker would have moved the row's *current* state into the history file and left a superseded generation as the headline. Markers were re-derived against the live row before writing. This is the `verify-never-assert-from-memory` rule applying to a measurement taken **earlier in the same session**, not just to recall from a prior one.
+
+### Why `LOG-72` was safe to collapse at all
+
+Its generations self-declare: each block ends by pointing at the next with "— Prior state below." / "— Original scope below." So the cut is mechanical rather than a judgment about which claims are still true. Kept: the current-state block (first) and the original scope statement (last). Moved: the 3 blocks in between.
+
+### Not done
+
+`LOG-37` still carries its own `Prior detail` status chain and sits at 7,160 chars, still over check 3d's cap. Same treatment applies; left out to respect the file cap (this session already touched 6). Tracked on `SES-25b`, which stays 🔶 Partial.
+
+### Also this session
+
+`SES-36` removed from `BETA.md` §2b at John's direction — developer tooling, invisible to a reviewer, so it does not belong on the beta board; numbering restored to three required items plus optional `SES-25b`. The `SES-25a` correction to that item **stays**: the "archive pass" it used to prescribe is measurably wrong (7 of 175 rows are `✅ Done`).
+
+
 ## S-SES-28-design / S-SES-28 (v6.3.208) — 2026-07-28 — regression tests self-run when invoked directly
 
 **Worktree:** `design-ses-28` · **Commits:** `331d2dd` (design) + `e96f2ee` (coding) · **Kickoff:** `docs/kickoffs/v6.3.208-SES-28-regression-self-run-guard.md`

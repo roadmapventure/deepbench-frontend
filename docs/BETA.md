@@ -113,9 +113,11 @@ for tooling the ship-gate itself depends on:
    nothing. The 278 KB lives inside *open* rows (175 rows averaging 1.6 KB, against
    `FEATURES-LATER.md`'s 229 rows in 83 KB). The growth-stop half already shipped as
    `SES-25a` (v6.3.207 — `check-session-docs.js` check 3d, a per-row 2,000-char cap, 38 rows
-   flagged). What remains is `SES-25b`: move the three inline `BACKLOG INTAKE` blocks into
-   their `docs/harvests/` files — **a move, never a delete** (`LOG-37`'s inline block
-   duplicates only 7 of its 20 clauses; the rest exists nowhere else). Efficiency, not
+   flagged). **`SES-25b` ran 2026-07-29 (v6.3.212): `FEATURES.md` 298.7 → 282.4 KB**, moving
+   the historical blocks out of the 4 worst rows (`LOO-21` 5383→2283, `LOG-23` 10491→6945,
+   `LOG-37` 11008→7160, `LOG-72` 8656→2582) into `docs/harvests/` — **a move, never a delete;
+   0 of 95 substantive clauses lost, verified per-clause.** Residue: `LOG-37`'s own status
+   chain, still over cap. Efficiency, not
    correctness — still skippable for beta.
 
 ---
