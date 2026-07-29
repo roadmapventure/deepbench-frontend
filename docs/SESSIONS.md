@@ -5616,3 +5616,43 @@ Follow-on to `S-SES-29-rca` (root-cause section above). John's go, with two stan
 **Runbook write-backs (design session, same commit as the kickoffs):** §1 baseline-corpus-integrity prerequisite (`is_baseline` rows must be `active` — the orphan-superseded Signal Mobile row broke case 8 and cost a 2-hour run); §3 failure attribution must cite the `durable_hops` `intent_slug`, never the shared error string; A2's ambiguous `<picked>` pinned to the hypothesis's **`.text`**; and a driver-maintenance rule that any driver change must self-test a full **Forecast** journey — v6.3.193 QA'd only a direct case, which is exactly how the broken commit path shipped.
 
 **Rerun status:** gated on a fresh deployment (`SES-33`). `AGT-36` (judge rubric for designed graceful-failure questions) and the recorded flagged-set still need John's decisions; `DAT-11`, `LOG-109`, `AGT-37` remain open.
+## S-SES-015-design / S-SES-015 (v6.3.209, `ba3232a`, 2026-07-28, worktree `design-ses-015`, 3 files)
+
+**`SES-015` (Tooling) — the deploy-current gate. "Pushed" is not "deployed." Self-verified QA 10/10 PASS.** Beta pre-regression prep, `docs/BETA.md` §2b item 2.
+
+**Why it matters, stated once:** a live-QA run against a stale preview is not a weaker result — it is a result about a *different build*, and it is indistinguishable from a real one **in either direction**. `LOG-105` already produced one false "the fix didn't work." The same mechanism can just as easily produce a false green, and bucket 1 (the 24-case CHI regression) is the beta ship gate.
+
+**Measured rather than asserted.** All 156 commits on `origin/dev` since 2026-07-28 12:00 CST, compared against every `dev` deployment Vercel actually produced (`meta.githubCommitRef === "dev"`), scoring each commit by the lag to the first build *containing* it:
+
+| Metric | Value |
+|---|---|
+| Median lag | 37 s |
+| p90 | 852 s (14 min) |
+| Max | 2,973 s (49.5 min) |
+| Waited > 5 min | 44 / 156 (28%) |
+| Waited > 10 min | 31 / 156 (20%) |
+
+The first naive cut of this number was **59/156 "never built,"** which is wrong and worth recording as a trap: a build of a *later* commit still contains yours, so per-commit build coverage is the wrong unit. The right question is whether any built commit is a *descendant*. Nearly shipped a scarier and less true number.
+
+**This reconciles the `SES-33` dispute rather than adding a third opinion.** `SES-33` recorded "no build since `b309da8`"; `S-LOG-91-design` re-measured and called that premise false. **Both were right** — a median of 37 s with a 46-minute tail produces exactly that pattern of contradictory spot-checks. Re-measuring by hand keeps producing whichever answer the moment happens to hold, which is the argument for an on-demand instrument rather than per-session re-litigation.
+
+**Root cause, found concurrently by `ses29-fix-kickoffs` and folded in here rather than left as this session's "unproven":** Vercel's **free-tier cap of 100 deployments/day is exhausted** (`vercel deploy` → `Resource is limited - try again in 24 hours (api-deployments-free-per-day)`). That is a better explanation than the "intermittent" reading this session reached on its own, and the two corroborate: a spent quota is not random — builds fire until the cap and then stop until the window rolls, which is precisely a fast median with a long evening tail, and it explains why a poke commit sometimes works and sometimes cures nothing. **Consequence for reading the numbers above: the 20%-over-10-min figure is "the share of the day's commits pushed after the quota ran out," not a fixed failure rate** — it moves with how many deploys the day's concurrent sessions have already spent. The gate detects the condition; it does not buy deploys back, so `SES-33` stays open.
+
+**Two findings reshaped the scope before any code was spec'd.**
+
+1. **The guidance already existed, in a file nobody reads.** Commit `eece74f` had already documented the bundle-grep, the Vercel API check, and the 402 limitation — into `docs/SESSIONS.md`, which is 1.67 MB and which `CLAUDE-STATE.md` explicitly instructs every session never to read by default. So the item was never "write this down"; it was **relocate it to a read-by-default home and make it a gate rather than a note.**
+2. **`BETA.md` §2b's prescribed fix could not cover the run it was listed to protect.** It specified "fetch the served bundle, grep for a string unique to the build." The regression driver posts to `/api/capabilities/execute` — a serverless function with no static asset to grep. The item that existed to protect bucket 1 would have left bucket 1 exposed. **Superseded by this session**; `BETA.md` itself deliberately not edited (it belongs to the beta-doc sessions).
+
+**The mechanism, and the one line it turns on.** `scripts/check-deploy-current.js` asks Vercel which commit `dev` is actually serving (newest `READY` **and** `aliasAssigned` — a READY deployment that never took the alias is not what the URL serves) and passes only if the tested SHA is an **ancestor** of it. Not equality. With 5–7 concurrent sessions the deployed tip is normally *ahead* of yours; an equality check would fail almost always and the gate would be ignored within a day. Verified live: `bc60735` correctly PASSED while the preview served a later commit.
+
+The failure path is split on evidence, not on a timeout guess. If Vercel has a build in flight, poll (measured build duration ~25 s). If nothing is pending, wait one 90 s webhook grace and then **stop** — that is the proven-futile case, and burning a five-minute budget on it teaches sessions to skip the gate. It prints the remedy rather than just the problem: `POST /v13/deployments` is 402 on this plan, so an empty poke commit is the working trigger. Exit `2` (cannot run) is deliberately distinct from `1` (stale) — an unrunnable check must never read as a pass.
+
+**A counter-example check changed the design mid-session.** The first pitch to John claimed one SHA check covers frontend and `api/` alike. Measured, that is true of the *build* but not the whole path: the dev preview's HTML is edge-cached (`X-Vercel-Cache: HIT`, `Age: 298`, and `Cache-Control: no-cache` / `Pragma: no-cache` both fail to bust it), while a POST to the `api/` route is never cached (`MISS`). So the gate is **sufficient alone for the regression run**, and **necessary-but-not-sufficient for frontend visual QA**, which still needs the bundle-grep second layer. `STANDARDS.md` §6 states both paths as a table rather than one rule.
+
+**Windows detail worth keeping:** the script's direct-invocation guard uses `pathToFileURL(process.argv[1])`, not a hand-built `file://${path}`. The hand-built form parses the drive letter as a URL *host*, so the comparison never matches and the gate silently no-ops when run directly — a guard that fails open is worse than no guard.
+
+**QA (10/10, run by the design session, not the coding agent).** Serving commit named; the serving commit itself → exit 0; a genuine ancestor → exit 0 (the concurrent-session case the gate lives or dies on); current `dev` tip while undeployed → exit 1 `no-build-fired` with the remedy printed; a synthetic never-pushed commit → exit 1; `VERCEL_TOKEN` unset → exit 2 with the `ENV-VARS.md` pointer. `STANDARDS.md` §6 no longer opens with the "After every Vercel deploy:" assumption (the section's single deleted line) and carries both the measured table and the two-path table; runbook Step 0 precedes the endpoint/auth step with **8 insertions, 0 deletions**, so `SES-28`'s concurrent edit to the same file rebases cleanly. Exactly 3 files. `test-ses-015.mjs` (12 assertions) deleted before commit.
+
+**One honest gap:** the *pending-build → poll → pass* path was never exercised live — every run during QA found either coverage or nothing queued. The polling branch is covered by unit assertions only. Not a blocker; recorded so a future session doesn't assume it was observed.
+
+**Residue.** `SES-39` (Tooling) — the row's third proposal, "prefer local dev QA when the change doesn't need `api/`," deliberately scoped out: it does nothing for bucket 1 (that driver needs the serverless route, which local dev 404s on, per `SES-014`) and converts a hard gate into a per-session judgment call. `SES-40` (Tech Debt) — found live when the documented SQL failed: `session-setup`'s step 3b tells every session to claim an ID via `next_number`, but the column is `last_issued_number`; it errors loudly rather than corrupting anything, but the improvised recovery is exactly how `SES-18`'s desync started.
