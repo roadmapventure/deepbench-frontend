@@ -42,7 +42,15 @@ My first Marcus test regexed the *JSON envelope*, not the answer — the text li
 
 ## S-AGT-36-design / S-AGT-36 / S-AGT-36b (v6.3.220 + v6.3.225, `6a775c8` / `715301a`, 2026-07-29, worktree `design-agt-36`) — a scoring rule that failed correct answers
 
-**`AGT-36` ✅ Done + archived.** Full technical detail: `docs/harvests/AGT-36.md`.
+**`AGT-36` 🔶 Partial — archived at close-out, then REOPENED the same day on John's call.** Full technical detail: `docs/harvests/AGT-36.md`.
+
+### The close-out was wrong, and John caught it
+
+This session closed `AGT-36` and filed four beta gates. John's question — *"you think we are done with agt-36, but you created 4 more tickets required for beta?"* — exposed the flaw: **`AGT-45` was `AGT-36`'s own unfinished scope filed under a second number.** `AGT-36`'s row asked for *"a business-grade gap answer with escalation guidance instead of naming the CSO Data Room."* The escalation-guidance half landed and measures working; the stop-naming-the-Data-Room half did not. Giving that residue a new ID let the row close while its stated work was undone — renaming the problem, not solving it.
+
+Reopened, `AGT-45` retired into it as a stub (kept, not deleted, so same-day cross-references resolve). **The other three are genuinely independent and pre-date this session's changes** — `AGT-43` and `LOO-27` are Owen's guardrail and the harness budget; `AGT-44` is Priya's artifact failing Owen's *ordinary* rubric. They were invisible until now because the broken scorer was failing cases 12 and 23 for the wrong reason, which masked the right ones. **Net for beta: 3 new gates, not 4.**
+
+The generalizable lesson: *a residue ticket that restates the parent's own acceptance criterion is not residue.* Before spinning one off, check whether closing the parent would leave a sentence in its own row unsatisfied — if so, it belongs to the parent.
 
 ### What shipped
 

@@ -94,9 +94,15 @@ Case 12 is the proof the whole class works: Owen's own overall verdict was `pass
 
 Case 23's single remaining failure is Marcus opening *"I don't have data… in the retrieved context. The Data Room contains industry benchmarks…"* — rule 1 not holding. Filed as `AGT-45`, with the likely interaction noted: narrowing rule 4 to permit context citation gave him a new sentence in which to name the source.
 
-### Residue filed, none of it `AGT-36`'s own scope
+### Residue filed — and one piece of it that was NOT residue
 
-`AGT-41`, `AGT-42`, `AGT-43` (beta gate), `AGT-44` (beta gate), `AGT-45` (beta gate), `LOO-27` (beta gate), `SES-56`.
+Filed at close-out: `AGT-41`, `AGT-42`, `AGT-43` (beta gate), `AGT-44` (beta gate), `AGT-45` (beta gate), `LOO-27` (beta gate), `SES-56`.
+
+**Corrected the same day, John's call.** `AGT-45` — Marcus still naming "the Data Room" / "the retrieved context" — is `AGT-36`'s own acceptance criterion, verbatim from its row: *"a business-grade gap answer with escalation guidance instead of naming the CSO Data Room."* The escalation-guidance half landed; that half did not. Filing it separately let `AGT-36` close with its stated work unfinished. `AGT-36` reopened, `AGT-45` retired into it as a stub (kept, not deleted, so same-day cross-references resolve).
+
+The other three beta gates are genuinely independent and pre-date this session's changes: `AGT-43` and `LOO-27` are Owen's production guardrail and the harness continue budget; `AGT-44` is Priya's artifact failing Owen's *ordinary* rubric under any scoring scheme. They were invisible before because the broken scorer failed cases 12 and 23 for the wrong reason, masking the right ones. **Net for beta: 3 new gates, not 4.**
+
+**Rule this produced:** a residue ticket that restates the parent's own acceptance criterion is not residue. Before spinning one off, check whether closing the parent would leave a sentence in its own row unsatisfied — if so, it belongs to the parent.
 
 ### Correction recorded
 
