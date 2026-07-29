@@ -92,6 +92,46 @@ Swept every authored config field — `skill_profiles` (all 8 text fields incl. 
 - **`SES-52`** — `FEATURES-ARCHIVE.md` is duplicated: **478 of 502 IDs appear 2+ times**, the whole
   taxonomy block copied. Found because archiving `LOO-013` hit a section header that exists twice, so
   the new row landed in one copy only. De-dupe needs John's deletion approval and a per-row diff.
+## S-LOG-112-design / S-LOG-112 (v6.3.218) — 2026-07-29 — the CHI Agents drawer shows verified pattern names only
+
+**Worktree:** `design-log-112` · commit `496723c` · 3 files, 3 tasks · self-verified QA **13/13 PASS**
+
+### What shipped
+
+The CHI Agents drawer's per-agent sub-rows read `row.patterns_used` — the write-time-stamped field `.claude/rules/ai-pattern-signature.md` freezes as legacy and forbids reading for classification. Every other pattern surface had already moved (`LOG-38` for AI Audit, `LOG-79` for the Agent Routing drawer); this was the last one. `CHI-90` made the defect visible rather than causing it: once the headline counted real model calls only, Eleanor Voss — The Librarian's drawer read `1,801 CALLS` with `Rag — 3,450 calls` underneath it.
+
+The sub-rows now join the Log Displayer rollup's `log_ids` and take the view's own `pattern_name`. An agent whose rows match no gold pattern renders no sub-rows at all.
+
+### The mechanism find that kept it to 3 files and zero new queries
+
+`LOG-97` had already added a complete `log_ids` array to the `ai_pattern_classification_rollup` read. Verified at design time: `array_length(log_ids,1)` equals `call_count` for all 7 classified patterns — nothing truncated. So the drawer matches its own already-fetched rows against those id lists in memory. **No `.in()` over ~16,400 ids and no direct `ai_call_patterns` read** — the latter is exactly what blew the anon role's 3 s statement timeout on `LOG-38`'s first attempt. Confirmed live at QA: 0 requests to `ai_call_patterns`, 0 to `pattern_vocabulary` (the dead resolver went with it).
+
+`buildAgentPatternRows()` is a new pure export in `useAIActivity.js`; `buildActivitySummary()` now records each included row's `{id, latencyMs}` in place of the old `byPattern` bucket, staying inside the `include` region so `MI-72a`'s duplicate-wrapper exclusion is preserved.
+
+### John's call: deterministic operations are not displayed
+
+The design conversation proposed a second "Operations" group so the drawer wouldn't lose the ~13,700 rows the governed classifier doesn't name — Eleanor Voss — The Librarian's 2,412 library reads at 392 ms, Michelle Manning — Project Manager's 1,764 directory lookups at 173 ms. **John rejected it.** The reasoning that settled it: a parallel display would paper over incomplete classification, when `§19l` already locks unclassified as an honest visible gap and `LOG-85`/`LOG-69` own closing it. The measured fact that made the decision easy: **0 of 4,283 rows that never called a model are classified, platform-wide** — a library read has no AI technique in it to name, so that gap is not one anyone will close.
+
+This closes the open question the row was carrying ("needs John's call on whether deterministic latency stays visible in the drawer at all"): it does not.
+
+**Process note worth keeping:** the first framing presented this as a tradeoff — patterns *or* operations — and John pushed back twice, correctly ("you are trying to remove functionality so a use-case is not longer covered?"). It was never a real fork; both could render. The second failure was continuing to explain Operations *after* adopting his call to drop it, which read as still arguing for it. `feedback-adopt-instinct-concede-fast` and `Lead With the Verdict` both cover this; the specific lesson is that once a call is adopted, the next message states the adopted scope and stops.
+
+### QA — 13/13, all live against a local dev server
+
+A local server sidesteps `SES-33`'s Vercel deploy cap entirely and is legitimate here: frontend-only change, no `api/` route.
+
+**Every one of the 11 agents matched SQL exactly — counts *and* average latencies.** Eleanor Voss — The Librarian 4 rows → 1 (Retrieval-Augmented Generation, 156 @ 5.0 s, well under her 1,817 headline); Michelle Manning — Project Manager 7 → 3 (Request Routing 1,260, Output Guardrails 381, RAG 368); Sam, Elena, Riley Torres and Dan Bingham — AI Prompt Strategist render none, the intended honest state. No sub-row exceeds its agent's headline anywhere. Header still `11 active · 0 potential`; Baseline rows, Calls and Avg Cost untouched; AI Audit's By Pattern renders all 7 patterns; mobile 375 px shows the same rows with no real horizontal overflow.
+
+**One QA trap worth recording.** A first read showed Eleanor at 114 calls against SQL's 156, and Michelle *over* SQL on one pattern while under on two others — over and under in the same load, which looks exactly like a paging bug. It was neither: the DOM had been read mid-fetch, while the drawer's 17 pages were still arriving. On settle every figure matched. Two intermediate hypotheses (`AI-51` pairing exclusion; rollup-vs-view disagreement) were each tested and disproved by query before the real cause was found — `feedback-interrogate-the-metric` in practice. **Do not read this drawer's numbers until the fetch settles.**
+
+Similarly, the rollup being requested twice and every console line appearing twice is React `StrictMode`'s dev-only double-invoke, confirmed in `src/main.jsx` — not a production double-fetch.
+
+### Residue logged
+
+- **`LOG-104` extended with a second, worse call site**, found during QA: `useAgentActivitySummary()`'s paged fetch (`useAgents.js` ~157-166) has **no `.order()` at all** — 17 `.range()` pages over ~16.4 k rows with unspecified ordering, so rows can be skipped or duplicated. Feeds the entire CHI Agents drawer. Not manifesting on the load QA'd (every figure matched SQL), but that is the planner happening to be stable, not a guarantee. Same one-line fix as `LOG-104`'s original site; do both together.
+- **`LOG-70`** narrowed: `useAgents.js` still selects `patterns_used`, now read by nothing. Drop the column when that row is taken.
+- **`LOG-102`** unchanged and inherited: a failed classification fetch resolves to an empty list, so the drawer renders no pattern rows — indistinguishable from "nothing verified yet". Out of scope here; it needs a third state in the hook and touches AI Audit too.
+
 ## S-SES-25 close-out (v6.3.217) — 2026-07-29 — SES-25 + SES-25b done and archived
 
 **Worktree:** `ses-25-close` · docs-only
