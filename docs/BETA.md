@@ -79,9 +79,11 @@ count below 10,000. Explicitly not a ship-gate.
 
 ## 2b. Pre-regression prep (John-approved 2026-07-28)
 
-Three `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
+These `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
 they were triaged Post-beta on the "reviewer never sees it" test, which is the wrong test
-for tooling the ship-gate itself depends on:
+for tooling the ship-gate itself depends on. Items 1-3 are **required**, item 4
+**recommended**, item 5 **optional**. *(Item 4 added and item 5 corrected 2026-07-28,
+`design-ses-25` — John's call, delegated.)*
 
 1. **`SES-28` (Tooling) — REQUIRED before any regression invocation.** Plain
    `node tests/regression/<file>.js` passes vacuously (exits 0 testing nothing — only
@@ -97,9 +99,30 @@ for tooling the ship-gate itself depends on:
    desynced (counter 1 vs real max `ABT-2`) — reseeded to 2 via `GREATEST`. Collision risk
    for the high-volume regression filing window is cleared. The row's remaining scope
    (drift *detection* mechanism) stays post-beta.
-4. *(Optional)* **`SES-25` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline;
-   an archive pass before the push starts cuts every session's read cost and lowers the
-   adjacent-append collision rate. Efficiency, not correctness — skippable.
+4. **`SES-36` (Tooling) — RECOMMENDED before the regression filing window.** Same
+   false-green class as `SES-28` and `SES-015` above, one step down: `check-session-docs.js`
+   resolves its target as `arg("worktree", process.cwd())`, but a session's cwd is
+   `C:/Projects` (the repo's *parent*), so the invocation `CLAUDE-DESIGN.md` Step 1
+   prescribes — `node scripts/check-session-docs.js`, no flag — makes every doc lookup miss.
+   Measured 2026-07-28 (`design-ses-25`) against one worktree: **no flag → `4 flagged,
+   2 warning`; `--worktree=<path>` → `53 flagged, 0 warning`.** The only symptom is two WARN
+   lines that read like a stale-doc note, not "checks 1/1b/2/3/3c/3d examined nothing." This
+   matters most during the high-volume filing window, when checks 5/5e are what catch stale
+   worktrees and unpushed inflight markers across the 5-7 concurrent sessions — right now
+   they silently do not run for anyone. One-line fix: default `WORKTREE` to the script's own
+   location (`path.resolve(__dirname, "..")`), correct by construction since the script lives
+   in the worktree it checks. Ranked below `SES-28`/`SES-015` because it protects evidence
+   *about sessions*, not the regression results themselves.
+5. *(Optional)* **`SES-25b` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline.
+   **Corrected 2026-07-28 (`design-ses-25`): the "archive pass" this item used to prescribe
+   does not work** — only **7 of 175** rows are `✅ Done`, so sweeping them recovers almost
+   nothing. The 278 KB lives inside *open* rows (175 rows averaging 1.6 KB, against
+   `FEATURES-LATER.md`'s 229 rows in 83 KB). The growth-stop half already shipped as
+   `SES-25a` (v6.3.207 — `check-session-docs.js` check 3d, a per-row 2,000-char cap, 38 rows
+   flagged). What remains is `SES-25b`: move the three inline `BACKLOG INTAKE` blocks into
+   their `docs/harvests/` files — **a move, never a delete** (`LOG-37`'s inline block
+   duplicates only 7 of its 20 clauses; the rest exists nowhere else). Efficiency, not
+   correctness — still skippable for beta.
 
 ---
 
