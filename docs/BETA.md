@@ -95,10 +95,38 @@ for tooling the ship-gate itself depends on:
    worktree first, because a worktree resolves `node_modules` up to a shared tree that may
    predate `package-lock.json` and produce a false RED (that exact false red was live tonight).
    Both rules are now in `STANDARDS.md` Section 2 rule 5.
-2. **`SES-015` (Tooling) — REQUIRED before the first QA leg.** Vercel can silently skip a
-   push (proven live in `S-LOG-105`, 2026-07-28); a stale-bundle pass is indistinguishable
-   from a real pass. Write the deploy-verify step (fetch the served bundle, grep for a
-   string unique to the build) into `STANDARDS.md` + the regression runbook.
+2. **`SES-015` (Tooling) — ✅ DONE 2026-07-28 (`S-SES-015`, v6.3.209, `ba3232a`).** A push to
+   `dev` is not a deploy, so a stale-preview pass is indistinguishable from a real one — in
+   *either* direction, which is what makes it a ship-bar risk and not just a nuisance.
+   Measured across 156 `dev` commits that day: median lag 37 s, but **p90 852 s, max 2,973 s,
+   20% waited over 10 minutes.** `scripts/check-deploy-current.js` now gates it — exit `0`
+   the serving deployment contains your commit, `1` stale, `2` couldn't check (**exit 2 is
+   not a pass**). It compares by **ancestor, not equality**, so a tip pushed ahead by a
+   concurrent session still passes. Wired as step 0 of `STANDARDS.md` Section 6 and of the
+   CHI regression runbook. Self-verified QA 10/10.
+   **This item's original prescription was wrong and is superseded — do not follow it.** It
+   said "fetch the served bundle, grep for a string unique to the build," which cannot work
+   for the run it was listed to protect: the regression driver posts to
+   `/api/capabilities/execute`, a serverless function with no static asset to grep. Verified
+   live, the two paths differ — `api/` responses are never edge-cached (`X-Vercel-Cache:
+   MISS`), so the commit-SHA gate is sufficient on its own for bucket 1; frontend HTML *is*
+   cached (`HIT`, `Age: 298`, and `Cache-Control: no-cache` does not bust it), so visual QA
+   still needs the bundle-grep as a second layer. Both are written into Section 6.
+   **Related:** `SES-33` — same symptom, different half. The gate *detects* a stale preview;
+   it does not produce deploys. Keep that row's recurrence warning in mind before a long run.
+   ⚠️ **Unresolved contradiction inside `SES-33`'s own row, flagged 2026-07-29 by
+   `S-SES-015-design`, not silently edited — someone should rule on it.** The row asserts both
+   *"ROOT CAUSE MEASURED (`ses29-fix-kickoffs`): Vercel's free-tier cap of 100 deployments/day
+   is exhausted"* — with a verbatim API error, `Resource is limited - try again in 24 hours
+   (api-deployments-free-per-day)` — **and** *"self-resolved; no fix was applied and no root
+   cause was established."* Both were written by different sessions. They are not equally
+   supported: the quota finding carries hard evidence, and an 08:45 self-recovery is precisely
+   what a daily quota rolling over looks like, so the recovery corroborates that cause rather
+   than contradicting it. **Why it matters for beta:** if it is the quota, recurrence is
+   *predictable* — a heavy multi-session day will re-exhaust it — and the mitigation is to
+   spend fewer deploys or upgrade the plan, not to wait and hope. `SES-015`'s measurement that
+   day (fast median, long evening tail) fits the quota explanation. Detail:
+   `docs/harvests/SES-33.md`.
 3. **`SES-18` (Tooling) — ✅ DONE 2026-07-28, both halves.** Reseed (`beta-doc-0728f`): all
    15 `feature_id_counter` prefixes audited against the real doc maxima; only `ABT` was
    desynced (counter 1 vs real max `ABT-2`) — reseeded to 2 via `GREATEST`. Bypass closure
