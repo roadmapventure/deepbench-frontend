@@ -1,3 +1,4 @@
+// DeepBench v6.3.227 | MarketIntelligenceScreen.jsx | CHI-92 -- fetchNewsCards() splits into Jordan's search call + his display request, so the stories he finds ride task_context to the display agent instead of dying in his own turn
 // DeepBench v6.3.216 | MarketIntelligenceScreen.jsx | LOG-109/CHI-91 -- analyzeNewsCard()'s fetch
 // now reads the error body instead of discarding it, classifies WHY the primary path failed
 // (articleFaultText, src/lib/articleFaultText.js), and pushes an HAR-15-style platform fault
@@ -3771,14 +3772,26 @@ export default function MarketIntelligenceScreen() {
     const myGeneration = clearGenerationRef.current;
     const isStale = () => clearGenerationRef.current !== myGeneration;
     try {
-      // FEATURE: LOO-010 — no declaration of any kind needed here anymore: Jordan's call always
-      // delegates to Alex (finalResult.display_agent_id will always be Alex's real id, never null),
-      // so automatic crediting correctly never fires for Jordan's own agent_id, and Alex's own
-      // credit is already fully covered live by the harness's delegation_complete event (LOO-009) +
-      // onDelegationProgress below — same zero-declaration shape the `display` call site already had.
-      const result = await callCapability({
+      // FEATURE: CHI-92 — Jordan searches first and returns structured stories; a second
+      // call is his display request, with those stories already in task_context. This is the
+      // same two-step shape ci-answer-display-intent uses (runQaWithQualityGate above): the
+      // harness's delegationRequired auto-dispatch spreads task_context into the delegate's
+      // envelope, so content reaches Alex the way it already reaches him for a Q&A answer.
+      // Before this split, search and hand-off shared one call, so the stories Jordan found
+      // existed only in his own turn and the delegate received the help-request text alone.
+      const search = await callCapability({
         capability_slug: "web-search-news", intent_slug: "ws-news-search-intent", agent_id: "jordan",
         task_context: {}, onProgress: onDelegationProgress, isStale,
+      });
+      if (isStale()) return;
+      const stories = Array.isArray(search?.stories) ? search.stories : [];
+      if (!stories.length) { setNewsCards([]); if (!chatTurnActiveRef.current) setWorkingStatus(null); return; }
+      // FEATURE: LOO-010 — still no hop declaration on either call: this one always resolves
+      // through a delegation (Alex's credit already arrives live via delegation_complete +
+      // onDelegationProgress), and the search call above deliberately declares nothing at all.
+      const result = await callCapability({
+        capability_slug: "web-search-news", intent_slug: "ws-news-display-intent", agent_id: "jordan",
+        task_context: { stories }, onProgress: onDelegationProgress, isStale,
       });
       if (isStale()) return;
       setNewsCards(Array.isArray(result?.cards) ? result.cards : []);
