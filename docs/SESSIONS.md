@@ -36,7 +36,11 @@ My first Marcus test regexed the *JSON envelope*, not the answer — the text li
 
 ### Filed
 - **`CHI-91`** (Feature) 🔶 Partial — shipped, gate items 8/9 pass, 6/7/11 pending one render.
-- **`SES-54`** (Tech Debt) — `.claude/rules/capability-logging.md` still documents the `'deterministic'` convention that misrouted this ticket, and its `paths:` front-matter (`api/capabilities/**`, `api/prompt/**`) never scoped it to `api/fetch-article.js`. Deliberately excluded from this session: a standing convention doc gets its own review, not a fold-in.
+- **`SES-54`** (Tech Debt) — `.claude/rules/capability-logging.md` still documents the `'deterministic'` convention that misrouted this ticket, and its `paths:` front-matter (`api/capabilities/**`, `api/prompt/**`) never scoped it to `api/fetch-article.js`. Deliberately excluded from this session: a standing convention doc gets its own review, not a fold-in. `Post-beta`.
+- **`SES-57`** (Tech Debt) `Beta-gate (bucket 1)` — **found by the completeness sweep after John asked whether anything beta-required had been filed, and it is a defect this session introduced.** `CHI-91` added a fourth field to the screen's `backgroundContext`; `scripts/chi-true-regression.mjs:540` still spreads three. On a failed article fetch the bucket-1 run therefore feeds Marcus Webb — GEO CSO Expert a payload the product never sends, so he cannot produce the gap acknowledgment `ci-answer-intent` now instructs and the judge scores an answer the screen does not generate — silently invalidating case 24, which *is* a bucket-1 gate. Same drift `SES-31` exists to prevent, recurring because nothing structurally couples the two payloads. **The design session should have caught this:** the kickoff changed a payload the regression driver mirrors and never checked the mirror. Listed in `BETA.md` §2b item 5.
+
+### Close-out miss, corrected same day
+`CHI-91` and `SES-54` were filed **without** the `Beta-gate (<bucket>)` / `Post-beta` declaration the beta rule requires at filing time. Added by `log-109-followup` (`7d2d0d3`), and `CHI-91` promoted into `BETA.md`'s bucket-2 queue — a row that declares a gate but never appears in the queue is the exact failure mode bucket 1's row 21 already records. `LOG-109` itself never appeared in `BETA.md`, so its archive left nothing stale there.
 
 ---
 
