@@ -76,6 +76,14 @@ is Post-beta and stays where it is in the FEATURES files.
 `SES-29` (Task Success Rate) is the bucket itself — the runbook run. Everything below is a
 known defect that would break or dirty that run:
 
+> **Bucket-1 strategy — regression-first (John, 2026-07-28):** no bucket-1 fix sessions until
+> the `SES-29` run produces its failure list. The rows below are **suspects, not a queue** —
+> most of their failure rates were measured before `HAR-17`-done's auto-recovery (v6.3.181–183)
+> and may no longer reproduce. Run first; schedule fixes only for what actually fires, with
+> the run's evidence attached. Expected: the first run will NOT be clean (at minimum
+> `LOO-013`'s case-24 misroute is structural and recovery-proof) — that is the diagnosis
+> working, not a surprise. Same logic as the `HAR-14` conditional ruling in §4.
+
 | # | ID (Type) | Why it breaks the run |
 |---|---|---|
 | 1 | `LOO-013` (Task Success Rate) | News flow routes to capability-less Brent — **fails case 24 outright**, drawer stuck. |
