@@ -269,16 +269,37 @@ complete beta board.**
 
 ---
 
-## 5. Bonus — "re-classify patterns below 10K" (post-gate)
+## 5. Bucket 6 (Bonus) — "re-classify patterns below 10K" (post-gate, John 2026-07-28)
 
-The reclassification population levers, largest first: `LOG-45` (Architecture — 12,679 Group A
-old-name rows; needs John's §19i freeze-rule authorization), `LOG-47` (Architecture — 7,606
-`structured-output` rows, no vocabulary destination yet), `LOG-46` (Architecture — 5,576
-`tool-use` rows, honest-hide precedent), `LOG-44` (Architecture — 2,796 `agent-delegation`
-rows; largely answered by `LOG-51`-done, re-scope), `LOG-73` (Architecture — embedding
-orphans), `LOG-77` (Architecture — capture-roadmap tail), `LOG-55` (Architecture — likely
-already closed by `LOG-37a-patch`, verify then close). Measure the live "needing
-reclassification" count first — it shares `LOG-60`'s reconciliation ground.
+**Metric grounded + levers verified 2026-07-28 night (`beta-doc-0728h`).** The screen's
+number is `ai_pattern_reclassification_count`: **log rows with no match in
+`ai_call_patterns`** — i.e. *signature-classification coverage*, not legacy naming.
+Measured live: **20,727** (of 24,689 log rows; 4,538 classified). Goal <10,000 → clear
+~10,700+.
+
+**Correction to this section's earlier draft:** the original lever list (`LOG-45` Group A
+renames, `LOG-46` `tool-use`, `LOG-47` `structured-output` destinations) was aimed at
+*display naming* — renaming `patterns_used` slugs moves NONE of this metric. Those rows stay
+real backlog for label honesty, but they are **out of bucket 6**. `LOG-44` likewise
+(largely answered by `LOG-51`-done anyway).
+
+**The floor:** 6,818 of the 20,727 carry no `call_facts` — honestly unclassifiable forever
+under §19k's no-backfill rule. The count cannot go below ~6.8K without a counting-rule
+change. The goal is reachable: the other **13,909 rows carry signature material** and fail
+only for lack of matching criteria.
+
+**Verified levers, in order:**
+
+| # | Lever | Moves the count by |
+|---|---|---|
+| 1 | **Criteria authoring through Susan Smith — Trainer's governed path** (= bucket 5's `LOG-72` (Architecture), quantified there: 27 vocabulary entries, only 9 with criteria). Target the top facts-bearing populations: `agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753. | Top-6 alone = **12,776 → count lands ~7,951 ✓ under 10K.** |
+| 2 | `LOG-71` (Architecture, bucket 5 #1) — resumed hops regain the config-half. | Stops the unclassifiable pool *growing*; small immediate effect. |
+| 3 | The counting conversation (`LOG-91`/`LOG-81`/`LOG-60`, bucket 4) — if John rules non-model ops out of the log/count (`librarian` 3,554 + `agent-directory` 1,745 unclassified, almost all facts-less), the floor itself drops. | Denominator change, John's call — not required for <10K. |
+| 4 | Minor: `LOG-73` (embedding-orphan naming decision), `LOG-77` (future capture facts), `LOG-55` (verify-then-close, likely mooted by `LOG-37a-patch`). | Marginal. |
+
+**One session shape, mostly data:** lever 1 is Susan's promote/criteria runs (Supabase data
+work per §19i/§19l, model per ticket at kickoff), not code. Ship rule unchanged: bucket 6
+starts only after the five ship-gate buckets are green.
 
 ---
 

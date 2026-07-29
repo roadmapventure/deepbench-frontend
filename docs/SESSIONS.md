@@ -5289,3 +5289,13 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 **Bucket-5 staleness: ~5 of 13 rows (38%) stale/dup/over-scoped** — consistent with bucket 4's 40%; the same signature/span machinery churn is the cause. Sweep totals across buckets 2/4/5: 48 rows checked, 11 dead-or-shrunk, 4 duplicate clusters found (`LOO-26`→`CHI-87`, `CHI-15`→`CHI-67`, `LOG-103`→`LOG-71`, `CHI-64`+`CHI-87`+`LOO-26` superset).
 
 **Close-out:** docs touched: `docs/BETA.md`, `docs/FEATURES.md` (8 row annotations), `docs/SESSIONS.md`. Inflight marker removed in close-out commit.
+
+---
+
+## beta-doc-0728h — Bucket 6 (sub-10K reclassify) grounded and verified (2026-07-28 night, addendum to beta-doc-0728, docs-only, no version bump)
+
+**John's ask: promote the bonus to bucket 6 and verify its levers.** Metric grounded first (per the interrogate-the-metric discipline): `ai_pattern_reclassification_count` = log rows with NO `ai_call_patterns` match — signature-classification coverage, not legacy naming. Live: **20,727** of 24,689 rows (4,538 classified).
+
+**Headline finding — the old lever list aimed at the wrong metric.** `LOG-45`/`LOG-46`/`LOG-47`/`LOG-44` (slug renames/destinations) move NONE of this count; they remain label-honesty backlog but are out of bucket 6. The real structure: **6,818 rows have no `call_facts` — honestly unclassifiable forever (§19k no-backfill), so the floor is ~6.8K**; the other **13,909 carry signature material and fail only for lack of matching criteria** (only 9 of 27 vocabulary entries have criteria). Verified levers: (1) criteria authoring through Susan Smith — Trainer's governed path against the top facts-bearing populations (`agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753 — top-6 = 12,776, landing the count ~7,951, under goal); (2) `LOG-71` resume config fix stops pool growth; (3) the bucket-4 counting conversation can legitimately drop the floor further (librarian/agent-directory facts-less ops); (4) minor: `LOG-73`/`LOG-77`/`LOG-55`. Recorded as `docs/BETA.md` §5 (Bucket 6). Ship rule unchanged — bonus starts after the five gates are green.
+
+**Close-out:** docs touched: `docs/BETA.md`, `docs/SESSIONS.md`. Inflight marker removed in close-out commit.
