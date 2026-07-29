@@ -193,8 +193,12 @@ what's still between that and "every agent shows ≥1 pattern, accurately":
    failure, no regression impact; the caller-identity-vs-code-path meaning question stays
    open but unscheduled. Consequence: `AA-179` (Architecture) **drops out of bucket 5** for
    beta (it was item 13, blocked on this ruling).
-5. **`MI-69` (Architecture)** — hardcoded routing-row narration "looks scripted" (the exact
-   anti-claim of §1), but the fix is a screen-wide redesign. Scope call.
+5. ~~`MI-69` (Architecture)~~ — **RESOLVED 2026-07-28, John: "move to next bucket no beta."**
+   Post-beta (Next tier); the narration-polish redesign waits. `CHI-17` (bucket 5 #7) remains
+   the beta-side answer to the canned-vs-real impression.
+
+**All five contested calls are now ruled — §3's queues plus the rulings above are the
+complete beta board.**
 
 ---
 
