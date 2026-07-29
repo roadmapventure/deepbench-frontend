@@ -180,13 +180,19 @@ known defect that would break or dirty that run:
 > the `SES-29` run produces its failure list. The rows below are **suspects, not a queue** —
 > most of their failure rates were measured before `HAR-17`-done's auto-recovery (v6.3.181–183)
 > and may no longer reproduce. Run first; schedule fixes only for what actually fires, with
-> the run's evidence attached. Expected: the first run will NOT be clean (at minimum
-> `LOO-013`'s case-24 misroute is structural and recovery-proof) — that is the diagnosis
+> the run's evidence attached. Expected: the first run will NOT be clean — that is the diagnosis
 > working, not a surprise. Same logic as the `HAR-14` conditional ruling in §4.
+>
+> **Amended 2026-07-29 (`design-loo-013`):** this note originally named `LOO-013`'s case-24
+> misroute as the guaranteed failure ("structural and recovery-proof"). That is no longer true —
+> `LOO-013` is fixed and verified 5/5. The prediction was also based on the wrong root cause: the
+> misroute was never about a capability-less candidate, it was a hardcoded delegation target in
+> Jordan Ellsworth — Web Search Expert's own Skill. The "expect failures" framing still stands on
+> the remaining 15 rows; case 24 specifically is no longer the known-bad one.
 
 | # | ID (Type) | Why it breaks the run |
 |---|---|---|
-| 1 | `LOO-013` (Task Success Rate) | News flow routes to capability-less Brent — **fails case 24 outright**, drawer stuck. |
+| 1 | ~~`LOO-013` (Task Success Rate)~~ **✅ Fixed 2026-07-29 (`design-loo-013`, v6.3.219) — no longer a bucket-1 risk.** | ~~News flow routes to capability-less Brent — fails case 24 outright, drawer stuck.~~ Root cause was not the capability-less-candidate question at all: Jordan Ellsworth — Web Search Expert's `ws-news-search-intent.method` hardcoded `delegate_to_agent targeting agent_id "alex"`, so Michelle Manning — Project Manager was never called and the roster was never consulted. Fixed in Skill data; verified live 5/5 (`jordan → michelle → michelle → alex`, 3 cards, no errors). **Case 24 should now pass — confirm it in the `SES-29` run rather than assuming.** |
 | 2 | `CHI-78` (Task Success Rate) | Turns silently stall or throw post-Marcus; 3 of 5 runs affected. |
 | 3 | `AA-194` (Task Success Rate) | Null `output_desc` misroutes agent selection — caused a live "went wrong reaching Marcus." |
 | 4 | `HAR-13` (Task Success Rate) | Owen's 1500-token gate vs 9,601-char method truncates, failing turns. |

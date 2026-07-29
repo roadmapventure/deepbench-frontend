@@ -5,6 +5,74 @@
 
 ---
 
+## S-AGT-38 (v6.3.221) — 2026-07-29 — engineering notes rendered as product copy
+
+**Worktree:** `audit-rule1-code` · data-only (6 Supabase `capabilities` rows) + doc updates
+
+### How the item changed shape
+
+`AGT-38` was filed hours earlier as an abstract question: `capabilities.data-analysis.description`
+names Eleanor Voss — The Librarian as a delegation target, which is Rule-#1-violating in form even
+though it encodes a real locked rule (§19c). Parked for John's decision.
+
+John then asked which tickets gate beta. Checking `BETA.md` §1 rather than guessing: the beta surface
+is **"the chi screen and the sub screens under bench."** `PersonnelScreen.jsx:393` renders
+`capabilities.description` verbatim — and Personnel File is a Bench sub-screen.
+
+That changed the item from architecture to UX. Six capability descriptions were printing internal
+engineering notes to an Apple chief AI architect:
+
+| Personnel File | Rendered text included |
+|---|---|
+| Nadia Farouk — Data Analyst | `Eleanor Voss (LB-01)`, `ARCHITECTURE.md §19c` |
+| Eleanor Voss — The Librarian | `writeLibrary()`, `lib/librarian.js`, `ARCHITECTURE.md §19c`, `the_library` |
+| Susan Smith — Trainer Agent | `pattern_vocabulary`, `pattern_candidates`, `ARCHITECTURE.md §19i` |
+| Marcus Webb — GEO CSO Expert | `Marcus/CI-01` |
+| Owen Marsh — The Proofreader | `Owen Marsh/CI-04` |
+| Sam Reyes — The Intake Assistant | `Sam Reyes (CI-05, ...)` |
+
+Against `BETA.md`'s bar — *"nothing embarrassing, nothing that undermines the claim of a real
+agentic platform"* — two separate hits: a doc reference in product UI is a polish failure, and a
+capability description naming another agent reads as hardcoded routing to precisely the reader
+hired to spot it.
+
+### The fix
+
+All 6 rewritten as reader-facing copy. Substantive meaning preserved deliberately — `data-analysis`
+still states it never writes to the Data Room directly and hands drafts to the custodian, so §19c's
+constraint survives *without naming who holds it*. Writing for a reader instead of a maintainer
+dissolved the original Rule #1 concern as a side effect rather than as a separate fix.
+
+**Verified:** 0 of 17 capability descriptions match the internal-reference pattern; 0 name any agent
+in the roster.
+
+### Regression test of the *previous* session's change
+
+John asked whether routing was tested after the hardcode came out. It was, for the flow that changed
+(`LOO-013`, 5/5). But that answer had a gap worth recording: populating `news-cards-format.objective`
+made a new Skill description visible in `rosterToContext()`, which builds Michelle Manning — Project
+Manager's candidate context for **every** selection platform-wide, not just the news flow. The
+plausible regression: the CHI Q&A hand-off also goes Michelle → Alex Reeves — Screen Controls Editor
+and must land on `qa-answer-format`, not the newly-visible `news-cards-format`.
+
+Tested directly, 3 runs of `channel-intelligence`/`ci-answer-display-intent`:
+`marcus:ci-answer-display-intent → michelle → michelle:agent-selection-intent → alex:qa-answer-format`,
+3/3. No regression — Michelle discriminates correctly between Alex's two intents.
+
+**Generalisable:** a Skill-content edit scoped to one flow is not scoped to one flow if the field is
+one the broker reads. `objective` and `output_desc` are global to every routing decision; `method`
+is not (it reaches only that agent's own prompt). Check which surface a field feeds before calling a
+Skill edit locally-scoped.
+
+### BETA.md corrections
+
+Bucket 1 row 1 (`LOO-013`) marked fixed. The bucket-1 strategy note was also amended: it predicted
+the first `SES-29` run would fail "at minimum" on `LOO-013`'s case-24 misroute, called "structural
+and recovery-proof." That prediction rested on the wrong root cause (a capability-less candidate)
+and is now obsolete. The expect-failures framing still stands on the remaining 15 rows.
+
+---
+
 ## S-LOO-013-design (v6.3.219) — 2026-07-29 — the hardcode was in the field nobody reads
 
 **Worktree:** `design-loo-013` · data-only (3 Supabase Skill rows + 1 deleted `agent_configs` row), no code, no kickoff doc
