@@ -5,6 +5,66 @@
 
 ---
 
+## S-SES-33-design (v6.3.213) — 2026-07-29 — a session that built nothing, and the rule that would have prevented it
+
+**Worktree:** `design-ses-33` · docs-only, kickoff written then discarded unpushed
+
+### What happened
+
+Opened on `SES-33` (Tooling) — the Vercel `dev` deploy stall. Re-verified it live rather than
+trusting the row, and independently reached the cause: the account is on the Vercel **hobby**
+plan, capped at **100 deployments/day**. On 2026-07-28 the project made **122+**; from ~17:30 CST
+Vercel admitted roughly one build per 15-18 minutes, and which commit won the slot was arbitrary.
+Builds themselves were healthy throughout — **27 s median, 1 s queue, 400/400 `READY`**. The driver:
+**187 commits reached `dev` that day and 148 (79%) touched no deployable file** — inflight markers,
+`FEATURES*.md` rows, kickoff docs — each burning a deployment.
+
+Scoped a `scripts/check-deploy-freshness.js` gate, walked it through with John, got approval, wrote
+the full 11-section kickoff (`v6.3.213`). Then, rebasing before editing `FEATURES.md`, found
+`SES-015` had shipped **`scripts/check-deploy-current.js`** (v6.3.209) doing exactly that — already
+wired as step 0 in `STANDARDS.md` §6 and `docs/runbooks/CHI-TRUE-REGRESSION.md`. It landed in the
+~2 hours between this session's scoping read and its kickoff write.
+
+**The shipped version is also strictly better.** It tests whether the deployed build *contains* the
+commit under test (`git merge-base --is-ancestor`), not SHA equality. Under 5-7 concurrent sessions
+the deployed tip is normally *ahead* of your commit, so the equality check this session specced
+would have failed almost always and been ignored within a day. It also handles `aliasAssigned` (a
+`READY` build that never took the alias is not what the preview serves), polls through
+`BUILDING`/`QUEUED`, and carries a webhook grace window.
+
+Kickoff discarded before any push. Nothing redundant reached `dev`.
+
+### Root cause of the waste — and the fix
+
+Step 4's Architect Review duplicate-functionality check *was* run, correctly, at scoping time
+against the commit this worktree was branched from. The rule is written as a one-time action; with
+5-7 concurrent sessions its answer has a shelf life of minutes. `CLAUDE-DESIGN.md` Step 4 now
+requires re-running that grep against a **fresh `origin/dev`** immediately before writing the
+kickoff doc — the same fetch already mandated before pushing, moved earlier, to where it can still
+change scope. Filed and closed as `SES-46`.
+
+### Also established
+
+- **Vercel's Ignored Build Step cannot fix the quota.** Vercel's own docs: canceled builds "are
+  counted as full deployments… will still count towards your deployment quotas." Filtering
+  docs-only commits skips the *work* and still spends the *budget*. Recorded so no session
+  re-derives it.
+- **Rejected: extending `scripts/platform-stats.js`** to record `VERCEL_GIT_COMMIT_SHA` (it already
+  runs as `prebuild` on every dev/main build and writes Supabase). It writes at *prebuild* — build
+  start, not go-live — so a build failing afterward would leave a SHA recorded that never shipped.
+  A check that lies is worse than no check.
+- `SES-47` filed: the 100/day ceiling itself is untracked anywhere. `SES-33`'s row closes on
+  "prevention," which is push frequency, not the cap. Two levers only — Pro (6000/day) or fewer
+  pushes. John's call, no session needed.
+
+### Note for future sessions
+
+`SES-33` needed no work at all by the time this session reached it — `BETA.md` §2b's pre-regression
+prep (`SES-28`, `SES-015`, `SES-18`) was already fully closed. The next beta item is bucket 1 #1,
+`LOO-013` (Task Success Rate), unclaimed.
+
+---
+
 ## S-SES-25b (v6.3.212) — 2026-07-29 — move the historical blocks out of FEATURES.md's worst rows
 
 **Worktree:** `ses-25b` · **Commit:** `05f079b` · docs-only, no kickoff (same shape as `S-SES-32`)
