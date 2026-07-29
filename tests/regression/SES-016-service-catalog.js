@@ -1,4 +1,4 @@
-// DeepBench v6.3.115 | tests/regression/SES-016-service-catalog.js | SES-016
+// DeepBench v6.3.208 | tests/regression/SES-016-service-catalog.js | SES-016
 // FEATURE: SES-016 — migrated from test-s-arch-hitl-resume-01b.mjs (debris cleanup)
 //
 // Persists the original file's 3 SERVICE_CATALOG assertions against the real
@@ -7,8 +7,9 @@
 
 import assert from "assert";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   for (const slug of ["screen-controls", "html-display", "pdf-assembly"]) {
     const entry = SERVICE_CATALOG.find(s => s.slug === slug);
     assert.ok(entry, `${slug} must have a SERVICE_CATALOG entry`);
@@ -23,3 +24,5 @@ export default async function () {
   const slugs = SERVICE_CATALOG.map(s => s.slug);
   assert.equal(new Set(slugs).size, slugs.length, "no duplicate SERVICE_CATALOG slugs");
 }
+
+selfRun(import.meta.url, run);

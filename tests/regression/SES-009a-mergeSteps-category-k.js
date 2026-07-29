@@ -1,4 +1,4 @@
-// DeepBench v6.3.109 | tests/regression/SES-009a-mergeSteps-category-k.js | SES-009a
+// DeepBench v6.3.208 | tests/regression/SES-009a-mergeSteps-category-k.js | SES-009a
 // FEATURE: SES-009a — persistent regression suite seed
 //
 // Persists 5 of STANDARDS.md Section 4's mandatory Category K assertions
@@ -8,8 +8,9 @@
 
 import assert from "assert";
 import { mergeSteps } from "../../src/utils/mergeSteps.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   // 1. Label-based dedup (not ID-based) for LLM-generated steps
   const current = [{ id: "a1", label: "Research market", type: "agent" }];
   const incoming = [{ id: "a2", label: "Research market", type: "agent" }];
@@ -39,3 +40,5 @@ export default async function () {
   const r5 = mergeSteps([], [{ id: "e1", label: "Please review and confirm" }], []);
   assert.strictEqual(r5.active[0].type, "hitl", "label containing HITL keyword must derive type hitl when incoming has no type");
 }
+
+selfRun(import.meta.url, run);

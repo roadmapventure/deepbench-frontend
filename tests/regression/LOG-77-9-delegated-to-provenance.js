@@ -1,4 +1,4 @@
-// DeepBench v6.3.190 | tests/regression/LOG-77-9-delegated-to-provenance.js | LOG-77-9
+// DeepBench v6.3.208 | tests/regression/LOG-77-9-delegated-to-provenance.js | LOG-77-9
 // FEATURE: LOG-77-9 — Category M (cross-reference consistency), persisted per SES-009a.
 //
 // Locks in the §19k `delegated_to_provenance` contract (Susan Smith — Trainer's
@@ -19,6 +19,7 @@
 import assert from "assert";
 import { SIGNATURE_FIELDS, validateCriteria } from "../../lib/pattern-vocabulary.js";
 import { extractDelegationProvenanceFacts, PROVENANCE_KEYS } from "../../api/prompt/request-receivable.js";
+import { selfRun } from "./_lib/self-run.js";
 
 export default async function run() {
   // Allowlist shape: 17 entries, delegated_to_provenance at position 7 (index 6),
@@ -55,3 +56,5 @@ export default async function run() {
   assert.strictEqual(extractDelegationProvenanceFacts(["agent_id"], { agent_id: 7 }).delegationTarget, null);
   assert.strictEqual(extractDelegationProvenanceFacts(["agent_id"], { agent_id: 7 }).taskProvenance, null);
 }
+
+selfRun(import.meta.url, run);

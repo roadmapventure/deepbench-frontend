@@ -40,7 +40,9 @@ Branch: commit directly to `dev`. No feature branches.
 2. Max 3 files modified per session
 3. Max 4 tasks per kickoff doc
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
-5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a)
+5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a). Two rules on invoking it, both from real false results found 2026-07-28 (`SES-28`):
+   - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. Before `SES-28`, a bare invocation exited 0 having tested nothing — `LOG-86`'s kickoff doc specced exactly that and would have shipped a red suite reporting green.
+   - **Run it against current dependencies.** A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree, which may predate `package-lock.json` — run `npm install` in the worktree first. Found live: the installed tree was two weeks older than `package.json`, so `LOG-77-9` failed on a missing `@vercel/functions` that was never a code problem.
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 

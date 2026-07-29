@@ -1,4 +1,4 @@
-// DeepBench v6.3.201 | tests/regression/HAR-20-forced-toolchoice.js | HAR-20
+// DeepBench v6.3.208 | tests/regression/HAR-20-forced-toolchoice.js | HAR-20
 // FEATURE: HAR-20 — Category N (pure), persisted per SES-009a. Imports the real
 // implementation, never a reimplementation.
 //
@@ -20,8 +20,8 @@
 // shared branch construction covers both, per the kickoff's Task 1 scope).
 
 import assert from "assert";
-import { fileURLToPath, pathToFileURL } from "url";
 import { buildCallBody, buildParseRetryCorrection } from "../../api/prompt/request-receivable.js";
+import { selfRun } from "./_lib/self-run.js";
 
 const CHECKS = [
   {
@@ -128,18 +128,20 @@ async function runChecks({ verbose } = {}) {
 }
 
 // run-all.js contract: export a default async function that resolves on pass, throws on fail.
-export default async function () {
+export default async function run() {
   const failures = await runChecks({ verbose: false });
   if (failures.length > 0) {
     throw new Error(`${failures.length}/${CHECKS.length} checks failed: ${failures.join(" | ")}`);
   }
 }
 
-// Direct-run contract (this file's own Section 8 convention): `node tests/regression/HAR-20-forced-toolchoice.js`
-// prints one PASS/FAIL line per assertion group and exits 1 on any FAIL.
-const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === fileURLToPath(pathToFileURL(process.argv[1]));
-if (isDirectRun) {
+// Direct-run contract: SES-28's shared guard replaces this file's hand-rolled entry-point
+// check. The verbose per-check output is kept -- the wrapper prints one PASS/FAIL line per
+// assertion group, then selfRun adds the standard `  [PASS|FAIL] <file>` line and exit code.
+selfRun(import.meta.url, async () => {
   const failures = await runChecks({ verbose: true });
   console.log(`\nHAR-20-forced-toolchoice: ${CHECKS.length - failures.length}/${CHECKS.length} passed`);
-  process.exit(failures.length > 0 ? 1 : 0);
-}
+  if (failures.length > 0) {
+    throw new Error(`${failures.length}/${CHECKS.length} checks failed: ${failures.join(" | ")}`);
+  }
+});

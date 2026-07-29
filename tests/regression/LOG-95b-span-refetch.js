@@ -1,4 +1,4 @@
-// DeepBench v6.3.186 | tests/regression/LOG-95b-span-refetch.js | LOG-95b
+// DeepBench v6.3.208 | tests/regression/LOG-95b-span-refetch.js | LOG-95b
 // FEATURE: LOG-95b — Category B/C (unit), persisted per SES-009a. Imports the real
 // implementation, never a reimplementation.
 //
@@ -11,8 +11,9 @@
 
 import assert from "assert";
 import { needsSpanRefetch } from "../../src/lib/tracePatterns.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   // ── Category B — refetch decision ──
   assert.strictEqual(needsSpanRefetch({}, "s1", 0), true,  "span missing, tries left -> refetch");
   assert.strictEqual(needsSpanRefetch({ s1: ["Request Routing"] }, "s1", 0), false, "span present -> no refetch");
@@ -24,3 +25,5 @@ export default async function () {
   assert.strictEqual(needsSpanRefetch(null, "s1", 0), false, "no map -> no refetch decision");
   assert.strictEqual(needsSpanRefetch({ s1: [] }, "s1", 0), false, "present key (even empty) -> no refetch");
 }
+
+selfRun(import.meta.url, run);

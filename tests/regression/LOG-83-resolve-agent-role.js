@@ -1,4 +1,4 @@
-// DeepBench v6.3.160 | tests/regression/LOG-83-resolve-agent-role.js | LOG-83
+// DeepBench v6.3.208 | tests/regression/LOG-83-resolve-agent-role.js | LOG-83
 // FEATURE: LOG-83 — Category A (unit), persisted per SES-009a.
 //
 // The rule this locks in: the AI Audit "By Agent" list resolves an agent's HUMAN ROLE
@@ -14,8 +14,9 @@
 
 import assert from "assert";
 import { resolveAgent } from "../../src/components/resolveAgent.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   // ── 1. Real id -> name + real role, not a code ──
   const marcus = resolveAgent("marcus");
   assert.strictEqual(marcus.name, "Marcus Webb", "marcus resolves to Marcus Webb");
@@ -31,3 +32,5 @@ export default async function () {
   assert.notStrictEqual(unknown.role, undefined, "an unknown id must still return a defined role");
   assert.strictEqual(unknown.role, "—", "an unknown id's role falls back to the em-dash placeholder");
 }
+
+selfRun(import.meta.url, run);

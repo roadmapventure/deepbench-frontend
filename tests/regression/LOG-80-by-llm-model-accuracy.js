@@ -1,4 +1,4 @@
-// DeepBench v6.3.158 | tests/regression/LOG-80-by-llm-model-accuracy.js | LOG-80
+// DeepBench v6.3.208 | tests/regression/LOG-80-by-llm-model-accuracy.js | LOG-80
 // FEATURE: LOG-80 — Category A (unit), persisted per SES-009a.
 //
 // The rule this locks in: the AI Audit "By LLM" drawer shows REAL model names only, each
@@ -13,8 +13,9 @@
 // (src/lib/supabase.js falls back to process.env); no network call is made here.
 
 import assert from "assert";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   if (!process.env.VITE_SUPABASE_URL) process.env.VITE_SUPABASE_URL = "http://localhost:54321";
   if (!process.env.VITE_SUPABASE_ANON_KEY) process.env.VITE_SUPABASE_ANON_KEY = "regression-placeholder";
   const { computeByLLM } = await import("../../src/hooks/useAIActivity.js");
@@ -71,3 +72,5 @@ export default async function () {
     "the three entries are exactly the three real models — the null row drops out"
   );
 }
+
+selfRun(import.meta.url, run);

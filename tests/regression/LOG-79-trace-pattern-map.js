@@ -1,4 +1,4 @@
-// DeepBench v6.3.166 | tests/regression/LOG-79-trace-pattern-map.js | LOG-79
+// DeepBench v6.3.208 | tests/regression/LOG-79-trace-pattern-map.js | LOG-79
 // FEATURE: LOG-79 — Category A (unit), persisted per SES-009a.
 //
 // The rule this locks in: the Agent Routing drawer's per-hop pattern names come from
@@ -18,8 +18,9 @@
 
 import assert from "assert";
 import { buildSpanPatternMap } from "../../src/lib/tracePatterns.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   // ── 1. Two rows sharing one span, two view matches -> one key, both names, deduped ──
   const map1 = buildSpanPatternMap(
     [
@@ -71,3 +72,5 @@ export default async function () {
   // ── 4. Empty inputs -> {} ──
   assert.deepStrictEqual(buildSpanPatternMap([], []), {}, "empty inputs yield an empty map");
 }
+
+selfRun(import.meta.url, run);

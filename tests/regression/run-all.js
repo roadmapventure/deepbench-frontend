@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v6.3.109 | tests/regression/run-all.js | SES-009a
+// DeepBench v6.3.208 | tests/regression/run-all.js | SES-009a
 //
 // Persistent regression suite runner. Unlike scripts/check-session-docs.js
 // (a report-only tripwire, always exit 0), this is a real gate: exit 1 if
@@ -7,9 +7,11 @@
 // pass before any commit for Category K/M sessions, same as the session's
 // own Node.js test.
 //
-// Each file in this directory (except this one) is a regression test
-// module. It must export a default async function that returns/resolves
-// on pass, or throws an Error (with a descriptive message) on fail.
+// Each file in this directory (except this one and any `_`-prefixed helper)
+// is a regression test module. It must export a default async function that
+// returns/resolves on pass, or throws an Error (with a descriptive message)
+// on fail, *and* call `selfRun(import.meta.url, fn)` from `_lib/self-run.js`
+// (SES-28) so a direct `node <file>` run is real rather than vacuous.
 //
 // Usage: node tests/regression/run-all.js [--dir=<path>]
 // --dir overrides the directory scanned (used by this session's own
@@ -31,7 +33,7 @@ const DIR = arg("dir", __dirname);
 
 async function main() {
   const files = fs.readdirSync(DIR)
-    .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js")
+    .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
     .sort();
 
   if (files.length === 0) {

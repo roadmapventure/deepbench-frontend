@@ -1,4 +1,4 @@
-// DeepBench v6.3.184 | tests/regression/LOG-95-credited-span.js | LOG-95
+// DeepBench v6.3.208 | tests/regression/LOG-95-credited-span.js | LOG-95
 // FEATURE: LOG-95 — Category B/C (unit), persisted per SES-009a. Imports the real
 // implementation, never a reimplementation.
 //
@@ -13,8 +13,9 @@
 
 import assert from "assert";
 import { pickCreditedSpan } from "../../src/lib/tracePatterns.js";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   // ── Category B — credited-span pick per the §19p identity contract ──
   assert.deepStrictEqual(
     pickCreditedSpan({ type: "delegation_complete", trace_id: "t1", from_span_id: "sA", to_span_id: "sB" }),
@@ -46,3 +47,5 @@ export default async function () {
   assert.strictEqual(line(pickCreditedSpan({ type: "delegation", from_span_id: "s1", trace_id: "t" })), true);
   assert.strictEqual(line(pickCreditedSpan({ type: "delegation", trace_id: "t" })), false);
 }
+
+selfRun(import.meta.url, run);

@@ -1,4 +1,4 @@
-// DeepBench v6.3.171 | tests/regression/LOG-36-pattern-display-sources.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
+// DeepBench v6.3.208 | tests/regression/LOG-36-pattern-display-sources.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.134 | tests/regression/LOG-36-pattern-display-sources.js | LOG-36
 // FEATURE: LOG-36 — Category M (cross-reference consistency), persisted per SES-009a.
 //
@@ -28,6 +28,7 @@ import assert from "assert";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { selfRun } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -60,7 +61,7 @@ function stripComments(src) {
     .replace(/([^:])\/\/.*$/gm, "$1");
 }
 
-export default async function () {
+export default async function run() {
   const files = SCAN_ROOTS.flatMap(listFiles);
   assert.ok(files.length > 0, "scan found no source files — check SCAN_ROOTS");
 
@@ -181,3 +182,5 @@ export default async function () {
   assert.strictEqual(out["rag"].name, humanizeSlug("rag"), "unmatched slug falls back to humanizeSlug, never a catalog name");
   assert.strictEqual(out["rag"].name, "Rag", "the approved expected value — an alias table to 'RAG' is banned");
 }
+
+selfRun(import.meta.url, run);

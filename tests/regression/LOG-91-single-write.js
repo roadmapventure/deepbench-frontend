@@ -1,4 +1,4 @@
-// DeepBench v6.3.204 | tests/regression/LOG-91-single-write.js | LOG-91
+// DeepBench v6.3.208 | tests/regression/LOG-91-single-write.js | LOG-91
 // FEATURE: LOG-91 — Category A (unit), persisted per SES-009a.
 //
 // The rule this locks in: the AI-51 timestamp-pairing heuristic (agent-turn row absorbed by a
@@ -26,8 +26,9 @@
 // is intercepted for part 3 and restored before this module returns.
 
 import assert from "assert";
+import { selfRun } from "./_lib/self-run.js";
 
-export default async function () {
+export default async function run() {
   if (!process.env.VITE_SUPABASE_URL) process.env.VITE_SUPABASE_URL = "http://localhost:54321";
   if (!process.env.VITE_SUPABASE_ANON_KEY) process.env.VITE_SUPABASE_ANON_KEY = "regression-placeholder";
   const { pairedAgentTurnIds, classifyRow, PAIR_LEGACY_CUTOFF_MS } =
@@ -138,3 +139,5 @@ export default async function () {
     if (priorKey === undefined) delete process.env.SUPABASE_SERVICE_KEY; else process.env.SUPABASE_SERVICE_KEY = priorKey;
   }
 }
+
+selfRun(import.meta.url, run);

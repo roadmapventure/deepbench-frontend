@@ -1,4 +1,4 @@
-// DeepBench v6.3.117 | tests/regression/CHI-31-source-simulation-consistency.js | CHI-31
+// DeepBench v6.3.208 | tests/regression/CHI-31-source-simulation-consistency.js | CHI-31
 // FEATURE: CHI-31 -- Category M persistent regression test (SES-009a standing rule).
 //
 // source_simulation is a new value cutting across 3 places: the_library data (Task 1, live
@@ -20,6 +20,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { T } from "../../src/tokens.js";
+import { selfRun } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../../.env.local") });
@@ -51,7 +52,7 @@ function extractDescribeDataType() {
   return factory(T);
 }
 
-export default async function () {
+export default async function run() {
   const describeDataType = extractDescribeDataType();
 
   // 1. New source_simulation the_library.data_type value gets its own explicit label/color.
@@ -107,3 +108,5 @@ export default async function () {
   // for this one file.
   await new Promise(r => setTimeout(r, 150));
 }
+
+selfRun(import.meta.url, run);
