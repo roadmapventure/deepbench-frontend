@@ -189,10 +189,19 @@ known defect that would break or dirty that run:
 > misroute was never about a capability-less candidate, it was a hardcoded delegation target in
 > Jordan Ellsworth — Web Search Expert's own Skill. The "expect failures" framing still stands on
 > the remaining 15 rows; case 24 specifically is no longer the known-bad one.
+>
+> **Corrected 2026-07-29 (`S-CHI-92-design`) — the sentence above is wrong, and this is a QA
+> lesson worth keeping.** `LOO-013`'s routing fix was real, but its "3 cards, no errors"
+> verification **counted cards without reading them**: all three were `<UNKNOWN>` in every field
+> then, and still were when reproduced live today. **Case 24 remains a known-bad case** until
+> `CHI-92` (Task Success Rate, kickoff `v6.3.227`) ships. Rule this re-proves
+> (`STANDARDS.md` §7): an assertion that would pass unchanged if the fix did nothing is not a
+> gate. `CHI-92`'s own QA asserts on card *contents* and on the delegate's input-token count.
 
 | # | ID (Type) | Why it breaks the run |
 |---|---|---|
 | 1 | ~~`LOO-013` (Task Success Rate)~~ **✅ Fixed 2026-07-29 (`design-loo-013`, v6.3.219) — no longer a bucket-1 risk.** | ~~News flow routes to capability-less Brent — fails case 24 outright, drawer stuck.~~ Root cause was not the capability-less-candidate question at all: Jordan Ellsworth — Web Search Expert's `ws-news-search-intent.method` hardcoded `delegate_to_agent targeting agent_id "alex"`, so Michelle Manning — Project Manager was never called and the roster was never consulted. Fixed in Skill data; verified live 5/5 (`jordan → michelle → michelle → alex`, 3 cards, no errors). **Case 24 should now pass — confirm it in the `SES-29` run rather than assuming.** |
+| 1b | `CHI-92` (Task Success Rate) | **Case 24's news door: all 3 News cards render `<UNKNOWN>` in every field.** Root-caused and designed 2026-07-29 (`S-CHI-92-design`, kickoff `v6.3.227`) — Jordan Ellsworth — Web Search Expert's search results never reach the display agent, because `delegation_required` auto-dispatch forwards only the help-request text. Data + one screen file; no harness change. |
 | 2 | `CHI-78` (Task Success Rate) | Turns silently stall or throw post-Marcus; 3 of 5 runs affected. |
 | 3 | `AA-194` (Task Success Rate) | Null `output_desc` misroutes agent selection — caused a live "went wrong reaching Marcus." |
 | 4 | `HAR-13` (Task Success Rate) | Owen's 1500-token gate vs 9,601-char method truncates, failing turns. |
