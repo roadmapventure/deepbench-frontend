@@ -1,1 +1,0 @@
-beta-doc-0728c — worktree `beta-doc-0728c`, branch `session/beta-doc-0728c`. Continuation of `beta-doc-0728` (same conversation): verifying the 20 bucket-2 rows in docs/BETA.md against current source (John suspects some are done or stale). Read-only sweep + BETA.md status updates.
