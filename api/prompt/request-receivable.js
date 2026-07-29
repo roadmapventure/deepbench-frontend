@@ -1,3 +1,4 @@
+// DeepBench v6.3.201 | api/prompt/request-receivable.js | HAR-20 -- disable_parallel_tool_use on both forced tool_choice sites (buildCallBody's forced branch + the guardrails inline call); buildParseRetryCorrection() covers every tool_use id, not just the first
 // DeepBench v6.3.190 | api/prompt/request-receivable.js | LOG-77-9 -- extractDelegationProvenanceFacts(): verbatim delegation_target/task_provenance backing facts for the read-time delegated_to_provenance derivation (§19k); no comparison, no conclusion
 // DeepBench v6.3.180 | api/prompt/request-receivable.js | HAR-15 -- classifyAnthropicFailure() stamps failureClass/faultCode/upstreamStatus on every thrown Anthropic failure; retry behavior byte-identical
 // DeepBench v6.3.153 | api/prompt/request-receivable.js | LOG-49 -- model-call write path completes the signature fact-half: span_id/parent_span_id chain links, input_references_other_deliverable, and quarantined self_reported_claims
@@ -113,10 +114,18 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
     };
   }
 
+  // FEATURE: HAR-20 -- disable_parallel_tool_use now also set on the forced branch (`{ type: 'tool' }`),
+  // not just the auto branch. Parallel emission on a forced schema tool splits required fields across
+  // multiple tool_use blocks; parseModelTurn() (above) reads only the first via `content?.find`, so a
+  // parallel emission surfaced as a spurious missing-required-fields throw. The auto branch has carried
+  // this flag since AI-35 -- this closes the same gap on the forced-tool_choice branch, used by every
+  // schema-only intent (no harness tools, no web search).
   return {
     model, max_tokens, tools,
     ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
-    tool_choice: needsAutoChoice ? { type: 'auto', disable_parallel_tool_use: true } : { type: 'tool', name: schemaTool.name },
+    tool_choice: needsAutoChoice
+      ? { type: 'auto', disable_parallel_tool_use: true }
+      : { type: 'tool', name: schemaTool.name, disable_parallel_tool_use: true },
     messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: systemPrompt }],
   };
 }
@@ -259,6 +268,32 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
   }
 }
 
+// FEATURE: HAR-20 -- extracted from callModel()'s inline correction-message construction (was:
+// attach a tool_result for only the FIRST tool_use block found via `content?.find`). Anthropic's
+// API rejects a turn outright (400 invalid_request_error) whenever an assistant message contains
+// a tool_use block with no matching tool_result immediately after -- so whenever the forced-branch
+// parallel-emission bug (see buildCallBody() above) produced 2+ tool_use blocks, the old
+// first-only construction left every id after the first orphaned, guaranteeing the retry a 400
+// no-op for exactly this failure class (confirmed live: verbatim "tool_use ids were found without
+// tool_result blocks immediately after" on all 7 failed durable_hops in the S-SES-29 run). Pure and
+// exported so the Node test can import the real implementation (STANDARDS.md Section 5). Zero-block
+// input (no tool_use in the failed turn) keeps the pre-existing plain-text fallback, unchanged.
+export function buildParseRetryCorrection(llmContent, correctionText) {
+  const toolUseBlocks = (llmContent || []).filter(b => b.type === 'tool_use');
+  if (toolUseBlocks.length === 0) {
+    return { role: 'user', content: correctionText };
+  }
+  return {
+    role: 'user',
+    content: toolUseBlocks.map((block, i) => ({
+      type: 'tool_result',
+      tool_use_id: block.id,
+      content: i === 0 ? correctionText : 'Duplicate parallel tool call -- not evaluated; see the first tool_result.',
+      is_error: true,
+    })),
+  };
+}
+
 // FEATURE: AA-80 — callModel(): pure extraction of sendRequest()'s prior Step 1 (call + retry-
 // once-on-parse-failure), now shared by sendRequest() itself and execute.js's loop. Never runs
 // guardrails/handler/logging -- that stays exclusively in sendRequest(). ARCHITECTURE.md §19d.
@@ -319,10 +354,7 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
       const correctionText = parseErr.truncated
         ? `Your previous response was cut off because it exceeded the response length limit. Return the same structured output again, but substantially more concise -- shorten or summarize the longest fields so that the complete response, including every required field, fits within the limit.`
         : `Your response did not conform to the required schema: ${parseErr.message}. Return the structured output again, exactly as specified, making sure to include every field named above.`;
-      const failedToolUse = llmData.content?.find(b => b.type === 'tool_use');
-      const correctionMessage = failedToolUse
-        ? { role: 'user', content: [{ type: 'tool_result', tool_use_id: failedToolUse.id, content: correctionText, is_error: true }] }
-        : { role: 'user', content: correctionText };
+      const correctionMessage = buildParseRetryCorrection(llmData.content, correctionText);
       const retryBody = {
         ...callBody,
         messages: [...callBody.messages, { role: 'assistant', content: llmData.content }, correctionMessage],
@@ -698,7 +730,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
               required: ['passed', 'violations'],
             },
           }],
-          tool_choice: { type: 'tool', name: 'guardrails_check' },
+          tool_choice: { type: 'tool', name: 'guardrails_check', disable_parallel_tool_use: true },
           messages: [{ role: 'user', content: guardrailsPrompt }],
         }),
         // FEATURE: HAR-04 -- bounded by real remaining time, not a blind fixed constant.
