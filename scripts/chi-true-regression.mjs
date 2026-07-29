@@ -1,4 +1,4 @@
-// DeepBench v6.3.202 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
+// DeepBench v6.3.210 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
 // driver (24 cases): walks routing->answer->gate->display for direct answers, the full Forecast
 // journey (Theories->Theory Result->commit->resolve) for the 6 Forecast questions, the D2 review
 // extension on any flagged direct answer, the D6 live news door as case 24, the D4 five-try
@@ -14,6 +14,13 @@
 // collapse to "[object Object]", news-door degradation threaded into the case record + a loud
 // progress-line marker, and infra-death records now carry the last attempt's real ctx/judgeVerdicts
 // instead of a fresh empty one. Root cause: docs/SESSIONS.md S-SES-29-rca findings 1-2.
+// SES-31a (v6.3.210): finishes the same job -- Owen's qg-review-intent final_answer is an OBJECT
+// {answer, citations, confidence_tier} (or null) when he regenerated a blocked answer, not a
+// string; `gate.final_answer || qa.answer` let a truthy object leak through as the exact
+// "[object Object]" class SES-31 just eliminated everywhere else. resolveGatedAnswer() now mirrors
+// MarketIntelligenceScreen.jsx:1519's screen parity (swap the WHOLE triple, not just .answer) at
+// both call sites, and a cheap assertString() runtime guard throws (never silently coerces) if a
+// judge/display payload is ever handed a non-string again.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -254,8 +261,23 @@ function flattenRejection(gate) {
   return parts.filter(Boolean).join("\n");
 }
 
+// FEATURE: SES-31a (Task 2) -- extends the existing "[object Object]" guard discipline (SES-31
+// Task 2's flatten-layer unwraps) with a runtime assertion: any value about to be judged or
+// displayed as prose must already be a real string. Throws naming the field and the received type
+// rather than silently coercing -- a shape change upstream (schema drift, a missed unwrap) is a
+// finding, consistent with the parent session's pickHypothesisText precedent (Task 1 above).
+function assertString(value, fieldName) {
+  if (typeof value !== "string") {
+    throw new Error(`${fieldName} must be a string, got ${value === null ? "null" : typeof value} -- ${JSON.stringify(value)}`);
+  }
+}
+
 // ---- Owen's AGT-35 content-context judge (D5) -- the only content judgment anywhere here ----
 async function judgeArtifact({ artifact_type, artifact_content, question, ctx }) {
+  // FEATURE: SES-31a (Task 2) -- covers every judgeArtifact call site generically (one enforcement
+  // point, not one assertion per caller): theory_test, forecast_draft, rejection, and answer (both
+  // runDirectCaseJourney and runRejectionProbe).
+  assertString(artifact_content, `artifact_content (${artifact_type})`);
   const verdict = await call({
     capability_slug: "quality-gate", intent_slug: "qg-content-context-intent", agent_id: "owen",
     task_context: { artifact_type, artifact_content, question },
@@ -282,6 +304,36 @@ function pickHypothesisText(hyp) {
     throw new Error(`hyp-generation-intent returned hypotheses[0] with no string .text -- shape: ${JSON.stringify(first)}`);
   }
   return first.text;
+}
+
+// FEATURE: SES-31a (Task 1) -- Owen Marsh (Proofreader) returns final_answer as
+// {answer, citations, confidence_tier} (or null) when he regenerated a blocked answer. Screen
+// parity: MarketIntelligenceScreen.jsx:1519 swaps the WHOLE object (`retried ? gate.final_answer :
+// qa`), then reads .answer/.citations/.confidence_tier off whichever won -- never just the answer
+// string with the ORIGINAL qa's citations/confidence_tier. The driver's old `gate.final_answer ||
+// qa.answer` both leaked the raw object as a truthy value ([object Object], the same class SES-31
+// just eliminated everywhere else) and mismatched provenance (always qa.citations/confidence_tier
+// even when the regenerated answer replaced the text). retried = !!gate?.final_answer (screen line
+// 1492's own test). When retried, each field falls back individually to qa's value if the
+// regenerated object omits it (only `answer` is load-bearing; citations/confidence_tier are
+// optional in the qg-review-intent schema). Defensive: if gate.final_answer is a bare STRING
+// (contract drift), treat it as the answer text and keep qa's citations/confidence_tier -- never
+// dereference a string into undefined fields.
+export function resolveGatedAnswer(gate, qa) {
+  const retried = !!gate?.final_answer;
+  if (!retried) {
+    return { answer: qa.answer, citations: qa.citations, confidence_tier: qa.confidence_tier, retried: false };
+  }
+  const fa = gate.final_answer;
+  if (typeof fa === "string") {
+    return { answer: fa, citations: qa.citations, confidence_tier: qa.confidence_tier, retried: true };
+  }
+  return {
+    answer: typeof fa?.answer === "string" ? fa.answer : qa.answer,
+    citations: fa?.citations !== undefined ? fa.citations : qa.citations,
+    confidence_tier: fa?.confidence_tier !== undefined ? fa.confidence_tier : qa.confidence_tier,
+    retried: true,
+  };
 }
 
 // ---- A2 steps 3-5 + A3's shared tail (Theory Result -> commit -> resolve) ----
@@ -338,7 +390,10 @@ async function runRejectionProbe({ question, extraFields, firstTryGuardrail, ctx
       tries.push({ accepted: false, rule_violated: gate.guardrail.rule_violated ?? null, reason: gate.guardrail.reason ?? null });
     } else {
       tries.push({ accepted: true, rule_violated: null, reason: null });
-      if (!SKIP_JUDGE) judgeVerdicts.push(await judgeArtifact({ artifact_type: "answer", artifact_content: gate.final_answer || qa.answer, question, ctx }));
+      // FEATURE: SES-31a (Task 1) -- resolveGatedAnswer() screen-parity swap; the judge always
+      // receives the resolved ANSWER STRING, never Owen's raw {answer,citations,confidence_tier}
+      // regenerated-answer object.
+      if (!SKIP_JUDGE) judgeVerdicts.push(await judgeArtifact({ artifact_type: "answer", artifact_content: resolveGatedAnswer(gate, qa).answer, question, ctx }));
     }
   }
   return { tries };
@@ -359,11 +414,18 @@ async function runDirectCaseJourney(question, ctx, judgeVerdicts, extraFields = 
     return { actual_journey: routing.intent === "qa" ? "direct" : "forecast", terminal: "rejected", flagged: false, resolution_applied: null, probe, rejectionOccurred: true };
   }
 
-  const finalAnswer = gate.final_answer || qa.answer;
+  // FEATURE: SES-31a (Task 1) -- resolveGatedAnswer() mirrors the screen's own whole-triple swap
+  // (MarketIntelligenceScreen.jsx:1519): when Owen retried, ALL THREE fields (answer, citations,
+  // confidence_tier) come from his regenerated answer, not just the text with the original qa's
+  // citations/confidence_tier still attached.
+  const resolved = resolveGatedAnswer(gate, qa);
   const needsReviewInput = qa.needs_review || gate.eval?.result === "revise";
+  // FEATURE: SES-31a (Task 2) -- runtime guard: task_context.answer fed to ci-answer-display-intent
+  // must be a string, never Owen's raw regenerated-answer object.
+  assertString(resolved.answer, "task_context.answer (ci-answer-display-intent)");
   const display = await call({
     capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent", agent_id: "marcus",
-    task_context: { answer: finalAnswer, citations: qa.citations, confidence_tier: qa.confidence_tier, needs_review: needsReviewInput, review_reason: qa.review_reason, ...extraFields },
+    task_context: { answer: resolved.answer, citations: resolved.citations, confidence_tier: resolved.confidence_tier, needs_review: needsReviewInput, review_reason: qa.review_reason, ...extraFields },
   }, ctx);
   const flaggedOut = display.needs_review ?? needsReviewInput;
   if (!SKIP_JUDGE) judgeVerdicts.push(await judgeArtifact({ artifact_type: "answer", artifact_content: flattenDisplay(display), question, ctx }));
