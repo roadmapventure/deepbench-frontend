@@ -5,6 +5,34 @@
 
 ---
 
+## S-SES-25 close-out (v6.3.217) — 2026-07-29 — SES-25 + SES-25b done and archived
+
+**Worktree:** `ses-25-close` · docs-only
+
+`LOG-37` — `SES-25b`'s last stated residue — was closed independently the same day by `design-log-37`/`S-LOG-37c` (v6.3.215) and archived `✅ Done`, verified this session: it is no longer in `docs/FEATURES.md` and sits in `docs/FEATURES-ARCHIVE.md`. With that, both `SES-25` and `SES-25b` are complete and have been moved to `FEATURES-ARCHIVE.md`. `BETA.md` §2b item 4 flipped to done.
+
+### What "done" means here, stated plainly
+
+The ticket originally complained that `docs/FEATURES.md` was too big. **It is still big — 288.5 KB, with 32 rows over the 2,000-char cap.** That is not unfinished work; it is the design working as intended:
+
+- **`SES-25a`** installed the thing that never existed — enforcement. `CLAUDE-DESIGN.md` had required "2-4 sentences" per row since 2026-07-07 and nothing checked it. Check 3d now names every over-cap row on every run.
+- **`SES-25b`** did the one-time cleanup of the four worst offenders, moving ~16 KB of historical material into `docs/harvests/` with zero loss.
+- The remaining 32 rows drain as sessions touch them. A bulk pass over rows a session has no context on is `SES-27`'s exact failure mode, and `SES-25b` produced live evidence for why: two separate boundary bugs, each of which would have destroyed live content, were caught only because the migration was dry-run first.
+
+### The two bugs, kept because they generalize
+
+1. **A "historical" marker does not mean everything after it is historical.** Cutting from `BACKLOG INTAKE` to end-of-cell would have swept `LOG-23`'s live `— TASK 1 DONE —` block and its "NOT archivable" note into a harvest file. The cut has to stop at `**FEATURE DETAIL`.
+2. **A measurement taken earlier in the same session can already be stale.** `LOG-72` was measured at 8,999 chars leading with a `⚠️ RE-SCOPED` block; by write time a concurrent session had made it 8,656 with that block gone. The stale marker would have filed the row's *current* state as history. Under 5-7 concurrent sessions, `verify-never-assert-from-memory` applies to your own earlier reads, not just to prior sessions.
+
+### Correction carried forward
+
+`BETA.md` §2b's original item 4 told a future session to fix this with an archive sweep of `✅ Done` rows. That was measurably wrong — only 7 of 175 rows were Done. The corrected framing stays in the doc even though the item is now closed, because the wrong instruction is the part a future reader could repeat.
+
+### Also
+
+`SES-36` (Tooling) was briefly added to `BETA.md` §2b by `design-ses-25` and **removed at John's direction** — developer tooling, invisible to a reviewer, so it does not belong on the beta board. It remains an open backlog row, correctly marked "Not a beta item."
+
+
 ## S-LOG-37c-design / S-LOG-37c (v6.3.215) — 2026-07-29 — `LOG-37` finished: Layer A facts on the embedding path
 
 **Worktree:** `design-log-37` · 3 code files (`lib/vector-search.js`, `lib/librarian.js`, `lib/rag.js`), 4 tasks, commit `efa244e`

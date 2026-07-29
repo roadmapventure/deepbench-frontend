@@ -146,7 +146,10 @@ for tooling the ship-gate itself depends on:
    point of filing; `next_number` renamed `last_issued_number`. Collision risk for the
    high-volume regression filing window is cleared. Drift *detection* was deliberately
    scoped out and is now **`SES-38`** (Tooling, post-beta).
-4. *(Optional)* **`SES-25b` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline.
+4. **`SES-25` (Tech Debt) — ✅ DONE 2026-07-29, both halves** (`SES-25a` v6.3.207, `SES-25b`
+   v6.3.212; final residue `LOG-37` closed by `design-log-37`). Nothing outstanding here
+   before the regression run. Original framing kept below because the correction is the
+   useful part. — `FEATURES.md` is ~290 KB vs the 40 KB baseline.
    **Corrected 2026-07-28 (`design-ses-25`): the "archive pass" this item used to prescribe
    does not work** — only **7 of 175** rows are `✅ Done`, so sweeping them recovers almost
    nothing. The 278 KB lives inside *open* rows (175 rows averaging 1.6 KB, against
