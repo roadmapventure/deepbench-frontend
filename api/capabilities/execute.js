@@ -1,3 +1,4 @@
+// DeepBench v6.3.205 | api/capabilities/execute.js | LOG-71 -- durable_hops now persists LOG-67's config-half snapshot and all three resumeCapability() re-entries recover it, so a resumed hop logs the same frozen signature its first hop did instead of a fact-half-only row
 // DeepBench v6.3.190 | api/capabilities/execute.js | LOG-77-9 -- delegate_to_agent turn rows capture verbatim delegation_target/task_provenance call_facts (§19k backing facts for the read-time delegated_to_provenance derivation); request_help turns deliberately unchanged
 // DeepBench v6.3.184 | api/capabilities/execute.js | LOG-95 -- hop-event span identity (§19p): all 10 streamed delegation-family onEvent payloads carry trace_id + from_span_id/to_span_id; lastHelpSelection and buildFinalDelegationResult() carry the credited execution's trace_id/span_id
 // DeepBench v6.3.182 | api/capabilities/execute.js | HAR-17 -- transient model-call failures checkpoint-recover once per hop (recovery_ledger, checked write) before surfacing; enable_web_search persisted across resume
@@ -476,7 +477,7 @@ async function finalizeDelegation({ delegateResult, targetAgentId, targetCapabil
 // recoveryLedger (null everywhere except the model-call recovery seam: null -> ordinary
 // fire-and-forget patch, byte-identical budget-path behavior; non-null -> patchDurableHopRowChecked,
 // because an unpersisted ledger entry would make "recover once per hop" unbounded).
-async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, enableWebSearch = false, recoveryLedger = null, trace_id, span_id = null, parent_span_id = null }) {
+async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection, pendingDelegation, enableWebSearch = false, recoveryLedger = null, trace_id, span_id = null, parent_span_id = null, signatureConfig = null }) {
   let row_id = job_id;
   if (!row_id) {
     const row = await createDurableHopRow({
@@ -508,6 +509,12 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
     // FEATURE: HAR-17 -- included on the always-run patch too, so a pre-existing row (resume-path
     // re-checkpoint, whose create ran before this session's column existed) still carries the flag.
     enable_web_search: enableWebSearch === true,
+    // FEATURE: LOG-71 -- persist LOG-67's config-half snapshot across the checkpoint, exactly as
+    // LOG-49 persists span_id here: via the always-run patch, so a pre-existing row created before
+    // this column existed still gains it. Written ONLY when non-null -- a checkpoint that doesn't
+    // have the snapshot must never erase one the row already carries (a resume-path re-checkpoint
+    // on a pre-migration row would otherwise null out a value a later hop could have used).
+    ...(signatureConfig ? { signature_config: signatureConfig } : {}),
   };
   if (recoveryLedger !== null) {
     // FEATURE: HAR-17 -- the recovery seam's write MUST be confirmed persisted before the caller
@@ -744,7 +751,8 @@ async function runLoop({
   // at every checkpointAndReturn() site and recovered by resumeCapability()'s three runLoop()
   // re-entries, closing HAR-05's accepted gap: the recovery seam makes checkpoint/resume a normal
   // path for ANY hop, including a web-search one, so the flag can no longer be silently dropped.
-  // (display_agent_*/signatureConfig remain documented residuals -- HAR-17 row in FEATURES.md.)
+  // (display_agent_* remains a documented residual -- HAR-17 row in FEATURES.md; signatureConfig is
+  // no longer one, LOG-71 closed it the same way.)
   enableWebSearch = false,
   // FEATURE: HAR-17 -- the per-hop recovery ledger (§19o): [{ o, fault, at }] entries keyed by hop
   // ordinal (conversationHistory.length at the top of the hop). [] on a fresh call; recovered from
@@ -763,9 +771,13 @@ async function runLoop({
   span_id = null, parent_span_id = null,
   onEvent, // FEATURE: MI-42 -- always a real function by the time this fires; runCapability()/resumeCapability() already default it to a no-op
   // FEATURE: LOG-67 -- the config-half signature snapshot from promptRequest (runCapability() reads it
-  // off db-assembly's raw output, same reason canRequestHelp can't come from `enriched`). Null on the
-  // resume path (durable_hops never persists it) -- an accepted gap, same precedent as
-  // requiresHumanConfirmation/enableWebSearch above; a resumed hop simply logs no config-half.
+  // off db-assembly's raw output, same reason canRequestHelp can't come from `enriched`).
+  // FEATURE: LOG-71 -- no longer null on the resume path: durable_hops.signature_config (this session's
+  // migration) is written at every checkpointAndReturn() site below and recovered by resumeCapability()'s
+  // three runLoop() re-entries, so a resumed hop logs the SAME frozen config-half its pre-checkpoint
+  // hops did instead of a fact-half-only row that no config-half criterion can ever match. Frozen, never
+  // recomputed -- buildSignatureConfig() would read today's skill profiles and reintroduce the very drift
+  // LOG-67 exists to prevent. Null now only for a pre-migration row (one-time, self-clearing).
   signatureConfig = null,
 }) {
   let delegationRetried = false;
@@ -792,6 +804,8 @@ async function runLoop({
         task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
         pendingDelegation: null, enableWebSearch,
         trace_id, span_id, parent_span_id,
+        // FEATURE: LOG-71 -- carry LOG-67's frozen config-half onto the row so the resume recovers it.
+        signatureConfig,
       });
     }
 
@@ -834,6 +848,8 @@ async function runLoop({
             task_context, conversationHistory, depth, delegationOccurred, lastHelpSelection,
             pendingDelegation: null, enableWebSearch, recoveryLedger: newLedger,
             trace_id, span_id, parent_span_id,
+            // FEATURE: LOG-71 -- carry LOG-67's frozen config-half onto the row so the resume recovers it.
+            signatureConfig,
           });
           // FEATURE: HAR-17 -- the recovery payload rides the in_progress response body: every call
           // site's resolveInProgress() sees it (streamed or not) -- the client half is S-HAR-17c.
@@ -1044,6 +1060,8 @@ async function runLoop({
         pendingDelegation: { via_tool: turn.tool_name, tool_input: turn.tool_input, tool_use_id: turn.tool_use_id },
         enableWebSearch,
         trace_id, span_id, parent_span_id,
+        // FEATURE: LOG-71 -- carry LOG-67's frozen config-half onto the row so the resume recovers it.
+        signatureConfig,
       });
     }
 
@@ -1064,6 +1082,8 @@ async function runLoop({
         pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId },
         enableWebSearch,
         trace_id, span_id, parent_span_id,
+        // FEATURE: LOG-71 -- carry LOG-67's frozen config-half onto the row so the resume recovers it.
+        signatureConfig,
       });
     }
     conversationHistory = dispatchOutcome.conversationHistory;
@@ -1267,6 +1287,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
           // resume cycles (same pattern delegation_required already follows here).
           enableWebSearch: row.enable_web_search === true,
           trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
+          // FEATURE: LOG-71 -- re-persist the recovered snapshot so it survives repeated
+          // checkpoint->resume cycles, the identical pattern enable_web_search follows above.
+          signatureConfig: row.signature_config ?? null,
         });
       }
       if (nestedRow.status === 'failed') {
@@ -1301,6 +1324,12 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         conversationHistory, delegationOccurred: true,
         lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
         deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
+        // FEATURE: LOG-71 -- recover LOG-67's frozen config-half from the persisted row so a resumed hop
+        // logs the SAME signature its pre-checkpoint hops did, rather than a fact-half-only row that can
+        // never match a config-half criterion. Frozen, not recomputed: buildSignatureConfig() would read
+        // today's skill profiles and reintroduce exactly the drift LOG-67 exists to prevent. Null only on
+        // a pre-migration row (one-time, self-clearing).
+        signatureConfig: row.signature_config ?? null,
       });
     }
 
@@ -1315,7 +1344,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       });
       if (dispatchOutcome.outcome === 'final') return dispatchOutcome.result;
       if (dispatchOutcome.outcome === 'nested_checkpoint') {
-        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, enableWebSearch: row.enable_web_search === true, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId });
+        // FEATURE: LOG-71 -- signatureConfig re-persists the recovered snapshot so it survives
+        // repeated checkpoint->resume cycles, the identical pattern enable_web_search follows here.
+        return checkpointAndReturn({ job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true, requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null, task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: dispatchOutcome.lastHelpSelection, pendingDelegation: { waiting_on_job_id: dispatchOutcome.waitingOnJobId, tool_use_id: dispatchOutcome.toolUseId }, enableWebSearch: row.enable_web_search === true, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, signatureConfig: row.signature_config ?? null });
       }
       // FEATURE: AI-46a -- this runLoop() continuation (the post-dispatch "continue" outcome, resumed
       // chain's own delegate hop having completed live above rather than checkpointing again) is not
@@ -1338,6 +1369,12 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
         conversationHistory: dispatchOutcome.conversationHistory, delegationOccurred: true,
         lastHelpSelection: dispatchOutcome.lastHelpSelection, hopCounter: { n: row.hop_counter || 0 },
         deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
+        // FEATURE: LOG-71 -- recover LOG-67's frozen config-half from the persisted row so a resumed hop
+        // logs the SAME signature its pre-checkpoint hops did, rather than a fact-half-only row that can
+        // never match a config-half criterion. Frozen, not recomputed: buildSignatureConfig() would read
+        // today's skill profiles and reintroduce exactly the drift LOG-67 exists to prevent. Null only on
+        // a pre-migration row (one-time, self-clearing).
+        signatureConfig: row.signature_config ?? null,
       });
     }
     return await runLoop({
@@ -1365,6 +1402,12 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
       lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
       deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
       onEvent,
+      // FEATURE: LOG-71 -- recover LOG-67's frozen config-half from the persisted row so a resumed hop
+      // logs the SAME signature its pre-checkpoint hops did, rather than a fact-half-only row that can
+      // never match a config-half criterion. Frozen, not recomputed: buildSignatureConfig() would read
+      // today's skill profiles and reintroduce exactly the drift LOG-67 exists to prevent. Null only on
+      // a pre-migration row (one-time, self-clearing).
+      signatureConfig: row.signature_config ?? null,
     });
   } catch (e) {
     // FEATURE: S-ARCH-DURABLE-RESUME-01 (AA-141) -- DB bookkeeping only: a genuinely-failed resumed
