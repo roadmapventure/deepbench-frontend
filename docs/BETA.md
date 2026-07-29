@@ -208,6 +208,11 @@ known defect that would break or dirty that run:
 | 14 | `AA-78` (Task Success Rate) | Off-topic hypothesis accepted silently; a probing reviewer hits it. *(triage call)* |
 | 15 | `AGT-34` (Data) | Contradictory `final_answer` rule could blank a blocked answer — rare path, verify first. *(triage call)* |
 | 16 | `DAT-8` (Tech Debt) | Test-artifact rows inflate Compliance counts a catalog question can surface. *(triage call)* |
+| 17 | `AGT-39` (Task Success Rate) | Nadia Farouk — Data Expert writes 8-character pseudo-ids into her drafted patch prose ("entries, with IDs 2479db72, 9e3c8eb8"), rendered on the CHI screen. Same bar as row 12 — an id-shaped string that is not an id. *(added 2026-07-29, `S-AGT-37`)* |
+| 18 | `AGT-46` (Task Success Rate) | Priya Nair — Forecast/Theory/Performance Expert does the same in theory-test prose — the original decoy source behind `AGT-37`. Correctness is now handled (`HAR-21` + `AGT-37`); what remains is a reviewer reading `(id: 0cecd001)` and seeing a fabricated citation. *(added 2026-07-29, `S-AGT-37`)* |
+| 19 | `DAT-14` (Data) | ~10 QA-authored rows written into `the_reasoning` / `apple-cso-data-room` by this session's own live tests. Same class as row 16 — synthetic content a catalog question can surface. *(added 2026-07-29, `S-AGT-37`)* |
+
+> **Bucket-1 note added 2026-07-29 (`S-AGT-37`):** `AGT-37`'s own crash — **Store as Forecast failing outright** with "Something went wrong committing that" whenever an answer's prose carried a truncated id — was a live bucket-1 defect on the beta surface that was never listed here. It is **fixed** (`HAR-21` v6.3.222 + `AGT-37` v6.3.224) and is recorded for the run's history rather than as an open row. What it left behind is rows 17–19: the *correctness* problem is closed, the *credibility* problem (agents writing id-shaped strings that are not ids) is not.
 
 ### Bucket 2 — UX/UI: chat + column 2
 
