@@ -5231,3 +5231,25 @@ Recorded because this cost two QA cycles and produced one false "the fix didn't 
 **Bucket-4 staleness rate: 6 of 15 rows (40%) were stale or over-scoped** — higher than bucket 2's 25%, consistent with the audit screen being today's hottest surface. Bucket 5 remains unswept (§8 item 5).
 
 **Close-out:** docs touched: `docs/BETA.md`, `docs/FEATURES.md` (7 row annotations), `docs/FEATURES-NEXT.md` (CHI-15), `docs/SESSIONS.md`. Inflight marker removed in the close-out commit.
+
+## S-LOG-107a-design / S-LOG-107a (v6.3.199, `1cb7453`, 2026-07-28, worktree `fade-depth`, 2 code files)
+
+**Patch to `LOG-107` — the scroll fade shipped invisible. Live-QA PASS desktop + mobile.**
+
+**John:** *"i don't see the gradient."* His screenshot was the decisive evidence: the bouncing `⌄` chevron **was** rendering at the bottom edge, so the component mounted and `canScrollMore` was true. Only the gradient was missing — which ruled out the show/hide logic before any code was read.
+
+**Root cause, measured on the deployed panel rather than reasoned about:**
+
+```
+fade gradient : linear-gradient(transparent, rgb(248, 242, 226) 70%)
+panel background:                            rgb(248, 242, 226)      // T.card
+fade height   : 26px
+```
+
+The gradient faded to **exactly the colour it was painted on**. Such a fade is only perceptible where content physically scrolls beneath it and dissolves — true on the Channel Intelligence screen (dense, continuous prose), false here, where bordered drawer rows separated by gaps leave the bottom 26 px as blank `T.card`. **No opacity value fixes this**; the mechanism itself was wrong for the surface. Worth generalising: *a same-colour scrim signals nothing over its own background* — it is a content-dissolve effect, not a depth effect, and the two are not interchangeable.
+
+**Fix (John's call: soft navy shadow).** An **opt-in, default-off `depth` variant** on the shared `ScrollFadeHint`: `linear-gradient(to bottom, ${T.navy}00, ${T.navy}1a)` at 48 px rather than 26. Starting from transparent *navy* (`…00`) rather than the `transparent` keyword avoids the grey midpoint some engines interpolate toward. Default-off was the constraint that mattered — `ScrollFadeHint` is shared, and CHI's current look is approved and must not move.
+
+**Live QA:** deployed gradient reads `rgba(18,36,60,0) → rgba(18,36,60,0.1)` at 48 px — the bottom edge paints ≈ `rgb(225,221,209)`, about 23 points darker than the cream, computed ahead of time so "is 10% enough" was a prediction to check rather than a guess to eyeball. Vanishes at the bottom, returns on scroll-up, returns on drawer-expand with no scroll event, `pointerEvents:none` confirmed via `elementFromPoint`. `LOG-107` intact (counts 7/3/19/31, hover tint). Mobile 375 px fine.
+
+**Regression proof for the shared component, from the deployed bundle rather than the source:** exactly **3** `ScrollFadeHint` call sites exist, and only one opts in — `{show,bg:card,depth:!0}` (AI Audit) versus `{show,bg:paperDeep}` and `{show,bg:cardAlt}` — with the default branch string byte-intact. `MarketIntelligenceScreen.jsx` never entered the diff. **Stated honestly:** CHI's fade was verified *structurally*, not observed rendering — its scroll areas were not overflowing during QA, so there was nothing to look at. Indirect evidence, documented rather than dressed up as a live check.
