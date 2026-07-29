@@ -85,11 +85,16 @@ for tooling the ship-gate itself depends on. Items 1-3 are **required**, item 4
 **recommended**, item 5 **optional**. *(Item 4 added and item 5 corrected 2026-07-28,
 `design-ses-25` — John's call, delegated.)*
 
-1. **`SES-28` (Tooling) — REQUIRED before any regression invocation.** Plain
-   `node tests/regression/<file>.js` passes vacuously (exits 0 testing nothing — only
-   `run-all.js` actually calls the exported function). A false-green here fakes the entire
-   bucket-1 ship bar. Fix: self-executing guard per file or a lint against the bare-`node`
-   idiom. Until fixed, the runbook must invoke ONLY via `run-all.js`.
+1. **`SES-28` (Tooling) — ✅ DONE 2026-07-28 (`S-SES-28`, v6.3.208, `e96f2ee`).** Plain
+   `node tests/regression/<file>.js` used to pass vacuously (exit 0 testing nothing — only
+   `run-all.js` called the exported function), which would have faked the entire bucket-1
+   ship bar. Every test file now carries a shared self-run guard, so a direct invocation is
+   real and a failure is loud; a meta-test fails the suite if any test file lacks its guard.
+   Suite 13/13, self-verified QA 7/7. **Runbook note, still standing:** invoke via
+   `run-all.js` — it is the only thing that runs *all* of them — and run `npm install` in the
+   worktree first, because a worktree resolves `node_modules` up to a shared tree that may
+   predate `package-lock.json` and produce a false RED (that exact false red was live tonight).
+   Both rules are now in `STANDARDS.md` Section 2 rule 5.
 2. **`SES-015` (Tooling) — REQUIRED before the first QA leg.** Vercel can silently skip a
    push (proven live in `S-LOG-105`, 2026-07-28); a stale-bundle pass is indistinguishable
    from a real pass. Write the deploy-verify step (fetch the served bundle, grep for a

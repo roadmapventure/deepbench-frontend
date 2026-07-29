@@ -5,6 +5,51 @@
 
 ---
 
+## S-SES-28-design / S-SES-28 (v6.3.208) — 2026-07-28 — regression tests self-run when invoked directly
+
+**Worktree:** `design-ses-28` · **Commits:** `331d2dd` (design) + `e96f2ee` (coding) · **Kickoff:** `docs/kickoffs/v6.3.208-SES-28-regression-self-run-guard.md`
+
+### A green that meant nothing
+
+`tests/regression/run-all.js` imports each test module and calls its default export. The test files only *export* that function — nothing in them runs on import. So `node tests/regression/<file>.js` imported the module, called nothing, and exited 0. Verified live before any scoping: that exact command against `LOG-36-pattern-display-sources.js` produced no output and exit code 0, and all 10 files then in the directory were checked — every one exported a default function, none self-executed.
+
+That is a false green on the suite `docs/BETA.md` makes the **bucket-1 ship gate**. It had already nearly bitten: `LOG-86`'s kickoff doc specced exactly that command, and that session only caught the problem because it also ran `run-all.js` — which was genuinely red at the time.
+
+John's call between the two candidate fix shapes was **A** — make a bare `node <file>` real rather than merely un-specced — with the 3-file cap explicitly waived, on the reasoning that a ship gate needs the false green to be *impossible*, not just discouraged.
+
+### What shipped
+
+A shared guard, `tests/regression/_lib/self-run.js`, exporting a pure `isEntryPoint()` and a `selfRun(import.meta.url, fn)` that fires **only** when that file is the process entry point — so `run-all.js`'s imports are untouched. Every test file names its default function `run` and calls it at the bottom. `run-all.js` gained a `!f.startsWith("_")` filter so a helper can never be mistaken for a test.
+
+The durable half is `tests/regression/SES-28-self-run-guard.js`: it scans the directory and fails the suite if any test file lacks its guard. Without it the session would have protected today's files and nothing else.
+
+**Two things the backlog row didn't predict**, both handled by the coding session:
+- The backfill was **12 files, not 10** — `HAR-20-forced-toolchoice.js` (v6.3.201) and `LOG-91-single-write.js` (v6.3.204) landed on `dev` mid-session. Since the meta-test scans the whole directory, omitting them would have failed the session's own new test.
+- `HAR-20-forced-toolchoice.js` **had already hand-rolled its own direct-run guard**. It now uses the shared one, with its verbose per-check output preserved.
+
+### The mirror finding: a false RED on the same gate
+
+`run-all.js` was reporting 9/10 — `LOG-77-9-delegated-to-provenance.js` failing on `Cannot find package '@vercel/functions'`. Not a code regression, and measured rather than assumed: the package entered `package.json` on 2026-07-16 (`c5857c6`, `S-LOG-18`) and is in `package-lock.json`, but the installed `node_modules` tree was last written **2026-07-03** and had no `@vercel` scope at all. A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree.
+
+Ruled **into `STANDARDS.md` rather than into a backlog row** — opening an item for "someone's `node_modules` is old" would have been filing a chore, when the real finding is that the ship gate can lie in *both* directions and neither was written down. Section 2 rule 5 now carries both: invoke via `run-all.js`, and install first.
+
+### Verification
+
+Suite **13/13**, `npm run build` clean. Self-verified QA **7/7** directly, not accepted from the coding report — including the two failure paths that actually matter, which a passing suite alone would not have proven:
+- a guarded test that throws, run directly → `[FAIL] … -- <message>`, exit 1;
+- a deliberately guardless probe file dropped into the directory → suite goes red naming that file, exit 1, then removed.
+
+Also confirmed by diff that not one assertion in the 12 backfilled files changed — only the import, the `run` name, the trailing call, and the version header.
+
+### Filed along the way
+
+- **`SES-43`** — `docs/FEATURES-ARCHIVE.md` contains the entire document **twice** (lines 7–609 byte-identical to 616–1218; 603 duplicated lines of 1253). Found because the Edit tool refused a unique match while archiving this session's own row. The second copy is the live one. Not fixed here — a 603-line deletion needs John's explicit approval.
+- **`SES-41`** — the guard's `platform` parameter only selects the case-sensitivity branch; `fileURLToPath()` always parses against the host platform, so POSIX-shaped fixture URLs throw on Windows. Harmless in use, misleading to the next session that unit-tests the helper.
+
+**A row filed and then withdrawn, worth recording:** the documented feature-ID claim SQL in the `session-setup` skill errored (`42703`, `next_number` vs the real `last_issued_number`) when this session ran it, and a row was written for it. On rebase it turned out the concurrent `design-ses-18` session had renamed that column and fixed the skill on `dev` in the same window — this worktree was simply branched before the fix. The row was withdrawn rather than filed stale. The general lesson is the one already in `CLAUDE.md`: a worktree is correct-by-construction only *as of the moment it was branched*, and under 5–7 concurrent sessions a "found live" defect in a shared doc deserves a re-check against `origin/dev` before it becomes a row.
+
+---
+
 ## S-SES-25a-design / S-SES-25a (v6.3.207) — 2026-07-28 — FEATURES row-length ratchet
 
 **Worktree:** `design-ses-25` · **Commits:** `84e4db8` (design) + `c9e9c28` (coding) · **Kickoff:** `docs/kickoffs/v6.3.207-SES-25a-features-row-cap.md`
