@@ -25,12 +25,21 @@
 > down, no session could honestly close an item on deployed evidence.
 >
 > **Now:** firing again, one deployment per commit, backlog drained (verified via the Vercel
-> API, 2026-07-29 08:45). **It self-resolved — no fix was applied and no root cause was
-> established.** It had also happened at least once before (`8fbfdd4`'s commit message).
+> API, 2026-07-29 08:45).
 >
-> **What to do if the board looks stale again:** check deployment freshness *before* trusting
-> any live-QA result, and re-open `SES-33` rather than working around it with a manual poke —
-> a poke deploy carries no git metadata and cannot be traced back to a commit.
+> **Root cause — the Vercel free-tier cap of 100 deployments/day.** Not a broken integration.
+> Confirmed by counting deployments per UTC day: **2026-07-28 = 120**, against 21/34/28/40 on
+> the surrounding days. Recovery ~24h after the burst rather than at a calendar reset points to
+> a **rolling** window — which is why it looked like it "self-healed" and why sessions
+> re-measuring it got contradictory answers.
+>
+> **What this means for this board.** The constraint is *push frequency*, and 5-7 concurrent
+> sessions is exactly what burns 120 deploys in a day — so expect this again on a heavy day.
+> A poke commit spends quota and fixes nothing. **Before trusting any live-QA result run
+> `node scripts/check-deploy-current.js` (`SES-015`); when the preview is stale, verify at the
+> true seam** (import the repo's own exported functions against the real upstream API) rather
+> than waiting out the window — that is how `HAR-20` and `LOG-71` were both verified while the
+> preview was stale. A seam proof is not an end-to-end deployed proof; say which one you have.
 
 ## 1. What beta means (John, verbatim)
 
