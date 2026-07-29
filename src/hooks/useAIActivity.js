@@ -1,3 +1,4 @@
+// DeepBench v6.3.211 | useAIActivity.js | CHI-90 -- buildActivitySummary()'s per-agent `calls` is now gated by isCountableCall(), so the CHI Agents drawer counts real model calls exactly as AI Audit's byAgent does; the raw every-logged-row count it used to hold moves to a new `operations` field (drives the drawer's active/potential split only, never rendered)
 // DeepBench v6.3.204 | useAIActivity.js | LOG-91 -- AI-51 timestamp-pairing heuristic scoped to the pre-trace legacy window (PAIR_LEGACY_CUTOFF_MS); the write path no longer produces agent-turn/wrapper duplicates, so fresh rows are never paired
 // DeepBench v6.3.203 | useAIActivity.js | LOG-81 -- every AI Audit count is real model calls only (isCountableCall gates Total Calls/By Agent/By LLM/By Pattern); By Service stays operations-based by design (§12)
 // DeepBench v6.3.191 | useAIActivity.js | LOG-97 -- By Pattern cost summed from the hydrated log via rollup log_ids (no new query; dedup-consistent with Total Cost)
@@ -229,9 +230,17 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
   const paired = pairedAgentTurnIds(scopedRows);
   const map = {};
   for (const row of scopedRows) {
-    if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, totalCost: 0, costCount: 0, byKind: {} };
+    if (!map[row.agent_id]) map[row.agent_id] = { calls: 0, operations: 0, totalCost: 0, costCount: 0, byKind: {} };
     const d = map[row.agent_id];
-    d.calls++;
+    // FEATURE: CHI-90 -- `calls` is the displayed model-call count, the same definition
+    // AI Audit's byAgent uses (LOG-81's isCountableCall). `operations` keeps the raw
+    // every-logged-row count this field used to hold: it is what tells the CHI drawer an
+    // agent did work on this screen at all, so an agent whose contribution is entirely
+    // deterministic can never be labelled "not yet used on this screen" (Task 2).
+    // isPairedDup is stamped by hydrateFromSupabase() for AI Audit's entries; here the
+    // paired Set computed above is the equivalent per-row source.
+    d.operations++;
+    if (isCountableCall({ model: row.model, isPairedDup: paired.has(row.id) })) d.calls++;
     const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
       : computeCallCost(row.model, row.input_tokens, row.output_tokens));

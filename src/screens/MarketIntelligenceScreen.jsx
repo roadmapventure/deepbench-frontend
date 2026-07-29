@@ -2794,10 +2794,16 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
   // already fully isolated deliberate test data, not production MI-loop traffic.
   const baselineActivity = useAgentActivitySummary(PROPOSED_MI_AGENT_IDS, null, 'speed-baseline-test');
   const agentById = (id) => agents.find(a => a.id === id);
+  // FEATURE: CHI-90 -- the active/potential split keys on `.operations` (every logged row),
+  // not on `.calls` (real model calls only, as of this session). "Not yet used on this screen"
+  // is a claim about whether the agent did any work here, not about whether it called a model:
+  // an agent whose whole contribution is deterministic (a Librarian read, a directory lookup)
+  // is working, and gating the list on `.calls` would silently relabel it as unused. The sort
+  // stays on `.calls` so the ranking matches the number actually displayed below.
   const activeIds = PROPOSED_MI_AGENT_IDS
-    .filter(id => agentActivity[id]?.calls > 0)
+    .filter(id => agentActivity[id]?.operations > 0)
     .sort((a, b) => (agentActivity[b]?.calls || 0) - (agentActivity[a]?.calls || 0));
-  const potentialIds = PROPOSED_MI_AGENT_IDS.filter(id => !agentActivity[id]?.calls);
+  const potentialIds = PROPOSED_MI_AGENT_IDS.filter(id => !agentActivity[id]?.operations);
 
   // FEATURE: MI-22 — Sourced/Simulation(sub-grouped)/Analysis buckets, single describeDataType()
   // pass per row via groupDataSources() (Category M) — replaces S-MI-15's flat count reduce.
