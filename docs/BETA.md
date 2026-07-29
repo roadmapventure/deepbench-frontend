@@ -79,11 +79,9 @@ count below 10,000. Explicitly not a ship-gate.
 
 ## 2b. Pre-regression prep (John-approved 2026-07-28)
 
-These `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
+Three `SES` items protect the regression run's *evidence* and run **before** bucket 1 —
 they were triaged Post-beta on the "reviewer never sees it" test, which is the wrong test
-for tooling the ship-gate itself depends on. Items 1-3 are **required**, item 4
-**recommended**, item 5 **optional**. *(Item 4 added and item 5 corrected 2026-07-28,
-`design-ses-25` — John's call, delegated.)*
+for tooling the ship-gate itself depends on:
 
 1. **`SES-28` (Tooling) — ✅ DONE 2026-07-28 (`S-SES-28`, v6.3.208, `e96f2ee`).** Plain
    `node tests/regression/<file>.js` used to pass vacuously (exit 0 testing nothing — only
@@ -109,21 +107,7 @@ for tooling the ship-gate itself depends on. Items 1-3 are **required**, item 4
    point of filing; `next_number` renamed `last_issued_number`. Collision risk for the
    high-volume regression filing window is cleared. Drift *detection* was deliberately
    scoped out and is now **`SES-38`** (Tooling, post-beta).
-4. **`SES-36` (Tooling) — RECOMMENDED before the regression filing window.** Same
-   false-green class as `SES-28` and `SES-015` above, one step down: `check-session-docs.js`
-   resolves its target as `arg("worktree", process.cwd())`, but a session's cwd is
-   `C:/Projects` (the repo's *parent*), so the invocation `CLAUDE-DESIGN.md` Step 1
-   prescribes — `node scripts/check-session-docs.js`, no flag — makes every doc lookup miss.
-   Measured 2026-07-28 (`design-ses-25`) against one worktree: **no flag → `4 flagged,
-   2 warning`; `--worktree=<path>` → `53 flagged, 0 warning`.** The only symptom is two WARN
-   lines that read like a stale-doc note, not "checks 1/1b/2/3/3c/3d examined nothing." This
-   matters most during the high-volume filing window, when checks 5/5e are what catch stale
-   worktrees and unpushed inflight markers across the 5-7 concurrent sessions — right now
-   they silently do not run for anyone. One-line fix: default `WORKTREE` to the script's own
-   location (`path.resolve(__dirname, "..")`), correct by construction since the script lives
-   in the worktree it checks. Ranked below `SES-28`/`SES-015` because it protects evidence
-   *about sessions*, not the regression results themselves.
-5. *(Optional)* **`SES-25b` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline.
+4. *(Optional)* **`SES-25b` (Tech Debt)** — `FEATURES.md` is ~290 KB vs the 40 KB baseline.
    **Corrected 2026-07-28 (`design-ses-25`): the "archive pass" this item used to prescribe
    does not work** — only **7 of 175** rows are `✅ Done`, so sweeping them recovers almost
    nothing. The 278 KB lives inside *open* rows (175 rows averaging 1.6 KB, against
