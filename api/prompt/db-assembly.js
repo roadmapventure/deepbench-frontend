@@ -1,3 +1,6 @@
+// DeepBench v6.3.228 | api/prompt/db-assembly.js | DAT-12 -- assemblePrompt() accepts a request-level
+// retrieval_scope and buildSections() stamps it onto the knowledge branch's fetch_instruction. Never
+// read from traits -- see the buildSections() comment for why that distinction is the whole point.
 // DeepBench v6.3.142 | api/prompt/db-assembly.js | LOG-67 -- snapshot the runtime-signature config-half into call_facts at write time
 // DeepBench v6.1.40 | api/prompt/db-assembly.js | AA-121 — Knowledge Skill Profile intent_allowlist gate
 // DeepBench v6.1.13 | api/prompt/db-assembly.js | AA-142 — delegationRequired passthrough
@@ -26,7 +29,11 @@ function getSupabaseHeaders(key) {
   };
 }
 
-export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlug) {
+// FEATURE: DAT-12 -- retrievalScope is a REQUEST-level value threaded down from assemblePrompt()'s
+// own caller, deliberately NOT read from `traits`. Reading it off Skill data would apply the scope to
+// live CHI permanently, which is the exact outcome DAT-12's constraint forbids: the regression scopes
+// its own reads, the screen keeps reading the whole corpus.
+export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, intentSlug, retrievalScope = null) {
   const sections = [];
   let reflectSection = null;
   let synthesisEnabled = false;
@@ -82,6 +89,9 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       // RAG search (queryLibrary()'s uber_access branch requires an explicit tag, denies without one).
       // Generic: reads a new optional trait, not gated on any agent identity.
       if (traits.data_room_tag) fetchInstruction.data_room_tag = traits.data_room_tag;
+      // FEATURE: DAT-12 -- stamped only when truthy, same style as the traits.source / data_room_tag
+      // passthroughs above. Unset leaves the fetch_instruction byte-identical to today.
+      if (retrievalScope) fetchInstruction.retrieval_scope = retrievalScope;
       // FEATURE: AA-173 -- optional per-profile retrieval-breadth override. Unset (every existing
       // Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is byte-identical
       // to today -- match_count stays 5.
@@ -351,7 +361,7 @@ export function mergeCallFacts(factHalf, configHalf) {
   return Object.keys(merged).length ? merged : null;
 }
 
-export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null }) {
+export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null, retrieval_scope = null }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl) throw new Error("SUPABASE_URL not configured");
@@ -520,7 +530,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug, retrieval_scope);
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used

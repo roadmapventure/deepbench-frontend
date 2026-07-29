@@ -1,3 +1,4 @@
+// DeepBench v6.3.228 | api/capabilities/execute.js | DAT-12 -- retrieval_scope: an explicit, named public param (AA-83 posture preserved) threaded to assemblePrompt() only, so a regression run can scope its own reads to the seed corpus without mutating a single row
 // DeepBench v6.3.224 | api/capabilities/execute.js | AGT-37 -- handler_context: a handler-facing envelope threaded runCapability() -> runLoop() -> sendRequest() only, never to assemblePrompt()/enrichPrompt(); resolveAccept() supplies the confirmed action's own chunk_id. Opaque throughout -- this file never opens it
 // DeepBench v6.3.205 | api/capabilities/execute.js | LOG-71 -- durable_hops now persists LOG-67's config-half snapshot and all three resumeCapability() re-entries recover it, so a resumed hop logs the same frozen signature its first hop did instead of a fact-half-only row
 // DeepBench v6.3.204 | api/capabilities/execute.js | LOG-91 -- terminal (non-delegating) turn writes exactly one ai_activity_log row: the agent-turn row, held until sendRequest() returns and merged with its _terminal_log wrapper facts (task_id, patterns union, call_facts); dispatch latency rides its own dispatch_latency_ms column, never call_facts; delegating turns log immediately, unchanged
@@ -1196,6 +1197,11 @@ export async function runCapability({
   enrichment_capability_slug = null,
   format_skill_profile_slug = null,
   display_agent_id = null,
+  // FEATURE: DAT-12 -- a request-level READ scope for the knowledge fetch, threaded to
+  // assemblePrompt() and nowhere else. Null for every existing caller -- byte-identical. Opaque here:
+  // this file adds no conditional keyed to its value, and never defaults it to anything but null
+  // (.claude/rules/capabilities-are-data.md).
+  retrieval_scope = null,
   _hop_counter = null,
   _deadline = null,
   _onEvent = null,
@@ -1238,6 +1244,8 @@ export async function runCapability({
     runtime_context,
     intent_slug,
     enrichment_capability_slug,
+    // FEATURE: DAT-12 -- the scope's only destination in this file.
+    retrieval_scope,
   });
 
   const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug, trace_id: traceId });
@@ -1681,20 +1689,27 @@ export default async function handler(req, res) {
 
     // FEATURE: AA-83 -- explicit public param list, never a raw req.body spread. Excludes
     // _hop_counter so no external caller can seed or override the platform's hop ceiling.
+    // FEATURE: DAT-12 -- retrieval_scope joins the explicit list. Same category as tenant_id, which is
+    // already accepted: a data scope supplied by the caller, not a platform limit like _hop_counter.
+    // AA-83's posture is preserved deliberately -- still an explicit, named param, never a req.body
+    // spread.
     const {
       capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
       tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id, stream,
+      retrieval_scope,
     } = req.body || {};
     if (stream === true) {
       return streamResult(res, (emit) => runCapability({
         capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
         tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+        retrieval_scope,
         _onEvent: emit,
       }));
     }
     const result = await runCapability({
       capability_slug, intent_slug, agent_id, task_context, handler_context, runtime_context,
       tenant_id, enrichment_capability_slug, format_skill_profile_slug, display_agent_id,
+      retrieval_scope,
     });
     return res.status(200).json(result);
   } catch (e) {

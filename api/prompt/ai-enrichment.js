@@ -1,3 +1,5 @@
+// DeepBench v6.3.228 | api/prompt/ai-enrichment.js | DAT-12 -- forward fetch_instruction.retrieval_scope
+// into queryContent(). One added argument, no logic.
 // DeepBench v6.3.142 | api/prompt/ai-enrichment.js | LOG-67 -- forward the config-half signature snapshot through enrichPrompt()
 // DeepBench v6.3.136 | api/prompt/ai-enrichment.js | LOG-37a-patch -- gate chunk ids on real retrieval, capture the retrieval method
 // FEATURE: LOG-37a-patch -- ARCHITECTURE.md §19i Layer A fact 7: record *how* context was fetched,
@@ -77,6 +79,10 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
               tenantId,
               matchCount: fi.match_count || 5,
               data_room_tag: fi.data_room_tag || undefined,
+              // FEATURE: DAT-12 -- read off the fetch_instruction the same way data_room_tag above
+              // already is. A request-level value stamped by db-assembly.js, never inferred from who
+              // is calling or which capability is running (.claude/rules/capabilities-are-data.md).
+              retrieval_scope: fi.retrieval_scope || undefined,
             }),
             RAG_TIMEOUT_MS
           )

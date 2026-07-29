@@ -1,3 +1,10 @@
+// DeepBench v6.3.228 | scripts/chi-true-regression.mjs | DAT-12 -- every capability call in the run now
+// carries retrieval_scope: "baseline", so the run reads the seed corpus by tag rather than whatever the
+// previous run left behind (measured live 2026-07-29: 15 retrievable non-baseline leftovers, five of
+// them near-duplicate copies of one upgrade-cycles answer competing for match_count's slots, plus four
+// seed scenarios legitimately superseded and therefore invisible). A READ scope: the run writes nothing,
+// so it cannot disturb the live screen and concurrent writes cannot disturb it. Recorded in the report's
+// totals block. See docs/runbooks/CHI-TRUE-REGRESSION.md §1.
 // DeepBench v6.3.225 | scripts/chi-true-regression.mjs | SES-29 -- CHI true end-to-end regression
 // driver (24 cases): walks routing->answer->gate->display for direct answers, the full Forecast
 // journey (Theories->Theory Result->commit->resolve) for the 6 Forecast questions, the D2 review
@@ -46,6 +53,11 @@ import path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const SCREEN_PATH = path.join(REPO_ROOT, "src", "screens", "MarketIntelligenceScreen.jsx");
+
+// FEATURE: DAT-12 -- the read scope every capability call in this run carries. Named here rather than
+// inlined so the value the run actually used is the value recorded in the report's totals block; a
+// reader of REPORT_JSON can see the run was scoped without taking it on faith.
+const RETRIEVAL_SCOPE = "baseline";
 
 const ENDPOINT = "https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/capabilities/execute";
 const FETCH_ARTICLE_ENDPOINT = "https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/fetch-article";
@@ -187,7 +199,14 @@ function unwrapTerminal(body) {
 }
 
 async function call(payload, ctx) {
-  let body = await postJSON(ENDPOINT, { ...payload, tenant_id: "global", stream: false });
+  // FEATURE: DAT-12 -- every case, every hop, including the news door and the rejection probe: this
+  // is the one place every capability call in this driver is born, so scoping it here is what makes
+  // two runs comparable. The run reads the seed corpus by tag instead of whatever the previous run
+  // left behind. It writes nothing -- a run cannot disturb the live screen, and concurrent sessions
+  // writing to The Library during a run are harmless because every write lands untagged.
+  // Deliberately NOT set on the `action: "continue"` post below: a resume replays a checkpointed hop
+  // from durable_hops and carries its own scope with it.
+  let body = await postJSON(ENDPOINT, { ...payload, tenant_id: "global", retrieval_scope: RETRIEVAL_SCOPE, stream: false });
   let continues = 0;
   while (body && body.status === "in_progress") {
     if (body.recovery) {
@@ -663,7 +682,10 @@ async function main() {
     cases: results,
     run_pass_server_side, // browser leg (runbook §6) is outside this script and outside this field
     banner: SKIP_JUDGE ? "NOT A VALID REGRESSION RUN — --skip-judge active, no content judged" : null,
-    totals: { baseline_cases: 24, extracted: extractedCount, cases_run: results.length },
+    // FEATURE: DAT-12 -- recorded so a reader of REPORT_JSON can tell a scoped run from an unscoped
+    // one. A run whose retrieval_scope is absent read whatever the previous run left behind and is
+    // not comparable to a scoped run.
+    totals: { baseline_cases: 24, extracted: extractedCount, cases_run: results.length, retrieval_scope: RETRIEVAL_SCOPE },
   };
 
   console.log("REPORT_JSON_START");
