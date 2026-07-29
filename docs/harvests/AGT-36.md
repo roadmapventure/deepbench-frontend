@@ -104,6 +104,18 @@ The other three beta gates are genuinely independent and pre-date this session's
 
 **Rule this produced:** a residue ticket that restates the parent's own acceptance criterion is not residue. Before spinning one off, check whether closing the parent would leave a sentence in its own row unsatisfied — if so, it belongs to the parent.
 
+### Reclosed the same day — and why that is not the same call as `AGT-45`
+
+John's question — *"are we able to consider agt-36 closed and agt-41 a new ticket?"* — passes the test `AGT-45` failed, on one specific point: **`AGT-36`'s row scoped its own mechanism.** Its words: *"…instead of naming the 'CSO Data Room' — **Skill data**."* That Skill-data change exists, is deployed, and measurably works part of the time. The residue is not an unfinished Skill edit; it is a mechanism this row explicitly did not cover.
+
+The reasoning that established that, which is worth not re-deriving:
+
+- Rule 1 lives in `skill_profiles.method` as prose assembled into Marcus's prompt, so compliance is **model-governed** — it held on case 23 in the v6.3.220 run and holds on case 12 today. No further wording pass is permitted (`AGT-37`'s generalization).
+- **A banned-phrase list was proposed by this session and rejected on John's challenge.** He asked whether `HAR-21`/`AGT-37` had hardcoded acceptable/unacceptable content. They had not: `lib/claim-resolver.js` validates by **structure** (a UUID regex) with a facts-beat-claims precedence rule — its own header reads *"Claims are format-filtered, never format-trusted"* — and `AGT-37` removed `source_chunk_ids` from Elena Cho — The Reasoner's output contract entirely because the calling code already knew the correct value. **Both work because a known-correct value existed to substitute. Generative answer text has none**, so the pattern does not transfer, and a phrase blocklist would be the content hardcode neither precedent used — visible in the repo to exactly the audience `BETA.md` is written for.
+- What remains is the answer John proposed earlier in the same session: **an Agent guardrails the Agent.** `qg-content-context-intent` already detects this exact failure via `platform_language_detected`; it simply never runs outside the regression harness. That is `AGT-41`.
+
+`AGT-41` inherited the closure gate — case 23 passing `platform_language_detected` in a real run — and was reclassified **🚨 beta-gate (bucket 1)** at the same time, since it moved onto the critical path. Net beta count is unchanged at four: `AGT-41`, `AGT-43`, `AGT-44`, `LOO-27`.
+
 ### Correction recorded
 
 The row previously referred to "Marcus — Channel Intelligence." `src/data/agents.js` gives his role as **GEO CSO Expert** (`id: marcus`, `code: CI-01`); Channel Intelligence is the Capability he holds, not his title.

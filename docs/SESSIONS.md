@@ -46,15 +46,21 @@ My first Marcus test regexed the *JSON envelope*, not the answer — the text li
 
 ## S-AGT-36-design / S-AGT-36 / S-AGT-36b (v6.3.220 + v6.3.225, `6a775c8` / `715301a`, 2026-07-29, worktree `design-agt-36`) — a scoring rule that failed correct answers
 
-**`AGT-36` 🔶 Partial — archived at close-out, then REOPENED the same day on John's call.** Full technical detail: `docs/harvests/AGT-36.md`.
+**`AGT-36` ✅ Done + archived.** Full technical detail: `docs/harvests/AGT-36.md`.
 
-### The close-out was wrong, and John caught it
+### Closed, reopened, reclosed — two different calls, and the test that separates them
 
-This session closed `AGT-36` and filed four beta gates. John's question — *"you think we are done with agt-36, but you created 4 more tickets required for beta?"* — exposed the flaw: **`AGT-45` was `AGT-36`'s own unfinished scope filed under a second number.** `AGT-36`'s row asked for *"a business-grade gap answer with escalation guidance instead of naming the CSO Data Room."* The escalation-guidance half landed and measures working; the stop-naming-the-Data-Room half did not. Giving that residue a new ID let the row close while its stated work was undone — renaming the problem, not solving it.
+The first close-out filed four beta gates and closed the row. John's question — *"you think we are done with agt-36, but you created 4 more tickets required for beta?"* — exposed a real flaw: **`AGT-45` restated `AGT-36`'s own acceptance criterion under a second number.** The row asked for *"a business-grade gap answer with escalation guidance instead of naming the CSO Data Room"*; the guidance half landed, the naming half did not. Reopened; `AGT-45` retired into it as a stub.
 
-Reopened, `AGT-45` retired into it as a stub (kept, not deleted, so same-day cross-references resolve). **The other three are genuinely independent and pre-date this session's changes** — `AGT-43` and `LOO-27` are Owen's guardrail and the harness budget; `AGT-44` is Priya's artifact failing Owen's *ordinary* rubric. They were invisible until now because the broken scorer was failing cases 12 and 23 for the wrong reason, which masked the right ones. **Net for beta: 3 new gates, not 4.**
+Reclosed shortly after, on a different basis — and the difference is the whole lesson. **`AGT-36` scoped its own mechanism:** *"— Skill data."* That change exists, is deployed, and measurably works part of the time. The residue is not an unfinished Skill edit; it is a mechanism the row explicitly did not cover, because rule 1 is **model-governed prose** and no Skill-data edit makes it deterministic.
 
-The generalizable lesson: *a residue ticket that restates the parent's own acceptance criterion is not residue.* Before spinning one off, check whether closing the parent would leave a sentence in its own row unsatisfied — if so, it belongs to the parent.
+**John's challenge is what settled it.** This session proposed a Platform Service holding a banned-phrase list, citing `HAR-21` as precedent. He asked whether `HAR-21`/`AGT-37` had hardcoded acceptable/unacceptable content. Reading `lib/claim-resolver.js` fresh: **they had not.** It validates by *structure* — a UUID regex — with facts-beat-claims precedence (*"Claims are format-filtered, never format-trusted"*), and `AGT-37` removed `source_chunk_ids` from Elena Cho — The Reasoner's contract because the calling code already held the right value. **Both work because a known-correct value existed to substitute; generative answer text has none.** The pattern does not transfer, and a phrase blocklist would be the content hardcode neither precedent used — sitting in the repo for exactly the audience `BETA.md` is written for. Proposal withdrawn.
+
+What remains is what John had already proposed earlier in the session: **an Agent guardrails the Agent.** `qg-content-context-intent` already detects this failure; it only needs to run outside the harness. That is `AGT-41`, which inherited the closure gate (case 23 passing `platform_language_detected`) and was reclassified 🚨 beta-gate at the same time — so the beta count stays at four.
+
+**The test, for future close-outs:** does closing the parent leave a sentence in *its own* row unsatisfied? `AGT-45` — yes, it was the row's own criterion. `AGT-41` — no, the row scoped itself to Skill data and delivered it.
+
+The other three gates are independent and pre-date this session's changes: `AGT-43` and `LOO-27` are Owen's production guardrail and the harness continue budget; `AGT-44` is Priya's artifact failing Owen's *ordinary* rubric. They were invisible until now because the broken scorer failed cases 12 and 23 for the wrong reason, masking the right ones.
 
 ### What shipped
 
