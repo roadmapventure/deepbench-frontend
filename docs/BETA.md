@@ -211,6 +211,39 @@ known defect that would break or dirty that run:
 | 17 | `AGT-39` (Task Success Rate) | Nadia Farouk — Data Expert writes 8-character pseudo-ids into her drafted patch prose ("entries, with IDs 2479db72, 9e3c8eb8"), rendered on the CHI screen. Same bar as row 12 — an id-shaped string that is not an id. *(added 2026-07-29, `S-AGT-37`)* |
 | 18 | `AGT-46` (Task Success Rate) | Priya Nair — Forecast/Theory/Performance Expert does the same in theory-test prose — the original decoy source behind `AGT-37`. Correctness is now handled (`HAR-21` + `AGT-37`); what remains is a reviewer reading `(id: 0cecd001)` and seeing a fabricated citation. *(added 2026-07-29, `S-AGT-37`)* |
 | 19 | `DAT-14` (Data) | ~10 QA-authored rows written into `the_reasoning` / `apple-cso-data-room` by this session's own live tests. Same class as row 16 — synthetic content a catalog question can surface. *(added 2026-07-29, `S-AGT-37`)* |
+| 20 | `AGT-47` (Task Success Rate) | A `forecast_draft` renders hollow while the `theory_test` one step earlier in the same case holds the exact figures it needed. Measured live on case 6; fails `named_entities_present`, `quantitative_content_present`, `asked_metric_present`. Survives any fix to row 21's narration leak. Not root-caused. *(added 2026-07-29, `design-arch-beta-0729` pre-regression check)* |
+| 21 | `AGT-44` (Architecture) | Artifact-producing Skills narrate platform mechanics (Data Room entries, consolidation status, flagging) into user-facing prose. **The single dominant bucket-1 blocker** per the pre-regression check below. *(promoted into this queue 2026-07-29, `design-arch-beta-0729` — the row declared `Beta-gate (bucket 1)` on 2026-07-29 but was never listed here)* |
+
+> **Pre-regression check — 2026-07-29 16:05 CST (`design-arch-beta-0729`, John's request).** Purpose: buy an
+> evidence-based expectation for the next full run without spending the full run. Method: the real driver
+> (`scripts/chi-true-regression.mjs --only <case>`) on **3 cases chosen one per failure class** from the 0/24
+> run — case 9 `vitrine-tech` (Data Room write-denial class), case 6 `upgrade-cycles` (`[object Object]`
+> serialization class, and the *edit* resolution `SES-31a` never verified), case 12 `vietnam-reseller`
+> (hollow-answer class). `smartphone-growth` deliberately excluded — already known to pass, would add nothing.
+> **Ran against the deployed dev preview `1ad2ed3` (v6.3.216).** `check-deploy-current` reported STALE and was
+> **deliberately overridden**: the single commit the preview lacked (`8b7549f`) is docs-only (verified
+> `--name-only`: `CLAUDE-STATE.md`, 3 `docs/` files, 1 harvest — no `src/`/`api/`/`lib/`/`scripts/`), and all four
+> fixes under test (`v6.3.219` `LOO-013`, `v6.3.222` `HAR-21`, `v6.3.224` `AGT-37`, `SES-31a`) were verified
+> present as ancestors of `1ad2ed3`. **Result: 1 PASS / 2 FAIL (9 min total, vs 2 h 2 m for the 0/24 run).**
+>
+> | Case | 0/24 outcome | Now | Failing criteria |
+> |---|---|---|---|
+> | 12 `vietnam-reseller` | fail | ✅ **PASS** (79 s) | — |
+> | 9 `vitrine-tech` | **`infra_death`** (write denial) | reached `display`, `judge_fail` (267 s) | `answer` **passed**; `theory_test` + `forecast_draft` failed `platform_language_detected` **only** |
+> | 6 `upgrade-cycles` | **`[object Object]`** | completed full `edit_then_accept`, `judge_fail` (193 s) | `theory_test` failed `platform_language_detected` only; `forecast_draft` also failed `named_entities_present`, `quantitative_content_present`, `asked_metric_present` |
+>
+> **The two mechanical failure classes that accounted for 22 of the 24 cases did not reproduce.** Zero write
+> denials, zero `[object Object]`, zero infra deaths; both previously-crashing cases now run start-to-finish and
+> emit real quantitative business content. **What remains is one writing defect and one content-loss defect**:
+> all 4 failing artifacts failed `platform_language_detected` (row 21 / `AGT-44`), 3 of them failed nothing else,
+> and the sole survivor of fixing that is row 20 / `AGT-47`. Owen — Proofreader verbatim: *"Platform back-office
+> narration dominates."*
+>
+> **Consequence for this bucket's strategy:** the regression-first rule above is unchanged, but the pre-regression
+> check is now the cheap instrument that decides *whether a full run is worth starting* — ~9 min for 3 cases
+> against ~70 min for 24 at the observed per-case rate. **Re-run these same 3 cases after each bucket-1 fix
+> before committing to a full run.** It is also the bounded test for what counts as beta: a newly-found row is
+> bucket-1 only if it fails a pre-regression case, Post-beta otherwise.
 
 > **Bucket-1 note added 2026-07-29 (`S-AGT-37`):** `AGT-37`'s own crash — **Store as Forecast failing outright** with "Something went wrong committing that" whenever an answer's prose carried a truncated id — was a live bucket-1 defect on the beta surface that was never listed here. It is **fixed** (`HAR-21` v6.3.222 + `AGT-37` v6.3.224) and is recorded for the run's history rather than as an open row. What it left behind is rows 17–19: the *correctness* problem is closed, the *credibility* problem (agents writing id-shaped strings that are not ids) is not.
 
