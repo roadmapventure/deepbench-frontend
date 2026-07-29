@@ -126,6 +126,20 @@ If a section names tables/functions/files before the "Solution" heading, it's al
 
 ---
 
+## Lead With the Verdict
+
+*(added 2026-07-28, `design-chi-90` — John corrected this twice in one session, both times because the answer was present but not stated first.)*
+
+**Every reply opens with the verdict, then stops.** The Explanation Order below governs how to explain a problem once John is asking about it; it is not a licence to pad an answer. Volume is the failure mode even when every section is individually correct and on-format.
+
+- **A decision → one recommendation, no options.** Not "either is defensible, here's the measured table, my recommendation is X" — just X in one sentence, then the shortest reason that supports it. John, verbatim: *"i have no idea, you have listed about 5 ideas. i need one summary of what you think we should do."* Present alternatives only if he asks.
+- **A close-out → the two questions he will actually ask, in the first two lines:** is the item done, and what is newly open (each with its ID + Type). John, verbatim: *"I am confused. Can you be straight forward with me. Is chi-90 complete, and are there new tickets required for beta?"* — both answers were derivable from the report and neither had been stated. QA counts, before/after tables, and Tier-2 flags go below that line, or not at all.
+- **Measured detail belongs in the repo docs, not the chat.** `FEATURES.md`/`SESSIONS.md` rows are where before/after numbers and root-cause narrative live; a session that has written those rows properly does not need to restate them to John.
+
+This outranks the Explanation Order and one-issue-at-a-time rules below when they conflict — those shape the body of an answer, this decides what comes first.
+
+---
+
 ## Communication Pacing
 
 - **One issue at a time, with a concrete use case.** John processes one issue at a time and needs a concrete story — specific agent, specific data, specific before/after — to reason about a proposal; an abstract mechanism description isn't enough even when technically accurate. When there are multiple findings or options, present exactly one and stop for his reaction before moving to the next — don't bundle 3-4 into one message, even related ones.
