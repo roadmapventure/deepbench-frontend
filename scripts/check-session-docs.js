@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v6.3.130 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23
+// DeepBench v6.3.207 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a
 //
-// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c --
+// Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 3d, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c --
 // previously a markdown checklist a session had to remember to run by hand
 // (greps + git commands typed out fresh each time). This is the same logic as
 // a single script, so "run session-hygiene" becomes "run this" instead of
@@ -114,6 +114,20 @@ function checkFeatureFile(findings, filename, requireType) {
       if (!type) {
         findings.push({ check: "3c", severity: "FLAG", detail: `${filename}: ${idMatch[1]} has a blank Type cell` });
       }
+    }
+
+    // Check 3d -- see ROW_LENGTH_CAP's comment for why 2000 and why it's a ratchet.
+    // Measure without the trailing \r: this repo checks out CRLF, so line.length
+    // would report every row 1 char longer than its actual content and would
+    // differ from the same row measured on an LF checkout. The reported number is
+    // the baseline SES-25b works against, so it has to be the content length.
+    const rowLength = line.endsWith("\r") ? line.length - 1 : line.length;
+    if (rowLength > ROW_LENGTH_CAP) {
+      findings.push({
+        check: "3d",
+        severity: "FLAG",
+        detail: `${filename}: ${idMatch[1]} row is ${rowLength} chars, over the ${ROW_LENGTH_CAP}-char cap -- move the detail to docs/harvests/${idMatch[1]}.md and leave a pointer (CLAUDE-DESIGN.md step 9). Never delete: append to the harvest file first, then trim the row.`,
+      });
     }
   }
 }
@@ -262,6 +276,20 @@ function extractInFlightBullets(stateText) {
 // generous enough for a genuinely detailed 3-4 sentence bullet, tight enough to
 // catch a paragraph masquerading as one.
 const ENTRY_LENGTH_CAP = 800;
+
+// ---- Check 3d: per-ROW character cap (added SES-25a) ----
+// CLAUDE-DESIGN.md line 214 has required "2-4 sentences" per FEATURES row since
+// 2026-07-07, but nothing enforced it, so docs/FEATURES.md reached 290 KB across
+// 175 rows (278 KB of that inside the rows themselves) while FEATURES-LATER.md
+// holds 229 rows in 83 KB. Check 3 caps the FILE, which fires forever with no
+// actionable target; this names the specific rows to fix.
+//
+// Deliberately set at 2000, not at the 2-4 sentences the prose asks for: 2000
+// flags 33 of 175 rows -- the genuinely pathological ones -- where a 1000-char
+// cap would flag 122 and be ignored as noise on day one. This is a RATCHET:
+// tighten it toward ~1000 as the backlog drains. Do not tighten it in the same
+// session that adds it.
+const ROW_LENGTH_CAP = 2000;
 
 function checkEntryLengths(findings, stateText) {
   // "In flight now" (retargeted 2026-07-21, SES-011): each session's status is
