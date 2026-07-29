@@ -5169,3 +5169,17 @@ LOG-77 (Architecture) item 9 — the evaluation-verdict-gated-retry fact, resolv
 **Proposed, not yet adopted (John hasn't ruled):** a close-out verdict-line rule — every session close-out leads with `GOAL MET/NOT MET — residue: <IDs> (blocking|non-blocking)` so goal-vs-residue is scannable. Filed nowhere yet; raise again when John wants it.
 
 **Close-out:** docs touched: `docs/BETA.md` (new), `docs/FEATURES.md` (pointer + `SES-30`), `docs/SESSIONS.md`, `CLAUDE-STATE.md` (rolling window). Inflight marker removed in this commit.
+
+## Operational note — Vercel does not reliably build every push to `dev` (observed 2026-07-28, `log-105-roll` + `audit-affordances`)
+
+Twice in one afternoon a push to `dev` produced **no deployment at all**, and the live-QA run that followed looked exactly like a failed fix. Both times the pattern was the same: **two commits pushed within ~1–2 minutes of each other** (a kickoff-doc commit, then the code commit) — Vercel built neither, and its most recent deployment remained the commit *preceding* the pair. Sitting and waiting did not resolve it (12+ minutes, no queued or building deployment via the API). A **subsequent unrelated push triggered a build immediately**, and that build included the earlier commits.
+
+**What this means for live QA in this repo:**
+- **"Pushed" is not "deployed."** Before concluding anything from what the screen shows, fetch the served bundle and grep it for a string unique to your change — JSX prop names survive minification, so a new prop name is a reliable marker:
+  `fetch(location.origin+'/?cb='+Date.now(),{cache:'reload'})` → match `assets/index-[A-Za-z0-9_-]+\.js` → fetch that asset → `.includes('<yourNewProp>')`.
+- **Confirm which commit actually built** rather than inferring from timing:
+  `GET https://api.vercel.com/v6/deployments?app=deepbench-frontend&limit=5` with `Authorization: Bearer $env:VERCEL_TOKEN`, reading `meta.githubCommitSha`.
+- **Waiting on a bundle-hash change beats waiting a fixed duration** — `Monitor` with `until … | grep -qv '<currentHash>'`.
+- **A manual API trigger is not available:** `POST /v13/deployments` returns **402 Payment Required** on this plan. The working remedy is another push.
+
+Recorded because this cost two QA cycles and produced one false "the fix didn't work" conclusion that was nearly acted on.
