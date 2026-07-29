@@ -211,24 +211,31 @@ still accruing).
 
 ### Bucket 5 — Agent Routing drawer
 
-`LOG-95`-done (v6.3.184/186) shipped per-hop pattern lines for every hop shape; these rows are
-what's still between that and "every agent shows ≥1 pattern, accurately":
+**Source + Supabase verified 2026-07-28 night (`beta-doc-0728g`, John's ask) — the last
+bucket swept; every queue on this board now carries verified-current evidence.** Foundation:
+`LOG-95`-done (v6.3.184/186) shipped per-hop pattern lines for every hop shape.
 
-| # | ID (Type) | Defect |
+**Confirmed still valid (the real queue):**
+
+| # | ID (Type) | Defect (verified evidence) |
 |---|---|---|
-| 1 | `CHI-11` (Observability) | Per-hop AI-pattern tags never audited for accuracy (John's own doubt) — this bucket's acceptance check, run **last**. |
-| 2 | `LOG-88` (Observability) | Child hops lack span identity → drawer shows no pattern. |
-| 3 | `LOG-71` + `LOG-103` (Architecture/Observability) | Resumed hops/rows lack the config-half → their hop shows no pattern (same family). |
-| 4 | `LOG-39` (Architecture) | Routing's own call gets a Layer A fact → routing hops carry a pattern. |
-| 5 | `LOG-72` (Architecture) 🔶 | Remaining criteria authoring → pattern coverage for still-unnamed patterns. |
-| 6 | `LOO-005` (Observability) | Pre-delegation reasoning never logged; routing card opens with a missing hop. |
-| 7 | `CHI-17` (UI) | Michelle Manning — Project Manager's raw unsummarized reasoning dumped into the `agent_selection` row. |
-| 8 | `CHI-27` (UI) | Panel reads newest-first and oldest-first simultaneously. |
-| 9 | `CHI-24` (Architecture) | Agent-id-only placeholder matching can silently undercount hops. |
-| 10 | `CHI-64` (Observability) | News delegation hops resolve null durations + console errors on load. |
-| 11 | `LOO-003` (Observability) | Multi-hop delegation reason overwritten — drawer shows the wrong why. *(triage call)* |
-| 12 | `AI-52` (Observability) | Verify two legacy intents' `patterns_used` — the "if appropriate" check. *(triage call)* |
-| ~~13~~ | ~~`AA-179` (Architecture)~~ | Dropped from beta 2026-07-28 — its blocker `AA-178`'s ruling was deferred post-beta (§4 Q4). |
+| 1 | `LOG-71` (Architecture) | Resume paths pass no `signatureConfig` (both `resumeCapability`→`runLoop` re-entries) → resumed hops show no pattern. **`LOG-103` verified as its duplicate** (same gap, observed-row side) — merge proposed. |
+| 2 | `LOG-72` (Architecture) 🔶 | Criteria authoring, now quantified: **27 vocabulary entries, only 9 with matching criteria** — 16 active patterns can't match any hop. Headline MISSING SIGNAL already resolved by `LOG-77`-item-9-done. |
+| 3 | `LOG-39` (Architecture) | Shrunk: the Layer A fact half largely exists (`tool_calls` records `request_help`); remaining work is the Layer B criteria row for routing. |
+| 4 | `LOO-005` (Observability) | Pre-delegation *reasoning* still uncaptured — `LOG-77`-item-9's provenance capture is deliberately facts-only (`delegation_target`/`task_provenance`, no reasoning field). First routing hop still missing. |
+| 5 | `LOO-003` (Observability) | `delegation_task` is still a fixed scalar key on both delegation paths — later hop clobbers earlier hop's reason. |
+| 6 | `CHI-17` (UI) | `agent_selection` still renders raw verbatim reasoning (truncation moved to render layer, text never shaped). |
+| 7 | `CHI-24` (Architecture) | Placeholder matching still keys on agent id only; the stored `replaces.key` is written but never read back. |
+| 8 | `CHI-64` (Observability) | Confirmed — and **one root with `CHI-87` + `LOO-26` (bucket 2)**: the mount-path news fetch never seeds `lastEventAtRef`. One fix closes all three rows; consolidation awaiting John. |
+| 9 | `CHI-11` (Observability) | The bucket's acceptance audit, run **last** — re-anchored: tags now come from the `ai_call_patterns` view (`tracePatterns.js`), not `patterns_used`. **`AI-52` folds in** (its verification ran 2026-07-28: both hyp intents uniformly write `["rag","structured-output"]`, 190+ rows — per-row legitimacy is this audit's judgment). |
+
+**Likely already fixed — verify, then close:**
+`LOG-88` (Observability — `LOG-95`-done shipped both halves the row asks for; residual is
+span-write *timing* only, settled by the §19k span-less-delegation count on recent rows),
+`CHI-27` (UI — the within-hop reversal was reverted in-code; both levels newest-first).
+
+**Dropped/absorbed:** `AA-179` (blocked ruling deferred post-beta, §4 Q4), `LOG-103` (dup of
+`LOG-71`), `AI-52` (folds into `CHI-11`).
 
 ---
 

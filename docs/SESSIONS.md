@@ -5275,3 +5275,17 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 **`SES-18` reseed executed this session (Supabase, `beta-doc-0728f-ses18-reseed`):** all 15 `feature_id_counter` prefixes audited against real doc maxima (grep across all four FEATURES files). Only `ABT` was desynced — counter `next_number=1` vs real `ABT-2` live in `FEATURES-LATER.md`; the next claim would have minted a duplicate `ABT-2`. Reseeded to 2 via `GREATEST`. All other prefixes (AGR, AGT, AIA, CHI, DAT, HAR, LOG, LOO, MCP, MOB, PRO, SCA, SES, SH) verified in sync. `SES-18`'s remaining scope (drift-detection mechanism) stays post-beta.
 
 **Close-out:** docs touched: `docs/BETA.md` (§2b), `docs/SESSIONS.md`. One Supabase counter UPDATE. Inflight marker removed in close-out commit.
+
+---
+
+## beta-doc-0728g — Bucket-5 (Agent Routing drawer) staleness sweep (2026-07-28 night, addendum to beta-doc-0728, docs-only, no version bump)
+
+**Last unswept bucket — every beta queue now carries verified-current evidence.** All 13 rows re-traced through current source (3 read-only sub-agents) + live Supabase. Recorded in `docs/BETA.md` §3 bucket 5 + row annotations.
+
+**Confirmed (9):** `LOG-71` (resume paths pass no `signatureConfig` — and `LOG-103` verified as its DUPLICATE, observed-row side; merge proposed), `LOG-72` (quantified: 27 vocabulary entries, only 9 with criteria — 16 active patterns can't match; headline MISSING SIGNAL already resolved by LOG-77-item-9), `LOG-39` (shrunk — fact half exists via `tool_calls`; remaining = Layer B criteria row), `LOO-005` (LOG-77-9's provenance capture is facts-only, reasoning still uncaptured), `LOO-003` (`delegation_task` scalar clobber), `CHI-17`, `CHI-24` (`replaces.key` written, never read), `CHI-64` — **shared-root CONFIRMED with `CHI-87` + `LOO-26`: one bug (unseeded `lastEventAtRef` on mount-path `fetchNewsCards`), three rows, two buckets; one fix closes all three**, `CHI-11` (re-anchored to the `ai_call_patterns` view; `AI-52` folds in — its verification ran: both hyp intents uniformly `["rag","structured-output"]`, 190+ rows).
+
+**Likely fixed (2):** `LOG-88` (LOG-95-done shipped both requested halves; residual = span-write timing, settled by the §19k span-less count), `CHI-27` (within-hop reversal reverted in code, both levels newest-first).
+
+**Bucket-5 staleness: ~5 of 13 rows (38%) stale/dup/over-scoped** — consistent with bucket 4's 40%; the same signature/span machinery churn is the cause. Sweep totals across buckets 2/4/5: 48 rows checked, 11 dead-or-shrunk, 4 duplicate clusters found (`LOO-26`→`CHI-87`, `CHI-15`→`CHI-67`, `LOG-103`→`LOG-71`, `CHI-64`+`CHI-87`+`LOO-26` superset).
+
+**Close-out:** docs touched: `docs/BETA.md`, `docs/FEATURES.md` (8 row annotations), `docs/SESSIONS.md`. Inflight marker removed in close-out commit.

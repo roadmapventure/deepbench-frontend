@@ -1,1 +1,0 @@
-beta-doc-0728g — worktree `beta-doc-0728g`, branch `session/beta-doc-0728g`. Continuation of `beta-doc-0728` (same conversation): bucket-5 (Agent Routing drawer) staleness sweep — source verification via read-only sub-agents + direct Supabase checks (LOG-72 criteria coverage, AI-52 patterns_used). BETA.md + row annotations updated at close.
