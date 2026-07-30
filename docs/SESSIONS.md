@@ -5,6 +5,38 @@
 
 ---
 
+## S-SES-65-design / S-SES-65 (v6.3.233, `4ea8133`, 2026-07-29, worktree `design-ses-65`) — half the ticket was already ruled on, and the half that was real was smaller than it claimed
+
+**`SES-65` ✅ done + archived, self-verified QA 6/6 PASS.** A bucket-1 regression run can no longer report a failing case without naming a cause.
+
+### The ticket had two claims and only one was a defect
+
+`SES-65` was filed as two causes in `scoreVerdict()`'s rich-answer branch. Reading the runbook before touching the code separated them:
+
+- **`asked_metric_present` absent from the scored loop — not a defect.** Runbook §5b's own criterion table already states *"Rich-answer class (default): not scored"*, locked under `AGT-36b` with John's §8 approval on 2026-07-29. The row speculated the omission "may be inherited rather than intended"; it was written down as intended. **And it cannot become a gate as written:** the criterion's own Skill text (`skill_profiles.qg-content-context-intent`, read live) says *"If the question does not ask for a quantity at all, this is false."* On the rich-answer path most questions ask for no quantity, so `false` is the correct reading and carries no signal — gating on it would fail correct answers, the exact failure `AGT-36b` removed when it replaced `quantitative_content_present`. Case 24 `news-first-card` is the live example. **Turned down, not deferred**, and the ruling is now in §5b so it is not refiled a third time.
+- **`pass` and `failed_criteria` independently sourced — real.** `pass` comes from Owen Marsh — The Proofreader's holistic flag (runbook §5's bar) while the list is built from a three-criterion loop, so a failure Owen makes on anything outside those three produced `case_pass: false, failed_criteria: []`.
+
+### The real half was a summary defect, not data loss — which the ticket overstated
+
+`BETA.md` row 24 justified the beta gate as *"bucket 1 cannot establish its bar."* That is stronger than the evidence supports: `judgeArtifact()` already returned the whole verdict as `evidence`, Owen's schema carries a `critique` string, and **`DAT-16` had already quoted him verbatim from that same output** (*"never names Brazil, never states Apple's compliance threshold…"*). The reason was always recoverable; the field meant to summarize it was empty. Fixing it is still right — anything reading `failed_criteria` as "what's wrong" got an empty list on a failing case — but it does not block ship on its own. Offered to John as a beta-status drop; he declined the change, so the row stayed beta and closed as beta.
+
+### What shipped
+
+Reporting only, across 3 files. `failed_criteria` can never be empty while `pass` is false — the marker `holistic_verdict` fills it, an honest name for what happened. `judge_fail` was the one bare token in `fail_causes` while `infra_death` and `journey_deviation` had always carried their detail inline; it now carries the failing artifact, its criteria, and Owen's critique the same way. **Extending the existing mechanism rather than adding a reporting channel was the Architect Review's finding**, not the first design.
+
+### Verified independently of the coding agent's report
+
+Both versions of `scoreVerdict()` extracted from git and re-run side by side over **972** criterion/class/flag combinations: **0 pass-verdict differences, 0 failures with an empty list, 0 cases where the marker joined a real criterion.** Live on case 6 `upgrade-cycles`, the FAIL line now reads `judge_fail (forecast_draft: quantitative_content_present -- "…it names no upgrade-cycle figures—no months, years, or percentage differences…")`, and `critique === evidence.critique` on every artifact — surfaced, not paraphrased. `asked_metric_present` was `false` on that artifact and correctly stayed out of the failed list.
+
+### Two agent claims that did not survive checking
+
+- It proposed filing a **new beta-gate row** for `@vercel/functions`/`jsdom` missing from the shared `node_modules`. The packages really are absent — but that exact condition, naming that exact package, is already `STANDARDS.md` §2 rule 5 and `BETA.md` §2b item 1, which calls it *"never a code problem."* **No row filed.**
+- `DAT-16` shipped **mid-session** (v6.3.234, `58e2cb4`), moving case 9 `vitrine-tech` into the honest-gap class — so the kickoff's headline QA case no longer exercises the branch under test. The 972-combination sweep is what carried the proof instead. Its comment-only corrections to stale `DAT-16` text in the test file were kept: those comments contradicted the assertions directly beneath them.
+
+**Version ordering:** v6.3.233 landed *after* v6.3.234 on `dev`. `CLAUDE-STATE.md` tracks the highest closed-out version and reads 233, with a note naming the inversion.
+
+---
+
 ## S-SES-62-design / S-SES-62 (v6.3.231, `462e5ac`, 2026-07-29, worktree `design-ses-62`) — the mirror drifted by call sequence, and the run that proved it also disproved me
 
 **Outcome: `SES-62` ✅ and `SES-57` ✅ both done + archived.** Regression test #24 reached a judged verdict for the first time since `CHI-92` shipped that morning. 3 files, suite **24/24**, build clean.
