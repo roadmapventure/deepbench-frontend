@@ -162,7 +162,17 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    0 of 95 substantive clauses lost, verified per-clause.** Residue: `LOG-37`'s own status
    chain, still over cap. Efficiency, not
    correctness — still skippable for beta.
-5. **`SES-57` (Tech Debt) — ❌ OPEN, filed 2026-07-29 (`log-109-followup`), cheap (one line).**
+5. **`SES-57` (Tech Debt) — 🔶 SHIPPED v6.3.230 (`bb60703`), NOT closed. Updated 2026-07-29
+   (`design-ses-57`).** The fix landed as a new platform service, **Article Context Resolver**
+   (`src/lib/newsCardContext.js`, §19m row 33) — the CHI screen and the test engine now call one
+   function, so the payload cannot diverge again. Suite 23/23, build clean, live-proven at the seam
+   (real 400 → a classified reason object; unreachable endpoint → fails open instead of recording an
+   infra death). **Two corrections this session measured, both of which change this item's story:**
+   the "one line" fix below was a **no-op** (the test engine never read the error body, and
+   `db-assembly.js` filters empty values, so adding the key alone changes nothing); and the item's
+   live impact is **latent, not live** — it needs a non-OK article fetch, which `CHI-95` shows
+   practically never happens. **Its own gate cannot run yet — blocked on `SES-62` then `CHI-95`
+   (both new, both below).** Original framing kept because the recurrence is the useful part:
    The regression driver stopped matching the screen the moment `CHI-91` shipped:
    `scripts/chi-true-regression.mjs:540` spreads 3 `extraFields` into case 24's answer/gate/display
    calls, and `analyzeNewsCard()` now spreads 4 — `article_unavailable_reason` is missing. On a
@@ -185,6 +195,27 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    above. Fix is small: the driver already resolves the serving commit at start; record it per case
    and flag a change in `REPORT_JSON`. Not to be confused with `SES-33` (Vercel producing no build
    at all) or `DAT-12` (which *data* a run read).
+7. **`SES-62` (Task Success Rate) — ❌ OPEN, filed 2026-07-29 (`design-ses-57`). DO THIS FIRST —
+   nothing about regression test #24 can be measured until it lands.** The news-door gate has been
+   failing **100% of the time, unconditionally, since `CHI-92` shipped this morning** (v6.3.227):
+   that session split the news flow into a search call returning `stories` and a display call
+   returning `cards`, and the test engine still makes only the first call and reads a `cards` key
+   that no longer exists. The case throws "news door: Jordan returned zero cards" before it reaches
+   the article, the answer, or the judge. Confirmed by a direct deployed call — `ws-news-search-intent`
+   returns `content.stories` with 3 real headlines and **no** `cards` key. **The product is fine**
+   (verified live: Jordan Ellsworth — Web Search Expert → Michelle Manning — Project Manager →
+   Alex Reeves — Screen Controls Editor all complete, drawer populates). Test engine only —
+   textbook §2b. **Third recurrence of this exact drift** after `SES-31` and `SES-57`.
+8. **`CHI-95` (Task Success Rate) — ❌ OPEN, filed 2026-07-29 (`design-ses-57`). Not a §2b evidence
+   item — this one is the product.** `api/fetch-article.js` returns **200 with a conversational
+   refusal as the article text** (`:114` only checks non-emptiness), so the honest-gap path
+   `CHI-91`/`SES-57` built can never fire. Measured against the deployed route: a paywalled
+   `wsj.com` URL returned a summary of *adjacent* reporting Claude guessed was "likely the subject
+   of that article"; a nonexistent `ft.com` path returned "I'm sorry, but I'm unable to access that
+   URL… How would you like to proceed?" — both `res.ok`, both with `article_unavailable_reason:
+   null`. Marcus Webb — GEO CSO Expert then analyzes that as if it were the article. **Bucket 1
+   because the judge would score content founded on a guess, and §1's "nothing lying" bar because a
+   reviewer clicking a paywalled card gets undisclosed guesswork.**
 
 ---
 
