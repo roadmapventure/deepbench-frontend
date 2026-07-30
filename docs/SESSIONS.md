@@ -5,6 +5,43 @@
 
 ---
 
+## S-DAT-16-design / S-DAT-16 / S-DAT-16b / S-DAT-16c (v6.3.234 / v6.3.236 / v6.3.237, `58e2cb4` / `4a45143`, 2026-07-30, worktree `design-dat-16`) — a writing fix confirmed working, and the failure moved to the judge
+
+**`DAT-16` shipped in two parts, deliberately NOT archived — case 9 (`vitrine-tech`) still fails a full run, but the reason is now a different, named row.**
+
+### Part 1 — membership widened
+
+Case 9 asks for a training-compliance *gap* at a partner whose completion rate (40%) is on record but whose required threshold is not — verified against `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` Scenario 2, no active Library row states Apple's target. Same structural shape `AGT-36`/`AGT-36b` built the `honest-gap` class for. John's call between 3 options (seed the threshold, tag the case, reword the question): **tag it.** `HONEST_GAP_IDS` widened to include `vitrine-tech`; the locked-membership test and runbook §2/§5b/§0 D7 updated to match. Coding session shipped 24/24 on the persisted suite (v6.3.234, `58e2cb4`).
+
+### Found on the design session's own live QA, before close-out
+
+Part 1 alone was insufficient. Case 9 can get flagged for review (the runbook's `D2` rule forces the fork: Priya's Theory → Nadia's Forecast), and both spawned artifacts inherit the case's `honest-gap` class. Nadia Farouk — Data Expert's `forecast_draft` failed `asked_metric_present` — she presented the real 40% completion figure as if it resolved the compliance gap.
+
+**Root cause: `data-patch-intent.method` was `NULL`, not one missing instruction — the field had never been set.** `db-assembly.js` only includes `method` when truthy, so every forecast draft she has ever written ran on `objective` alone. John's call, narrowly scoped: give her the same discipline `AGT-36b` gave Marcus — real numbers as context, never as the resolved value — deliberately **not** worded as "declare unavailable whenever unsure," which risks masking `AGT-47` (case 6's `forecast_draft` *dropping* real figures it already has). Shipped v6.3.236, `4a45143`. Required re-checks on cases 6, 10, 20, 22 (the other Forecast-journey cases this now-filled field reaches): no regressions — case 6 failed exactly as `AGT-47` predicts, case 10 failed on an unrelated journey-routing deviation with clean content, cases 20/22 passed clean.
+
+### The first wording didn't move the needle — and the reason was a verdict, not a number
+
+Live re-run: Nadia's draft was *"essentially unchanged"* — still `asked_metric_present: true`. Pulling her actual generated text (`pending_confirmations` row `f683f8e2-...`) found why: she wasn't fabricating a number, she was rendering an implicit **verdict** — *"Hypothesis: Vitrine's 40%... does not represent a meaningful compliance risk"* — using 40% as justification, then separately hedging that the deciding fact was unconfirmed. The first wording only forbade substituting an adjacent number; it said nothing about delivering a conclusion the record can't support. **Widened live, same session, John's approval (`S-DAT-16c`, v6.3.237, Supabase-only, no separate kickoff):** `method` now also forbids a directional conclusion on the asked question, even hedged, when the deciding fact is missing.
+
+### The widened wording worked as writing — and the score still failed, because the grader did
+
+Confirming this needed several live attempts: one hit an unrelated citation-rejection path (Nadia never invoked), three died on an account-wide Anthropic usage cap (`SES-66`, below), and John raised the limit mid-session to unblock the rest. The run that finally exercised the fix: Owen Marsh — The Proofreader's own critique of the new draft reads *"correctly identifies what's unknown... and what would resolve the hypothesis"* — confirming she no longer overreaches. **`asked_metric_present` still scored `true`, on evidence that's just her citing the real 40% figure** — the same fact Marcus Webb — GEO CSO Expert's direct answer cites in the same run without being flagged. The failure moved from Nadia's writing to Owen's `qg-content-context-intent` criterion. Filed `AGT-50` rather than continuing to iterate on Nadia's Skill — `DAT-16b`'s own design rules kept Owen's Skill frozen deliberately, since changing writer and grader together makes results uninterpretable.
+
+### Two more findings from the same live runs, unrelated to the honest-gap mechanism
+
+- **`AGT-51`:** a citation's `confidence_tier` can read `inferred` when the Data Room classifies the same UUID as sourced-equivalent, triggering a hard case-fail via the runbook's `D4` strict-rejection rule regardless of retry outcome.
+- **`AGT-52`:** the resulting rejection-reason text itself leaks platform jargon (`confidence_tier`, raw UUIDs, `Data Room`) — `AGT-44`'s exact defect class, on a Skill that guardrail apparently didn't reach.
+
+### `SES-66` — an account-wide Anthropic usage cap, same class as `SES-33`
+
+Every live call failed instantly with `Anthropic call failed: 400`; Vercel logs showed the real cause: *"You have reached your specified API usage limits. You will regain access on 2026-08-01 at 00:00 UTC."* Confirmed cross-cutting (not this session's change) by an untouched case failing identically. John raised the account limit directly; no code change. Unlike `SES-33`'s deploy-quota gate, there is no pre-flight check for this today.
+
+### Status
+
+`DAT-16` stays open in `FEATURES.md`, pointing to `docs/harvests/DAT-16.md` — not archived. Both shipped parts are verified working on their own terms and introduced no regressions; case 9 itself does not yet pass a full run, and the blocker is now `AGT-50`, not this row.
+
+---
+
 ## S-SES-65-design / S-SES-65 (v6.3.233, `4ea8133`, 2026-07-29, worktree `design-ses-65`) — half the ticket was already ruled on, and the half that was real was smaller than it claimed
 
 **`SES-65` ✅ done + archived, self-verified QA 6/6 PASS.** A bucket-1 regression run can no longer report a failing case without naming a cause.
