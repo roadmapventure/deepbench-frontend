@@ -1,3 +1,4 @@
+// DeepBench v6.3.230 | MarketIntelligenceScreen.jsx | SES-57 -- analyzeNewsCard() no longer owns the article fetch: the new Article Context Resolver (src/lib/newsCardContext.js, §19m) does the fetch, the failure classification and the payload, and scripts/chi-true-regression.mjs calls the same function, so the two news-card payloads cannot diverge again. No behavior change on the screen -- the fault line, the visible question, the journey reset and submit()'s signature are all untouched
 // DeepBench v6.3.227 | MarketIntelligenceScreen.jsx | CHI-92 -- fetchNewsCards() splits into Jordan's search call + his display request, so the stories he finds ride task_context to the display agent instead of dying in his own turn
 // DeepBench v6.3.216 | MarketIntelligenceScreen.jsx | LOG-109/CHI-91 -- analyzeNewsCard()'s fetch
 // now reads the error body instead of discarding it, classifies WHY the primary path failed
@@ -389,6 +390,7 @@ import { SERVICE_CATALOG, usePatternClassification, buildAgentPatternRows } from
 // event builder); see src/lib/turnTracking.js for full rationale.
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
 import { articleFaultText } from "../lib/articleFaultText.js"; // FEATURE: LOG-109/CHI-91
+import { resolveNewsCardContext } from "../lib/newsCardContext.js"; // FEATURE: SES-57
 // FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
@@ -4040,39 +4042,25 @@ export default function MarketIntelligenceScreen() {
     resetJourney();
     ensureStep("news");
     setNewsCardLoadingUrl(card.url);
-    let articleText = null, articleSource = null, articleFailure = null;
-    try {
-      const res = await fetch("/api/fetch-article", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: card.url }),
-      });
-      const data = await res.json().catch(() => null); // FEATURE: LOG-109 -- an error body is still a body
-      if (res.ok) {
-        articleText = data?.text || null;
-        articleSource = data?.source || null;
-      } else {
-        // FEATURE: LOG-109/CHI-91 -- the route now classifies WHY the primary path failed; this
-        // branch used to drop that on the floor into console.error and submit a bare null.
-        articleFailure = data?.primary_failure || { http_status: res.status, extraction_outcome: "not_attempted" };
-        console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article failed:", res.status, articleFailure);
-      }
-    } catch (e) {
-      articleFailure = { http_status: null, extraction_outcome: "not_attempted" }; // FEATURE: LOG-109 -- network/abort: no response at all
-      console.error("[MarketIntelligenceScreen] analyzeNewsCard fetch-article", e.message);
-    } finally {
-      setNewsCardLoadingUrl(null);
-    }
+    // FEATURE: SES-57 -- the Article Context Resolver owns the fetch, the failure classification and
+    // the payload. This screen and the CHI test engine call the same function, so the payload cannot
+    // diverge again (the CHI-91 field drift that invalidated regression test #24).
+    // setNewsCardLoadingUrl(null) is a plain statement rather than a finally, safe ONLY because
+    // resolveNewsCardContext() cannot throw (its no-throw contract IS the fail-open behavior). If
+    // that contract ever changes, this becomes a spinner leak.
+    const { payload, failure } = await resolveNewsCardContext(card.url, "/api/fetch-article");
+    setNewsCardLoadingUrl(null);
     // FEATURE: CHI-91 -- platform fault report before the analysis runs. Fail-open is unchanged
     // (CHI-58, :4032): the question is still submitted with a null article. This only stops the
-    // non-answer from being unexplained.
-    const faultText = articleFaultText(articleFailure);
+    // non-answer from being unexplained. Presentation stays in the screen -- the resolver returns
+    // the failure, the screen decides to render it.
+    const faultText = articleFaultText(failure);
     if (faultText) setMessages(prev => [...prev, buildMessage({ kind: "error", text: faultText })]);
     const visibleMessage = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`; // FEATURE: CHI-33-patch2 -- reworded again to present the headline as delivered news (a given fact), not a causal test, matching ci-routing-intent's new EXTERNAL-FACT QUESTIONS rule; see kickoff CONTEXT.
     // FEATURE: CHI-58 — article_url threaded through so submit()'s qa branch can persist which
     // article this answer came from onto qaEvidence (Task 1b), independent of whether the fetch
     // itself succeeded (a card can still be "the one analyzed" even if fetch-article failed open).
-    submit(visibleMessage, { article_content: articleText, article_source: articleSource, article_url: card.url, article_unavailable_reason: articleFailure }, { skipJourneyReset: true }); // FEATURE: CHI-82 — see reset above; CHI-91 — the reason rides the same backgroundContext spread as article_source
+    submit(visibleMessage, payload, { skipJourneyReset: true }); // FEATURE: CHI-82 — see reset above; CHI-91 — the reason rides the same backgroundContext spread as article_source; SES-57 — the payload is the resolver's, byte-identical to the test engine's
   };
 
   // FEATURE: CHI-03a — onGoodThanks/onReview now operate on qaEvidence directly (were

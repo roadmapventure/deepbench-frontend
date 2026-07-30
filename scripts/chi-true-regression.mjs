@@ -1,3 +1,13 @@
+// DeepBench v6.3.230 | scripts/chi-true-regression.mjs | SES-57 -- the news door no longer builds its own
+// news-card payload. runNewsDoorCaseJourney() calls the shared Article Context Resolver
+// (src/lib/newsCardContext.js) that MarketIntelligenceScreen.jsx calls, so this run can no longer ask
+// Marcus a question the shipped screen would never ask. Two divergences die with the copy: it never read
+// the error body, so article_unavailable_reason (CHI-91) was silently missing and case 24's green verdict
+// proved nothing; and it had no try, so a dropped connection recorded an infra_death where the screen
+// fails open and still answers. The case record now also carries article_unavailable_reason -- WHY the
+// article was unavailable, not just that it was. SES-31 fixed this same drift once, driver-side only;
+// nothing coupled the two payloads, so the next added field diverged them again. The resolver is that
+// coupling. Registered in platform_services as article-context-resolver (§19m).
 // DeepBench v6.3.228 | scripts/chi-true-regression.mjs | DAT-12 -- every capability call in the run now
 // carries retrieval_scope: "baseline", so the run reads the seed corpus by tag rather than whatever the
 // previous run left behind (measured live 2026-07-29: 15 retrievable non-baseline leftovers, five of
@@ -49,6 +59,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { resolveNewsCardContext } from "../src/lib/newsCardContext.js"; // FEATURE: SES-57
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -541,24 +552,17 @@ async function runNewsDoorCaseJourney(_caseObj, ctx, judgeVerdicts) {
   if (cards.length === 0) throw new Error("news door: Jordan returned zero cards");
   const card = cards[0];
 
-  let articleContent = null, articleSource = null, articleDegraded = false;
-  const artRes = await fetch(FETCH_ARTICLE_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: card.url }) });
-  if (artRes.ok) {
-    const data = await artRes.json();
-    articleContent = data.text || null;
-    articleSource = data.source || null;
-    // FEATURE: SES-31 (Task 3) -- an OK response with an empty/missing body is degraded too, not
-    // just a non-OK response (S-SES-29 finding, case 24: fetch-article returning 200 with no text
-    // silently left articleDegraded false).
-    if (!articleContent) articleDegraded = true;
-  } else {
-    articleDegraded = true; // fail-open, matches the screen's own behavior -- not an infra death
-  }
+  // FEATURE: SES-57 -- same Article Context Resolver the screen calls, so this run cannot ask Marcus
+  // a question the product would never ask. Replaces this function's own copy of the fetch: the copy
+  // never read the error body (so it had no reason to pass on) and had no try (so a dropped
+  // connection killed the case while the screen fails open and still answers). SES-31's own
+  // "200 with no text is degraded too" rule survives inside the resolver as `degraded: !text`.
+  const { payload: extraFields, failure: articleFailure, degraded: articleDegraded } =
+    await resolveNewsCardContext(card.url, FETCH_ARTICLE_ENDPOINT);
 
   const question = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`;
-  const extraFields = { article_content: articleContent, article_source: articleSource, article_url: card.url };
   const result = await runDirectCaseJourney(question, ctx, judgeVerdicts, extraFields);
-  return { ...result, card_headline: card.headline, card_url: card.url, article_source: articleSource, article_degraded: articleDegraded };
+  return { ...result, card_headline: card.headline, card_url: card.url, article_source: extraFields.article_source, article_degraded: articleDegraded, article_unavailable_reason: articleFailure };
 }
 
 function executeCaseJourney(caseObj, ctx, judgeVerdicts) {
@@ -571,7 +575,7 @@ function executeCaseJourney(caseObj, ctx, judgeVerdicts) {
 // Task 3 -- the report.
 // ================================================================================================
 
-function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError, card_headline, card_url, article_source, article_degraded }) {
+function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError, card_headline, card_url, article_source, article_degraded, article_unavailable_reason }) {
   const fail_causes = [];
   if (infraDeath) fail_causes.push(`infra_death: ${infraError || "unrecovered transient failure"}`);
   if (rejectionOccurred) fail_causes.push("rejection");
@@ -593,6 +597,11 @@ function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_
     ...(card_url !== undefined ? { card_url } : {}),
     ...(article_source !== undefined ? { article_source } : {}),
     ...(article_degraded !== undefined ? { article_degraded } : {}),
+    // FEATURE: SES-57 -- WHY the article was unavailable, not just that it was. A bare
+    // article_degraded true/false cannot tell a paywall from a publisher timeout even though
+    // api/fetch-article.js classified it; this is the resolver's primary_failure, recorded verbatim.
+    // null (article read) on case 24, absent on every other case and on an infra death.
+    ...(article_unavailable_reason !== undefined ? { article_unavailable_reason } : {}),
   };
 }
 
@@ -633,6 +642,7 @@ async function runOneCase(caseObj) {
         rejectionOccurred: !!outcome.rejectionOccurred, infraDeath: false,
         card_headline: outcome.card_headline, card_url: outcome.card_url,
         article_source: outcome.article_source, article_degraded: outcome.article_degraded,
+        article_unavailable_reason: outcome.article_unavailable_reason, // FEATURE: SES-57
       })
     : finalizeCase({
         n: caseObj.n, id: caseObj.id, expected_journey: caseObj.expected_journey,
