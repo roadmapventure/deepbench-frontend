@@ -1,3 +1,10 @@
+// DeepBench v6.3.235 | MarketIntelligenceScreen.jsx | AGT-47 -- onResolveConfirmation()'s edit branch
+// stops discarding the theory-test's figures. It built edited_task_context.user_reasoning from the
+// reviewer's edited text ALONE, so Nadia never received the original theory text on the edit-resolve
+// call and S-AGT-47's shipped carry-forward instruction had nothing to carry. The original is already
+// on hypFlow.confirmation (written at the first patch call, preserved across repeated edits by the
+// ...prev.confirmation spread) -- this reads it and joins it with the edit. Read-only: no new state
+// field, no other resolution branch, no api/ change
 // DeepBench v6.3.230 | MarketIntelligenceScreen.jsx | SES-57 -- analyzeNewsCard() no longer owns the article fetch: the new Article Context Resolver (src/lib/newsCardContext.js, §19m) does the fetch, the failure classification and the payload, and scripts/chi-true-regression.mjs calls the same function, so the two news-card payloads cannot diverge again. No behavior change on the screen -- the fault line, the visible question, the journey reset and submit()'s signature are all untouched
 // DeepBench v6.3.227 | MarketIntelligenceScreen.jsx | CHI-92 -- fetchNewsCards() splits into Jordan's search call + his display request, so the stories he finds ride task_context to the display agent instead of dying in his own turn
 // DeepBench v6.3.216 | MarketIntelligenceScreen.jsx | LOG-109/CHI-91 -- analyzeNewsCard()'s fetch
@@ -4335,9 +4342,15 @@ export default function MarketIntelligenceScreen() {
     const myGeneration = clearGenerationRef.current; // FEATURE: CHI-04
     const isStale = () => clearGenerationRef.current !== myGeneration; // FEATURE: CHI-04
     const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); }; // FEATURE: CHI-04
-    const { confirmation_id, disputed_chunk_id } = hypFlow.confirmation;
+    const { confirmation_id, disputed_chunk_id, user_reasoning: originalUserReasoning } = hypFlow.confirmation;
+    // FEATURE: AGT-47 — the edit-resolve call used to send the reviewer's edit ALONE as
+    // user_reasoning, so Nadia never received the theory-test figures on this path and had nothing
+    // to carry forward. The original theory text is already on hypFlow.confirmation (written at the
+    // first patch call, and preserved by the edit round-trip's ...prev.confirmation spread below);
+    // this reads it and joins it with the edit. .filter(Boolean) falls back to today's behavior
+    // (edit alone) for an older confirmation row that never stored user_reasoning.
     const edited_task_context = resolution === "edit"
-      ? { disputed_chunk_id, correction: editedText, user_reasoning: editedText }
+      ? { disputed_chunk_id, correction: editedText, user_reasoning: [originalUserReasoning, editedText].filter(Boolean).join("\n") }
       : null;
     const t0 = Date.now();
     setStatus("Nadia is processing your response…");

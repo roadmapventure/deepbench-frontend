@@ -1,3 +1,9 @@
+// DeepBench v6.3.235 | scripts/chi-true-regression.mjs | AGT-47 -- the edit-resolve leg mirrors the
+// screen's fix: runHypTail()'s `edit` branch carries the original theory-test text (jointText)
+// alongside the reviewer's edit in edited_task_context.user_reasoning, instead of sending the edit
+// alone. Case 6 (upgrade-cycles) is the only case hardcoded to `edit`, and its beta-gate criterion is
+// measured against the edit-resolve artifact, so its forecast_draft was graded on input that never
+// contained the figures. Mirrored deliberately, not extracted into a shared helper (SES-31 convention)
 // DeepBench v6.3.234 | scripts/chi-true-regression.mjs | DAT-16 -- vitrine-tech (case 9) joins
 // HONEST_GAP_IDS. Its question asks for a training-compliance gap at a partner whose completion
 // rate is on record (40%, docs/APPLE-DATA-ROOM-SOURCE-DATA.md Scenario 2) but whose required
@@ -484,7 +490,11 @@ async function runHypTail({ flaggedQuestion, flaggedAnswer, intentForTest, picke
     const editedCorrection = `${picked} — reviewed and confirmed against current quarter data.`;
     const editResolve = await call({
       action: "resolve", confirmation_id: patch.confirmation_id, resolution: "edit",
-      edited_task_context: { disputed_chunk_id: null, correction: editedCorrection, user_reasoning: editedCorrection },
+      // FEATURE: AGT-47 — mirrors the screen's onResolveConfirmation() edit branch: carry the
+      // original theory-test text (jointText, already in scope above) alongside the reviewer's edit
+      // instead of sending the edit alone. Deliberately mirrored, not extracted into a shared
+      // helper — the driver mirrors the screen independently everywhere these two build a call.
+      edited_task_context: { disputed_chunk_id: null, correction: editedCorrection, user_reasoning: [jointText, editedCorrection].filter(Boolean).join("\n") },
     }, ctx);
     if (!SKIP_JUDGE) judgeVerdicts.push(await judgeArtifact({ artifact_type: "forecast_draft", artifact_content: flattenForecastDraft(editResolve), question: flaggedQuestion, ctx }));
     await call({ action: "resolve", confirmation_id: editResolve.confirmation_id, resolution: "accept", edited_task_context: null }, ctx);
