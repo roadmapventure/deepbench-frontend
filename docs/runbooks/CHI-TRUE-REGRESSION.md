@@ -113,6 +113,8 @@ Owen (Proofreader) still judges these artifacts and the full verdict is still re
 | `actionable_guidance_present` | required | **required, unchanged** |
 | `platform_language_detected` | must be false | **must be false, unchanged** |
 
+> **Why `asked_metric_present` is *not scored* on the rich-answer path (ruling, 2026-07-29, `SES-65`).** This is deliberate, not an omission, and has now been raised as a bug twice. The criterion asks whether the artifact reports a figure for *the quantity the question asked about*; Owen's Skill instructs him to return `false` when the question asks for no quantity at all. On the rich-answer path most questions do not, so `false` is the correct reading there and carries no quality signal — gating on it would fail correct answers, the exact failure `AGT-36b` removed when it replaced `quantitative_content_present`. Case 24 `news-first-card` is the live example: it asks for analysis of a news story, not a figure. Making it a rich-answer gate is a §8 baseline change and would first require separating *"the answer omitted the asked-for number"* from *"no number was asked for"*, which the single boolean cannot express today. A genuine miss on a question that **does** ask for a figure — case 6 `upgrade-cycles` — is tracked as content, on `AGT-47`, not as a scorer defect.
+
 **Why the guidance and jargon bars stay:** §5 already demands business guidance even from a rejection ("what's missing and what to do — not platform narration"). In the first run both answers failed those two legitimately, so this class does not turn either case green by itself — the generation side still has to improve. That is the point: this change removes an impossible bar, it does not lower a real one.
 
 **What a regression looks like in this class:** an answer that suddenly reports a South Korea co-op utilization number. That fails the class immediately, which is the protection this whole group of questions exists to provide.
@@ -135,6 +137,10 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 - **Run PASS** = all 24 cases PASS AND browser leg passes. One automatic HAR-17 recovery inside a journey does not fail a case (it's designed behavior) — but report every recovery.
 - **Case 24 specifics:** the news fetch itself failing (no cards, or `fetch-article` failing on the first card) is an infra-class FAIL of case 24, not a skip — the door is part of the product. `fetch-article` failing *open* (screen behavior: proceeds without article text) = run the journey as the screen would, but report the degradation prominently; content verdicts then judge what the user actually got.
 - Anything else = run FAIL, with per-question causes.
+
+> **A failure always names a cause (`SES-65`, v6.3.233).** `scoreVerdict()` cannot return `pass: false` with an empty `failed_criteria`: when Owen fails an artifact as a whole without any scored criterion failing, the list carries `holistic_verdict` and the run's own FAIL line carries his critique verbatim. `holistic_verdict` is a reporting marker, not a criterion — it is not in Owen's Skill schema and he is never asked about it.
+>
+> **Known, unobserved gap.** The mirror direction is not guarded: `pass: true` alongside a failing scored criterion would report a green case with a recorded failure. Never observed on a scored criterion. Closing it means sourcing `pass` from `failed_criteria` instead of Owen's flag — a scoring change under §8, deliberately not taken by `SES-65`.
 
 ## 8. Filing results (before the session ends)
 

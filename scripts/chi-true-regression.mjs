@@ -4,6 +4,16 @@
 // threshold is not in any active Library row -- computing a gap needs a number the corpus was
 // never given, the same shape already solved for cases 12/23. Membership widening only; no
 // change to scoreVerdict() or extractCases()'s tagging logic. John's §8 baseline approval.
+// DeepBench v6.3.233 | scripts/chi-true-regression.mjs | SES-65 -- a failure can never be reported
+// without a cause. scoreVerdict()'s rich-answer branch took `pass` from Owen Marsh (Proofreader)'s own
+// holistic flag but built failed_criteria from an independent three-criterion loop, so an artifact he
+// failed on something outside that loop printed `case_pass: false, failed_criteria: []` -- a FAIL
+// stating no reason, measured four times on case 9 vitrine-tech. (DAT-16, v6.3.234, has since moved
+// case 9 into the honest-gap class -- that fixes case 9's rubric, not this defect: every one of the
+// remaining 21 rich-answer cases could still print an empty cause list.) The list now carries the literal
+// `holistic_verdict` in exactly that case, and judge_fail carries Owen's own critique inline the way
+// infra_death and journey_deviation already did. Reporting only: `pass` is byte-unchanged on both
+// branches, so no case changes verdict. Guarded by tests/regression/AGT-36-honest-gap-scoring.js §10.
 // DeepBench v6.3.231 | scripts/chi-true-regression.mjs | SES-62 -- the news door mirrors the screen's
 // TWO calls. CHI-92 (v6.3.227) split the news flow: ws-news-search-intent returns structured `stories`,
 // then ws-news-display-intent carries those stories in task_context and Alex Reeves formats them into
@@ -367,7 +377,17 @@ export function scoreVerdict(verdict, outcomeClass) {
     if (!isTrue(k)) failed_criteria.push(k);
   }
   if (isTrue("platform_language_detected")) failed_criteria.push("platform_language_detected");
-  return { pass: verdict?.pass === true, failed_criteria };
+  // FEATURE: SES-65 -- a failure always names a cause. `pass` comes from Owen's own holistic flag
+  // (runbook §5's bar) while failed_criteria is built from the loop above, so when he fails an
+  // artifact on something none of those criteria cover the two disagree and the reason list comes
+  // back EMPTY -- `case_pass: false, failed_criteria: []`, measured four times on case 9
+  // vitrine-tech (reclassified honest-gap by DAT-16 after this was written; the defect is the
+  // branch's, not that one case's). `holistic_verdict` is an honest name for what happened: Owen judged the artifact
+  // as a whole and failed it. Reporting only -- `pass` is byte-unchanged, so nothing that passes
+  // today starts failing. It is NOT a sixth criterion and never reaches Owen's Skill schema.
+  const pass = verdict?.pass === true;
+  if (!pass && failed_criteria.length === 0) failed_criteria.push("holistic_verdict");
+  return { pass, failed_criteria };
 }
 
 // ---- Owen's AGT-35 content-context judge (D5) -- the only content judgment anywhere here ----
@@ -383,7 +403,11 @@ async function judgeArtifact({ artifact_type, artifact_content, question, ctx })
   // FEATURE: AGT-36 -- the class rides on ctx (created per case, already passed to every one of the
   // six call sites), so scoring became class-aware without touching a single caller.
   const { pass, failed_criteria } = scoreVerdict(verdict, ctx?.outcome_class);
-  return { artifact: artifact_type, outcome_class: ctx?.outcome_class || "rich-answer", pass, failed_criteria, evidence: verdict };
+  // FEATURE: SES-65 -- Owen's own words, surfaced beside the criteria they explain. The reason was
+  // never lost (the whole verdict has always ridden along as `evidence`), but a reader of the case
+  // record had to dig it out; finalizeCase() now puts it on the run's FAIL line. Surfaced verbatim,
+  // never rewritten, summarized, or truncated by the driver -- `evidence` is untouched.
+  return { artifact: artifact_type, outcome_class: ctx?.outcome_class || "rich-answer", pass, failed_criteria, critique: verdict?.critique ?? null, evidence: verdict };
 }
 
 // FEATURE: SES-31 (Task 1) -- D1 semantics unchanged (still `[0]`, first-listed): pick the picked
@@ -605,7 +629,17 @@ function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_
   if (rejectionOccurred) fail_causes.push("rejection");
   const bucket = actual_journey ? actual_journey.split("+")[0] : null;
   if (!infraDeath && bucket !== expected_journey) fail_causes.push(`journey_deviation (expected ${expected_journey}, got ${actual_journey})`);
-  if (!SKIP_JUDGE && !infraDeath && judgeVerdicts.some(v => v.pass !== true)) fail_causes.push("judge_fail");
+  // FEATURE: SES-65 -- `judge_fail` was the one bare token on this list; infra_death and
+  // journey_deviation have always carried their detail inline, and the per-case console line prints
+  // fail_causes verbatim. Built from the FAILING verdicts only, so a passing artifact's critique
+  // never pads the line.
+  if (!SKIP_JUDGE && !infraDeath && judgeVerdicts.some(v => v.pass !== true)) {
+    const detail = judgeVerdicts.filter(v => v.pass !== true).map(v => {
+      const why = v.failed_criteria.join(", ");
+      return v.critique ? `${v.artifact}: ${why} -- "${v.critique}"` : `${v.artifact}: ${why}`;
+    }).join(" | ");
+    fail_causes.push(`judge_fail (${detail})`);
+  }
   return {
     n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied,
     recoveries: ctx.recoveries, trace_ids: ctx.trace_ids,
