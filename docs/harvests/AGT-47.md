@@ -85,3 +85,27 @@ a scoping constraint, not a driver bug.*
 - **The log cannot corroborate it.** `ai_activity_log` has no prompt or response columns — only
   tokens, latency, `call_facts`, `trace_id`/`span_id` (verified against
   `information_schema.columns`). What an agent received is not recoverable after the fact.
+
+## Correction, 2026-07-30 (`design-arch-beta-0729` round 2, pulled in by this worktree's fast-forward)
+
+This file's "row's own evidence was stale" section above claims the after-`AGT-44` residue is
+`quantitative_content_present` only. A second, independent pre-regression round measured
+`failed_criteria: [named_entities_present, quantitative_content_present]` on case 6's
+`forecast_draft` — **both still fail**. `docs/FEATURES.md`'s row carries the live correction; the
+kickoff doc scopes the fix (and its QA) against both criteria, not one. Also filed that round:
+`SES-65` — the rich-answer scorer drops `asked_metric_present` from `failed_criteria` and sources
+`pass` from Owen's holistic flag instead of the criteria list, so neither `asked_metric_present`
+nor the aggregate `pass`/`case_pass` boolean is trustworthy evidence for this row until `SES-65`
+is ruled on. The kickoff's QA reads `failed_criteria` directly for that reason.
+
+## Correction, 2026-07-30 (kickoff session, before writing `docs/kickoffs/v6.3.232-AGT-47-*.md`)
+
+**The field named above ("Fix is Skill data — `skill_profiles`, `data-patch-intent.method`") is
+wrong.** Verified live: `data-patch-intent.method` (and `data-patch-execute-intent.method`) are both
+`NULL`. The full instructional text this intent actually runs on lives in
+`traits.analysis_instructions` — confirmed against `api/prompt/db-assembly.js`'s `intent` branch,
+which concatenates `objective` + `method` + `traits.analysis_instructions`, in that order, when each
+is present. The fix lands in `analysis_instructions`, inserted inline where that narrative already
+talks about composing `content`, not in the empty `method` field. See the kickoff doc for the exact
+inserted paragraph and the live proof. The mechanism finding above (Nadia receives the figures,
+mechanism (a), not (b)) is unaffected by this correction — only the target field was wrong.
