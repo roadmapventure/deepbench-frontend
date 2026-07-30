@@ -14,7 +14,7 @@
 4. **D4 — Strict rejection line:** ANY rejection by Owen (Proofreader) = that question is red, and triggers the §4 five-try probe to measure why. No "majority accept" softening.
 5. **D5 — Content review by agent:** content quality is judged by Owen via the `AGT-35` content-context review capability (LLM-as-judge), never by the driver model's own reading. The 2-question live-browser leg (§6) additionally proves rendering.
 6. **D6 — News door (case 24, added same day):** every run also drives one **live web article** end-to-end through the news-card door — Jordan Ellsworth's (web-search agent) live card fetch → **first-listed card** (the D1 rule's analog) → article extraction → full analysis journey. The article's *content* varies run to run by nature; what's locked is the *procedure* and the *journey shape* (Direct answer — the routing rule that treats a delivered headline as an external fact is part of what this case protects). Owen judges the content as usual.
-7. **D7 — Honest-gap scoring (added 2026-07-29, `AGT-36`; metric bar amended same day, `AGT-36b`):** questions the Data Room is *designed* not to answer are scored against §5b's bar, not the rich-answer rubric. A correct refusal passes; a figure reported as the *asked-for* value fails — relevant context that is plainly not that value does not. Cases 12 and 23 carry the class today.
+7. **D7 — Honest-gap scoring (added 2026-07-29, `AGT-36`; metric bar amended same day, `AGT-36b`; widened 2026-07-30, `DAT-16`):** questions the Data Room is *designed* not to answer are scored against §5b's bar, not the rich-answer rubric. A correct refusal passes; a figure reported as the *asked-for* value fails — relevant context that is plainly not that value does not. Cases 9, 12, and 23 carry the class today.
 
 ## 1. Prerequisites — check before starting, stop if missing
 
@@ -48,7 +48,7 @@ Questions #1–23 come verbatim from `src/screens/MarketIntelligenceScreen.jsx`:
 | 6 | upgrade-cycles | Upgrade cycles by country → planning | **Forecast journey** | **edit-then-accept** |
 | 7 | at-risk-accounts | Biggest at-risk accounts + why | Direct answer | — |
 | 8 | horizon-store | Horizon vs Signal Mobile NPI readiness | Direct answer | — |
-| 9 | vitrine-tech | Vitrine Tech training gap + cert risk | Direct answer | — |
+| 9 | vitrine-tech | Vitrine Tech training gap + cert risk | Direct answer — **`honest-gap` class (§5b)** | — |
 | 10 | smartphone-growth | Emerging-market growth → investment | **Forecast journey** | **accept** |
 | 11 | coop-mdf-benchmark | Co-op/MDF vs benchmarks | Direct answer | — |
 | 12 | vietnam-reseller | Vietnam reseller performance | Direct answer — **`honest-gap` class (§5b)** | — |
@@ -101,7 +101,7 @@ Verdict contract (the criteria live in Owen's Skill data; this is the shape the 
 
 ### 5b. The `honest-gap` outcome class (D7 — John's decision, 2026-07-29)
 
-**Locked decision (`AGT-36`).** A question the Data Room is *designed* to be unable to answer is scored against a different bar, because the rich-answer rubric structurally cannot pass a correct refusal. Two questions carry the `honest-gap` class today (§2 table): **#12 `vietnam-reseller`** and **#23 `south-korea-coop`**. Both are named verbatim in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` (question bank 16/17) under line 96's *"what is NOT public — do not allow the agent to claim it knows these"* — they exist to prove the agents refuse to fabricate, so a figure offered as the **asked-for** value is a **failure signal**, not a pass signal. A number that is plainly *not* that value — an industry benchmark, a comparable partner's rate, a regional trend, labelled as what it is — is legitimate content and does not fail the class.
+**Locked decision (`AGT-36`).** A question the Data Room is *designed* to be unable to answer is scored against a different bar, because the rich-answer rubric structurally cannot pass a correct refusal. Three questions carry the `honest-gap` class today (§2 table): **#9 `vitrine-tech`**, **#12 `vietnam-reseller`**, and **#23 `south-korea-coop`**. The latter two are named verbatim in `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` (question bank 16/17) under line 96's *"what is NOT public — do not allow the agent to claim it knows these"* — they exist to prove the agents refuse to fabricate, so a figure offered as the **asked-for** value is a **failure signal**, not a pass signal. A number that is plainly *not* that value — an industry benchmark, a comparable partner's rate, a regional trend, labelled as what it is — is legitimate content and does not fail the class.
 
 Owen (Proofreader) still judges these artifacts and the full verdict is still recorded verbatim. Only the pass bar changes:
 
@@ -120,6 +120,8 @@ Owen (Proofreader) still judges these artifacts and the full verdict is still re
 Adding or removing a question from this class is a baseline change — §8 rules apply (John's approval, in this runbook).
 
 > **Amended 2026-07-29 (`AGT-36b`, v6.3.225 — John's approval, §8 baseline change).** The metric bar was originally `quantitative_content_present`, which asks only whether a number is present. Measured live in `S-AGT-36`: case 23's answer cleared the guidance and jargon bars and still failed, on an industry benchmark (40–60%) and a comparable partner's rate (Nordholm, EMEA 55%) — both real, both correctly sourced, neither a South Korea co-op rate. The criterion was catching good content along with fabrication. `asked_metric_present` is the scoped replacement and matches what this section's own regression example always described. Marcus's Skill correspondingly stopped instructing him to avoid numbers (`ci-answer-intent` rule 4, narrowed to the asked-for value).
+
+> **Amended 2026-07-30 (`DAT-16`, v6.3.234 — John's approval, §8 baseline change).** Case 9 (`vitrine-tech`) joins the class. Its question asks for a training-compliance gap at a partner whose completion rate is on record (40%) but whose required-completion threshold is not — verified against `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` Scenario 2, no active Library row states Apple's target. Measured live in `S-AGT-44-design` (3 runs): Marcus Webb — GEO CSO Expert correctly never reports a gap figure or names Brazil's threshold, and failed the rich-answer rubric every time on Owen Marsh — The Proofreader's holistic flag alone, with zero scored criteria failing. Same shape as cases 12/23; no new scoring logic, membership only.
 
 ## 6. Live-browser leg — rendering proof, every run
 

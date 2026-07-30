@@ -1,7 +1,10 @@
+// DeepBench v6.3.234 | tests/regression/AGT-36-honest-gap-scoring.js | DAT-16 -- membership widened
+// to three honest-gap questions (case 9 vitrine-tech joins 12/23); see scripts/chi-true-regression.mjs
+// DAT-16 header and runbook §5b's amendment record. No scoring-logic change.
 // DeepBench v6.3.225 | tests/regression/AGT-36-honest-gap-scoring.js | AGT-36, AGT-36b
 // FEATURE: AGT-36 — Category M (cross-reference consistency), persisted per SES-009a.
 //
-// The rule this locks in: the two `honest-gap` questions (runbook D7/§5b — CHI-TRUE-REGRESSION.md)
+// The rule this locks in: the three `honest-gap` questions (runbook D7/§5b — CHI-TRUE-REGRESSION.md)
 // are scored against §5b's own criteria table, NOT against Owen Marsh — Proofreader's overall
 // `pass` flag. That flag encodes the rich-answer rubric, which structurally requires a metric to
 // be present; cases 12 (vietnam-reseller) and 23 (south-korea-coop) exist to prove the agents
@@ -66,18 +69,18 @@ export default async function run() {
   // ── 1. The locked §5b membership ──
   assert.deepStrictEqual(
     [...HONEST_GAP_IDS].sort(),
-    ["south-korea-coop", "vietnam-reseller"],
-    "HONEST_GAP_IDS must be exactly the two ids runbook §5b locks — adding or removing one is a §8 baseline change"
+    ["south-korea-coop", "vietnam-reseller", "vitrine-tech"],
+    "HONEST_GAP_IDS must be exactly the three ids runbook §5b locks — adding or removing one is a §8 baseline change"
   );
 
   // ── 2. The tagging, against the real screen ──
   const { cases } = extractCases();
   const tagged = cases.filter(c => c.outcome_class === "honest-gap");
-  assert.strictEqual(tagged.length, 2, "exactly two cases carry the honest-gap class");
+  assert.strictEqual(tagged.length, 3, "exactly three cases carry the honest-gap class");
   assert.deepStrictEqual(
     tagged.map(c => `${c.n}:${c.id}`).sort(),
-    ["12:vietnam-reseller", "23:south-korea-coop"],
-    "the tagged cases are #12 vietnam-reseller and #23 south-korea-coop (runbook §2's table)"
+    ["12:vietnam-reseller", "23:south-korea-coop", "9:vitrine-tech"].sort(),
+    "the tagged cases are #9 vitrine-tech, #12 vietnam-reseller, and #23 south-korea-coop (runbook §2's table)"
   );
   const others = cases.filter(c => c.outcome_class !== "honest-gap");
   assert.ok(

@@ -1,3 +1,9 @@
+// DeepBench v6.3.234 | scripts/chi-true-regression.mjs | DAT-16 -- vitrine-tech (case 9) joins
+// HONEST_GAP_IDS. Its question asks for a training-compliance gap at a partner whose completion
+// rate is on record (40%, docs/APPLE-DATA-ROOM-SOURCE-DATA.md Scenario 2) but whose required
+// threshold is not in any active Library row -- computing a gap needs a number the corpus was
+// never given, the same shape already solved for cases 12/23. Membership widening only; no
+// change to scoreVerdict() or extractCases()'s tagging logic. John's §8 baseline approval.
 // DeepBench v6.3.231 | scripts/chi-true-regression.mjs | SES-62 -- the news door mirrors the screen's
 // TWO calls. CHI-92 (v6.3.227) split the news flow: ws-news-search-intent returns structured `stories`,
 // then ws-news-display-intent carries those stories in task_context and Alex Reeves formats them into
@@ -162,7 +168,7 @@ const RESOLUTIONS = {
 // not to answer. Keyed by question id, never by case number: `n` is assigned from screen-extraction
 // order, so a screen reorder would silently re-tag a different question. Adding or removing an id
 // here is a baseline change -- runbook §8 rules apply (John's approval, in the runbook).
-export const HONEST_GAP_IDS = new Set(["vietnam-reseller", "south-korea-coop"]);
+export const HONEST_GAP_IDS = new Set(["vietnam-reseller", "south-korea-coop", "vitrine-tech"]);
 
 export function extractCases() {
   if (!existsSync(SCREEN_PATH)) {
