@@ -297,6 +297,31 @@ known defect that would break or dirty that run:
 | 21 | ~~`AGT-44` (Architecture)~~ **✅ Fixed 2026-07-29 (`S-AGT-44`, v6.3.229) — no longer a bucket-1 risk.** | ~~Artifact-producing Skills narrate platform mechanics into user-facing prose. The single dominant bucket-1 blocker.~~ One shared Guardrails Skill (`platform-language-guardrail`) now carries the business-content standard to Priya Nair — Forecast/Theory/Performance Expert and Nadia Farouk — Data Expert, and the worked example that *instructed* the violation is deleted from Priya's Skill. **`platform_language_detected` failures 4 → 0, held across 3 independent runs.** Two rows spun out of the QA rather than staying hidden inside this one: `AGT-49` (row 23) and `DAT-16` (row 22). |
 | 22 | `DAT-16` (Data) | Case 9 `vitrine-tech` asks for a compliance **gap** against Apple's required completion threshold, and no `active` Library row contains one — so the rubric requires a figure the corpus cannot supply. Failed 3/3 runs on Owen Marsh — The Proofreader's holistic verdict with **zero** scored criteria failing and `platform_language_detected` false throughout. Same structural problem `D7`/§5b exists for, on a case never tagged into `HONEST_GAP_IDS`. **Blocks a clean 24-case run on its own.** John's call between seeding the threshold, tagging the case (a §8 baseline change), or rewording the question. *(added 2026-07-29, `S-AGT-44-design` QA)* |
 | 23 | `AGT-49` (Architecture) | The Personnel File screen renders the platform's first Guardrails Skill as an **INTENT** badge with all four rule clauses blank, on four agents' files — `PersonnelScreen.jsx` has no `guardrails` entry in its skill-type colour map and reads `guardrails.must`/`.must_not`, which don't exist on the jsonb array shape. Introduced by `AGT-44` the same day; same class as `AGT-38`-done. Needs John's UI approval. Confirmed by reading both code paths, not seen rendered. *(added 2026-07-29, `S-AGT-44-design`)* |
+| 24 | `SES-65` (Task Success Rate) | **The scorer itself.** `asked_metric_present` is judged and stored but dropped on the rich-answer path (`:360`), and rich-answer `pass` comes from Owen's holistic flag rather than the scored list (`:364`) — so bucket 1 can report a failure with an empty reason list *or* go green with a recorded criterion failing. Both directions measured. Explains `DAT-16`'s "zero scored criteria failing"; needs a ruling before a fix. *(added 2026-07-30, `design-arch-beta-0729` pre-regression round 2)* |
+
+> **Pre-regression round 2 — 2026-07-30, `design-arch-beta-0729` (John: "do i still run that test?").** Same 3 cases
+> as round 1 **plus case 24** (`news-first-card`), newly able to reach a verdict after `CHI-92`/`SES-57`/`SES-62`.
+> Ran against deployed preview `f9824e8`; `check-deploy-current` STALE again and again **deliberately overridden** —
+> the 3 commits the preview lacked (`75e0161`, `4c975a7`, `bb668e0`) are all docs-only, and `DAT-12` (`9706ce4`),
+> `AGT-44` (`cd4bbdd`) and `SES-62`'s engine fix (`462e5ac`) were each verified as ancestors of the serving commit.
+> Note the driver runs **locally** from the worktree, so the engine-side fix is present by checkout, not by deploy.
+> **Result: 2 PASS / 2 FAIL, 16 min** (round 1: 1 PASS / 2 FAIL, 9 min for 3).
+>
+> | Case | Round 1 | Round 2 |
+> |---|---|---|
+> | 12 `vietnam-reseller` | ✅ PASS | ✅ PASS |
+> | 24 `news-first-card` | *not run — could not reach a verdict* | ✅ **PASS** (article degraded — see `SES-64` amendment) |
+> | 9 `vitrine-tech` | FAIL — `theory_test` + `forecast_draft` on `platform_language_detected` | FAIL — **both now pass**; `answer` fails, empty scored list (`DAT-16` + `SES-65`) |
+> | 6 `upgrade-cycles` | FAIL — 4 criteria across 2 artifacts | FAIL — `theory_test` **now passes**; `forecast_draft` on `named_entities_present` + `quantitative_content_present` (`AGT-47`) |
+>
+> **`AGT-44` independently confirmed: `platform_language_detected` went 4 failing artifacts → 0.** Verified here by a
+> session that did not do the fix, on the deployed build, which is the check the fixing session could not perform on
+> itself. **Every remaining failure is now attributable to a specific open row** — `AGT-47` (case 6's
+> `forecast_draft`), `DAT-16` (case 9's missing threshold), `SES-65` (why case 9's failure prints no reason). No
+> unexplained failure remains in the pre-regression set.
+>
+> **`AGT-47` residue is wider than its own row claims.** That row says only `quantitative_content_present` still
+> fails post-`AGT-44`; measured here, `named_entities_present` fails too. Two criteria, not one.
 
 > **Pre-regression check — 2026-07-29 16:05 CST (`design-arch-beta-0729`, John's request).** Purpose: buy an
 > evidence-based expectation for the next full run without spending the full run. Method: the real driver
