@@ -38,13 +38,26 @@ const SKILL_SLUG = "platform-language-guardrail";
 // (John's call, 2026-07-29: Elena Cho -- The Reasoner's output is not judged, so no leak has ever
 // been measured on it).
 //
-// quality-gate was attached at ship and DETACHED the same day (John's call, 2026-07-29) after the QA
-// run measured why: Owen Marsh -- The Proofreader is the agent who POLICES this vocabulary, so giving
-// him a Skill that spells the vocabulary out put the banned phrases into the judge's own prompt. He
-// then quoted them -- along with two phrases from his own qg-content-context-intent.method -- as the
-// "offending phrase" found in an artifact. The agent enforcing a word list must not be handed the
-// word list. Re-attaching it would re-contaminate every verdict this suite exists to trust.
-const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis", "channel-intelligence"];
+// TWO Capabilities, not four. Both of the others were attached at ship and detached the same day
+// (John's calls, 2026-07-29), each after measurement -- and this list is the record of why, because
+// re-adding either one silently is the regression that costs the most here.
+//
+//   quality-gate -- Owen Marsh -- The Proofreader is the agent who POLICES this vocabulary. Giving him
+//     a Skill that spells the vocabulary out put the banned phrases into the judge's own prompt, and he
+//     quoted them back -- along with two phrases from his own qg-content-context-intent.method -- as the
+//     "offending phrase" found in an artifact. The agent enforcing a word list must not be handed it.
+//
+//   channel-intelligence -- Marcus Webb -- GEO CSO Expert's answer NEVER failed
+//     platform_language_detected: not at baseline, not in either QA run. All four measured failures were
+//     Priya Nair's theory_test and Nadia Farouk's forecast_draft. The attachment was scope on assumption
+//     rather than evidence, and it cost real behaviour: a Skill attaches to a Capability, so it also
+//     reached ci-routing-intent, and case 6's five-way classification went forecast -> qa
+//     deterministically, producing a journey_deviation the baseline never had. Marcus is covered by
+//     AGT-41 (Owen's content check running live), which is the row that owns catching a leak there.
+//
+// The general rule both cases teach: attach this Skill only where a leak has actually been measured,
+// and never to an agent whose Capability also serves classification or routing calls.
+const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis"];
 
 // Two clauses that must survive verbatim into the assembled prompt. The first names the reader; the
 // second is the store prohibition the measured failures breached.

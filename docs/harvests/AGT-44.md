@@ -153,4 +153,26 @@ The Skill is attached to `channel-intelligence`, so it also reaches `ci-routing-
 
 **Conclusion:** adding a writing standard to a classification call changed its answer. This is the third design error and the one that needs code — `AA-121`'s `traits.intent_allowlist`, hoisted out of `buildSections()`'s Knowledge-only branch so a Guardrails Skill can scope itself to `ci-answer-intent` + `ci-answer-display-intent`. Hoisting is behaviour-identical for the only two Skills that set the field today (`ci-knowledge`, `hyp-knowledge` — both Knowledge type, verified live).
 
+## Resolved by detachment, not by code — and the `format` type cannot carry this
+
+John challenged the code change and proposed the **`format`** Skill type instead. It cannot be used, for two specific reasons:
+
+- **`ARCHITECTURE.md` rule 14 (LOCKED, `S-PM-08-design`):** *"Content specialists (planners, researchers, analysts) never own Format Skills. Format Skill ownership belongs exclusively to display/editor agents."* All three agents here are content specialists.
+- **It would clobber the answer.** The format branch overwrites `formatContract` — `output_type`, **`schema`**, `handler` — unconditionally, and Skills are processed in `display_order`, so a format Skill ordered after `ci-answer-intent` destroys that intent's own schema (the `AA-75`/`AA-76` class). The branch also renders only `Output type:`/`Structure:` into the prompt, never prose, so the rule text would not reach the model at all.
+
+**But the instinct was right and the code change was the wrong fix.** Going back to what actually leaked: **all four measured failures were Priya Nair's `theory_test` and Nadia Farouk's `forecast_draft`. Marcus Webb — GEO CSO Expert's `answer` never failed `platform_language_detected` — not at baseline, not in either run.** The `channel-intelligence` attachment was scope on assumption, not evidence, and it was the sole cause of the routing regression.
+
+**Fix applied: detach `channel-intelligence`.** One row deleted, zero code. Attachments 4 → 2 (`hypothesis-evaluation`, `data-analysis` — exactly where leaks were measured). Marcus is covered by `AGT-41`, the row that owns catching a live leak.
+
+### The A/B that proves the causation
+
+Same question, same model, deterministic in both directions, one variable:
+
+| | `input_tokens` | classification |
+|---|---|---|
+| Guardrail on `channel-intelligence` | 1988 | `qa` (3/3) |
+| After detachment | **1801** | **`forecast`** (3/3) |
+
+The 187-token delta is the guardrails section, and `forecast` is what case 6 expects. **A writing standard attached to a five-way classification call changed its answer** — that is the generalizable finding, and it is why `traits.intent_allowlist` was never needed here: the right scope was fewer attachments, not a finer filter.
+
 **Case 9's `answer` also reproduced 2/2** (Owen: the answer states Apple's enforcement threshold is unknown, so certification risk is unanswerable). Same Capability, and both answer-side intents now carry clause 3's instruction on how to report missing information — a plausible bias toward foregrounding a gap. Not isolated: unlike the routing call, there is no stored pre-change output to compare against.

@@ -229,6 +229,50 @@ to remove.
 
 ---
 
+## S-AGT-44-design / S-AGT-44 (v6.3.229, `cd4bbdd`, 2026-07-29, worktree `design-agt-44`) — a writing standard that changed a routing answer
+
+**`AGT-44` ✅ Done + archived, `BETA.md` bucket 1 row 21 marked fixed. Self-verified across three independent runs: `platform_language_detected` failures 4 → 0.** Full technical detail, all verbatim evidence, and the A/B: `docs/harvests/AGT-44.md`.
+
+### What shipped
+
+One shared Guardrails Skill — `platform-language-guardrail` — carrying the business-content standard, **the platform's first Guardrails Skill and its first Skill attached to more than one Capability**. Plus deletion of the worked example in Priya Nair — Forecast/Theory/Performance Expert's `hyp-hypothesis-test-intent` that handed her a ready-made sentence naming the store. Zero assembler change: `db-assembly.js` already composes and renders a `guardrails`-type Skill.
+
+**Root cause, and it was word-agnostic:** the standard existed in exactly one place on the platform — inside Owen Marsh — The Proofreader's judging criteria — and in no producing agent's Skill. The writers were graded on a rule they had never been given.
+
+### Three design errors of mine, each caught by measurement and none by review
+
+Attachments went **4 → 2** over the session, one correction per error:
+
+1. **A quoted counter-example inside the rule.** Clause 3 read *never "the Data Room contains no record of this"* — a full sentence in the artifact's own voice, handed to every holder of the Skill. That is `AA-127`'s failure mode exactly, the same precedent the fix cited for itself. Restated positively; assertion `B2b` pins its absence.
+2. **The judge was given the vocabulary it polices.** With the Skill on `quality-gate`, Owen quoted the banned phrases **out of his own prompt** as the offending phrase found in an artifact — two of the three quoted fragments are verbatim from his own `qg-content-context-intent.method`. **This retroactively invalidates `AGT-44`'s original filing evidence:** the row cited `task_context carries artifact_type` as proof of a leak, and that string is his own instruction text. The design session raised this suspicion *before* building and dropped it; the controlled before/after reproduced it.
+3. **Scope on assumption rather than evidence.** All four measured failures were Priya's `theory_test` and Nadia Farouk — Data Expert's `forecast_draft`. **Marcus Webb — GEO CSO Expert's `answer` never failed the criterion — not at baseline, not in any run.** `channel-intelligence` was attached because the answer is user-facing, not because it leaked.
+
+### The finding worth keeping
+
+Error 3 was not free. A Skill attaches to a **Capability**, so it also reached `ci-routing-intent` — Marcus's five-way classification. Same question, single variable, deterministic both directions:
+
+| | `input_tokens` | classification |
+|---|---|---|
+| guardrail attached | 1988 | `qa` (3/3) |
+| detached | **1801** | **`forecast`** (3/3) |
+
+**A writing standard attached to a classification call changed its answer** — a `journey_deviation` the baseline never had, reproduced 2/2 in full runs before the fix and gone after. Never attach a Guardrails Skill to a Capability that also serves routing or classification intents; that rule now lives in the persisted test beside the attachment list.
+
+### John overturned my fix twice, and was right both times
+
+- I proposed a code change (hoisting `AA-121`'s `traits.intent_allowlist` out of `buildSections()`'s Knowledge-only branch). He rejected it and asked whether the **`format`** Skill type could carry this instead. Format cannot — `ARCHITECTURE.md` rule 14 (LOCKED, `S-PM-08-design`) bars content specialists from owning Format Skills, the format branch overwrites `formatContract`'s schema unconditionally, and it renders no prose. **But the challenge sent me back to the evidence, which is where error 3 surfaced** — and detaching one attachment fixed the regression with zero code. The allowlist hoist was never needed.
+- Earlier he rejected my claim that this was the banned-phrase list turned down that morning for `AGT-36`: *"this morning was different. it was checking if actual numbers are facts vs made up. This ticket is to set parameters to make efficient content — 2 separate problems."* Correct, and the precedent that actually governs it is the shipped VOICE section, which that rejection never considered.
+
+### Verified
+
+Deploy gate LIVE before every run. Suite 23/23 **with** the credential-gated data half running — proven by negative control (without credentials it prints SKIPPED and the file still reports `[PASS]`, which is `SES-61`). Live assembler checked per Capability. Final run: case 12 PASS; case 6 journey correct, both artifacts clean, fails only `quantitative_content_present` (`AGT-47`); case 9 clean on all three artifacts with Nadia's `forecast_draft` passing outright. **All three runs' full `REPORT_JSON` captured to files — the first runs of this driver whose judge evidence survives them (`SES-56`).**
+
+### Filed
+
+`DAT-16` 🚨 **beta bucket 1** — case 9 `vitrine-tech` asks for a compliance *gap* against Apple's required threshold, and no `active` Library row contains one; failed 3/3 on Owen's holistic verdict with **zero** scored criteria failing and platform language false throughout. Structurally what `D7`/§5b exists for, on a case never tagged into `HONEST_GAP_IDS`. Blocks a clean 24-case run by itself. `AGT-49` 🚨 **beta bucket 1** — the Personnel File screen renders the new Guardrails Skill as an **INTENT** badge with all four clauses blank; introduced here, needs John's UI call. `SCA-5`, `AGT-48`, `SES-61` — post-beta.
+
+---
+
 ## S-LOG-109-design / S-LOG-109 (v6.3.216, `e89d465`, 2026-07-29, worktree `design-log-109`) — the article fetch says what happened
 
 **`LOG-109` ✅ Done + archived. `CHI-91` 🔶 Partial — shipped and live-verified, one render gate unseen. `SES-54` filed, deliberately not folded in.** Self-verified QA 10/12 PASS, 2 blocked on infrastructure.
