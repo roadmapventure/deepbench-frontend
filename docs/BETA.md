@@ -331,6 +331,16 @@ known defect that would break or dirty that run:
 > | 12 `vietnam-reseller` | ✅ PASS | FAIL — `theory_test` on `platform_language_detected` |
 > | 24 `news-first-card` | ✅ PASS (degraded) | FAIL — `answer` on `platform_language_detected` (degraded again) |
 >
+> **⚠️ Amended 2026-07-30, same session, before anyone acted on it — the "two standards contradict" reading below is wrong.**
+> `platform-language-guardrail`'s **clause 3 already permits honest disclosure** (*"say what is missing in business terms and
+> what would resolve it — describe the absent information itself, never where you looked for it"*), so nothing needs
+> loosening and no ruling is required. The real cause of case 24 is **coverage**: verified in Supabase, that guardrail is
+> attached to only `hypothesis-evaluation` (Priya) and `data-analysis` (Nadia) — **not** `channel-intelligence` (Marcus, who
+> emits the `answer` on every direct question), `quality-gate` (Owen), or `project-manager` (Michelle). Case 24 was failed
+> for breaking a rule Marcus never received. Also retracted: case 12's flip is **not** caused by the guardrail — it was
+> attached 2026-07-29 23:48 UTC, and case 12 **passed** in round 2 (02:03 UTC) with it already in place. That flip is Owen's
+> own judgment varying. **Minimal remaining work is two `capability_skill_profiles` rows, no code.**
+>
 > **The score went down and the platform got better — read the composition, not the count.** `AGT-47` is confirmed on the
 > hardest journey in the set. `DAT-16` Part 1 is confirmed (case 9's `answer` now passes). **Every one of the three failures
 > is now the same root problem: the platform is being penalised for honest disclosure** — `AGT-50` (widened, `AGT-53`
