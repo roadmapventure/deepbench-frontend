@@ -34,10 +34,17 @@ const ROOT = path.join(__dirname, "..", "..");
 
 const SKILL_SLUG = "platform-language-guardrail";
 
-// The four Capabilities whose output a user reads. memory-consolidation is deliberately absent
+// The Capabilities whose output a user reads. memory-consolidation is deliberately absent
 // (John's call, 2026-07-29: Elena Cho -- The Reasoner's output is not judged, so no leak has ever
 // been measured on it).
-const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis", "channel-intelligence", "quality-gate"];
+//
+// quality-gate was attached at ship and DETACHED the same day (John's call, 2026-07-29) after the QA
+// run measured why: Owen Marsh -- The Proofreader is the agent who POLICES this vocabulary, so giving
+// him a Skill that spells the vocabulary out put the banned phrases into the judge's own prompt. He
+// then quoted them -- along with two phrases from his own qg-content-context-intent.method -- as the
+// "offending phrase" found in an artifact. The agent enforcing a word list must not be handed the
+// word list. Re-attaching it would re-contaminate every verdict this suite exists to trust.
+const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis", "channel-intelligence"];
 
 // Two clauses that must survive verbatim into the assembled prompt. The first names the reader; the
 // second is the store prohibition the measured failures breached.
@@ -224,6 +231,17 @@ async function liveSkillRow() {
   const joined = row.guardrails.join("\n");
   for (const phrase of PINNED_PHRASES) {
     assert.ok(joined.includes(phrase), `the live ${SKILL_SLUG} row no longer carries the pinned phrase "${phrase}"`);
+  }
+
+  // B2b. NO QUOTED COUNTER-EXAMPLE. The rule states what to do; it never spells out a bad sentence.
+  // Clause 3 originally read: never "the Data Room contains no record of this". That handed every
+  // holder of this Skill a ready-made sentence committing the violation -- exactly AA-127's failure
+  // mode (the model mirroring phrasing out of its own instructional text), and it was quoted back as
+  // evidence in the QA run. A prohibition list (clause 2) names vocabulary; a counter-example supplies
+  // a whole sentence in the artifact's own voice, which is the part that gets copied.
+  for (const banned of ["contains no record", "No comparable partner has reported this"]) {
+    assert.ok(!joined.includes(banned),
+      `${SKILL_SLUG} carries a quoted counter-example again ("${banned}"). State the rule positively -- a model-answer sentence in the artifact's voice is copyable, and it is also quotable by the judge as a finding.`);
   }
 
   // B3. Attached to exactly the four artifact-producing Capabilities -- and to memory-consolidation

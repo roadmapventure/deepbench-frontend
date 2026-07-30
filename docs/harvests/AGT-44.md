@@ -117,4 +117,40 @@ A Skill attaches to a **Capability**, so it reaches every intent of that Capabil
 
 `AA-121` already solved exactly this for Knowledge Skills — `traits.intent_allowlist` — for the same stated reason (*"Knowledge Skill Profiles attach to a capability, not an intent, so historically fired RAG unconditionally on every call for that capability — including lightweight, non-analytical intents"*). But that gate lives **inside** `buildSections()`'s `if (typeSlug === "knowledge")` branch, so it does not apply to a guardrails-type Skill. Hoisting the check above the type branches is a generic trait read, not a conditional — the shape `.claude/rules/capabilities-are-data.md` requires.
 
-**Candidate cause of a new failure, not proven:** case 6 picked up `journey_deviation (expected forecast, got direct)` that the baseline did not have — Marcus Webb — GEO CSO Expert's routing classification now carries 836 chars of writing instruction it has no use for. `CHI-78` documents real run-to-run variance on this screen, so this is a suspicion to test, not a conclusion.
+## Corrections applied, 2026-07-29 (John's approval) — data-only, plus one test line
+
+1. **Clause 3 restated positively.** Was: *…what would resolve it. "No comparable partner has reported this" -- never "the Data Room contains no record of this".* Now: *…what would resolve it -- describe the absent information itself, never where you looked for it.* A prohibition list (clause 2) names vocabulary; a counter-example supplies a whole sentence **in the artifact's own voice**, which is the part that gets copied — and quoted back as a finding. New assertion `B2b` pins its absence.
+2. **Detached from `quality-gate`.** Verified live afterwards: Owen Marsh — The Proofreader's assembled prompt now contains **zero** guardrails sections, while Priya's still carries the rule with the counter-example gone. Attachments 4 → 3.
+
+The one non-data edit: the persisted test asserted the four-Capability attachment set, so detaching made the suite red until that line changed — recorded because the change was approved as "data-only" and was not quite.
+
+**#3 (hoisting `traits.intent_allowlist` out of the Knowledge branch) was deliberately NOT done.** John's call, and the better sequencing: the two breakages it would address are unproven from a single run against `CHI-78`'s known variance. Measure whether they reproduce before editing a shared harness file on a suspicion. If they do reproduce, the allowlist hoist is the fix and gets its own row and ID claimed at that point; if not, they were variance and no code change was ever needed. (No ID is minted here on purpose — an unclaimed id-shaped string in prose gets copied.)
+
+**Candidate cause of a new failure, not proven:** case 6 picked up `journey_deviation (expected forecast, got direct)` that the baseline did not have — Marcus Webb — GEO CSO Expert's routing classification now carries 836 chars of writing instruction it has no use for. `CHI-78` documents real run-to-run variance on this screen, so this is a suspicion to test, not a conclusion. **Since measured — see the re-run section below.**
+
+---
+
+# Re-run after the corrections, 2026-07-29 — the target criterion is fully met; two regressions are mine
+
+**Zero `platform_language_detected` failures across every artifact judged, down from 4 at baseline.** `AGT-44`'s own defect is gone.
+
+| Case | Result | Platform language | Residue |
+|---|---|---|---|
+| 12 `vietnam-reseller` | ✅ **PASS** (96 s) | false | — |
+| 9 `vitrine-tech` | ❌ FAIL (58 s) | **false** | `answer` fails Owen's holistic verdict with **zero** scored criteria failing |
+| 6 `upgrade-cycles` | ❌ FAIL (236 s) | **false** on both artifacts | `journey_deviation` + `forecast_draft` fails 3 content criteria (`AGT-47`) |
+
+Case-level count unchanged at 1 PASS / 2 FAIL. What changed is *why*: the platform-language defect is gone from all of them, and what remains is `AGT-47`'s content loss plus two regressions this session introduced.
+
+## The routing regression, measured
+
+The Skill is attached to `channel-intelligence`, so it also reaches `ci-routing-intent` — the five-way classification whose output the driver turns into `actual_journey`.
+
+- **Pre-change:** the pre-regression run's three routing calls (2026-07-29 20:55 / 20:59 / 21:02 UTC, in case order 9 → 6 → 12) returned `qa` / **`forecast`** / `qa` — case 6 classified correctly.
+- **Post-change:** `qa`, `confidence: high`, **3/3 identical direct calls** plus 2/2 in the full runs. `input_tokens` 1988, of which the guardrails section is ~200.
+
+*One inferential step, stated plainly:* routing deliverables carry a null `title`, so the pre-change rows are matched to their cases by timestamp order within that run's window, not by stored question text.
+
+**Conclusion:** adding a writing standard to a classification call changed its answer. This is the third design error and the one that needs code — `AA-121`'s `traits.intent_allowlist`, hoisted out of `buildSections()`'s Knowledge-only branch so a Guardrails Skill can scope itself to `ci-answer-intent` + `ci-answer-display-intent`. Hoisting is behaviour-identical for the only two Skills that set the field today (`ci-knowledge`, `hyp-knowledge` — both Knowledge type, verified live).
+
+**Case 9's `answer` also reproduced 2/2** (Owen: the answer states Apple's enforcement threshold is unknown, so certification risk is unanswerable). Same Capability, and both answer-side intents now carry clause 3's instruction on how to report missing information — a plausible bias toward foregrounding a gap. Not isolated: unlike the routing call, there is no stored pre-change output to compare against.
