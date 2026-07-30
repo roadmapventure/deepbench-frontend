@@ -67,3 +67,54 @@ Also verified: `capability_skill_profiles.level` is an **integer** (2 on every S
 ## Closure gate
 
 Case 9 `vitrine-tech`: **both** `theory_test` and `forecast_draft` clear `platform_language_detected`. That case failed on that criterion only, on both artifacts, in the pre-regression check. Case 6's `theory_test` clears it too; its `forecast_draft` is expected to still fail on the three `AGT-47` criteria. Case 12 must stay PASS.
+
+---
+
+# QA run, 2026-07-29 (`S-AGT-44-design`, self-verified) — the fix works and the one survivor is a measurement defect I introduced
+
+Deploy gate **LIVE on `cd4bbdd`** before the run. Suite **22/22** including the credential-gated data half (proven running by a negative control: without credentials it prints SKIPPED and the file still reports `[PASS]` — that gap is `SES-61`). Live assembler verified independently on all four Capabilities: one `guardrails` section, both pinned phrases, VOICE still last.
+
+**Full `REPORT_JSON` for all three cases captured to files** — the first run of this driver whose judge evidence survives it (`SES-56`'s gap).
+
+## Scoreboard against the pre-regression baseline
+
+Baseline: 4 artifacts failed `platform_language_detected`, 3 of them failed nothing else.
+
+| Case | Artifact | Baseline | After | Read |
+|---|---|---|---|---|
+| 9 `vitrine-tech` | `theory_test` | fail — platform language only | ✅ **PASS**, clean | Priya's deletion worked |
+| 9 | `forecast_draft` | fail — platform language only | ❌ still `platform_language_detected` | **contaminated evidence, see below** |
+| 9 | `answer` | pass | ❌ Owen's overall `pass: false`, **zero** scored criteria failed | regression on his holistic flag, not on platform language |
+| 6 `upgrade-cycles` | `theory_test` | fail — platform language only | ✅ **PASS**, clean | fixed |
+| 6 | `forecast_draft` | fail — platform language + 3 others | `platform_language_detected` **false**; fails `quantitative_content_present` only | **exactly what the kickoff predicted** — the residue is `AGT-47` |
+| 12 `vietnam-reseller` | all 3 artifacts | PASS (79 s) | ✅ **PASS** (234 s), `platform_language_detected` false on `answer`, `theory_test` **and** `forecast_draft` | held, and the artifact `AGT-44` was originally filed against is clean |
+
+**Case-level count is unchanged at 1 PASS / 2 FAIL. Criterion-level, `platform_language_detected` failures went 4 → 1**, and that one has contaminated evidence. **`AGT-44` is not closable on this run**, for two reasons beyond the contamination:
+
+- **Case 9's `answer` regressed** — it passed in the baseline; now Owen's overall `pass` is `false` with **zero** scored criteria failing. His critique: the answer reports Vitrine's Q3 completion (40%) but never states Brazil's target or the actual gap. A content miss, not platform language.
+- **Case 6 gained `journey_deviation`** (`expected forecast, got direct`).
+
+Both new failures are on `channel-intelligence` — the one Capability where the Skill reaches routing, display and ack intents as well as the answer. That is the correlation behind the allowlist finding below; `CHI-78`'s known run-to-run variance means it is not proof.
+
+**3 of the 4 baseline `platform_language_detected` failures cleared, including a `forecast_draft`** — which is what makes the fourth readable as contamination rather than as Nadia Farouk — Data Expert being unfixable.
+
+## The measurement defect — two design errors, both mine
+
+Owen Marsh — The Proofreader's three quoted "offending phrases" on case 9's `forecast_draft`:
+
+> `task_context carries artifact_type… Per-type calibration: for rejection artifacts, criteria 1-2 apply to what the rejection references… the Data Room contains no record`
+
+1. **The first two are verbatim from Owen's own `qg-content-context-intent.method`** — it opens *"Your task_context carries artifact_type (one of: answer, theory_test, forecast_draft, rejection)"* and contains *"Per-type calibration: for rejection artifacts, criteria 1-2 apply to what the rejection references…"*. Neither string is in Nadia's prompt. **He is quoting his own instructions as evidence against the artifact.**
+2. **The third is verbatim from this session's own new Skill.** Clause 3 read: *never "the Data Room contains no record of this"*. Attaching that Skill to `quality-gate` put the banned phrase into the judge's prompt as a literal string, and attaching it to `data-analysis` handed Nadia the exact sentence to copy — **the `AA-127` failure mode this fix cited as its own precedent.**
+
+**This also retroactively invalidates `AGT-44`'s original evidence.** The row cited `task_context carries artifact_type` as proof of Priya's leak on case 12; that string is Owen quoting himself. The design session raised this suspicion before building and dropped it — the controlled before/after has now reproduced it.
+
+**Corrective design, data-only:** state clause 3 positively with no quoted bad sentence, and **detach the Skill from `quality-gate`** — the agent policing the vocabulary must not be fed it.
+
+## Third error — the Skill fires on non-prose intents
+
+A Skill attaches to a **Capability**, so it reaches every intent of that Capability. Verified live: `ci-routing-intent` (a 5-way classification with a ~95-token output), `ci-answer-display-intent` (pure hand-off routing), `ci-resolution-ack-intent` and `data-patch-execute-intent` **all** receive the full 836-char guardrails section.
+
+`AA-121` already solved exactly this for Knowledge Skills — `traits.intent_allowlist` — for the same stated reason (*"Knowledge Skill Profiles attach to a capability, not an intent, so historically fired RAG unconditionally on every call for that capability — including lightweight, non-analytical intents"*). But that gate lives **inside** `buildSections()`'s `if (typeSlug === "knowledge")` branch, so it does not apply to a guardrails-type Skill. Hoisting the check above the type branches is a generic trait read, not a conditional — the shape `.claude/rules/capabilities-are-data.md` requires.
+
+**Candidate cause of a new failure, not proven:** case 6 picked up `journey_deviation (expected forecast, got direct)` that the baseline did not have — Marcus Webb — GEO CSO Expert's routing classification now carries 836 chars of writing instruction it has no use for. `CHI-78` documents real run-to-run variance on this screen, so this is a suspicion to test, not a conclusion.
