@@ -162,7 +162,7 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    0 of 95 substantive clauses lost, verified per-clause.** Residue: `LOG-37`'s own status
    chain, still over cap. Efficiency, not
    correctness — still skippable for beta.
-5. **`SES-57` (Tech Debt) — 🔶 SHIPPED v6.3.230 (`bb60703`), NOT closed. Updated 2026-07-29
+5. **`SES-57` (Tech Debt) — ✅ DONE + archived 2026-07-29 (v6.3.230 `bb60703`; gate verified by `S-SES-62` QA, v6.3.231). Nothing outstanding here before the regression run.** Updated 2026-07-29
    (`design-ses-57`).** The fix landed as a new platform service, **Article Context Resolver**
    (`src/lib/newsCardContext.js`, §19m row 33) — the CHI screen and the test engine now call one
    function, so the payload cannot diverge again. Suite 23/23, build clean, live-proven at the seam
@@ -195,7 +195,7 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    above. Fix is small: the driver already resolves the serving commit at start; record it per case
    and flag a change in `REPORT_JSON`. Not to be confused with `SES-33` (Vercel producing no build
    at all) or `DAT-12` (which *data* a run read).
-7. **`SES-62` (Task Success Rate) — ❌ OPEN, filed 2026-07-29 (`design-ses-57`). DO THIS FIRST —
+7. **`SES-62` (Task Success Rate) — ✅ DONE + archived 2026-07-29 (v6.3.231, `462e5ac`). The news door mirrors the screen two calls; the first run since `CHI-92` to reach a judged verdict.** Original framing kept — it is why #24 was unmeasurable. Was: DO THIS FIRST —
    nothing about regression test #24 can be measured until it lands.** The news-door gate has been
    failing **100% of the time, unconditionally, since `CHI-92` shipped this morning** (v6.3.227):
    that session split the news flow into a search call returning `stories` and a display call
@@ -216,6 +216,23 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    null`. Marcus Webb — GEO CSO Expert then analyzes that as if it were the article. **Bucket 1
    because the judge would score content founded on a guess, and §1's "nothing lying" bar because a
    reviewer clicking a paywalled card gets undisclosed guesswork.**
+   **Corrected 2026-07-29 (`S-SES-62` QA) — narrower than filed, and it no longer blocks anything.**
+   My "the honest-gap path can never fire" claim was an overgeneralization from two samples; a live
+   run supplied the counter-example. The Apple newsroom card returned a real `401`, the reason
+   reached Marcus Webb — GEO CSO Expert, and the ARTICLE UNAVAILABLE clause fired verbatim. So the
+   route *does* classify failures correctly when the AI fallback also fails. What stands is the
+   narrower defect: **when the fallback returns something, a refusal or a guess passes as article
+   text.** Still a §1 bar, no longer a blocker for `SES-57`. Size the fix by measuring how often
+   each branch actually occurs.
+9. **`SES-64` (Task Success Rate) — ❌ OPEN, filed 2026-07-29 (`S-SES-62` QA). Do before the next
+   bucket-1 run.** Regression test #24 is hardcoded `outcome_class: "rich-answer"`
+   (`chi-true-regression.mjs:191`), but when its card's article cannot be read the *correct* answer
+   is an honest gap — so the run **fails a correct answer on the wrong rubric.** Measured on the
+   first #24 run to reach a verdict since `CHI-92`: Marcus produced a textbook honest gap and Owen
+   — Proofreader failed it on `actionable_guidance_present` against the rich-answer bar,
+   `case_pass: false`. This is exactly what `AGT-36` built the `honest-gap` class (§5b) to fix;
+   #24 is the one case never wired to it, because its class predates the class. Fix: derive #24's
+   class from that run's `article_degraded` instead of hardcoding it.
 
 ---
 

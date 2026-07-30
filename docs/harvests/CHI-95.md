@@ -53,8 +53,38 @@ computed at `:111` and currently only feeds `patternsUsed` — if the search nev
 summary declines, return the failure with `primary_failure` instead of 200. Then `SES-57`'s plumbing
 carries a real reason and the gap acknowledgment fires.
 
-## Relationship to `SES-57`
+## Relationship to `SES-57` — CORRECTED 2026-07-29 (`S-SES-62` QA)
 
-This is why `SES-57`'s live impact is latent rather than live: the non-OK branch `SES-57` fixes is
-practically unreachable until this lands. `SES-57`'s own QA items 6 and 7 are blocked on it (and on
-`SES-62`).
+**As filed, this row claimed the defect made the honest-gap path unreachable, so `SES-57`'s live
+impact was latent and its QA items 6/7 were blocked on it. That was an overgeneralization from two
+samples, and the first live run to reach a verdict supplied the counter-example.**
+
+On that run the news card was `https://www.apple.com/newsroom/2026/07/apple-upgrade-launches-in-the-united-states/`.
+The route returned a **real classified failure** — `{http_status: 401, extraction_outcome:
+"not_attempted"}` — meaning the primary fetch got a 401 *and* the AI fallback also failed, so the
+non-OK branch was taken. `SES-57`'s Article Context Resolver carried the reason through, and Marcus
+Webb — GEO CSO Expert's answer (pulled from `deliverables`, not the judge's paraphrase) opened:
+
+> "The article from Apple's newsroom could not be retrieved — the platform was unable to access the
+> full text. I'm working from the headline alone, which tells me Apple has launched a new offering
+> called \"Apple Upgrade\" in the United States, but I don't have the specifics of what it does…"
+
+No status codes, no field names, then real reasoning from two cited Data Room facts. That is
+`ci-answer-intent`'s ARTICLE UNAVAILABLE clause firing exactly as instructed — **so this row's own
+inherited acceptance criterion (`SES-57`'s old QA item 6) is already satisfied**, and `SES-57` closed
+on its revised gate the same session.
+
+**What remains real and unfixed** is narrower than filed but still a `BETA.md` §1 "nothing lying"
+defect: when the AI fallback *does* return something, a refusal or a guess passes as article text.
+Both measured transcripts above stand unchanged. It no longer blocks any other row.
+
+**Before sizing the fix, measure the branch split** — how often the route returns a real classified
+failure (as here) versus a refusal-as-content (as in the WSJ/FT transcripts). The two measurements
+that produced this row and the one that corrected it are three data points, not a distribution.
+
+## Related
+
+`SES-64` (Task Success Rate, `Beta-gate (bucket 1)`) came out of the same run: regression test #24
+is hardcoded `outcome_class: "rich-answer"`, so the correct honest-gap answer quoted above was
+scored against the rich-answer bar and failed `actionable_guidance_present`. Distinct from this row
+— that is the test engine's rubric selection, not the route's classification.

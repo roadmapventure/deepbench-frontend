@@ -5,6 +5,30 @@
 
 ---
 
+## S-SES-62-design / S-SES-62 (v6.3.231, `462e5ac`, 2026-07-29, worktree `design-ses-62`) — the mirror drifted by call sequence, and the run that proved it also disproved me
+
+**Outcome: `SES-62` ✅ and `SES-57` ✅ both done + archived.** Regression test #24 reached a judged verdict for the first time since `CHI-92` shipped that morning. 3 files, suite **24/24**, build clean.
+
+**The defect.** `CHI-92` (v6.3.227) split the news flow: the screen calls `ws-news-search-intent` and reads `search.stories`, then calls `ws-news-display-intent` with `task_context: { stories }` and reads `result.cards` from Alex Reeves — Screen Controls Editor. The test engine still made only the first call and read `cardsResp.cards` — a key that call has never carried — so `runNewsDoorCaseJourney()` threw *"news door: Jordan returned zero cards"* before reaching the article, the answer or the judge. A bucket-1 gate failing 100% of the time, unconditionally, for a reason that had nothing to do with the product (verified live: Jordan Ellsworth — Web Search Expert → Michelle Manning — Project Manager → Alex Reeves all complete and the drawer populates).
+
+**Third recurrence of one mirror.** `SES-31` was field *values*, `SES-57` was payload *fields*, this was the *call sequence*. The shared-code coupling `SES-57` shipped for the payload is the right answer here too, but the screen's version is entangled with React-only concerns the test engine has no analogue for — `isStale()` generation guards, `setNewsCards`, `setWorkingStatus`, the `CHI-75` ownership ref — so where the seam goes is a design call, filed as `SES-63` (`Post-beta`) rather than folded in. Interim mitigation is a source-parity test asserting both sides make the same two calls with the same field reads; **6 of its 9 assertions fail against the pre-fix source**, verified independently rather than taken from the coding report.
+
+**`SES-57` closed on a revised gate — a correction to my own kickoff, stated as such.** `SES-57`'s original QA item 6 ("Marcus states the gap") tested three things at once: the payload plumbing, `CHI-91`'s Skill clause, and whether a failure is ever *reported* — the last of which is `CHI-95`. It was moved onto `CHI-95` as that row's acceptance criterion, leaving `SES-57`'s gate as *"regression test #24 reaches a judged verdict carrying the resolver's payload."*
+
+**Then the live run over-delivered, and disproved me.** I had predicted `article_unavailable_reason: null` because `CHI-95` meant the route "practically never" returns non-OK. Instead the Apple newsroom card returned a real **`{http_status: 401, extraction_outcome: "not_attempted"}"`**, `SES-57`'s Article Context Resolver carried it through, and Marcus Webb — GEO CSO Expert produced a textbook honest gap — pulled from `deliverables`, not the judge's paraphrase:
+
+> *"The article from Apple's newsroom could not be retrieved — the platform was unable to access the full text. I'm working from the headline alone…"*
+
+No status codes, no field names, then real reasoning from two cited Data Room facts (the 3.84-year US replacement cycle; Crest Wireless's 28% conversion lift). That is `ci-answer-intent`'s ARTICLE UNAVAILABLE clause firing exactly as written — **so the criterion I had just moved onto `CHI-95` was already satisfied, and my "practically never" was an overgeneralization from two samples.** `CHI-95` was corrected on its row and in `BETA.md`: what stands is the narrower defect (when the AI fallback *does* return something, a refusal or a guess passes as article text — both measured transcripts hold), and it no longer blocks anything.
+
+**The case still scored `case_pass: false` — on the wrong rubric, which is the session's other finding.** `chi-true-regression.mjs:191` hardcodes #24 as `outcome_class: "rich-answer"`, but #24's correct class is not a property of the question — it depends on whether that run's card happened to be readable. Owen — Proofreader scored a correct honest gap against the rich-answer bar and failed the one criterion `actionable_guidance_present`, critiquing that it *"stops at retrieval instructions rather than delivering actionable channel positioning guidance."* This is precisely the failure `AGT-36` built the scored `honest-gap` class (§5b, `:349`) to fix; #24 is the one case never wired to it, because its class predates the class. Filed `SES-64` (`Beta-gate (bucket 1)`) — until it lands, a bucket-1 run reports a false FAIL on #24 whenever the card's article is unreadable.
+
+**Deploy gate FAILED and was exempted deliberately, not skipped.** No Vercel build fired for `462e5ac`. No poke commit was spent, because the gate asks the wrong question here: all three files are local-only (a Node script, a test, a docs row), and the serving commit was confirmed to already contain `bb60703`, which carries `SES-57`'s deployed resolver. The test engine is a local script calling the deployed API.
+
+**One coding-agent deviation, correct:** a version header on the touched file, per `STANDARDS.md` §5's Always Required list. It also flagged two things about its own test that I confirmed — the pre-fix run short-circuits at assertion 1b rather than the kickoff's named 3c, and assertion 4b (`/zero cards/`) is not discriminating on its own because the old throw message used those exact words. 3c does discriminate; 4a carries the distinguishability guarantee.
+
+---
+
 ## S-SES-57-design / S-SES-57 (v6.3.230, `bb60703`, 2026-07-29, worktree `design-ses-57`) — the fix is right, its own gate can't run, and QA found the two reasons why
 
 **Outcome: `SES-57` shipped and deliberately NOT closed. QA 8 PASS / 2 BLOCKED / 2 partial.** New platform service **Article Context Resolver** (`article-context-resolver`, §19m row 33, layer `frontend`, `tracking_status: machinery`): `src/lib/newsCardContext.js` now owns all five steps the CHI screen and the CHI test engine were each implementing — POST to `/api/fetch-article`, read the response, decide success, determine *why* on failure, assemble the payload. Both callers import it; neither retains a copy. Suite **23/23**, build clean, 3 files + 1 Supabase row.
