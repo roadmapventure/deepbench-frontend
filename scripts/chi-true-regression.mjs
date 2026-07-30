@@ -1,3 +1,11 @@
+// DeepBench v6.3.231 | scripts/chi-true-regression.mjs | SES-62 -- the news door mirrors the screen's
+// TWO calls. CHI-92 (v6.3.227) split the news flow: ws-news-search-intent returns structured `stories`,
+// then ws-news-display-intent carries those stories in task_context and Alex Reeves formats them into
+// `cards`. This file still made only the first call and read a `cards` key that call has never carried,
+// so regression test #24 -- a bucket-1 beta gate -- threw "zero cards" and recorded an infra_death on
+// every run for the whole day CHI-92 shipped, before asking anything. The product was never broken;
+// this was the mirror drifting by call SEQUENCE rather than by field, its third recurrence (SES-31
+// field values, SES-57 payload fields, this). Guarded by tests/regression/SES-62-news-door-call-parity.js.
 // DeepBench v6.3.230 | scripts/chi-true-regression.mjs | SES-57 -- the news door no longer builds its own
 // news-card payload. runNewsDoorCaseJourney() calls the shared Article Context Resolver
 // (src/lib/newsCardContext.js) that MarketIntelligenceScreen.jsx calls, so this run can no longer ask
@@ -547,9 +555,19 @@ async function runForecastCaseJourney(caseObj, ctx, judgeVerdicts) {
 
 // ---- A4 news door (D6, case 24) ----
 async function runNewsDoorCaseJourney(_caseObj, ctx, judgeVerdicts) {
-  const cardsResp = await call({ capability_slug: "web-search-news", intent_slug: "ws-news-search-intent", agent_id: "jordan", task_context: {} }, ctx);
-  const cards = Array.isArray(cardsResp.cards) ? cardsResp.cards : [];
-  if (cards.length === 0) throw new Error("news door: Jordan returned zero cards");
+  // FEATURE: SES-62 -- mirrors MarketIntelligenceScreen.jsx:3784-3799 exactly. CHI-92 split the news
+  // flow: Jordan searches and returns structured `stories`, then a second call is his display request
+  // with those stories in task_context, and Alex Reeves formats them into `cards`. This function used
+  // to make only the first call and read a `cards` key that call has never carried, so every run since
+  // CHI-92 threw "zero cards" and regression test #24 -- a bucket-1 gate -- died before asking
+  // anything. call() already unwraps body.content (unwrapTerminal, :207), so .stories and .cards are
+  // read directly off each result, same as the screen reads them off callCapability().
+  const search = await call({ capability_slug: "web-search-news", intent_slug: "ws-news-search-intent", agent_id: "jordan", task_context: {} }, ctx);
+  const stories = Array.isArray(search.stories) ? search.stories : [];
+  if (stories.length === 0) throw new Error("news door: Jordan returned zero stories");
+  const display = await call({ capability_slug: "web-search-news", intent_slug: "ws-news-display-intent", agent_id: "jordan", task_context: { stories } }, ctx);
+  const cards = Array.isArray(display.cards) ? display.cards : [];
+  if (cards.length === 0) throw new Error("news door: Alex returned zero cards from " + stories.length + " stories");
   const card = cards[0];
 
   // FEATURE: SES-57 -- same Article Context Resolver the screen calls, so this run cannot ask Marcus
