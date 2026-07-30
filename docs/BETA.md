@@ -316,6 +316,34 @@ known defect that would break or dirty that run:
 | 25 | `AGT-50` (Architecture) | Owen Marsh — The Proofreader's `asked_metric_present`/`platform_language_detected` criteria read inconsistently on `forecast_draft`/`theory_test` under the honest-gap class — measured on Nadia Farouk — Data Expert's already-fixed writing still failing on evidence that's just a real, correctly-hedged figure citation. The actual reason `DAT-16` (row 22) can't close. Not root-caused; Owen's Skill deliberately kept frozen while diagnosing. *(added 2026-07-30, `design-dat-16`)* |
 | 26 | `AGT-51` (Architecture) | A citation's `confidence_tier` can read `inferred` when the Data Room classifies the same UUID as sourced-equivalent, triggering a hard case-fail via the runbook's `D4` strict-rejection rule regardless of retry outcome. Independent of any content defect. Not root-caused. *(added 2026-07-30, `design-dat-16`)* |
 | 27 | `AGT-52` (Architecture) | A citation rejection's own reason text leaks platform jargon (`confidence_tier`, raw UUIDs, `Data Room`) — `AGT-44`'s exact defect class, on a Skill that guardrail apparently didn't reach. Not root-caused; verify which intent generates this text before scoping. *(added 2026-07-30, `design-dat-16`)* |
+| 28 | `CHI-96` (Speed) | The Forecast **edit** journey slowed ~4.3× after `AGT-47` — case 6 went 193 s → 828 s between pre-regression rounds 2 and 3, same driver and endpoint. Suspected cause is `AGT-47`'s larger `user_reasoning` payload; one run each, so variance not excluded. **Measure before scoping, and do not revert `AGT-47`** — it is the only case that improved. Bucket 2, not 1. *(added 2026-07-30, `design-arch-beta-0729` round 3)* |
+
+> **Pre-regression round 3 — 2026-07-30, `design-arch-beta-0729` ("i have finished the 3 tickets. do you pre-test again?").** Same 4 cases.
+> Nothing this round depended on a Vercel deploy: `SES-65` and `DAT-16` Part 1 are driver-local, `DAT-16b` and `AGT-44` are
+> Supabase Skill data, and `AGT-47` touched **both** the screen and the driver's mirror payload (`1dce9d7`) — the
+> `feedback-check-the-mirror-payload` trap was avoided by that session, so the local driver genuinely exercises the fix.
+> **Result: 1 PASS / 3 FAIL, 29 min** (round 2: 2 PASS / 2 FAIL, 16 min).
+>
+> | Case | Round 2 | Round 3 |
+> |---|---|---|
+> | 6 `upgrade-cycles` | FAIL — `forecast_draft` missing entities + figures | ✅ **PASS** — both artifacts clean (`AGT-47` confirmed) |
+> | 9 `vitrine-tech` | FAIL — `answer`, empty scored list | FAIL — `answer` **now passes**; `theory_test` + `forecast_draft` fail `asked_metric_present` under the new `honest-gap` class |
+> | 12 `vietnam-reseller` | ✅ PASS | FAIL — `theory_test` on `platform_language_detected` |
+> | 24 `news-first-card` | ✅ PASS (degraded) | FAIL — `answer` on `platform_language_detected` (degraded again) |
+>
+> **The score went down and the platform got better — read the composition, not the count.** `AGT-47` is confirmed on the
+> hardest journey in the set. `DAT-16` Part 1 is confirmed (case 9's `answer` now passes). **Every one of the three failures
+> is now the same root problem: the platform is being penalised for honest disclosure** — `AGT-50` (widened, `AGT-53`
+> retired into it). Cases 12 and 24 fail for *saying* a gap exists; case 9 fails for *supplying a figure* under a class that
+> requires saying it doesn't have one. `AGT-44`'s Guardrails Skill and the `honest-gap` class cannot both be satisfied by a
+> gap disclosure as currently written.
+>
+> **Two prior-round claims are now settled by observation:** `SES-64`'s predicted false-FAIL on #24 *did* occur (green in
+> round 2, red in round 3, same code and same degraded-article condition — the pair brackets it), and `DAT-16`'s pending QA
+> is a **FAIL**, with Priya Nair — Forecast/Theory/Performance Expert's `theory_test` never in Part 2's scope.
+>
+> **Caveat stated once:** case 12's flip is 2 prior passes vs 1 fail. Suggestive of `AGT-44` as cause, not proof — a repeat
+> run is what separates regression from Owen's own judgment varying. Same for `CHI-96`'s timing.
 
 > **Pre-regression round 2 — 2026-07-30, `design-arch-beta-0729` (John: "do i still run that test?").** Same 3 cases
 > as round 1 **plus case 24** (`news-first-card`), newly able to reach a verdict after `CHI-92`/`SES-57`/`SES-62`.

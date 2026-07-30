@@ -6867,3 +6867,30 @@ Caught by John immediately after the kickoff was pushed, from a one-line compreh
 **Process note — two rounds of "no blind fixes" in one session.** Both real corrections this session (the `.method`→`traits.analysis_instructions` field catch, and the edit-resolve gap) came from verifying live before committing to a claim, not from trusting the design harvest's own prior-session prose or the coding session's first completion report. Neither would have been caught by re-reading source; both needed a real query or a real run.
 
 **FEATURE DETAIL:** `docs/harvests/AGT-47.md`, `docs/kickoffs/v6.3.232-AGT-47-carry-forward-theory-figures.md`, `docs/kickoffs/v6.3.235-AGT-47-edit-resolve-preserves-figures.md`.
+
+---
+
+## 2026-07-30 — `design-arch-beta-0729` round 3 (docs-only, no version bump) — **the score fell to 1/4 and it is the most useful result yet: three failures, one root cause, and the platform is being punished for telling the truth**
+
+**John's ask:** *"i have finished the 3 tickets. do you pre-test again?"* — `AGT-47`, `SES-65`, `DAT-16`.
+
+**Result: 1 PASS / 3 FAIL in 29 min** (round 2: 2 PASS / 2 FAIL in 16 min). Per-case table and deploy reasoning: `docs/BETA.md` §3 bucket 1.
+
+**Both in-scope fixes are confirmed working.** `AGT-47` took case 6 `upgrade-cycles` — the longest journey in the set — from FAIL to a clean PASS on both artifacts. `DAT-16` Part 1 is confirmed: case 9's `answer` artifact now passes. That is real, measured progress on the two hardest items of the morning.
+
+**The three failures share one root cause, and it is not a bug in any one agent: the platform is now penalised for honest disclosure.** `AGT-44`'s Guardrails Skill forbids narrating platform mechanics; the `honest-gap` class *requires* an agent to say the Data Room lacks the asked-for fact. Saying so **is** narrating platform mechanics. An honest answer therefore fails `platform_language_detected` and a concealing one fails for fabricating — as the two standards are currently written there is no satisfying answer.
+- **Case 24** — Marcus Webb — GEO CSO Expert disclosed *"MacRumors headline only, no access to full article"* and was failed for it, Owen Marsh — The Proofreader conceding the trap in his own critique: *"The content itself is strong—specific geographies, real numbers, clear next steps—but the framing reads as platform narration of the agent's constraints."*
+- **Case 12** — Priya Nair — Forecast/Theory/Performance Expert's `theory_test` failed for *"back-office vocabulary (data pull, retrieval gap, visibility problem, measurement problem)"* while honestly explaining a real corpus gap.
+- **Case 9** — the mirror image: under `honest-gap`, supplying the asked figure is the failure, and both remaining artifacts supply one (Vitrine's own 40% completion rate presented **as** the gap).
+
+**`AGT-53` was claimed and immediately retired into `AGT-50`.** `design-dat-16` had filed `AGT-50` hours earlier over the same scope; this session claimed an ID before checking. Caught and unwound within the session rather than left to close under two numbers — **the identical pattern John had to unwind that morning when `AGT-45` turned out to be `AGT-36`'s unfinished scope under a second ID.** The round-3 evidence was folded into `AGT-50`, including the fact that changes its diagnosis: **case 12 passed this criterion in rounds 1 and 2 and fails in round 3**, i.e. after the Guardrails Skill reached every artifact-producing agent. `AGT-50` was framed as an inconsistent judge; that before/after points at the standard itself, and the two diagnoses imply different fixes — re-wording Owen's criteria treats a symptom if the conflict is structural.
+
+**Two open rows settled by observation rather than argument.** `SES-64`'s predicted false-FAIL on #24 **did** occur — green in round 2, red in round 3, same code and the same degraded-article condition, so the rounds bracket it and the behaviour is confirmed unpredictable in both directions. And `DAT-16`'s QA, which its own row listed as pending, is a **FAIL**: Part 2 set `data-patch-intent.method` for Nadia Farouk — Data Expert only, while the failing `theory_test` artifact is Priya's and was never in scope.
+
+**Consequence worth carrying: fixing `SES-64` alone will not make case 24 pass.** Reclassifying it to `honest-gap` leaves the identical Guardrails penalty on the identical disclosure. `SES-64` and `AGT-50` have to land together.
+
+**`CHI-96` filed (Speed, bucket 2 — not 1).** Case 6 went **193 s → 828 s** between rounds, ~4.3×, and accounts for most of the set's 16→29 min increase. Suspected cause is `AGT-47`'s larger `user_reasoning` payload now carrying the original theory text alongside the edit. **Filed with an explicit instruction not to revert `AGT-47`** — it is the only case that improved this round; if the slowdown is real the fix is payload shape, not removal.
+
+**A correction this session owes its own advice.** Round 2 recommended making `asked_metric_present` a hard gate on rich-answer artifacts. `S-SES-65` turned that down correctly: the criterion's Skill returns `false` whenever the question asks for **no quantity at all**, so gating it would fail correct answers — case 24 among them. The recommendation read `false` as "the asked figure is missing" without checking it also encodes "no figure was asked for", and runbook §5b had already locked it not-scored on that path under `AGT-36b`'s §8 approval. `SES-65` shipped the half that was real (a failure can no longer report an empty reason list) and verified scoring byte-unchanged across all 972 criterion/class/flag combinations. **Round 2's prediction of "1 PASS / 3 FAIL if the ruling lands" was therefore void** — the score did land there, for entirely unrelated reasons, which is exactly the coincidence that would have validated bad reasoning had nobody checked why.
+
+**Standing caveat, stated once:** case 12's flip and `CHI-96`'s timing are each one run against two priors. Suggestive, not proof — a repeat run separates a regression from Owen's own judgment varying, and neither should be scoped as fact until then.
