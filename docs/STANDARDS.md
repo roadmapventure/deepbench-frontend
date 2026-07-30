@@ -483,3 +483,40 @@ When any `api/` route or service capability ships in a coding session, that sess
 The Platform Roadmap section of the AI Audit panel shows all services where `roadmap !== 'now'`. A live service appearing in the roadmap is incorrect and will mislead any architect reviewing the panel.
 
 **Add to CLAUDE-DESIGN.md AI Audit wiring checklist:** "SERVICE_CATALOG `roadmap` updated to `'now'` for any service that ships in this session."
+
+---
+
+## Section 13: Canonical Test-Engine Vocabulary
+
+**Settled by John 2026-07-29 (`design-ses-57`). Sweep tracked by `SES-60`.**
+
+The CHI end-to-end regression tooling had accumulated two names that read like product
+concepts but are not — nothing a DeepBench user ever encounters. Use these exact terms:
+
+| Do NOT use | Canonical term |
+|------------|----------------|
+| "driver", "the regression driver", "the CHI driver" | **Test engine** |
+| "case 24", "case #24", "the news-door case" | **Regression test #24** |
+
+**Why it matters, John's own framing:** "driver" and "case 24" read as platform vocabulary,
+which forces a translation step every time a session reports test results — and invites the
+reader to think a *product* behavior is under discussion when it is a *test artifact*. The
+news door itself **is** a real user-facing feature; regression test #24 is the test *of* it.
+Keep that distinction visible in every report.
+
+**Scope of the term:** `scripts/chi-true-regression.mjs` and the runbook/report vocabulary
+around it. This is test tooling only — it never ships to the browser and never appears on the
+beta surface.
+
+**This is not a blind find-and-replace.** "driver" is an ordinary English word and appears in
+this repo in at least four unrelated senses that must be left alone (verified 2026-07-29):
+
+- `src/nigp-lookup.js` — NIGP commodity-code product data ("Line Drivers", "Engine/Driver
+  Performance", "Driver and Hardware Support Programs"). Real content, 11 hits.
+- `docs/WORKING-WITH-JOHN.md` — "Deadlines are never a silent **driver** of scope," plus the
+  `feedback-deadline-not-driver` memory filename.
+- `docs/APPLE-DATA-ROOM-SOURCE-DATA.md` — "Price/value as upgrade **driver**" (business data).
+- `src/hooks/useAIActivity.js`, `docs/kickoffs/v6.3.134-LOG-36-*`, `v6.1.28-*`, `v6.0.45-*` —
+  "the log is the driver," "growth drivers," "dual-driver reasoning."
+
+Any session doing this rename reviews each hit rather than replacing by string.
