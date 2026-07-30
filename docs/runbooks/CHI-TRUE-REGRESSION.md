@@ -115,7 +115,7 @@ Owen (Proofreader) still judges these artifacts and the full verdict is still re
 
 **Why the guidance and jargon bars stay:** §5 already demands business guidance even from a rejection ("what's missing and what to do — not platform narration"). In the first run both answers failed those two legitimately, so this class does not turn either case green by itself — the generation side still has to improve. That is the point: this change removes an impossible bar, it does not lower a real one.
 
-**What a regression looks like in this class:** an answer that suddenly reports a South Korea co-op utilization number. That fails the class immediately, which is the protection this whole pair of questions exists to provide.
+**What a regression looks like in this class:** an answer that suddenly reports a South Korea co-op utilization number. That fails the class immediately, which is the protection this whole group of questions exists to provide.
 
 Adding or removing a question from this class is a baseline change — §8 rules apply (John's approval, in this runbook).
 
@@ -131,7 +131,7 @@ CHI input quirk: the screen drops keystrokes under re-render. Workaround: set th
 
 ## 7. Scoring
 
-- **Question PASS** = actual journey matches baseline (incl. approved flagged-set) AND all Owen content verdicts pass AND zero rejections AND no unrecovered infra death. **Exception — `honest-gap` questions (§5b, cases 12 and 23):** the content bar is §5b's table, not Owen's overall `pass` flag; everything else in this line still applies unchanged.
+- **Question PASS** = actual journey matches baseline (incl. approved flagged-set) AND all Owen content verdicts pass AND zero rejections AND no unrecovered infra death. **Exception — `honest-gap` questions (§5b, cases 9, 12 and 23):** the content bar is §5b's table, not Owen's overall `pass` flag; everything else in this line still applies unchanged.
 - **Run PASS** = all 24 cases PASS AND browser leg passes. One automatic HAR-17 recovery inside a journey does not fail a case (it's designed behavior) — but report every recovery.
 - **Case 24 specifics:** the news fetch itself failing (no cards, or `fetch-article` failing on the first card) is an infra-class FAIL of case 24, not a skip — the door is part of the product. `fetch-article` failing *open* (screen behavior: proceeds without article text) = run the journey as the screen would, but report the degradation prominently; content verdicts then judge what the user actually got.
 - Anything else = run FAIL, with per-question causes.
