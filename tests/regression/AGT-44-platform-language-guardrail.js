@@ -1,3 +1,9 @@
+// DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch2 --
+// B3 re-anchored to the SHIPPED S-AGT-44b (v7.0.7) state: channel-intelligence is attached again
+// (AGT-44 reopen, done + archived), and the mitigation that makes it safe is now asserted -- the
+// Skill row's traits.intent_allowlist must be non-empty and must exclude ci-routing-intent (the
+// exclusion is the invariant; the full list may legitimately grow, so it is deliberately not
+// pinned). Records a shipped decision, not a new one. Full record: docs/harvests/AGT-44.md.
 // DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch --
 // A3/A4 re-anchored to the stable-first layout (S-HAR-02b prompt reorder): guardrails now renders at
 // order 5, prompt_phase 'stable', LAST within the stable phase -- after format/intent/identity/
@@ -24,7 +30,7 @@
 //      column is the only column read, the section reaches the model AFTER the agent's own instructions
 //      and BEFORE VOICE, and a Capability with no guardrails-type Skill still gets no guardrails section
 //      (the addition is opt-in per Capability, so the untouched Capabilities are provably unaffected).
-//   B. Live Skill row -- the real `platform-language-guardrail` row and its four attachments. Gated on
+//   B. Live Skill row -- the real `platform-language-guardrail` row and its three attachments. Gated on
 //      Supabase credentials; announces itself SKIPPED rather than passing quietly. Half A alone cannot
 //      fail if the Skill row were deleted or its text moved to `method`, because AGT-44 shipped no code
 //      -- a green Half A on reverted data is the vacuous pass this half exists to prevent.
@@ -45,26 +51,36 @@ const SKILL_SLUG = "platform-language-guardrail";
 // (John's call, 2026-07-29: Elena Cho -- The Reasoner's output is not judged, so no leak has ever
 // been measured on it).
 //
-// TWO Capabilities, not four. Both of the others were attached at ship and detached the same day
-// (John's calls, 2026-07-29), each after measurement -- and this list is the record of why, because
-// re-adding either one silently is the regression that costs the most here.
+// THREE Capabilities. The list has moved twice, each time on measurement, and this comment is the
+// record of both moves -- because silently changing this set is the regression that costs the most here.
+//
+// SHIP + SAME-DAY DETACHES (John's calls, 2026-07-29) -- four attached at ship, two detached after
+// measurement:
 //
 //   quality-gate -- Owen Marsh -- The Proofreader is the agent who POLICES this vocabulary. Giving him
 //     a Skill that spells the vocabulary out put the banned phrases into the judge's own prompt, and he
 //     quoted them back -- along with two phrases from his own qg-content-context-intent.method -- as the
 //     "offending phrase" found in an artifact. The agent enforcing a word list must not be handed it.
+//     STILL DETACHED -- this half of the 2026-07-29 decision stands.
 //
-//   channel-intelligence -- Marcus Webb -- GEO CSO Expert's answer NEVER failed
-//     platform_language_detected: not at baseline, not in either QA run. All four measured failures were
-//     Priya Nair's theory_test and Nadia Farouk's forecast_draft. The attachment was scope on assumption
-//     rather than evidence, and it cost real behaviour: a Skill attaches to a Capability, so it also
-//     reached ci-routing-intent, and case 6's five-way classification went forecast -> qa
-//     deterministically, producing a journey_deviation the baseline never had. Marcus is covered by
-//     AGT-41 (Owen's content check running live), which is the row that owns catching a leak there.
+//   channel-intelligence -- Marcus Webb -- GEO CSO Expert: detached 2026-07-29 because the plain
+//     attachment reached ci-routing-intent (a Skill attaches to a Capability, so it reached every
+//     intent), and case 6's five-way classification went forecast -> qa deterministically, producing
+//     a journey_deviation the baseline never had.
 //
-// The general rule both cases teach: attach this Skill only where a leak has actually been measured,
-// and never to an agent whose Capability also serves classification or routing calls.
-const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis"];
+// THE v7.0.7 RE-ATTACH (S-AGT-44b, AGT-44 reopen, 2026-07-31, shipped + archived): channel-intelligence
+// carries the Skill again -- the v6.3.229 close-out had claimed this gap was already closed, and the
+// reopen closed it for real. The routing hazard above was fixed at ROOT first (AGT-54: AA-121's
+// intent_allowlist gate hoisted out of the knowledge-only branch to fire for ANY Skill type), then the
+// Skill re-attached with traits.intent_allowlist scoping it AWAY from ci-routing-intent -- proven by a
+// deterministic 3/3 A/B in both directions. B3 below asserts that exclusion (the accepted-risk note on
+// the row: the allowlist lives on the one shared Skill row and can rot silently if a new content intent
+// is added without updating it). Full record: docs/harvests/AGT-44.md.
+//
+// The general rule all of this teaches: attach this Skill only where a leak has actually been measured,
+// and never let it reach an intent that serves classification or routing calls -- since v7.0.7 that
+// scoping is carried by traits.intent_allowlist rather than by refusing the attachment outright.
+const ATTACHED_CAPABILITIES = ["hypothesis-evaluation", "data-analysis", "channel-intelligence"];
 
 // Two clauses that must survive verbatim into the assembled prompt. The first names the reader; the
 // second is the store prohibition the measured failures breached.
@@ -245,7 +261,7 @@ async function liveSkillRow() {
   assert.ok(tRes.ok, `skill_types read failed: HTTP ${tRes.status}`);
   const [typeRow] = await tRes.json();
   assert.ok(typeRow, "skill_types has no 'guardrails' row -- the FK backing every Guardrails Skill is gone");
-  assert.equal(typeRow.display_order, 6, `skill_types.guardrails.display_order is ${typeRow.display_order}, not 6 (SKILL_ORDER.guardrails)`);
+  assert.equal(typeRow.display_order, 6, `skill_types.guardrails.display_order is ${typeRow.display_order}, not 6 (display metadata -- deliberately NOT a SKILL_ORDER mirror since S-HAR-02b's renumbering moved SKILL_ORDER.guardrails to 5)`);
 
   // B2. THE DATA DISCRIMINATOR. The rule text is in the `guardrails` column, array-shaped, and NOT in
   //     `method`/`objective`. A future edit that moves it is silent everywhere else on the platform.
@@ -275,9 +291,10 @@ async function liveSkillRow() {
       `${SKILL_SLUG} carries a quoted counter-example again ("${banned}"). State the rule positively -- a model-answer sentence in the artifact's voice is copyable, and it is also quotable by the judge as a finding.`);
   }
 
-  // B3. Attached to exactly the four artifact-producing Capabilities -- and to memory-consolidation
-  //     never. Elena Cho -- The Reasoner's exclusion is a decision, not an oversight; a fifth
-  //     attachment appearing silently is what this asserts against.
+  // B3. Attached to exactly the recorded Capability set (see the ATTACHED_CAPABILITIES comment for
+  //     both dated moves) -- and to memory-consolidation never. Elena Cho -- The Reasoner's exclusion
+  //     is a decision, not an oversight; an attachment appearing or vanishing silently is what this
+  //     asserts against.
   const aRes = await fetch(`${url}/rest/v1/capability_skill_profiles?skill_profile_slug=eq.${SKILL_SLUG}&select=capability_slug,level,is_required`, { headers });
   assert.ok(aRes.ok, `capability_skill_profiles read failed: HTTP ${aRes.status}`);
   const attachments = await aRes.json();
@@ -286,6 +303,18 @@ async function liveSkillRow() {
   for (const a of attachments) {
     assert.equal(a.is_required, true, `${SKILL_SLUG} on '${a.capability_slug}' is not is_required -- the standard is not optional`);
   }
+  //     The v7.0.7 mitigation that makes the channel-intelligence attachment safe: the Skill row's
+  //     traits.intent_allowlist must exist (non-empty array) and must EXCLUDE ci-routing-intent --
+  //     the deterministic 3/3 A/B proved that exclusion is what keeps case 6's five-way routing
+  //     classification clean. Deliberately NOT a pin of the full intent list: the allowlist may
+  //     legitimately grow as new content intents are added (that growth-without-update is the
+  //     recorded rot risk; the exclusion is the invariant). An empty/missing allowlist means the
+  //     Skill fires on EVERY intent of all three Capabilities -- the exact pre-AGT-54 hazard.
+  const allowlist = row.traits?.intent_allowlist;
+  assert.ok(Array.isArray(allowlist) && allowlist.length > 0,
+    `${SKILL_SLUG}.traits.intent_allowlist is missing/empty (got ${JSON.stringify(allowlist)}) -- without it the guardrail reaches every intent, including routing/classification calls (the AGT-44b regression)`);
+  assert.ok(!allowlist.includes("ci-routing-intent"),
+    `${SKILL_SLUG}.traits.intent_allowlist includes "ci-routing-intent" -- the guardrail must never reach the five-way routing classification (proven deterministic 3/3: it flips case 6 forecast -> qa; see docs/harvests/AGT-44.md)`);
 
   // B4. The worked example Priya was handed -- a sentence that committed the very violation clause 2
   //     forbids -- stays deleted, and the rule it illustrated stays intact. Deleting the whole
