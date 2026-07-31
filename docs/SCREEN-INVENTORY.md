@@ -19,12 +19,19 @@ Not a flat list — every top-level nav destination is a **Product Focus Area**,
 |---|---|---|---|
 | Home Screen | `/` *(not yet — see note)* | not built yet | ❌ Missing, tracked as `LA-01` (`docs/FEATURES-LATER.md`) |
 
-Splash, announcements, and overall dashboard metrics. `Channel Intelligence` (below) currently occupies `/` temporarily — it needs its own route once Home Screen is built. Not scoped yet.
+Splash, announcements, and overall dashboard metrics. `Channel Intelligence` (below) currently occupies `/` temporarily — it needs its own route once Home Screen is built. Not scoped yet. **Interim update 2026-07-31 (`LAV-1`):** when the Live Agent View build's flip session (`S-LAV-1e`) lands, `/` serves the **Live Agent View** (below) transitionally and Channel Intelligence moves to `/channel-intelligence`. When `LA-01` Home ships, `/` repoints again to Home; neither screen is the permanent homepage.
+
+### Live Agent View — transitional homepage (new, 2026-07-31)
+| Screen | Route | Component | Status |
+|---|---|---|---|
+| Live Agent View | `/live-agent-view` (also served at `/` transitionally after `S-LAV-1e`, until `LA-01` Home ships) | `LiveAgentViewScreen.jsx` | 🔶 In build — `LAV-1` (`docs/FEATURES.md`) |
+
+Screen code: **`LAV`** — claimed 2026-07-31 (`design-live-agent-dash-0731`, row `LAV-1`). **Dual naming is deliberate (John, 2026-07-31):** the open page's own title reads "Live Multi-Agent Routing (Beta)"; the Work-dropdown label reads "Live Agent View (Beta)". Both are correct; do not "fix" one to match the other.
 
 ### Work — a family of dashboards, one per work-type
 | Screen | Route | Component | Children | Notes |
 |---|---|---|---|---|
-| Channel Intelligence | `/` *(temporary — see Home above)* | `MarketIntelligenceScreen.jsx` | — | Renamed from "Market Intelligence," then from the interim "Channel Sales Intelligence" (`MI-46`). Filename never updated to match — that's normal, expected to lag. |
+| Channel Intelligence | `/` *(temporary — moving to `/channel-intelligence` at `S-LAV-1e`, see Home above)* | `MarketIntelligenceScreen.jsx` | — | Renamed from "Market Intelligence," then from the interim "Channel Sales Intelligence" (`MI-46`). Filename never updated to match — that's normal, expected to lag. |
 | Project Management | `/work` | `DashboardScreen.jsx` | Create Work Order, Task Instructions | Filename says "Dashboard" — nav label is the canonical name. |
 | Spend Analysis | `/work/:taskId/analyze` | `AnalyzerScreen.jsx` | Fetch *(uncertain, see below)* | Filename/legacy prefix (`AZ`) reflect NIGP-analyzer heritage — nav label is canonical. |
 | Create Work Order | `/work/new` | `CreateWorkOrderScreen.jsx` | — | Always a child of Project Management. |
