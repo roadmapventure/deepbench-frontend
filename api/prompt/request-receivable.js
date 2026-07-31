@@ -1,4 +1,5 @@
 // DeepBench v7.0.15 | api/prompt/request-receivable.js | HAR-02a -- capture usage.cache_creation_input_tokens/cache_read_input_tokens (normalized to 0, summed across the parse retry) and pass them to logActivity() at both write sites; NULL/0 until S-HAR-02b/c enable caching
+// DeepBench v7.0.13 | api/prompt/request-receivable.js | LOO-28 -- trait-conditional parallel tool use on the AUTO tool_choice branch only (disable_parallel_tool_use: !enableParallelToolUse); forced branch + guardrails inline call stay hardcoded true (HAR-20). parseModelTurn() now collects ALL tool_use blocks into an additive tool_calls array (singular fields untouched); a turn mixing the terminal schema tool with harness calls is incoherent and routes through the existing parse-retry machinery once, then fails loudly
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
 // DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
 // DeepBench v7.0.14 | api/prompt/request-receivable.js | HAR-27 -- optional webSearchMaxUses param on buildCallBody()/callModel() emits max_uses on the web_search tool definition; sendRequest() threads llm.web_search_max_uses. Unset (every non-opted-in caller) is byte-identical
@@ -106,7 +107,13 @@ const DELEGATE_TO_AGENT_TOOL = {
 // server-side per-turn search cap. Inert when enableWebSearch is false (the tool entry it
 // decorates doesn't exist). Unset for every existing caller is byte-identical: the conditional
 // spread adds no key.
-export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, conversation_history = [] }) {
+// FEATURE: LOO-28 -- enableParallelToolUse is a new optional param, same opt-in shape as
+// canRequestHelp/enableWebSearch above. Only the AUTO branch (harness tools present) becomes
+// trait-conditional: disable_parallel_tool_use: !enableParallelToolUse. The forced branch and
+// the guardrails inline call stay disable_parallel_tool_use: true verbatim -- HAR-20's fix for
+// multiple emissions of the SAME schema tool was a real live failure class and is not touched.
+// Omitted (every existing caller) is byte-identical: !false === true.
+export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
@@ -134,7 +141,7 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
     model, max_tokens, tools,
     ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
     tool_choice: needsAutoChoice
-      ? { type: 'auto', disable_parallel_tool_use: true }
+      ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
       : { type: 'tool', name: schemaTool.name, disable_parallel_tool_use: true },
     messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: systemPrompt }],
   };
@@ -170,8 +177,30 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
 // retry corrective for schema-shape failures but never handled the truncation case.
 export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
   const wasTruncated = responseData.stop_reason === 'max_tokens';
-  const toolUseBlock = responseData.content?.find(b => b.type === 'tool_use');
+  // FEATURE: LOO-28 -- collect ALL tool_use blocks (was: `content?.find` reading only the first).
+  // Multi-block turns are only reachable when the calling intent's enable_parallel_tool_use trait
+  // lifted disable_parallel_tool_use on the auto branch; every other caller still gets exactly
+  // 0 or 1 block from the API.
+  const toolUseBlocks = (responseData.content || []).filter(b => b.type === 'tool_use');
+  const toolUseBlock = toolUseBlocks[0];
   if (toolUseBlock) {
+    // FEATURE: LOO-28 -- mixed-emission rule: a multi-call turn is legal ONLY when every call is
+    // a harness tool (a fan -- the results come back and the caller continues). A turn that emits
+    // the schema (terminal) tool alongside harness calls -- or emits it more than once -- is
+    // incoherent: a final answer before its inputs exist / two finals. Thrown here so it routes
+    // through callModel()'s existing parse-retry machinery (buildParseRetryCorrection() already
+    // answers every tool_use id per HAR-20) with a purpose-built correction asking for
+    // pure-delegate or pure-terminal; a second occurrence fails loudly via the existing
+    // "Parse failed and retry also failed" 422 -- same one-retry shape as AA-142.
+    if (toolUseBlocks.length >= 2) {
+      const allHarness = toolUseBlocks.every(b => b.name === 'request_help' || b.name === 'delegate_to_agent');
+      if (!allHarness) {
+        throw Object.assign(
+          new Error(`Incoherent parallel emission: ${toolUseBlocks.length} tool_use blocks where the terminal schema tool appears alongside other calls -- a multi-call turn must be all harness-tool calls (parallel delegation); the terminal schema tool must be a single, standalone call`),
+          { mixedEmission: true, truncated: wasTruncated }
+        );
+      }
+    }
     const isHarnessTool = toolUseBlock.name === 'request_help' || toolUseBlock.name === 'delegate_to_agent';
     if (!isHarnessTool && schemaTool && toolUseBlock.name === schemaTool.name) {
       const required = schemaTool.input_schema?.required || [];
@@ -190,6 +219,11 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
       tool_name: toolUseBlock.name,
       tool_use_id: toolUseBlock.id,
       tool_input: toolUseBlock.input,
+      // FEATURE: LOO-28 -- additive, backward-compatible: the singular fields above stay the
+      // first block exactly as before; tool_calls carries EVERY block in emission order. Only
+      // execute.js's runLoop() reads this array (fan when length >= 2); every existing consumer
+      // keeps reading the singular fields.
+      tool_calls: toolUseBlocks.map(b => ({ tool_name: b.name, tool_use_id: b.id, tool_input: b.input })),
     };
   }
   if (hasSchemaTool) {
@@ -202,7 +236,7 @@ export function parseModelTurn(responseData, hasSchemaTool, schemaTool) {
   }
   const textBlock = responseData.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text block in response');
-  return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text };
+  return { is_delegate_call: false, tool_name: null, tool_use_id: null, tool_input: textBlock.text, tool_calls: [] };
 }
 
 // FEATURE: AA-113 -- retry on a transient non-2xx Anthropic HTTP error (429/500/502/503/529),
@@ -314,7 +348,10 @@ export function buildParseRetryCorrection(llmContent, correctionText) {
 // bounded by real remaining budget, not a blind fixed constant.
 // FEATURE: HAR-27 -- webSearchMaxUses threaded through to buildCallBody(), same opt-in shape as
 // enableWebSearch. Unset for every non-opted-in caller: byte-identical request body.
-export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, conversation_history = [], deadline = null }) {
+// FEATURE: LOO-28 -- enableParallelToolUse threaded through to buildCallBody(), same opt-in
+// contract as canRequestHelp/enableWebSearch. Omitted by every caller except execute.js's
+// runLoop() when the calling intent's trait is on -- byte-identical otherwise.
+export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [], deadline = null }) {
   const effectiveDeadline = deadline || (Date.now() + 55000);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -329,7 +366,7 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const hasSchemaTool = !!schemaTool;
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, enableParallelToolUse, conversation_history });
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
@@ -367,7 +404,12 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
       // into the same max_tokens ceiling with a now-longer prompt, cannot succeed. Confirmed live:
       // 0 recoveries across 30 real truncation retries. Same shape as postToAnthropicWithRetry()'s
       // existing rule that a 400 is not worth retrying -- classify first, then retry only what can work.
-      const correctionText = parseErr.truncated
+      // FEATURE: LOO-28 -- mixed-emission correction: ask for pure-delegate or pure-terminal,
+      // never both in one turn. Checked before the truncation branch -- a mixed turn's failure
+      // mode is incoherence, not length, and "be more concise" would not correct it.
+      const correctionText = parseErr.mixedEmission
+        ? `Your previous turn called your terminal structured-output tool alongside other tool calls in the same turn. That is incoherent: a final answer cannot be emitted before the inputs it depends on exist. Choose exactly one this turn: EITHER call only the delegation tool(s) you need (request_help / delegate_to_agent) and wait for their results, OR return exactly one complete call to your structured-output tool with no other tool calls beside it.`
+        : parseErr.truncated
         ? `Your previous response was cut off because it exceeded the response length limit. Return the same structured output again, but substantially more concise -- shorten or summarize the longest fields so that the complete response, including every required field, fits within the limit.`
         : `Your response did not conform to the required schema: ${parseErr.message}. Return the structured output again, exactly as specified, making sure to include every field named above.`;
       const correctionMessage = buildParseRetryCorrection(llmData.content, correctionText);

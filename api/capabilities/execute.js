@@ -1,6 +1,7 @@
 // DeepBench v7.0.22 | api/capabilities/execute.js | SES-67 -- the pending_confirmation return, its durable_hops result mirror, and both depth_exceeded returns now carry trace_id/span_id (§19p: identity attached where the result is born -- the loop's own identity, same as the adjacent critique dispatch threads), closing the last executor result shapes that omitted it; error returns deliberately still unchanged
 // DeepBench v7.0.16 | api/capabilities/execute.js | HAR-02b -- runLoop()'s callModel() site forwards system_prompt_stable/system_prompt_volatile from the enriched prompt (additive plumbing; callModel()/buildCallBody() don't read them until S-HAR-02c); the format-override append mirrors onto the volatile half so the split stays coherent with system_prompt; the agent-turn log row now carries cache_creation_input_tokens/cache_read_input_tokens from the turn's usage (HAR-02a follow-through -- the loop path's single log record, LOG-91). The split halves are NOT persisted to durable_hops (system_prompt is; see S-HAR-02b build report) -- a resumed hop carries only the concatenated prompt until S-HAR-02c decides resume-side caching
 // DeepBench v7.0.14 | api/capabilities/execute.js | HAR-27 -- runLoop()'s callModel() site passes webSearchMaxUses from enriched.llm; checkpointAndReturn()'s durable_hops llm persist now carries web_search_max_uses (conditionally) so the cap survives checkpoint/resume -- the persisted llm object was hand-narrowed, not wholesale
+// DeepBench v7.0.13 | api/capabilities/execute.js | LOO-28 -- parallel dispatch for the harness Loop (parallelization pattern, native Anthropic parallel tool use): trait-gated multi-call turns fan out concurrently (Promise.all over per-prong dispatchDelegation, each individually caught into an is_error tool_result), per-ask hop accounting (a fan of N claims N from the shared MAX_LOOP_DEPTH pool up front, clean once-per-loop refusal when it doesn't fit), is_final ignored on fan turns, per-prong durable pause/resume via pending_delegation.fan (done-with-result entries never re-run). Mechanism dormant until an Intent Skill Profile carries enable_parallel_tool_use; single-call path byte-identical; fan depth_exceeded/refusal returns follow SES-67's trace_id/span_id shape
 // DeepBench v7.0.10 | api/capabilities/execute.js | AA-179c -- one call-site change: enrichPrompt() now receives this execution's span identity and the opt-in onEvent seam, so the assembly work that runs before runLoop() can stream. No emit site added here; resumeCapability()/runLoop() untouched
 // DeepBench v7.0.3 | api/capabilities/execute.js | LAV-1d -- one streamed emit at runLoop()'s model-call seam exposing the assembled system prompt (full text, never truncated) on the same opt-in _onEvent seam the 10 delegation emits use; no persistence, no logAICall, no new column -- a non-streaming caller is byte-identical
 // DeepBench v6.3.228 | api/capabilities/execute.js | DAT-12 -- retrieval_scope: an explicit, named public param (AA-83 posture preserved) threaded to assemblePrompt() only, so a regression run can scope its own reads to the seed corpus without mutating a single row
@@ -282,12 +283,17 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
-  // that passes usedWebSearch gets the fact recorded too. Set-deduped for consistency with the
-  // patternsUsed block below; at the single real call site tool_calls holds at most one name.
-  const toolCallFacts = Array.from(new Set([
+  // that passes usedWebSearch gets the fact recorded too.
+  // FEATURE: LOO-28 -- was Set-deduped (defensive only -- LOG-37b's own comment: "at the single
+  // real call site tool_calls holds at most one name"). A fan turn now legitimately carries N
+  // names INCLUDING repeats (two request_help asks are two real calls -- §19i records facts
+  // verbatim), so the blanket dedup would silently under-report a homogeneous fan. Only the
+  // original web_search guard survives: never append it twice. Every single-call caller's output
+  // is byte-identical (client tool_calls never contain 'web_search').
+  const toolCallFacts = [
     ...tool_calls,
-    ...(usedWebSearch ? ['web_search'] : []),
-  ]));
+    ...(usedWebSearch && !tool_calls.includes('web_search') ? ['web_search'] : []),
+  ];
   // FEATURE: LOG-49 -- fact-half additions. self_reported_claims stays quarantined in its own key
   // (never merged into tool_calls); input_references_other_deliverable is a boolean, both omitted
   // when empty. Combined with the config-half via mergeCallFacts below, preserving the "null not {}"
@@ -632,6 +638,14 @@ async function dispatchDelegation({
   // passes _parent_span_id: span_id, so the child execution points its parent_span_id at this
   // caller -- exactly parallel to the _trace_id: trace_id each already passes.
   span_id = null,
+  // FEATURE: LOO-28 -- true only when this call is one prong of a concurrent fan (runLoop's fan
+  // block / resumeCapability's fan branch). Two effects, both scoped to fan prongs: (1) is_final
+  // is ignored (design decision 4: a multi-call turn is Orchestrator-Workers by construction --
+  // every prong's result returns to the caller; honoring one prong's is_final would strand the
+  // others' tool_use ids, which the protocol forbids); (2) the 'continue' outcome RETURNS its
+  // tool_result content instead of appending it -- the caller folds every prong into ONE user
+  // message answering every id. False (every pre-existing call site) is byte-identical.
+  isFanProng = false,
 }) {
   let delegateResult;
   let returningFromAgentId = null;
@@ -742,7 +756,9 @@ async function dispatchDelegation({
     // any dispatch happens — neither depends on the nested call's result. Computed once, reused
     // below, so the early-fire decision and the existing final-branch check share one evaluation,
     // never two independently-computed conditions that could drift out of sync.
-    const willResolveFinal = delegationRequired || tool_input.is_final === true;
+    // FEATURE: LOO-28 -- !isFanProng: fan prongs never resolve final (design decision 4, see the
+    // param comment above). Single-call path (isFanProng false) is byte-identical.
+    const willResolveFinal = !isFanProng && (delegationRequired || tool_input.is_final === true);
     if (willResolveFinal) {
       // FEATURE: LOO-014 — moved from after the nested call resolves (LOO-011's original position)
       // to here, before the 'delegation' announcement below creates its own placeholder. Fixes a
@@ -779,6 +795,13 @@ async function dispatchDelegation({
   if (returningFromAgentId) {
     onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: span_id }); // LOG-95 (§19p): row credits the returning delegate
   }
+  // FEATURE: LOO-28 -- a fan prong returns its tool_result content instead of appending it: the
+  // Anthropic protocol requires every tool_use id in the assistant turn to be answered in the
+  // immediately-following user message, so the fan's caller assembles ONE message covering every
+  // prong. The single-call append below is untouched.
+  if (isFanProng) {
+    return { outcome: 'continue', toolResultContent: JSON.stringify(delegateResult), lastHelpSelection };
+  }
   conversationHistory = [
     ...conversationHistory,
     { role: 'user', content: [{ type: 'tool_result', tool_use_id, content: JSON.stringify(delegateResult) }] },
@@ -809,6 +832,14 @@ async function runLoop({
   // (display_agent_* remains a documented residual -- HAR-17 row in FEATURES.md; signatureConfig is
   // no longer one, LOG-71 closed it the same way.)
   enableWebSearch = false,
+  // FEATURE: LOO-28 -- the effective parallel-tool-use flag (trait && !delegation_required,
+  // computed in db-assembly.js), threaded the same explicit-param way enableWebSearch is and
+  // passed only to callModel(). Deliberately NOT persisted to durable_hops (no DDL this session):
+  // a resumed continuation runs with the flag off -- post-resume decision turns are sequential-
+  // only, the safe default -- a documented residual in the same class as display_agent_*. A fan
+  // already emitted before the checkpoint is unaffected: its prongs persist per-prong in
+  // pending_delegation.fan and resume fully (Task 3).
+  enableParallelToolUse = false,
   // FEATURE: HAR-17 -- the per-hop recovery ledger (§19o): [{ o, fault, at }] entries keyed by hop
   // ordinal (conversationHistory.length at the top of the hop). [] on a fresh call; recovered from
   // durable_hops.recovery_ledger on resume. Only the model-call seam below ever appends to it.
@@ -836,6 +867,11 @@ async function runLoop({
   signatureConfig = null,
 }) {
   let delegationRetried = false;
+  // FEATURE: LOO-28 -- the once-per-loop oversized-fan refusal flag, mirroring delegationRetried's
+  // one-retry pattern exactly: first oversized fan gets a structural refusal (model re-plans), a
+  // second is terminal depth_exceeded -- never a new unbounded, non-terminal cap-exhaustion path
+  // (the LOO-29 lesson).
+  let fanRefused = false;
   // FEATURE: LOG-49 -- fact 2: flips true once a delegate's returned result has been folded back
   // into conversationHistory (dispatchDelegation()'s 'continue' outcome below). From that point on
   // in this loop, every logAgentTurn row -- and the terminal sendRequest write -- carries
@@ -902,6 +938,7 @@ async function runLoop({
         // FEATURE: HAR-27 -- rides enriched.llm (validated at db-assembly.js's trait gate);
         // undefined for every capability without the trait, byte-identical request body.
         webSearchMaxUses: enriched.llm?.web_search_max_uses,
+        enableParallelToolUse, // FEATURE: LOO-28 -- lifts disable_parallel_tool_use on the auto branch only
         conversation_history: conversationHistory,
         deadline,
       });
@@ -977,13 +1014,23 @@ async function runLoop({
       // Never derived, translated, or normalized -- 'delegate_to_agent' and 'request_help' are
       // different facts and collapsing them is the bug LOG-44 exists to fix. Null on a plain text
       // turn (parseModelTurn(), request-receivable.js:171), which correctly yields call_facts null.
-      tool_calls: turn.tool_name ? [turn.tool_name] : [],
+      // FEATURE: LOO-28 -- on a fan turn the row honestly carries N names, one per real call,
+      // repeats included (two request_help asks are two real calls -- §19i facts, verbatim).
+      // Single-call turns map to the identical [name] this line always produced; the singular
+      // fallback covers any turn shape without the array.
+      tool_calls: (turn.tool_calls && turn.tool_calls.length > 0)
+        ? turn.tool_calls.map(c => c.tool_name)
+        : (turn.tool_name ? [turn.tool_name] : []),
       // FEATURE: LOG-77-9 -- §19k backing facts for the read-time `delegated_to_provenance`
       // derivation, captured verbatim ONLY on a delegate_to_agent turn (a structural harness-tool
       // check, never an agent/capability conditional). request_help turns deliberately get
       // nothing: they carry no target. task_context is already in scope (it threads to
       // persistFailureAndRethrow); resumed loops capture identically (AA-145 persists it).
-      ...(turn.tool_name === 'delegate_to_agent'
+      // FEATURE: LOO-28 -- deliberately single-call-only: a fan's per-prong provenance already
+      // lives on each prong's own child span rows, and LOG-77-9's delegation_target/
+      // task_provenance shape is singular -- widening a log schema per-prong is not done
+      // silently here (it would need its own row).
+      ...(turn.tool_name === 'delegate_to_agent' && !(turn.tool_calls && turn.tool_calls.length >= 2)
         ? (() => { const f = extractDelegationProvenanceFacts(turn.tool_input, task_context); return { delegationTarget: f.delegationTarget, taskProvenance: f.taskProvenance }; })()
         : {}),
     };
@@ -1131,6 +1178,152 @@ async function runLoop({
         await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
       }
       return finalResult;
+    }
+
+    // FEATURE: LOO-28 -- parallel dispatch (the published parallelization pattern, carried
+    // natively by Anthropic parallel tool use). A multi-call turn (2+ tool_use blocks, all
+    // harness tools by parseModelTurn()'s mixed-emission rule) is the model's own logged
+    // judgment that the sub-tasks are independent (§19d sniff test: the fan is model reasoning,
+    // who-gets-asked routing is unchanged). The !delegationRequired guard is belt-and-braces:
+    // db-assembly.js already computes the effective trait as false for a delegation_required
+    // intent (design decision 3 -- its whole job is ONE terminal hand-off), so a fan cannot
+    // legally occur there; if the API ever multi-emitted anyway, falling through to the single
+    // path (first call wins) is exactly today's behavior for a rogue parallel emission.
+    const fanCalls = (!delegationRequired && turn.tool_calls && turn.tool_calls.length >= 2) ? turn.tool_calls : null;
+    if (fanCalls) {
+      const fanSize = fanCalls.length;
+      if (hopCounter.n >= MAX_LOOP_DEPTH) {
+        // No hops remain at all -- existing depth_exceeded behavior (SES-67 shape: §19p identity).
+        return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug, trace_id, span_id };
+      }
+      if (hopCounter.n + fanSize > MAX_LOOP_DEPTH) {
+        // FEATURE: LOO-28 -- hops remain, but not enough for the whole fan: clean refusal, once
+        // per loop (mirrors the delegationRetried one-retry pattern). Dispatch NOTHING -- never a
+        // partial fan -- answer every id with a structural refusal, and let the model re-plan
+        // (fewer asks this turn, or sequenced across turns). A SECOND oversized fan in the same
+        // loop is the existing terminal depth_exceeded -- bounded by construction, never a new
+        // non-terminal cap-exhaustion path (the LOO-29 lesson).
+        if (fanRefused) {
+          return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug, trace_id, span_id }; // SES-67 shape: §19p identity
+        }
+        fanRefused = true;
+        const hopsRemaining = MAX_LOOP_DEPTH - hopCounter.n;
+        conversationHistory = [
+          ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
+          { role: 'assistant', content: turn.raw_content },
+          {
+            role: 'user',
+            content: fanCalls.map(c => ({
+              type: 'tool_result',
+              tool_use_id: c.tool_use_id,
+              is_error: true,
+              content: `insufficient hop allowance: asked ${fanSize}, ${hopsRemaining} remain -- nothing was dispatched. Re-plan: make at most ${hopsRemaining} call(s) this turn, or sequence the work across turns.`,
+            })),
+          },
+        ];
+        continue;
+      }
+      // FEATURE: LOO-28 -- claim the whole fan's hops up front (per-ask accounting: a fan of N
+      // spends N from the shared pool). No separate width limit exists or is needed -- the pool
+      // bounds the widest possible fan by arithmetic.
+      hopCounter.n += fanSize;
+      delegationOccurred = true;
+      // The assistant's own multi-call decision turn, appended exactly once -- present in
+      // conversationHistory whether the fan dispatches live or checkpoints pending, same
+      // contract as the single path's append below.
+      conversationHistory = [
+        ...(conversationHistory.length > 0 ? conversationHistory : [{ role: 'user', content: enriched.system_prompt }]),
+        { role: 'assistant', content: turn.raw_content },
+      ];
+      // FEATURE: LOO-28 -- pre-dispatch budget check, fan form. Prongs run concurrently, so the
+      // wall-clock reserve is the MAX of the per-prong estimates, never the sum. Short budget ->
+      // checkpoint the whole already-decided fan undispatched ('pending' per prong, emission
+      // order); the resume dispatches with a fresh full budget. Never a partial fan.
+      const fanRemainingMs = __testPreDispatchBudgetMs !== null ? __testPreDispatchBudgetMs : (deadline - Date.now());
+      const fanReserves = await Promise.all(fanCalls.map(c => getHopBudgetReserveMs(
+        c.tool_name === 'delegate_to_agent' ? c.tool_input?.capability_slug : 'project-manager',
+        c.tool_name === 'delegate_to_agent' ? c.tool_input?.intent_slug : 'agent-selection-intent'
+      )));
+      if (fanRemainingMs < Math.max(...fanReserves)) {
+        return checkpointAndReturn({
+          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+          requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+          // depth + fanSize: the fan's hops were claimed above; persist the post-claim value so a
+          // resume re-enters with the fan's spend intact (a checkpoint must never refund hops --
+          // the LOO-29 lesson, not repeated on this new path).
+          task_context, conversationHistory, depth: depth + fanSize, delegationOccurred, lastHelpSelection,
+          pendingDelegation: { fan: fanCalls.map(c => ({ tool_use_id: c.tool_use_id, status: 'pending', via_tool: c.tool_name, tool_input: c.tool_input })) },
+          enableWebSearch,
+          trace_id, span_id, parent_span_id,
+          signatureConfig,
+        });
+      }
+      // FEATURE: LOO-28 -- dispatch every prong concurrently, each individually caught. A thrown
+      // permanent failure becomes an honest is_error tool_result the orchestrator reasons about
+      // (§19j posture) -- never a throw that kills the whole question; the prong's own child-run
+      // transient recovery (§19o, inside its own runLoop) already had its shot before that throw
+      // surfaced. Per-prong delegation/delegation_complete/delegation_return events keep firing
+      // inside dispatchDelegation() with correct per-prong spans (§19p); they now interleave --
+      // truthful chronology, no new event types.
+      const prongOutcomes = await Promise.all(fanCalls.map(async (c) => {
+        try {
+          return await dispatchDelegation({
+            via_tool: c.tool_name, tool_input: c.tool_input, tool_use_id: c.tool_use_id,
+            agent_id, capability_slug, intent_slug, tenant_id, task_context, delegationRequired,
+            conversationHistory, hopCounter, deadline, job_id, delegationOccurred, lastHelpSelection, onEvent,
+            trace_id, span_id,
+            isFanProng: true,
+          });
+        } catch (e) {
+          return { outcome: 'prong_failed', error: e };
+        }
+      }));
+      const fanState = fanCalls.map((c, i) => {
+        const o = prongOutcomes[i];
+        if (o.outcome === 'nested_checkpoint') {
+          return { tool_use_id: c.tool_use_id, status: 'waiting', waiting_on_job_id: o.waitingOnJobId };
+        }
+        if (o.outcome === 'prong_failed') {
+          return { tool_use_id: c.tool_use_id, status: 'done', is_error: true, result: JSON.stringify({ error: o.error?.message || 'delegation failed', failure_class: o.error?.failureClass || 'permanent', fault_code: o.error?.faultCode || null }) };
+        }
+        // 'continue' -- the prong's full tool_result content, returned (not appended) per isFanProng.
+        return { tool_use_id: c.tool_use_id, status: 'done', result: o.toolResultContent };
+      });
+      // Display bookkeeping only: keep the last non-null prong selection, emission order.
+      for (const o of prongOutcomes) {
+        if (o && o.lastHelpSelection) lastHelpSelection = o.lastHelpSelection;
+      }
+      if (fanState.some(p => p.status !== 'done')) {
+        // FEATURE: LOO-28 -- checkpoint only after EVERY prong settled (resolved, or itself
+        // in_progress). Finished prongs persist status 'done' WITH their full result -- a resume
+        // must never re-run finished work (§19o: re-rolling completed work can duplicate stored
+        // deliverables). The outer job_id the client polls is unchanged -- no client change.
+        return checkpointAndReturn({
+          job_id, tenant_id, capability_slug, intent_slug, agent_id, enriched, canRequestHelp, delegationRequired,
+          requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
+          // depth + fanSize: same post-claim persistence as the pre-dispatch fan checkpoint above.
+          task_context, conversationHistory, depth: depth + fanSize, delegationOccurred, lastHelpSelection,
+          pendingDelegation: { fan: fanState },
+          enableWebSearch,
+          trace_id, span_id, parent_span_id,
+          signatureConfig,
+        });
+      }
+      // FEATURE: LOO-28 -- every prong settled live: fold ALL results into ONE tool_result user
+      // message answering every emitted id in emission order, exactly once (the protocol pairs by
+      // id and requires every id answered in the immediately-following user message -- partial
+      // fold-in is protocol-impossible; completion order is irrelevant). is_final was ignored on
+      // every prong (design decision 4) and the single-dispatch 'final' short-circuit below is
+      // skipped entirely; the fold-in IS the integrate step.
+      conversationHistory = [
+        ...conversationHistory,
+        { role: 'user', content: fanState.map(p => ({ type: 'tool_result', tool_use_id: p.tool_use_id, content: p.result, ...(p.is_error ? { is_error: true } : {}) })) },
+      ];
+      integratedDelegateResult = true;
+      // Per-ask depth accounting: a fan of N advanced the chain by N hops, so the next turn logs
+      // pre-fan depth + N (the for-update's own ++ supplies the final 1).
+      depth += fanSize - 1;
+      continue;
     }
 
     // FEATURE: AA-87 -- turn.is_delegate_call is now true only for the two harness-generic
@@ -1322,6 +1515,10 @@ export async function runCapability({
   const canRequestHelp = promptRequest.canRequestHelp === true;
   // FEATURE: HAR-05 -- same read-from-promptRequest reasoning as canRequestHelp directly above.
   const enableWebSearch = promptRequest.enableWebSearch === true;
+  // FEATURE: LOO-28 -- same read; already the effective boolean (trait && !delegation_required,
+  // computed in db-assembly.js's buildSections). Not persisted to durable_hops -- see runLoop()'s
+  // param comment for the deliberate sequential-after-resume residual.
+  const enableParallelToolUse = promptRequest.enableParallelToolUse === true;
   const delegationRequired = promptRequest.delegationRequired === true;
   const requiresHumanConfirmation = promptRequest.requiresHumanConfirmation === true;
   const critiqueCapabilitySlug = promptRequest.critiqueCapabilitySlug || null;
@@ -1339,6 +1536,7 @@ export async function runCapability({
       // have already run above without it. That ordering is the invariant, not an accident.
       handler_context,
       enableWebSearch,
+      enableParallelToolUse, // FEATURE: LOO-28
       delegationRequired,
       requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug,
       display_agent_id, display_agent_card,
@@ -1395,11 +1593,103 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
   const onEvent = _onEvent || (() => {});
 
   try {
+    // FEATURE: LOO-28 -- resume of a mid-fan checkpoint. pending_delegation.fan is a per-prong
+    // list in emission order: {tool_use_id, status:'done', result [, is_error]} |
+    // {tool_use_id, status:'waiting', waiting_on_job_id} | {tool_use_id, status:'pending',
+    // via_tool, tool_input}. Finished prongs stay finished -- their persisted results are reused
+    // verbatim, never re-run (§19o: re-rolling completed work can duplicate stored deliverables).
+    // Every non-done entry is driven to completion concurrently; a resume that runs low
+    // re-persists the fan with newly-'done' entries (re-checkpoint, same outer job_id -- the
+    // polled contract is unchanged). Once all prongs are done, ONE tool_result user message
+    // answers every id in emission order and the loop re-enters exactly like the single
+    // waiting_on_job_id branch below. The pre-existing singular shapes keep their own branches
+    // below, verbatim -- old checkpoint rows exist. The outer recovery ledger is deliberately
+    // NOT extended per-prong: per-prong transient recovery lives inside each prong's own child
+    // run (its own runLoop seam).
+    if (Array.isArray(row.pending_delegation?.fan)) {
+      const driven = await Promise.all(row.pending_delegation.fan.map(async (entry) => {
+        if (entry.status === 'done') return entry; // finished work never re-runs
+        if (entry.status === 'waiting') {
+          try {
+            await resumeCapability({ job_id: entry.waiting_on_job_id, _onEvent: onEvent });
+          } catch (prongError) {
+            // The nested job failed permanently (its own §19o recovery already ran inside its
+            // own runLoop) -- honest is_error tool_result the orchestrator reasons about, never
+            // a throw that kills the whole question (unlike the single waiting branch below,
+            // where the one prong IS the question).
+            return { tool_use_id: entry.tool_use_id, status: 'done', is_error: true, result: JSON.stringify({ error: prongError?.message || 'delegation failed', failure_class: prongError?.failureClass || 'permanent', fault_code: prongError?.faultCode || null }) };
+          }
+          // Re-read canonical state from the row (same reasoning as the single waiting branch).
+          const nestedRow = await loadDurableHopRow(entry.waiting_on_job_id);
+          if (nestedRow.status === 'in_progress') return entry; // still waiting -- re-persist unchanged
+          if (nestedRow.status === 'failed') {
+            return { tool_use_id: entry.tool_use_id, status: 'done', is_error: true, result: JSON.stringify({ error: nestedRow.error || 'unknown error', failure_class: 'permanent', fault_code: 'nested-terminal' }) };
+          }
+          return { tool_use_id: entry.tool_use_id, status: 'done', result: JSON.stringify(nestedRow.result) };
+        }
+        // status 'pending' -- decided but never dispatched (the pre-dispatch fan budget
+        // checkpoint): dispatch it now with this resume's fresh budget.
+        try {
+          const outcome = await dispatchDelegation({
+            via_tool: entry.via_tool, tool_input: entry.tool_input, tool_use_id: entry.tool_use_id,
+            agent_id: row.agent_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug, tenant_id: row.tenant_id,
+            task_context: row.task_context ?? null, delegationRequired: row.delegation_required === true,
+            conversationHistory: row.conversation_history || [], hopCounter: { n: row.hop_counter || 0 }, deadline,
+            job_id: row.id, delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null, onEvent,
+            trace_id: traceId, span_id: spanId,
+            isFanProng: true,
+          });
+          if (outcome.outcome === 'nested_checkpoint') {
+            return { tool_use_id: entry.tool_use_id, status: 'waiting', waiting_on_job_id: outcome.waitingOnJobId };
+          }
+          return { tool_use_id: entry.tool_use_id, status: 'done', result: outcome.toolResultContent };
+        } catch (prongError) {
+          return { tool_use_id: entry.tool_use_id, status: 'done', is_error: true, result: JSON.stringify({ error: prongError?.message || 'delegation failed', failure_class: prongError?.failureClass || 'permanent', fault_code: prongError?.faultCode || null }) };
+        }
+      }));
+      if (driven.some(p => p.status !== 'done')) {
+        return checkpointAndReturn({
+          job_id: row.id, tenant_id: row.tenant_id, capability_slug: row.capability_slug, intent_slug: row.intent_slug,
+          agent_id: row.agent_id, enriched, canRequestHelp: row.can_request_help, delegationRequired: row.delegation_required === true,
+          requiresHumanConfirmation: row.requires_human_confirmation === true, critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+          // depth: row.hop_counter unchanged -- the fan's hops were claimed before its first
+          // checkpoint and must never be refunded or re-claimed across resume cycles.
+          task_context: row.task_context ?? null, conversationHistory: row.conversation_history || [], depth: row.hop_counter || 0,
+          delegationOccurred: !!row.delegation_occurred, lastHelpSelection: row.last_help_selection || null,
+          pendingDelegation: { fan: driven },
+          enableWebSearch: row.enable_web_search === true,
+          trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId,
+          signatureConfig: row.signature_config ?? null,
+        });
+      }
+      const fanConversationHistory = [
+        ...(row.conversation_history || []),
+        { role: 'user', content: driven.map(p => ({ type: 'tool_result', tool_use_id: p.tool_use_id, content: p.result, ...(p.is_error ? { is_error: true } : {}) })) },
+      ];
+      return await runLoop({
+        capability_slug: row.capability_slug, intent_slug: row.intent_slug, agent_id: row.agent_id, tenant_id: row.tenant_id,
+        task_context: row.task_context ?? null, enriched, canRequestHelp: row.can_request_help,
+        delegationRequired: row.delegation_required === true,
+        requiresHumanConfirmation: row.requires_human_confirmation === true,
+        critiqueCapabilitySlug: row.critique_capability_slug || null, critiqueIntentSlug: row.critique_intent_slug || null,
+        // FEATURE: HAR-17 -- recover the web-search flag and the per-hop recovery ledger from the
+        // persisted row, exactly as the single branches below do. enableParallelToolUse is
+        // deliberately absent (not persisted, no DDL) -- the resumed continuation's own later
+        // decision turns run sequential-only, the documented LOO-28 residual.
+        enableWebSearch: row.enable_web_search === true, recoveryLedger: row.recovery_ledger || [],
+        display_agent_id: null, display_agent_card: null,
+        conversationHistory: fanConversationHistory, delegationOccurred: true,
+        lastHelpSelection: row.last_help_selection || null, hopCounter: { n: row.hop_counter || 0 },
+        deadline, job_id: row.id, trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent,
+        signatureConfig: row.signature_config ?? null,
+      });
+    }
+
     // FEATURE: S-ARCH-DURABLE-RESUME-02 (AA-185/AA-187) -- if the checkpoint that produced this row
     // captured an already-decided-but-undispatched delegation, dispatch it directly with this fresh
     // full budget instead of re-entering runLoop() from persisted conversation_history, which would
     // re-ask the model for a turn it already answered (AA-185) and never resume the nested call's own
-    // partial work (AA-187). This is the one and only place pending_delegation is read.
+    // partial work (AA-187). pending_delegation is read only here and in the LOO-28 fan branch above.
     // FEATURE: AA-195 (S-ARCH-NESTED-RESUME-01) -- a previous resume dispatched this delegation,
     // but the nested target itself checkpointed before returning a result (S-ARCH-DURABLE-RESUME-02's
     // unfinished second half). Actively resume the nested job so this outer resume drives real

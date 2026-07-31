@@ -8,6 +8,11 @@
 // DeepBench v7.0.14 | api/prompt/db-assembly.js | HAR-27 -- web_search_max_uses trait read (positive
 // integer only), carried on the returned llm object; merged after the profile loop so a later Format
 // Skill Profile's wholesale llm rebuild can't drop it. Absent/invalid trait -> key omitted entirely.
+// DeepBench v7.0.13 | api/prompt/db-assembly.js | LOO-28 -- enable_parallel_tool_use trait passthrough
+// (parallelization pattern, native Anthropic parallel tool use), effective boolean computed here as
+// enableParallelToolUse && !delegationRequired (a delegation_required intent never fans -- its whole
+// job is one terminal hand-off). Generic trait read, no identity conditional; dormant until an Intent
+// Skill Profile opts in.
 // DeepBench v7.0.7 | api/prompt/db-assembly.js | AGT-54 -- AA-121's intent_allowlist gate hoisted out
 // of the knowledge-only branch to fire generically for any skill type; a Guardrails Skill reaching a
 // routing/classification intent was skewing its answer (channel-intelligence's ci-routing-intent).
@@ -70,6 +75,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   let canRequestHelp = false;
   let enableWebSearch = false;
   let webSearchMaxUses = null;
+  let enableParallelToolUse = false;
   let delegationRequired = false;
   let requiresHumanConfirmation = false;
   let critiqueCapabilitySlug = null;
@@ -238,6 +244,15 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
         if (Number.isInteger(traits.web_search_max_uses) && traits.web_search_max_uses > 0) {
           webSearchMaxUses = traits.web_search_max_uses;
         }
+        // FEATURE: LOO-28 -- enable_parallel_tool_use passthrough, same gate/shape as
+        // can_request_help above. Permits the model to emit several harness-tool calls in one
+        // turn (the published parallelization pattern -- sectioning/voting -- carried natively
+        // by Anthropic parallel tool use); whether sub-tasks are actually independent stays the
+        // model's own per-turn judgment (§19d sniff test), never harness-forced. Read here,
+        // combined with delegation_required at the return below.
+        if (traits.enable_parallel_tool_use === true) {
+          enableParallelToolUse = true;
+        }
         // FEATURE: AA-142 -- delegation_required passthrough, same shape as can_request_help
         // directly above. Marks an intent whose entire job is completing a hand-off via
         // request_help/delegate_to_agent -- never a legitimate direct-text answer (unlike e.g.
@@ -361,7 +376,11 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   // trait is absent/invalid -- every non-opted-in capability's llm object is byte-identical.
   if (webSearchMaxUses !== null) llm = { ...llm, web_search_max_uses: webSearchMaxUses };
 
-  return { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices };
+  // FEATURE: LOO-28 -- the final effective boolean, computed here once from two generic trait
+  // reads (design decision 3: a delegation_required intent never fans -- its entire job is a
+  // single terminal hand-off, and two finals is undefined). No identity conditional anywhere
+  // (.claude/rules/capabilities-are-data.md).
+  return { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse: enableParallelToolUse && !delegationRequired };
 }
 
 function buildLabel(typeSlug, name) {
@@ -442,6 +461,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       llm: DEFAULT_LLM,
       canRequestHelp: false,
       enableWebSearch: false,
+      enableParallelToolUse: false,
       delegationRequired: false,
       requiresHumanConfirmation: false,
       critiqueCapabilitySlug: null,
@@ -588,7 +608,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     }
   }
 
-  const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug, retrieval_scope);
+  const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug, retrieval_scope);
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used
@@ -715,6 +735,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     llm,
     canRequestHelp,
     enableWebSearch,
+    // FEATURE: LOO-28 -- already the effective boolean (trait && !delegation_required), computed
+    // in buildSections(). Read by execute.js's runCapability() off this raw output, same as
+    // canRequestHelp/enableWebSearch (ai-enrichment.js drops unknown fields from `enriched`).
+    enableParallelToolUse,
     delegationRequired,
     requiresHumanConfirmation,
     critiqueCapabilitySlug,
