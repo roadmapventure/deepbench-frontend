@@ -1,3 +1,4 @@
+// DeepBench v7.0.3 | api/capabilities/execute.js | LAV-1d -- one streamed emit at runLoop()'s model-call seam exposing the assembled system prompt (full text, never truncated) on the same opt-in _onEvent seam the 10 delegation emits use; no persistence, no logAICall, no new column -- a non-streaming caller is byte-identical
 // DeepBench v6.3.228 | api/capabilities/execute.js | DAT-12 -- retrieval_scope: an explicit, named public param (AA-83 posture preserved) threaded to assemblePrompt() only, so a regression run can scope its own reads to the seed corpus without mutating a single row
 // DeepBench v6.3.224 | api/capabilities/execute.js | AGT-37 -- handler_context: a handler-facing envelope threaded runCapability() -> runLoop() -> sendRequest() only, never to assemblePrompt()/enrichPrompt(); resolveAccept() supplies the confirmed action's own chunk_id. Opaque throughout -- this file never opens it
 // DeepBench v6.3.205 | api/capabilities/execute.js | LOG-71 -- durable_hops now persists LOG-67's config-half snapshot and all three resumeCapability() re-entries recover it, so a resumed hop logs the same frozen signature its first hop did instead of a fact-half-only row
@@ -847,6 +848,15 @@ async function runLoop({
     }
 
     const turnStart = Date.now();
+    // FEATURE: LAV-1d -- expose the assembled prompt on the opt-in event stream (John, 2026-07-31).
+    // Same no-op-default onEvent seam the delegation emits use; §19p: identity attached where born,
+    // so the frame credits THIS execution's span, never the outer requester's. Full text, never
+    // truncated or summarized -- it is already in memory here and the stream is opt-in, so a
+    // non-streaming caller pays nothing. Nothing is persisted: replay is a separate decision.
+    onEvent({ type: 'prompt_assembled', agentId: agent_id, toCapabilitySlug: capability_slug,
+      toIntentSlug: intent_slug, system_prompt: enriched.system_prompt ?? null,
+      prompt_chars: enriched.system_prompt?.length ?? 0, depth,
+      trace_id, span_id, parent_span_id });
     // FEATURE: HAR-04 -- threads this loop's existing deadline (AA-139's own hop-budget value,
     // no new computation) one level deeper into callModel()'s internal Anthropic call(s), so a
     // hop that passes the pre-hop budget check can't still blow the shared maxDuration ceiling

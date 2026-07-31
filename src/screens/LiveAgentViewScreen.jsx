@@ -1,3 +1,10 @@
+// DeepBench v7.0.3 | LiveAgentViewScreen.jsx | LAV-1d -- the prompt box (the assembled system
+// prompt, exposed for the first time: real streamed text, 2-line clamp, click to expand), and
+// full-turn coverage -- a CHI turn is up to THREE top-level calls, each minting its own trace_id,
+// so the poller now queries the whole set (`.in`) and every meter/console/waterfall figure derives
+// over the union instead of the first trace alone (measured under-count: 13.1k of ~43k tokens).
+// Eleanor Voss — The Librarian's broker rows carry trace_id: null (AA-179's blind edge) and are
+// deliberately rendered nowhere here rather than fudged in by timestamp.
 // DeepBench v7.0.2 | LiveAgentViewScreen.jsx | LAV-1c -- adds the run's bounded trace-row poller
 // (one interval, one row store, keyed on the run's real trace_id), the four title-bar meters, and
 // the HARNESS TRACE console/waterfall below the canvas. Every figure here is row-derived: it comes
@@ -11,7 +18,7 @@
 // (AgentNetwork.jsx) and CHI's own AuditColumn as the right rail.
 // FEATURE: LAV-1c
 import { useState, useEffect, useMemo, useRef } from "react";
-import { T, display, body, mono, FOCUS_STATUS_STYLE, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
+import { T, PALETTE, display, body, mono, FOCUS_STATUS_STYLE, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents, useAgentActivitySummary } from "../hooks/useAgents.js";
@@ -140,9 +147,94 @@ function Meter({ label, value, unit, sup }) {
   );
 }
 
+// FEATURE: LAV-1d -- rgba shades composed from imported tokens, never written as literals
+// (.claude/rules/design-tokens.md). Same helper HarnessTraceConsole.jsx uses.
+const rgba = (hex, a) =>
+  `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
+
+const PROMPT_IDLE_BODY = "Waiting for a request…";
+const PROMPT_DASH = "—";
+
+// FEATURE: LAV-1d -- the ported .promptbox visual: a bottom overlay beside the canvas legend.
+// It renders the REAL streamed system prompt and nothing else -- no placeholder prompt text ever,
+// no estimated size. The count is the emit's own character length until that span's
+// ai_activity_log row lands, at which point it is replaced by the row's real input_tokens.
+// Clicking opens the same fixed popover pattern the trace console's record inspector uses: full,
+// selectable, scrollable text.
+function PromptBox({ prompt, agents, traceRows }) {
+  const [open, setOpen] = useState(false);
+  const agent = prompt?.agentId ? agents.find(a => a.id === prompt.agentId) : null;
+  const who = agent ? (agent.name || "").split(" ")[0] : (prompt?.agentId || null);
+  // Real row value only -- an absent row leaves the character count in place, never an estimate.
+  const row = prompt?.span_id != null
+    ? (traceRows || []).find(r => String(r.span_id) === String(prompt.span_id))
+    : null;
+  const tokens = row && row.input_tokens != null ? row.input_tokens : null;
+  const text = prompt?.system_prompt || null;
+  const hasText = typeof text === "string" && text.length > 0;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+  useEffect(() => { if (!prompt) setOpen(false); }, [prompt]);
+
+  const countLabel = tokens != null
+    ? `${tokens} tok`
+    : (prompt ? `${prompt.prompt_chars} chars` : PROMPT_DASH);
+
+  return (
+    <>
+      <div onClick={() => { if (hasText) setOpen(true); }}
+        title={hasText ? "Click to read the full assembled prompt" : undefined}
+        style={{position:"absolute",right:314,bottom:8,zIndex:7,width:"min(660px, 52%)",
+          background:rgba(T.paper, 0.94),border:`1px solid ${T.line}`,borderRadius:8,padding:"6px 11px",
+          boxShadow:`0 2px 8px ${rgba(T.navy, 0.16)}`,cursor: hasText ? "pointer" : "default"}}>
+        <div style={{fontFamily:mono,fontWeight:600,fontSize:8,letterSpacing:"0.1em",
+          textTransform:"uppercase",color:T.muted,marginBottom:3}}>
+          Prompt assembled for <b style={{color:T.navy}}>{who || PROMPT_DASH}</b> · {countLabel}
+        </div>
+        <div style={{fontFamily:mono,fontSize:11,lineHeight:1.42,color:T.muted,
+          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
+          {hasText ? text : PROMPT_IDLE_BODY}
+        </div>
+      </div>
+
+      {open && hasText && (
+        <div onClick={() => setOpen(false)}
+          style={{position:"fixed",inset:0,zIndex:100001,background:rgba(PALETTE[14], 0.42),
+            display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div onClick={e => e.stopPropagation()}
+            style={{width:"min(880px, 94vw)",maxHeight:"82vh",display:"flex",flexDirection:"column",
+              background:T.card,border:`1px solid ${T.brass}`,borderRadius:10,
+              boxShadow:`0 14px 40px ${rgba(PALETTE[14], 0.55)}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 13px",
+              borderBottom:`1px solid ${T.line}`,background:T.cardAlt,borderRadius:"10px 10px 0 0",
+              fontFamily:mono,fontWeight:700,fontSize:11,color:T.navy}}>
+              <b>Prompt assembled for {who || PROMPT_DASH} · {countLabel}</b>
+              <span style={{marginLeft:"auto",fontFamily:mono,fontSize:8,fontWeight:600,color:T.muted,
+                textTransform:"uppercase",letterSpacing:"0.09em"}}>
+                {prompt?.toIntentSlug || "streamed prompt_assembled"}
+              </span>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close assembled prompt"
+                style={{cursor:"pointer",color:T.muted,fontSize:14,background:"none",border:"none",padding:"0 2px"}}>✕</button>
+            </div>
+            <pre style={{margin:0,padding:"12px 14px",overflow:"auto",fontFamily:mono,fontSize:11.5,
+              lineHeight:1.55,whiteSpace:"pre-wrap",wordBreak:"break-word",color:T.ink,userSelect:"text"}}>
+              {text}
+            </pre>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function LiveAgentViewScreen() {
   const agents = useAgents();
-  const { events, status, running, result, error, recovery, runQuestion } = useHarnessStream();
+  const { events, status, running, result, error, recovery, prompt, traceIds, runQuestion } = useHarnessStream();
 
   const [picked, setPicked] = useState("");
   const [submitted, setSubmitted] = useState(null);
@@ -193,16 +285,27 @@ export default function LiveAgentViewScreen() {
   const runHops = useMemo(() => hops.slice(runStart), [hops, runStart]);
   const runHopTimes = useMemo(() => hopTimes.slice(runStart), [hopTimes, runStart]);
 
+  // FEATURE: LAV-1d -- `prompt_assembled` is harness plumbing, not a hand-off. It belongs in the
+  // HARNESS TRACE console (which gets the full ledger below) and in the prompt box, and nowhere
+  // else: the canvas derives bubbles/engagement from the ledger it is given, and the Pipeline Log
+  // rail is the user-facing narrative. Filtering here -- rather than withholding the frame from the
+  // ledger -- keeps the console's record honest while leaving both of those surfaces byte-identical
+  // to their pre-LAV-1d behavior. Neither AgentNetwork.jsx nor AuditColumn is modified.
+  const isPromptFrame = (e) => e.type === "prompt_assembled";
+  const canvasHops = useMemo(() => hops.filter(h => !isPromptFrame(h)), [hops]);
+  const canvasRunHops = useMemo(() => runHops.filter(h => !isPromptFrame(h)), [runHops]);
+  const railEvents = useMemo(() => events.filter(e => !isPromptFrame(e)), [events]);
+
   // Idle baseline: this focus area's roster tab, plus anyone who actually appears in the stream.
   // Membership is keyed on a joined id STRING so the roster array keeps a stable identity while a
   // run streams -- otherwise every single event would re-key the canvas's layout memos.
   const streamAgentIds = useMemo(() => {
     const out = [];
-    for (const h of hops) {
+    for (const h of canvasHops) {
       for (const id of [h.agentId, h.secondaryAgentId]) if (id && !out.includes(id)) out.push(id);
     }
     return out.join(",");
-  }, [hops]);
+  }, [canvasHops]);
   const rosterKey = useMemo(() => {
     const base = agents.filter(a => a.benchGroups?.includes(MI_ROSTER_TAB)).map(a => a.id);
     const extra = streamAgentIds.split(",")
@@ -235,29 +338,39 @@ export default function LiveAgentViewScreen() {
     return () => clearInterval(id);
   }, [running]);
 
-  // ── Task 1: the run's trace_id, and one bounded poller over its ai_activity_log rows ────────
-  // The trace id is not invented here: it rides the stored events themselves, spread in by
-  // pickCreditedSpan() (verified fresh -- useHarnessStream.js L82/L86 spreads it into `data`).
-  const traceId = useMemo(() => {
-    for (const h of runHops) { const t = h.data?.trace_id; if (t) return t; }
-    return null;
-  }, [runHops]);
+  // ── Task 1 (LAV-1c) / Task 3 (LAV-1d): the turn's traces, and one bounded poller over ALL of ──
+  // their ai_activity_log rows. No id is invented here: the hook collects each frame's own
+  // trace_id off the raw stream (§19p identity), in arrival order. The header keeps naming the
+  // FIRST one, which is the call the user started; the rest of the turn is the quality-gate and
+  // display calls the harness itself makes, and they are just as much this turn's cost.
+  const traceKey = traceIds.join(",");
+  const traceId = traceIds.length ? traceIds[0] : null;
 
   const [traceRows, setTraceRows] = useState([]);
   useEffect(() => {
-    if (!traceId) { setTraceRows([]); return undefined; }
+    const ids = traceKey ? traceKey.split(",") : [];
+    if (ids.length === 0) { setTraceRows([]); return undefined; }
     let cancelled = false;
     const fetchRows = async () => {
       const { data, error: rowsError } = await supabase
         .from("ai_activity_log")
         .select(TRACE_ROW_COLUMNS)
-        .eq("trace_id", traceId)
+        .in("trace_id", ids)
         .order("created_at", { ascending: true });
       if (cancelled) return;
       // LOG-38's fetch posture: warn and leave the store as it is. Every consumer below renders
       // "—" from an empty store -- a failed read never becomes a guessed value.
       if (rowsError) { console.warn("[LAV-1c] trace row read failed:", rowsError.message); return; }
-      setTraceRows(data || []);
+      // FEATURE: LAV-1d -- grouped by trace in the order the traces arrived, `created_at` ascending
+      // within each. That ordering is what makes the waterfall render one root group per trace with
+      // its nesting intact (buildWaterfallRows maps in array order and computes depth from
+      // parent_span_id, so grouping is purely this sort). Every other consumer is order-agnostic.
+      const ordered = [...(data || [])].sort((a, b) => {
+        const ta = ids.indexOf(a.trace_id), tb = ids.indexOf(b.trace_id);
+        if (ta !== tb) return ta - tb;
+        return (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0);
+      });
+      setTraceRows(ordered);
     };
     fetchRows();
     if (running) {
@@ -271,25 +384,30 @@ export default function LiveAgentViewScreen() {
     // it fires once and is cleared with the effect.
     const settle = setTimeout(fetchRows, TRACE_SETTLE_MS);
     return () => { cancelled = true; clearTimeout(settle); };
-  }, [traceId, running]);
+    // FEATURE: LAV-1d -- keyed on the joined id list, so the query is re-issued as the set grows
+    // mid-run (each new top-level call adds its trace) and not once per unrelated render.
+  }, [traceKey, running]);
 
   // ── Task 3: the four title-bar meters, all row- or ledger-derived ───────────────────────────
-  const activeSpans = useMemo(() => deriveActiveSpans(runHops, running), [runHops, running]);
-  const peakSpans = useMemo(() => peakActiveSpans(runHops), [runHops]);
+  // FEATURE: LAV-1d -- tokens/cost now sum the UNION of the turn's traces (the poller's store),
+  // which is what closes LAV-1c's measured under-count. The span/engagement figures stay defined
+  // over the delegation ledger exactly as before.
+  const activeSpans = useMemo(() => deriveActiveSpans(canvasRunHops, running), [canvasRunHops, running]);
+  const peakSpans = useMemo(() => peakActiveSpans(canvasRunHops), [canvasRunHops]);
   const tokenTotal = useMemo(() => sumTokens(traceRows), [traceRows]);
   const costTotal = useMemo(() => sumCost(traceRows), [traceRows]);
   const agentsEngaged = useMemo(() => {
     const seen = new Set();
-    for (const h of runHops) if (h.agentId) seen.add(h.agentId);
+    for (const h of canvasRunHops) if (h.agentId) seen.add(h.agentId);
     return seen.size;
-  }, [runHops]);
+  }, [canvasRunHops]);
 
   // ── Task 4 (screen half): which node is mid-recovery right now ──────────────────────────────
   // HAR-17's notice names the agent whose hop was re-run. It stays true until that agent's next
   // REAL event arrives -- so the mark records where in the ledger it landed, and any later event
   // for that agent clears it. No timer: the stream itself ends the state.
-  const runHopsRef = useRef(runHops);
-  runHopsRef.current = runHops;
+  const runHopsRef = useRef(canvasRunHops);
+  runHopsRef.current = canvasRunHops;
   const [recoveryMark, setRecoveryMark] = useState(null);
   useEffect(() => {
     if (!recovery) { setRecoveryMark(null); return; }
@@ -297,11 +415,11 @@ export default function LiveAgentViewScreen() {
   }, [recovery]);
   const recoveringAgentId = useMemo(() => {
     if (!running || !recoveryMark?.agentId) return null;
-    const answered = runHops.slice(recoveryMark.atIndex).some(h => h.agentId === recoveryMark.agentId);
+    const answered = canvasRunHops.slice(recoveryMark.atIndex).some(h => h.agentId === recoveryMark.agentId);
     return answered ? null : recoveryMark.agentId;
-  }, [running, recoveryMark, runHops]);
+  }, [running, recoveryMark, canvasRunHops]);
 
-  const mode = deriveMode(runHops, { running, terminal });
+  const mode = deriveMode(canvasRunHops, { running, terminal });
   const errorDetail = terminal === "error"
     ? (error?.failureClass || error?.status || error?.message || null)
     : null;
@@ -389,19 +507,24 @@ export default function LiveAgentViewScreen() {
             page so the canvas genuinely takes the whole remaining viewport height (the console
             below is flex-shrink:0). minHeight:0 + alignItems:stretch is what lets it shrink when
             the console is open instead of pushing the page into a scroll. */}
-        <div style={{flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
-          <AgentNetwork roster={roster} hops={hops} runHops={runHops} running={running}
+        {/* FEATURE: LAV-1d -- position:relative so the prompt box can sit as a bottom overlay
+            beside AgentNetwork's own legend (which is absolute at left:12/bottom:8 inside it),
+            clear of the 300px rail. */}
+        <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
+          <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}/>
+          <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>
-            <AuditColumn events={events} agentActivity={agentActivity} onAgentsDrawerOpen={() => {}}/>
+            <AuditColumn events={railEvents} agentActivity={agentActivity} onAgentsDrawerOpen={() => {}}/>
           </aside>
         </div>
 
         {/* ── Task 2: HARNESS TRACE console + span waterfall ── */}
         <HarnessTraceConsole
           events={runHops} eventTimes={runHopTimes} traceRows={traceRows} traceId={traceId}
+          traceIds={traceIds}
           running={running} recovery={recovery} recoveryAt={recoveryMark?.at ?? 0} now={now}/>
       </div>
     </AppShell>

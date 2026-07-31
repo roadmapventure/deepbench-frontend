@@ -1,3 +1,7 @@
+// DeepBench v7.0.3 | MarketIntelligenceScreen.jsx | LAV-1d -- one defensive type guard in onDelegationProgress:
+// execute.js now streams a non-delegation `prompt_assembled` frame, and this screen's blind forwarder would
+// otherwise render it as a nameless routing status + a contentless drawer row on every model call. Ignored here;
+// no other change. See the comment at the guard for the full reasoning.
 // DeepBench v7.0.0 | MarketIntelligenceScreen.jsx | LAV-1a -- zero visible change: the three example-question
 // consts moved verbatim to src/data/chiQuestions.js (imported back under the same names), and the stream
 // primitives readSSEResult/callCapability/buildHopEvent/describeDelegationEvent/runQaWithQualityGate/AuditColumn
@@ -3696,6 +3700,15 @@ export default function MarketIntelligenceScreen() {
   // credits toAgentId (the agent who actually finished — same field 'delegation' used to name them
   // as the target); 'delegation_return' keeps its existing fromAgentId convention, unchanged.
   const onDelegationProgress = (evt) => {
+    // FEATURE: LAV-1d -- readSSEResult forwards EVERY non-terminal frame here, and until this
+    // session every frame execute.js streamed was delegation-family. `prompt_assembled` is not:
+    // it carries no from/to pair, so describeDelegationEvent below would write a nameless
+    // " is routing to …" status for the whole duration of every model call, log a contentless
+    // Agent Routing row per hop, and trip buildHopEvent's CHI-07 console.error (the type has no
+    // resolveEventDuration rule). CHI has no prompt surface -- LAV-1d exposes the prompt on
+    // /live-agent-view only -- so this screen ignores the frame and stays byte-identical to its
+    // pre-LAV-1d behavior on the same stream. Type guard only; no other change to this file.
+    if (evt.type === 'prompt_assembled') return;
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
     // FEATURE: CHI-56 — real client-side arrival-delta duration (was a literal `null` at both

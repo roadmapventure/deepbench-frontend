@@ -1,3 +1,6 @@
+// DeepBench v7.0.3 | HarnessTraceConsole.jsx | LAV-1d -- one new optional prop (`traceIds`): the
+// header states the turn's other traces as a `+N` count and the trace inspector lists every id with
+// its own row count. Presentation only, no new fetch; the merged rows keep arriving via `traceRows`.
 // DeepBench v7.0.2 | HarnessTraceConsole.jsx | LAV-1c -- the dark HARNESS TRACE console for the
 // Live Agent View: real event lines merged with row-derived `model_call` lines, a Raw JSON toggle
 // that flips every line to its ACTUAL underlying record, a click-an-id inspector that resolves the
@@ -299,6 +302,11 @@ const POP_W = 400;
 export default function HarnessTraceConsole({
   events = [], eventTimes = [], traceRows = [], traceId = null, running = false,
   recovery = null, recoveryAt = 0, now = 0,
+  // FEATURE: LAV-1d -- every trace this turn produced, in arrival order (a CHI turn is up to three
+  // top-level calls, each minting its own). The header keeps showing the FIRST id, as it always
+  // has, and states the remainder as a real count; the trace inspector lists them all with their
+  // own row counts. Defaults to [] so an existing single-trace caller renders exactly as before.
+  traceIds = [],
 }) {
   const [raw, setRaw] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -341,6 +349,13 @@ export default function HarnessTraceConsole({
     return m;
   }, [traceRows]);
 
+  // FEATURE: LAV-1d -- the real id list: whatever the caller collected, falling back to the single
+  // id it already passes. No id is invented and none is dropped.
+  const allTraceIds = useMemo(
+    () => (traceIds.length ? traceIds : (traceId ? [traceId] : [])),
+    [traceIds, traceId]);
+  const extraTraces = Math.max(0, allTraceIds.length - 1);
+
   const inspected = useMemo(() => {
     if (!inspect) return null;
     if (inspect.kind === "trace") {
@@ -350,6 +365,11 @@ export default function HarnessTraceConsole({
         kind: "trace",
         record: {
           trace_id: traceId,
+          // FEATURE: LAV-1d -- per-trace row counts, counted over the rows actually returned.
+          traces: allTraceIds.map(id => ({
+            trace_id: id,
+            rows: (traceRows || []).filter(r => r.trace_id === id).length,
+          })),
           rows: traceRows.length,
           input_tokens: (traceRows || []).reduce((n, r) => n + (r.input_tokens || 0), 0),
           output_tokens: (traceRows || []).reduce((n, r) => n + (r.output_tokens || 0), 0),
@@ -362,7 +382,7 @@ export default function HarnessTraceConsole({
     }
     const row = rowBySpan.get(String(inspect.spanId));
     return { title: `span ${inspect.spanId}`, kind: "span", record: row || null, pending: !row };
-  }, [inspect, rowBySpan, traceRows, traceId, maxDepth, retryTotal]);
+  }, [inspect, rowBySpan, traceRows, traceId, allTraceIds, maxDepth, retryTotal]);
 
   const openInspector = (e, payload) => {
     e.stopPropagation();
@@ -421,6 +441,8 @@ export default function HarnessTraceConsole({
           {traceId
             ? <button type="button" className="lavc-id trace" onClick={e => openInspector(e, { kind: "trace" })}>{traceId}</button>
             : <b>—</b>}
+          {/* FEATURE: LAV-1d -- the turn's other traces, as a real count. Click the id for the list. */}
+          {extraTraces > 0 && <b>+{extraTraces}</b>}
         </div>
         <div className="lavc-stat sep">events <b>{events.length}</b></div>
         <div className="lavc-stat">loops <b>{traceRows.length ? maxDepth : "–"}</b></div>
@@ -514,7 +536,7 @@ export default function HarnessTraceConsole({
             {inspected.pending
               ? "This span has no ai_activity_log row yet. The trace poller is still running; this panel fills in when the row lands."
               : inspected.kind === "trace"
-                ? "Summed from this trace's own ai_activity_log rows — no stored trace record exists; every figure above is derived from the rows themselves."
+                ? "Summed from this turn's own ai_activity_log rows — no stored trace record exists; every figure above is derived from the rows themselves."
                 : "Resolved from the actual ai_activity_log row for this trace_id."}
           </div>
         </div>

@@ -1,3 +1,7 @@
+// DeepBench v7.0.3 | useHarnessStream.js | LAV-1d -- captures execute.js's new `prompt_assembled`
+// frame (latest one wins, cleared with the run) and collects the DISTINCT trace_id set a turn
+// produces: a CHI turn is up to three top-level calls (qa -> quality-gate -> display), each minting
+// its own trace, so a single-trace reader under-counts the turn. Both are stream-derived only.
 // DeepBench v7.0.0 | useHarnessStream.js | LAV-1a -- run a capability request and consume its
 // live event stream outside the CHI screen. Reuses the CHI screen's exported primitives --
 // one implementation, two consumers (FEATURE: LAV-1). CHI's own wiring is intentionally not
@@ -9,7 +13,7 @@ import { useAgents } from "./useAgents.js";
 // NOT declared in MarketIntelligenceScreen.jsx (it imports them itself from these two modules), so
 // this hook imports them from their real single source rather than laundering them through a
 // re-export on the screen. Same function identity either way; one fewer indirection.
-import { resolveEventDuration, buildTransactionBoundaryEvent } from "../lib/turnTracking.js";
+import { resolveEventDuration, resolveDelegationDuration, buildTransactionBoundaryEvent } from "../lib/turnTracking.js";
 import { pickCreditedSpan } from "../lib/tracePatterns.js";
 import {
   runQaWithQualityGate, buildHopEvent, describeDelegationEvent,
@@ -23,6 +27,15 @@ export function useHarnessStream() {
   const [result, setResult] = useState(null);      // terminal result frame, verbatim
   const [error, setError] = useState(null);
   const [recovery, setRecovery] = useState(null);  // last HAR-17 recovery notice | null
+  // FEATURE: LAV-1d -- the latest assembled prompt this run streamed, verbatim. Replaced by each
+  // new arrival (the box always shows the agent currently working), null until one arrives and
+  // null again on clear()/a new run. Never synthesized: every field is the emit's own.
+  const [prompt, setPrompt] = useState(null);      // { agentId, system_prompt, prompt_chars, trace_id, span_id, toIntentSlug } | null
+  // FEATURE: LAV-1d -- every DISTINCT trace_id seen this run, in arrival order. Collected from the
+  // raw frames (each one carries its own trace_id, §19p) rather than inferred, because one turn
+  // spans up to three top-level calls and each mints its own trace.
+  const [traceIds, setTraceIds] = useState([]);
+  const traceIdsRef = useRef([]);
   const lastEventAtRef = useRef(null);
   const runIdRef = useRef(0);
   // FEATURE: LAV-1a -- synchronous source of truth for the event array, mirroring CHI's
@@ -56,6 +69,25 @@ export function useHarnessStream() {
     setEvents(next);
   };
 
+  // FEATURE: LAV-1d -- a plain append, deliberately NOT logEvent: logEvent's pending-row path
+  // (MI-52/LOO-009b) would let a `prompt_assembled` frame CLAIM the still-open "X is routing to Y"
+  // row registered for that same agent, erasing the delegation event the canvas derives its edge
+  // from. A prompt frame awaits nothing and replaces nothing, so it never touches that map.
+  const appendEvent = (evt) => {
+    const next = [...eventsRef.current, { ...evt, id: eventsRef.current.length }];
+    eventsRef.current = next;
+    setEvents(next);
+  };
+
+  // FEATURE: LAV-1d -- record this frame's own trace. Order is arrival order and duplicates are
+  // dropped; a frame with no trace_id contributes nothing (never a fabricated id).
+  const noteTrace = (evt) => {
+    const t = evt?.trace_id ?? evt?.data?.trace_id ?? null;
+    if (!t || traceIdsRef.current.includes(t)) return;
+    traceIdsRef.current = [...traceIdsRef.current, t];
+    setTraceIds(traceIdsRef.current);
+  };
+
   // Mirrors CHI's setStatus writer (~L3642): same merge semantics -- an omitted expectation/
   // expectationMs carries the previous turn's value forward, turnStartedAt survives every hop swap,
   // and startedAt resets on each new hop so the consumer's elapsed timer restarts with it.
@@ -72,6 +104,32 @@ export function useHarnessStream() {
   // Mirrors MarketIntelligenceScreen.jsx's onDelegationProgress (~L3724-3749) exactly:
   // same attribution branch, same data fields, same span spread, same arrival-delta timing.
   const onDelegationProgress = (evt) => {
+    noteTrace(evt); // FEATURE: LAV-1d -- every frame, every type, before any branch
+    // FEATURE: LAV-1d -- `prompt_assembled` is NOT a delegation frame: it names one agent, has no
+    // from/to pair, and must never reach describeDelegationEvent (which would render a nameless
+    // "is routing to" line) or resolveEventDuration (which returns undefined for it and would trip
+    // buildHopEvent's CHI-07 console.error). It gets the same real arrival-delta duration the
+    // delegation frames get, and the same running clock update, so the console's merged timeline
+    // stays a single honest sequence.
+    if (evt.type === 'prompt_assembled') {
+      setPrompt({
+        agentId: evt.agentId ?? null,
+        system_prompt: evt.system_prompt ?? null,
+        prompt_chars: evt.prompt_chars ?? 0,
+        trace_id: evt.trace_id ?? null,
+        span_id: evt.span_id ?? null,
+        toIntentSlug: evt.toIntentSlug ?? null,
+      });
+      const promptAt = Date.now();
+      const promptDurationMs = resolveDelegationDuration(promptAt, lastEventAtRef.current);
+      lastEventAtRef.current = promptAt;
+      appendEvent(buildHopEvent('prompt_assembled', evt.agentId ?? null, {
+        message: `${evt.agentId ?? "—"} · ${evt.prompt_chars ?? 0} chars`,
+        prompt_chars: evt.prompt_chars ?? 0,
+        trace_id: evt.trace_id ?? null, span_id: evt.span_id ?? null,
+      }, promptDurationMs, {}));
+      return;
+    }
     const message = describeDelegationEvent(evt, agents);
     writeStatus(message, { kind: 'orchestration' });
     const now = Date.now();
@@ -111,6 +169,11 @@ export function useHarnessStream() {
     setResult(null);
     setError(null);
     setRecovery(null);
+    // FEATURE: LAV-1d -- a new run starts with no prompt and no traces of its own; the box shows
+    // its idle copy until this turn's first real frame lands, and the poller has nothing to query.
+    setPrompt(null);
+    traceIdsRef.current = [];
+    setTraceIds([]);
     // FEATURE: CHI-04 (mirrored) -- the question divider only appears between questions, never
     // above the first one of a fresh session.
     if (eventsRef.current.length > 0) logEvent(buildTransactionBoundaryEvent("start", turnStart));
@@ -150,6 +213,9 @@ export function useHarnessStream() {
     pendingDelegationsRef.current = new Map();
     lastEventAtRef.current = null;
     runningRef.current = false;
+    traceIdsRef.current = []; // FEATURE: LAV-1d
+    setPrompt(null);
+    setTraceIds([]);
     setEvents([]);
     setStatus(null);
     setRunning(false);
@@ -158,5 +224,5 @@ export function useHarnessStream() {
     setRecovery(null);
   }, []);
 
-  return { events, status, running, result, error, recovery, runQuestion, clear };
+  return { events, status, running, result, error, recovery, prompt, traceIds, runQuestion, clear };
 }
