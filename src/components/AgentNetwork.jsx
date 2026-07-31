@@ -1,3 +1,11 @@
+// DeepBench v7.0.2 | AgentNetwork.jsx | LAV-1c -- fills the node card's reserved slot with real
+// data: the governed pattern name(s) for this node's latest credited span (the ai_call_patterns
+// read-time view, via src/lib/tracePatterns.js -- the ONLY legitimate source of a pattern name),
+// the model id from that agent's latest ai_activity_log row, and HAR-17's amber "recovering" chip
+// while a hop of that agent's is being re-run. Unclassified renders NOTHING (§19l) -- there is no
+// fallback label anywhere in this file. Also closes LAV-1b's canvas-fill QA finding: the stage is
+// now contained inside the available height instead of overflowing it when the trace console is
+// open (which would have letterboxed the SVG away from the node positions it has to line up with).
 // DeepBench v7.0.1 | AgentNetwork.jsx | LAV-1b -- animated agent-network canvas for the Live Agent
 // View: node cards, observed-traffic edges, hop pulses and the Choreographed/Static reorg, all
 // rendered as a pure function of the harness event ledger the screen hands down. Ported from
@@ -8,6 +16,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { T, PALETTE, mono, body, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AgentAvatar, FeatureBadge } from "./SharedUI.jsx";
+// FEATURE: LAV-1c -- the same module the Agent Routing drawer's pattern line joins through
+// (LOG-79/LOG-95b). Reused verbatim: this file holds no pattern name, slug, or per-pattern branch.
+import { fetchTracePatterns, needsSpanRefetch } from "../lib/tracePatterns.js";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
@@ -204,9 +215,20 @@ function Pulse({ d, color, dur, onDone }) {
 
 // ── component-scoped CSS (GLOBAL_CSS already owns spin/fadeIn/slideUp/aiBlink) ─
 const NET_CSS = `
-.lav-stagewrap{flex:1;position:relative;overflow:hidden;padding:10px 6px 6px;background:${T.paper};min-width:0}
-.lav-stage{position:absolute;inset:10px 6px 6px}
-.lav-inner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;aspect-ratio:1200/640;max-height:100%}
+.lav-stagewrap{flex:1;position:relative;overflow:hidden;padding:10px 6px 6px;background:${T.paper};
+  min-width:0;min-height:0}
+.lav-stage{position:absolute;inset:10px 6px 6px;container-type:size}
+/* FEATURE: LAV-1c -- LAV-1b QA finding (canvas fill). The stage box must CONTAIN the 1200x640
+   canvas, not just cap its height: node cards are positioned as a % of this box while the SVG uses
+   preserveAspectRatio="xMidYMid meet", so the two only line up while the box holds that exact
+   ratio. A plain width:100% plus max-height:100% clamps the height and leaves the width alone --
+   survivable at LAV-1b's full-height canvas, a visible edge/node mismatch now that the trace
+   console takes 230px off the bottom. min() against the stage's own height (100cqh) picks
+   whichever axis binds, so the stage always fits AND stays centered. The plain width:100% above
+   it is a deliberate fallback for engines without container query units -- exactly LAV-1b's
+   behaviour, never a collapsed shrink-to-fit box. */
+.lav-inner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;
+  width:min(100%, calc(100cqh * 1200 / 640));aspect-ratio:1200/640;max-height:100%}
 .lav-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .lav-node{position:absolute;transform:translate(-50%,-50%);width:132px;text-align:center;
   transition:transform .35s cubic-bezier(.2,.8,.3,1.4),opacity .35s,filter .35s;z-index:2}
@@ -217,8 +239,19 @@ const NET_CSS = `
 .lav-code{font-family:${mono};font-size:9px;font-weight:600;letter-spacing:.1em;color:${T.muted};text-transform:uppercase}
 .lav-name{font-family:${body};font-weight:700;font-size:12.5px;color:${T.navy};line-height:1.15;margin-top:1px}
 .lav-role{font-family:${body};font-size:9.5px;color:${T.muted};margin-top:1px;line-height:1.2}
-/* Reserved for LAV-1c's pattern pill + model tag. Renders NOTHING until it has real data. */
-.lav-slot{height:15px;margin-top:4px}
+/* FEATURE: LAV-1c -- the slot LAV-1b reserved, now filled. Still renders NOTHING without real
+   data: no pattern match means no pill, no row means no model tag (§19l honest-unclassified). */
+.lav-slot{height:15px;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:4px}
+.lav-pill{font-family:${mono};font-size:8.5px;font-weight:600;letter-spacing:.05em;color:${T.brassDeep};
+  background:${rgba(T.brass, 0.14)};border:1px solid ${rgba(T.brass, 0.42)};border-radius:9px;
+  padding:1px 6px;max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lav-model{position:absolute;top:5px;right:6px;font-family:${mono};font-size:8px;color:${T.muted};
+  max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:3}
+.lav-recov{font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:${T.flag};background:${rgba(T.flag, 0.12)};border:1px solid ${rgba(T.flag, 0.45)};border-radius:9px;
+  padding:1px 6px;white-space:nowrap}
+.lav-node.is-recovering .lav-card{border-color:${T.flag};
+  box-shadow:0 10px 26px ${rgba(T.flag, 0.28)},0 0 0 3px ${rgba(T.flag, 0.18)}}
 .lav-ring{position:absolute;left:50%;top:32px;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
   border:2px solid ${T.brass};opacity:0;pointer-events:none;z-index:1}
 @keyframes lavRipple{0%{opacity:.75;transform:scale(.55)}100%{opacity:0;transform:scale(2.1)}}
@@ -265,8 +298,10 @@ const NET_CSS = `
  *  hops     -- every stored event observed this SESSION (edges persist across runs)
  *  runHops  -- the slice since the current run's question boundary (node state, pulses, bubbles)
  *  running  -- the harness is live right now
+ *  traceRows -- this run's real ai_activity_log rows (the screen's poller); model tag only
+ *  recoveringAgentId -- the agent HAR-17 is mid-recovery on, or null
  */
-export default function AgentNetwork({ roster, hops, runHops, running, choreographed, onToggleChoreographed }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -344,6 +379,56 @@ export default function AgentNetwork({ roster, hops, runHops, running, choreogra
 
   const dropPulse = (id) => setPulses(cur => cur.filter(p => p.id !== id));
 
+  // ── LAV-1c: node card data ────────────────────────────────────────────────
+  // Each node's LATEST credited span this run. pickCreditedSpan() already decided which endpoint's
+  // span a delegation-family event credits (§19p) and useHarnessStream spreads it into data --
+  // this only picks the most recent one per agent, it never re-derives credit.
+  const traceId = useMemo(() => {
+    for (const h of runHops) { const t = h.data?.trace_id; if (t) return t; }
+    return null;
+  }, [runHops]);
+  const spanByAgent = useMemo(() => {
+    const m = new Map();
+    for (const h of runHops) if (h.agentId && h.data?.span_id != null) m.set(h.agentId, h.data.span_id);
+    return m;
+  }, [runHops]);
+  const spanKey = useMemo(() => [...spanByAgent.values()].join(","), [spanByAgent]);
+
+  // The Agent Routing drawer's own join, reused: fetch the trace's span -> governed-name map, and
+  // apply LOG-95b's BOUNDED refetch while any span on this canvas is still missing. After the
+  // budget the span is honestly unclassified and simply shows no pill -- never a fallback label.
+  const [spanPatterns, setSpanPatterns] = useState({});
+  const spansRef = useRef([]);
+  spansRef.current = spanKey ? spanKey.split(",") : [];
+  useEffect(() => {
+    if (!traceId) { setSpanPatterns({}); return undefined; }
+    let cancelled = false, tries = 0, timer = null;
+    const attempt = () => {
+      fetchTracePatterns(traceId).then(map => {
+        if (cancelled) return;
+        setSpanPatterns(map);
+        if (spansRef.current.some(s => needsSpanRefetch(map, s, tries))) {
+          tries += 1;
+          timer = setTimeout(attempt, 2500);
+        }
+      });
+    };
+    attempt();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [traceId, spanKey]);
+
+  // Model tag: the model on that agent's most recent row in THIS trace. No row, no tag.
+  const modelByAgent = useMemo(() => {
+    const m = new Map();
+    for (const r of traceRows || []) {
+      if (!r?.agent_id || !r.model) continue;
+      const at = Date.parse(r.created_at) || 0;
+      const cur = m.get(r.agent_id);
+      if (!cur || at >= cur.at) m.set(r.agent_id, { model: r.model, at });
+    }
+    return m;
+  }, [traceRows]);
+
   return (
     <div className="lav-stagewrap">
       <FeatureBadge id="LAV-1"/>
@@ -377,12 +462,18 @@ export default function AgentNetwork({ roster, hops, runHops, running, choreogra
           {roster.map(a => {
             const cls = ["lav-node"];
             if (benched.has(a.id)) cls.push("is-benched");
+            const recovering = recoveringAgentId === a.id;
+            if (recovering) cls.push("is-recovering");
             if (net.orchestrators.has(a.id)) cls.push("is-orch");
             else if (running && net.activeId === a.id) cls.push("is-active");
             else if (net.done.has(a.id)) cls.push("is-done");
             const bubble = running ? net.bubbles[a.id] : null;
             const start = posRef.current[a.id] || home[a.id] || { x: VW / 2, y: VH / 2 };
             const down = start.y < VH * 0.34;
+            const span = spanByAgent.get(a.id);
+            const names = span != null ? spanPatterns[span] : null;
+            const patternLabel = names && names.length > 0 ? names.join(", ") : null;
+            const modelTag = modelByAgent.get(a.id)?.model || null;
             return (
               <div key={a.id} className={cls.join(" ")} ref={el => { nodeRefs.current[a.id] = el; }}
                 style={{ left: `${(start.x / VW) * 100}%`, top: `${(start.y / VH) * 100}%` }}>
@@ -390,11 +481,15 @@ export default function AgentNetwork({ roster, hops, runHops, running, choreogra
                 <div className="lav-card">
                   <div className="lav-spin"/>
                   <div className="lav-ring"/>
+                  {modelTag && <div className="lav-model" title={modelTag}>{modelTag}</div>}
                   <div className="lav-ava"><AgentAvatar who={a.id} size={50}/></div>
                   <div className="lav-code">{a.code}</div>
                   <div className="lav-name">{a.name}</div>
                   <div className="lav-role">{a.role}</div>
-                  <div className="lav-slot"/>
+                  <div className="lav-slot">
+                    {recovering && <span className="lav-recov">recovering</span>}
+                    {!recovering && patternLabel && <span className="lav-pill" title={patternLabel}>{patternLabel}</span>}
+                  </div>
                 </div>
               </div>
             );
