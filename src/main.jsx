@@ -1,3 +1,4 @@
+// DeepBench v7.0.1 | main.jsx | LAV-1b — one route added: /live-agent-view (Live Agent View). No other change.
 // DeepBench v6.3.137 | main.jsx | CHI-66 — root React error boundary wrapping BrowserRouter
 // (inside StrictMode), so a render error anywhere in the tree shows a reload prompt instead of a
 // white screen. Per-Drawer protection lives in SharedUI.jsx's Drawer.
@@ -22,6 +23,7 @@ import TeachScreen            from "./screens/TeachScreen.jsx";
 import TestTeamScreen         from "./screens/TestTeamScreen.jsx";
 import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
 import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
+import LiveAgentViewScreen      from "./screens/LiveAgentViewScreen.jsx"; // FEATURE: LAV-1b
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -32,6 +34,7 @@ createRoot(document.getElementById("root")).render(
           <AnalyzerProvider>
             <Routes>
               <Route path="/"                          element={<MarketIntelligenceScreen />} />
+              <Route path="/live-agent-view"           element={<LiveAgentViewScreen />} />
               <Route path="/work"                      element={<DashboardScreen />} />
               <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
               <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
