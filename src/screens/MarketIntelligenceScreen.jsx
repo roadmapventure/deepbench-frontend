@@ -1,3 +1,6 @@
+// DeepBench v7.0.8 | MarketIntelligenceScreen.jsx | AA-179a -- the LAV-1d type guard below now also
+// ignores the two assembly-seam frame types (`assembly_work`, `assembly_work_complete`). Inert until
+// AA-179c ships the server emit; guard extension only, no other change to this file.
 // DeepBench v7.0.3 | MarketIntelligenceScreen.jsx | LAV-1d -- one defensive type guard in onDelegationProgress:
 // execute.js now streams a non-delegation `prompt_assembled` frame, and this screen's blind forwarder would
 // otherwise render it as a nameless routing status + a contentless drawer row on every model call. Ignored here;
@@ -3708,7 +3711,11 @@ export default function MarketIntelligenceScreen() {
     // resolveEventDuration rule). CHI has no prompt surface -- LAV-1d exposes the prompt on
     // /live-agent-view only -- so this screen ignores the frame and stays byte-identical to its
     // pre-LAV-1d behavior on the same stream. Type guard only; no other change to this file.
-    if (evt.type === 'prompt_assembled') return;
+    // FEATURE: AA-179a -- assembly_work/assembly_work_complete are enrichment-seam frames (AA-179c),
+    // not delegation-family: no from/to pair, so describeDelegationEvent would render a nameless
+    // routing status. CHI has no assembly surface -- the Live Agent View renders these (AA-179d);
+    // this screen ignores them and stays byte-identical, same posture as LAV-1d's prompt_assembled.
+    if (evt.type === 'prompt_assembled' || evt.type === 'assembly_work' || evt.type === 'assembly_work_complete') return;
     const message = describeDelegationEvent(evt, agents);
     setStatus(message, { kind: 'orchestration' });
     // FEATURE: CHI-56 — real client-side arrival-delta duration (was a literal `null` at both

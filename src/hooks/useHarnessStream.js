@@ -1,3 +1,7 @@
+// DeepBench v7.0.8 | useHarnessStream.js | AA-179a -- captures the assembly event family
+// (`assembly_work` / `assembly_work_complete`, AA-179c's enrichment-seam emit) into the same run
+// ledger, via a plain append with a real arrival-delta duration. Inert until AA-179c ships: no
+// frame of either type exists anywhere yet, and nothing renders differently today.
 // DeepBench v7.0.6 | useHarnessStream.js | LAV-1f -- human-in-the-loop: a run that ends on the
 // harness's real confirmation gate (`status:'pending_confirmation'`) is held in a `pending` state
 // read verbatim off that frame, and resolveConfirmation() dispatches the decision through the same
@@ -160,6 +164,36 @@ export function useHarnessStream() {
         prompt_chars: evt.prompt_chars ?? 0,
         trace_id: evt.trace_id ?? null, span_id: evt.span_id ?? null,
       }, promptDurationMs, {}));
+      return;
+    }
+    // FEATURE: AA-179a -- the assembly event family (`assembly_work` / `assembly_work_complete`) is
+    // emitted from the enrichment seam (AA-179c), not the delegation seam: a frame names ONE worker
+    // and carries no from/to pair, so it must never reach describeDelegationEvent (nameless "is
+    // routing to" line) or resolveEventDuration (no rule for these types -> undefined -> CHI-07
+    // console.error in buildHopEvent). Same posture as prompt_assembled above: real arrival-delta
+    // duration, the same running-clock update, and a PLAIN appendEvent -- never logEvent, whose
+    // pending-row path (MI-52/LOO-009b) would let an assembly frame CLAIM the still-open "X is
+    // routing to Y" row registered for that same agent. An assembly frame awaits nothing and
+    // replaces nothing. It also writes no prompt and no status line: the scripted status stays as
+    // it is, and the canvas treatment is AA-179b's. Every field below is the frame's own -- carried
+    // only when the frame actually has it (a real 0 is data; a missing field is omitted, never
+    // defaulted into the ledger).
+    if (evt.type === 'assembly_work' || evt.type === 'assembly_work_complete') {
+      const assemblyAt = Date.now();
+      const assemblyDurationMs = resolveDelegationDuration(assemblyAt, lastEventAtRef.current);
+      lastEventAtRef.current = assemblyAt;
+      const who = evt.agentId ?? "—";
+      const assemblyMessage = evt.work === 'fetch'
+        ? `${who} · ${evt.source} · ${evt.matchCount ?? 0} chunks`
+        : `${who} · ${evt.work}${evt.type === 'assembly_work_complete' && evt.tokens != null ? ` · ${evt.tokens} tok` : ''}`;
+      const assemblyData = { message: assemblyMessage };
+      for (const [k, v] of Object.entries({
+        work: evt.work, source: evt.source, matchCount: evt.matchCount, tokens: evt.tokens,
+        model: evt.model, forAgentId: evt.forAgentId, trace_id: evt.trace_id, span_id: evt.span_id,
+      })) {
+        if (v != null) assemblyData[k] = v;
+      }
+      appendEvent(buildHopEvent(evt.type, evt.agentId ?? null, assemblyData, assemblyDurationMs, {}));
       return;
     }
     const message = describeDelegationEvent(evt, agents);
