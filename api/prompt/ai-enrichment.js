@@ -1,3 +1,8 @@
+// DeepBench v7.0.10 | api/prompt/ai-enrichment.js | AA-179c -- the assembly event family
+// (`assembly_work` / `assembly_work_complete`) emitted on the same opt-in onEvent seam execute.js's
+// delegation + prompt_assembled frames already use, plus §19p span identity onto Dan Bingham's two
+// logActivity rows and Michelle Manning's roster fetch. Default handler passes no onEvent -- no-op,
+// byte-identical for every non-streaming caller.
 // DeepBench v6.3.228 | api/prompt/ai-enrichment.js | DAT-12 -- forward fetch_instruction.retrieval_scope
 // into queryContent(). One added argument, no logic.
 // DeepBench v6.3.142 | api/prompt/ai-enrichment.js | LOG-67 -- forward the config-half signature snapshot through enrichPrompt()
@@ -36,6 +41,13 @@ const RAG_TIMEOUT_MS = 10000;
 // null/unknown fallthrough via queryRAG() -- runs a real embedding similarity search.
 const DIRECT_LOOKUP_SOURCES = new Set(['roster', 'the_library_catalog']);
 
+// FEATURE: AA-179c -- who owns each brokered assembly source (§19e's LOCKED registry: Eleanor
+// owns the_library, Michelle the roster directory; §19 rule 16 precedent for naming a service
+// owner at its call site). Attribution label only -- nothing may ever branch on these values
+// (.claude/rules/capabilities-are-data.md). Sources absent here are the requesting agent's own
+// work (§19f Content-Owner Access) and attribute to requestingAgentId.
+const ASSEMBLY_ATTRIBUTION = { the_library: "eleanor", the_library_catalog: "eleanor", roster: "michelle" };
+
 // FEATURE: LOG-37a-patch -- derived from the same generic fi.source trait fetchSection() already
 // branches on, never from who the agent is or which capability is running
 // (.claude/rules/capabilities-are-data.md). Unknown/absent sources fall through to
@@ -56,7 +68,10 @@ async function fetchWithTimeout(promise, timeoutMs) {
   }
 }
 
-async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null) {
+// FEATURE: AA-179c -- `spanId` joins the existing `traceId` positional so the two brokered fetches
+// below can stamp the run's §19p identity on the rows they write. No emit lives in here: the
+// completion frame is attached at the STEP 1 call site instead (see there for why).
+async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null, spanId = null) {
   if (section.type === "stored") return { ...section };
 
   if (section.type === "rag") {
@@ -69,7 +84,10 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
       // byte-identical by S-ARCH-REASONING-LAYER-01a's M1/M2 regression test. There is no fallback
       // branch for either value -- same "exactly one path" posture AG-30 established for the_library.
       const result = fi.source === "roster"
-        ? await fetchWithTimeout(getRosterCandidates({ requestingAgentId }), RAG_TIMEOUT_MS)
+        // FEATURE: AA-179c -- Michelle Manning's roster read already writes an `agent-directory`
+        // row per fetch; it just had no way to say which run it belonged to. Both values are the
+        // requesting execution's own (§19p: identity travels with the work it credits).
+        ? await fetchWithTimeout(getRosterCandidates({ requestingAgentId, traceId, spanId }), RAG_TIMEOUT_MS)
         : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog")
         ? await fetchWithTimeout(
             queryContent({
@@ -83,6 +101,13 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
               // already is. A request-level value stamped by db-assembly.js, never inferred from who
               // is calling or which capability is running (.claude/rules/capabilities-are-data.md).
               retrieval_scope: fi.retrieval_scope || undefined,
+              // FEATURE: AA-179c -- deliberate pre-wiring for AA-179d (Eleanor Voss's library
+              // linkage): queryContent() destructures a fixed set of named options, so these two
+              // are inert extras today and become the identity d stamps on the Librarian's own
+              // rows without needing a second api/ change. Verified against lib/search-harness.js
+              // this session -- plain destructuring, no rest capture, no schema validation.
+              traceId,
+              spanId,
             }),
             RAG_TIMEOUT_MS
           )
@@ -140,7 +165,14 @@ function assembleSystemPrompt(renderedBlocks) {
   return renderedBlocks.filter(Boolean).join("\n\n---\n\n");
 }
 
-export async function enrichPrompt({ prompt_request, agent_id, capability_slug, trace_id = null }) {
+// FEATURE: AA-179c -- `span_id`/`parent_span_id`/`onEvent` are all optional and all default to the
+// pre-AA-179c behavior: no caller that omits them (api/plan.js's two calls, this file's own default
+// handler) changes by a single byte. `onEvent` is normalized to a no-op exactly the way
+// execute.js's runCapability() normalizes its own `_onEvent`, so the emit sites below never branch
+// on whether anyone is listening.
+export async function enrichPrompt({ prompt_request, agent_id, capability_slug, trace_id = null,
+  span_id = null, parent_span_id = null, onEvent = null }) {
+  const emit = onEvent || (() => {});
   const promptRequest = prompt_request;
   if (!promptRequest || typeof promptRequest !== "object") {
     throw new Error("Prompt Request body required");
@@ -182,7 +214,28 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   // STEP 1 — FETCH: run stored pass-through + RAG fetches in parallel
   const nonReflectSections = sections.filter(s => s.type !== "reflect");
   const fetchedSections = await Promise.all(
-    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id))
+    // FEATURE: AA-179c -- completion-only, one frame per RAG fetch, attached as each individual
+    // fetch resolves: this .then() runs before Promise.all's barrier, so the stream shows real
+    // arrival order rather than a batch dumped after the slowest fetch. Attached HERE rather than
+    // inside fetchSection() for two reasons: (1) fetchSection()'s success path lives inside its own
+    // try/catch, where a throwing handler would be swallowed and would silently turn a successful
+    // fetch into an omitted section -- exactly the kind of quiet corruption LAV-1d's guard lesson
+    // was about; (2) every field the frame needs (the worker, the requesting agent, the capability,
+    // the run's identity) is already in scope out here, so nothing has to be threaded inward.
+    // A failed fetch emits nothing -- it already surfaces to the caller as an omitted section plus
+    // a fetch_errors entry, and inventing a failure frame here would be a second, softer claim
+    // about the same event. `stored` sections emit nothing either: no work happened.
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id).then(fetched => {
+      if (s.type === "rag" && !fetched._fetch_error) {
+        const source = s.fetch_instruction?.source ?? 'knowledge';
+        emit({ type: 'assembly_work_complete', work: 'fetch',
+          agentId: ASSEMBLY_ATTRIBUTION[source] ?? effectiveAgentId ?? null,
+          forAgentId: effectiveAgentId ?? null, toCapabilitySlug: effectiveCapabilitySlug ?? null,
+          source, matchCount: fetched._rag_chunks || 0,
+          trace_id, span_id, parent_span_id });
+      }
+      return fetched;
+    }))
   );
 
   // STEP 2 — RENDER: assemble text blocks in section order
@@ -231,6 +284,14 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   if (reflectSection) {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey) {
+      // FEATURE: AA-179c -- the model this step is about to request, read off the same
+      // fetch_instruction the request body below reads, hoisted out of the try so the start and
+      // the complete frame carry one identical real value rather than two separate reads.
+      const reflectModelRequested = reflectSection.fetch_instruction?.model || "claude-haiku-4-5-20251001";
+      // FEATURE: AA-179c -- gates the finally below so a complete frame can only ever follow a
+      // start frame: if prompt assembly throws before the call is made, no work started and
+      // neither frame fires.
+      let reflectStarted = false;
       try {
         // FEATURE: AA-60 — use traits.reflect_prompt from fetch_instruction when present
         const fi = reflectSection.fetch_instruction;
@@ -240,6 +301,16 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
         const reflectPrompt = fi.reflect_prompt
           ? `${fi.reflect_prompt}\n\n${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n\n` : ""}## SPECIFIC TASK\n${taskContextStr}\n\nWrite a numbered execution plan. Be concrete — reference specific knowledge where it applies.`
           : `You are ${identityText ? identityText.split("\n")[0] : "an AI agent"}. Review your background knowledge and the task below. Write a numbered execution plan that reflects your role, incorporates relevant knowledge, and addresses this specific task concretely.\n\n${identityText ? `## YOUR ROLE & IDENTITY\n${identityText}\n` : ""}${knowledgeText ? `## YOUR BACKGROUND KNOWLEDGE\n${knowledgeText}\n` : ""}\n## SPECIFIC TASK\n${taskContextStr}\n\nWrite a numbered execution plan. Be concrete — reference specific knowledge where it applies.`;
+
+        // FEATURE: AA-179c -- Dan Bingham's REFLECT is a real model call by a real agent, and it is
+        // the first thing this seam does that a user would recognize as work. Emitted here, at the
+        // last possible moment before the call goes out, so the frame means "this started" and not
+        // "this was contemplated".
+        emit({ type: 'assembly_work', work: 'reflect', agentId: 'dan',
+          forAgentId: effectiveAgentId, toCapabilitySlug: effectiveCapabilitySlug,
+          model: reflectModelRequested,
+          trace_id, span_id, parent_span_id });
+        reflectStarted = true;
 
         const reflectRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -283,6 +354,19 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
         }
       } catch (e) {
         console.warn("[ai-enrichment] REFLECT failed:", e.message);
+      } finally {
+        // FEATURE: AA-179c -- exactly one complete frame per started step, whichever way the step
+        // ended: model returned, model returned non-ok, or the call threw. The step ENDING is the
+        // fact; whether it produced usable output is not restated here as an invented ok/status
+        // field (design rule: real fields only). `tokens` appears only when a real usage figure
+        // came back -- a step that failed before usage exists reports no token count rather than 0.
+        if (reflectStarted) {
+          emit({ type: 'assembly_work_complete', work: 'reflect', agentId: 'dan',
+            forAgentId: effectiveAgentId, toCapabilitySlug: effectiveCapabilitySlug,
+            model: reflectModelRequested,
+            ...(reflectTokensUsed > 0 ? { tokens: reflectTokensUsed } : {}),
+            trace_id, span_id, parent_span_id });
+        }
       }
     }
   }
@@ -297,12 +381,24 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   if (synthesis?.enabled) {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey) {
+      // FEATURE: AA-179c -- same shape as REFLECT above: the requested model hoisted so both
+      // frames read one real value, and a started-flag so a complete can never appear alone.
+      const synthesisModelRequested = synthesis.model || "claude-haiku-4-5-20251001";
+      let synthesisStarted = false;
       try {
         // FEATURE: AA-61 — use traits.synthesis_prompt from synthesis object when present
         const baseInstruction = synthesis.prompt ||
           "You are a prompt optimization engine. The prompt below will be sent to an AI agent to complete a task. Rewrite it to be maximally clear, coherent, and efficient. Remove redundancy. Tighten language. Preserve all factual content, all constraints, and all output format instructions exactly. Do not add new instructions. Do not remove guardrails or format requirements.";
 
         const synthPrompt = `${baseInstruction} The rewritten prompt must be under ${synthesis.max_tokens || 2048} tokens.\n\n${assembledPrompt}`;
+
+        // FEATURE: AA-179c -- Dan Bingham's second real model call at this seam. Same placement
+        // rule as REFLECT: emitted immediately before the request goes out.
+        emit({ type: 'assembly_work', work: 'synthesis', agentId: 'dan',
+          forAgentId: effectiveAgentId, toCapabilitySlug: effectiveCapabilitySlug,
+          model: synthesisModelRequested,
+          trace_id, span_id, parent_span_id });
+        synthesisStarted = true;
 
         const synthRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -332,6 +428,15 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
         }
       } catch (e) {
         console.warn("[ai-enrichment] Synthesis failed:", e.message);
+      } finally {
+        // FEATURE: AA-179c -- one complete per started step, same three exit paths as REFLECT.
+        if (synthesisStarted) {
+          emit({ type: 'assembly_work_complete', work: 'synthesis', agentId: 'dan',
+            forAgentId: effectiveAgentId, toCapabilitySlug: effectiveCapabilitySlug,
+            model: synthesisModelRequested,
+            ...(synthesisTokensUsed > 0 ? { tokens: synthesisTokensUsed } : {}),
+            trace_id, span_id, parent_span_id });
+        }
       }
     }
   }
@@ -350,6 +455,13 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
       outputTokens: reflectUsage?.output_tokens ?? null,
       patternsUsed: ['reflect'],
       traceId: trace_id,
+      // FEATURE: AA-179c -- §19p: these rows already carried the trace but not the span, so Dan's
+      // enrichment work could not be tied to the specific execution that requested it. Both values
+      // are the requesting execution's own -- REFLECT runs inside it, it is not a delegate with a
+      // span of its own, so attaching the caller's span here credits the right call, not a
+      // fabricated child (the rule's "never attach the outer requester's span to a delegate's row"
+      // is about delegates; this is the same execution's own pre-loop work).
+      spanId: span_id, parentSpanId: parent_span_id,
     });
   }
   if (synthesisRan && synthesisTokensUsed > 0) {
@@ -360,6 +472,8 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
       outputTokens: synthesisUsage?.output_tokens ?? null,
       patternsUsed: ['intelligent-synthesis'],
       traceId: trace_id,
+      // FEATURE: AA-179c -- same §19p linkage as the reflect row above.
+      spanId: span_id, parentSpanId: parent_span_id,
     });
   }
 

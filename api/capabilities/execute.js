@@ -1,3 +1,4 @@
+// DeepBench v7.0.10 | api/capabilities/execute.js | AA-179c -- one call-site change: enrichPrompt() now receives this execution's span identity and the opt-in onEvent seam, so the assembly work that runs before runLoop() can stream. No emit site added here; resumeCapability()/runLoop() untouched
 // DeepBench v7.0.3 | api/capabilities/execute.js | LAV-1d -- one streamed emit at runLoop()'s model-call seam exposing the assembled system prompt (full text, never truncated) on the same opt-in _onEvent seam the 10 delegation emits use; no persistence, no logAICall, no new column -- a non-streaming caller is byte-identical
 // DeepBench v6.3.228 | api/capabilities/execute.js | DAT-12 -- retrieval_scope: an explicit, named public param (AA-83 posture preserved) threaded to assemblePrompt() only, so a regression run can scope its own reads to the seed corpus without mutating a single row
 // DeepBench v6.3.224 | api/capabilities/execute.js | AGT-37 -- handler_context: a handler-facing envelope threaded runCapability() -> runLoop() -> sendRequest() only, never to assemblePrompt()/enrichPrompt(); resolveAccept() supplies the confirmed action's own chunk_id. Opaque throughout -- this file never opens it
@@ -1258,7 +1259,15 @@ export async function runCapability({
     retrieval_scope,
   });
 
-  const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug, trace_id: traceId });
+  // FEATURE: AA-179c -- the enrichment seam gets this execution's full §19p identity plus the same
+  // opt-in onEvent callback the delegation/prompt_assembled emits already use, so the work that
+  // happens BEFORE runLoop() starts (Data Room reads, the roster fetch, Dan Bingham's REFLECT and
+  // Intelligent Synthesis) can stream instead of being invisible until prompt_assembled. onEvent is
+  // already normalized to a no-op above, so every non-streaming caller stays byte-identical. This is
+  // the ONLY change this file makes -- no emit site is added here, and resumeCapability()/runLoop()
+  // are untouched (enrichment does not re-run on resume; `enriched` is recovered from durable_hops).
+  const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id, capability_slug,
+    trace_id: traceId, span_id: spanId, parent_span_id: parentSpanId, onEvent });
 
   let display_agent_card = null;
   if (format_skill_profile_slug) {
