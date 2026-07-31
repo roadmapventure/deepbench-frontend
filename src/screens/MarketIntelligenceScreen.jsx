@@ -1,3 +1,8 @@
+// DeepBench v7.0.19 | MarketIntelligenceScreen.jsx | LAV-5a -- export-in-place only, zero behavior change:
+// groupEventsIntoHops / QuestionDivider / RoutingHopCard / AGENT_ROUTING_EMPTY_TEXT gained the `export`
+// keyword (same move LAV-1a made for AuditColumn). The Live Agent View's right rail is now a routing-only
+// feed built from these exact components, so there is one hop-rendering implementation platform-wide.
+// Nothing else in this file changed; CHI's own AuditColumn is untouched and still uses all four.
 // DeepBench v7.0.12 | MarketIntelligenceScreen.jsx | AA-179e -- one real case in describePipelineEvent()
 // for the two assembly-seam types, returning the hop's own composed message muted. Closes the blank
 // activity line S-AA-179b recorded on the Live Agent View's Pipeline Log rail. Inert for this screen
@@ -1074,7 +1079,7 @@ function describePipelineEvent(evt, opts = {}) {
 // FEATURE: CHI-56 — `transaction_complete` is the same shape of marker (the new symmetric
 // "closing half," fired from onGoodThanks): both are boundary markers, neither should merge into
 // an adjacent hop or count toward hop numbering.
-function groupEventsIntoHops(ordered) {
+export function groupEventsIntoHops(ordered) { // FEATURE: LAV-5a -- exported in place (no body/props change); the Live Agent View's routing-only rail groups its own feed with this same implementation
   const hops = [];
   for (const evt of ordered) {
     const last = hops[hops.length - 1];
@@ -2641,7 +2646,7 @@ function rollupBaseline(stats) {
 // IDs (S-MARKET-INTEL-01d/03), one of which had already shipped; mobile's copy was already
 // correct. Fixed at the source instead of patching desktop's string in place, so the two
 // surfaces cannot drift again.
-const AGENT_ROUTING_EMPTY_TEXT = "Real agent-hop events appear here as the chat runs.";
+export const AGENT_ROUTING_EMPTY_TEXT = "Real agent-hop events appear here as the chat runs."; // FEATURE: LAV-5a -- exported in place (same string); the Live Agent View's rail imports it rather than authoring a second empty-state sentence
 
 // FEATURE: CHI-01 — one bordered card per hop (was one per raw event). Card header
 // (avatar/name/role) renders once per hop, matching S-MI-68-design's original intent more
@@ -2657,7 +2662,7 @@ const AGENT_ROUTING_EMPTY_TEXT = "Real agent-hop events appear here as the chat 
 // behavior, unchanged wording/trigger; transaction_complete/"complete", new — the closing half of a
 // transaction). Label derived from evt.type directly rather than a new prop — QuestionDivider
 // already receives the full event.
-function QuestionDivider({ evt }) {
+export function QuestionDivider({ evt }) { // FEATURE: LAV-5a -- exported in place (no body/props change)
   const label = evt.type === "transaction_complete" ? "Transaction complete" : "New question";
   return (
     <div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0"}}>
@@ -2671,7 +2676,7 @@ function QuestionDivider({ evt }) {
 // FEATURE: CHI-88 — `terse` is opt-in and set only by MobileBody's pinned feed; it is forwarded to
 // each activity line, which passes it on to describePipelineEvent. Desktop's AuditColumn renders this
 // card with no terse prop, so its rows are unchanged.
-function RoutingHopCard({ hop, agentById, terse }) {
+export function RoutingHopCard({ hop, agentById, terse }) { // FEATURE: LAV-5a -- exported in place (no body/props change)
   const primary = agentById(hop.agentId);
   const lastColor = describePipelineEvent(hop.events[0], { terse }).color;
   return (

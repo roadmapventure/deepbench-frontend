@@ -1,3 +1,11 @@
+// DeepBench v7.0.19 | LiveAgentViewScreen.jsx | LAV-5a -- John's round-1 UX pass, items 1/3/5/6/7/23/24:
+// the question picker reads as the primary CTA (white), the status strip carries the live status message
+// + elapsed instead of the question that was run, the four meters move out of the title bar into the strip's
+// right end as a 2x2 block (cost at cent precision), the prompt preview grows to 4 lines and starts after
+// the leading OUTPUT FORMAT block (the record itself is never altered -- the popover still shows it), and
+// the right rail becomes the Agent Routing feed only, rendered with CHI's own exported hop components at
+// full rail height. Dropping the rail's other drawers is what removes this file's duplicated copy of
+// CHI's loop-scope filter, the last hand-mirrored const it carried (closes LAV-3).
 // DeepBench v7.0.9 | LiveAgentViewScreen.jsx | AA-179b -- the screen half of assembly work on the
 // canvas. Deliberately close to a no-op: every path the assembly frames need was already generic,
 // and this session's job here was to VERIFY that rather than reimplement it (see the three
@@ -31,9 +39,14 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { T, PALETTE, display, body, mono, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { FeatureBadge } from "../components/SharedUI.jsx";
-import { useAgents, useAgentActivitySummary } from "../hooks/useAgents.js";
+import { useAgents } from "../hooks/useAgents.js";
 import { useHarnessStream } from "../hooks/useHarnessStream.js";
-import { AuditColumn } from "./MarketIntelligenceScreen.jsx";
+// FEATURE: LAV-5a -- CHI's own hop-feed components, imported unmodified. The rail below is the same
+// render path CHI's AuditColumn uses; only the container (a plain full-height section instead of a
+// capped Drawer inside the Focus Area Audit stack) differs.
+import {
+  groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT,
+} from "./MarketIntelligenceScreen.jsx";
 import AgentNetwork from "../components/AgentNetwork.jsx";
 import { STATIC_QUESTION, ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 import { supabase } from "../lib/supabase.js";
@@ -49,36 +62,15 @@ import HarnessTraceConsole, {
 // agent roster -- adding an agent to the tab puts it on this canvas with no code change.
 const MI_ROSTER_TAB = "mi";
 
-// FEATURE: LAV-1b -- CHI's own loop scope, mirrored verbatim from MarketIntelligenceScreen.jsx
-// (~L2537) so this rail's Agents drawer counts exactly the rows CHI's does. It is NOT imported:
-// the const is module-private there and this session's scope rules forbid touching that file, and
-// passing `null` instead would silently widen every figure in the shared drawer to each agent's
-// platform-wide total. Contains no agent ids -- it is an ai_type/feature-prefix filter.
-const MI_LOOP_SCOPE = {
-  aiTypes: [
-    "channel-intelligence", "hypothesis-evaluation", "quality-gate", "pipeline-triage",
-    "memory-consolidation", "data-analysis",
-    "project-manager", "screen-controls", "agent-directory",
-    "librarian", "librarian-write", "data-room-custody",
-    "reflect", "synthesis",
-    "guardrails-check",
-    "html-display",
-  ],
-  featurePrefixes: [
-    "channel-intelligence:", "hypothesis-evaluation:", "quality-gate:", "pipeline-triage:",
-    "data-analysis:", "memory-consolidation:", "data-room-custody:",
-    "project-manager:agent-selection-intent:",
-    "screen-controls:qa-answer-format:", "screen-controls:intelligence-review-format:",
-    "html-display:",
-  ],
-};
+// FEATURE: LAV-5a -- LAV-1b's hand-mirrored copy of CHI's loop-scope filter is gone (closes LAV-3). It
+// existed only to scope the Agents/Data Sources drawers this rail no longer renders; the single remaining
+// copy lives where it was always canonical, in MarketIntelligenceScreen.jsx.
 
 // FEATURE: LAV-1b -- page identity. John's explicit dual-naming call (2026-07-31): the page title
 // and the nav label are deliberately different strings and are not to be unified. The nav label is
 // LAV-1e's job; nothing in this file touches nav.
 const PAGE_TITLE = "Live Multi-Agent Routing";
 const PAGE_SUBTITLE = "Harness, Loop, Pattern Behavior Display";
-const IDLE_QUESTION_COPY = "Standing by — harness idle.";
 const PICKER_PLACEHOLDER = "Choose a question and watch the agents work…";
 
 const ALL_QUESTIONS = [STATIC_QUESTION, ...ROTATING_POOL, ...FIXED_DRAWER_TAIL];
@@ -180,6 +172,20 @@ const PROMPT_DASH = "—";
 // ai_activity_log row lands, at which point it is replaced by the row's real input_tokens.
 // Clicking opens the same fixed popover pattern the trace console's record inspector uses: full,
 // selectable, scrollable text.
+// FEATURE: LAV-5a -- The assembled prompt is `=== LABEL ===` blocks joined by "\n\n---\n\n"
+// (api/prompt/ai-enrichment.js renderSection/assembleSystemPrompt; HAR-02b orders the format section
+// first, deliberately, for prompt caching). The PREVIEW starts after a leading OUTPUT FORMAT block; the
+// popover keeps the full untouched text -- the record is never altered, only where the preview window
+// starts. Exported for the session's test and future reuse.
+export function promptPreviewText(text) {
+  if (typeof text !== "string" || !text) return text;
+  const blocks = text.split("\n\n---\n\n");
+  if (blocks.length > 1 && /^===\s*OUTPUT FORMAT\s*===/.test(blocks[0])) {
+    return blocks.slice(1).join("\n\n---\n\n");
+  }
+  return text;
+}
+
 function PromptBox({ prompt, agents, traceRows }) {
   const [open, setOpen] = useState(false);
   const agent = prompt?.agentId ? agents.find(a => a.id === prompt.agentId) : null;
@@ -215,9 +221,11 @@ function PromptBox({ prompt, agents, traceRows }) {
           textTransform:"uppercase",color:T.muted,marginBottom:3}}>
           Prompt assembled for <b style={{color:T.navy}}>{who || PROMPT_DASH}</b> · {countLabel}
         </div>
+        {/* FEATURE: LAV-5a -- 4 lines, and the preview window starts after the leading OUTPUT FORMAT
+            block. `countLabel` above and the popover below both still render from the FULL text. */}
         <div style={{fontFamily:mono,fontSize:11,lineHeight:1.42,color:T.muted,
-          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
-          {hasText ? text : PROMPT_IDLE_BODY}
+          display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
+          {hasText ? promptPreviewText(text) : PROMPT_IDLE_BODY}
         </div>
       </div>
 
@@ -251,13 +259,44 @@ function PromptBox({ prompt, agents, traceRows }) {
   );
 }
 
+// FEATURE: LAV-5a -- the right rail is the Agent Routing feed and nothing else. CHI's Focus Area Audit
+// container (its heading, its Agents/Data Sources/Analysis drawers) belongs to CHI's job of auditing a
+// focus area; this screen's job is the routing story, and the rail now gives that story the full column
+// height instead of a 280px Drawer window. Everything below the header is CHI's own implementation --
+// groupEventsIntoHops / QuestionDivider / RoutingHopCard, imported unmodified -- so there is exactly one
+// hop-rendering path platform-wide. `assembly_work`/`assembly_work_complete` frames reach this feed by
+// design (AA-179b) and describePipelineEvent already renders their copy (AA-179e), so reusing the cards
+// inherits that for free.
+function AgentRoutingRail({ events, agents }) {
+  const agentById = (id) => agents.find(a => a.id === id);
+  const ordered = [...events].reverse();          // newest on top, same as AuditColumn
+  const hops = groupEventsIntoHops(ordered);
+  const realHopCount = hops.filter(h => !h.isBoundary).length;  // boundary markers are dividers, not hops
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {/* The drawer-title look without the Drawer: not collapsible, nothing to collapse into. */}
+      <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",
+        textTransform:"uppercase",color:T.muted}}>
+        Agent Routing · {realHopCount} hop{realHopCount === 1 ? "" : "s"}
+      </div>
+      {ordered.length === 0 ? (
+        <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
+      ) : hops.map(hop =>
+          hop.isBoundary
+            ? <QuestionDivider key={hop.events[0].id} evt={hop.events[0]}/>
+            : <RoutingHopCard key={hop.events[hop.events.length - 1].id} hop={hop} agentById={agentById}/>
+        )}
+    </div>
+  );
+}
+
 export default function LiveAgentViewScreen() {
   const agents = useAgents();
   const { events, status, running, result, error, recovery, prompt, traceIds, pending, resolving,
     runQuestion, resolveConfirmation } = useHarnessStream();
 
   const [picked, setPicked] = useState("");
-  const [submitted, setSubmitted] = useState(null);
   const [choreographed, setChoreographed] = useState(true);
   const [terminal, setTerminal] = useState(null);       // 'result' | 'error' | null (badge only)
   const [liveStatus, setLiveStatus] = useState(null);   // last non-null status, so terminal can freeze
@@ -310,7 +349,7 @@ export default function LiveAgentViewScreen() {
   // else: the canvas derives bubbles/engagement from the ledger it is given, and the Pipeline Log
   // rail is the user-facing narrative. Filtering here -- rather than withholding the frame from the
   // ledger -- keeps the console's record honest while leaving both of those surfaces byte-identical
-  // to their pre-LAV-1d behavior. Neither AgentNetwork.jsx nor AuditColumn is modified.
+  // to their pre-LAV-1d behavior. Neither AgentNetwork.jsx nor CHI's hop components are modified.
   // FEATURE: AA-179b -- verified this session, not assumed: this predicate matches EXACTLY ONE type
   // and is deliberately NOT widened. `assembly_work` / `assembly_work_complete` therefore reach the
   // canvas (walk-on-stage + the muted ring, AgentNetwork.jsx) AND the Pipeline Log rail, which is
@@ -340,9 +379,6 @@ export default function LiveAgentViewScreen() {
   const roster = useMemo(
     () => rosterKey.split(",").map(id => agents.find(a => a.id === id)).filter(Boolean),
     [rosterKey, agents]);
-
-  const rosterIds = useMemo(() => roster.map(a => a.id), [roster]);
-  const agentActivity = useAgentActivitySummary(rosterIds, MI_LOOP_SCOPE, "global");
 
   // ── terminal / timer bookkeeping ───────────────────────────────────────────
   useEffect(() => { if (result) setTerminal("result"); }, [result]);
@@ -478,7 +514,6 @@ export default function LiveAgentViewScreen() {
   const onRun = () => {
     const q = ALL_QUESTIONS.find(x => x.id === picked);
     if (!q || running || awaiting) return;
-    setSubmitted(q.label);
     setTerminal(null);
     runQuestion(q.label);
   };
@@ -488,6 +523,7 @@ export default function LiveAgentViewScreen() {
       <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,
         background:T.paperDeep,overflow:"hidden"}}>
         <FeatureBadge id="LAV-1"/>
+        <FeatureBadge id="LAV-5"/>
 
         {/* ── Title bar ── */}
         <div style={{background:T.paper,borderBottom:`1px solid ${T.line}`,padding:"11px 24px",
@@ -504,8 +540,10 @@ export default function LiveAgentViewScreen() {
               {PAGE_SUBTITLE}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
+              {/* FEATURE: LAV-5a -- white, not cream: the picker is this screen's primary call to action
+                  and has to read as the one thing to touch against the T.paper title bar. */}
               <select value={picked} onChange={e => setPicked(e.target.value)} aria-label="Pick a question"
-                style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,background:T.card,
+                style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,background:T.white,
                   border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
                   cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
                 <option value="">{PICKER_PLACEHOLDER}</option>
@@ -520,43 +558,48 @@ export default function LiveAgentViewScreen() {
               </button>
             </div>
           </div>
+          {/* FEATURE: LAV-5a -- the meters left the title bar for the status strip below (they now sit
+              directly above the rail they describe). The right side of the title bar is empty space. */}
           <div style={{flex:1}}/>
-          {/* ── Task 3: meters. Every tile is Σ over real rows or a count over real events. ── */}
-          <div style={{display:"flex",gap:18,alignItems:"flex-start",flexShrink:0}}>
-            <Meter label="Active Spans" value={activeSpans} sup={peakSpans || null}/>
-            <Meter label="Tokens" value={formatTokens(tokenTotal)} unit="tok"/>
-            <Meter label="Est. Cost" value={costTotal == null ? "—" : `$${costTotal.toFixed(4)}`}/>
-            <Meter label="Agents Engaged" value={agentsEngaged}/>
-          </div>
         </div>
 
         {/* ── Status strip ── */}
         <div style={{display:"flex",alignItems:"center",gap:14,padding:"8px 24px",background:T.cardAlt,
           borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
           <ModeBadge mode={mode} detail={badgeDetail}/>
-          <div style={{fontFamily:display,fontStyle:"italic",fontSize:15,color:T.navy,flex:1,minWidth:0,
-            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-            {submitted || IDLE_QUESTION_COPY}
-          </div>
-          {/* FEATURE: LAV-1f -- while the gate is open the harness is emitting nothing, so there is
+          {/* FEATURE: LAV-5a -- the strip carries live activity, not the question. The question is
+              already on screen in the picker directly above, so repeating it here spent the widest
+              line on the page on a string the user just chose; the live status message takes that
+              space instead and grows into it (no 340px cap).
+              FEATURE: LAV-1f -- while the gate is open the harness is emitting nothing, so there is
               no live status message to show; the strip carries CHI's own NeedsDecisionBadge copy
               (MarketIntelligenceScreen.jsx ~L1209) verbatim instead -- the platform's existing
               words for exactly this state, in the same brass. Once the decision is dispatched the
-              real streamed status takes over again. */}
+              real streamed status takes over again. That branch keeps its priority unchanged. */}
           {awaiting ? (
-            <div style={{fontFamily:mono,fontSize:11,color:T.brassDeep,fontWeight:700,flexShrink:0,
+            <div style={{fontFamily:mono,fontSize:11,color:T.brassDeep,fontWeight:700,flex:1,minWidth:0,
               textTransform:"uppercase",letterSpacing:"0.02em"}}>
               Needs Your Decision
             </div>
-          ) : status?.message && (
-            <div style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",flexShrink:0,
-              maxWidth:340,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-              {status.message}
+          ) : (
+            <div style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",flex:1,minWidth:0,
+              whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+              {status?.message || ""}
             </div>
           )}
           {elapsedText && (
             <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{elapsedText}</div>
           )}
+          {/* FEATURE: LAV-5a -- the four meters, unchanged in what they measure (every tile is still Σ
+              over real ai_activity_log rows or a count over real ledger events), re-laid-out as a 2x2
+              block at the strip's right end so they sit as two lines above the rail. Est. Cost rounds
+              to cents -- John's call; the 4-decimal figure read as noise at this size. */}
+          <div style={{display:"grid",gridTemplateColumns:"auto auto",columnGap:18,rowGap:2,flexShrink:0}}>
+            <Meter label="Active Spans" value={activeSpans} sup={peakSpans || null}/>
+            <Meter label="Tokens" value={formatTokens(tokenTotal)} unit="tok"/>
+            <Meter label="Est. Cost" value={costTotal == null ? "—" : `$${costTotal.toFixed(2)}`}/>
+            <Meter label="Agents Engaged" value={agentsEngaged}/>
+          </div>
         </div>
 
         {/* ── Canvas + right rail ── */}
@@ -576,23 +619,11 @@ export default function LiveAgentViewScreen() {
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>
             {/* FEATURE: AA-179b -- assembly frames DO reach this rail (railEvents filters only
-                prompt_assembled, above), so once AA-179c emits them each worker gets its own
-                numbered, muted-bordered entry here in arrival order -- John's "the narrative loses
-                its dead-air gap too".
-                KNOWN GAP, deliberately not fixed here: the entry's TEXT will be blank. The rail's
-                line copy comes from describePipelineEvent(), whose `default:` case returns
-                `{ summary: "", color: T.muted }` -- it does NOT fall back to evt.data.message the
-                way this session's kickoff assumed. That function lives in MarketIntelligenceScreen.jsx,
-                which this session's SCOPE RULES forbid touching, and there is no seam for it from
-                this file (AuditColumn's rows are inline-styled with no class hooks, and remapping an
-                assembly frame onto a type the rail already renders would be a lie about what
-                happened). The fix is a real `assembly_work`/`assembly_work_complete` case in
-                describePipelineEvent returning `{ summary: evt.data.message, color: T.muted }`, and
-                it is provably inert for CHI itself -- CHI's own onEvent returns early on both types
-                (MarketIntelligenceScreen.jsx ~L3718), so they never reach its events array. Handed
-                back to the design session to schedule (it belongs with AA-179c, which is what makes
-                the row visible at all). */}
-            <AuditColumn events={railEvents} agentActivity={agentActivity} onAgentsDrawerOpen={() => {}}/>
+                prompt_assembled, above), so each assembly worker gets its own numbered entry here in
+                arrival order. The blank-text gap AA-179b recorded at this call site is closed: AA-179e
+                gave describePipelineEvent a real case for both assembly types, so the shared
+                RoutingHopCard renders their composed message with no work needed here. */}
+            <AgentRoutingRail events={railEvents} agents={agents}/>
           </aside>
         </div>
 
