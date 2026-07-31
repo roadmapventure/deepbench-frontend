@@ -1,3 +1,4 @@
+// DeepBench v7.0.16 | api/capabilities/execute.js | HAR-02b -- runLoop()'s callModel() site forwards system_prompt_stable/system_prompt_volatile from the enriched prompt (additive plumbing; callModel()/buildCallBody() don't read them until S-HAR-02c); the format-override append mirrors onto the volatile half so the split stays coherent with system_prompt; the agent-turn log row now carries cache_creation_input_tokens/cache_read_input_tokens from the turn's usage (HAR-02a follow-through -- the loop path's single log record, LOG-91). The split halves are NOT persisted to durable_hops (system_prompt is; see S-HAR-02b build report) -- a resumed hop carries only the concatenated prompt until S-HAR-02c decides resume-side caching
 // DeepBench v7.0.14 | api/capabilities/execute.js | HAR-27 -- runLoop()'s callModel() site passes webSearchMaxUses from enriched.llm; checkpointAndReturn()'s durable_hops llm persist now carries web_search_max_uses (conditionally) so the cap survives checkpoint/resume -- the persisted llm object was hand-narrowed, not wholesale
 // DeepBench v7.0.10 | api/capabilities/execute.js | AA-179c -- one call-site change: enrichPrompt() now receives this execution's span identity and the opt-in onEvent seam, so the assembly work that runs before runLoop() can stream. No emit site added here; resumeCapability()/runLoop() untouched
 // DeepBench v7.0.3 | api/capabilities/execute.js | LAV-1d -- one streamed emit at runLoop()'s model-call seam exposing the assembled system prompt (full text, never truncated) on the same opt-in _onEvent seam the 10 delegation emits use; no persistence, no logAICall, no new column -- a non-streaming caller is byte-identical
@@ -272,7 +273,11 @@ function getSupabaseHeaders(key) {
 // there would make every row's signature distinct (720 -> 24,826 measured live) and re-cross the
 // 3 s anon statement timeout LOG-99 just fixed. latency_ms itself stays the turn's model-call
 // latency (what the screen displays today via classifyRow()).
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null }) {
+// FEATURE: HAR-02b -- cache_creation_input_tokens/cache_read_input_tokens: HAR-02a's cache-token
+// split, now captured on the agent-turn row too. This row is the SINGLE log record for a loop-path
+// model call (LOG-91 absorbed the wrapper row), so without these params every loop-path row would
+// keep NULL cache fields forever. Plumbing values like input_tokens -- never call_facts keys.
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -316,6 +321,10 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     latencyMs: latency_ms,
     inputTokens: input_tokens ?? null,
     outputTokens: output_tokens ?? null,
+    // FEATURE: HAR-02b -- same ?? null shape as the two token params above; logActivity() writes
+    // them to the HAR-02a plumbing columns (exactly as request-receivable.js's two sites do).
+    cacheCreationInputTokens: cache_creation_input_tokens ?? null,
+    cacheReadInputTokens: cache_read_input_tokens ?? null,
     // FEATURE: LOG-91 -- union of the turn's own computed list and the wrapper's patterns_used
     // (empty spread when wrapperFacts is null -- byte-identical for every pre-existing caller).
     patternsUsed: Array.from(new Set([
@@ -877,6 +886,12 @@ async function runLoop({
       }
       turn = await callModel({
         systemPrompt: enriched.system_prompt,
+        // FEATURE: HAR-02b -- additive plumbing only: callModel() destructures a fixed param set,
+        // so these two ride the options object unread until S-HAR-02c places cache_control on the
+        // stable/volatile boundary. Undefined on a resumed hop (durable_hops persists only the
+        // concatenated system_prompt) -- S-HAR-02c must treat an absent split as "no breakpoints".
+        system_prompt_stable: enriched.system_prompt_stable,
+        system_prompt_volatile: enriched.system_prompt_volatile,
         model: enriched.llm.model,
         max_tokens: enriched.llm.max_tokens,
         temperature: enriched.llm.temperature,
@@ -937,6 +952,11 @@ async function runLoop({
       is_delegate_call: turn.is_delegate_call, api_retry_count: turn.apiRetryCount || 0,
       input_tokens: turn.usage?.input_tokens ?? null,
       output_tokens: turn.usage?.output_tokens ?? null,
+      // FEATURE: HAR-02b -- HAR-02a's cache-token split off the same usage object (callModel()
+      // normalizes both to 0 until caching is enabled in S-HAR-02c; ?? null guards a usage-less
+      // turn). Held-row mechanics unchanged: every terminal sub-branch writes these once.
+      cache_creation_input_tokens: turn.usage?.cache_creation_input_tokens ?? null,
+      cache_read_input_tokens: turn.usage?.cache_read_input_tokens ?? null,
       intent_technical_services: enriched.intent_technical_services || [],
       trace_id,
       usedWebSearch: turnUsedWebSearch,
@@ -1285,6 +1305,10 @@ export async function runCapability({
     });
     if (formatContract) {
       enriched.system_prompt = (enriched.system_prompt || '') + '\n\n---\n\n' + formatSection;
+      // FEATURE: HAR-02b -- mirror the append onto the volatile half so the split stays coherent
+      // with system_prompt (the invariant S-HAR-02c's breakpoints rely on). The override is
+      // per-call display shaping, so it belongs in the volatile tail; the stable half is untouched.
+      enriched.system_prompt_volatile = (enriched.system_prompt_volatile || '') + '\n\n---\n\n' + formatSection;
       enriched.format_contract = formatContract;
     }
     display_agent_card = displayAgentCard;

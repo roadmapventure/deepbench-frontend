@@ -1,3 +1,10 @@
+// DeepBench v7.0.16 | api/prompt/db-assembly.js | HAR-02b -- stable-first prompt reorder: every
+// section carries prompt_phase ('stable' = agent-constant content, 'volatile' = per-call content)
+// and order values are renumbered so ALL stable sections sort before ALL volatile ones (Anthropic
+// prompt caching is a byte-prefix match -- per-call content interleaved into the middle of stable
+// content, the pre-7.0.16 layout, capped the cacheable prefix at Format+Intent). Intra-group
+// relative order preserved exactly; VOICE stays the absolute last section (AA-127). No cache_control
+// is added this session -- the reorder ships alone so S-HAR-02b's A/B isolates the behavior change.
 // DeepBench v7.0.14 | api/prompt/db-assembly.js | HAR-27 -- web_search_max_uses trait read (positive
 // integer only), carried on the returned llm object; merged after the profile loop so a later Format
 // Skill Profile's wholesale llm rebuild can't drop it. Absent/invalid trait -> key omitted entirely.
@@ -14,7 +21,20 @@
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
 
-const SKILL_ORDER = { format: 1, intent: 2, identity: 3, behavior: 4, knowledge: 5, guardrails: 6 };
+// FEATURE: HAR-02b -- stable sections (agent-constant content) occupy orders 1-5; volatile sections
+// (per-call content: prior-conversation 10, current-task/task-details 11, reflect 12, knowledge-* 13,
+// voice 100) occupy 10+. knowledge moved 5 -> 13 (RAG content is fetched per call) and guardrails
+// 6 -> 5 (closing the gap so the stable run is contiguous); relative order within each group is
+// exactly what it was before the renumbering. skill_types.guardrails.display_order (6) is display
+// metadata in Supabase and deliberately NOT changed to track this -- SKILL_ORDER is a render-order
+// constant, not a display-order mirror, as of this renumbering.
+const SKILL_ORDER = { format: 1, intent: 2, identity: 3, behavior: 4, knowledge: 13, guardrails: 5 };
+
+// FEATURE: HAR-02b -- prompt_phase per skill type. 'stable' renders in the cacheable prefix;
+// 'volatile' renders in the per-call tail. knowledge is volatile because its content is fetched
+// per call (RAG). Unknown/future types default to 'volatile' at the stamp site below -- a
+// wrongly-volatile section only loses caching; a wrongly-stable one would poison the cache key.
+const SKILL_PHASE = { format: "stable", intent: "stable", identity: "stable", behavior: "stable", guardrails: "stable", knowledge: "volatile" };
 
 const DEFAULT_LLM = { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" };
 // FEATURE: AA-44 — format_contract gains handler + guardrails for request-receivable
@@ -286,6 +306,8 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       fetch_instruction: fetchInstruction,
       required: sp.is_required ?? false,
       order,
+      // FEATURE: HAR-02b -- unknown types default to volatile (see SKILL_PHASE comment).
+      prompt_phase: SKILL_PHASE[typeSlug] ?? "volatile",
     };
     sections.push(section);
 
@@ -302,12 +324,18 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
           method: "reflect",
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1024,
-          inserts_after: "behavior",
+          // FEATURE: HAR-02b -- `inserts_after: "behavior"` removed. It was NOT display metadata:
+          // ai-enrichment.js's STEP 3 spliced the generated plan into the rendered blocks right
+          // after the behavior section, which would have re-interleaved per-call content into the
+          // stable prefix. Placement is now order-driven (this section's own `order` below), same
+          // mechanism as every other section; the field had no other consumer (grepped 2026-07-31).
           declared_by: sp.slug,
           reflect_prompt: traits.reflect_prompt || null,  // FEATURE: AA-60
         },
         required: false,
-        order: 4.5,
+        order: 12,
+        // FEATURE: HAR-02b -- generated fresh per call, so it lives in the volatile tail.
+        prompt_phase: "volatile",
       };
     }
 
@@ -597,7 +625,8 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       content: workOrderParts.join('\n'),
       fetch_instruction: null,
       required: true,
-      order: 2.5,
+      order: 11,  // FEATURE: HAR-02b -- was 2.5; per-call content renders after the stable run
+      prompt_phase: 'volatile',
     });
     sections.sort((a, b) => (a.order || 0) - (b.order || 0));
   } else if (typeof task_context === 'object' && task_context !== null && Object.keys(task_context).length > 0) {
@@ -622,7 +651,8 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
         content: taskDetailsText,
         fetch_instruction: null,
         required: true,
-        order: 2.5,
+        order: 11,  // FEATURE: HAR-02b -- was 2.5; per-call content renders after the stable run
+        prompt_phase: 'volatile',
       });
       sections.sort((a, b) => (a.order || 0) - (b.order || 0));
     }
@@ -634,9 +664,9 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // always-final VOICE section, read by the model as most current) and no `label` (rendered as a
   // literal "=== undefined ===" header via ai-enrichment.js's renderSection()). Both stemmed from
   // this section never being built as a first-class section like every other one in this function --
-  // fixed together. order: 2.4 places it just before CURRENT TASK/TASK DETAILS (2.5) and before the
-  // agent's own identity/behavior/knowledge sections (3/4/5) -- background context first, agent's own
-  // instructions next, current task last before RAG/VOICE.
+  // fixed together. FEATURE: HAR-02b -- order renumbered 2.4 -> 10: this section still renders just
+  // before CURRENT TASK/TASK DETAILS (11), but the whole per-call group now renders AFTER the
+  // agent's stable sections (1-5) instead of before them, so the stable prefix stays cacheable.
   if (runtime_context && typeof runtime_context === 'string' && runtime_context.trim()) {
     sections.push({
       slug: 'prior-conversation',
@@ -646,7 +676,8 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       content: runtime_context.trim(),
       fetch_instruction: null,
       required: false,
-      order: 2.4,
+      order: 10,
+      prompt_phase: 'volatile',
     });
     sections.sort((a, b) => (a.order || 0) - (b.order || 0));
   }
@@ -666,6 +697,10 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     fetch_instruction: null,
     required: true,
     order: 100,
+    // FEATURE: HAR-02b -- VOICE's text is constant, but it must stay the absolute last thing the
+    // model reads (AA-127), which puts it after every per-call section -- so it lives in the
+    // volatile tail by position, deliberately trading its own few cached bytes for that invariant.
+    prompt_phase: 'volatile',
   });
 
   return {

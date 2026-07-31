@@ -1,3 +1,11 @@
+// DeepBench v7.0.16 | api/prompt/ai-enrichment.js | HAR-02b -- render split: stable-phase sections
+// render into system_prompt_stable, volatile-phase into system_prompt_volatile (missing prompt_phase
+// defaults volatile -- a wrongly-volatile section only loses caching; a wrongly-stable one would
+// poison the cache key). system_prompt remains and equals stable + separator + volatile (no dangling
+// separator on an empty half) -- every existing consumer keeps working, and the concatenation IS the
+// reordered prompt. REFLECT insertion is now order-driven (fetch_instruction.inserts_after retired:
+// splicing after 'behavior' would re-interleave per-call content into the stable prefix). A
+// synthesis rewrite collapses the whole prompt to volatile (no stable byte-prefix survives it).
 // DeepBench v7.0.10 | api/prompt/ai-enrichment.js | AA-179c -- the assembly event family
 // (`assembly_work` / `assembly_work_complete`) emitted on the same opt-in onEvent seam execute.js's
 // delegation + prompt_assembled frames already use, plus §19p span identity onto Dan Bingham's two
@@ -161,8 +169,31 @@ function renderSection(section) {
   return `=== ${section.label} ===\n${content}`;
 }
 
-function assembleSystemPrompt(renderedBlocks) {
-  return renderedBlocks.filter(Boolean).join("\n\n---\n\n");
+// FEATURE: HAR-02b -- the one separator both halves and the concatenation use.
+const SECTION_SEPARATOR = "\n\n---\n\n";
+
+// FEATURE: HAR-02b -- the real split helper, exported so the Node test imports THIS implementation
+// rather than a hand-copied one (tests/regression convention). Takes rendered entries
+// ({ prompt_phase, text }) in final section order and returns the two phase halves plus their
+// concatenation. Invariants: system_prompt === system_prompt_stable + SECTION_SEPARATOR +
+// system_prompt_volatile when both halves are non-empty; an empty half never leaves a dangling
+// separator; an entry with a missing/unknown prompt_phase lands in volatile (defensive: a
+// wrongly-volatile section only loses caching, a wrongly-stable one would poison the cache key).
+// Because db-assembly.js orders all stable sections before all volatile ones, the concatenation is
+// byte-identical to joining the entries in their given order.
+export function assemblePhaseSplit(renderedEntries) {
+  const stableBlocks = [];
+  const volatileBlocks = [];
+  for (const e of renderedEntries) {
+    if (!e || !e.text) continue;
+    (e.prompt_phase === "stable" ? stableBlocks : volatileBlocks).push(e.text);
+  }
+  const system_prompt_stable = stableBlocks.join(SECTION_SEPARATOR);
+  const system_prompt_volatile = volatileBlocks.join(SECTION_SEPARATOR);
+  const system_prompt = (system_prompt_stable && system_prompt_volatile)
+    ? system_prompt_stable + SECTION_SEPARATOR + system_prompt_volatile
+    : (system_prompt_stable || system_prompt_volatile);
+  return { system_prompt, system_prompt_stable, system_prompt_volatile };
 }
 
 // FEATURE: AA-179c -- `span_id`/`parent_span_id`/`onEvent` are all optional and all default to the
@@ -190,6 +221,9 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   if (!sections.length) {
     return {
       system_prompt: "",
+      // FEATURE: HAR-02b -- same shape as the main return; both halves empty on the guard path.
+      system_prompt_stable: "",
+      system_prompt_volatile: "",
       sections: {},
       format_contract: format_contract || { output_type: "html", skill_profile_slug: null, schema: null },
       llm: llm || { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" },
@@ -268,11 +302,20 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     if (s._rag_method !== undefined) ragMethodBySection[s.slug] = s._rag_method;
   }
 
-  const renderedBlocks = orderedFetched
+  // FEATURE: HAR-02b -- rendered entries carry order + prompt_phase alongside the text so the
+  // phase split (and REFLECT's order-driven insertion below) never re-derives either. Entries are
+  // already in final section order (orderedFetched is order-sorted, and all stable orders sort
+  // before all volatile orders as of db-assembly.js's renumbering).
+  const renderedEntries = orderedFetched
     .filter(s => renderedMap[s.slug])
-    .map(s => renderSection({ ...s, content: renderedMap[s.slug] }));
+    .map(s => ({
+      slug: s.slug,
+      order: s.order || 0,
+      prompt_phase: s.prompt_phase === "stable" ? "stable" : "volatile",
+      text: renderSection({ ...s, content: renderedMap[s.slug] }),
+    }));
 
-  let assembledPrompt = assembleSystemPrompt(renderedBlocks);
+  let { system_prompt: assembledPrompt, system_prompt_stable: stablePrompt, system_prompt_volatile: volatilePrompt } = assemblePhaseSplit(renderedEntries);
 
   // STEP 3 — REFLECT
   const reflectSection = sections.find(s => s.type === "reflect");
@@ -335,20 +378,29 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
           reflectModel = fi.model || "claude-haiku-4-5-20251001";
 
           if (executionPlan) {
-            const insertAfterSlug = fi.inserts_after || null;
-            const insertAfterIndex = insertAfterSlug
-              ? renderedBlocks.findIndex(b => b && b.includes(`=== ${(orderedFetched.find(s => s.slug === insertAfterSlug) || {}).label} ===`))
-              : -1;
-
+            // FEATURE: HAR-02b -- placement is order-driven now (fetch_instruction.inserts_after
+            // retired at its source, db-assembly.js): the entry is inserted before the first
+            // rendered entry with a higher order, honoring the reflect section's own order (12 --
+            // volatile tail, after the task sections, before knowledge/VOICE). The old splice
+            // targeted "right after behavior", which would have re-interleaved this per-call text
+            // into the stable prefix. Fallback push covers only an entry set with no higher order
+            // (impossible for assemblePrompt() output -- VOICE at 100 is always present).
             const reflectBlock = `=== ${reflectSection.label || "EXECUTION PLAN"} ===\n${executionPlan}`;
-            if (insertAfterIndex >= 0) {
-              renderedBlocks.splice(insertAfterIndex + 1, 0, reflectBlock);
+            const reflectEntry = {
+              slug: reflectSection.slug || "reflect",
+              order: reflectSection.order ?? 12,
+              prompt_phase: reflectSection.prompt_phase === "stable" ? "stable" : "volatile",
+              text: reflectBlock,
+            };
+            const insertIndex = renderedEntries.findIndex(e => (e.order || 0) > reflectEntry.order);
+            if (insertIndex >= 0) {
+              renderedEntries.splice(insertIndex, 0, reflectEntry);
             } else {
-              renderedBlocks.push(reflectBlock);
+              renderedEntries.push(reflectEntry);
             }
 
             renderedMap[reflectSection.slug || "reflect"] = executionPlan;
-            assembledPrompt = assembleSystemPrompt(renderedBlocks);
+            ({ system_prompt: assembledPrompt, system_prompt_stable: stablePrompt, system_prompt_volatile: volatilePrompt } = assemblePhaseSplit(renderedEntries));
             reflectRan = true;
           }
         }
@@ -423,6 +475,12 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
           synthesisModel = synthesis.model || "claude-haiku-4-5-20251001";
           if (rewritten) {
             assembledPrompt = rewritten;
+            // FEATURE: HAR-02b -- a synthesis rewrite is a fresh per-call text; no stable byte
+            // prefix survives it, so the whole rewritten prompt is volatile (defensive direction:
+            // wrongly-volatile only loses caching). The split-join invariant holds via the
+            // empty-stable case: system_prompt === system_prompt_volatile, no dangling separator.
+            stablePrompt = "";
+            volatilePrompt = rewritten;
             synthesisRan = true;
           }
         }
@@ -479,6 +537,11 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
 
   return {
     system_prompt: assembledPrompt,
+    // FEATURE: HAR-02b -- the stable/volatile boundary, threaded outward so S-HAR-02c can place
+    // cache_control breakpoints on it. system_prompt above remains the single source every current
+    // consumer reads and always equals the two halves joined (see assemblePhaseSplit()).
+    system_prompt_stable: stablePrompt,
+    system_prompt_volatile: volatilePrompt,
     sections: renderedMap,
     format_contract: format_contract || { output_type: "html", skill_profile_slug: null, schema: null },
     llm: llm || { provider: "anthropic", model: "claude-sonnet-4-6", max_tokens: 4000, api_key_source: "platform" },
