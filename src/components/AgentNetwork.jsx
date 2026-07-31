@@ -1,3 +1,9 @@
+// DeepBench v7.0.20 | AgentNetwork.jsx | LAV-5b -- canvas round 1b: the segmented control drops its
+// "Layout" label, the model tag reads the family name parsed off the real id (never a lookup table),
+// a finished agent keeps the LAST pattern it was really classified on, and every routing pulse
+// leaves its line lit in its meaning colour with the legend's own word riding the line until the
+// next pulse fires. Nothing here invents a pattern, a label or an edge: an unclassified span still
+// shows no pill (§19l) and a colour outside EDGE_MEANING_LABEL still renders no word.
 // DeepBench v7.0.9 | AgentNetwork.jsx | AA-179b -- assembly work on the canvas. The workers that
 // build a prompt (the enrichment seam's fetches, Dan Bingham's REFLECT/Synthesis steps) walk on
 // stage and light up like any engaged agent, in their own quiet-infrastructure tint (T.mutedDeep
@@ -40,6 +46,10 @@ import { fetchTracePatterns, needsSpanRefetch } from "../lib/tracePatterns.js";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
+// LAV-1c's bounded pattern-refetch gap, and LAV-5b's single post-terminal settle read. Both are
+// waits, not schedules: nothing here polls and nothing here invents a duration.
+const PATTERN_REFETCH_MS = 2500;
+const PATTERN_SETTLE_MS = 2500;
 // Choreography anchors, ported verbatim from the prototype's computeTargets().
 const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
 const ARC_RX = 235, ARC_RY = 215, ARC_SPREAD = (162 * Math.PI) / 180;
@@ -62,6 +72,27 @@ export const DISPATCH_COLOR = ACTION_TEXT_COLORS_FETCH.CLICK;  // a delegation g
 export const REPORT_COLOR = T.moss;                            // control/result coming back
 export const REDISPATCH_COLOR = T.flag;                        // the same pair crossed again this run
 export const HANDOFF_COLOR = T.brass;                          // dispatched, never returned before terminal
+
+// FEATURE: LAV-5b -- the legend's own words, keyed by the meaning colours defined immediately above.
+// The lit-line label and the legend below both render from this one map, so they can never disagree,
+// and a colour that is not a routing meaning (LINK_COLOR at rest, ASSEMBLY_COLOR) is deliberately
+// absent: `get` returns undefined and the line carries NO word. Never a default label.
+export const EDGE_MEANING_LABEL = new Map([
+  [DISPATCH_COLOR,   "Delegate"],
+  [REPORT_COLOR,     "Report back"],
+  [REDISPATCH_COLOR, "Re-dispatch"],
+  [HANDOFF_COLOR,    "Hand-off"],
+]);
+
+// FEATURE: LAV-5b -- "claude-haiku-4-5-20251001" -> "Haiku". Parsed from the real id, never a lookup
+// table of models; an id that doesn't match the claude-<family> shape renders verbatim (honest
+// fallback, never invented). The full id stays on the element's title either way.
+export function modelFamily(modelId) {
+  if (typeof modelId !== "string") return null;
+  const m = modelId.match(/^claude-([a-z]+)/);
+  if (!m) return modelId;
+  return m[1].charAt(0).toUpperCase() + m[1].slice(1);
+}
 
 // ── FEATURE: AA-179b -- the assembly seam's two frame types ──────────────────
 // Spelled exactly as useHarnessStream.js's AA-179a branch appends them (~L181) and as AA-179c will
@@ -277,6 +308,47 @@ function ePath(a, b) {
   return `M ${a.x} ${a.y} Q ${mx + nx * c} ${my + ny * c} ${b.x} ${b.y}`;
 }
 
+// FEATURE: LAV-5b -- an edge is ONE physical line, drawn in the direction the delegation first ran.
+// A report-back pulse travels that same line backwards, so the lit-line match is direction-agnostic
+// on the pair and nothing wider: a pulse can only ever light the line it actually crossed.
+export function isLitEdge(litEdge, edge) {
+  if (!litEdge?.key || !edge?.key) return false;
+  return litEdge.key === edge.key || litEdge.key === edgeKey(edge.to, edge.from);
+}
+
+// FEATURE: LAV-5b -- where one edge's word sits and how it is turned, so it rides the line rather
+// than floating beside it. ePath() draws a quadratic with control point `c`; its t=0.5 point is
+// (a + 2c + b)/4 and its tangent there is parallel to the chord, so the chord's own angle is the
+// reading angle. A label that would come out upside-down is turned 180 degrees -- it always reads
+// left-to-right, whichever way the edge runs.
+export function edgeLabelTransform(a, b) {
+  if (!a || !b) return null;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len, c = 18;
+  const cx = mx + nx * c, cy = my + ny * c;
+  const x = (a.x + 2 * cx + b.x) / 4, y = (a.y + 2 * cy + b.y) / 4;
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;   // (-180, 180]
+  if (angle > 90) angle -= 180;
+  else if (angle <= -90) angle += 180;                // folded into (-90, 90]: always readable
+  return `translate(${x} ${y}) rotate(${angle})`;
+}
+
+// FEATURE: LAV-5b (Task 3) -- the pill an agent keeps. Walks that agent's own spans newest-first and
+// returns the first one the Log Displayer really classified, so a finished agent keeps the LAST
+// pattern it was credited with instead of blanking the moment its final span happens to be an
+// unclassified one. Returns null when NO span of that agent's is classified -- there is no fallback
+// label anywhere in this file (§19l / .claude/rules/ai-pattern-signature.md).
+export function latestClassifiedPattern(spans, spanPatterns) {
+  if (!Array.isArray(spans) || !spanPatterns) return null;
+  for (let i = spans.length - 1; i >= 0; i--) {
+    const names = spanPatterns[spans[i]];
+    if (names && names.length > 0) return names.join(", ");
+  }
+  return null;
+}
+
 // ── pulse (ported dash-offset draw + glow trail, real rAF, no scripted timing) ─
 function Pulse({ d, color, dur, onDone }) {
   const pathRef = useRef(null);
@@ -409,8 +481,6 @@ const NET_CSS = `
   background:transparent}
 .lav-seg{position:absolute;left:12px;top:12px;display:flex;align-items:stretch;background:${T.card};
   border:1px solid ${T.line};border-radius:8px;overflow:hidden;z-index:8;box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
-.lav-seg .lbl{font-family:${mono};font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-  color:${T.muted};display:flex;align-items:center;padding:0 10px;border-right:1px solid ${T.line}}
 .lav-seg button{border:none;background:transparent;font-family:${body};font-weight:600;font-size:11px;
   color:${T.muted};padding:6px 13px;cursor:pointer}
 .lav-seg button.on{background:${T.navy};color:${T.card}}
@@ -481,6 +551,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const tgtRef = useRef({});
   const nodeRefs = useRef({});
   const edgeRefs = useRef({});
+  // FEATURE: LAV-5b -- the on-line words move with their lines. The tick below repositions edge
+  // paths imperatively while the choreography settles; a label left at its last render position
+  // would visibly drift off its line, so it is re-placed in the same loop from the same positions.
+  const labelRefs = useRef({});
   const benchOrderRef = useRef([]);
   const rafRef = useRef(0);
   const choreoRef = useRef(choreographed);
@@ -502,8 +576,12 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
       if (el) { el.style.left = `${(p.x / VW) * 100}%`; el.style.top = `${(p.y / VH) * 100}%`; }
     }
     for (const e of edges) {
+      const a = posRef.current[e.from], b = posRef.current[e.to];
       const el = edgeRefs.current[e.key];
-      if (el) el.setAttribute("d", ePath(posRef.current[e.from], posRef.current[e.to]));
+      if (el) el.setAttribute("d", ePath(a, b));
+      const lab = labelRefs.current[e.key];
+      const tr = lab && edgeLabelTransform(a, b);
+      if (tr) lab.setAttribute("transform", tr);
     }
     rafRef.current = moving ? requestAnimationFrame(() => tick.current()) : 0;
   };
@@ -524,21 +602,29 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
 
   // ── pulses: one per newly-observed delegation-family hop, on the real pair it crossed ──
   const [pulses, setPulses] = useState([]);
+  // FEATURE: LAV-5b -- the one line left lit by the most recent pulse, `{ key, color }`. A pulse is
+  // over in 900ms, which is too fast to follow; the line it crossed keeps its meaning colour until
+  // the NEXT pulse fires, so at any moment the canvas shows exactly one lit line and exactly one
+  // word. Cleared by the same ledger reset a question_boundary produces. Assembly hops emit no
+  // pulses (pulsesForHop returns [] for them), so they can never light a line.
+  const [litEdge, setLitEdge] = useState(null);
   const seenRef = useRef(0);
   const pulseIdRef = useRef(0);
   useEffect(() => {
-    if (runHops.length < seenRef.current) { seenRef.current = 0; setPulses([]); return; }
+    if (runHops.length < seenRef.current) { seenRef.current = 0; setPulses([]); setLitEdge(null); return; }
     if (runHops.length === seenRef.current) return;
     const fresh = [];
+    let lit = null;
     for (let i = seenRef.current; i < runHops.length; i++) {
       for (const p of pulsesForHop(runHops[i], i, runHops.slice(0, i))) {
         const a = posRef.current[p.from], b = posRef.current[p.to];
         if (!a || !b) continue;
         fresh.push({ id: ++pulseIdRef.current, d: ePath(a, b), color: p.color });
+        lit = { key: edgeKey(p.from, p.to), color: p.color };  // last pulse of the batch wins
       }
     }
     seenRef.current = runHops.length;
-    if (fresh.length) setPulses(cur => [...cur, ...fresh]);
+    if (fresh.length) { setPulses(cur => [...cur, ...fresh]); setLitEdge(lit); }
   }, [runHops]);
 
   const dropPulse = (id) => setPulses(cur => cur.filter(p => p.id !== id));
@@ -569,42 +655,91 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   }, [resolving, home]);
 
   // ── LAV-1c: node card data ────────────────────────────────────────────────
-  // Each node's LATEST credited span this run. pickCreditedSpan() already decided which endpoint's
-  // span a delegation-family event credits (§19p) and useHarnessStream spreads it into data --
-  // this only picks the most recent one per agent, it never re-derives credit.
-  const traceId = useMemo(() => {
-    for (const h of runHops) { const t = h.data?.trace_id; if (t) return t; }
-    return null;
+  // The spans each node was credited with this run. pickCreditedSpan() already decided which
+  // endpoint's span a delegation-family event credits (§19p) and useHarnessStream spreads it into
+  // data -- everything below only groups and orders those, it never re-derives credit.
+  // FEATURE: LAV-5b (Task 3 root cause, diagnosed live on the dev preview 2026-07-31) -- EVERY trace
+  // this run touched, in arrival order, not just the first frame's. A run is not one trace: each
+  // top-level capability execution opens its own `trace_id` (measured live: one Live Agent View run
+  // spanned `846b5223…`, `15ebefd7…` and `573b2569…`, with the run's agents split across all three).
+  // LAV-1c joined patterns for the FIRST trace only, so an agent whose latest credited span belonged
+  // to a later trace could never be in the map -- which is why a pill that was showing mid-run went
+  // blank the moment that agent moved into the next trace, and why every finished agent ended empty.
+  // This is the same set the screen's own row poller already reads over (LiveAgentViewScreen's
+  // `traceKey`), derived here from the ledger this component is given -- no new source.
+  const traceKey = useMemo(() => {
+    const out = [];
+    for (const h of runHops) { const t = h.data?.trace_id; if (t && !out.includes(t)) out.push(t); }
+    return out.join(",");
   }, [runHops]);
-  const spanByAgent = useMemo(() => {
+  // Every span each agent was credited with this run, oldest first, deduped. LAV-1c kept only the
+  // latest; the list is what lets a finished agent fall back to the last span it was really
+  // classified on when its final span happens to carry no gold-pattern match.
+  const spansByAgent = useMemo(() => {
     const m = new Map();
-    for (const h of runHops) if (h.agentId && h.data?.span_id != null) m.set(h.agentId, h.data.span_id);
+    for (const h of runHops) {
+      if (!h.agentId || h.data?.span_id == null) continue;
+      const list = m.get(h.agentId) || [];
+      const s = String(h.data.span_id);
+      const at = list.indexOf(s);
+      if (at !== -1) list.splice(at, 1);
+      list.push(s);
+      m.set(h.agentId, list);
+    }
     return m;
   }, [runHops]);
-  const spanKey = useMemo(() => [...spanByAgent.values()].join(","), [spanByAgent]);
+  const spanKey = useMemo(
+    () => [...spansByAgent.values()].map(l => l.join("+")).join(","), [spansByAgent]);
 
-  // The Agent Routing drawer's own join, reused: fetch the trace's span -> governed-name map, and
-  // apply LOG-95b's BOUNDED refetch while any span on this canvas is still missing. After the
-  // budget the span is honestly unclassified and simply shows no pill -- never a fallback label.
+  // The Agent Routing drawer's own join, reused per trace and merged: span ids are UUIDs, so the
+  // union is unambiguous. LOG-95b's BOUNDED refetch still applies while any span on this canvas is
+  // missing. After the budget the span is honestly unclassified and simply shows no pill -- never a
+  // fallback label. The per-trace fan-out stays bounded because a new span cancels the in-flight
+  // chain (the cleanup below) rather than stacking a second one on top of it.
   const [spanPatterns, setSpanPatterns] = useState({});
   const spansRef = useRef([]);
-  spansRef.current = spanKey ? spanKey.split(",") : [];
+  spansRef.current = spanKey ? spanKey.split(/[,+]/).filter(Boolean) : [];
   useEffect(() => {
-    if (!traceId) { setSpanPatterns({}); return undefined; }
+    const traces = traceKey ? traceKey.split(",") : [];
+    if (!traces.length) { setSpanPatterns({}); return undefined; }
     let cancelled = false, tries = 0, timer = null;
     const attempt = () => {
-      fetchTracePatterns(traceId).then(map => {
+      Promise.all(traces.map(t => fetchTracePatterns(t))).then(maps => {
         if (cancelled) return;
-        setSpanPatterns(map);
-        if (spansRef.current.some(s => needsSpanRefetch(map, s, tries))) {
+        const merged = Object.assign({}, ...maps);
+        setSpanPatterns(merged);
+        if (spansRef.current.some(s => needsSpanRefetch(merged, s, tries))) {
           tries += 1;
-          timer = setTimeout(attempt, 2500);
+          timer = setTimeout(attempt, PATTERN_REFETCH_MS);
         }
       });
     };
     attempt();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [traceId, spanKey]);
+  }, [traceKey, spanKey]);
+
+  // FEATURE: LAV-5b (Task 3) -- ONE last read after the run goes terminal, and only on the
+  // running->false edge. The rows a run's final calls write land slightly after the stream ends, and
+  // by then the bounded budget above may already be spent; without this a span classified in those
+  // last moments would stay pill-less until the next question. Merged, never replaced: it covers the
+  // same traces, so it can only add -- and a transient fetch error (which returns {}) can therefore
+  // never blank a pill that is already on screen. Fires once and is cleared with the effect: not a
+  // poller, and it never re-arms while the canvas sits idle.
+  const wasRunningRef = useRef(running);
+  useEffect(() => {
+    const was = wasRunningRef.current;
+    wasRunningRef.current = running;
+    const traces = traceKey ? traceKey.split(",") : [];
+    if (!was || running || !traces.length) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      Promise.all(traces.map(t => fetchTracePatterns(t))).then(maps => {
+        if (cancelled) return;
+        setSpanPatterns(cur => Object.assign({}, cur, ...maps));
+      });
+    }, PATTERN_SETTLE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [running, traceKey]);
 
   // Model tag: the model on that agent's most recent row in THIS trace. No row, no tag.
   const modelByAgent = useMemo(() => {
@@ -623,7 +758,6 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
       <FeatureBadge id="LAV-1"/>
       <style>{NET_CSS}</style>
       <div className="lav-seg">
-        <span className="lbl">Layout</span>
         <button className={choreographed ? "on" : ""} onClick={() => onToggleChoreographed(true)}>Choreographed</button>
         <button className={choreographed ? "" : "on"} onClick={() => onToggleChoreographed(false)}>Static</button>
       </div>
@@ -636,12 +770,31 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             </filter>
           </defs>
           <g>
-            {edges.map(e => (
-              <path key={e.key} ref={el => { edgeRefs.current[e.key] = el; }}
-                d={ePath(posRef.current[e.from] || home[e.from], posRef.current[e.to] || home[e.to])}
-                fill="none" stroke={e.color} strokeWidth={e.handoff ? 2.2 : 1.6}
-                strokeDasharray="2 7" strokeLinecap="round" opacity="0.9"/>
-            ))}
+            {/* FEATURE: LAV-5b -- one edge, one optional word. The lit line takes the meaning colour
+                of the pulse that just crossed it and goes solid; every other edge keeps exactly the
+                LAV-1b resting look. The word comes from EDGE_MEANING_LABEL keyed on the colour
+                actually drawn, so a resting LINK_COLOR edge (not in the map) carries none and the
+                brass hand-off carries "Hand-off" -- no separate branch decides which lines speak. */}
+            {edges.map(e => {
+              const lit = isLitEdge(litEdge, e);
+              const stroke = lit ? litEdge.color : e.color;
+              const label = EDGE_MEANING_LABEL.get(stroke) ?? null;
+              const a = posRef.current[e.from] || home[e.from];
+              const b = posRef.current[e.to] || home[e.to];
+              return (
+                <g key={e.key}>
+                  <path ref={el => { edgeRefs.current[e.key] = el; }} d={ePath(a, b)}
+                    fill="none" stroke={stroke} strokeWidth={(lit || e.handoff) ? 2.2 : 1.6}
+                    strokeDasharray={lit ? undefined : "2 7"} strokeLinecap="round"
+                    opacity={lit ? 1 : 0.9}/>
+                  {label && (
+                    <text ref={el => { labelRefs.current[e.key] = el; }}
+                      transform={edgeLabelTransform(a, b) || undefined} textAnchor="middle" dy="-5"
+                      style={{ fontFamily: body, fontSize: 9.5, fill: T.muted }}>{label}</text>
+                  )}
+                </g>
+              );
+            })}
           </g>
           <g>
             {pulses.map(p => <Pulse key={p.id} d={p.d} color={p.color} dur={900} onDone={() => dropPulse(p.id)}/>)}
@@ -663,9 +816,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             const bubble = running ? net.bubbles[a.id] : null;
             const start = posRef.current[a.id] || home[a.id] || { x: VW / 2, y: VH / 2 };
             const down = start.y < VH * 0.34;
-            const span = spanByAgent.get(a.id);
-            const names = span != null ? spanPatterns[span] : null;
-            const patternLabel = names && names.length > 0 ? names.join(", ") : null;
+            // FEATURE: LAV-5b -- the LAST pattern this agent was really classified on, kept after
+            // the run ends. Null when none of its spans matched a gold pattern: still no pill, still
+            // no fallback label (§19l).
+            const patternLabel = latestClassifiedPattern(spansByAgent.get(a.id), spanPatterns);
             const modelTag = modelByAgent.get(a.id)?.model || null;
             return (
               <div key={a.id} className={cls.join(" ")} ref={el => { nodeRefs.current[a.id] = el; }}
@@ -674,7 +828,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                 <div className="lav-card">
                   <div className="lav-spin"/>
                   <div className="lav-ring"/>
-                  {modelTag && <div className="lav-model" title={modelTag}>{modelTag}</div>}
+                  {/* FEATURE: LAV-5b -- the family name, so the tag stays clear of the avatar; the
+                      full id is one hover away. The overflow/ellipsis rule above stays as the safety
+                      net for an id that doesn't parse and therefore renders verbatim. */}
+                  {modelTag && <div className="lav-model" title={modelTag}>{modelFamily(modelTag)}</div>}
                   <div className="lav-ava"><AgentAvatar who={a.id} size={50}/></div>
                   <div className="lav-code">{a.code}</div>
                   <div className="lav-name">{a.name}</div>
