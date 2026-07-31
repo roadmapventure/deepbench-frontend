@@ -1,3 +1,9 @@
+// DeepBench v7.0.0 | MarketIntelligenceScreen.jsx | LAV-1a -- zero visible change: the three example-question
+// consts moved verbatim to src/data/chiQuestions.js (imported back under the same names), and the stream
+// primitives readSSEResult/callCapability/buildHopEvent/describeDelegationEvent/runQaWithQualityGate/AuditColumn
+// gained the `export` keyword in place -- no body moved, no CHI wiring refactored. src/hooks/useHarnessStream.js
+// consumes them so the Live Agent View screen (LAV-1b) runs the same implementation, not a second copy.
+// FEATURE: LAV-1a
 // DeepBench v6.3.235 | MarketIntelligenceScreen.jsx | AGT-47 -- onResolveConfirmation()'s edit branch
 // stops discarding the theory-test's figures. It built edited_task_context.user_reasoning from the
 // reviewer's edited text ALONE, so Nadia never received the original theory text on the edit-resolve
@@ -402,6 +408,9 @@ import { resolveNewsCardContext } from "../lib/newsCardContext.js"; // FEATURE: 
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
 import { fetchTracePatterns, needsSpanRefetch, pickCreditedSpan } from "../lib/tracePatterns.js";
+// FEATURE: LAV-1a -- the 23 CHI example questions now live in one shared module (src/data/chiQuestions.js)
+// so the Live Agent View screen can render the same list without a second copy.
+import { STATIC_QUESTION, ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 // FEATURE: MI-51 — AI_PAT/AiBadge import removed: the qa card's AiBadge(AI_PAT.AGENT_ROUTING) rendering
 // (previously shown only on non-flagged answers) is superseded by the universal guided review prompt
 // below, which now renders on every qa message regardless of needs_review — no remaining call site.
@@ -411,45 +420,10 @@ import { fetchTracePatterns, needsSpanRefetch, pickCreditedSpan } from "../lib/t
 // the title block entirely (single-line title chrome) and shows it at the top of the overlay instead.
 const CHI_SUBTITLE = "LLM Wiki - Apple channel performance analysis - agent-orchestrated";
 
-// FEATURE: CHI-30 — static seed question, always slot 2, never rotates.
-const STATIC_QUESTION = { id: "library-catalog", label: "What data is in the library and how can i use it?" };
-
-// FEATURE: CHI-30 (split size patched by CHI-32) — 10-question rotation pool (today's confirmed
-// positions 1, 3-11). On every empty-state render, 2 of these fill visible slots 1, 3; the other 8
-// lead the drawer. Order here is the "default" order used verbatim (via splitRotation(pool, identity))
-// before the splash has ever been dismissed this tab session.
-const ROTATING_POOL = [
-  { id: "japan-geo",          label: "Japan is Apple's fastest-growing GEO in 2025 — what is driving that?" },
-  { id: "crest-wireless",      label: "What made Crest Wireless's recent upgrade promotion successful, and can we replicate it with other US partners?" },
-  { id: "geo-revenue",         label: "How has our GEO revenue trended from 2023 to 2025, and which regions are growing fastest?" },
-  { id: "reseller-reqs",       label: "What are the public requirements for a partner to become an Apple Authorized Reseller?" },
-  { id: "upgrade-cycles",      label: "How do smartphone upgrade cycles vary by country, and what does that mean for our channel replenishment planning?" },
-  { id: "at-risk-accounts",    label: "Across all our channel partners globally, which ones are the biggest at-risk accounts this quarter, and why?" },
-  { id: "horizon-store",       label: "Why is Horizon Store in Vietnam so much more ready for our new product introduction than Signal Mobile in Thailand and Indonesia?" },
-  { id: "vitrine-tech",        label: "What's the training compliance gap at Vitrine Tech in Brazil, and what's the risk to their certification?" },
-  { id: "smartphone-growth",   label: "What is the smartphone growth trajectory in emerging markets, and how should that shape our channel investment?" },
-  { id: "coop-mdf-benchmark",  label: "How does our co-op/MDF utilization compare to industry benchmarks?" },
-];
-
-// FEATURE: CHI-30 — fixed drawer tail (today's confirmed positions 12-23). Never rotates, never
-// reorders — always the last 12 questions in the drawer beneath whichever 8 pool leftovers lead it.
-// (CHI-31 tried adding a 13th guardrail-demo question here; dropped per John's call -- the wording
-// it landed on couldn't be made reliable enough not to mislead, and the underlying idea is spun off
-// as its own follow-up design item instead. No demo question ships this session.)
-const FIXED_DRAWER_TAIL = [
-  { id: "vietnam-reseller",             label: "How is our authorized reseller network performing in Vietnam?" },
-  { id: "meridian-electronics",         label: "What's going on with Meridian Electronics' digital shelf compliance issue in France and Italy?" },
-  { id: "emea-coop-large-format",       label: "Why is co-op budget utilization so low for our EMEA large-format retail partner this quarter?" },
-  { id: "jinhua-digital",               label: "How is Jinhua Digital recovering after its sales decline in Greater China?" },
-  { id: "elevate-mobility",             label: "What risks should we watch as Elevate Mobility rapidly expands in India?" },
-  { id: "nippo-carrier",                label: "What is Nippo Carrier in Japan doing that makes them our top performer, and how do we scale it to other partners?" },
-  { id: "altiplano-movil",              label: "How is the installment plan program performing with Altiplano Móvil in Mexico?" },
-  { id: "emea-emerging",                label: "What is our channel strategy outlook for EMEA Emerging markets — India, Middle East, and Africa?" },
-  { id: "southeast-asia",               label: "What is our channel strategy outlook for Southeast Asia?" },
-  { id: "training-turnover-benchmark",  label: "How does our partner training and turnover rate compare to industry benchmarks?" },
-  { id: "latin-america",                label: "What is our channel strategy outlook for Latin America this year?" },
-  { id: "south-korea-coop",             label: "What is our co-op utilization rate for our partner in South Korea?" },
-];
+// FEATURE: LAV-1a — the 23 example questions (STATIC_QUESTION / ROTATING_POOL / FIXED_DRAWER_TAIL)
+// moved verbatim to src/data/chiQuestions.js so the Live Agent View screen renders the same list
+// from one source instead of a second copy. Names, shapes, ids, labels and order are unchanged —
+// every use site below (splitRotation, visibleQuestions, drawerQuestions) is untouched.
 
 // FEATURE: CHI-32 — patches CHI-30: split point changed from 6/4 to 2/8 (3 visible slots instead of
 // 7, per John's call to keep the original UI shape). shuffleFn injection unchanged.
@@ -609,7 +583,7 @@ function formatDuration(ms) {
 // 'result'` resolves the promise; `type: 'error'` throws (this is how a streamed request's failure
 // surfaces now that the HTTP status is locked at 200 once streaming starts -- see execute.js
 // streamResult()); every other type is forwarded to onProgress as a live delegation event.
-async function readSSEResult(res, onProgress) {
+export async function readSSEResult(res, onProgress) { // FEATURE: LAV-1a -- exported in place (no body change) for src/hooks/useHarnessStream.js
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -1136,7 +1110,7 @@ function hopBadgeText(hopStart, hopEnd) {
 // other type is a caller bug (a real Date.now()-turnStart was forgotten) — logged via
 // console.error, never thrown (never block the user over a logging gap), and still resolves to
 // null so the UI degrades the same way a legitimate non-measurable event already does.
-function buildHopEvent(type, agentId, data, durationMs, extra = {}) {
+export function buildHopEvent(type, agentId, data, durationMs, extra = {}) { // FEATURE: LAV-1a -- exported in place (no body change) for src/hooks/useHarnessStream.js
   let resolved = durationMs;
   if (resolved == null) {
     if (!NON_MEASURABLE_EVENT_TYPES.has(type)) {
@@ -1297,7 +1271,7 @@ function firstNameFor(id, agentById) {
 // Agent Routing drawer's own row headers explicitly out of scope (still full names). MI-52 reverses
 // that scope note per John's direct instruction this session: RoutingEventRow now also renders
 // first name only (see below), via the same firstNameFor() helper this function calls.
-function describeDelegationEvent(evt, agents) {
+export function describeDelegationEvent(evt, agents) { // FEATURE: LAV-1a -- exported in place (no body change) for src/hooks/useHarnessStream.js
   const agentById = (id) => agents.find(a => a.id === id);
   const fromName = firstNameFor(evt.fromAgentId, agentById);
   const toName = firstNameFor(evt.toAgentId, agentById);
@@ -1393,7 +1367,7 @@ async function resolveInProgress(result, onProgress = null, isStale = () => fals
 // is prompt material (db-assembly.js serializes every non-empty key into the agent's prompt);
 // handler_context reaches the capability's write handler and stops there, so the caller can hand over
 // facts the model must not see. Null for every existing call site -- byte-identical.
-async function callCapability({ capability_slug, intent_slug, agent_id, task_context, handler_context = null, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
+export async function callCapability({ capability_slug, intent_slug, agent_id, task_context, handler_context = null, runtime_context = null, format_skill_profile_slug = null, display_agent_id = null, onProgress = null, isStale = () => false, onEvent = null, hop_type = null, onRecovery = null }) { // FEATURE: HAR-17 -- onRecovery threaded straight through to resolveInProgress()
   const t0 = Date.now();
   const res = await fetch("/api/capabilities/execute", {
     method: "POST",
@@ -1477,7 +1451,7 @@ async function resolveConfirmation({ confirmation_id, resolution, edited_task_co
 // plain confirmed question text). Unset (every existing caller) is byte-identical.
 // FEATURE: HAR-17 -- onRecovery threaded into every user-visible-wait call in this pipeline so a
 // checkpoint-recovered hop annotates the live chat status line (Task 3's wire-up list).
-async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null, onRecovery = null) {
+export async function runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale = () => false, backgroundContext = null, onRecovery = null) { // FEATURE: LAV-1a -- exported in place (no body change) for src/hooks/useHarnessStream.js
   // FEATURE: AA-164 -- surfaces an internal request_help hop Marcus's own ci-answer-intent turn
   // took (e.g. delegating to Eleanor Voss for a catalog question, AA-162) using the exact same
   // generic Pipeline Log case already rendering Michelle's Display-agent hand-off below (same
@@ -3003,7 +2977,7 @@ function AuditDrawersBody({ agents, agentActivity, onAgentsDrawerOpen }) {
 // FEATURE: MI-45 — slimmed to the Agent Routing drawer only (RoutingEventRow, shared with mobile's
 // pinned feed) plus AuditDrawersBody for the remaining four drawers — net-zero visual change,
 // extraction only (STYLE-GUIDE.md §21).
-function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) {
+export function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) { // FEATURE: LAV-1a -- exported in place (no body/props change); LAV-1b renders it as the Live Agent View's right rail
   const agents = useAgents();
   const agentById = (id) => agents.find(a => a.id === id);
   const ordered = [...events].reverse(); // newest event on top, confirmed with John

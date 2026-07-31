@@ -1,3 +1,9 @@
+// DeepBench v7.0.0 | scripts/chi-true-regression.mjs | LAV-1a -- question extraction repointed from
+// MarketIntelligenceScreen.jsx to src/data/chiQuestions.js, where the 23 questions now live (single
+// source, shared with the Live Agent View screen). Same scrape, same order, same 1/10/12 counts --
+// only the file it reads and the `export const` marker changed. Found by the regression gate itself,
+// which hard-FATALed the moment the screen stopped declaring the consts.
+// FEATURE: LAV-1a
 // DeepBench v6.3.235 | scripts/chi-true-regression.mjs | AGT-47 -- the edit-resolve leg mirrors the
 // screen's fix: runHypTail()'s `edit` branch carries the original theory-test text (jointText)
 // alongside the reviewer's edit in edited_task_context.user_reasoning, instead of sending the edit
@@ -93,7 +99,11 @@ import { resolveNewsCardContext } from "../src/lib/newsCardContext.js"; // FEATU
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const SCREEN_PATH = path.join(REPO_ROOT, "src", "screens", "MarketIntelligenceScreen.jsx");
+// FEATURE: LAV-1a -- the 23 questions moved out of the screen into their own module (single source,
+// shared with the Live Agent View screen). Extraction below reads them there now; the old
+// SCREEN_PATH scrape of MarketIntelligenceScreen.jsx hard-FATALed on every run once the screen
+// stopped declaring them, and had no other reader in this file.
+const QUESTIONS_PATH = path.join(REPO_ROOT, "src", "data", "chiQuestions.js");
 
 // FEATURE: DAT-12 -- the read scope every capability call in this run carries. Named here rather than
 // inlined so the value the run actually used is the value recorded in the report's totals block; a
@@ -134,10 +144,12 @@ const SKIP_JUDGE = argv.includes("--skip-judge");
 // ================================================================================================
 
 function extractBlock(source, constName, expectArray) {
-  const marker = `const ${constName} = `;
+  // FEATURE: LAV-1a -- matches `export const NAME = ` (chiQuestions.js) as well as the bare
+  // `const NAME = ` form the consts had while they lived in the screen.
+  const marker = `export const ${constName} = `;
   const startIdx = source.indexOf(marker);
   if (startIdx === -1) {
-    console.error(`FATAL: const ${constName} not found in MarketIntelligenceScreen.jsx -- the screen changed, review the baseline (docs/runbooks/CHI-TRUE-REGRESSION.md §2) before re-running.`);
+    console.error(`FATAL: const ${constName} not found in src/data/chiQuestions.js -- the question set changed, review the baseline (docs/runbooks/CHI-TRUE-REGRESSION.md §2) before re-running.`);
     process.exit(1);
   }
   let i = startIdx + marker.length;
@@ -187,11 +199,11 @@ const RESOLUTIONS = {
 export const HONEST_GAP_IDS = new Set(["vietnam-reseller", "south-korea-coop", "vitrine-tech"]);
 
 export function extractCases() {
-  if (!existsSync(SCREEN_PATH)) {
-    console.error(`FATAL: screen source not found at ${SCREEN_PATH}`);
+  if (!existsSync(QUESTIONS_PATH)) {
+    console.error(`FATAL: question source not found at ${QUESTIONS_PATH}`);
     process.exit(1);
   }
-  const source = readFileSync(SCREEN_PATH, "utf8");
+  const source = readFileSync(QUESTIONS_PATH, "utf8"); // FEATURE: LAV-1a -- was SCREEN_PATH
   const staticQ = extractQuestions(extractBlock(source, "STATIC_QUESTION", false));
   const pool = extractQuestions(extractBlock(source, "ROTATING_POOL", true));
   const tail = extractQuestions(extractBlock(source, "FIXED_DRAWER_TAIL", true));
