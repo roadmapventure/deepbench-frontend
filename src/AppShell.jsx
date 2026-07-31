@@ -1,3 +1,4 @@
+// DeepBench v7.0.4 | AppShell.jsx | LAV-1e -- nav flip: "Live Agent View" added as the first Work item (desktop dropdown + mobile NAV_GROUPS), Channel Sales Intelligence repointed to /channel-intelligence, isMI/isLAV active-state derivations updated
 // DeepBench v6.3.139 | AppShell.jsx | S-SH-23b -- widen Work dropdown so focus-area names fit one line + right-justify the (Beta)/(Alpha) status
 // DeepBench v6.3.138 | AppShell.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.2.0 | AppShell.jsx | S-MOBILE-NAV-01 — mobile header collapse (SH-19): logo + shrunk subtitle + hamburger opening an 82%-width right-side drawer (Work/Bench/Platform nav groups); Work dropdown's "Market Intelligence" item renamed "Channel Sales Intelligence" (MI-46)
@@ -97,14 +98,24 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
 
   const isWork  = location.pathname.startsWith("/work");
   const isBench = location.pathname.startsWith("/bench");
-  const isMI    = location.pathname === "/";
+  // FEATURE: LAV-1e — "/" now serves the Live Agent View; Channel Intelligence moved to
+  // /channel-intelligence. isMI keeps its existing meaning — "the Channel Intelligence screen is
+  // what's rendering" — so it follows that screen to its new route rather than staying pinned to
+  // "/". That keeps both of its consumers correct: this nav entry's active state, and MI-23's
+  // header AI-dot suppression (the dot is hidden on CHI because CHI shows its own chat-embedded
+  // version). isLAV is true on both paths that render the Live Agent View — no redirect by design.
+  const isMI    = location.pathname === "/channel-intelligence";
+  const isLAV   = location.pathname === "/" || location.pathname === "/live-agent-view";
   const isSpend = location.pathname.startsWith("/work/1/analyze");
 
   if (isMobile) {
     const NAV_GROUPS = [
       // FEATURE: SH-23 -- release-status per Work focus area (Bench item gets none)
       { label: "Work", items: [
-        { label: "Channel Sales Intelligence", icon: "◈", path: "/", active: isMI, status: FOCUS_AREA_STATUS.channelSales },
+        // FEATURE: LAV-1e -- Live Agent View first; nav label deliberately differs from the screen's
+        // own title ("Live Multi-Agent Routing") -- dual naming is John's call, do not unify.
+        { label: "Live Agent View", icon: "◎", path: "/", active: isLAV, status: FOCUS_AREA_STATUS.liveAgentView },
+        { label: "Channel Sales Intelligence", icon: "◈", path: "/channel-intelligence", active: isMI, status: FOCUS_AREA_STATUS.channelSales },
         { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend, status: FOCUS_AREA_STATUS.projectMgmt },
         { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend, status: FOCUS_AREA_STATUS.spendAnalysis },
       ]},
@@ -206,7 +217,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch",zIndex:1000}}>
         <span style={{position:"relative",display:"flex"}}>
           <NavTab
-            isActive={isWork || isMI}
+            isActive={isWork || isMI || isLAV}
             onClick={()=>setWorkMenuOpen(o=>!o)}
             icon="📋"
             label="Work"
@@ -218,8 +229,10 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
             // FEATURE: SH-23b -- widened so focus-area names stay on one line (was minWidth:220)
             <div style={{position:"absolute",top:"100%",left:0,minWidth:280,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
               {/* FEATURE: SH-23 -- status per focus area */}
+              {/* FEATURE: LAV-1e -- Live Agent View first; see the mobile NAV_GROUPS note on dual naming */}
               {[
-                {label:"Channel Sales Intelligence", icon:"◈", path:"/",              status:FOCUS_AREA_STATUS.channelSales},
+                {label:"Live Agent View",            icon:"◎", path:"/",                    status:FOCUS_AREA_STATUS.liveAgentView},
+                {label:"Channel Sales Intelligence", icon:"◈", path:"/channel-intelligence", status:FOCUS_AREA_STATUS.channelSales},
                 {label:"Project Management",         icon:"📋", path:"/work",          status:FOCUS_AREA_STATUS.projectMgmt},
                 {label:"Spend Analysis",             icon:"💰", path:"/work/1/analyze", status:FOCUS_AREA_STATUS.spendAnalysis},
               ].map(item => (

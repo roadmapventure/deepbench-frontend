@@ -1,3 +1,4 @@
+// DeepBench v7.0.4 | tokens.js | LAV-1e -- focus-area status flip: channelSales Beta->Alpha, projectMgmt/spendAnalysis Alpha->Pre-Alpha, new liveAgentView key (Beta)
 // DeepBench v6.3.171 | tokens.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.138 | tokens.js | S-SH-23 -- focus-area release-status labels
 // DeepBench v5.1.15 | tokens.js | Treasury design system — colors, fonts, formatters
@@ -42,9 +43,10 @@ export const mono    = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospa
 // dropdown, the mobile nav, and each focus area's homepage title. Graduating a focus area to full
 // release is one edit: set its value to null and the guarded render drops the tag everywhere.
 export const FOCUS_AREA_STATUS = {
-  channelSales:  "Beta",
-  projectMgmt:   "Alpha",
-  spendAnalysis: "Alpha",
+  channelSales:  "Alpha",      // was "Beta" (John, 2026-07-31)
+  projectMgmt:   "Pre-Alpha",  // was "Alpha"
+  spendAnalysis: "Pre-Alpha",  // was "Alpha"
+  liveAgentView: "Beta",       // FEATURE: LAV-1e -- new focus-area status key
 };
 export const FOCUS_STATUS_STYLE = { color: T.muted, fontSize: "0.72em", fontWeight: 400 };
 

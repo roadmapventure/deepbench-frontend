@@ -1,3 +1,4 @@
+// DeepBench v7.0.4 | main.jsx | LAV-1e — homepage flip: / serves LiveAgentViewScreen (transitional), Channel Intelligence moves to /channel-intelligence, /live-agent-view kept. WelcomeSplash untouched.
 // DeepBench v7.0.1 | main.jsx | LAV-1b — one route added: /live-agent-view (Live Agent View). No other change.
 // DeepBench v6.3.137 | main.jsx | CHI-66 — root React error boundary wrapping BrowserRouter
 // (inside StrictMode), so a render error anywhere in the tree shows a reload prompt instead of a
@@ -33,8 +34,13 @@ createRoot(document.getElementById("root")).render(
         <FetchProvider>
           <AnalyzerProvider>
             <Routes>
-              <Route path="/"                          element={<MarketIntelligenceScreen />} />
+              {/* FEATURE: LAV-1e — "/" now serves the Live Agent View. TRANSITIONAL: when LA-01 Home
+                  ships, "/" repoints again; nothing here is the permanent homepage. Channel Intelligence
+                  moved to its own /channel-intelligence route (John, 2026-07-31). Both "/" and
+                  /live-agent-view render the same component — no redirect by design. */}
+              <Route path="/"                          element={<LiveAgentViewScreen />} />
               <Route path="/live-agent-view"           element={<LiveAgentViewScreen />} />
+              <Route path="/channel-intelligence"      element={<MarketIntelligenceScreen />} />
               <Route path="/work"                      element={<DashboardScreen />} />
               <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
               <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
