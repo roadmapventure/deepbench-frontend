@@ -1,1 +1,3 @@
-design-loo-28-0731 — design session on LOO-28 (started 2026-07-31 16:25 CST)
+design-loo-28-0731 — design session on LOO-28 (Architecture): parallel dispatch for the harness Loop (started 2026-07-31 16:25 CST).
+
+Settled with John: native parallel tool use (model-judged, per-Intent trait), fan-out asks count per-ask against the existing 5-hop pool (no new width limit), pause/resume generalizes pending_delegation → per-prong list with completed results persisted. Architect Review + live measurement done. Filed LOO-29 (Task Success Rate, 🚨 Beta-gate bucket 1): MAX_LOOP_DEPTH breachable live — 7 depth-5 delegate turns on one span 2026-07-29. Next: scope walkthrough → kickoff doc.
