@@ -1,3 +1,10 @@
+// DeepBench v7.0.21 | HarnessTraceConsole.jsx | LAV-5c -- John's round-1 UX/UI pass on the console:
+// the header drops the word "trace" and cuts the id to its unique 8-char segment, the console
+// shrinks to 172px with a real scroll affordance on both panes (SharedUI's ScrollFadeHint, never a
+// second implementation), every line carries a sequential number and both panes carry static field
+// labels, and every duration this file renders goes through `formatLavDuration` (John's approved LAV
+// time format). Labels are column headers around the real strings -- the vocabulary rule below is
+// untouched: nothing renames an event type.
 // DeepBench v7.0.3 | HarnessTraceConsole.jsx | LAV-1d -- one new optional prop (`traceIds`): the
 // header states the turn's other traces as a `+N` count and the trace inspector lists every id with
 // its own row count. Presentation only, no new fetch; the merged rows keep arriving via `traceRows`.
@@ -19,6 +26,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { T, PALETTE, mono, body, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { computeCallCost } from "../hooks/useAIActivity.js";
+import { useScrollFadeHint, ScrollFadeHint } from "./SharedUI.jsx";
 
 // Every colour resolves to an imported token; rgba() shades are composed from those same imported
 // values rather than written as literals (.claude/rules/design-tokens.md).
@@ -100,6 +108,20 @@ export function formatTokens(n) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
+// FEATURE: LAV-5c -- John's approved LAV time format (2026-07-31): <10s one decimal, <60s whole
+// seconds, 60s+ Xm Ys. Every duration this console renders goes through here, so the header stat,
+// the model_call line, the waterfall column and the per-line offsets can never disagree.
+// Null/undefined -> em dash: a missing duration is shown missing, never guessed.
+// Deliberately NOT MarketIntelligenceScreen's formatDuration -- that one's raw-`ms` contract
+// contradicts this rule and changing it would alter Channel Intelligence.
+export function formatLavDuration(ms) {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  if (ms < 10000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+  const totalSec = Math.round(ms / 1000);
+  return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
+}
+
 // The waterfall's tree: nest by parent_span_id. A row whose parent is not in this trace's row set
 // is a root at depth 0 (never flattened above a parent that IS present).
 export function buildWaterfallRows(rows) {
@@ -169,7 +191,9 @@ export function buildConsoleLines({ events, eventTimes, traceRows, recovery, rec
       type: "model_call",
       at: Date.parse(r.created_at) || 0,
       spanId: r.span_id ?? null,
-      text: `${r.agent_id || "—"} · ${r.model || "—"} · ${tokensIn}/${tokensOut} tok · ${r.latency_ms == null ? "—" : `${r.latency_ms}ms`}${rowRetryMark(r.feature)}`,
+      // FEATURE: LAV-5c -- the slash is input/output, so the line says so; the duration follows the
+      // approved LAV format like every other duration on this console.
+      text: `${r.agent_id || "—"} · ${r.model || "—"} · in ${tokensIn} / out ${tokensOut} tok · ${formatLavDuration(r.latency_ms)}${rowRetryMark(r.feature)}`,
       record: r,
     });
   }
@@ -184,7 +208,10 @@ export function buildConsoleLines({ events, eventTimes, traceRows, recovery, rec
       record: recovery,
     });
   }
-  return lines.sort((a, b) => a.at - b.at);
+  // FEATURE: LAV-5c -- sequential line numbers, assigned in the sorted order: the oldest line is 1
+  // at the top and the newest carries the highest number at the bottom (where the pane auto-scrolls
+  // to). Numbering lives here, with the sort, so normal and Raw JSON modes can never disagree.
+  return lines.sort((a, b) => a.at - b.at).map((l, i) => ({ ...l, no: i + 1 }));
 }
 
 // Real types keep real colours; anything the harness streams that is not listed here still prints
@@ -235,7 +262,7 @@ function JsonText({ value, indent }) {
 // ── component CSS (GLOBAL_CSS already owns aiBlink/fadeIn/spin) ──────────────────────────────
 const CON_CSS = `
 .lavc{background:${CON_BG};color:${CON_TXT};border-top:2px solid ${CON_LINE};display:flex;
-  flex-direction:column;flex-shrink:0;height:230px;transition:height .3s;min-height:0}
+  flex-direction:column;flex-shrink:0;height:172px;transition:height .3s;min-height:0}
 .lavc.is-collapsed{height:34px}
 .lavc-head{height:34px;display:flex;align-items:center;gap:14px;padding:0 14px;background:${CON_HEAD};
   border-bottom:1px solid ${CON_LINE};flex:0 0 auto}
@@ -253,15 +280,26 @@ const CON_CSS = `
   font-family:${mono};font-weight:600;font-size:10px;padding:4px 10px;border-radius:6px;cursor:pointer}
 .lavc-btn.on{background:${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.55)};border-color:${ACTION_TEXT_COLORS_FETCH.CLICK}}
 .lavc-body{flex:1;display:flex;min-height:0}
-.lavc-events{flex:1.3;overflow:auto;padding:6px 10px;border-right:1px solid ${CON_LINE};
+/* LAV-5c: each pane sits in its own position:relative shell so SharedUI's ScrollFadeHint can anchor
+   to the real scroll viewport's bounds. The flex ratio moved to the shell; the pane fills it. */
+.lavc-pane{position:relative;display:flex;min-width:0;min-height:0}
+.lavc-pane-ev{flex:1.3;border-right:1px solid ${CON_LINE}}
+.lavc-pane-wf{flex:1}
+.lavc-events{flex:1;overflow:auto;scrollbar-width:thin;padding:6px 10px;min-width:0;
   font-family:${mono};font-size:11px;line-height:1.5}
-.lavc-wf{flex:1;overflow:auto;padding:6px 10px;min-width:0}
+.lavc-wf{flex:1;overflow:auto;scrollbar-width:thin;padding:6px 10px;min-width:0}
 .lavc-wfhead{font-family:${mono};font-weight:700;font-size:9.5px;color:${CON_DIM};letter-spacing:0.1em;
-  text-transform:uppercase;margin-bottom:6px}
+  text-transform:uppercase;margin-bottom:2px}
 .lavc-ev{display:flex;gap:8px;align-items:baseline;animation:fadeIn .2s ease}
-.lavc-t{color:${CON_DIM};flex:0 0 auto}
+/* LAV-5c: static field labels. Same flex geometry as .lavc-ev so every label sits over its column. */
+.lavc-hdrow{display:flex;gap:8px;align-items:baseline;position:sticky;top:0;z-index:2;
+  background:${CON_HEAD};margin:-6px -10px 4px;padding:4px 10px 3px;border-bottom:1px solid ${CON_LINE}}
+.lavc-hdrow span{font-family:${mono};font-weight:700;font-size:8px;color:${CON_DIM};
+  letter-spacing:0.1em;text-transform:uppercase}
+.lavc-no{color:${CON_DIM};flex:0 0 30px;text-align:right}
+.lavc-t{color:${CON_DIM};flex:0 0 58px}
 .lavc-ty{font-weight:700;min-width:152px;flex:0 0 auto}
-.lavc-sid{color:${CON_DIM};flex:0 0 auto}
+.lavc-sid{color:${CON_DIM};flex:0 0 62px}
 .lavc-de{color:${CON_TXT};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lavc-raw{color:${CON_DIM};white-space:pre-wrap;word-break:break-word;min-width:0}
 .lavc-id{color:${ACTION_TEXT_COLORS_FETCH.SCROLL};text-decoration:underline dotted;text-underline-offset:2px;
@@ -273,6 +311,11 @@ const CON_CSS = `
 .lavc-wftrack{position:relative;flex:1;height:9px;background:${rgba(T.white, 0.07)};border-radius:3px;overflow:hidden}
 .lavc-wfbar{position:absolute;top:0;height:9px;border-radius:3px}
 .lavc-wfms{width:52px;text-align:right;color:${CON_DIM};flex:0 0 auto}
+/* LAV-5c: the waterfall's own field-label row -- same row geometry, label typography. */
+.lavc-wfcols{height:13px;margin-bottom:3px}
+.lavc-wfcols span{font-family:${mono};font-weight:700;font-size:8px;color:${CON_DIM};
+  letter-spacing:0.1em;text-transform:uppercase}
+.lavc-wftl{flex:1;min-width:0}
 .lavc-pop{position:fixed;z-index:100000;width:400px;max-width:92vw;background:${CON_BG};
   border:1px solid ${T.brass};border-radius:10px;box-shadow:0 14px 40px ${rgba(PALETTE[14], 0.55)};color:${CON_TXT}}
 .lavc-pop .rh{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid ${CON_LINE};
@@ -314,6 +357,7 @@ export default function HarnessTraceConsole({
   // every render, so a span clicked before its row landed fills itself in when the poller lands it.
   const [inspect, setInspect] = useState(null); // { kind:'span'|'trace', spanId?, x, y }
   const evRef = useRef(null);
+  const wfRef = useRef(null);
 
   const lines = useMemo(
     () => buildConsoleLines({ events, eventTimes, traceRows, recovery, recoveryAt }),
@@ -330,10 +374,17 @@ export default function HarnessTraceConsole({
     const el = evRef.current;
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [lines.length, raw]);
-  const onScroll = () => {
+  const tailScroll = () => {
     const el = evRef.current;
     if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   };
+
+  // FEATURE: LAV-5c -- scroll affordance on both panes, from the platform's existing mechanism
+  // (CHI-29/LOG-107a). The events pane's handler composes the tail-follow bookkeeping with the
+  // hint's own check -- both run on every scroll, neither replaces the other.
+  const evHint = useScrollFadeHint(evRef, [lines.length, raw, collapsed]);
+  const wfHint = useScrollFadeHint(wfRef, [traceRows.length, collapsed]);
+  const onScroll = () => { tailScroll(); evHint.onScroll(); };
 
   // Close the inspector on any click outside it.
   useEffect(() => {
@@ -437,9 +488,11 @@ export default function HarnessTraceConsole({
       <style>{CON_CSS}</style>
       <div className="lavc-head">
         <div className="lavc-title"><span className={`lavc-rec${running ? " is-live" : ""}`}/>Harness Trace</div>
-        <div className="lavc-stat sep">trace{" "}
+        {/* FEATURE: LAV-5c -- no word "trace" (the title already says it) and the id shows its unique
+            8-char segment, the same cut span ids use. The inspector still carries the full id. */}
+        <div className="lavc-stat sep">
           {traceId
-            ? <button type="button" className="lavc-id trace" onClick={e => openInspector(e, { kind: "trace" })}>{traceId}</button>
+            ? <button type="button" className="lavc-id trace" onClick={e => openInspector(e, { kind: "trace" })}>{String(traceId).slice(0, 8)}</button>
             : <b>—</b>}
           {/* FEATURE: LAV-1d -- the turn's other traces, as a real count. Click the id for the list. */}
           {extraTraces > 0 && <b>+{extraTraces}</b>}
@@ -447,7 +500,7 @@ export default function HarnessTraceConsole({
         <div className="lavc-stat sep">events <b>{events.length}</b></div>
         <div className="lavc-stat">loops <b>{traceRows.length ? maxDepth : "–"}</b></div>
         <div className="lavc-stat">retries <b>{retryTotal}</b></div>
-        <div className="lavc-stat">p50 <b>{traceRows.length ? p50 : "—"}</b>{traceRows.length ? "ms" : ""}</div>
+        <div className="lavc-stat">p50 <b>{traceRows.length ? formatLavDuration(p50) : "—"}</b></div>
         <div className="lavc-right">
           <span className="lavc-hint">click any id → raw record</span>
           <button type="button" className={`lavc-btn${raw ? " on" : ""}`} onClick={() => setRaw(r => !r)}>▤ Raw JSON</button>
@@ -458,11 +511,28 @@ export default function HarnessTraceConsole({
 
       {!collapsed && (
         <div className="lavc-body">
+         <div className="lavc-pane lavc-pane-ev">
           <div className="lavc-events" ref={evRef} onScroll={onScroll}>
+            {/* FEATURE: LAV-5c -- static field labels over the real columns. These name the columns;
+                the event type strings inside them still print exactly as the harness streamed them. */}
+            <div className="lavc-hdrow">
+              <span className="lavc-no">#</span>
+              <span className="lavc-t">time</span>
+              {raw ? (
+                <span className="lavc-raw">raw record</span>
+              ) : (
+                <>
+                  <span className="lavc-ty">event</span>
+                  <span className="lavc-sid">call id</span>
+                  <span className="lavc-de">detail</span>
+                </>
+              )}
+            </div>
             {lines.length === 0 && <div className="lavc-empty">No trace activity yet.</div>}
             {lines.map(l => (
               <div className="lavc-ev" key={l.key}>
-                <span className="lavc-t">{`+${(Math.max(0, l.at - t0) / 1000).toFixed(1)}s`}</span>
+                <span className="lavc-no">{l.no}</span>
+                <span className="lavc-t">{`+${formatLavDuration(Math.max(0, l.at - t0))}`}</span>
                 {raw ? (
                   <span className="lavc-raw"><JsonText value={l.record} indent={false}/></span>
                 ) : (
@@ -482,9 +552,18 @@ export default function HarnessTraceConsole({
               </div>
             ))}
           </div>
+          <ScrollFadeHint show={evHint.canScrollMore} bg={CON_BG}/>
+         </div>
 
-          <div className="lavc-wf">
+         <div className="lavc-pane lavc-pane-wf">
+          <div className="lavc-wf" ref={wfRef} onScroll={wfHint.onScroll}>
             <div className="lavc-wfhead">Span Waterfall</div>
+            {/* FEATURE: LAV-5c -- the waterfall's columns, named. */}
+            <div className="lavc-wfrow lavc-wfcols">
+              <span className="lavc-wflab">agent · intent</span>
+              <span className="lavc-wftl">timeline</span>
+              <span className="lavc-wfms">duration</span>
+            </div>
             {!scale && <div className="lavc-empty">No spans yet.</div>}
             {scale && wf.map(({ row, depth }) => {
               const s = Date.parse(row.created_at);
@@ -500,7 +579,7 @@ export default function HarnessTraceConsole({
                   <div className="lavc-wftrack">
                     <div className="lavc-wfbar" style={{ left: pct(left), width: pct(Math.max(width, 0.6)), background: barColor(depth) }}/>
                   </div>
-                  <span className="lavc-wfms">{row.latency_ms == null ? "—" : `${row.latency_ms}ms`}</span>
+                  <span className="lavc-wfms">{formatLavDuration(row.latency_ms)}</span>
                 </div>
               );
             })}
@@ -519,6 +598,8 @@ export default function HarnessTraceConsole({
               );
             })}
           </div>
+          <ScrollFadeHint show={wfHint.canScrollMore} bg={CON_BG}/>
+         </div>
         </div>
       )}
 
