@@ -566,7 +566,9 @@ bucket swept; every queue on this board now carries verified-current evidence.**
 span-write *timing* only, settled by the §19k span-less-delegation count on recent rows),
 `CHI-27` (UI — the within-hop reversal was reverted in-code; both levels newest-first).
 
-**Dropped/absorbed:** `AA-179` (blocked ruling deferred post-beta, §4 Q4), `LOG-103` (dup of
+**Dropped/absorbed:** `AA-179` (blocked ruling deferred post-beta, §4 Q4 — **since shipped
+✅ 2026-07-31 outside the beta queue, `S-AA-179a-e` v7.0.8–v7.0.12, John's pick at `LAV-1`'s
+close; archived, see `FEATURES-ARCHIVE.md`**), `LOG-103` (dup of
 `LOG-71` — **merge confirmed by John 2026-07-28**), `AI-52` (folds into `CHI-11`).
 
 ---

@@ -187,6 +187,21 @@ Chat-embedded "agent is working" indicator — two stacked lines, live `m:ss` co
 
 **Final-timeline caption (`S-MI-42`, 2026-07-09):** once a multi-hop agent turn completes, its result bubble (`kind==="qa"` and `kind==="hypothesis_test"` message cards) shows a small caption directly under the card: `Full Agent Routing & Answer Given in Xs` (or `Xm Ys`). Styling: `fontFamily: mono, fontSize: 9.5, color: T.muted, marginTop: 4` — matches the existing small-print convention already used elsewhere in this file (e.g. `AuditColumn`'s pipeline-event `svc` line), not a new text style. Reuses `formatElapsed()` unchanged. The value (`msg.totalElapsedMs`) is a simple `end - start` timestamp diff captured once at the start of the turn (`submit()`/`onSelectHypothesis()`), not a sum of individually-displayed segment durations — mathematically identical since hops are strictly sequential with zero gaps, computed the simpler way. Persists in chat history (not a transient status line) since it's stored on the message object itself, not on `workingStatus`. Reusable by any future screen showing a multi-hop agent result.
 
+### 5b. Live Agent View canvas — assembly work tint (Locked 2026-07-31, `S-AA-179-design`, John)
+
+The LAV canvas's color vocabulary is semantic and closed — one meaning per tint, never reused:
+brass family = routing, `ACTION_TEXT_COLORS_FETCH.CLICK` blue = orchestrating, `T.moss` = complete,
+`T.flag` = error/recovery, and (this session) **`T.mutedDeep` ring / `T.muted` caption = assembly
+work** — the quiet-infrastructure register for prompt-assembly frames (`assembly_work`/
+`assembly_work_complete`, `ARCHITECTURE.md` §19h extension). Hard rules, same bar as §19d's sniff
+test: **assembly work never draws an edge, an arrow, or an edge-pulse** (arrows mean agent-reasoned
+routing and nothing less — a worker's ring with no arrow touching it *is* the statement "contributing
+to the prompt, nobody routed to them"); the ring reuses `lavRipple`, no new keyframes; bubble/rail
+copy comes only from the frame's own fields (real counts, `—` when absent, never invented); the
+legend's `Assembly work` entry renders a **ring** swatch, not a bar, because a bar would imply an
+assembly edge exists. Any future non-delegation frame class added to the stream picks its own tint
+from unclaimed tokens rather than reusing one of these six meanings.
+
 ---
 
 ## 6. FeatureBadge
