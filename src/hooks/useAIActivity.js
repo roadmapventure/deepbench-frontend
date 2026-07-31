@@ -1,3 +1,4 @@
+// DeepBench v7.0.15 | useAIActivity.js | HAR-02a -- computeCallCost() gains optional cache-token params (creation 1.25x input rate, read 0.1x); the two row-based read-time call sites pass the new ai_activity_log columns. Historical rows (NULL fields) and every omitting caller price byte-identically
 // DeepBench v6.3.218 | useAIActivity.js | LOG-112 -- buildActivitySummary() stops reading the frozen legacy patterns_used field: its per-agent byPattern bucket is replaced by a plain `rows` list of each included row's id + latency, and the new exported buildAgentPatternRows() joins those ids to the VERIFIED pattern names the Log Displayer derived at read time (ai_pattern_classification_rollup.log_ids, LOG-97's existing read -- no new query). An agent whose rows matched no gold pattern gets no buckets at all
 // DeepBench v6.3.211 | useAIActivity.js | CHI-90 -- buildActivitySummary()'s per-agent `calls` is now gated by isCountableCall(), so the CHI Agents drawer counts real model calls exactly as AI Audit's byAgent does; the raw every-logged-row count it used to hold moves to a new `operations` field (drives the drawer's active/potential split only, never rendered)
 // DeepBench v6.3.204 | useAIActivity.js | LOG-91 -- AI-51 timestamp-pairing heuristic scoped to the pre-trace legacy window (PAIR_LEGACY_CUTOFF_MS); the write path no longer produces agent-turn/wrapper duplicates, so fresh rows are never paired
@@ -244,7 +245,8 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
     if (isCountableCall({ model: row.model, isPairedDup: paired.has(row.id) })) d.calls++;
     const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
-      : computeCallCost(row.model, row.input_tokens, row.output_tokens));
+      // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
+      : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens));
     if (rowCost != null && !paired.has(row.id)) { d.totalCost += rowCost; d.costCount++; }
 
     const { kind, include } = classifyRow(row, turnTimestampsByAgent);
@@ -736,12 +738,20 @@ const MODEL_ID_NORMALIZE = {
 // ai-enrichment.js) writes input_tokens/output_tokens but never a cost_usd value, so
 // 99.5% of real rows had no dollar figure. Deriving cost from tokens at read time prices
 // every existing and future row with no backfill migration.
-export function computeCallCost(model, inputTokens, outputTokens) {
+// FEATURE: HAR-02a -- optional cache-token params (Anthropic prompt caching, S-HAR-02b/c): cache
+// creation bills at 1.25x the model's input rate, cache reads at 0.1x. Rows/callers without the
+// fields (all historical rows, every caller that omits the params) price byte-identically to
+// before -- the two new terms are exactly 0 when the params are null/undefined/0. Rates stay in
+// the one existing per-model table (COST_PER_1K_INPUT/OUTPUT); no new rates constant.
+export function computeCallCost(model, inputTokens, outputTokens, cacheCreationInputTokens = null, cacheReadInputTokens = null) {
   const resolvedModel = MODEL_ID_NORMALIZE[model] || model;
   const inRate = COST_PER_1K_INPUT[resolvedModel] ?? COST_PER_1K_INPUT[model];
   const outRate = COST_PER_1K_OUTPUT[resolvedModel] ?? COST_PER_1K_OUTPUT[model];
   if (inRate == null && outRate == null) return null;
-  return ((inputTokens || 0) / 1000) * (inRate || 0) + ((outputTokens || 0) / 1000) * (outRate || 0);
+  return ((inputTokens || 0) / 1000) * (inRate || 0)
+    + ((cacheCreationInputTokens || 0) / 1000) * (inRate || 0) * 1.25
+    + ((cacheReadInputTokens || 0) / 1000) * (inRate || 0) * 0.10
+    + ((outputTokens || 0) / 1000) * (outRate || 0);
 }
 
 // FEATURE: AI-16 — logAICall Supabase persistence
@@ -839,7 +849,8 @@ export async function hydrateFromSupabase(tenantId = null) {
       agentId:   row.agent_id || null,
       cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
         ? parseFloat(row.cost_usd)
-        : computeCallCost(row.model, row.input_tokens, row.output_tokens)),
+        // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
+        : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens)),
       patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
       ts:        row.created_at,
       // FEATURE: LOG-81 -- stamped here so isCountableCall() can stay a pure per-entry predicate

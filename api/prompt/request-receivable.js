@@ -1,3 +1,4 @@
+// DeepBench v7.0.15 | api/prompt/request-receivable.js | HAR-02a -- capture usage.cache_creation_input_tokens/cache_read_input_tokens (normalized to 0, summed across the parse retry) and pass them to logActivity() at both write sites; NULL/0 until S-HAR-02b/c enable caching
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
 // DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
 // DeepBench v7.0.14 | api/prompt/request-receivable.js | HAR-27 -- optional webSearchMaxUses param on buildCallBody()/callModel() emits max_uses on the web_search tool definition; sendRequest() threads llm.web_search_max_uses. Unset (every non-opted-in caller) is byte-identical
@@ -332,7 +333,11 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
-  let usage = llmData.usage || { input_tokens: 0, output_tokens: 0 };
+  // FEATURE: HAR-02a -- normalize the two cache-token fields to 0 whether or not Anthropic sent
+  // them. Until S-HAR-02b/c enable prompt caching they arrive as undefined and stay 0; once
+  // caching is live, input_tokens means UNCACHED input only and these two carry the remainder.
+  // Captured now so ai_activity_log never has a window of silently-undercounted rows.
+  let usage = { cache_creation_input_tokens: 0, cache_read_input_tokens: 0, ...(llmData.usage || { input_tokens: 0, output_tokens: 0 }) };
   let retryCount = 0;
   let turn;
 
@@ -400,7 +405,13 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
         throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryDetail });
       }
       llmData = await retryRes.json();
-      usage = { input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0), output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0) };
+      // FEATURE: HAR-02a -- the retry merge sums the cache-token fields too, same || 0 guards.
+      usage = {
+        input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0),
+        output_tokens: usage.output_tokens + (llmData.usage?.output_tokens || 0),
+        cache_creation_input_tokens: (usage.cache_creation_input_tokens || 0) + (llmData.usage?.cache_creation_input_tokens || 0),
+        cache_read_input_tokens: (usage.cache_read_input_tokens || 0) + (llmData.usage?.cache_read_input_tokens || 0),
+      };
       // FEATURE: AA-151 -- the retry HTTP call can now succeed (AA-150's tool_result fix) while the
       // model's retried response still fails validation itself (e.g. omits a required schema field
       // again). This second parseModelTurn() call was previously unguarded, so that failure propagated
@@ -778,6 +789,9 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
           model: guardrailsModel, agentId: agent_id || null, taskId: task_id || null,
           inputTokens: gData.usage?.input_tokens ?? null,
           outputTokens: gData.usage?.output_tokens ?? null,
+          // FEATURE: HAR-02a -- cache-token capture; NULL until prompt caching ships (S-HAR-02b/c).
+          cacheCreationInputTokens: gData.usage?.cache_creation_input_tokens ?? null,
+          cacheReadInputTokens: gData.usage?.cache_read_input_tokens ?? null,
           latencyMs: guardrailsLatency,
           patternsUsed: ['guardrails', 'prompt-chaining'],
           traceId: trace_id,
@@ -871,6 +885,10 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
       model, agentId: agent_id || null, taskId: task_id || null,
       inputTokens: usage.input_tokens ?? null,
       outputTokens: usage.output_tokens ?? null,
+      // FEATURE: HAR-02a -- cache-token capture from the normalized usage object (0 until
+      // S-HAR-02b/c enable caching; ?? null keeps a truly-absent field writing NULL).
+      cacheCreationInputTokens: usage.cache_creation_input_tokens ?? null,
+      cacheReadInputTokens: usage.cache_read_input_tokens ?? null,
       latencyMs: latency_ms,
       patternsUsed,
       traceId: trace_id,
