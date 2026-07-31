@@ -317,6 +317,7 @@ known defect that would break or dirty that run:
 | 26 | `AGT-51` (Architecture) | A citation's `confidence_tier` can read `inferred` when the Data Room classifies the same UUID as sourced-equivalent, triggering a hard case-fail via the runbook's `D4` strict-rejection rule regardless of retry outcome. Independent of any content defect. Not root-caused. *(added 2026-07-30, `design-dat-16`)* |
 | 27 | `AGT-52` (Architecture) | A citation rejection's own reason text leaks platform jargon (`confidence_tier`, raw UUIDs, `Data Room`) — `AGT-44`'s exact defect class, on a Skill that guardrail apparently didn't reach. Not root-caused; verify which intent generates this text before scoping. *(added 2026-07-30, `design-dat-16`)* |
 | 28 | `CHI-96` (Speed) | The Forecast **edit** journey slowed ~4.3× after `AGT-47` — case 6 went 193 s → 828 s between pre-regression rounds 2 and 3, same driver and endpoint. Suspected cause is `AGT-47`'s larger `user_reasoning` payload; one run each, so variance not excluded. **Measure before scoping, and do not revert `AGT-47`** — it is the only case that improved. Bucket 2, not 1. *(added 2026-07-30, `design-arch-beta-0729` round 3)* |
+| 29 | `AGT-44` (Architecture) | **REOPENED** — v6.3.229's "every artifact-producing agent" reached 2 of 5; `channel-intelligence` (Marcus Webb — GEO CSO Expert) never got the guardrail, and case 24 failed on the standard he was never given. Completion is ONE `capability_skill_profiles` row + a coverage query + two documented exclusions; full scope on the FEATURES.md row. Next fix session (`S-AGT-44b`, Sonnet 5, John running); round 4 here verifies. *(reopened 2026-07-30, `design-arch-beta-0729`)* |
 
 > **Pre-regression round 3 — 2026-07-30, `design-arch-beta-0729` ("i have finished the 3 tickets. do you pre-test again?").** Same 4 cases.
 > Nothing this round depended on a Vercel deploy: `SES-65` and `DAT-16` Part 1 are driver-local, `DAT-16b` and `AGT-44` are
@@ -339,7 +340,9 @@ known defect that would break or dirty that run:
 > emits the `answer` on every direct question), `quality-gate` (Owen), or `project-manager` (Michelle). Case 24 was failed
 > for breaking a rule Marcus never received. Also retracted: case 12's flip is **not** caused by the guardrail — it was
 > attached 2026-07-29 23:48 UTC, and case 12 **passed** in round 2 (02:03 UTC) with it already in place. That flip is Owen's
-> own judgment varying. **Minimal remaining work is two `capability_skill_profiles` rows, no code.**
+> own judgment varying. **Minimal remaining work is ONE `capability_skill_profiles` row (`channel-intelligence`), no code**
+> — "two rows" stood here briefly and was a slip; `quality-gate`/`project-manager` are deliberate exclusions, see the
+> reopened `AGT-44` row in `FEATURES.md` for the full scope.
 >
 > **The score went down and the platform got better — read the composition, not the count.** `AGT-47` is confirmed on the
 > hardest journey in the set. `DAT-16` Part 1 is confirmed (case 9's `answer` now passes). **Every one of the three failures
