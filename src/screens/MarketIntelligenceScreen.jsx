@@ -1047,7 +1047,7 @@ function describePipelineEvent(evt, opts = {}) {
     // with a blank activity line (the gap S-AA-179b recorded at the AuditColumn call site in
     // LiveAgentViewScreen.jsx). A frame with no message yields an empty summary -- never invented
     // copy (.claude/rules/agent-section-rendering.md). Unreachable from CHI: onDelegationProgress's
-    // AA-179a guard (~L3722) drops both types before they reach this screen's events array; only the
+    // AA-179a guard (~L3733) drops both types before they reach this screen's events array; only the
     // Live Agent View's Pipeline Log rail feeds this function these types.
     case "assembly_work":
     case "assembly_work_complete":
