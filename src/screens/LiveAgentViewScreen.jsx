@@ -1,3 +1,8 @@
+// DeepBench v7.0.9 | LiveAgentViewScreen.jsx | AA-179b -- the screen half of assembly work on the
+// canvas. Deliberately close to a no-op: every path the assembly frames need was already generic,
+// and this session's job here was to VERIFY that rather than reimplement it (see the three
+// AA-179b notes below -- ledger flow-through, agents-engaged, mode). The one item the design asked
+// for that could NOT land in this session's two files is recorded at the AuditColumn call site.
 // DeepBench v7.0.6 | LiveAgentViewScreen.jsx | LAV-1f -- human-in-the-loop: the mode badge gains a
 // steady "Awaiting confirmation" state for as long as the harness really is holding a confirmation
 // gate open, the status strip carries CHI's own "Needs Your Decision" copy and the gate frame's own
@@ -306,6 +311,11 @@ export default function LiveAgentViewScreen() {
   // rail is the user-facing narrative. Filtering here -- rather than withholding the frame from the
   // ledger -- keeps the console's record honest while leaving both of those surfaces byte-identical
   // to their pre-LAV-1d behavior. Neither AgentNetwork.jsx nor AuditColumn is modified.
+  // FEATURE: AA-179b -- verified this session, not assumed: this predicate matches EXACTLY ONE type
+  // and is deliberately NOT widened. `assembly_work` / `assembly_work_complete` therefore reach the
+  // canvas (walk-on-stage + the muted ring, AgentNetwork.jsx) AND the Pipeline Log rail, which is
+  // John's locked treatment -- assembly work is real work by a real agent, unlike `prompt_assembled`,
+  // which is the plumbing frame announcing the result of that work.
   const isPromptFrame = (e) => e.type === "prompt_assembled";
   const canvasHops = useMemo(() => hops.filter(h => !isPromptFrame(h)), [hops]);
   const canvasRunHops = useMemo(() => runHops.filter(h => !isPromptFrame(h)), [runHops]);
@@ -411,6 +421,12 @@ export default function LiveAgentViewScreen() {
   const peakSpans = useMemo(() => peakActiveSpans(canvasRunHops), [canvasRunHops]);
   const tokenTotal = useMemo(() => sumTokens(traceRows), [traceRows]);
   const costTotal = useMemo(() => sumCost(traceRows), [traceRows]);
+  // FEATURE: AA-179b -- assembly workers join this count with no code change: the formula is a
+  // distinct-agentId count over the run's canvas hops, and an assembly frame is credited to its
+  // worker like any other. Confirmed, not reimplemented. The two span meters above are equally
+  // unaffected in the other direction -- deriveActiveSpans/peakActiveSpans branch on the three
+  // delegation types by name (HarnessTraceConsole.jsx ~L57-78, read fresh this session), so an
+  // assembly frame cannot inflate a span figure.
   const agentsEngaged = useMemo(() => {
     const seen = new Set();
     for (const h of canvasRunHops) if (h.agentId) seen.add(h.agentId);
@@ -438,6 +454,9 @@ export default function LiveAgentViewScreen() {
   // decision it was handed is still in flight. The badge's detail is the gate frame's OWN
   // capability_slug (never a label authored here), the same way errorDetail carries the real fault.
   const awaiting = !!pending || !!resolving;
+  // FEATURE: AA-179b -- deriveMode is untouched and stays untouched: its only event test is
+  // `delegation_return`, so an assembly frame can never flip the badge to Routing or Orchestrating.
+  // Assembly work is not a routing decision (§19d) and the badge must not imply it is.
   const mode = deriveMode(canvasRunHops, { running, terminal, awaiting });
   const errorDetail = terminal === "error"
     ? (error?.failureClass || error?.status || error?.message || null)
@@ -556,6 +575,23 @@ export default function LiveAgentViewScreen() {
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>
+            {/* FEATURE: AA-179b -- assembly frames DO reach this rail (railEvents filters only
+                prompt_assembled, above), so once AA-179c emits them each worker gets its own
+                numbered, muted-bordered entry here in arrival order -- John's "the narrative loses
+                its dead-air gap too".
+                KNOWN GAP, deliberately not fixed here: the entry's TEXT will be blank. The rail's
+                line copy comes from describePipelineEvent(), whose `default:` case returns
+                `{ summary: "", color: T.muted }` -- it does NOT fall back to evt.data.message the
+                way this session's kickoff assumed. That function lives in MarketIntelligenceScreen.jsx,
+                which this session's SCOPE RULES forbid touching, and there is no seam for it from
+                this file (AuditColumn's rows are inline-styled with no class hooks, and remapping an
+                assembly frame onto a type the rail already renders would be a lie about what
+                happened). The fix is a real `assembly_work`/`assembly_work_complete` case in
+                describePipelineEvent returning `{ summary: evt.data.message, color: T.muted }`, and
+                it is provably inert for CHI itself -- CHI's own onEvent returns early on both types
+                (MarketIntelligenceScreen.jsx ~L3718), so they never reach its events array. Handed
+                back to the design session to schedule (it belongs with AA-179c, which is what makes
+                the row visible at all). */}
             <AuditColumn events={railEvents} agentActivity={agentActivity} onAgentsDrawerOpen={() => {}}/>
           </aside>
         </div>

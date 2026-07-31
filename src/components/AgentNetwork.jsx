@@ -1,3 +1,11 @@
+// DeepBench v7.0.9 | AgentNetwork.jsx | AA-179b -- assembly work on the canvas. The workers that
+// build a prompt (the enrichment seam's fetches, Dan Bingham's REFLECT/Synthesis steps) walk on
+// stage and light up like any engaged agent, in their own quiet-infrastructure tint (T.mutedDeep
+// ring / T.muted bubble accent) -- and NEVER with an edge or a pulse. An arrow on this canvas means
+// agent-reasoned routing (§19d) and nothing less; a worker rippling with no arrow touching it IS
+// the visual statement "contributing to the prompt, nobody routed to it". Every visual added here
+// is INERT until AA-179c ships the emit -- with no assembly frames in the ledger the derivation is
+// byte-identical to LAV-1f's.
 // DeepBench v7.0.6 | AgentNetwork.jsx | LAV-1f -- human-in-the-loop: while the harness holds a real
 // confirmation gate open, a "You" node joins the canvas as the requesting agent's focus counterpart,
 // a pulse hands control from that agent to the human, and the decision controls render on the node
@@ -55,6 +63,57 @@ export const REPORT_COLOR = T.moss;                            // control/result
 export const REDISPATCH_COLOR = T.flag;                        // the same pair crossed again this run
 export const HANDOFF_COLOR = T.brass;                          // dispatched, never returned before terminal
 
+// ── FEATURE: AA-179b -- the assembly seam's two frame types ──────────────────
+// Spelled exactly as useHarnessStream.js's AA-179a branch appends them (~L181) and as AA-179c will
+// emit them. Referenced through these constants everywhere below so the canvas can never drift from
+// the hook's spelling without this one line changing with it.
+export const ASSEMBLY_START = "assembly_work";
+export const ASSEMBLY_COMPLETE = "assembly_work_complete";
+export function isAssemblyHop(hop) {
+  return hop?.type === ASSEMBLY_START || hop?.type === ASSEMBLY_COMPLETE;
+}
+
+// Assembly work is quiet infrastructure, not a routing decision: its own tint, distinct from brass
+// (routing), CLICK blue (orchestrating), moss (complete) and flag (error/recovery).
+export const ASSEMBLY_COLOR = T.mutedDeep;
+export const ASSEMBLY_LEGEND_LABEL = "Assembly work";
+
+// A missing count renders this, never 0-as-a-guess and never invented copy
+// (.claude/rules/agent-section-rendering.md).
+const ASSEMBLY_DASH = "—";
+// Bubble copy for a fetch, keyed on the frame's OWN `source` field. An unlisted or absent source
+// falls to the generic knowledge read -- it is still a real fetch that really happened, and the
+// count is still the frame's own.
+const ASSEMBLY_FETCH_COPY = {
+  the_library:         (n) => `Data Room read · ${n} chunks`,
+  the_library_catalog: (n) => `Data Room catalog · ${n}`,
+  roster:              (n) => `Roster fetch · ${n} candidates`,
+  the_reasoning:       (n) => `Reasoning Layer read · ${n}`,
+};
+// Dan Bingham's two model steps ripple WHILE running, so each has a start line and a complete line.
+// The token clause exists only when the frame really carried tokens.
+const ASSEMBLY_STEP_COPY = {
+  reflect:   { start: "REFLECT · drafting execution plan", done: (tok) => `REFLECT · plan drafted${tok}` },
+  synthesis: { start: "Synthesis · rewriting prompt",      done: (tok) => `Synthesis · prompt rewritten${tok}` },
+};
+
+// The bubble text for one assembly hop, composed from the frame's own fields ONLY. Returns null for
+// a work kind this canvas has no approved copy for -- no bubble is the honest render, never a
+// guessed label (§19l / .claude/rules/agent-section-rendering.md).
+export function assemblyBubbleText(hop) {
+  if (!isAssemblyHop(hop)) return null;
+  const d = hop.data || {};
+  if (d.work === "fetch") {
+    const count = d.matchCount != null ? d.matchCount : ASSEMBLY_DASH;
+    const copy = ASSEMBLY_FETCH_COPY[d.source];
+    return copy ? copy(count) : `Knowledge read · ${count} chunks`;
+  }
+  const step = ASSEMBLY_STEP_COPY[d.work];
+  if (!step) return null;
+  if (hop.type === ASSEMBLY_START) return step.start;
+  return step.done(d.tokens != null ? ` · ${d.tokens} tok` : "");
+}
+
 // ── pure derivations over the stored-event ledger ────────────────────────────
 // Stored events are exactly what buildHopEvent() produces (verified fresh in
 // MarketIntelligenceScreen.jsx L1113): { type, agentId, data, durationMs, id, secondaryAgentId? }.
@@ -71,15 +130,33 @@ export function deriveNetwork(runHops) {
   const finished = new Set();    // agents whose hop completed this run
   const edges = [];              // observed traffic only
   const edgeSeen = new Set();
+  // FEATURE: AA-179b -- `${agentId}|${work}` -> agentId, while that assembly step is unfinished.
+  // Closed by its matching complete, or by ANY later real event for that agent (that agent has
+  // visibly moved on) -- the same event-driven window semantics the rest of this file uses. Never
+  // a timer: nothing here invents a duration.
+  const assemblyOpen = new Map();
   let activeId = null;
+  let activeIsAssembly = false;
 
   for (const h of runHops) {
     const id = h.agentId;
+    const assembly = isAssemblyHop(h);
     if (id) {
       if (!engaged.includes(id)) engaged.push(id);
-      const text = h.data?.reasoning ?? h.data?.task ?? h.data?.message ?? null;
+      // An assembly frame carries the hook's own composed `message` in data, which is plumbing
+      // wording -- the canvas speaks the approved copy instead, built from the same real fields.
+      const text = assembly
+        ? assemblyBubbleText(h)
+        : (h.data?.reasoning ?? h.data?.task ?? h.data?.message ?? null);
       if (text) bubbles[id] = text;
       activeId = id;
+      activeIsAssembly = assembly;
+    }
+    if (h.type === ASSEMBLY_START && id) {
+      assemblyOpen.set(`${id}|${h.data?.work ?? ""}`, id);
+    } else if (id) {
+      assemblyOpen.delete(`${id}|${h.data?.work ?? ""}`);
+      for (const k of [...assemblyOpen.keys()]) if (k.startsWith(`${id}|`)) assemblyOpen.delete(k);
     }
     if (h.type === "delegation" && id && h.secondaryAgentId) {
       const k = edgeKey(id, h.secondaryAgentId);
@@ -93,7 +170,13 @@ export function deriveNetwork(runHops) {
 
   const orchestrators = new Set([...openByTarget.values()]);
   const done = new Set([...engaged, ...finished].filter(a => a !== activeId && !orchestrators.has(a)));
-  return { engaged, bubbles, openByTarget, orchestrators, done, activeId, edges };
+  // FEATURE: AA-179b -- who renders in the assembly tint: anyone holding an open step, plus the
+  // agent whose OWN latest hop was an assembly frame. The second half is what gives a
+  // completion-only frame (every fetch -- they emit no start) the standard short active window the
+  // existing hop treatment already produces, in the assembly tint rather than routing brass.
+  const assemblyActive = new Set(assemblyOpen.values());
+  if (activeIsAssembly && activeId) assemblyActive.add(activeId);
+  return { engaged, bubbles, openByTarget, orchestrators, done, activeId, edges, assemblyActive };
 }
 
 // A pulse is emitted per real delegation-family hop, on the real pair that hop crossed.
@@ -101,6 +184,11 @@ export function deriveNetwork(runHops) {
 // `delegation_complete`, which is the same real event family closing the same real edge) travels
 // back along it. A pair crossed a second time in one run is a re-dispatch.
 export function pulsesForHop(hop, index, priorHops) {
+  // FEATURE: AA-179b -- an assembly frame NEVER emits a pulse. Stated as an explicit type check
+  // rather than left to fall through the delegation branches below on a missing secondaryAgentId:
+  // the rule is "assembly work is not routing (§19d)", and a rule that holds only because a field
+  // happens to be absent would break silently the day the emit carries one.
+  if (isAssemblyHop(hop)) return [];
   const id = hop.agentId;
   if (hop.type === "delegation" && id && hop.secondaryAgentId) {
     const k = edgeKey(id, hop.secondaryAgentId);
@@ -277,6 +365,21 @@ const NET_CSS = `
 .lav-node.is-active .lav-card{border-color:${T.brass};
   box-shadow:0 10px 26px ${rgba(T.brassDeep, 0.35)},0 0 0 3px ${rgba(T.brass, 0.18)}}
 .lav-node.is-done .lav-card{border-color:${T.mossLight}}
+/* FEATURE: AA-179b -- the assembly state. Same ripple keyframe as an active node (this really is
+   the same "working right now" motion, and a second animation would imply a second meaning), in
+   the palette's quiet-infrastructure register instead of routing brass. Slightly under is-active's
+   scale/z so a real routing decision still reads as the loudest thing on the canvas. */
+.lav-node.is-assembly .lav-ring{border-color:${ASSEMBLY_COLOR};animation:lavRipple 1.1s ease-out infinite}
+.lav-node.is-assembly{transform:translate(-50%,-50%) scale(1.04);z-index:6}
+.lav-node.is-assembly .lav-card{border-color:${ASSEMBLY_COLOR};
+  box-shadow:0 8px 22px ${rgba(T.mutedDeep, 0.26)},0 0 0 3px ${rgba(T.muted, 0.16)}}
+/* Mono micro-label on a paper bubble, per this file's caption idiom -- deliberately not the navy
+   speech bubble a routed agent gets: this is instrumentation the prompt was built from, not an
+   agent talking. */
+.lav-node.is-assembly .lav-bubble{background:${T.card};color:${T.mutedDeep};
+  border:1px solid ${rgba(T.muted, 0.55)};font-family:${mono};font-size:10.5px}
+.lav-node.is-assembly .lav-bubble:after{border-top-color:${T.card}}
+.lav-node.is-assembly .lav-bubble.down:after{border-top-color:transparent;border-bottom-color:${T.card}}
 .lav-spin{position:absolute;left:50%;top:32px;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;
   border:2px dashed ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.5)};opacity:0;z-index:0}
 .lav-node.is-orch .lav-spin{opacity:1;animation:spin 6s linear infinite}
@@ -300,6 +403,10 @@ const NET_CSS = `
   border-radius:20px;padding:6px 11px;z-index:6}
 .lav-legend span{display:inline-flex;align-items:center;gap:5px}
 .lav-legend .sw{width:15px;height:3px;border-radius:2px}
+/* FEATURE: AA-179b -- a RING swatch, not a bar. The five bars above are edge/pulse colours; this
+   one is a node state, and drawing it as a bar would imply an assembly edge exists. It never does. */
+.lav-legend .sw-ring{width:11px;height:11px;border-radius:50%;border:2px solid ${ASSEMBLY_COLOR};
+  background:transparent}
 .lav-seg{position:absolute;left:12px;top:12px;display:flex;align-items:stretch;background:${T.card};
   border:1px solid ${T.line};border-radius:8px;overflow:hidden;z-index:8;box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
 .lav-seg .lbl{font-family:${mono};font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
@@ -546,7 +653,11 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             if (benched.has(a.id)) cls.push("is-benched");
             const recovering = recoveringAgentId === a.id;
             if (recovering) cls.push("is-recovering");
+            // FEATURE: AA-179b -- assembly outranks the plain active state so a fetch or a REFLECT
+            // step can never light a node in routing brass, and outranks is-done so a worker
+            // holding an open step keeps rippling after a later agent takes the active slot.
             if (net.orchestrators.has(a.id)) cls.push("is-orch");
+            else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
             else if (running && net.activeId === a.id) cls.push("is-active");
             else if (net.done.has(a.id)) cls.push("is-done");
             const bubble = running ? net.bubbles[a.id] : null;
@@ -615,6 +726,9 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
         <span><span className="sw" style={{ background: DISPATCH_COLOR }}/>Delegate</span>
         <span><span className="sw" style={{ background: REPORT_COLOR }}/>Report back</span>
         <span><span className="sw" style={{ background: REDISPATCH_COLOR }}/>Re-dispatch</span>
+        {/* FEATURE: AA-179b -- the one node-state entry on this legend, and the reason the canvas
+            can be read honestly: a ring with no arrow touching it is assembly work. */}
+        <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>
       </div>
     </div>
   );
