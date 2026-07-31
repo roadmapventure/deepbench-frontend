@@ -86,6 +86,8 @@
 
 ---
 
+| HAR-26 | Architecture | **New 2026-07-31 (`S-LAV-1f`'s live gated round trip — found by a discriminating live test, not code reading). `api/capabilities/execute.js`'s confirmation-resolve branch honors `stream:true` for accept and edit but the reject path falls through to `resolvePendingConfirmation()` and returns plain JSON, ignoring `stream` entirely.** A client that sends `stream:true` and unconditionally reads SSE throws *after* the rejection already succeeded server-side — a silent success dressed as a harness failure. CHI never hits it (its resolve passes no `onProgress` → JSON path); the Live Agent View works around it client-side by branching on the response's actual content-type. Fix: make the reject path stream like its siblings (or document the asymmetry as the contract). Post-beta. | ❌ Missing | S-future (small, `execute.js` — needs Architect Review) |
+
 Core loop/harness/speed/charts: `docs/FEATURES.md` (now)
 Everything else: `docs/FEATURES-LATER.md`
 Full architecture decisions: `docs/ARCHITECTURE.md`

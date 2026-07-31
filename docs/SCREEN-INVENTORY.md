@@ -24,7 +24,7 @@ Splash, announcements, and overall dashboard metrics. `Channel Intelligence` (be
 ### Live Agent View — transitional homepage (new, 2026-07-31)
 | Screen | Route | Component | Status |
 |---|---|---|---|
-| Live Agent View | `/live-agent-view` (also served at `/` transitionally after `S-LAV-1e`, until `LA-01` Home ships) | `LiveAgentViewScreen.jsx` | 🔶 In build — `LAV-1` (`docs/FEATURES.md`) |
+| Live Agent View | `/live-agent-view` (also served at `/` transitionally since `S-LAV-1e` v7.0.4, until `LA-01` Home ships) | `LiveAgentViewScreen.jsx` (+ `AgentNetwork.jsx`, `HarnessTraceConsole.jsx`) | ✅ Live — `LAV-1-done` (v7.0.0–v7.0.6, `docs/FEATURES-ARCHIVE.md`) |
 
 Screen code: **`LAV`** — claimed 2026-07-31 (`design-live-agent-dash-0731`, row `LAV-1`). **Dual naming is deliberate (John, 2026-07-31):** the open page's own title reads "Live Multi-Agent Routing (Beta)"; the Work-dropdown label reads "Live Agent View (Beta)". Both are correct; do not "fix" one to match the other.
 
