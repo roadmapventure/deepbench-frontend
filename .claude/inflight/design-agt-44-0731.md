@@ -1,1 +1,0 @@
-design-agt-44-0731 — worktree `design-agt-44-0731`, branch `session/design-agt-44-0731`. Design session for reopened `AGT-44` (Sonnet 5): read the FEATURES.md row, write kickoff, then apply the data change in this same session per the Automated Design→Code→Verify Loop. Created 2026-07-31 from origin/dev.

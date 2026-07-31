@@ -176,3 +176,50 @@ Same question, same model, deterministic in both directions, one variable:
 The 187-token delta is the guardrails section, and `forecast` is what case 6 expects. **A writing standard attached to a five-way classification call changed its answer** — that is the generalizable finding, and it is why `traits.intent_allowlist` was never needed here: the right scope was fewer attachments, not a finer filter.
 
 **Case 9's `answer` also reproduced 2/2** (Owen: the answer states Apple's enforcement threshold is unknown, so certification risk is unanswerable). Same Capability, and both answer-side intents now carry clause 3's instruction on how to report missing information — a plausible bias toward foregrounding a gap. Not isolated: unlike the routing call, there is no stored pre-change output to compare against.
+
+---
+
+# Reopen, 2026-07-30/31 (`design-arch-beta-0729` → `S-AGT-44b`) — the missing attachment, the regression it reproduces, and the fix that finally scopes it
+
+## Why it reopened
+
+`design-arch-beta-0729`'s pre-regression round 3 failed case 24 `news-first-card`'s `answer` on `platform_language_detected`. Checked live in `capability_skill_profiles`: `channel-intelligence` never received the attachment — the v6.3.229 close-out's "every artifact-producing agent" claim covered 2 of 5 (`hypothesis-evaluation`, `data-analysis`), not the third one that was actually measured to leak nothing at the time (see the original re-run table above: Marcus's `answer` never failed `platform_language_detected`, at baseline or in either 2026-07-29 run) but was never re-measured after `AGT-47`/`DAT-16` changed what ran through it.
+
+## First attempt (v7.0.5) — content right, delivery wrong, reproducing the exact 2026-07-29 finding
+
+Plain attach: `capability_skill_profiles` row, `channel-intelligence` + `platform-language-guardrail`, no allowlist. Same shape as the two existing rows.
+
+**Reproduced this doc's own "routing regression, measured" section (above) almost exactly**, just a different destination class:
+
+- **This session's live A/B**, case 6 `upgrade-cycles`'s real question, direct `ci-routing-intent` calls: row in → `direct`/`qa`-family classification, not `forecast`. Confirmed via a full case-6 regression run too: `journey_deviation (expected forecast, got direct)`, both artifacts otherwise clean (zero `failed_criteria`).
+- **Root cause, re-confirmed in source, not just re-inferred:** `db-assembly.js`'s `AA-121` `intent_allowlist` gate (added by the original `AGT-44` session specifically to solve this class of problem) lived **inside** the `skill_type_slug === "knowledge"` branch only. A guardrails-type Skill was never eligible for the gate, so once re-attached to a capability that also carries a routing intent, it reached that intent unconditionally — same mechanism this doc's original "third error" section found, just never generalized into a fix at the time (deliberately deferred, see that section: *"the allowlist hoist is the fix and gets its own row and ID... if it does reproduce"*).
+- **What the attempt proved and kept:** with the row live, case 24 passed end-to-end for the first time ever recorded — all three artifacts, `platform_language_detected` clean, under a genuinely degraded article (401, headline-only). The guardrail's *content* (clause 3's honest-gap carve-out) works on Marcus. Only capability-wide delivery was the defect.
+- A same-window confound theory (an unrelated commit, `S-LAV-1d`, touching the same file) was raised and checked directly against source — an additive-only `onEvent` emit reading already-computed `enriched.system_prompt`, no change to what's sent to the model — and withdrawn; the live A/B held it constant regardless.
+
+**Interim: reverted the insert.** Priya's and Nadia's existing attachments (live since 2026-07-29, no allowlist) were left untouched — no A/B evidence they cause any equivalent harm on `hypothesis-evaluation`/`data-analysis`, both of which lack a routing/classification intent for the guardrail to reach.
+
+## The fix (v7.0.7) — generalize the gate, then scope the delivery
+
+**`AGT-54`:** hoisted the `AA-121` check out of the knowledge-only branch to fire once per skill profile, before the type-dispatch branches — a generic `traits.intent_allowlist` read, unconditional on `skill_type_slug`. Unset (every Skill Profile except the ones below) stays byte-identical. One file, `api/prompt/db-assembly.js`.
+
+**Then `platform-language-guardrail.traits.intent_allowlist`** was set on the shared `skill_profiles` row to the union of every intent it should reach across all three attached capabilities:
+
+```
+["hyp-generation-intent", "hyp-hypothesis-test-intent", "hyp-hypothesis-test-display-intent",
+ "data-escalate-intent", "data-patch-intent", "data-patch-execute-intent", "data-escalate-execute-intent",
+ "ci-answer-intent"]
+```
+
+`ci-routing-intent` is not on the list — the whole point. Nor are `ci-answer-display-intent`, `ci-submission-ack-intent`, `ci-resolution-ack-intent` — never measured to need the guardrail (Marcus's `answer` is the one artifact this row was ever about), added narrowly rather than by default. `channel-intelligence` re-attached with this allowlist already in place.
+
+**Two accepted risks, named rather than silently taken (John's ask):**
+
+1. **The trait lives on the one shared Skill row, not per-attachment.** A single `traits.intent_allowlist` filters every capability the Skill is attached to — there is no per-attachment scoping mechanism, and building one was out of this session's scope (one feature, one file). Enumerating every currently-served intent across all three capabilities into one list was the deliberate choice over leaving the Skill unscoped again.
+2. **Silent rot.** If `hypothesis-evaluation`, `data-analysis`, or `channel-intelligence` ever gains a new content-producing intent, this allowlist does not know about it automatically — the guardrail will silently not reach it until someone adds it here. No detection mechanism exists for this yet.
+
+## Re-verification
+
+- **3/3 direct `ci-routing-intent` calls**, case 6's real question (`src/data/chiQuestions.js`, `upgrade-cycles`): `forecast` all three, matching the pre-regression baseline exactly.
+- **Full `--only upgrade-cycles`:** `case_pass: true`, both artifacts `failed_criteria: []`, no `journey_deviation`.
+- **Full `--only news-first-card`:** a *different* live card than the v7.0.5 proof run (case 24 pulls a rotating live article). `answer`'s `platform_language_detected` read clean again. Overall `case_pass: false` this run — but on `AGT-52`'s already-tracked, separately-filed rejection-jargon leak (`confidence_tier`, `citations array`, `rule codes` in the rejection's own reason text) plus `holistic_verdict`/`actionable_guidance_present` (the answer stops at naming the gap) — neither criterion this row owns. `AGT-52`'s row updated with this run's corroborating evidence.
+- **Coverage query, all six candidate capabilities:** `hypothesis-evaluation`/`data-analysis`/`channel-intelligence` → `true`; `quality-gate`/`project-manager`/`memory-consolidation` → `false`, unchanged.
