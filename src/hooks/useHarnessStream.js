@@ -1,3 +1,8 @@
+// DeepBench v7.0.6 | useHarnessStream.js | LAV-1f -- human-in-the-loop: a run that ends on the
+// harness's real confirmation gate (`status:'pending_confirmation'`) is held in a `pending` state
+// read verbatim off that frame, and resolveConfirmation() dispatches the decision through the same
+// `action:'resolve'` request CHI sends, streaming the continuation back into THIS run's ledger and
+// trace set. Nothing here auto-resolves, times out, or defaults a decision.
 // DeepBench v7.0.3 | useHarnessStream.js | LAV-1d -- captures execute.js's new `prompt_assembled`
 // frame (latest one wins, cleared with the run) and collects the DISTINCT trace_id set a turn
 // produces: a CHI turn is up to three top-level calls (qa -> quality-gate -> display), each minting
@@ -16,8 +21,27 @@ import { useAgents } from "./useAgents.js";
 import { resolveEventDuration, resolveDelegationDuration, buildTransactionBoundaryEvent } from "../lib/turnTracking.js";
 import { pickCreditedSpan } from "../lib/tracePatterns.js";
 import {
-  runQaWithQualityGate, buildHopEvent, describeDelegationEvent,
+  runQaWithQualityGate, buildHopEvent, describeDelegationEvent, readSSEResult,
 } from "../screens/MarketIntelligenceScreen.jsx";
+
+// FEATURE: LAV-1f -- mirrors MarketIntelligenceScreen.jsx's MAX_CONTINUE_ITERATIONS (~L1314): the
+// client-side safety cap on a checkpoint-continue chain, same value, same meaning.
+const MAX_CONTINUE_ITERATIONS = 10;
+// FEATURE: LAV-1f -- the endpoint every capability request on the platform goes through (§19b).
+const EXECUTE_ENDPOINT = "/api/capabilities/execute";
+
+// FEATURE: LAV-1f -- `stream:true` is a REQUEST, not a guarantee, and the resolve endpoint honours
+// it selectively: api/capabilities/execute.js streams the accept and edit branches (both re-enter
+// the harness and have real events to emit) but answers reject with plain JSON from
+// resolvePendingConfirmation() -- a single row update with nothing to stream. Found live this
+// session: reading the reject response as SSE throws "Stream ended without a result event" while
+// the rejection has in fact already succeeded server-side. CHI never hit this because its own
+// resolve call passes no onProgress at all and so always takes the JSON path. Branching on what
+// the response actually IS covers both, and stays correct if a branch's streaming changes later.
+async function readCapabilityResponse(res, onProgress) {
+  const isStream = (res.headers.get("content-type") || "").includes("text/event-stream");
+  return isStream ? readSSEResult(res, onProgress) : res.json();
+}
 
 export function useHarnessStream() {
   const agents = useAgents();
@@ -35,6 +59,14 @@ export function useHarnessStream() {
   // raw frames (each one carries its own trace_id, §19p) rather than inferred, because one turn
   // spans up to three top-level calls and each mints its own trace.
   const [traceIds, setTraceIds] = useState([]);
+  // FEATURE: LAV-1f -- the harness's confirmation gate, held verbatim off the frame that opened it.
+  // Non-null means the run is genuinely paused on a human decision and nothing continues until one
+  // is dispatched. `resolving` is the same gate while its decision request is in flight -- both are
+  // real request state, neither is a display flag.
+  const [pending, setPending] = useState(null);     // { confirmation_id, agentId, capability_slug, proposed_action, critique, depth } | null
+  const [resolving, setResolving] = useState(null); // { confirmation_id, agentId, resolution } | null
+  const pendingRef = useRef(null);
+  const resolvingRef = useRef(null);
   const traceIdsRef = useRef([]);
   const lastEventAtRef = useRef(null);
   const runIdRef = useRef(0);
@@ -153,8 +185,134 @@ export function useHarnessStream() {
     setStatus(prev => (prev ? { ...prev, message: "Hit a snag — recovered automatically, continuing…", kind: 'orchestration' } : prev));
   };
 
-  // FEATURE: LAV-1d will extend this hook with the confirmation-resolve path
-  // (resolveConfirmation()/HITL) -- deliberately not wired this session.
+  // FEATURE: LAV-1f -- the confirmation gate, read straight off the terminal frame the harness
+  // returns. Field names are execute.js's own (runCapability()'s pending_confirmation early return,
+  // read fresh this session at api/capabilities/execute.js ~L1058:
+  //   { status:'pending_confirmation', confirmation_id, proposed_action, critique, depth,
+  //     agent_id, capability_slug }
+  // -- note the frame carries NO intent_slug; the confirmation_id already encodes which
+  // capability/agent/intent it belongs to, which is why the resolve request needs nothing else).
+  // Nothing below is derived, defaulted to a guess, or renamed. Returns whether a gate opened.
+  const notePending = (frame) => {
+    if (frame?.status !== 'pending_confirmation' || !frame.confirmation_id) return false;
+    const gate = {
+      confirmation_id: frame.confirmation_id,
+      agentId: frame.agent_id ?? null,
+      capability_slug: frame.capability_slug ?? null,
+      proposed_action: frame.proposed_action ?? null,
+      critique: frame.critique ?? null,
+      depth: frame.depth ?? null,
+    };
+    pendingRef.current = gate;
+    setPending(gate);
+    return true;
+  };
+
+  // Mirrors MarketIntelligenceScreen.jsx's resolveInProgress (~L1333). That function is
+  // module-private there and this session must not modify that file, so the loop is mirrored here
+  // exactly as logEvent/writeStatus/onDelegationProgress already are: same `continue` action, same
+  // HAR-17 recovery exemption from the client cap, same CHI-04 stale bail-out, same throw on a
+  // terminal 'failed' row. Without it a resolve that checkpoints server-side would surface
+  // {status:'in_progress'} to this screen as though it were a terminal result.
+  const continueChain = async (result, onProgress, isStale) => {
+    let iterations = 0;
+    while (result.status === "in_progress") {
+      if (isStale()) return result;
+      if (result.recovery) {
+        if (!isStale()) onRecovery(result.recovery);
+      } else if (++iterations > MAX_CONTINUE_ITERATIONS) {
+        throw new Error(`Chain did not complete after ${MAX_CONTINUE_ITERATIONS} continuations (job_id: ${result.job_id})`);
+      }
+      const res = await fetch(EXECUTE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "continue", job_id: result.job_id, stream: true }),
+      });
+      if (!res.ok) throw new Error(`continue (job_id: ${result.job_id}) failed: ${res.status}`);
+      result = await readCapabilityResponse(res, onProgress);
+    }
+    if (result.status === 'failed') {
+      throw Object.assign(new Error(result.error || 'chain failed'), { status: 500 });
+    }
+    return result;
+  };
+
+  // FEATURE: LAV-1f -- dispatch the human's decision on the open gate. The request body is byte-for-
+  // byte the one MarketIntelligenceScreen.jsx's resolveConfirmation() sends (~L1424-1429):
+  //   { action:'resolve', confirmation_id, resolution, edited_task_context, stream }
+  // with stream:true so that WHEN the branch taken has events (accept/edit re-enter the harness),
+  // every one of them runs through the SAME progress router the original run used -- so its hops
+  // append to this run's ledger and its trace_ids join this run's set (noteTrace) instead of
+  // starting a second, disconnected run. Reject has no events and answers in plain JSON; see
+  // readCapabilityResponse above, which is why the reader branches on the response, not the ask.
+  // `pending` is cleared the moment the decision is dispatched: the gate is no longer open, the run
+  // is live again. `resolving` carries the same gate until the request settles, which is what lets
+  // the canvas keep the human on stage through the hand-back instead of blinking it out mid-pulse.
+  // edited_task_context stays null here: it is the ORIGINAL request's task_context re-authored, so
+  // only the flow that built that request can honestly produce one (CHI builds it from hypFlow).
+  // This screen never built it, so it offers the two decisions that need nothing but the
+  // confirmation_id -- accept and reject -- and never fabricates a task context to enable a third.
+  const resolveConfirmation = useCallback(async (resolution) => {
+    const gate = pendingRef.current;
+    if (!gate || resolvingRef.current || runningRef.current) return null;
+    const myRun = ++runIdRef.current;
+    const isStale = () => runIdRef.current !== myRun;
+    const dispatched = { confirmation_id: gate.confirmation_id, agentId: gate.agentId, capability_slug: gate.capability_slug, resolution };
+    resolvingRef.current = dispatched;
+    runningRef.current = true;
+    pendingRef.current = null;
+    setPending(null);
+    setResolving(dispatched);
+    setRunning(true);
+    setResult(null);
+    setError(null);
+    setRecovery(null);
+    // The next event's duration means "time from the decision to the harness's first move", the
+    // same arrival-delta semantics every other hop on this screen carries.
+    lastEventAtRef.current = Date.now();
+    try {
+      const onProgress = (evt) => { if (!isStale()) onDelegationProgress(evt); };
+      const res = await fetch(EXECUTE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "resolve",
+          confirmation_id: gate.confirmation_id,
+          resolution,
+          edited_task_context: null,
+          stream: true,
+        }),
+      });
+      // Mirrors CHI's own failure read (DAT-7/HAR-15): the body carries the real denial tier, so it
+      // is forwarded onto the error rather than collapsed into a status code.
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || `resolve ${resolution} failed: ${res.status}`),
+          { status: res.status, upstreamStatus: body.upstreamStatus, failureClass: body.failureClass, faultCode: body.faultCode, detail: body.detail || null });
+      }
+      const first = await readCapabilityResponse(res, onProgress);
+      const settled = await continueChain(first, onProgress, isStale);
+      if (isStale()) return null;
+      setResult(settled);
+      // A resolve can itself open a new gate (an edit round-trip re-runs the capability, which hits
+      // the same confirmation gate again). Terminal handling is identical to a normal run's.
+      notePending(settled);
+      return settled;
+    } catch (err) {
+      if (isStale()) return null;
+      setError(err);
+      return null;
+    } finally {
+      if (!isStale()) {
+        setStatus(null);
+        setRunning(false);
+        setResolving(null);
+      }
+      resolvingRef.current = null;
+      runningRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents]);
 
   const runQuestion = useCallback(async (text, { conversationContext = [], backgroundContext = null } = {}) => {
     if (runningRef.current) return null; // guard re-entry -- one live turn at a time
@@ -172,6 +330,9 @@ export function useHarnessStream() {
     // FEATURE: LAV-1d -- a new run starts with no prompt and no traces of its own; the box shows
     // its idle copy until this turn's first real frame lands, and the poller has nothing to query.
     setPrompt(null);
+    // FEATURE: LAV-1f -- a new question never inherits the previous run's gate.
+    pendingRef.current = null;
+    setPending(null);
     traceIdsRef.current = [];
     setTraceIds([]);
     // FEATURE: CHI-04 (mirrored) -- the question divider only appears between questions, never
@@ -192,6 +353,10 @@ export function useHarnessStream() {
       );
       if (isStale()) return null;
       setResult(res);
+      // FEATURE: LAV-1f -- if this turn ended on the harness's confirmation gate, the run is paused
+      // on a human, not finished. Read generically off the frame's own status; an ordinary terminal
+      // never creates a gate.
+      notePending(res);
       return res;
     } catch (err) {
       if (isStale()) return null;
@@ -214,7 +379,11 @@ export function useHarnessStream() {
     lastEventAtRef.current = null;
     runningRef.current = false;
     traceIdsRef.current = []; // FEATURE: LAV-1d
+    pendingRef.current = null;   // FEATURE: LAV-1f
+    resolvingRef.current = null; // FEATURE: LAV-1f
     setPrompt(null);
+    setPending(null);
+    setResolving(null);
     setTraceIds([]);
     setEvents([]);
     setStatus(null);
@@ -224,5 +393,5 @@ export function useHarnessStream() {
     setRecovery(null);
   }, []);
 
-  return { events, status, running, result, error, recovery, prompt, traceIds, runQuestion, clear };
+  return { events, status, running, result, error, recovery, prompt, traceIds, pending, resolving, runQuestion, resolveConfirmation, clear };
 }

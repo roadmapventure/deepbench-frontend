@@ -1,3 +1,8 @@
+// DeepBench v7.0.6 | AgentNetwork.jsx | LAV-1f -- human-in-the-loop: while the harness holds a real
+// confirmation gate open, a "You" node joins the canvas as the requesting agent's focus counterpart,
+// a pulse hands control from that agent to the human, and the decision controls render on the node
+// itself. The node exists ONLY while a real gate is open (or its decision is in flight) -- it is
+// never decorative, never scripted, and nothing here resolves a gate on the human's behalf.
 // DeepBench v7.0.2 | AgentNetwork.jsx | LAV-1c -- fills the node card's reserved slot with real
 // data: the governed pattern name(s) for this node's latest credited span (the ai_call_patterns
 // read-time view, via src/lib/tracePatterns.js -- the ONLY legitimate source of a pattern name),
@@ -15,7 +20,12 @@
 // FEATURE: LAV-1b
 import { useEffect, useMemo, useRef, useState } from "react";
 import { T, PALETTE, mono, body, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
-import { AgentAvatar, FeatureBadge } from "./SharedUI.jsx";
+// FEATURE: LAV-1f -- UserAvatar is the platform's deliberate NON-agent "You" mark (MI-27,
+// STYLE-GUIDE §17: the avatar-mandatory rule is scoped to agent attribution, and the human has no
+// agent identity to represent). ConfirmationCardContent is CHI's own generic pending_confirmation
+// renderer (MI-01d/CHI-50) -- reused verbatim so the proposal the human is deciding on is rendered
+// by exactly one implementation platform-wide, with no copy authored here.
+import { AgentAvatar, FeatureBadge, UserAvatar, ConfirmationCardContent } from "./SharedUI.jsx";
 // FEATURE: LAV-1c -- the same module the Agent Routing drawer's pattern line joins through
 // (LOG-79/LOG-95b). Reused verbatim: this file holds no pattern name, slug, or per-pattern branch.
 import { fetchTracePatterns, needsSpanRefetch } from "../lib/tracePatterns.js";
@@ -25,6 +35,13 @@ const VW = 1200, VH = 640;
 // Choreography anchors, ported verbatim from the prototype's computeTargets().
 const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
 const ARC_RX = 235, ARC_RY = 215, ARC_SPREAD = (162 * Math.PI) / 180;
+// FEATURE: LAV-1f -- the human's anchor: LEAD mirrored across the canvas. While a gate is open the
+// requesting agent IS the lead (see `lead` below), so the human materializes directly opposite the
+// agent asking, and the hand-off pulse runs straight between the two. Derived from the ported
+// choreography constants -- not a new hand-authored coordinate, and clear of the bench stack.
+const YOU = { x: VW - LEAD.x, y: LEAD.y };
+// The human's label. No code, no role -- deliberately not an agent card (STYLE-GUIDE §17).
+const YOU_LABEL = "You";
 
 // FEATURE: LAV-1b -- every colour below resolves to an imported token; rgba() shades are composed
 // from those same imported values rather than written as literals (.claude/rules/design-tokens.md).
@@ -290,6 +307,29 @@ const NET_CSS = `
 .lav-seg button{border:none;background:transparent;font-family:${body};font-weight:600;font-size:11px;
   color:${T.muted};padding:6px 13px;cursor:pointer}
 .lav-seg button.on{background:${T.navy};color:${T.card}}
+/* FEATURE: LAV-1f -- the You node. Same node geometry as an agent card so it sits in the same
+   choreography, deliberately different skin (dashed brass, no code/role row, silhouette avatar) so
+   it can never be mistaken for an agent card. */
+.lav-you{position:absolute;transform:translate(-50%,-50%);width:132px;text-align:center;z-index:9;
+  animation:fadeIn .3s ease-out}
+.lav-you-card{background:linear-gradient(180deg,${T.card},${T.cardAlt});border:1.5px dashed ${T.brass};
+  border-radius:14px;padding:9px 7px 8px;box-shadow:0 10px 26px ${rgba(T.brassDeep, 0.35)}}
+.lav-you-ava{width:50px;height:50px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center}
+.lav-you-name{font-family:${body};font-weight:700;font-size:12.5px;color:${T.navy};line-height:1.15}
+.lav-you-panel{position:absolute;left:50%;top:calc(100% + 10px);transform:translateX(-50%);width:250px;
+  background:${T.card};border:1px solid ${T.brass};border-radius:10px;padding:8px;text-align:left;
+  box-shadow:0 12px 30px ${rgba(T.navy, 0.28)};z-index:30}
+/* Copy and swatch are CHI's own NeedsDecisionBadge (MarketIntelligenceScreen.jsx ~L1209), verbatim. */
+.lav-you-badge{display:inline-block;font-family:${mono};font-size:9px;padding:2px 7px;background:${T.brass};
+  color:${T.card};border-radius:2px;text-transform:uppercase;letter-spacing:.02em;margin-bottom:6px}
+.lav-you-scroll{max-height:170px;overflow:auto;margin-bottom:7px}
+/* Buttons mirror CHI's ConfirmationCardActions (SharedUI.jsx ~L620) exactly -- same labels, same
+   padding, same type, same navy-primary/outline-secondary split. */
+.lav-you-actions{display:flex;gap:6px}
+.lav-you-actions button{flex:1;padding:8px 6px;font-family:${body};font-size:11px;cursor:pointer}
+.lav-you-actions button:disabled{cursor:default;opacity:.5}
+.lav-you-reject{background:transparent;border:1px solid ${T.line};color:${T.ink}}
+.lav-you-accept{background:${T.navy};color:${T.card};border:none;font-weight:600}
 `;
 
 /**
@@ -300,18 +340,35 @@ const NET_CSS = `
  *  running  -- the harness is live right now
  *  traceRows -- this run's real ai_activity_log rows (the screen's poller); model tag only
  *  recoveringAgentId -- the agent HAR-17 is mid-recovery on, or null
+ *  pending   -- LAV-1f: the harness's OPEN confirmation gate, verbatim off its frame, or null
+ *  resolving -- LAV-1f: that same gate while the human's decision request is in flight, or null
+ *  onResolveConfirmation -- LAV-1f: dispatches the human's decision ('accept' | 'reject')
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
   const edges = useMemo(() => sessionEdges(hops, runHops, running), [hops, runHops, running]);
 
+  // FEATURE: LAV-1f -- the human is on stage from the moment a real gate opens until the decision
+  // it dispatched has come back. `gate` is the open gate (controls render only for it); `human` is
+  // either that or the in-flight decision, which is what keeps the node present through the
+  // hand-back instead of blinking out mid-pulse. Both are the hook's real request state.
+  const gate = pending;
+  const human = pending || resolving;
+  const humanAgentId = human?.agentId ?? null;
+  const requester = useMemo(
+    () => (humanAgentId ? roster.find(a => a.id === humanAgentId) || null : null),
+    [roster, humanAgentId]);
+
   // Lead = the agent actually holding an open delegation right now; else the first engaged agent.
+  // While a gate is open that agent holds the focus by definition -- it is the one waiting on the
+  // human -- so it takes the lead anchor and the human materializes opposite it.
   const lead = useMemo(() => {
+    if (humanAgentId && ids.includes(humanAgentId)) return humanAgentId;
     const open = [...net.orchestrators];
     return open.length ? open[open.length - 1] : (net.engaged[0] ?? null);
-  }, [net]);
+  }, [net, humanAgentId, ids]);
 
   const posRef = useRef({});
   const tgtRef = useRef({});
@@ -378,6 +435,31 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   }, [runHops]);
 
   const dropPulse = (id) => setPulses(cur => cur.filter(p => p.id !== id));
+
+  // ── LAV-1f: the two real hand-offs a gate produces, one pulse each, never repeated ──────────
+  // Both use the report-back colour: control genuinely changes hands here (agent -> human, then
+  // human -> agent), which is the same meaning REPORT_COLOR already carries on the legend -- not a
+  // delegation. Keyed on the gate's own confirmation_id, so a pulse fires exactly once per real
+  // gate and a re-render can never replay one.
+  const gateArrivedRef = useRef(null);
+  useEffect(() => {
+    const cid = pending?.confirmation_id ?? null;
+    if (!cid || gateArrivedRef.current === cid) return;
+    gateArrivedRef.current = cid;
+    const from = posRef.current[pending.agentId] || home[pending.agentId];
+    if (!from) return;
+    setPulses(cur => [...cur, { id: ++pulseIdRef.current, d: ePath(from, YOU), color: REPORT_COLOR }]);
+  }, [pending, home]);
+
+  const gateDispatchedRef = useRef(null);
+  useEffect(() => {
+    const cid = resolving?.confirmation_id ?? null;
+    if (!cid || gateDispatchedRef.current === cid) return;
+    gateDispatchedRef.current = cid;
+    const to = posRef.current[resolving.agentId] || home[resolving.agentId];
+    if (!to) return;
+    setPulses(cur => [...cur, { id: ++pulseIdRef.current, d: ePath(YOU, to), color: REPORT_COLOR }]);
+  }, [resolving, home]);
 
   // ── LAV-1c: node card data ────────────────────────────────────────────────
   // Each node's LATEST credited span this run. pickCreditedSpan() already decided which endpoint's
@@ -494,6 +576,37 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               </div>
             );
           })}
+          {/* FEATURE: LAV-1f -- the human on the canvas. Rendered ONLY while the harness really is
+              holding a gate open (or the decision it was handed is still in flight); there is no
+              decorative or demo state. The controls sit on the node because that is where control
+              actually is right now. */}
+          {human && (
+            <div className="lav-you" style={{ left: `${(YOU.x / VW) * 100}%`, top: `${(YOU.y / VH) * 100}%` }}>
+              <div className="lav-you-card">
+                <div className="lav-you-ava"><UserAvatar size={50}/></div>
+                <div className="lav-you-name">{YOU_LABEL}</div>
+              </div>
+              {gate && (
+                <div className="lav-you-panel">
+                  <div className="lav-you-badge">Needs Your Decision</div>
+                  <div className="lav-you-scroll">
+                    <ConfirmationCardContent agent={requester}
+                      proposedAction={gate.proposed_action} critique={gate.critique}/>
+                  </div>
+                  <div className="lav-you-actions">
+                    <button type="button" className="lav-you-reject" disabled={!onResolveConfirmation}
+                      onClick={() => onResolveConfirmation?.("reject")}>
+                      Reject
+                    </button>
+                    <button type="button" className="lav-you-accept" disabled={!onResolveConfirmation}
+                      onClick={() => onResolveConfirmation?.("accept")}>
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div></div>
       <div className="lav-legend">

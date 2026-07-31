@@ -1,3 +1,8 @@
+// DeepBench v7.0.6 | LiveAgentViewScreen.jsx | LAV-1f -- human-in-the-loop: the mode badge gains a
+// steady "Awaiting confirmation" state for as long as the harness really is holding a confirmation
+// gate open, the status strip carries CHI's own "Needs Your Decision" copy and the gate frame's own
+// capability, and the gate + its resolve dispatcher are wired through to the canvas so the human
+// joins it. Also drops LAV-1b's hardcoded title status word for FOCUS_AREA_STATUS.liveAgentView.
 // DeepBench v7.0.3 | LiveAgentViewScreen.jsx | LAV-1d -- the prompt box (the assembled system
 // prompt, exposed for the first time: real streamed text, 2-line clamp, click to expand), and
 // full-turn coverage -- a CHI turn is up to THREE top-level calls, each minting its own trace_id,
@@ -18,7 +23,7 @@
 // (AgentNetwork.jsx) and CHI's own AuditColumn as the right rail.
 // FEATURE: LAV-1c
 import { useState, useEffect, useMemo, useRef } from "react";
-import { T, PALETTE, display, body, mono, FOCUS_STATUS_STYLE, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
+import { T, PALETTE, display, body, mono, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents, useAgentActivitySummary } from "../hooks/useAgents.js";
@@ -100,19 +105,28 @@ function formatExpectation(ms) {
 // ── Task 3: mode badge, derived from the run's real events ───────────────────
 // Routing is the default while a run is live; the first real `delegation_return` (control handed
 // back to a dispatcher -- execute.js L762) is what proves the loop is orchestrating.
-export function deriveMode(runHops, { running, terminal }) {
+// FEATURE: LAV-1f -- `awaiting` outranks every other state: a run holding a real confirmation gate
+// has a terminal frame (the gate IS the frame the harness returned) and is not running, so without
+// this it would read "Complete" while the harness is in fact stopped, waiting on a human. It is
+// driven only by the hook's real gate state -- there is no way to reach it without one.
+export function deriveMode(runHops, { running, terminal, awaiting = false }) {
+  if (awaiting) return "awaiting";
   if (terminal) return terminal === "error" ? "error" : "complete";
   if (!running) return "idle";
   return runHops.some(h => h.type === "delegation_return") ? "orch" : "route";
 }
 
-const MODE_COPY = { idle: "Idle", route: "Routing", orch: "Orchestrating", complete: "Complete", error: "Error" };
+const MODE_COPY = { idle: "Idle", route: "Routing", orch: "Orchestrating", awaiting: "Awaiting confirmation", complete: "Complete", error: "Error" };
 
 function ModeBadge({ mode, detail }) {
   const tint = {
     idle:     { fg: T.muted,     br: T.line },
     route:    { fg: T.brassDeep, br: T.brass },
     orch:     { fg: ACTION_TEXT_COLORS_FETCH.CLICK, br: ACTION_TEXT_COLORS_FETCH.CLICK },
+    // FEATURE: LAV-1f -- brass family, and deliberately the brassGlow token, whose single documented
+    // job (tokens.js, CHI-05) is the "needs your input" surface. Steady: only `orch` animates, and
+    // a pulsing badge would read as work in progress when nothing is progressing.
+    awaiting: { fg: T.brassDeep, br: T.brassGlow },
     complete: { fg: T.moss,      br: T.moss },
     error:    { fg: T.flag,      br: T.flag },
   }[mode];
@@ -234,7 +248,8 @@ function PromptBox({ prompt, agents, traceRows }) {
 
 export default function LiveAgentViewScreen() {
   const agents = useAgents();
-  const { events, status, running, result, error, recovery, prompt, traceIds, runQuestion } = useHarnessStream();
+  const { events, status, running, result, error, recovery, prompt, traceIds, pending, resolving,
+    runQuestion, resolveConfirmation } = useHarnessStream();
 
   const [picked, setPicked] = useState("");
   const [submitted, setSubmitted] = useState(null);
@@ -419,10 +434,15 @@ export default function LiveAgentViewScreen() {
     return answered ? null : recoveryMark.agentId;
   }, [running, recoveryMark, canvasRunHops]);
 
-  const mode = deriveMode(canvasRunHops, { running, terminal });
+  // FEATURE: LAV-1f -- the run is awaiting a human for exactly as long as a real gate is open or the
+  // decision it was handed is still in flight. The badge's detail is the gate frame's OWN
+  // capability_slug (never a label authored here), the same way errorDetail carries the real fault.
+  const awaiting = !!pending || !!resolving;
+  const mode = deriveMode(canvasRunHops, { running, terminal, awaiting });
   const errorDetail = terminal === "error"
     ? (error?.failureClass || error?.status || error?.message || null)
     : null;
+  const badgeDetail = awaiting ? ((pending || resolving)?.capability_slug ?? null) : errorDetail;
 
   // Same math AgentWorkingIndicator uses (~L718): turnStartedAt survives every hop swap, so the
   // elapsed figure is the whole question's time, not the current hop's. Frozen at terminal because
@@ -433,9 +453,12 @@ export default function LiveAgentViewScreen() {
     ? `elapsed ${formatElapsed(clock - base)} | ${liveStatus?.expectation || formatExpectation(liveStatus?.expectationMs ?? 120000)}`
     : null;
 
+  // FEATURE: LAV-1f -- an open gate blocks a new question. Not a timer and not a default decision:
+  // the run genuinely has not finished, and letting a new one start would silently abandon a gate
+  // the harness is still holding open. The gate stays pending until a human resolves it.
   const onRun = () => {
     const q = ALL_QUESTIONS.find(x => x.id === picked);
-    if (!q || running) return;
+    if (!q || running || awaiting) return;
     setSubmitted(q.label);
     setTerminal(null);
     runQuestion(q.label);
@@ -452,7 +475,11 @@ export default function LiveAgentViewScreen() {
           display:"flex",alignItems:"flex-start",gap:20,flexShrink:0}}>
           <div>
             <div style={{fontFamily:display,fontSize:24,fontWeight:700,color:T.navy,lineHeight:1}}>
-              {PAGE_TITLE}<span style={FOCUS_STATUS_STYLE}> (Beta)</span>
+              {/* FEATURE: LAV-1f -- was a hardcoded status word written here by LAV-1b; the focus area's
+                  status now comes from its own key, so graduating it is one edit in tokens.js and
+                  the guard drops the tag everywhere at once (SH-23's contract, same render every
+                  other focus-area title already uses). */}
+              {PAGE_TITLE}{FOCUS_AREA_STATUS.liveAgentView && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.liveAgentView})</span>}
             </div>
             <div style={{fontFamily:mono,fontSize:11.5,color:T.muted,marginTop:4,letterSpacing:"0.02em"}}>
               {PAGE_SUBTITLE}
@@ -465,10 +492,11 @@ export default function LiveAgentViewScreen() {
                 <option value="">{PICKER_PLACEHOLDER}</option>
                 {ALL_QUESTIONS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
               </select>
-              <button onClick={onRun} disabled={!picked || running}
+              <button onClick={onRun} disabled={!picked || running || awaiting}
                 style={{background:T.navy,color:T.card,border:"none",fontFamily:body,fontWeight:600,fontSize:12,
                   padding:"8px 14px",borderRadius:6,letterSpacing:"0.3px",whiteSpace:"nowrap",
-                  cursor: (!picked || running) ? "default" : "pointer", opacity: (!picked || running) ? 0.45 : 1}}>
+                  cursor: (!picked || running || awaiting) ? "default" : "pointer",
+                  opacity: (!picked || running || awaiting) ? 0.45 : 1}}>
                 Run ▸
               </button>
             </div>
@@ -486,12 +514,22 @@ export default function LiveAgentViewScreen() {
         {/* ── Status strip ── */}
         <div style={{display:"flex",alignItems:"center",gap:14,padding:"8px 24px",background:T.cardAlt,
           borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
-          <ModeBadge mode={mode} detail={errorDetail}/>
+          <ModeBadge mode={mode} detail={badgeDetail}/>
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:15,color:T.navy,flex:1,minWidth:0,
             whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
             {submitted || IDLE_QUESTION_COPY}
           </div>
-          {status?.message && (
+          {/* FEATURE: LAV-1f -- while the gate is open the harness is emitting nothing, so there is
+              no live status message to show; the strip carries CHI's own NeedsDecisionBadge copy
+              (MarketIntelligenceScreen.jsx ~L1209) verbatim instead -- the platform's existing
+              words for exactly this state, in the same brass. Once the decision is dispatched the
+              real streamed status takes over again. */}
+          {awaiting ? (
+            <div style={{fontFamily:mono,fontSize:11,color:T.brassDeep,fontWeight:700,flexShrink:0,
+              textTransform:"uppercase",letterSpacing:"0.02em"}}>
+              Needs Your Decision
+            </div>
+          ) : status?.message && (
             <div style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",flexShrink:0,
               maxWidth:340,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
               {status.message}
@@ -513,7 +551,8 @@ export default function LiveAgentViewScreen() {
         <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
           <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
-            choreographed={choreographed} onToggleChoreographed={setChoreographed}/>
+            choreographed={choreographed} onToggleChoreographed={setChoreographed}
+            pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>
