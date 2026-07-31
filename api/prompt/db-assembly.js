@@ -1,3 +1,6 @@
+// DeepBench v7.0.14 | api/prompt/db-assembly.js | HAR-27 -- web_search_max_uses trait read (positive
+// integer only), carried on the returned llm object; merged after the profile loop so a later Format
+// Skill Profile's wholesale llm rebuild can't drop it. Absent/invalid trait -> key omitted entirely.
 // DeepBench v7.0.7 | api/prompt/db-assembly.js | AGT-54 -- AA-121's intent_allowlist gate hoisted out
 // of the knowledge-only branch to fire generically for any skill type; a Guardrails Skill reaching a
 // routing/classification intent was skewing its answer (channel-intelligence's ci-routing-intent).
@@ -46,6 +49,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   let llm = { ...DEFAULT_LLM };
   let canRequestHelp = false;
   let enableWebSearch = false;
+  let webSearchMaxUses = null;
   let delegationRequired = false;
   let requiresHumanConfirmation = false;
   let critiqueCapabilitySlug = null;
@@ -205,6 +209,15 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
         if (traits.enable_web_search === true) {
           enableWebSearch = true;
         }
+        // FEATURE: HAR-27 -- web_search_max_uses passthrough, same gate as enable_web_search
+        // directly above. Caps Anthropic's server-side web_search searches for this call only
+        // (max_uses on the tool definition, emitted in request-receivable.js). Accepted only as
+        // a positive integer -- anything else (0, negative, float, string) is dropped right here
+        // so an invalid value can never reach the Anthropic request body. Held in a local and
+        // merged onto llm after the loop (see the pre-return merge below).
+        if (Number.isInteger(traits.web_search_max_uses) && traits.web_search_max_uses > 0) {
+          webSearchMaxUses = traits.web_search_max_uses;
+        }
         // FEATURE: AA-142 -- delegation_required passthrough, same shape as can_request_help
         // directly above. Marks an intent whose entire job is completing a hand-off via
         // request_help/delegate_to_agent -- never a legitimate direct-text answer (unlike e.g.
@@ -313,6 +326,12 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   const synthesis = synthesisEnabled
     ? { enabled: true, model: "claude-haiku-4-5-20251001", max_tokens: 2048, declared_by: synthesisDeclaringSlug, prompt: synthesisPromptText }
     : { enabled: false };
+
+  // FEATURE: HAR-27 -- merged here, after the profile loop, NOT inline at the trait read: a
+  // later-iterated Format Skill Profile with llm_provider/llm_model rebuilds llm wholesale
+  // (~line 250 above) and would silently drop a key set mid-loop. Key omitted entirely when the
+  // trait is absent/invalid -- every non-opted-in capability's llm object is byte-identical.
+  if (webSearchMaxUses !== null) llm = { ...llm, web_search_max_uses: webSearchMaxUses };
 
   return { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices };
 }

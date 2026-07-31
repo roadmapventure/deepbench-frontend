@@ -1,5 +1,6 @@
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
 // DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
+// DeepBench v7.0.14 | api/prompt/request-receivable.js | HAR-27 -- optional webSearchMaxUses param on buildCallBody()/callModel() emits max_uses on the web_search tool definition; sendRequest() threads llm.web_search_max_uses. Unset (every non-opted-in caller) is byte-identical
 // DeepBench v6.3.201 | api/prompt/request-receivable.js | HAR-20 -- disable_parallel_tool_use on both forced tool_choice sites (buildCallBody's forced branch + the guardrails inline call); buildParseRetryCorrection() covers every tool_use id, not just the first
 // DeepBench v6.3.190 | api/prompt/request-receivable.js | LOG-77-9 -- extractDelegationProvenanceFacts(): verbatim delegation_target/task_provenance backing facts for the read-time delegated_to_provenance derivation (§19k); no comparison, no conclusion
 // DeepBench v6.3.180 | api/prompt/request-receivable.js | HAR-15 -- classifyAnthropicFailure() stamps failureClass/faultCode/upstreamStatus on every thrown Anthropic failure; retry behavior byte-identical
@@ -98,13 +99,19 @@ const DELEGATE_TO_AGENT_TOOL = {
 // Zero-regression scope: the only existing enable_web_search:true Skill Profile
 // (ws-news-search-intent) already has can_request_help:true too, so harnessTools.length>0 was
 // already true for it -- this change is a no-op for every caller that existed before this session.
-export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, conversation_history = [] }) {
+// FEATURE: HAR-27 -- webSearchMaxUses is a new optional param, same opt-in shape as
+// enableWebSearch directly above. When set (validated upstream at db-assembly.js's trait gate:
+// positive integer only), it emits `max_uses` on the web_search tool definition -- Anthropic's
+// server-side per-turn search cap. Inert when enableWebSearch is false (the tool entry it
+// decorates doesn't exist). Unset for every existing caller is byte-identical: the conditional
+// spread adds no key.
+export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
-  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search' }] : [];
+  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search', ...(webSearchMaxUses ? { max_uses: webSearchMaxUses } : {}) }] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0;
 
@@ -304,7 +311,9 @@ export function buildParseRetryCorrection(llmContent, correctionText) {
 // 55s window computed at this exact call, byte-identical. execute.js's runLoop() (AA-139) passes
 // its own already-computed deadline through here so this call's internal Anthropic request(s) are
 // bounded by real remaining budget, not a blind fixed constant.
-export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, conversation_history = [], deadline = null }) {
+// FEATURE: HAR-27 -- webSearchMaxUses threaded through to buildCallBody(), same opt-in shape as
+// enableWebSearch. Unset for every non-opted-in caller: byte-identical request body.
+export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, conversation_history = [], deadline = null }) {
   const effectiveDeadline = deadline || (Date.now() + 55000);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -315,11 +324,11 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
     : null;
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
-  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search' }] : [];
+  const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search', ...(webSearchMaxUses ? { max_uses: webSearchMaxUses } : {}) }] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const hasSchemaTool = !!schemaTool;
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, conversation_history });
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
@@ -668,7 +677,9 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     // (this path never threads canRequestHelp either -- every existing non-precomputed caller of
     // sendRequest(), api/plan.js and confirmation.js, has no delegation flow). Unset (every
     // existing caller) is byte-identical.
-    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, conversation_history: [], deadline });
+    // FEATURE: HAR-27 -- webSearchMaxUses read off the same llm object destructured above;
+    // undefined for every capability without the trait (byte-identical).
+    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, webSearchMaxUses: llm?.web_search_max_uses, conversation_history: [], deadline });
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;

@@ -1,3 +1,4 @@
+// DeepBench v7.0.14 | api/capabilities/execute.js | HAR-27 -- runLoop()'s callModel() site passes webSearchMaxUses from enriched.llm; checkpointAndReturn()'s durable_hops llm persist now carries web_search_max_uses (conditionally) so the cap survives checkpoint/resume -- the persisted llm object was hand-narrowed, not wholesale
 // DeepBench v7.0.10 | api/capabilities/execute.js | AA-179c -- one call-site change: enrichPrompt() now receives this execution's span identity and the opt-in onEvent seam, so the assembly work that runs before runLoop() can stream. No emit site added here; resumeCapability()/runLoop() untouched
 // DeepBench v7.0.3 | api/capabilities/execute.js | LAV-1d -- one streamed emit at runLoop()'s model-call seam exposing the assembled system prompt (full text, never truncated) on the same opt-in _onEvent seam the 10 delegation emits use; no persistence, no logAICall, no new column -- a non-streaming caller is byte-identical
 // DeepBench v6.3.228 | api/capabilities/execute.js | DAT-12 -- retrieval_scope: an explicit, named public param (AA-83 posture preserved) threaded to assemblePrompt() only, so a regression run can scope its own reads to the seed corpus without mutating a single row
@@ -516,7 +517,12 @@ async function checkpointAndReturn({ job_id, tenant_id, capability_slug, intent_
     const row = await createDurableHopRow({
       tenant_id, capability_slug, intent_slug, agent_id, task_context,
       system_prompt: enriched.system_prompt, format_contract: enriched.format_contract,
-      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature }, can_request_help: canRequestHelp,
+      // FEATURE: HAR-27 -- the persisted llm object is hand-narrowed (NOT the wholesale enriched.llm,
+      // despite what earlier comments elsewhere implied), so the cap must be carried explicitly or a
+      // resumed hop (enriched.llm rebuilt from row.llm in resumeCapability()) would run uncapped --
+      // the exact silent-false-on-resume gap HAR-17 closed for enable_web_search. Conditional spread:
+      // rows for capabilities without the trait stay byte-identical.
+      llm: { model: enriched.llm.model, max_tokens: enriched.llm.max_tokens, temperature: enriched.llm.temperature, ...(enriched.llm.web_search_max_uses ? { web_search_max_uses: enriched.llm.web_search_max_uses } : {}) }, can_request_help: canRequestHelp,
       delegation_required: delegationRequired === true,
       // FEATURE: LOO-20 -- persist the confirmation-gate overrides so a resume re-reads the real
       // gate instead of the hardcoded false; snake_case column names, same as delegation_required.
@@ -877,6 +883,9 @@ async function runLoop({
         format_contract: enriched.format_contract,
         canRequestHelp,
         enableWebSearch,
+        // FEATURE: HAR-27 -- rides enriched.llm (validated at db-assembly.js's trait gate);
+        // undefined for every capability without the trait, byte-identical request body.
+        webSearchMaxUses: enriched.llm?.web_search_max_uses,
         conversation_history: conversationHistory,
         deadline,
       });
