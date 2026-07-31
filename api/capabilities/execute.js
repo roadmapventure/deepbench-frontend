@@ -1,3 +1,4 @@
+// DeepBench v7.0.22 | api/capabilities/execute.js | SES-67 -- the pending_confirmation return, its durable_hops result mirror, and both depth_exceeded returns now carry trace_id/span_id (§19p: identity attached where the result is born -- the loop's own identity, same as the adjacent critique dispatch threads), closing the last executor result shapes that omitted it; error returns deliberately still unchanged
 // DeepBench v7.0.16 | api/capabilities/execute.js | HAR-02b -- runLoop()'s callModel() site forwards system_prompt_stable/system_prompt_volatile from the enriched prompt (additive plumbing; callModel()/buildCallBody() don't read them until S-HAR-02c); the format-override append mirrors onto the volatile half so the split stays coherent with system_prompt; the agent-turn log row now carries cache_creation_input_tokens/cache_read_input_tokens from the turn's usage (HAR-02a follow-through -- the loop path's single log record, LOG-91). The split halves are NOT persisted to durable_hops (system_prompt is; see S-HAR-02b build report) -- a resumed hop carries only the concatenated prompt until S-HAR-02c decides resume-side caching
 // DeepBench v7.0.14 | api/capabilities/execute.js | HAR-27 -- runLoop()'s callModel() site passes webSearchMaxUses from enriched.llm; checkpointAndReturn()'s durable_hops llm persist now carries web_search_max_uses (conditionally) so the cap survives checkpoint/resume -- the persisted llm object was hand-narrowed, not wholesale
 // DeepBench v7.0.10 | api/capabilities/execute.js | AA-179c -- one call-site change: enrichPrompt() now receives this execution's span identity and the opt-in onEvent seam, so the assembly work that runs before runLoop() can stream. No emit site added here; resumeCapability()/runLoop() untouched
@@ -1034,7 +1035,7 @@ async function runLoop({
         let critique = null;
         if (critiqueCapabilitySlug) {
           if (hopCounter.n >= MAX_LOOP_DEPTH) {
-            return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+            return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug, trace_id, span_id };
           }
           hopCounter.n++;
           const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
@@ -1082,10 +1083,10 @@ async function runLoop({
         if (job_id) {
           await patchDurableHopRow(job_id, {
             status: 'complete',
-            result: { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug },
+            result: { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug, trace_id, span_id },
           });
         }
-        return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug };
+        return { status: 'pending_confirmation', confirmation_id, proposed_action: turn.tool_input, critique, depth, agent_id, capability_slug, trace_id, span_id };
       }
 
       // FEATURE: HAR-04 -- same deadline passthrough as the callModel() call above.
@@ -1122,8 +1123,9 @@ async function runLoop({
       });
       // FEATURE: LOG-79 -- the response now carries the loop's trace identity (generic, every
       // capability identically) so the client can join hop events to the ai_call_patterns view.
-      // Deliberately NOT added to error/pending_confirmation/depth_exceeded returns -- those
-      // never display pattern lines.
+      // Deliberately NOT added to error returns -- those never display pattern lines.
+      // (pending_confirmation/depth_exceeded returns DO carry trace_id/span_id since SES-67,
+      // v7.0.22 -- §19p identity, not pattern-line display.)
       const finalResult = { ...resultSansTerminalLog, display_agent_card, display_agent_id: display_agent_id || null, last_help_selection: lastHelpSelection, trace_id, span_id };
       if (job_id) {
         await patchDurableHopRow(job_id, { status: 'complete', result: finalResult });
@@ -1135,7 +1137,7 @@ async function runLoop({
     // tools (request_help, delegate_to_agent) -- there is no more data-driven delegate array
     // to match against. The same shared hopCounter ceiling applies to both. ARCHITECTURE.md §19d.
     if (hopCounter.n >= MAX_LOOP_DEPTH) {
-      return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug };
+      return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug, trace_id, span_id };
     }
     hopCounter.n++;
     delegationOccurred = true;
