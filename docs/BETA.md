@@ -333,6 +333,32 @@ known defect that would break or dirty that run:
 > half (case 24) had in fact landed. Round 5 runs after the revert + gate hoist ship: all 4 cases, expecting case 6
 > restored to `forecast` routing AND case 24's pass retained.
 
+> **Pre-regression round 5 — 2026-07-31, `design-arch-beta-0729`, independent confirmation of `AGT-44` + `AGT-54`
+> (v7.0.7, deploy gate PASSED on `72cd1b8`). Verdict: both fixes CONFIRMED — rows 29/30 stay closed.**
+>
+> | Case | R1 | R2 | R3 | R4 | R5 | R5 attribution |
+> |---|---|---|---|---|---|---|
+> | 6 `upgrade-cycles` | FAIL | FAIL | PASS | void | ✅ **PASS** | `forecast`/edit journey restored with guardrail delivered — `AGT-54`'s gate works. 394 s (see `CHI-96` note). |
+> | 24 `news-first-card` | — | PASS | FAIL | PASS | ❌ FAIL | **`platform_language_detected` CLEAN — the fix's criterion holds, third consecutive run.** Fail is `holistic_verdict` with zero scored criteria: degraded article judged under the hardcoded rich-answer rubric — **`SES-64` verbatim, 4th occurrence** (green/red now brackets the same condition twice). |
+> | 12 `vietnam-reseller` | PASS | PASS | FAIL | FAIL | ✅ PASS | Flaky per `AGT-50`'s judge-variance framing; `AGT-52`/`AGT-51` remain real and open. |
+> | 9 `vitrine-tech` | FAIL | FAIL | FAIL | void | ❌ FAIL | `asked_metric_present` under honest-gap on `theory_test`+`forecast_draft` — exactly the predicted `DAT-16` residue / `AGT-50` class. Expected, unchanged. |
+>
+> **Bar accounting, stated honestly:** the round-4 bar said "case 24's pass retained." That welded this fix's verification
+> to `SES-64`, an untouched, separately-filed defect whose whole point is that case 24's case-level outcome is a
+> readability lottery under the wrong rubric. The correct, criterion-level reading: the guardrail's target criterion has
+> now been clean on every run since the delivery landed (round 4, `S-AGT-44b`'s fresh-card check, round 5), and Marcus
+> Webb — GEO CSO Expert's degraded-article answer discloses in business terms with zero platform narration. `AGT-44`/`AGT-54`
+> are done; **case 24's case-level pass now depends on `SES-64` (+`CHI-95`) and nothing else.**
+>
+> **Remaining bucket-1 blockers for the pre-regression set, each named:** case 24 → `SES-64` (driver-only, already
+> scoped "do before the next bucket-1 run") + `CHI-95`; case 9 → `AGT-50` + `DAT-16` residue (Priya's `theory_test`,
+> never in `DAT-16b`'s scope). Recommended next fix: **`SES-64`** — smallest change, driver-only, and round 5 just gave
+> it a fourth measured occurrence.
+>
+> **`CHI-96` second measurement:** case 6 completed in **394 s** (R2 193 s → R3 828 s → R5 394 s, plus a void 29-min
+> network hang in R4). The 828 s reading looks like top-end variance, not a stable 4.3× regression — `CHI-96` stays
+> measure-first, downgraded urgency.
+
 
 > **Pre-regression round 3 — 2026-07-30, `design-arch-beta-0729` ("i have finished the 3 tickets. do you pre-test again?").** Same 4 cases.
 > Nothing this round depended on a Vercel deploy: `SES-65` and `DAT-16` Part 1 are driver-local, `DAT-16b` and `AGT-44` are
