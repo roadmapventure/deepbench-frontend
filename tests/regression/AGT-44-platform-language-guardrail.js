@@ -1,3 +1,10 @@
+// DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch --
+// A3/A4 re-anchored to the stable-first layout (S-HAR-02b prompt reorder): guardrails now renders at
+// order 5, prompt_phase 'stable', LAST within the stable phase -- after format/intent/identity/
+// behavior, before every volatile (per-call) section, knowledge included. The pre-reorder claims
+// ("after knowledge", "last among Skill-derived sections", SKILL_ORDER.guardrails === 6) encoded the
+// superseded layout. B1's live skill_types.guardrails.display_order === 6 check is deliberately
+// UNCHANGED -- that column is DB display metadata, not a SKILL_ORDER mirror, as of the renumbering.
 // DeepBench v6.3.229 | tests/regression/AGT-44-platform-language-guardrail.js | AGT-44
 // FEATURE: AGT-44 -- SES-009a persistence. One shared Guardrails Skill (`platform-language-guardrail`)
 // carries the business-content standard to every artifact-producing agent: business content for a VP of
@@ -142,23 +149,34 @@ async function assemblerContract() {
       `rule text in \`method\` surfaced in the '${s.slug}' section -- a guardrails-type Skill's method must reach the model through no section at all`);
   }
 
-  // A3. The guardrails section reaches the model AFTER the agent's own instructions. A constraint the
-  //     model reads before the instructions it constrains is a constraint it discounts.
+  // A3. The guardrails section renders positioned per the platform's declared order. A constraint the
+  //     model reads before the instructions it constrains is a constraint it discounts -- so it still
+  //     comes AFTER the agent's own stable instructions (format/intent/identity/behavior). Since
+  //     S-HAR-02b's stable-first reorder it is the LAST section of the STABLE phase (order 5,
+  //     prompt_phase 'stable'), before every volatile per-call section (knowledge/RAG included --
+  //     knowledge moved to the volatile tail because its content is fetched per call; "after
+  //     knowledge" was the pre-reorder claim and is deliberately no longer asserted).
+  assert.equal(g.order, 5, `guardrails order is ${g.order}, not 5 -- the stable-first layout moved`);
+  assert.equal(g.prompt_phase, "stable",
+    `guardrails prompt_phase is '${g.prompt_phase}', not 'stable' -- a volatile guardrails section would fall out of the cacheable prefix and re-order it after per-call content`);
   for (const slug of ["identity", "behavior", "intent"]) {
     const other = sectionBySlug(withGuardrails.sections, slug);
     assert.ok(other, `fixture set produced no '${slug}' section -- the ordering comparison would be vacuous`);
     assert.ok(g.order > other.order,
       `guardrails order (${g.order}) must be greater than '${slug}' order (${other.order})`);
   }
-  const knowledge = withGuardrails.sections.find(s => s.slug.startsWith("knowledge-"));
-  assert.ok(knowledge, "fixture set produced no knowledge section -- the ordering comparison would be vacuous");
-  assert.ok(g.order > knowledge.order,
-    `guardrails order (${g.order}) must be greater than the knowledge section's order (${knowledge.order})`);
-  // Sorted output, not just numerically greater: buildSections() sorts by order, so the guardrails
-  // section must physically be the last of the Skill-derived sections.
-  const skillSections = withGuardrails.sections.filter(s => s.skill_profile_slug);
-  assert.equal(skillSections[skillSections.length - 1].slug, "guardrails",
-    "the guardrails section must sort last among the Skill-derived sections");
+  // Sorted output, not just numerically greater: buildSections() sorts by order, so guardrails must
+  // physically be the last stable-phase section, and every volatile section must sort after it.
+  const stableSections = withGuardrails.sections.filter(s => s.prompt_phase === "stable");
+  assert.equal(stableSections[stableSections.length - 1].slug, "guardrails",
+    "the guardrails section must sort last within the stable phase");
+  const volatileSections = withGuardrails.sections.filter(s => s.prompt_phase !== "stable");
+  assert.ok(volatileSections.length > 0,
+    "fixture set produced no volatile section -- the stable/volatile boundary comparison would be vacuous");
+  for (const v of volatileSections) {
+    assert.ok(v.order > g.order,
+      `volatile section '${v.slug}' (order ${v.order}) sorts before guardrails (order ${g.order}) -- per-call content is interleaving into the stable prefix`);
+  }
 
   // A4. ...and still BEFORE VOICE. VOICE is appended by assemblePrompt() at a hardcoded order and must
   //     remain the final thing the model reads (AA-127); a SKILL_ORDER value that ever reached it would
@@ -166,8 +184,8 @@ async function assemblerContract() {
   const src = fs.readFileSync(path.join(ROOT, "api", "prompt", "db-assembly.js"), "utf8");
   const skillOrderLiteral = src.match(/const SKILL_ORDER = \{([^}]*)\}/);
   assert.ok(skillOrderLiteral, "SKILL_ORDER literal not found in api/prompt/db-assembly.js -- the file changed shape");
-  assert.ok(/guardrails\s*:\s*6/.test(skillOrderLiteral[1]),
-    "SKILL_ORDER.guardrails is no longer 6 -- skill_types.guardrails.display_order (6) was chosen to match it");
+  assert.ok(/guardrails\s*:\s*5/.test(skillOrderLiteral[1]),
+    "SKILL_ORDER.guardrails is no longer 5 -- S-HAR-02b's stable-first table puts it last in the stable run (1-5). NOTE: skill_types.guardrails.display_order stays 6 in Supabase (display metadata, deliberately NOT a SKILL_ORDER mirror since the renumbering)");
   const voiceOrder = Number((src.match(/slug:\s*'voice'[\s\S]*?order:\s*(\d+)/) || [])[1]);
   assert.ok(Number.isFinite(voiceOrder), "the VOICE section's order literal not found in api/prompt/db-assembly.js");
   const orderValues = [...skillOrderLiteral[1].matchAll(/:\s*(\d+)/g)].map(m => Number(m[1]));
