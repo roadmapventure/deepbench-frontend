@@ -317,7 +317,21 @@ known defect that would break or dirty that run:
 | 26 | `AGT-51` (Architecture) | A citation's `confidence_tier` can read `inferred` when the Data Room classifies the same UUID as sourced-equivalent, triggering a hard case-fail via the runbook's `D4` strict-rejection rule regardless of retry outcome. Independent of any content defect. Not root-caused. *(added 2026-07-30, `design-dat-16`)* |
 | 27 | `AGT-52` (Architecture) | A citation rejection's own reason text leaks platform jargon (`confidence_tier`, raw UUIDs, `Data Room`) — `AGT-44`'s exact defect class, on a Skill that guardrail apparently didn't reach. Not root-caused; verify which intent generates this text before scoping. *(added 2026-07-30, `design-dat-16`)* |
 | 28 | `CHI-96` (Speed) | The Forecast **edit** journey slowed ~4.3× after `AGT-47` — case 6 went 193 s → 828 s between pre-regression rounds 2 and 3, same driver and endpoint. Suspected cause is `AGT-47`'s larger `user_reasoning` payload; one run each, so variance not excluded. **Measure before scoping, and do not revert `AGT-47`** — it is the only case that improved. Bucket 2, not 1. *(added 2026-07-30, `design-arch-beta-0729` round 3)* |
-| 29 | `AGT-44` (Architecture) | **REOPENED** — v6.3.229's "every artifact-producing agent" reached 2 of 5; `channel-intelligence` (Marcus Webb — GEO CSO Expert) never got the guardrail, and case 24 failed on the standard he was never given. Completion is ONE `capability_skill_profiles` row + a coverage query + two documented exclusions; full scope on the FEATURES.md row. Next fix session (`S-AGT-44b`, Sonnet 5, John running); round 4 here verifies. *(reopened 2026-07-30, `design-arch-beta-0729`)* |
+| 29 | `AGT-44` (Architecture) | **REOPENED — completion scope now v3 (intent-scoped delivery), the bare row attach is proven net-negative.** `S-AGT-44b`'s A/B: row in → case 6 routes `qa` not `forecast`, 3/3 both directions; mechanism confirmed in source by both sessions (`AA-121` gate is knowledge-only, so the guardrail reaches `ci-routing-intent`). But with the row live case 24 **passed end-to-end for the first time ever** — content right, delivery wrong. Interim revert; completion = hoist the `AA-121` allowlist to all skill types + scope delivery away from `ci-routing-intent` + A/B re-verify. Full scope on the FEATURES.md row. *(updated 2026-07-31)* |
+
+> **Pre-regression round 4 — 2026-07-31, `design-arch-beta-0729`, row live, deploy gate PASSED (`3ccf21b`).**
+> Two informative results, two void: **case 24 ✅ PASS — the first pass in four rounds** (all three artifacts,
+> `platform_language_detected=false`, article degraded again — the guardrail's benefit is real on Marcus); case 12 FAIL on
+> **already-filed** rows (`AGT-52`'s rejection-text jargon — "confidence_tier: inferred, synthesized records" — plus one
+> probe try naming the Data Room; the fix under test is not implicated); **cases 6 and 9 VOID** — `infra_death: fetch
+> failed` (case 6 after a 29-min hang, case 9 in 148 ms; endpoint/network, not judged results — re-run in round 5).
+> **Attribution notes, recorded against this session's own round-4 messages:** the "no routing regression" reading of
+> cases 12/24 is **retracted** (neither case exercises `ci-routing-intent`'s Forecast branch — an assertion that cannot
+> discriminate is not evidence), and the `S-LAV-1d` confound theory is **withdrawn** (`S-AGT-44b`'s A/B held LAV constant).
+> `S-AGT-44b`'s original net-negative call was right on the delivery mechanism; what it missed was only that the benefit
+> half (case 24) had in fact landed. Round 5 runs after the revert + gate hoist ship: all 4 cases, expecting case 6
+> restored to `forecast` routing AND case 24's pass retained.
+
 
 > **Pre-regression round 3 — 2026-07-30, `design-arch-beta-0729` ("i have finished the 3 tickets. do you pre-test again?").** Same 4 cases.
 > Nothing this round depended on a Vercel deploy: `SES-65` and `DAT-16` Part 1 are driver-local, `DAT-16b` and `AGT-44` are
