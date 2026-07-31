@@ -1,3 +1,6 @@
+// DeepBench v7.0.7 | api/prompt/db-assembly.js | AGT-54 -- AA-121's intent_allowlist gate hoisted out
+// of the knowledge-only branch to fire generically for any skill type; a Guardrails Skill reaching a
+// routing/classification intent was skewing its answer (channel-intelligence's ci-routing-intent).
 // DeepBench v6.3.228 | api/prompt/db-assembly.js | DAT-12 -- assemblePrompt() accepts a request-level
 // retrieval_scope and buildSections() stamps it onto the knowledge branch's fetch_instruction. Never
 // read from traits -- see the buildSections() comment for why that distinction is the whole point.
@@ -54,26 +57,34 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
     const order = SKILL_ORDER[typeSlug] ?? 99;
     const traits = sp.traits || {};
 
+    // FEATURE: AA-121, hoisted AGT-54 -- optional intent_allowlist gate, now type-agnostic. Originally
+    // scoped inside the knowledge branch only (RAG fetch cost on lightweight intents); AGT-44b/AGT-54
+    // found the same unconditional-delivery problem on a Guardrails Skill (platform-language-guardrail
+    // reaching channel-intelligence's ci-routing-intent, a 5-way classification call, skewed its answer
+    // -- proven live, deterministic 3/3 both directions). A Skill Profile attaches to a Capability, not
+    // an intent, so any type can carry this trait; the gate now reads it once, before the type dispatch
+    // below, generic to every branch (`.claude/rules/capabilities-are-data.md`: a trait/field read, not
+    // a type- or capability-keyed conditional). Opt-in: unset (every Skill Profile except this session's
+    // opt-ins) is byte-identical to today -- fires on every call for its Capability, same as before.
+    if (Array.isArray(traits.intent_allowlist) && traits.intent_allowlist.length > 0) {
+      if (!intentSlug || !traits.intent_allowlist.includes(intentSlug)) {
+        continue;
+      }
+    }
+
     let sectionType = "stored";
     let content = null;
     let fetchInstruction = null;
 
     if (typeSlug === "knowledge") {
-      // FEATURE: AA-121 -- optional intent_allowlist gate. Knowledge Skill Profiles attach to a
-      // capability, not an intent, so historically fired RAG unconditionally on every call for that
-      // capability -- including lightweight, non-analytical intents that never reference retrieved
-      // content (e.g. channel-intelligence's ci-routing-intent classification call, or
-      // ci-answer-display-intent's pure hand-off routing). Confirmed live: ci-routing-intent was
-      // pulling ~4.3K tokens of RAG context to decide a 5-way classification with a 95-token output.
-      // Opt-in via traits.intent_allowlist (array of intent_slugs) -- when set, this section (and its
-      // RAG fetch) is skipped entirely unless the current call's intent_slug is in the list. Unset
-      // (every existing Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is
-      // byte-identical to today -- fires on every call, same as before.
-      if (Array.isArray(traits.intent_allowlist) && traits.intent_allowlist.length > 0) {
-        if (!intentSlug || !traits.intent_allowlist.includes(intentSlug)) {
-          continue;
-        }
-      }
+      // FEATURE: AA-121 -- Knowledge Skill Profiles attach to a capability, not an intent, so
+      // historically fired RAG unconditionally on every call for that capability -- including
+      // lightweight, non-analytical intents that never reference retrieved content (e.g.
+      // channel-intelligence's ci-routing-intent classification call, or ci-answer-display-intent's
+      // pure hand-off routing). Confirmed live: ci-routing-intent was pulling ~4.3K tokens of RAG
+      // context to decide a 5-way classification with a 95-token output. The intent_allowlist gate
+      // itself is now hoisted above (AGT-54); this comment stays for the RAG-cost rationale specific
+      // to this branch.
       sectionType = "rag";
       fetchInstruction = {
         method: "rag",
