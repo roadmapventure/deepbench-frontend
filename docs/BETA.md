@@ -248,7 +248,13 @@ the same class — 4 done, 2 open as of 2026-07-29. Don't restate a count in thi
    `case_pass: false`. This is exactly what `AGT-36` built the `honest-gap` class (§5b) to fix;
    #24 is the one case never wired to it, because its class predates the class. Fix: derive #24's
    class from that run's `article_degraded` instead of hardcoding it.
-10. **`SES-67` (Observability) — ❌ OPEN, filed 2026-07-31 (`design-chi-96`), cheap.** The driver's
+10. **`SES-67` (Observability) — ✅ DONE + archived 2026-07-31 (`S-SES-67`, v7.0.22, `56935bd`).**
+   Confirmation-gate (and `depth_exceeded`) returns now carry `trace_id`/`span_id` (§19p); the
+   driver needed zero changes. Closure gate passed discriminating: case 6 report carries **10**
+   trace ids vs 8 on every pre-fix run, the 2 new ids verified in `ai_activity_log` as the
+   forecast-patch chains. Guard test proven to fail on pre-fix source. The QA run's own
+   `case_pass: false` is `HAR-30` (bucket-1 table below), A/B-proven independent. Original
+   framing kept: The driver's
    `REPORT_JSON` `trace_ids` list misses the two mid-journey forecast-patch chains on the edit
    journey — measured on case 6, both runs this session: the `patch` and edit-`resolve` calls each
    ran a full `data-analysis:data-patch-intent` chain (~80–100 s, 5 calls apiece) under trace ids
@@ -329,6 +335,7 @@ known defect that would break or dirty that run:
 | 28 | ~~`CHI-96` (Speed)~~ **✅ CLOSED 2026-07-31 (`design-chi-96`) — measured, no regression; row archived.** | ~~The Forecast **edit** journey slowed ~4.3× after `AGT-47`.~~ Two clean dedicated re-runs of case 6 (deploy gate PASSED): **455 s and 326 s, both full PASS** — sequence 193 → 828 → 394 → 455 → 326, so the 828 s reading was top-end variance. Per-call `ai_activity_log` accounting shows zero idle time: the edit journey inherently runs the forecast-patch chain twice (draft + edit re-draft) plus the accept-execute chain, ~15–18 sequential model calls, so ~5.5–7.5 min is its construction cost. `AGT-47`'s payload exonerated (edit-leg inputs 3–12K tokens). A faster journey is a redesign ticket if ever wanted, not a regression fix. Side finding: `SES-67` (Observability), §2b item 10. *(added 2026-07-30, `design-arch-beta-0729` round 3; closed 2026-07-31, `design-chi-96`)* |
 | 29 | ~~`AGT-44` (Architecture)~~ **✅ Fixed 2026-07-31 (`S-AGT-44b`, v7.0.7) — no longer a bucket-1 risk.** | ~~v6.3.229's "every artifact-producing agent" reached 2 of 5; `channel-intelligence` never got the guardrail, and case 24 failed on the standard Marcus was never given.~~ Attached, but the plain attach (v7.0.5) deterministically broke Forecast routing (case 6: `qa` instead of `forecast`, 3/3 both directions) — root cause was `AA-121`'s intent-scoping gate being Knowledge-only, fixed generically as `AGT-54`, then the guardrail re-attached with an explicit `intent_allowlist` scoping it away from `ci-routing-intent`. Re-verified: 3/3 routing calls clean, case 6 full `case_pass: true`, case 24's `answer` clean on `platform_language_detected` on a fresh run (case's remaining instability is `AGT-52`, unrelated). *(reopened 2026-07-30, `design-arch-beta-0729`; fixed 2026-07-31, `S-AGT-44b`)* |
 | 30 | `AGT-54` (Architecture) | **✅ DONE 2026-07-31 (`S-AGT-44b`, v7.0.7) — no longer a live risk, kept as a beta-relevant record.** `db-assembly.js`'s `AA-121` intent-scoping gate only fired for Knowledge Skills; a Guardrails Skill reaching a routing/classification intent could silently skew its classification. Hoisted the gate to be type-agnostic — this is what unblocked `AGT-44`'s reopen. *(found + fixed live 2026-07-31, `S-AGT-44b`)* |
+| 31 | `HAR-30` (Task Success Rate) | `S-HAR-02b`'s stable-first prompt reorder (v7.0.16, `5f051f3`) deterministically flips case 6's `ci-routing-intent` to `qa` — `forecast` 3/3 on pre-`HAR-02b` code, `qa` 3/3 on the `HAR-02b` window and tip, same live Skill data, `SES-67`'s commit exonerated by A/B. Journey still completes but the deviation fails the case, so a bucket-1 run cannot go clean. Owner: the in-flight `HAR-02` chain (part 2/3) — reconcile there before part 3 closes. *(added 2026-07-31, `S-SES-67-design` QA)* |
 
 > **Pre-regression round 4 — 2026-07-31, `design-arch-beta-0729`, row live, deploy gate PASSED (`3ccf21b`).**
 > Two informative results, two void: **case 24 ✅ PASS — the first pass in four rounds** (all three artifacts,
