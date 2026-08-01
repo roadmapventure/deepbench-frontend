@@ -263,7 +263,6 @@ instruction (`fetch_instruction` field populated). Never both. Never neither.
         "method": "reflect",
         "model": "claude-haiku-4-5-20251001",
         "max_tokens": 1024,
-        "inserts_after": "knowledge",
         "declared_by": "planning-behavior"
       },
       "required": false,
@@ -359,7 +358,6 @@ Within each type, `capability_skill_profiles.display_order` determines ordering.
   "method": "reflect",
   "model": "claude-haiku-4-5-20251001",
   "max_tokens": 1024,
-  "inserts_after": "knowledge",
   "declared_by": "<skill_profile_slug>"
 }
 ```
@@ -498,9 +496,10 @@ as the agent persona — not a separate DB lookup. If no identity section exists
 runs on task_context only, producing a thin generic plan. No failure, no user notification.
 This degradation is expected and acceptable.
 
-**`inserts_after` fallback:** If the section named in `inserts_after` was omitted (e.g. RAG
-returned nothing and knowledge section was dropped), insert REFLECT output at the end of
-all currently rendered sections. Future: smarter positioning logic.
+**Placement (updated v7.0.16, `S-HAR-02b`):** the `inserts_after` field was removed — REFLECT
+placement is order-driven (the reflect section carries its own `order`, 12, rendering after the
+stable run and before RAG at 13, per `HAR-02`'s stable-first layout). Fallback: if no rendered
+section has a higher order, the REFLECT output appends at the end.
 
 After REFLECT, the rendered prompt is updated with the execution plan section inserted
 at the correct position.

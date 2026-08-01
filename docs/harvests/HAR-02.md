@@ -39,6 +39,31 @@ calls; a payload-shape fix, not a caching fix).
 
 ---
 
+# Ship record — 2026-07-31 → 2026-08-01 (`design-har-02`, S-HAR-02a/b/c, v7.0.15–v7.0.17)
+
+## What shipped
+- **a (v7.0.15, `7a351b7`) — audit first.** `ai_activity_log` gains `cache_creation_input_tokens`/`cache_read_input_tokens` (migration `har_02a_cache_token_columns`); captured through `usage` in `request-receivable.js` (incl. retry merge + guardrails site), passed via `logActivity()`, priced at read time in `computeCallCost()` (creation 1.25×, read 0.10× input rate). Shipped before any caching so `input_tokens` (which becomes "uncached remainder only") never silently undercounts the audit.
+- **b (v7.0.16, `5f051f3` + patches `474e814`/`d76cc79`/`42acc95`) — stable-first reorder.** `prompt_phase: stable|volatile` on every section; stable run = format→identity→behavior→guardrails→**intent last** (see regressions below); volatile tail = prior-conversation→current-task→reflect→RAG, VOICE always final (`AA-127` preserved). `ai-enrichment.js` renders `system_prompt_stable`/`system_prompt_volatile` (unknown phase defaults volatile — a wrongly-volatile section only loses caching); `execute.js` threads the split + completes the agent-turn row's cache fields. `inserts_after` was found to be a live mechanism, replaced with order-driven REFLECT insertion.
+- **c (v7.0.17, `120d7ce` + rot-guard `3a422f9`) — the breakpoints.** `buildCallBody()`: stable run as a single `system` content block with `cache_control: {type: "ephemeral"}` (5-min TTL); second breakpoint stamped **at send time onto a copy** of the final history message (never persisted — `durable_hops` replay would accumulate markers past the 4-breakpoint limit; stray persisted markers are stripped defensively). Split absent (checkpoint-resumed hops) → byte-identical uncached fallback, by design.
+
+## Regressions the A/B caught, root causes, fixes
+1. **Routing flip, case 6 (= `HAR-30`, independently measured by `S-SES-67-design`):** first reorder put Identity/Behavior between the `ci-routing-intent` classification instructions and the question → `forecast`→`qa` flip, deterministic 4/4. Fix 1: intent moved last-in-stable (`42acc95`), restoring intent→task adjacency. Fix 2 (residual flips on cases 13/15/20/22, two systematic + two wobbling): **routing isolation** — `traits.intent_allowlist` on `ci-identity`/`ci-behavior` (both attach only to `channel-intelligence`) excluding `ci-routing-intent`, so persona text never enters the classifier at all (same `AGT-54` gate + same accepted rot-risk shape as `S-AGT-44b`; rot-guard B5 added to `tests/regression/AGT-44-platform-language-guardrail.js`). Post-fix: 10/10 discriminating runs, full gate 24/24 journeys correct, wobblers stabilized.
+2. **Loop non-termination, case 5:** same adjacency root cause (intent's completion instructions far from task/history); resolved by fix 1, 3/3.
+
+## Live verification (deployed dev, `ai_activity_log` evidence)
+- `ci-answer-intent`: stable prefix 4,112 tokens — row 33590 writes it (`input=238`), next hop row 33595 **reads 4,112 + writes the 4,234-token conversation breakpoint** (`input=5`), repeat run 90s later row 33604 reads 4,112 cold. Coding session's direct L test: call 1 `cache_creation=19597`, call 2 `cache_read=19597`, `input=20`.
+- Below-floor calls (routing ~1.6K, guardrails ~1.3K; Haiku 4.5 floor = 4,096 tokens) correctly no-op at zero cost — the "unconditional marking" decision holds.
+
+## Honest coverage caveat (why realized savings start below the 30–50% ceiling)
+The measured floor assumed the *repeated* content was cacheable. Two big repeated payloads are volatile-by-construction and don't cache yet: Michelle Manning — Project Manager's ~9K roster context and quality-gate's artifact context (their **stable** runs sit under the 4,096 floor; her 11.7K calls show zero cache activity live). Filed: `HAR-32` (make content-stable runtime contexts cacheable — the bulk of the remaining estimate), `HAR-31` (loop seeds `history[0]` with the concatenated prompt → stable text duplicated in messages from hop 2). `HAR-29` (plan.js/brief.js bypass the pipeline entirely) was filed at design time.
+
+## Decisions on record
+- Unconditional breakpoints, no per-capability opt-in data (John, 2026-07-31) — below-floor no-ops make per-capability judgment moot; §19b-clean.
+- 5-min TTL only; 2 of 4 breakpoints used.
+- Reorder + routing isolation accepted as the new baseline (John, 2026-08-01) — the old "persona after question" layout is unreachable under prefix caching; the classifier now simply doesn't receive persona text.
+
+---
+
 # HAR-02 — row detail harvested 2026-08-01 (SES-68)
 
 Full `docs/FEATURES.md` row text as it stood immediately before this session's harvest-trim (verbatim):
