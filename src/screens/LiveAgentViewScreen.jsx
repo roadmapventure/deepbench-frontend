@@ -1,3 +1,10 @@
+// DeepBench v7.0.41 | LiveAgentViewScreen.jsx | LAV-13 -- the Routing badge dot now pulses. A run's
+// first delegation can be 10+ seconds out; until then the canvas is empty and the badge is the only
+// thing on screen that could signal life, so a steady badge read as a frozen screen (John, live).
+// The two-mode inline test is replaced by a named PULSING_MODES set so the rule has one home and
+// stops going stale -- it already had, twice. `awaiting` stays STEADY on LAV-1f's unchanged
+// reasoning. ModeBadge is shared, so this pulses on desktop too: intended, confirmed with John --
+// the dead-window problem is not mobile-specific. Nothing else about the badge changes.
 // DeepBench v7.0.36 | LiveAgentViewScreen.jsx | MOB-4a -- mobile Live Agent View, part 1 of 2: the
 // shell. Below MOBILE_BREAKPOINT (useIsMobile(), STYLE-GUIDE.md §22) this screen returns a DIFFERENT
 // composition of the same shared components, never a CSS reflow of the desktop grid -- the same
@@ -209,14 +216,24 @@ export function deriveMode(runHops, { running, terminal, awaiting = false }) {
 // metrics/canvas/answer around the screen -- not a generic process-complete word.
 const MODE_COPY = { idle: "Idle", route: "Routing", orch: "Orchestrating", awaiting: "Awaiting confirmation", complete: "Question Answered", error: "Error" };
 
+// FEATURE: LAV-13 -- which badge states animate. `route` joins because a run genuinely IS in
+// progress from the moment it starts, and the first delegation can be 10+ seconds out; a steady
+// badge across that window reads as a frozen screen, which is exactly what John hit live.
+// `awaiting` deliberately stays STEADY -- LAV-1f's reasoning is unchanged and still correct: the
+// harness is stopped waiting on a human, and a pulse there would claim work is happening when
+// none is. `idle` and `error` are at-rest states.
+const PULSING_MODES = new Set(["route", "orch", "complete"]);
+
 function ModeBadge({ mode, detail }) {
   const tint = {
     idle:     { fg: T.muted,     br: T.line },
     route:    { fg: T.brassDeep, br: T.brass },
     orch:     { fg: ACTION_TEXT_COLORS_FETCH.CLICK, br: ACTION_TEXT_COLORS_FETCH.CLICK },
     // FEATURE: LAV-1f -- brass family, and deliberately the brassGlow token, whose single documented
-    // job (tokens.js, CHI-05) is the "needs your input" surface. Steady: only `orch` animates, and
-    // a pulsing badge would read as work in progress when nothing is progressing.
+    // job (tokens.js, CHI-05) is the "needs your input" surface. Steady -- it is deliberately NOT in
+    // PULSING_MODES above, because a pulsing badge would read as work in progress when nothing is
+    // progressing. (This clause used to read "only `orch` animates"; that enumeration went stale at
+    // LAV-9c and again at LAV-13, which is why the set is now named once and read from one place.)
     awaiting: { fg: T.brassDeep, br: T.brassGlow },
     complete: { fg: T.moss,      br: T.moss },
     error:    { fg: T.flag,      br: T.flag },
@@ -233,7 +250,7 @@ function ModeBadge({ mode, detail }) {
         // signal from `orch`'s pulse (different color -- T.moss green vs the CLICK blue `orch` uses
         // -- and different label), so the two "this is animating" states don't get confused for the
         // same meaning.
-        animation: (mode === "orch" || mode === "complete") ? "aiBlink 1.1s ease-in-out infinite" : "none"}}/>
+        animation: PULSING_MODES.has(mode) ? "aiBlink 1.1s ease-in-out infinite" : "none"}}/>
       <span>{MODE_COPY[mode]}</span>
       {detail && <span style={{fontFamily:mono,fontWeight:600,letterSpacing:0,textTransform:"none",
         maxWidth:220,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{String(detail)}</span>}

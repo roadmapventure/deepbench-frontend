@@ -1,3 +1,11 @@
+// DeepBench v7.0.41 | AgentNetwork.jsx | LAV-13/MOB-7 -- the mobile bench node widens 56px -> 84px
+// and gains a one-line role under the first name. LAV-12 removed the agent code platform-wide, which
+// was right on desktop (the card still carries a role line underneath) but left the mobile mini node
+// showing nothing but a first name -- it never had a role line. John's call: put the role there.
+// Name-then-role, same vertical order as the desktop card, NOT role-above-name where the code sat.
+// One line with an ellipsis is the spec, not a compromise; the full string is in `title`. 84px is a
+// measured ceiling against the real 402x461 stage -- see the .lav-mnode rule for the derivation.
+// mobileSlot(), the ring geometry and every desktop path are untouched.
 // DeepBench v7.0.37 | AgentNetwork.jsx | MOB-4b -- below MOBILE_BREAKPOINT this canvas renders a
 // DIFFERENT composition of the same derivations (STYLE-GUIDE 42), never a reflow of the desktop one:
 // the desktop stage is a locked 1200x640 viewBox with 132px fixed-pixel cards and eleven of them do
@@ -798,15 +806,32 @@ const NET_CSS = `
    (found live in the mock -- 44px avatars blew up to 126px and collapsed the cards). NOTE this
    block lives inside a JS template literal: a backtick in a CSS comment here ends the string. */
 .lav-medges{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:1}
-/* Bench node: an avatar, its code and its first name. No card, so the state distinctions live on
-   the avatar's own glow instead of a card border -- same five meanings, same tokens. */
-.lav-mnode{position:absolute;transform:translate(-50%,-50%);width:56px;text-align:center;z-index:2}
+/* Bench node: an avatar, its first name and its role. No card, so the state distinctions live on
+   the avatar's own glow instead of a card border -- same five meanings, same tokens.
+   FEATURE: MOB-7 -- width 56px -> 84px to make room for the role line below. 84 is a measured
+   ceiling, not a preference: against the real 402x461 stage, ring slots 1/2, 5/6, 6/7 and 10/1 are
+   only ~31px apart vertically -- less than the ~62px node height -- so they overlap on that axis
+   and are held apart purely by their ~90px horizontal separation. 84px leaves a 6px gutter and
+   anything wider collides. Edge clearance also holds: outermost slot centres are 56px and 346px,
+   so the box spans 14px..388px of 402. mobileSlot() is NOT touched -- this is a width change only,
+   and the Section-8 test re-derives both bounds from the real mobileSlot source. */
+.lav-mnode{position:absolute;transform:translate(-50%,-50%);width:84px;text-align:center;z-index:2}
 .lav-mava{width:38px;height:38px;margin:0 auto;display:flex;align-items:center;justify-content:center;
   transition:filter .3s}
 /* FEATURE: LAV-12 -- .lav-mcode removed with the agent code it styled. Its margin-top:2px was the
    only thing separating the avatar from the label below it, so that 2px moves onto .lav-mname --
    the gap is preserved exactly, nothing else about the card's appearance changes. */
 .lav-mname{font-family:${body};font-size:8px;font-weight:600;color:${T.navy};line-height:1.1;margin-top:2px}
+/* FEATURE: MOB-7 -- the role line LAV-12 left room for. Name-then-role, matching desktop's own card
+   after LAV-12 -- NOT role-above-name where the agent code used to sit; same vertical order at both
+   breakpoints. ONE line with an ellipsis is the specified behaviour, not a compromise: 84px at 7px
+   mono is ~18 characters, so 4 of the 11 roles truncate. The full string is always a long-press away
+   in the title attribute, the same affordance .lav-pill and .lav-model already use. Do not add a
+   second line, shrink the font to force a fit, wrap, or abbreviate -- agents.js is canonical agent
+   data. (No backtick in this comment: see the .lav-medges note above -- this block is a JS template
+   literal, so a backtick here ends the string. That is what broke this build once already.) */
+.lav-mrole{font-family:${mono};font-size:7px;color:${T.muted};line-height:1.15;margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lav-mnode.is-recovering .lav-mava{filter:drop-shadow(0 0 7px ${rgba(T.flag, 0.9)})}
 .lav-mnode.is-active .lav-mava{filter:drop-shadow(0 0 8px ${rgba(T.brass, 0.9)})}
 .lav-mnode.is-done .lav-mava{filter:drop-shadow(0 0 5px ${rgba(T.mossLight, 0.85)})}
@@ -1381,6 +1406,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                     style={{ left: `${slot.x}%`, top: `${slot.y}%` }}>
                     <div className="lav-mava"><AgentAvatar who={a.id} size={38}/></div>
                     <div className="lav-mname">{String(a.name || "").split(" ")[0]}</div>
+                    <div className="lav-mrole" title={a.role}>{a.role}</div>
                   </div>
                 );
               })}
