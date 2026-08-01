@@ -204,7 +204,7 @@ svg.av{width:44px;height:44px;display:block;margin:0 auto;flex:none}
     <div class="phone" id="pB"></div>
   </div>
   <div class="slot">
-    <div class="cap">View <b>Active</b> — after tapping Active</div>
+    <div class="cap">View <b>Single</b> — after tapping Single</div>
     <div class="phone" id="pA"></div>
   </div>
   <div class="slot">
@@ -217,11 +217,11 @@ svg.av{width:44px;height:44px;display:block;margin:0 auto;flex:none}
 <h2>What changed vs. desktop</h2>
 <ul>
 <li><b>Canvas is the main window</b> — it sits exactly where CHI mobile puts chat.</li>
-<li><b>These are two VIEWS of one canvas, user-picked.</b> Legend hard left, <code>Active | Bench</code> hard right, one row at the top of the canvas — the legend grows rightward into the middle as more edge meanings light up. Toggle matches the legend's height; a transparent <code>::after</code> takes its touch box to ~36px so that costs nothing in tappability.</li>
+<li><b>These are two VIEWS of one canvas, user-picked.</b> Legend hard left, <code>Single | Bench</code> hard right, one row at the top of the canvas — the legend grows rightward into the middle as more edge meanings light up. Toggle matches the legend's height; a transparent <code>::after</code> takes its touch box to ~36px so that costs nothing in tappability.</li>
 <li><b>No Answer pill on the canvas</b> — Answer is a tab and only a tab.</li>
 <li><b>Bench is the default</b>, and shows <b>only the agents this run actually called</b>. Empty slots stay empty; the gap is the information.</li>
 <li><b>Every agent has a permanent slot</b>, derived from its index in the <code>mi</code> roster — never from the order it was engaged. Same agent, same place, every run. This mirrors <code>homeLayout()</code>'s existing rule (<code>AgentNetwork.jsx</code> L281: computed from roster order, no hand-authored position table, no hand-listed agent id), so a 12th agent added to the bench group claims the next slot with no code change.</li>
-<li><b>Active view</b> — the current hand-off at full card size (name, role, model tag, pattern pill all legible).</li>
+<li><b>Single view</b> — the current hand-off at full card size (name, role, model tag, pattern pill all legible).</li>
 <li><b>Auto-switch on orchestration is dropped</b> — Bench being the default already covers it, and a view that reassigns itself mid-read is worse than one that doesn't. The toggle is the only thing that moves the view.</li>
 <li><b>Dropdown arrow</b> — <code>tokens.js</code> L78 already gives every <code>&lt;select&gt;</code> a chevron; the app's inline <code>background</code> shorthand wipes it. Mock uses <code>background-color</code>, which keeps it.</li>
 <li><b>Suppressed:</b> subtitle, Choreographed/Static toggle, prompt-box overlay, 2 of 4 meters, agent task text in the feed (<code>terse:true</code>, CHI-88's locked call).</li>
@@ -325,11 +325,11 @@ const chrome=(view,thirdWord)=>`
     <em><s style="background:${T.moss}"></s>reports back</em>
     <em><s style="background:${T.line}"></s>${thirdWord}</em></div>
   <div class="vtoggle">
-    <button class="${view==="active"?"on":""}">Active</button>
+    <button class="${view==="single"?"on":""}">Single</button>
     <button class="${view==="bench"?"on":""}">Bench</button></div>
 </div>`;
 
-const stageA=`${chrome("active","observed")}
+const stageA=`${chrome("single","observed")}
 <div class="conn"><i></i><u></u><b>delegates to</b></div>
 ${node("michelle",50,24,"is-orch",{model:"opus",bub:"Routing to a data specialist"})}
 ${node("nadia",50,76,"is-active",{model:"sonnet",pill:"Retrieval → Synthesis"})}`;

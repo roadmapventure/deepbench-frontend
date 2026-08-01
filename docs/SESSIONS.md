@@ -4,6 +4,21 @@
 > Google Drive retired as source of truth. GitHub is single master.
 
 ---
+## design-lav-single-0801 / S-MOB-8 (v7.0.44, `b7113cb`, 2026-08-01, worktree `design-lav-single-0801`) — mobile canvas view toggle reads "Single"
+
+**`MOB-8` (UI) ✅ done + archived.** John's label call, one line of user-facing copy: the mobile canvas view toggle's `Active` becomes **`Single`**; `Bench` unchanged. No behaviour, geometry, or layout change. Ran on **Sonnet 5** per the model rule — a one-file, fully prescribed rename is the definition of a mechanical ticket.
+
+**The one judgment call, made and flagged rather than asked about:** the internal `mobileView` state key was renamed alongside the label (`"active"` → `"single"`). `AgentNetwork.jsx` already uses "active" for an entirely different concept — the agent currently working (`net.activeId`, the `is-active` node class, `assemblyActive`, `activeIsAssembly`) — so leaving the *view* key as `"active"` while the button rendered "Single" would have made the word ambiguous on two axes at once, precisely the drift that costs the next session a wrong read. Those working-agent identifiers were deliberately left untouched, and the coding session confirmed by full-file grep that they are genuinely a separate concept rather than stale view references. Five comments naming the view "Active" were corrected in the same pass.
+
+**QA, live at 402×874.** Toggle reads `SINGLE | BENCH`; **zero occurrences of "Active" anywhere on the page**; Bench still selected on load; both switch directions work; the pill is still 19px and flush right. `Single` measures **46px — byte-identical to `Active`'s former width**, so there is no layout shift at all, which was the one real risk in a copy change on a geometry-constrained row. Desktop verified by a **fresh reload** at 1440px, never a live resize (`SES-73`, this repo's own finding from the previous session): 11 cards, rail, Choreographed/Static toggle present, no mobile toggle rendered, and "Single" does not leak to desktop.
+
+**The coding session ran a proper negative control** (`SES-69`'s lesson, now landing): the 6 rename-specific assertions fail against the unmodified file while all 11 must-not-change assertions still pass — so the test discriminates rather than passing vacuously. The kickoff's Section 8 also carried `SES-72`'s fix from the outset (blanking `${…}` interpolations before matching any `NET_CSS` rule body), with a self-check asserting that guard is load-bearing. Both of those were defects this same design session shipped two sessions earlier; neither recurred.
+
+**Docs synced in the close-out, not deferred:** `STYLE-GUIDE.md` §42 in two places (the toggle rule and the view description), the still-open `MOB-5` row whose text named the old label, and `docs/mocks/lav-mobile-mock.html`, the mock of record. Historical kickoffs (`v7.0.37`) were left alone — they correctly record what was built at the time.
+
+**Housekeeping note:** `docs/SESSIONS.md` itself is duplicated — the whole document appears twice, second copy starting near line 3749 — the same class as `SES-43`/`SES-52` (`FEATURES-ARCHIVE.md`), now confirmed on a third tracked doc. This entry was inserted into the top/live copy only. Appended to `SES-52`'s row rather than filed separately, since it is the same defect and the same blocked-on-deletion-approval fix.
+
+---
 ## S-LOG-127 (v7.0.43, `3225fdf`, 2026-08-01, worktree `log-127-caller-merge-fix`) — By Platform User stops over-merging callers
 
 **`LOG-127` (Observability, Post-beta) ✅ done + archived, self-verified live.** A patch on `LOG-121`/`LOG-124`, both already archived — found the same day, reviewing the drawer they'd just shipped.
