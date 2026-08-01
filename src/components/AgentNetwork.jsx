@@ -1,3 +1,9 @@
+// DeepBench v7.0.44 | AgentNetwork.jsx | MOB-8 -- the mobile canvas view toggle's "Active" label and
+// view-key are renamed "Single" (John's call, 2026-08-01); Bench, the geometry, the styling and the
+// behaviour in both views are all unchanged. This file already uses "active" for a different concept
+// (net.activeId, is-active, assemblyActive -- the currently-working agent), which keeps its own name
+// untouched throughout; only the view's own name changes, in the button label, the state key and the
+// comments that referred to it by that name.
 // DeepBench v7.0.41 | AgentNetwork.jsx | LAV-13/MOB-7 -- the mobile bench node widens 56px -> 84px
 // and gains a one-line role under the first name. LAV-12 removed the agent code platform-wide, which
 // was right on desktop (the card still carries a role line underneath) but left the mobile mini node
@@ -12,7 +18,7 @@
 // not fit 402px. Mobile gets two USER-PICKED views of the same real data -- Bench (the default) puts
 // every agent in a permanent slot derived from its roster index, renders ONLY the agents this run
 // actually called, and leaves an uncalled agent's slot empty because that gap is the information;
-// Active blows the current hand-off up to two full-size cards. Nothing auto-switches: the toggle is
+// Single blows the current hand-off up to two full-size cards. Nothing auto-switches: the toggle is
 // the only thing that moves the view. The desktop LEAD-anchored choreography is deliberately absent
 // -- mobile holds still so the user learns where to look, and that divergence is the feature. The
 // "You" gate node has no mobile equivalent (a 38px avatar cannot hold a proposal, and the human has
@@ -837,7 +843,7 @@ const NET_CSS = `
 .lav-mnode.is-done .lav-mava{filter:drop-shadow(0 0 5px ${rgba(T.mossLight, 0.85)})}
 .lav-mnode.is-assembly .lav-mava{filter:drop-shadow(0 0 7px ${rgba(ASSEMBLY_COLOR, 0.85)})}
 .lav-mnode.is-orch .lav-mava{filter:drop-shadow(0 0 9px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.9)})}
-/* Active view's connector: positioned HTML in the same percentage space the two cards are laid out
+/* Single view's connector: positioned HTML in the same percentage space the two cards are laid out
    in, deliberately NOT an svg in a preserveAspectRatio box -- that drifts off the cards at stage
    heights nobody tested (found live in the mock). Colour and word are the edge's own. */
 .lav-mconn{position:absolute;left:50%;top:37%;bottom:39%;width:0;z-index:1}
@@ -1290,7 +1296,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   // with nothing on the canvas behind it.
   const mobileAssemblyLit = running && net.assemblyActive.size > 0;
 
-  // Active view's subject: the most recently active edge (recentOrder is already ranked by the fold
+  // Single view's subject: the most recently active edge (recentOrder is already ranked by the fold
   // index of each edge's last real pulse). recentOrder holds CANONICAL keys, which are direction-
   // agnostic by design, so the dispatcher/recipient split comes from sessionEdges' own entry -- that
   // key is only ever minted from a real `delegation` event and therefore always runs dispatcher->target.
@@ -1304,7 +1310,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const agentById = useMemo(() => new Map(roster.map(a => [a.id, a])), [roster]);
 
   // The desktop node card, rendered at a mobile position. Same classes, same state chain, same slot
-  // contents -- the Active view is the desktop card at a different coordinate, not a second card.
+  // contents -- the Single view is the desktop card at a different coordinate, not a second card.
   const mobileFullCard = (a, topPct) => {
     if (!a) return null;
     const cls = ["lav-node"];
@@ -1339,7 +1345,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   };
 
   if (isMobile) {
-    // The Active connector points the way the edge's own meaning runs: a report-back really did
+    // The Single connector points the way the edge's own meaning runs: a report-back really did
     // travel this same physical line backwards (the rule canonicalEdgeKey already encodes), so its
     // arrowhead sits at the top rather than contradicting the word beside it.
     const connReversed = activeHandoff?.color === REPORT_COLOR;
@@ -1362,8 +1368,8 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               </div>
             )}
             <div className="lav-mseg">
-              <button type="button" className={mobileView === "active" ? "on" : ""}
-                onClick={() => setMobileView("active")}>Active</button>
+              <button type="button" className={mobileView === "single" ? "on" : ""}
+                onClick={() => setMobileView("single")}>Single</button>
               <button type="button" className={mobileView === "bench" ? "on" : ""}
                 onClick={() => setMobileView("bench")}>Bench</button>
             </div>
