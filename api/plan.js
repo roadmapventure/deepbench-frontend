@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/plan.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.2.35 | api/plan.js | BUG-17 wire dan-ai-enrichment into prompt-service + preview-prompt
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
@@ -7,6 +9,7 @@ import { enrichPrompt } from './prompt/ai-enrichment.js';
 import { sendRequest } from './prompt/request-receivable.js';
 import { queryRAG } from '../lib/rag.js';
 import { logActivity } from '../lib/activity-log.js';
+import { withRequestContext } from '../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -19,7 +22,7 @@ function getSupabaseHeaders(key) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -463,3 +466,5 @@ Return JSON only, no markdown fences, no explanation.`;
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withRequestContext(handler);

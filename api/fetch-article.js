@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/fetch-article.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v6.3.216 | api/fetch-article.js | LOG-109 -- the primary path now logs every outcome
 // via the shared logActivity() service (AA-190), never just the fallback path: banded
 // http_status/extraction_outcome facts in call_facts (never a raw character count -- LOG-91's
@@ -10,6 +12,7 @@ import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import { logActivity } from "../lib/activity-log.js";
 import { SERVICE_SLUG } from "../shared/ai-patterns.js";
+import { withRequestContext } from "../lib/request-context.js";
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
 
@@ -29,7 +32,7 @@ export function classifyExtraction(httpStatus, text) {
   return len > 0 ? "below_threshold" : "empty";
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -132,3 +135,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message, primary_failure: { http_status: httpStatus, extraction_outcome: extractionOutcome } });
   }
 }
+
+export default withRequestContext(handler);

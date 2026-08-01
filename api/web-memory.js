@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/web-memory.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v6.3.99 | api/web-memory.js | LOG-35b -- log the real summarization call, response's own model field
 // api/web-memory.js
 // v4.2.0: GET endpoint refactored to use rag-query.js (vector search) + agent-run (REFLECT)
@@ -10,10 +12,11 @@
 import { assembleContext } from "../lib/agent-run.js";
 import { embedContent } from "../lib/vector-search.js";
 import { logActivity } from "../lib/activity-log.js";
+import { withRequestContext } from "../lib/request-context.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -349,3 +352,5 @@ Structure your response as valid JSON only:
 
   return res.status(405).json({ error: "Method not allowed" });
 }
+
+export default withRequestContext(handler);

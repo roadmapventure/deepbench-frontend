@@ -1,3 +1,9 @@
+// DeepBench v7.0.34 | scripts/chi-true-regression.mjs | LOG-121 -- every request this driver makes
+// now carries the x-db-call-source: regression header, so a regression run's rows are attributable
+// instead of landing in the same undifferentiated pile as John's CHI clicking and live QA.
+// Deliberately a HEADER, not a payload field: this driver hand-rebuilds the screen's *body* payload,
+// so a body field would have a second constructor to keep in sync (the SES-57 mirror-payload trap).
+// Headers have exactly one constructor here -- the HDRS constant below.
 // DeepBench v7.0.0 | scripts/chi-true-regression.mjs | LAV-1a -- question extraction repointed from
 // MarketIntelligenceScreen.jsx to src/data/chiQuestions.js, where the 23 questions now live (single
 // source, shared with the Live Agent View screen). Same scrape, same order, same 1/10/12 counts --
@@ -125,7 +131,7 @@ function loadBypassSecret() {
   process.exit(1);
 }
 const BYPASS_SECRET = loadBypassSecret();
-const HDRS = { "Content-Type": "application/json", "x-vercel-protection-bypass": BYPASS_SECRET };
+const HDRS = { "Content-Type": "application/json", "x-vercel-protection-bypass": BYPASS_SECRET, "x-db-call-source": "regression" };
 
 // ---- CLI flags ----
 const argv = process.argv.slice(2);

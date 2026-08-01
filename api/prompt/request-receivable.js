@@ -1,3 +1,6 @@
+// DeepBench v7.0.34 | api/prompt/request-receivable.js | LOG-121 -- handler wrapped in
+// withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
+// site in this file changes
 // DeepBench v7.0.15 | api/prompt/request-receivable.js | HAR-02a -- capture usage.cache_creation_input_tokens/cache_read_input_tokens (normalized to 0, summed across the parse retry) and pass them to logActivity() at both write sites; NULL/0 until S-HAR-02b/c enable caching
 // DeepBench v7.0.13 | api/prompt/request-receivable.js | LOO-28 -- trait-conditional parallel tool use on the AUTO tool_choice branch only (disable_parallel_tool_use: !enableParallelToolUse); forced branch + guardrails inline call stay hardcoded true (HAR-20). parseModelTurn() now collects ALL tool_use blocks into an additive tool_calls array (singular fields untouched); a turn mixing the terminal schema tool with harness calls is incoherent and routes through the existing parse-retry machinery once, then fails loudly
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
@@ -33,6 +36,7 @@ import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
 import { mergeCallFacts } from './db-assembly.js';
+import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
@@ -982,7 +986,7 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -1000,3 +1004,5 @@ export default async function handler(req, res) {
     return res.status(status).json({ error: e.message, ...(e.detail ? { detail: e.detail } : {}) });
   }
 }
+
+export default withRequestContext(handler);

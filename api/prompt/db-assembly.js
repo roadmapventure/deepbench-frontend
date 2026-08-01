@@ -1,3 +1,6 @@
+// DeepBench v7.0.34 | api/prompt/db-assembly.js | LOG-121 -- handler wrapped in
+// withRequestContext(). This route reaches no logActivity() call today -- wrapping it is inert now
+// and means a logging site added here later cannot silently lose attribution.
 // DeepBench v7.0.16 | api/prompt/db-assembly.js | HAR-02b-patch3 -- intent moved to order 5, LAST in
 // the stable run, restoring the intent->task adjacency the first stable-first cut broke (live A/B:
 // case 6 routing 4/4, case 5 continue-cap 2/2). Stable run is now format 1, identity 2, behavior 3,
@@ -27,6 +30,8 @@
 // DeepBench v6.1.40 | api/prompt/db-assembly.js | AA-121 — Knowledge Skill Profile intent_allowlist gate
 // DeepBench v6.1.13 | api/prompt/db-assembly.js | AA-142 — delegationRequired passthrough
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
+
+import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
 
@@ -761,7 +766,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -777,3 +782,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withRequestContext(handler);

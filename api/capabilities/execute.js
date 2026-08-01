@@ -1,3 +1,6 @@
+// DeepBench v7.0.34 | api/capabilities/execute.js | LOG-121 -- handler wrapped in
+// withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
+// site in this file changes
 // DeepBench v7.0.22 | api/capabilities/execute.js | SES-67 -- the pending_confirmation return, its durable_hops result mirror, and both depth_exceeded returns now carry trace_id/span_id (§19p: identity attached where the result is born -- the loop's own identity, same as the adjacent critique dispatch threads), closing the last executor result shapes that omitted it; error returns deliberately still unchanged
 // DeepBench v7.0.16 | api/capabilities/execute.js | HAR-02b -- runLoop()'s callModel() site forwards system_prompt_stable/system_prompt_volatile from the enriched prompt (additive plumbing; callModel()/buildCallBody() don't read them until S-HAR-02c); the format-override append mirrors onto the volatile half so the split stays coherent with system_prompt; the agent-turn log row now carries cache_creation_input_tokens/cache_read_input_tokens from the turn's usage (HAR-02a follow-through -- the loop path's single log record, LOG-91). The split halves are NOT persisted to durable_hops (system_prompt is; see S-HAR-02b build report) -- a resumed hop carries only the concatenated prompt until S-HAR-02c decides resume-side caching
 // DeepBench v7.0.14 | api/capabilities/execute.js | HAR-27 -- runLoop()'s callModel() site passes webSearchMaxUses from enriched.llm; checkpointAndReturn()'s durable_hops llm persist now carries web_search_max_uses (conditionally) so the cap survives checkpoint/resume -- the persisted llm object was hand-narrowed, not wholesale
@@ -78,6 +81,7 @@ import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationPro
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
+import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -1942,7 +1946,7 @@ async function streamResult(res, run) {
   res.end();
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -2077,3 +2081,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
+export default withRequestContext(handler);

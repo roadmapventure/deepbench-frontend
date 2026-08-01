@@ -1,4 +1,10 @@
-export default async function handler(req, res) {
+// DeepBench v7.0.34 | api/agent-configs.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes.
+// This route reaches no logActivity() call today -- wrapping it is inert now and means a logging
+// site added here later cannot silently lose attribution.
+import { withRequestContext } from "../lib/request-context.js";
+
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -148,3 +154,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || "Internal server error" });
   }
 }
+
+export default withRequestContext(handler);

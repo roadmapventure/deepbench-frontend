@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/extract.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.3.7 | api/extract.js | S-APPLE-02c — SH-11 second merge slice: upload-csv.js absorbed
 // FEATURE: SH-11 — api/upload-csv.js merged into api/extract.js (action dispatch) to free a Vercel Hobby serverless slot
 // FEATURE: MI-12 — both branches now call logDeterministic() (AI Audit §13.3 gap closed — deterministic routes must log too)
@@ -5,6 +7,7 @@
 import { Buffer } from "buffer";
 import { logActivity } from '../lib/activity-log.js';
 import { SERVICE_SLUG } from '../shared/ai-patterns.js';
+import { withRequestContext } from '../lib/request-context.js';
 
 export const config = {
   api: {
@@ -188,7 +191,7 @@ async function handleUploadCsv(req, res, startTime) {
   return res.status(200).json({ success: true, path: storagePath });
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -206,3 +209,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message, ...(action === 'extract' ? { hint: "If this is a scanned PDF, text extraction is not supported — use a text-based PDF or DOCX instead." } : {}) });
   }
 }
+
+export default withRequestContext(handler);

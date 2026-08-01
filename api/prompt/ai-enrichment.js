@@ -1,3 +1,6 @@
+// DeepBench v7.0.34 | api/prompt/ai-enrichment.js | LOG-121 -- handler wrapped in
+// withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
+// site in this file changes
 // DeepBench v7.0.16 | api/prompt/ai-enrichment.js | HAR-02b -- render split: stable-phase sections
 // render into system_prompt_stable, volatile-phase into system_prompt_volatile (missing prompt_phase
 // defaults volatile -- a wrongly-volatile section only loses caching; a wrongly-stable one would
@@ -37,6 +40,7 @@ import { queryRAG } from "../../lib/rag.js";
 import { queryContent } from "../../lib/search-harness.js";
 import { getRosterCandidates } from "../../lib/project-manager.js";
 import { logActivity } from '../../lib/activity-log.js';
+import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -584,7 +588,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -600,3 +604,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withRequestContext(handler);

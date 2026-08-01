@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/brief.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v6.3.98 | api/brief.js | LOG-35a -- sourced model literals from shared/models.js
 // Generates AI briefing with full 5-layer prompt assembly.
 // v4.2.0: thin wrapper — delegates context assembly and Claude call to agent-run.js
@@ -8,6 +10,7 @@ import { logActivity } from "../lib/activity-log.js";
 import { SERVICE_SLUG } from "../shared/ai-patterns.js";
 // FEATURE: LOG-35a -- canonical model constants (docs/STANDARDS.md Section 12)
 import { MODELS } from "../shared/models.js";
+import { withRequestContext } from "../lib/request-context.js";
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -21,7 +24,7 @@ const BRIEF_AI_TYPE_FEATURE = {
   extraction: SERVICE_SLUG.DOCUMENT_METADATA_GENERATION,
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -154,3 +157,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || "Internal server error" });
   }
 }
+
+export default withRequestContext(handler);
