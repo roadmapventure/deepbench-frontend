@@ -1,3 +1,10 @@
+// DeepBench v7.0.27 | HarnessTraceConsole.jsx | LAV-7c -- the events pane's sticky field-label row
+// no longer jumps on first scroll. `.lavc-events` carries `padding:6px 10px` and `.lavc-hdrow` is
+// pulled flush with `margin:-6px -10px 4px`, but sticky's `top:0` threshold measures from the
+// container's padding edge -- 6px below where the margin parks the row at rest -- so any scroll
+// snapped it down 6px and uncovered real event text in the gap. `top:-6px` (the negative of that
+// same padding-top) puts the threshold exactly where the margin already placed it. Positioning
+// value only: margin, padding, background and the rest of the rule are untouched.
 // DeepBench v7.0.21 | HarnessTraceConsole.jsx | LAV-5c -- John's round-1 UX/UI pass on the console:
 // the header drops the word "trace" and cuts the id to its unique 8-char segment, the console
 // shrinks to 172px with a real scroll affordance on both panes (SharedUI's ScrollFadeHint, never a
@@ -292,7 +299,7 @@ const CON_CSS = `
   text-transform:uppercase;margin-bottom:2px}
 .lavc-ev{display:flex;gap:8px;align-items:baseline;animation:fadeIn .2s ease}
 /* LAV-5c: static field labels. Same flex geometry as .lavc-ev so every label sits over its column. */
-.lavc-hdrow{display:flex;gap:8px;align-items:baseline;position:sticky;top:0;z-index:2;
+.lavc-hdrow{display:flex;gap:8px;align-items:baseline;position:sticky;top:-6px;z-index:2;
   background:${CON_HEAD};margin:-6px -10px 4px;padding:4px 10px 3px;border-bottom:1px solid ${CON_LINE}}
 .lavc-hdrow span{font-family:${mono};font-weight:700;font-size:8px;color:${CON_DIM};
   letter-spacing:0.1em;text-transform:uppercase}
