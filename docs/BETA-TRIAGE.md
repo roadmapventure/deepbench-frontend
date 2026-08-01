@@ -278,6 +278,8 @@ biggest gap and surfaced two smaller ones.
 | # | ID (Type) | State |
 |---|---|---|
 | ~~1~~ | ~~`MOB-4` (Feature)~~ | ✅ **DONE 2026-08-01 (`S-MOB-4a` v7.0.36 + `S-MOB-4b` v7.0.37) — off the queue.** LAV had no mobile branch at all; it now has the full CHI-§21-shaped composition with a two-view canvas. 12 of 13 QA items verified live at 402×874; the stability guarantee (an agent occupies the same slot on every run) proven by diffing two different runs — zero movement across all 5 shared agents. Archived. |
+| ~~1b~~ | ~~`LAV-13` (UI)~~ | ✅ **DONE 2026-08-01 (`S-LAV-13/MOB-7`, v7.0.41) — off the queue.** The Routing badge sat still through the 10+ second pre-delegation window, so the screen read as frozen at exactly the moment a first-time viewer is deciding whether anything works. `route` joined `PULSING_MODES`; `awaiting` deliberately stays steady (`LAV-1f`). Verified over 125 live samples. |
+| ~~1c~~ | ~~`MOB-7` (UI)~~ | ✅ **DONE 2026-08-01 (`S-LAV-13/MOB-7`, v7.0.41) — off the queue.** `LAV-12`'s code removal left mobile nodes showing only a first name; they now carry the agent's role on one line in an 84px box (the ring's geometric ceiling). Truncation verified with real data. |
 | 2 | `MOB-6` (Tech Debt) | The mobile decision panel shipped and is code-verified but **cannot be exercised from LAV** — all 303 gates in 30 days come from `data-analysis`, which LAV's 3-question picker never invokes. Post-beta (additive; nothing regressed), but it is the one unverified surface of `MOB-4`. |
 | 3 | `MOB-5` (Tech Debt) | Mobile LAV's legend row wraps if more than 3 of the 6 possible edge meanings light at once (~23px slack at 402px). Cosmetic only, deliberately not worked around. Post-beta. |
 
