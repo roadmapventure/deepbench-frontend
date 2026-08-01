@@ -1,3 +1,4 @@
+// DeepBench v7.0.45 | useAIActivity.js | LOG-129 -- buildByDevice(): a third cut of the SAME By Platform User row set (Desktop/Mobile/Unknown), a pure aggregate across every caller and source rather than something nested inside them, returned from the hook as `byDevice` beside bySource/byCaller and reconciling with both by construction
 // DeepBench v7.0.43 | useAIActivity.js | LOG-127 -- By Platform User stops over-merging callers: the fourth, host-derived bucket is gone (exactly three -- a known caller's name, Public, Unattributed) and the hardcoded production-host constant with it; identity donation now folds a cookie-less `ui` row only into the ONE visitor seen at its address+host, never regression/script traffic and never a row carrying its own different visitor id
 // DeepBench v7.0.39 | useAIActivity.js | LOG-121 -- By Platform User: buildBySource()/buildByCaller() (two reconciling cuts of one row set) + the known_callers/ip_org_cache read; LOG-124 -- hydrateFromSupabase() stops asking for '*' and reads caller_ip_masked, never the raw address
 // DeepBench v7.0.15 | useAIActivity.js | HAR-02a -- computeCallCost() gains optional cache-token params (creation 1.25x input rate, read 0.1x); the two row-based read-time call sites pass the new ai_activity_log columns. Historical rows (NULL fields) and every omitting caller price byte-identically
@@ -884,6 +885,32 @@ export function buildByCaller(rows, known = [], orgs = []) {
     .sort((a, b) => b.cost - a.cost || b.calls - a.calls || String(a.label).localeCompare(String(b.label)));
 }
 
+/**
+ * FEATURE: LOG-129 -- By Device: a third cut of the SAME row set, pure aggregate across every
+ * caller and source (John's explicit correction -- not nested per caller). Desktop/Mobile are
+ * part a's own accepted device signal (sec-ch-ua-mobile / UA, never re-derived here); Unknown
+ * covers every pre-LOG-121 historical row (no device_type was ever captured before Aug 1) plus
+ * any row a future writer omits it from -- shrinks daily, same honesty pattern as Unattributed.
+ * Returns [{ device, calls, cost, pctCost, avgCost, lastSeen }].
+ */
+export function buildByDevice(rows) {
+  const groups = new Map();
+  let totalCost = 0;
+  for (const row of rows || []) {
+    const device = row?.device_type === 'desktop' ? 'Desktop' : row?.device_type === 'mobile' ? 'Mobile' : 'Unknown';
+    if (!groups.has(device)) groups.set(device, { device, calls: 0, cost: 0, firstSeen: null, lastSeen: null, _first: null, _last: null });
+    accumulate(groups.get(device), row);
+    totalCost += row.cost || 0;
+  }
+  return [...groups.values()]
+    .map(({ _first, _last, firstSeen, ...g }) => ({
+      ...g,
+      pctCost: totalCost > 0 ? g.cost / totalCost : 0,
+      avgCost: g.calls > 0 ? g.cost / g.calls : null,
+    }))
+    .sort((a, b) => b.cost - a.cost || b.calls - a.calls || a.device.localeCompare(b.device));
+}
+
 // FEATURE: LOG-121 -- the two small read-time tables behind the drawer, fetched once per page load
 // with the same module-level cache shape as fetchCapabilityDirectory() above (never cache a
 // failure). `known_callers` is the label table: adding a row there renames a caller on the next
@@ -1498,11 +1525,15 @@ export function useAIActivity() {
   // with each other. platformUserCount is the distinct-caller count behind the new stat tile.
   const bySource = buildBySource(log, knownCallers, ipOrgs);
   const byCaller = buildByCaller(log, knownCallers, ipOrgs);
+  // FEATURE: LOG-129 -- the drawer's third section, from that same `log`: no directory input, because
+  // device is a fact already on the row, not an identity to resolve. Same input = reconciles with the
+  // two above and with the header tiles, with no extra wiring.
+  const byDevice = buildByDevice(log);
   const platformUserCount = byCaller.length;
 
   // FEATURE: LOG-98 -- logLoaded is read at render time, not stored in hook state: notify()
   // already re-renders every consumer the moment hydration completes, so the value is never stale.
-  return { log, logLoaded: isLogHydrated(), byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount, bySource, byCaller, platformUserCount };
+  return { log, logLoaded: isLogHydrated(), byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount, bySource, byCaller, byDevice, platformUserCount };
 }
 
 export { MODEL_PROVIDER };

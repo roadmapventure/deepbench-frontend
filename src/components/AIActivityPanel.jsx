@@ -1,3 +1,4 @@
+// DeepBench v7.0.45 | AIActivityPanel.jsx | LOG-129 -- By Platform User renders as a real table: the per-row card box (PlatformUserRow) is replaced by a shared PlatformUserTableHead/PlatformUserTableRow pair driven by one column model, and a third section, By Device, sits between By Source and By Caller
 // DeepBench v7.0.39 | AIActivityPanel.jsx | LOG-121 -- drawer order runs By Agent, then the new By Platform User (two sub-tables under one header, closed by default, plus a seventh stat tile), then By Service; LOG-124 -- no caller address is ever rendered unblurred
 // DeepBench v6.3.199 | AIActivityPanel.jsx | LOG-107a -- scroll fade uses the depth variant (a same-colour fade was invisible on this panel)
 // DeepBench v6.3.197 | AIActivityPanel.jsx | LOG-107 -- scroll-fade hint, per-drawer item counts, header hover affordance
@@ -103,34 +104,47 @@ function PlatformServiceRow({ d }) {
   );
 }
 
-// FEATURE: LOG-121 -- one row of either By Platform User sub-table. Deliberately ONE component for
-// both: the two sections are two cuts of the same rows, and giving them two visual grammars is how
-// they would start to look like two unrelated numbers. Follows the By Agent row exactly (1px T.line
-// block, display font for the primary label, mono 8px uppercase column keys, T.brassDeep on cost) --
-// the new section matches the existing ones; the existing ones are not restyled to match it.
-function PlatformUserRow({ primary, secondary, stats, active = true }) {
+// FEATURE: LOG-129 -- one column model shared by a table's header and every body row, so they
+// can never drift out of alignment with each other. `align` defaults left; numeric columns pass
+// 'right'. `flex` sets relative column width (same units as CSS flex-grow).
+// (Replaces LOG-121's PlatformUserRow -- the bordered card per row. John's original ask for this
+// feature was answered with a plain-text grid mock; the card layout that shipped was never the
+// thing he confirmed. All three sections use these two components -- one visual grammar, not three.)
+function PlatformUserTableHead({ cols }) {
   return (
-    <div style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-      <div style={{width:8,height:8,borderRadius:"50%",background:active?T.moss:T.lineSoft,flexShrink:0}}/>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{primary}</div>
-        {secondary && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{secondary}</div>}
-      </div>
-      <div style={{display:"flex",gap:14,flexShrink:0}}>
-        {stats.map(([k,v])=>(
-          <div key={k} style={{textAlign:"right"}}>
-            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
-            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
-          </div>
-        ))}
-      </div>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"5px 12px 6px"}}>
+      {cols.map(c => (
+        <div key={c.key} style={{flex:c.flex,minWidth:0,textAlign:c.align||"left",fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8,whiteSpace:"nowrap"}}>{c.label}</div>
+      ))}
+    </div>
+  );
+}
+
+// `cells` is an array of pre-formatted strings/nodes, positionally matching `cols`. The FIRST
+// column always renders as the row's primary identity (display font, navy, 600 weight) -- every
+// other column is a plain mono value; a column literally named "Cost" renders in brassDeep,
+// matching every other cost figure on this panel.
+function PlatformUserTableRow({ cols, cells, active = true }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",borderBottom:`1px solid ${T.lineSoft}`,opacity:active?1:.5}}>
+      {cols.map((c, i) => (
+        <div key={c.key} style={{
+          flex:c.flex,minWidth:0,textAlign:c.align||"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+          fontFamily:i===0?display:mono,
+          fontSize:i===0?12:11,
+          fontWeight:i===0?600:400,
+          color:c.key==="cost"?T.brassDeep:i===0?T.navy:T.ink,
+        }}>{cells[i]}</div>
+      ))}
     </div>
   );
 }
 
 // FEATURE: LOG-121 -- each sub-table ends with its own total, which is the drawer's own honesty
-// check made visible: the two sections partition one row set, so their totals must match each other
+// check made visible: the sections each partition one row set, so their totals must match each other
 // and the header's Total Calls / Total Cost. A reader can see that hold -- and see it break.
+// LOG-129: unchanged by the table rewrite -- it already renders as a totals bar, not a card. It now
+// closes three sections instead of two, which only strengthens the check.
 function PlatformUserTotal({ calls, cost }) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"5px 12px 9px",borderTop:`1px solid ${T.lineSoft}`,marginTop:2}}>
@@ -143,6 +157,34 @@ function PlatformUserTotal({ calls, cost }) {
 
 // Same sub-header treatment the By Service drawer already uses for its layer groups.
 const PU_SUBHEAD = {fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4};
+
+// FEATURE: LOG-129 -- the column sets, module scope so they are not rebuilt per render and so the
+// head and the body rows are literally reading one object. By Device is By Source's shape with one
+// label changed -- derived from it rather than copied, so a future column added to one cannot
+// silently miss the other.
+const SOURCE_COLS = [
+  {key:"primary",label:"Source",  flex:3},
+  {key:"calls",  label:"Calls",   flex:1,align:"right"},
+  {key:"cost",   label:"Cost",    flex:1,align:"right"},
+  {key:"pct",    label:"% Cost",  flex:1,align:"right"},
+  {key:"avg",    label:"Avg $/Call",flex:1,align:"right"},
+  {key:"last",   label:"Last Seen",flex:1,align:"right"},
+];
+const DEVICE_COLS = SOURCE_COLS.map((c, i) => i === 0 ? {...c, label:"Device"} : c);
+// By Caller deliberately drops First Seen: 7 columns overflow this drawer on mobile, and Last Seen
+// is the more actionable of the two at a glance. The data is untouched -- `firstSeen` is still on
+// every row object; it is simply not rendered. Restoring it is one entry here, not a redesign.
+const CALLER_COLS = [
+  {key:"primary",label:"Caller",  flex:2},
+  {key:"device", label:"Device",  flex:1},
+  {key:"org",    label:"Org / Network",flex:2},
+  {key:"calls",  label:"Calls",   flex:1,align:"right"},
+  {key:"cost",   label:"Cost",    flex:1,align:"right"},
+  {key:"last",   label:"Last Seen",flex:1,align:"right"},
+];
+// The table's own top edge, replacing the weight the removed per-row boxes used to carry. It is the
+// only border the new layout adds; rows carry the lineSoft hairline, the head carries none.
+const PU_TABLE = {borderTop:`1px solid ${T.line}`};
 
 // FEATURE: AI-23 patch — PatternRow with "more" text expand
 // FEATURE: AI-30 — PatternRow HITL special columns + Parallelization partial badge
@@ -347,7 +389,8 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: LOG-121 -- bySource/byCaller/platformUserCount drive the new By Platform User drawer
   // and its stat tile. All three come from the SAME hook read the header tiles use, so the drawer
   // cannot disagree with Total Calls / Total Cost -- there is no second query to drift from.
-  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded, bySource, byCaller, platformUserCount } = useAIActivity();
+  // FEATURE: LOG-129 -- byDevice is the drawer's third cut, from the same hook read as the other two.
+  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded, bySource, byCaller, byDevice, platformUserCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
   // FEATURE: LOG-97 -- passing `log` overrides each row's cost with the in-memory sum (the view's
@@ -559,9 +602,10 @@ export default function AIActivityPanel({ onClose }) {
             )}
 
             {/* FEATURE: LOG-121 -- the drawer's name, its position (immediately after the agents
-                block), and its two-section structure collapsing as ONE unit are John's explicit
+                block), and its multi-section structure collapsing as ONE unit are John's explicit
                 calls; do not rename, reorder, or split them. Section one answers "what kind of
-                caller," section two "which caller" -- two cuts of the same rows, which is why each
+                caller," section two (LOG-129) "on what device," section three "which caller" --
+                three cuts of the same rows, which is why each
                 carries its own total and why those totals must agree. The UI split is the whole
                 point of the feature: before this, John's own clicking, a QA session's scripts and an
                 outside visitor all landed in one undifferentiated pile.
@@ -578,27 +622,46 @@ export default function AIActivityPanel({ onClose }) {
                 : (
                   <>
                     <div style={{...PU_SUBHEAD,marginTop:0}}>By Source</div>
-                    {bySource.map(s => (
-                      <PlatformUserRow
-                        key={s.source}
-                        primary={s.source}
-                        secondary={`${fmtPct(s.pctCost)} of cost · avg ${s.avgCost != null ? fmt$(s.avgCost) : "—"} · last ${fmtDay(s.lastSeen)}`}
-                        stats={[["Calls", s.calls.toLocaleString()], ["Cost", fmt$(s.cost)]]}
-                        active={s.calls > 0}
-                      />
-                    ))}
-                    <PlatformUserTotal calls={sumBy(bySource,'calls')} cost={sumBy(bySource,'cost')}/>
+                    <div style={PU_TABLE}>
+                      <PlatformUserTableHead cols={SOURCE_COLS}/>
+                      {bySource.map(s => (
+                        <PlatformUserTableRow key={s.source} cols={SOURCE_COLS} active={s.calls > 0} cells={[
+                          s.source, s.calls.toLocaleString(), fmt$(s.cost), fmtPct(s.pctCost),
+                          s.avgCost != null ? fmt$(s.avgCost) : "—", fmtDay(s.lastSeen),
+                        ]}/>
+                      ))}
+                      <PlatformUserTotal calls={sumBy(bySource,'calls')} cost={sumBy(bySource,'cost')}/>
+                    </div>
+
+                    {/* FEATURE: LOG-129 -- By Device sits between the other two, John's explicit call.
+                        It is a third cut of the SAME rows, aggregated across every caller and source
+                        ("mobile and desktop are purely aggregate of all users, not just me") -- which
+                        is why it is a sibling section with its own total, never a column folded into
+                        By Source's list, where it would double-count against that section's total.
+                        It is not independently collapsible: the whole drawer opens and closes as one. */}
+                    <div style={{...PU_SUBHEAD,marginTop:12}}>By Device</div>
+                    <div style={PU_TABLE}>
+                      <PlatformUserTableHead cols={DEVICE_COLS}/>
+                      {byDevice.map(d => (
+                        <PlatformUserTableRow key={d.device} cols={DEVICE_COLS} active={d.calls > 0} cells={[
+                          d.device, d.calls.toLocaleString(), fmt$(d.cost), fmtPct(d.pctCost),
+                          d.avgCost != null ? fmt$(d.avgCost) : "—", fmtDay(d.lastSeen),
+                        ]}/>
+                      ))}
+                      <PlatformUserTotal calls={sumBy(byDevice,'calls')} cost={sumBy(byDevice,'cost')}/>
+                    </div>
+
                     <div style={{...PU_SUBHEAD,marginTop:12}}>By Caller</div>
-                    {byCaller.map((c, i) => (
-                      <PlatformUserRow
-                        key={`${c.label}·${i}`}
-                        primary={c.label}
-                        secondary={[c.org, c.city, c.device, c.ips.join(" · ")].filter(Boolean).join(" · ") || "—"}
-                        stats={[["Calls", c.calls.toLocaleString()], ["Cost", fmt$(c.cost)]]}
-                        active={c.calls > 0}
-                      />
-                    ))}
-                    <PlatformUserTotal calls={sumBy(byCaller,'calls')} cost={sumBy(byCaller,'cost')}/>
+                    <div style={PU_TABLE}>
+                      <PlatformUserTableHead cols={CALLER_COLS}/>
+                      {byCaller.map((c, i) => (
+                        <PlatformUserTableRow key={`${c.label}·${i}`} cols={CALLER_COLS} active={c.calls > 0} cells={[
+                          c.label, c.device || "—", [c.org, c.city].filter(Boolean).join(", ") || "—",
+                          c.calls.toLocaleString(), fmt$(c.cost), fmtDay(c.lastSeen),
+                        ]}/>
+                      ))}
+                      <PlatformUserTotal calls={sumBy(byCaller,'calls')} cost={sumBy(byCaller,'cost')}/>
+                    </div>
                   </>
                 )
             )}
