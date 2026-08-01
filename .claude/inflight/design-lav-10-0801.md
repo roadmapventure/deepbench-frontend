@@ -1,1 +1,1 @@
-design-lav-10-0801 — design session for LAV-10 (orchestration-mode showcase visual, split out of LAV-9). Concept-only, needs motion/timing design.
+design-lav-10-0801 — LAV-10 design settled, kickoff v7.0.35 written. About to spawn the coding session and self-verify QA.
