@@ -456,7 +456,9 @@ export default function LiveAgentViewScreen() {
     if (changed) { setHops(led.all); setHopTimes(led.at); }
   }, [events]);
 
-  // Node state / bubbles / pulses are per-RUN; observed edges persist for the session.
+  // Node state / bubbles / pulses are per-RUN -- and, since LAV-12, so are the canvas's observed
+  // edges: both <AgentNetwork> call sites now pass the run-scoped list for `hops` too. The whole
+  // ledger below still feeds the HARNESS TRACE console, which really is session-wide.
   const runStart = useMemo(() => {
     let start = 0;
     hops.forEach((h, i) => { if (h.type === "question_boundary") start = i + 1; });
@@ -785,7 +787,14 @@ export default function LiveAgentViewScreen() {
               change. */}
           {mobileTab === "canvas" ? (
             <div style={{position:"relative",flex:3,display:"flex",alignItems:"stretch",minHeight:0}}>
-              <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
+              {/* FEATURE: LAV-12 -- `hops` now gets the SAME per-run slice `runHops` already is
+                  (`canvasRunHops`), not the whole-session ledger (`canvasHops`). sessionEdges() only
+                  ever reads whatever list it's handed to find delegation-family hops, so passing the
+                  run-scoped list is sufficient on its own -- no change to sessionEdges()/AgentNetwork.
+                  A deliberate reversal of the LAV-1b/1c-era "edges persist across runs" choice: a
+                  line from question A survived into question B, whose node/queue state is run-scoped,
+                  so it read as a line pointing at a card sitting in the queue. */}
+              <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
                 traceRows={traceRows} recoveringAgentId={recoveringAgentId}
                 choreographed={choreographed} onToggleChoreographed={setChoreographed}
                 pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
@@ -978,7 +987,8 @@ export default function LiveAgentViewScreen() {
             and the Answer drawer that renders them; passing them ahead of that render is a no-op on
             today's AgentNetwork, which simply ignores props it does not destructure. */}
         <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
-          <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
+          {/* FEATURE: LAV-12 -- run-scoped `hops`, same reversal as the mobile call site above. */}
+          <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
             pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}

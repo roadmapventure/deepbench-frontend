@@ -144,7 +144,22 @@ const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
 // Checked against the canvas's other fixed points at this new size: arc rightmost point
 // (MID.x + ARC_RX = 835) still clears STACKX (1098) by 263px, and the arc's angular range never
 // swings left of MID.x, so LEAD (270) is untouched -- this widening cannot newly overlap either.
-const ARC_RX = 275, ARC_RY = 245, ARC_SPREAD = (162 * Math.PI) / 180;
+// FEATURE: LAV-12 -- the legend/toggle (screen-pixel `right:12,top:12`) and the prompt box
+// (screen-pixel `right:314,bottom:8`, up to 660px wide) live entirely outside this canvas's own
+// 1200x640 coordinate space, so there's no exact runtime mapping between "their screen rect" and
+// "a viewBox position" without measuring the DOM every render. Confirmed with John: a static
+// reserved band, not runtime measurement -- cheaper, can't drift out of sync, costs a little of
+// LAV-9b's added breathing room. TOP_SAFE_Y/BOTTOM_SAFE_Y bound the vertical range every card
+// center (home grid, arc, bench stack) must stay within; homeLayout()'s existing grid already
+// fits this band without changes (its own range is ~102-538) -- only the arc and bench-stack math
+// currently swing outside it, and the ARC_RY/bench-span values below narrow them to fit.
+export const TOP_SAFE_Y = 85;
+export const BOTTOM_SAFE_Y = 555;
+// FEATURE: LAV-12 -- ARC_RY narrows from LAV-9b's 245 back toward its pre-LAV-9b 215, so
+// MID.y (305) +/- ARC_RY stays inside [TOP_SAFE_Y, BOTTOM_SAFE_Y]; 245 swung as low as y=60,
+// inside the legend's reserved band. ARC_RX is untouched -- the arc's angular range never swings
+// left of MID.x, so horizontal spacing (the crowding LAV-9b widened for) is unaffected.
+const ARC_RX = 275, ARC_RY = 215, ARC_SPREAD = (162 * Math.PI) / 180;
 // FEATURE: LAV-1f -- the human's anchor: LEAD mirrored across the canvas. While a gate is open the
 // requesting agent IS the lead (see `lead` below), so the human materializes directly opposite the
 // agent asking, and the hand-off pulse runs straight between the two. Derived from the ported
@@ -406,6 +421,9 @@ export function labelOpacityForRank(rank) {
 // ── layout ───────────────────────────────────────────────────────────────────
 // The home grid is COMPUTED from roster order -- there is no hand-authored position table and no
 // hand-listed agent id anywhere in this file (kickoff SCOPE RULES).
+// FEATURE: LAV-12 -- verified this session: this formula's y-range (~102 to ~538 for VH=640)
+// already sits inside [TOP_SAFE_Y, BOTTOM_SAFE_Y] (85-555) without any change -- only the arc and
+// bench-stack math (below) swung outside it.
 export function homeLayout(ids) {
   const n = ids.length, out = {};
   if (!n) return out;
@@ -458,7 +476,11 @@ export function computeTargets({ ids, home, choreographed, engaged, lead, benchO
     // FEATURE: LAV-9b -- bench-stack cards render at 0.56 scale (~67px tall); the old 52px step cap
     // meant adjacent queued cards could overlap. Raised the cap and the total span so the stack has
     // room to breathe within the canvas's 640px height (VH) without changing the queue's meaning.
-    const m = order.length, step = m > 1 ? Math.min(58, 520 / (m - 1)) : 0, y0 = 305 - (step * (m - 1)) / 2;
+    // FEATURE: LAV-12 -- span narrowed from 520 to 430 so the full stack (y0 +/- span/2, centered on
+    // 305) fits inside [TOP_SAFE_Y, BOTTOM_SAFE_Y] -- the old 520 swung to y=565, inside the prompt
+    // box's reserved band. Step cap unchanged; for a small roster the step is still capped at 58,
+    // it's only a long queue (where the span-derived step already governs, not the cap) that tightens.
+    const m = order.length, step = m > 1 ? Math.min(58, 430 / (m - 1)) : 0, y0 = 305 - (step * (m - 1)) / 2;
     order.forEach((id, i) => { t[id] = { x: STACKX, y: y0 + i * step }; });
     return { targets: t, benched, benchOrder: order };
   }
@@ -621,7 +643,6 @@ const NET_CSS = `
   border-radius:14px;padding:9px 7px 8px;box-shadow:0 3px 10px ${rgba(T.navy, 0.16)};position:relative;
   transition:border-color .3s,box-shadow .35s}
 .lav-ava{width:50px;height:50px;margin:0 auto 4px;position:relative;z-index:2;display:flex;justify-content:center}
-.lav-code{font-family:${mono};font-size:9px;font-weight:600;letter-spacing:.1em;color:${T.muted};text-transform:uppercase}
 .lav-name{font-family:${body};font-weight:700;font-size:12.5px;color:${T.navy};line-height:1.15;margin-top:1px}
 .lav-role{font-family:${body};font-size:9.5px;color:${T.muted};margin-top:1px;line-height:1.2}
 /* FEATURE: LAV-1c -- the slot LAV-1b reserved, now filled. Still renders NOTHING without real
@@ -782,9 +803,10 @@ const NET_CSS = `
 .lav-mnode{position:absolute;transform:translate(-50%,-50%);width:56px;text-align:center;z-index:2}
 .lav-mava{width:38px;height:38px;margin:0 auto;display:flex;align-items:center;justify-content:center;
   transition:filter .3s}
-.lav-mcode{font-family:${mono};font-size:7px;font-weight:700;letter-spacing:.06em;color:${T.muted};
-  text-transform:uppercase;margin-top:2px;line-height:1.1}
-.lav-mname{font-family:${body};font-size:8px;font-weight:600;color:${T.navy};line-height:1.1}
+/* FEATURE: LAV-12 -- .lav-mcode removed with the agent code it styled. Its margin-top:2px was the
+   only thing separating the avatar from the label below it, so that 2px moves onto .lav-mname --
+   the gap is preserved exactly, nothing else about the card's appearance changes. */
+.lav-mname{font-family:${body};font-size:8px;font-weight:600;color:${T.navy};line-height:1.1;margin-top:2px}
 .lav-mnode.is-recovering .lav-mava{filter:drop-shadow(0 0 7px ${rgba(T.flag, 0.9)})}
 .lav-mnode.is-active .lav-mava{filter:drop-shadow(0 0 8px ${rgba(T.brass, 0.9)})}
 .lav-mnode.is-done .lav-mava{filter:drop-shadow(0 0 5px ${rgba(T.mossLight, 0.85)})}
@@ -822,7 +844,11 @@ const NET_CSS = `
 /**
  * Pure presentation of the harness stream. No fetching, no timers that invent state.
  *  roster   -- agent objects that may appear on this canvas (idle baseline + anyone seen streaming)
- *  hops     -- every stored event observed this SESSION (edges persist across runs)
+ *  hops     -- the ledger sessionEdges() scans for observed edges. FEATURE: LAV-12 -- as of this
+ *    session the caller hands it the CURRENT RUN's slice, the same list as runHops, so edges reset
+ *    on the question boundary like every other piece of this canvas. It formerly received the whole
+ *    browser session's ledger ("edges persist across runs", LAV-1b/1c) -- that made a line from a
+ *    previous question keep pointing at a card that had gone back to the queue for this one.
  *  runHops  -- the slice since the current run's question boundary (node state, pulses, bubbles)
  *  running  -- the harness is live right now
  *  traceRows -- this run's real ai_activity_log rows (the screen's poller); model tag only
@@ -1276,7 +1302,6 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           <div className="lav-ring"/>
           {modelTag && <div className="lav-model" title={modelTag}>{modelFamily(modelTag)}</div>}
           <div className="lav-ava"><AgentAvatar who={a.id} size={50}/></div>
-          <div className="lav-code">{a.code}</div>
           <div className="lav-name">{a.name}</div>
           <div className="lav-role">{a.role}</div>
           <div className="lav-slot">
@@ -1355,7 +1380,6 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                   <div key={a.id} className={cls.join(" ")}
                     style={{ left: `${slot.x}%`, top: `${slot.y}%` }}>
                     <div className="lav-mava"><AgentAvatar who={a.id} size={38}/></div>
-                    <div className="lav-mcode">{a.code}</div>
                     <div className="lav-mname">{String(a.name || "").split(" ")[0]}</div>
                   </div>
                 );
@@ -1485,7 +1509,12 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               const stroke = open ? DISPATCH_COLOR : (pulsed || e.color);
               const animated = open || (running && !!pulsed);
               const arrowColor = open ? DISPATCH_COLOR : pulsed;
-              const labelOpacity = labelOpacityForRank(rank);
+              // FEATURE: LAV-12 -- while the line is genuinely animating (solid + arrow, running),
+              // its label is always fully visible -- the recency-ranked fade only governs the
+              // SETTLED view after the run ends, when there's no "active" left to prioritize by.
+              // `label` itself (whether a <text> renders at all) is unchanged: still gated on
+              // `active` (this edge carried a real pulse this run) and never on a genuinely-open one.
+              const labelOpacity = running ? 1 : labelOpacityForRank(rank);
               const label = open || !active ? null : (EDGE_MEANING_LABEL.get(pulsed) ?? null);
               const a = posRef.current[e.from] || home[e.from];
               const b = posRef.current[e.to] || home[e.to];
@@ -1560,7 +1589,6 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                       net for an id that doesn't parse and therefore renders verbatim. */}
                   {modelTag && <div className="lav-model" title={modelTag}>{modelFamily(modelTag)}</div>}
                   <div className="lav-ava"><AgentAvatar who={a.id} size={50}/></div>
-                  <div className="lav-code">{a.code}</div>
                   <div className="lav-name">{a.name}</div>
                   <div className="lav-role">{a.role}</div>
                   <div className="lav-slot">
