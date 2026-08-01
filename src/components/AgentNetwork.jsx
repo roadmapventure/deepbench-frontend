@@ -1,3 +1,13 @@
+// DeepBench v7.0.26 | AgentNetwork.jsx | LAV-7b -- canvas round 2b: the legend and the
+// Choreographed/Static toggle move into ONE right-aligned row at the top of the canvas, the freed
+// top-left corner takes a new "Answer" drawer (closed by default -- this screen is about the agent
+// communication, and the answer is one click away for anyone who wants it), and a delegation that is
+// GENUINELY still open (dispatched, no return yet) carries a small arrowhead travelling its line over
+// and over until the real return event closes it. Nothing here invents an open state: the loop is
+// mounted straight off deriveNetwork's existing openByTarget, with a minimum-lap floor so a
+// near-instant hop still shows one readable pass -- and no ceiling, so a long call keeps looping for
+// exactly as long as it is really open. LAV-5b's lit-edge/label mechanism is untouched and still
+// governs every edge that is not currently open.
 // DeepBench v7.0.20 | AgentNetwork.jsx | LAV-5b -- canvas round 1b: the segmented control drops its
 // "Layout" label, the model tag reads the family name parsed off the real id (never a lookup table),
 // a finished agent keeps the LAST pattern it was really classified on, and every routing pulse
@@ -39,10 +49,19 @@ import { T, PALETTE, mono, body, ACTION_TEXT_COLORS_FETCH } from "../tokens.js";
 // agent identity to represent). ConfirmationCardContent is CHI's own generic pending_confirmation
 // renderer (MI-01d/CHI-50) -- reused verbatim so the proposal the human is deciding on is rendered
 // by exactly one implementation platform-wide, with no copy authored here.
-import { AgentAvatar, FeatureBadge, UserAvatar, ConfirmationCardContent } from "./SharedUI.jsx";
+// FEATURE: LAV-7b -- Drawer is the platform's one collapsible-section component; the Answer drawer is
+// the same object every other drawer on the platform is, not a canvas-local panel.
+import { AgentAvatar, FeatureBadge, UserAvatar, ConfirmationCardContent, Drawer } from "./SharedUI.jsx";
 // FEATURE: LAV-1c -- the same module the Agent Routing drawer's pattern line joins through
 // (LOG-79/LOG-95b). Reused verbatim: this file holds no pattern name, slug, or per-pattern branch.
 import { fetchTracePatterns, needsSpanRefetch } from "../lib/tracePatterns.js";
+// FEATURE: LAV-7b -- CHI's own terminal-answer card, reused verbatim (LAV-7a added the export and
+// nothing else). The answer this screen shows and the answer CHI shows are rendered by exactly one
+// implementation, so they can never drift; this file authors no answer markup of its own. Note
+// QaEvidenceCard performs its own groupKeyDataPoints() call internally -- that grouping is therefore
+// reused too, and is deliberately NOT re-imported here (an import this file never calls would be
+// dead code, and re-deriving the groups would be the duplication the reuse exists to prevent).
+import { QaEvidenceCard } from "../screens/MarketIntelligenceScreen.jsx";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
@@ -50,6 +69,11 @@ const VW = 1200, VH = 640;
 // waits, not schedules: nothing here polls and nothing here invents a duration.
 const PATTERN_REFETCH_MS = 2500;
 const PATTERN_SETTLE_MS = 2500;
+// FEATURE: LAV-7b -- one lap of the open-delegation arrow, and the minimum-lap floor below. Same
+// duration as the Pulse `dur` this canvas already uses, so the canvas has one motion language rather
+// than two. Module scope because both LoopingArrow and the component's floor effect read it, and it
+// must be exactly one value.
+const LOOP_LAP_MS = 900;
 // Choreography anchors, ported verbatim from the prototype's computeTargets().
 const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
 const ARC_RX = 235, ARC_RY = 215, ARC_SPREAD = (162 * Math.PI) / 180;
@@ -390,6 +414,41 @@ function Pulse({ d, color, dur, onDone }) {
   );
 }
 
+// ── FEATURE: LAV-7b -- the open-delegation arrow ─────────────────────────────
+// A small arrowhead travelling repeatedly from `d`'s start to its end for as long as this component
+// is mounted. It has NO opinion about when it should stop: the caller mounts it exactly while the
+// edge is visually open, which is what keeps "is this delegation still open?" a single question
+// answered in one place. Position comes from getPointAtLength (the same technique Pulse already
+// uses); the rotation is taken from a 1px look-ahead sample so the head visibly points along the
+// direction of travel rather than sitting at a fixed angle.
+function LoopingArrow({ d, color }) {
+  const pathRef = useRef(null);
+  const arrowRef = useRef(null);
+  useEffect(() => {
+    const path = pathRef.current, arrow = arrowRef.current;
+    if (!path || !arrow) return undefined;
+    const total = path.getTotalLength() || 1;
+    let raf = 0;
+    const t0 = performance.now();
+    const frame = (now) => {
+      const len = ((now - t0) % LOOP_LAP_MS) / LOOP_LAP_MS * total;
+      const p = path.getPointAtLength(len);
+      const ahead = path.getPointAtLength(Math.min(total, len + 1));
+      const angle = (Math.atan2(ahead.y - p.y, ahead.x - p.x) * 180) / Math.PI;
+      arrow.setAttribute("transform", `translate(${p.x} ${p.y}) rotate(${angle})`);
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [d]);
+  return (
+    <g>
+      <path ref={pathRef} d={d} fill="none" stroke="none"/>
+      <polygon ref={arrowRef} points="-6,-4 6,0 -6,4" fill={color} filter="url(#lavGlow)"/>
+    </g>
+  );
+}
+
 // ── component-scoped CSS (GLOBAL_CSS already owns spin/fadeIn/slideUp/aiBlink) ─
 const NET_CSS = `
 .lav-stagewrap{flex:1;position:relative;overflow:hidden;padding:10px 6px 6px;background:${T.paper};
@@ -470,20 +529,29 @@ const NET_CSS = `
 .lav-bubble.down{bottom:auto;top:calc(100% + 12px);transform:translateX(-50%) translateY(-6px)}
 .lav-bubble.down:after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:${T.navy}}
 .lav-bubble.down.show{transform:translateX(-50%) translateY(0)}
-.lav-legend{position:absolute;left:12px;bottom:8px;display:flex;gap:12px;flex-wrap:wrap;font-family:${body};
+/* FEATURE: LAV-7b -- legend and toggle now share ONE right-aligned row at the top of the canvas
+   (legend first, then the buttons), which is what frees the top-left corner for the Answer drawer.
+   The row is the only thing positioned: both children keep their own internal layout exactly as
+   before and simply sit in normal flow inside it. Clear of the 300px Agent Routing rail, which is
+   the screen's sibling element and outside this box entirely. */
+.lav-topright{position:absolute;right:12px;top:12px;display:flex;align-items:center;gap:10px;z-index:8}
+.lav-legend{display:flex;gap:12px;flex-wrap:wrap;font-family:${body};
   font-size:9.5px;color:${T.muted};background:${rgba(T.card, 0.82)};border:1px solid ${T.line};
-  border-radius:20px;padding:6px 11px;z-index:6}
+  border-radius:20px;padding:6px 11px}
 .lav-legend span{display:inline-flex;align-items:center;gap:5px}
 .lav-legend .sw{width:15px;height:3px;border-radius:2px}
 /* FEATURE: AA-179b -- a RING swatch, not a bar. The five bars above are edge/pulse colours; this
    one is a node state, and drawing it as a bar would imply an assembly edge exists. It never does. */
 .lav-legend .sw-ring{width:11px;height:11px;border-radius:50%;border:2px solid ${ASSEMBLY_COLOR};
   background:transparent}
-.lav-seg{position:absolute;left:12px;top:12px;display:flex;align-items:stretch;background:${T.card};
-  border:1px solid ${T.line};border-radius:8px;overflow:hidden;z-index:8;box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
+.lav-seg{display:flex;align-items:stretch;background:${T.card};flex-shrink:0;
+  border:1px solid ${T.line};border-radius:8px;overflow:hidden;box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
 .lav-seg button{border:none;background:transparent;font-family:${body};font-weight:600;font-size:11px;
   color:${T.muted};padding:6px 13px;cursor:pointer}
 .lav-seg button.on{background:${T.navy};color:${T.card}}
+/* FEATURE: LAV-7b -- the Answer drawer takes the slot .lav-seg just vacated, at the same z-index, so
+   nothing else on this canvas needs its stacking order changed. */
+.lav-answer{position:absolute;left:12px;top:12px;width:280px;z-index:8}
 /* FEATURE: LAV-1f -- the You node. Same node geometry as an agent card so it sits in the same
    choreography, deliberately different skin (dashed brass, no code/role row, silhouette avatar) so
    it can never be mistaken for an agent card. */
@@ -520,8 +588,10 @@ const NET_CSS = `
  *  pending   -- LAV-1f: the harness's OPEN confirmation gate, verbatim off its frame, or null
  *  resolving -- LAV-1f: that same gate while the human's decision request is in flight, or null
  *  onResolveConfirmation -- LAV-1f: dispatches the human's decision ('accept' | 'reject')
+ *  answerQa   -- LAV-7b: the run's real terminal answer in QaEvidenceCard's shape, or null (LAV-7a)
+ *  answerText -- LAV-7b: that same terminal turn's plain message when it is not a qa result, or null
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -600,6 +670,43 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
 
   useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
+  // ── FEATURE: LAV-7b -- which delegations are genuinely still open, and the visual floor ─────
+  // The real open/closed state comes straight off deriveNetwork's existing openByTarget
+  // (targetId -> dispatcherId while unreturned) -- no new event tracking, and nothing here can
+  // report an edge open that the ledger does not really show open.
+  const openEdgeKeys = useMemo(
+    () => new Set([...net.openByTarget.entries()].map(([to, from]) => edgeKey(from, to))),
+    [net]);
+
+  // The VISUAL open state, deliberately decoupled from the real one by a floor: once an edge opens it
+  // stays visually open for at least LOOP_LAP_MS even if the real delegation has already closed, so a
+  // near-instant hop still shows one full readable pass instead of a flash. Never a ceiling -- a
+  // genuinely long-open delegation keeps looping for its real duration, untouched.
+  const openSinceRef = useRef(new Map());          // edgeKey -> ms timestamp first observed open
+  const [visuallyOpenKeys, setVisuallyOpenKeys] = useState(() => new Set());
+  useEffect(() => {
+    const now = Date.now();
+    setVisuallyOpenKeys(prev => {
+      const next = new Set(prev);
+      for (const k of openEdgeKeys) {
+        if (!openSinceRef.current.has(k)) openSinceRef.current.set(k, now);
+        next.add(k);
+      }
+      return next;
+    });
+    const timers = [];
+    for (const [k, since] of openSinceRef.current) {
+      if (openEdgeKeys.has(k)) continue;           // still really open -- nothing to schedule
+      const remaining = LOOP_LAP_MS - (now - since);
+      const clear = () => {
+        openSinceRef.current.delete(k);
+        setVisuallyOpenKeys(prev => { const n = new Set(prev); n.delete(k); return n; });
+      };
+      if (remaining <= 0) clear(); else timers.push(setTimeout(clear, remaining));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [openEdgeKeys]);
+
   // ── pulses: one per newly-observed delegation-family hop, on the real pair it crossed ──
   const [pulses, setPulses] = useState([]);
   // FEATURE: LAV-5b -- the one line left lit by the most recent pulse, `{ key, color }`. A pulse is
@@ -611,7 +718,14 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const seenRef = useRef(0);
   const pulseIdRef = useRef(0);
   useEffect(() => {
-    if (runHops.length < seenRef.current) { seenRef.current = 0; setPulses([]); setLitEdge(null); return; }
+    // FEATURE: LAV-7b -- the open-loop ledger resets on exactly the same question boundary the
+    // pulse/lit-edge ledger already does. A new question is a new run: an edge left open by the
+    // previous one is not open now, and must not keep looping into the next question.
+    if (runHops.length < seenRef.current) {
+      seenRef.current = 0; setPulses([]); setLitEdge(null);
+      openSinceRef.current.clear(); setVisuallyOpenKeys(new Set());
+      return;
+    }
     if (runHops.length === seenRef.current) return;
     const fresh = [];
     let lit = null;
@@ -757,9 +871,38 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     <div className="lav-stagewrap">
       <FeatureBadge id="LAV-1"/>
       <style>{NET_CSS}</style>
-      <div className="lav-seg">
-        <button className={choreographed ? "on" : ""} onClick={() => onToggleChoreographed(true)}>Choreographed</button>
-        <button className={choreographed ? "" : "on"} onClick={() => onToggleChoreographed(false)}>Static</button>
+      {/* FEATURE: LAV-7b -- the answer, one click away and closed by default. This screen exists to
+          show the agent communication, not the answer; the answer is available to anyone who wants
+          it and never competes with the canvas for attention. The card is CHI's own QaEvidenceCard,
+          rendered by the one implementation platform-wide. The empty state is screen chrome (the
+          same register as the rail's own empty text), never a stand-in for an agent's words. */}
+      <div className="lav-answer">
+        <Drawer title="Answer" defaultOpen={false}>
+          {answerQa
+            ? <QaEvidenceCard qa={answerQa}/>
+            : answerText
+              ? <div style={{ fontFamily: body, fontSize: 11.5, lineHeight: 1.5, color: T.ink }}>{answerText}</div>
+              : <div style={{ fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>
+                  No answer yet — appears here once a run completes.
+                </div>}
+        </Drawer>
+      </div>
+      {/* FEATURE: LAV-7b -- legend then toggle, one row, top-right. */}
+      <div className="lav-topright">
+        <div className="lav-legend">
+          <span><span className="sw" style={{ background: LINK_COLOR }}/>Link</span>
+          <span><span className="sw" style={{ background: HANDOFF_COLOR }}/>Hand-off</span>
+          <span><span className="sw" style={{ background: DISPATCH_COLOR }}/>Delegate</span>
+          <span><span className="sw" style={{ background: REPORT_COLOR }}/>Report back</span>
+          <span><span className="sw" style={{ background: REDISPATCH_COLOR }}/>Re-dispatch</span>
+          {/* FEATURE: AA-179b -- the one node-state entry on this legend, and the reason the canvas
+              can be read honestly: a ring with no arrow touching it is assembly work. */}
+          <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>
+        </div>
+        <div className="lav-seg">
+          <button className={choreographed ? "on" : ""} onClick={() => onToggleChoreographed(true)}>Choreographed</button>
+          <button className={choreographed ? "" : "on"} onClick={() => onToggleChoreographed(false)}>Static</button>
+        </div>
       </div>
       <div className="lav-stage"><div className="lav-inner">
         <svg className="lav-svg" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="xMidYMid meet">
@@ -775,18 +918,26 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                 LAV-1b resting look. The word comes from EDGE_MEANING_LABEL keyed on the colour
                 actually drawn, so a resting LINK_COLOR edge (not in the map) carries none and the
                 brass hand-off carries "Hand-off" -- no separate branch decides which lines speak. */}
+            {/* FEATURE: LAV-7b -- an edge that is genuinely open takes visual precedence over the
+                lit-edge look for exactly as long as it is open, and hands straight back to LAV-5b's
+                mechanism the moment it closes (past its floor): solid in the delegation colour with a
+                travelling arrowhead, and NO word riding it. A static "Delegate" beside a moving arrow
+                would read as a contradiction -- the motion already says the delegation is in flight,
+                and the word's whole job is to describe a line that has stopped. */}
             {edges.map(e => {
-              const lit = isLitEdge(litEdge, e);
-              const stroke = lit ? litEdge.color : e.color;
-              const label = EDGE_MEANING_LABEL.get(stroke) ?? null;
+              const open = visuallyOpenKeys.has(e.key);
+              const lit = !open && isLitEdge(litEdge, e);
+              const stroke = open ? DISPATCH_COLOR : (lit ? litEdge.color : e.color);
+              const label = open ? null : (EDGE_MEANING_LABEL.get(stroke) ?? null);
               const a = posRef.current[e.from] || home[e.from];
               const b = posRef.current[e.to] || home[e.to];
               return (
                 <g key={e.key}>
                   <path ref={el => { edgeRefs.current[e.key] = el; }} d={ePath(a, b)}
-                    fill="none" stroke={stroke} strokeWidth={(lit || e.handoff) ? 2.2 : 1.6}
-                    strokeDasharray={lit ? undefined : "2 7"} strokeLinecap="round"
-                    opacity={lit ? 1 : 0.9}/>
+                    fill="none" stroke={stroke} strokeWidth={(open || lit || e.handoff) ? 2.2 : 1.6}
+                    strokeDasharray={(open || lit) ? undefined : "2 7"} strokeLinecap="round"
+                    opacity={(open || lit) ? 1 : 0.9}/>
+                  {open && <LoopingArrow d={ePath(a, b)} color={DISPATCH_COLOR}/>}
                   {label && (
                     <text ref={el => { labelRefs.current[e.key] = el; }}
                       transform={edgeLabelTransform(a, b) || undefined} textAnchor="middle" dy="-5"
@@ -877,16 +1028,6 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           )}
         </div>
       </div></div>
-      <div className="lav-legend">
-        <span><span className="sw" style={{ background: LINK_COLOR }}/>Link</span>
-        <span><span className="sw" style={{ background: HANDOFF_COLOR }}/>Hand-off</span>
-        <span><span className="sw" style={{ background: DISPATCH_COLOR }}/>Delegate</span>
-        <span><span className="sw" style={{ background: REPORT_COLOR }}/>Report back</span>
-        <span><span className="sw" style={{ background: REDISPATCH_COLOR }}/>Re-dispatch</span>
-        {/* FEATURE: AA-179b -- the one node-state entry on this legend, and the reason the canvas
-            can be read honestly: a ring with no arrow touching it is assembly work. */}
-        <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>
-      </div>
     </div>
   );
 }
