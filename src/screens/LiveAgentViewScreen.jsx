@@ -143,7 +143,10 @@ export function deriveMode(runHops, { running, terminal, awaiting = false }) {
   return runHops.some(h => h.type === "delegation_return") ? "orch" : "route";
 }
 
-const MODE_COPY = { idle: "Idle", route: "Routing", orch: "Orchestrating", awaiting: "Awaiting confirmation", complete: "Complete", error: "Error" };
+// FEATURE: LAV-9c -- "Question Answered" (John's own wording, design session 2026-08-01): the
+// specific thing that finished is the question, and this is what tells the user to look at the
+// metrics/canvas/answer around the screen -- not a generic process-complete word.
+const MODE_COPY = { idle: "Idle", route: "Routing", orch: "Orchestrating", awaiting: "Awaiting confirmation", complete: "Question Answered", error: "Error" };
 
 function ModeBadge({ mode, detail }) {
   const tint = {
@@ -162,7 +165,14 @@ function ModeBadge({ mode, detail }) {
       fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",padding:"5px 12px",borderRadius:20,
       border:`1.5px solid ${tint.br}`,color:tint.fg,background:T.card}}>
       <span style={{width:9,height:9,borderRadius:"50%",background:tint.br,
-        animation: mode === "orch" ? "aiBlink 1.1s ease-in-out infinite" : "none"}}/>
+        // FEATURE: LAV-9c -- "Question Answered" pulses continuously for as long as the badge sits
+        // in that state (same as `orch` already does), per John: the pulse is what tells the user
+        // the ending metrics around the screen are ready to look at, for however long they take to
+        // notice -- not a brief flourish that stops before anyone sees it. It reads as a distinct
+        // signal from `orch`'s pulse (different color -- T.moss green vs the CLICK blue `orch` uses
+        // -- and different label), so the two "this is animating" states don't get confused for the
+        // same meaning.
+        animation: (mode === "orch" || mode === "complete") ? "aiBlink 1.1s ease-in-out infinite" : "none"}}/>
       <span>{MODE_COPY[mode]}</span>
       {detail && <span style={{fontFamily:mono,fontWeight:600,letterSpacing:0,textTransform:"none",
         maxWidth:220,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{String(detail)}</span>}
@@ -407,11 +417,11 @@ export default function LiveAgentViewScreen() {
   // ── terminal / timer bookkeeping ───────────────────────────────────────────
   useEffect(() => { if (result) setTerminal("result"); }, [result]);
   useEffect(() => { if (error) setTerminal("error"); }, [error]);
-  useEffect(() => {
-    if (terminal !== "result") return undefined;
-    const id = setTimeout(() => setTerminal(null), 3000);
-    return () => clearTimeout(id);
-  }, [terminal]);
+  // FEATURE: LAV-9c -- the 3-second auto-revert removed. `terminal` now stays "result"/"error" until
+  // the ONLY other place that ever clears it: onRun()'s setTerminal(null) (below, unchanged), which
+  // fires when the NEXT question actually starts. Previously this timer meant the "Question
+  // Answered" badge was only ever visible for 3 seconds before silently degrading to the exact same
+  // "Idle" look as a screen that has never run anything -- the confusion John flagged.
   useEffect(() => { if (status) setLiveStatus(status); }, [status]);
   useEffect(() => {
     if (running) setFrozenAt(null);
