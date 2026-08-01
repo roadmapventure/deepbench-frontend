@@ -408,6 +408,15 @@ export function scoreVerdict(verdict, outcomeClass) {
   return { pass, failed_criteria };
 }
 
+// FEATURE: SES-64 -- pure and exported so it is testable without a live run, same pattern as
+// scoreVerdict() (AGT-36). Case 24's outcome class is a property of THIS RUN's article-fetch
+// outcome, not a fixed baseline membership fact -- runbook §5b/§8 baseline-change approval:
+// John, 2026-08-01 (design-ses-64). HONEST_GAP_IDS is unchanged and still question-id-keyed;
+// case 24's id ("news-first-card") never belongs there.
+export function resolveNewsDoorOutcomeClass(articleDegraded) {
+  return articleDegraded ? "honest-gap" : "rich-answer";
+}
+
 // ---- Owen's AGT-35 content-context judge (D5) -- the only content judgment anywhere here ----
 async function judgeArtifact({ artifact_type, artifact_content, question, ctx }) {
   // FEATURE: SES-31a (Task 2) -- covers every judgeArtifact call site generically (one enforcement
@@ -630,6 +639,12 @@ async function runNewsDoorCaseJourney(_caseObj, ctx, judgeVerdicts) {
   const { payload: extraFields, failure: articleFailure, degraded: articleDegraded } =
     await resolveNewsCardContext(card.url, FETCH_ARTICLE_ENDPOINT);
 
+  // FEATURE: SES-64 -- runbook §5b/§8 baseline change: case 24 scores honest-gap when this run's
+  // article could not be read, rich-answer when it could. ctx is the same mutable object
+  // judgeArtifact() reads (L423) and finalizeCase() records (L670), so this is the only line that
+  // needs to change -- no reordering, articleDegraded is already known before the answer/judge call.
+  ctx.outcome_class = resolveNewsDoorOutcomeClass(articleDegraded);
+
   const question = `New industry development: ${card.headline}. What does this mean for our channel program positioning?`;
   const result = await runDirectCaseJourney(question, ctx, judgeVerdicts, extraFields);
   return { ...result, card_headline: card.headline, card_url: card.url, article_source: extraFields.article_source, article_degraded: articleDegraded, article_unavailable_reason: articleFailure };
@@ -734,7 +749,7 @@ async function runOneCase(caseObj) {
   // "report the degradation prominently").
   const degradedMarker = record.article_degraded ? " *** ARTICLE DEGRADED ***" : "";
   // FEATURE: AGT-36 -- so a reader can see why a pass:false verdict from Owen did not fail the case.
-  const classMarker = caseObj.outcome_class === "honest-gap" ? " [honest-gap]" : "";
+  const classMarker = record.outcome_class === "honest-gap" ? " [honest-gap]" : "";
   console.log(`[${caseObj.n}/24] ${caseObj.id}${classMarker} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${degradedMarker}`);
   return record;
 }
