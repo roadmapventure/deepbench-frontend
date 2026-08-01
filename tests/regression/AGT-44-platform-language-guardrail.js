@@ -1,3 +1,10 @@
+// DeepBench v7.0.17 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02c-patch --
+// B5 added: HAR-30 rot-guard. The HAR-30 fix scoped the ci-identity/ci-behavior skill_profiles
+// rows away from ci-routing-intent via traits.intent_allowlist (persona text deterministically
+// flipped case 6's five-way routing forecast -> qa after the stable-first reorder; verified
+// restored 10/10 + full-run journeys 24/24). Same rot-prone allowlist shape B3 already guards on
+// the shared guardrail Skill row -- B5 asserts non-empty, ci-routing-intent excluded, and
+// ci-answer-intent included, for BOTH rows. Full record: docs/harvests/HAR-02.md.
 // DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch3 --
 // A3/A4 re-anchored again: stable run is now format 1, identity 2, behavior 3, guardrails 4,
 // intent 5 -- intent LAST in the stable phase, restoring the intent->task adjacency whose loss the
@@ -349,6 +356,33 @@ async function liveSkillRow() {
   // standard governs what she writes, not what she reads. Asserted so a later sweep doesn't "clean" it.
   assert.ok(priya.objective.includes("CSO Data Room"),
     "hyp-hypothesis-test-intent.objective no longer names the CSO Data Room -- that phrase is operational instruction about what to query, deliberately left in place");
+
+  // B5. THE HAR-30 ROT-GUARD (S-HAR-02c-patch). S-HAR-02b's stable-first prompt reorder made the
+  //     persona text on Marcus Webb -- GEO CSO Expert's OWN ci-identity/ci-behavior Skill rows
+  //     deterministically flip case 6's five-way routing classification forecast -> qa (3/3 in
+  //     both A/B directions -- HAR-30). The fix is the same mechanism B3 asserts on the shared
+  //     guardrail Skill: traits.intent_allowlist on BOTH rows scopes the persona text to the four
+  //     content/ack intents and AWAY from ci-routing-intent (restored historical routing 10/10,
+  //     full-run journeys 24/24). And it rots the same two silent ways: clearing the traits
+  //     reintroduces the routing regression; adding a new channel-intelligence content intent
+  //     without extending them strips persona from that intent with no error anywhere. The
+  //     exclusion (ci-routing-intent out) and one content-intent inclusion (ci-answer-intent in)
+  //     are the invariants; the full list may legitimately grow, so it is deliberately not
+  //     pinned. Full record: docs/harvests/HAR-02.md.
+  const ciRes = await fetch(`${url}/rest/v1/skill_profiles?slug=in.(ci-identity,ci-behavior)&select=slug,traits`, { headers });
+  assert.ok(ciRes.ok, `ci-identity/ci-behavior read failed: HTTP ${ciRes.status}`);
+  const ciRows = await ciRes.json();
+  for (const slug of ["ci-identity", "ci-behavior"]) {
+    const ciRow = ciRows.find(r => r.slug === slug);
+    assert.ok(ciRow, `skill_profiles has no '${slug}' row -- Marcus Webb's persona Skill is gone, and with it the HAR-30 routing-isolation allowlist (see docs/harvests/HAR-02.md)`);
+    const ciAllowlist = ciRow.traits?.intent_allowlist;
+    assert.ok(Array.isArray(ciAllowlist) && ciAllowlist.length > 0,
+      `${slug}.traits.intent_allowlist is missing/empty (got ${JSON.stringify(ciAllowlist)}) -- without it the persona text reaches EVERY channel-intelligence intent, including ci-routing-intent, where it deterministically flips case 6's five-way classification forecast -> qa (the HAR-30 regression; see docs/harvests/HAR-02.md)`);
+    assert.ok(!ciAllowlist.includes("ci-routing-intent"),
+      `${slug}.traits.intent_allowlist includes "ci-routing-intent" -- persona text must never sit adjacent to the five-way routing classification: the routing call needs the intent's own instructions next to the task, and persona content there flips case 6 forecast -> qa deterministically (HAR-30; see docs/harvests/HAR-02.md)`);
+    assert.ok(ciAllowlist.includes("ci-answer-intent"),
+      `${slug}.traits.intent_allowlist no longer includes "ci-answer-intent" -- the allowlist exists to scope persona AWAY from routing, not off the content path: dropping the main answer intent silently strips Marcus Webb's persona from every CHI answer (same rot class as adding a new content intent without extending the list; see docs/harvests/HAR-02.md)`);
+  }
 }
 
 export default async function run() {
