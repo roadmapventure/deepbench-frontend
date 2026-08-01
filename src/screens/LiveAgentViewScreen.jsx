@@ -1,3 +1,26 @@
+// DeepBench v7.0.36 | LiveAgentViewScreen.jsx | MOB-4a -- mobile Live Agent View, part 1 of 2: the
+// shell. Below MOBILE_BREAKPOINT (useIsMobile(), STYLE-GUIDE.md §22) this screen returns a DIFFERENT
+// composition of the same shared components, never a CSS reflow of the desktop grid -- the same
+// construction §21 already locked for CHI, now locked for this screen as §42. Top to bottom: title
+// row + a right-justified `Harness Trace ›` CTA, the picker + Run row (Canvas tab ONLY -- §21's rule
+// that the input row belongs to the main tab, not to shared chrome), a permanent tab-independent
+// status strip, the Canvas|Answer tab bar, the tab body, and the pinned Agent Routing feed. The
+// desktop rail, the bottom trace console and the canvas-overlay prompt box are not rendered on
+// mobile; the latter two move into the full-screen Harness Trace overlay.
+// The desktop return path is untouched apart from ONE property: the question <select>'s `background`
+// shorthand becomes `backgroundColor`. React's inline `background` is the SHORTHAND and resets
+// `background-image:none`, wiping tokens.js L78's global chevron -- so that one word applies at BOTH
+// widths and is SES-70's proven root cause. The other 7 <select> call sites stay open on that row
+// and are deliberately not touched here.
+// The canvas INSIDE the Canvas tab is sub-session b's job (AgentNetwork.jsx): until b lands, the tab
+// renders today's desktop canvas with today's props unchanged and will look wrong on a phone. That
+// is expected and is not a bug to fix in this file.
+// Landed AFTER v7.0.38 below despite the lower number -- both versions were claimed atomically and
+// LAV-11 pushed first. Out-of-numeric-order landings are expected here; do not renumber. What that
+// ordering DID require is real: everything LAV-11 added to the desktop picker and the desktop
+// AgentNetwork call (the guardrail-demo option decoration, the answerQuestionId prop) is mirrored
+// into the mobile branch below at rebase time, so the two compositions cannot drift.
+// FEATURE: MOB-4
 // DeepBench v7.0.38 | LiveAgentViewScreen.jsx | LAV-11 -- swaps the LAV-8 question set: measured
 // per-trace final gate verdicts (2026-08-01, durable_hops) showed vietnam-reseller only clears the
 // pre-display gate 56% of the time, so John replaced it with training-turnover-benchmark (75%
@@ -72,11 +95,17 @@ import { AppShell } from "../AppShell.jsx";
 import { FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { useHarnessStream } from "../hooks/useHarnessStream.js";
+// FEATURE: MOB-4 -- the platform's single breakpoint source (STYLE-GUIDE.md §22). Never re-derived
+// inline: the media query and the pixel figure both live in that hook and nowhere else.
+import { useIsMobile } from "../hooks/useIsMobile.js";
 // FEATURE: LAV-5a -- CHI's own hop-feed components, imported unmodified. The rail below is the same
 // render path CHI's AuditColumn uses; only the container (a plain full-height section instead of a
 // capped Drawer inside the Focus Area Audit stack) differs.
+// FEATURE: MOB-4 -- QaEvidenceCard joins that same import: the Answer tab renders CHI's own card,
+// the one implementation platform-wide (AgentNetwork.jsx's LAV-7b drawer already calls it the same
+// way, with `qa` as its only prop -- read at its call site, not assumed).
 import {
-  groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT,
+  groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT, QaEvidenceCard,
 } from "./MarketIntelligenceScreen.jsx";
 import AgentNetwork from "../components/AgentNetwork.jsx";
 import { ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
@@ -144,6 +173,21 @@ function formatExpectation(ms) {
   const m = Math.floor(roundedSec / 60);
   const s = roundedSec % 60;
   return m > 0 ? `expect > ${m}m ${s}s` : `expect > ${s}s`;
+}
+
+// MOB-4a -- mobile-width elapsed/expectation. m:ss instead of "Xm Ys", and the expectation
+// abbreviated to its minute figure. ARCHITECTURE.md §19o requires the expectation to remain
+// visible on mobile, so it is shortened, never dropped. Mobile always derives from the numeric
+// expectationMs (falling back to desktop's own 120000 default) rather than liveStatus.expectation's
+// pre-formatted desktop string, which is too long for this row by construction.
+export function formatElapsedShort(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+export function formatExpectationShort(ms) {
+  const sec = Math.ceil(ms / 1000 / 5) * 5;
+  const m = Math.floor(sec / 60);
+  return m > 0 ? `>${m}m` : `>${sec}s`;
 }
 
 // ── Task 3: mode badge, derived from the run's real events ───────────────────
@@ -237,7 +281,12 @@ export function promptPreviewText(text) {
   return start > 0 ? blocks.slice(start).join("\n\n---\n\n") : text;
 }
 
-function PromptBox({ prompt, agents, traceRows }) {
+// FEATURE: MOB-4 -- `inline` is the ONLY thing this component gained. When true the outer div stops
+// being a canvas overlay (it has no canvas to sit over inside the Harness Trace overlay) and becomes
+// a normal full-width block. The 4-line clamp, promptPreviewText, countLabel and the click-to-open
+// popover are all untouched, and the desktop call site keeps today's absolute positioning by simply
+// omitting the prop.
+function PromptBox({ prompt, agents, traceRows, inline = false }) {
   const [open, setOpen] = useState(false);
   const agent = prompt?.agentId ? agents.find(a => a.id === prompt.agentId) : null;
   const who = agent ? (agent.name || "").split(" ")[0] : (prompt?.agentId || null);
@@ -265,7 +314,9 @@ function PromptBox({ prompt, agents, traceRows }) {
     <>
       <div onClick={() => { if (hasText) setOpen(true); }}
         title={hasText ? "Click to read the full assembled prompt" : undefined}
-        style={{position:"absolute",right:314,bottom:8,zIndex:7,width:"min(660px, 52%)",
+        style={{...(inline
+            ? {position:"static",width:"100%"}
+            : {position:"absolute",right:314,bottom:8,zIndex:7,width:"min(660px, 52%)"}),
           background:rgba(T.paper, 0.94),border:`1px solid ${T.line}`,borderRadius:8,padding:"6px 11px",
           boxShadow:`0 2px 8px ${rgba(T.navy, 0.16)}`,cursor: hasText ? "pointer" : "default"}}>
         <div style={{fontFamily:mono,fontWeight:600,fontSize:8,letterSpacing:"0.1em",
@@ -342,10 +393,25 @@ function AgentRoutingRail({ events, agents }) {
   );
 }
 
+// FEATURE: MOB-4 -- the mobile status strip's meter pair. Two tiles only: Active Spans and Agents
+// Engaged are suppressed at this width (four 8px labels across 402px are unreadable), which is a
+// display decision -- both figures are still derived above, unchanged, for the desktop strip.
+const MOB_METER_LABEL = {fontFamily:mono,fontSize:7.5,letterSpacing:"0.13em",
+  textTransform:"uppercase",color:T.muted};
+const MOB_METER_VALUE = {fontFamily:mono,fontSize:13,fontWeight:700,color:T.navy};
+// The two mobile tabs, in render order. `canvas` is the default (STYLE-GUIDE.md §42).
+const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
+
 export default function LiveAgentViewScreen() {
   const agents = useAgents();
   const { events, status, running, result, error, recovery, prompt, traceIds, pending, resolving,
     runQuestion, resolveConfirmation } = useHarnessStream();
+
+  // FEATURE: MOB-4 -- one breakpoint source, read once. Both pieces of mobile-only state live up
+  // here with every other hook so the two return paths below call an identical hook sequence.
+  const isMobile = useIsMobile();
+  const [mobileTab, setMobileTab] = useState("canvas");   // "canvas" | "answer"
+  const [showTrace, setShowTrace] = useState(false);      // the Harness Trace overlay
 
   const [picked, setPicked] = useState("");
   // FEATURE: LAV-11 -- captured at Run-click time, not read live off `picked` (the select is not
@@ -562,6 +628,11 @@ export default function LiveAgentViewScreen() {
   const elapsedText = base
     ? `elapsed ${formatElapsed(clock - base)} | ${liveStatus?.expectation || formatExpectation(liveStatus?.expectationMs ?? 120000)}`
     : null;
+  // FEATURE: MOB-4 -- the same figures at mobile width, same `base` guard, same clock. Desktop's
+  // elapsedText above is unchanged and stays the only thing the desktop strip reads.
+  const elapsedTextShort = base
+    ? `${formatElapsedShort(clock - base)} · ${formatExpectationShort(liveStatus?.expectationMs ?? 120000)}`
+    : null;
 
   // ── Task 4: the run's real terminal answer, for LAV-7b's Answer drawer ──────────────────────
   // FEATURE: LAV-7a -- the real terminal answer, mapped to QaEvidenceCard's exact shape (the same
@@ -586,6 +657,197 @@ export default function LiveAgentViewScreen() {
     setRanQuestionId(q.id);
     runQuestion(q.label);
   };
+
+  // ── MOB-4a: the mobile composition ──────────────────────────────────────────────────────────
+  // A separate return, not a reflow of the one below: the desktop canvas is a locked
+  // aspect-ratio:1200/640 viewBox with 132px fixed-pixel node cards, and eleven mi-roster cards
+  // cannot coexist on a 402px screen (STYLE-GUIDE.md §42). Every hook above runs identically on
+  // both paths -- this branch is placed after the last one deliberately.
+  if (isMobile) {
+    const runDisabled = !picked || running || awaiting;
+    return (
+      <AppShell>
+        <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,
+          background:T.paperDeep,overflow:"hidden"}}>
+          <FeatureBadge id="LAV-1"/>
+          <FeatureBadge id="LAV-5"/>
+          <FeatureBadge id="MOB-4"/>
+
+          {/* ── Title row ── */}
+          {/* CHI-88's locked mobile title chrome, mirrored: one 17px line with the focus area's own
+              status tag inline, then a right-justified boxless text CTA on its own line. PAGE_SUBTITLE
+              is deliberately NOT here -- it renders at the top of the Harness Trace overlay instead,
+              from the same single module-scope constant the desktop title block uses. */}
+          <div style={{background:T.paper,padding:"9px 14px 8px",borderBottom:`1px solid ${T.line}`,
+            flexShrink:0}}>
+            <div style={{fontFamily:display,fontSize:17,fontWeight:700,color:T.navy,lineHeight:1.15}}>
+              {PAGE_TITLE}{FOCUS_AREA_STATUS.liveAgentView && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.liveAgentView})</span>}
+            </div>
+            <button type="button" onClick={() => setShowTrace(true)}
+              style={{display:"block",width:"100%",textAlign:"right",background:"none",border:"none",
+                fontFamily:body,fontSize:12,fontWeight:600,color:T.brassDeep,marginTop:5,
+                padding:"2px 0",cursor:"pointer",whiteSpace:"nowrap"}}>
+              Harness Trace ›
+            </button>
+          </div>
+
+          {/* ── Picker + Run, Canvas tab only ── */}
+          {/* §21's locked rule: the input row belongs to the main tab, not to shared chrome. The
+              Answer tab has nothing to run. Same value/onChange/aria-label/options and the same
+              disabled logic as desktop -- only the metrics change. fontSize:16 is the locked mobile
+              text-input floor (below 16px iPhone browsers auto-zoom on focus and never zoom back).
+              backgroundColor, never the `background` shorthand -- see the file header. */}
+          {mobileTab === "canvas" && (
+            <div style={{background:T.paper,padding:"0 14px 9px",display:"flex",gap:7,flexShrink:0}}>
+              <select value={picked} onChange={e => setPicked(e.target.value)} aria-label="Pick a question"
+                style={{flex:1,minWidth:0,fontFamily:body,fontSize:16,color:T.ink,backgroundColor:T.white,
+                  border:`1px solid ${T.line}`,borderRadius:6,padding:"9px 28px 9px 10px",outline:"none",
+                  cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
+                <option value="">{PICKER_PLACEHOLDER}</option>
+                {/* FEATURE: LAV-11 -- the SAME option list the desktop picker builds, guardrail-demo
+                    prefix included. Mirrored deliberately at rebase time: a mobile picker that
+                    silently dropped the decoration would offer a different-reading question set at
+                    one width, and onRun still sends the undecorated q.label from either branch. */}
+                {ALL_QUESTIONS.map(q => (
+                  <option key={q.id} value={q.id}>
+                    {q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}
+                  </option>
+                ))}
+              </select>
+              <button onClick={onRun} disabled={runDisabled}
+                style={{background:T.navy,color:T.card,border:"none",fontFamily:body,fontWeight:600,
+                  fontSize:14,padding:"9px 15px",borderRadius:6,letterSpacing:"0.3px",whiteSpace:"nowrap",
+                  cursor: runDisabled ? "default" : "pointer", opacity: runDisabled ? 0.45 : 1}}>
+                Run ▸
+              </button>
+            </div>
+          )}
+
+          {/* ── Status strip: permanent, tab-independent ── */}
+          {/* §21's locked fix, inherited: the one progress indicator on the page must never be
+              inside a tab body, or switching tabs hides it. Both status branches keep desktop's
+              priority -- `awaiting` outranks the streamed message. */}
+          <div style={{background:T.cardAlt,borderBottom:`1px solid ${T.line}`,padding:"7px 14px",
+            flexShrink:0,display:"flex",flexDirection:"column",gap:4}}>
+            <div style={{display:"flex",alignItems:"center",gap:9}}>
+              <ModeBadge mode={mode} detail={badgeDetail}/>
+              {elapsedTextShort && (
+                <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>
+                  {elapsedTextShort}
+                </div>
+              )}
+              <div style={{marginLeft:"auto",display:"flex",gap:12,flexShrink:0,textAlign:"right"}}>
+                <div>
+                  <div style={MOB_METER_LABEL}>Tokens</div>
+                  <div style={MOB_METER_VALUE}>{formatTokens(tokenTotal)}</div>
+                </div>
+                <div>
+                  <div style={MOB_METER_LABEL}>Est. Cost</div>
+                  <div style={MOB_METER_VALUE}>{costTotal == null ? "—" : `$${costTotal.toFixed(2)}`}</div>
+                </div>
+              </div>
+            </div>
+            {awaiting ? (
+              <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.brassDeep,
+                textTransform:"uppercase",letterSpacing:"0.02em"}}>
+                Needs Your Decision
+              </div>
+            ) : (
+              <div style={{fontFamily:mono,fontSize:10.5,color:T.muted,fontStyle:"italic",
+                whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                {status?.message || ""}
+              </div>
+            )}
+          </div>
+
+          {/* ── Tab bar ── */}
+          <div style={{display:"flex",background:T.paper,borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
+            {MOB_TABS.map(([key, label]) => {
+              const on = mobileTab === key;
+              return (
+                <button key={key} type="button" onClick={() => setMobileTab(key)}
+                  style={{flex:1,fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.11em",
+                    textTransform:"uppercase",padding:"10px 4px",border:"none",cursor:"pointer",
+                    background: on ? T.cardAlt : "none", color: on ? T.navy : T.muted,
+                    borderBottom: `2px solid ${on ? T.brass : "transparent"}`}}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Tab body ── */}
+          {/* Canvas: today's AgentNetwork with today's props, byte-for-byte -- including LAV-11's
+              answerQuestionId, mirrored here at rebase time. This call is the sibling of the desktop
+              one below and has to carry the identical prop set: a prop added to one and not the
+              other is exactly how a screen's two payloads drift apart unnoticed (SES-57). Sub-session
+              b gives the canvas its own mobile composition; nothing about it is this session's to
+              change. */}
+          {mobileTab === "canvas" ? (
+            <div style={{position:"relative",flex:3,display:"flex",alignItems:"stretch",minHeight:0}}>
+              <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
+                traceRows={traceRows} recoveringAgentId={recoveringAgentId}
+                choreographed={choreographed} onToggleChoreographed={setChoreographed}
+                pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
+                answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}/>
+            </div>
+          ) : (
+            /* Answer: CHI's own QaEvidenceCard for a real qa result, the terminal frame's own text
+               otherwise. The empty line is screen chrome for an empty state -- the same register as
+               the routing rail's own empty text -- never a stand-in for an agent's words. */
+            <div style={{flex:3,minHeight:0,overflowY:"auto",background:T.paperDeep,padding:"12px 14px"}}>
+              {answerQa
+                ? <QaEvidenceCard qa={answerQa}/>
+                : answerText
+                  ? <div style={{fontFamily:body,fontSize:13,color:T.ink,lineHeight:1.55,
+                      whiteSpace:"pre-wrap"}}>{answerText}</div>
+                  : <div style={{fontFamily:body,fontSize:13,color:T.muted,fontStyle:"italic"}}>
+                      No answer yet — run a question.
+                    </div>}
+            </div>
+          )}
+
+          {/* ── Pinned Agent Routing feed ── */}
+          {/* Visible under both tabs and scrolling independently of the tab body, exactly as §21
+              pins CHI's. Same AgentRoutingRail, same events, unchanged. */}
+          <div style={{flex:1,minHeight:0,overflowY:"auto",background:T.paperDeep,
+            borderTop:`1px solid ${T.line}`,padding:"8px 12px"}}>
+            <AgentRoutingRail events={railEvents} agents={agents}/>
+          </div>
+
+          {/* ── Harness Trace overlay ── */}
+          {/* Everything mobile drops from the main composition lands here: the assembled-prompt box
+              (inline, full width) and the trace console + span waterfall with the same props the
+              desktop path passes. `← Back to Canvas` is the only dismissal -- §21's unchanged
+              convention, deliberately no backdrop tap. */}
+          {showTrace && (
+            <div style={{position:"fixed",inset:0,zIndex:2000,background:T.paperDeep,
+              display:"flex",flexDirection:"column"}}>
+              <div style={{flexShrink:0,background:T.paper,borderBottom:`1px solid ${T.line}`,
+                padding:"6px 14px 9px"}}>
+                <button type="button" onClick={() => setShowTrace(false)}
+                  style={{background:"none",border:"none",fontFamily:body,fontSize:12,fontWeight:600,
+                    color:T.brassDeep,padding:"8px 12px 8px 0",cursor:"pointer",whiteSpace:"nowrap"}}>
+                  ← Back to Canvas
+                </button>
+                <div style={{fontFamily:mono,fontSize:11.5,color:T.muted,letterSpacing:"0.02em"}}>
+                  {PAGE_SUBTITLE}
+                </div>
+              </div>
+              <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"10px 12px 14px",
+                display:"flex",flexDirection:"column",gap:10}}>
+                <PromptBox prompt={prompt} agents={agents} traceRows={traceRows} inline/>
+                <HarnessTraceConsole
+                  events={runHops} eventTimes={runHopTimes} traceRows={traceRows} traceId={traceId}
+                  traceIds={traceIds}
+                  running={running} recovery={recovery} recoveryAt={recoveryMark?.at ?? 0} now={now}/>
+              </div>
+            </div>
+          )}
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -621,7 +883,7 @@ export default function LiveAgentViewScreen() {
             {/* FEATURE: LAV-5a -- white, not cream: the picker is this screen's primary call to action
                 and has to read as the one thing to touch against the T.paper title bar. */}
             <select value={picked} onChange={e => setPicked(e.target.value)} aria-label="Pick a question"
-              style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,background:T.white,
+              style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,backgroundColor:T.white,
                 border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
                 cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
               <option value="">{PICKER_PLACEHOLDER}</option>
