@@ -1,3 +1,16 @@
+// DeepBench v7.0.37 | AgentNetwork.jsx | MOB-4b -- below MOBILE_BREAKPOINT this canvas renders a
+// DIFFERENT composition of the same derivations (STYLE-GUIDE 42), never a reflow of the desktop one:
+// the desktop stage is a locked 1200x640 viewBox with 132px fixed-pixel cards and eleven of them do
+// not fit 402px. Mobile gets two USER-PICKED views of the same real data -- Bench (the default) puts
+// every agent in a permanent slot derived from its roster index, renders ONLY the agents this run
+// actually called, and leaves an uncalled agent's slot empty because that gap is the information;
+// Active blows the current hand-off up to two full-size cards. Nothing auto-switches: the toggle is
+// the only thing that moves the view. The desktop LEAD-anchored choreography is deliberately absent
+// -- mobile holds still so the user learns where to look, and that divergence is the feature. The
+// "You" gate node has no mobile equivalent (a 38px avatar cannot hold a proposal, and the human has
+// no roster index) so a real open gate raises a decision panel from the bottom of the CANVAS box
+// instead, leaving the status strip and the routing feed readable while you decide. Every node,
+// edge, colour and word here comes from the derivations and maps this file already had.
 // DeepBench v7.0.38 | AgentNetwork.jsx | LAV-11 -- the Answer drawer's title is now conditional: it
 // reads "Answer: Agent guardrail catch" when the run just completed was south-korea-coop (John's
 // deliberate guardrail-catch demo question, LAV-11's other file), else the existing plain "Answer".
@@ -100,6 +113,9 @@ import { fetchTracePatterns, needsSpanRefetch } from "../lib/tracePatterns.js";
 // reused too, and is deliberately NOT re-imported here (an import this file never calls would be
 // dead code, and re-deriving the groups would be the duplication the reuse exists to prevent).
 import { QaEvidenceCard } from "../screens/MarketIntelligenceScreen.jsx";
+// FEATURE: MOB-4b -- the platform's ONE breakpoint source (STYLE-GUIDE 22). This file asks no width
+// question of its own; the hook is the only thing that decides which composition renders.
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
@@ -407,6 +423,19 @@ export function homeLayout(ids) {
   return out;
 }
 
+// FEATURE: MOB-4b -- mobile Bench slots. Returns PERCENTAGES of the mobile stage box, the same
+// units the desktop node cards already position in. index is the agent's index in the roster
+// array, never its position in the engaged list -- that is the whole point: an agent occupies the
+// same slot on every run, so the user learns where to look. roster[0] takes the hub; the rest ring
+// around it. Nothing here names an agent, so a 12th agent joining the mi bench group claims the
+// next slot with no code change, exactly as homeLayout() behaves today.
+export function mobileSlot(index, total) {
+  if (index === 0) return { x: 50, y: 52 };
+  const n = Math.max(1, total - 1);
+  const ang = (-90 + (index - 1) * (360 / n)) * Math.PI / 180;
+  return { x: 50 + 38 * Math.cos(ang), y: 52 + 35 * Math.sin(ang) };
+}
+
 // Ported arc/bench target math. Lead = the agent actually holding an open delegation; the arc fills
 // in engagement order, one at a time; everyone not yet engaged parks in the bench stack.
 export function computeTargets({ ids, home, choreographed, engaged, lead, benchOrder }) {
@@ -476,6 +505,21 @@ export function latestClassifiedPattern(spans, spanPatterns) {
     if (names && names.length > 0) return names.join(", ");
   }
   return null;
+}
+
+// FEATURE: MOB-4b -- the one glow filter Pulse and LoopingArrow both reference, lifted out of the
+// desktop svg's inline <defs> so BOTH canvases define it. An svg element whose filter url does not
+// resolve is not painted at all, so a mobile arrow inside an svg that never declared lavGlow would
+// silently vanish. Same markup, same id, and only one of the two canvases is ever mounted.
+function LavGlowDefs() {
+  return (
+    <defs>
+      <filter id="lavGlow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="4" result="lavBlur"/>
+        <feMerge><feMergeNode in="lavBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  );
 }
 
 // ── pulse (ported dash-offset draw + glow trail, real rAF, no scripted timing) ─
@@ -699,6 +743,80 @@ const NET_CSS = `
 .lav-you-actions button:disabled{cursor:default;opacity:.5}
 .lav-you-reject{background:transparent;border:1px solid ${T.line};color:${T.ink}}
 .lav-you-accept{background:${T.navy};color:${T.card};border:none;font-weight:600}
+
+/* ── FEATURE: MOB-4b -- the mobile composition ───────────────────────────────
+   Everything below is reached ONLY through the isMobile branch; not one rule above is touched, so
+   the desktop canvas is byte-identical to what it renders today. The mobile canvas reuses
+   .lav-stagewrap/.lav-stage as its box, but never .lav-inner: that box is locked to
+   aspect-ratio:1200/640 for the desktop viewBox and would letterbox this layout away. */
+/* One chrome row: legend hard left, view toggle hard right, nothing in the middle -- which is what
+   lets the legend grow rightward as more edge meanings light up (MOB-5 accepts the wrap past 3). */
+.lav-mchrome{position:absolute;left:8px;right:8px;top:7px;z-index:6;display:flex;align-items:center;
+  justify-content:space-between;gap:8px}
+.lav-mlegend{min-height:19px;display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:0 7px;
+  border-radius:8px;border:1px solid ${T.line};background:${rgba(T.paper, 0.94)};
+  font-family:${mono};font-size:7px;color:${T.muted};line-height:1}
+.lav-mlegend span{display:inline-flex;align-items:center;gap:3px}
+.lav-mlegend .sw{width:11px;height:2px;border-radius:1px;flex:none}
+/* A RING, not a bar -- assembly work is a node state and never an edge, exactly as the desktop
+   legend's own sw-ring says. */
+.lav-mlegend .sw-ring{width:9px;height:9px;border-radius:50%;border:2px solid ${ASSEMBLY_COLOR};
+  background:transparent;flex:none}
+.lav-mseg{display:flex;align-items:stretch;height:19px;flex:none;margin-left:auto;padding:1px;
+  background:${T.card};border:1px solid ${T.brass};border-radius:20px;
+  box-shadow:0 2px 7px ${rgba(T.navy, 0.14)}}
+.lav-mseg button{position:relative;border:none;background:none;border-radius:20px;cursor:pointer;
+  font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:${T.muted};padding:3px 8px}
+/* The visual height matches the legend's 19px; this transparent box takes the TOUCH target to ~36px
+   without changing one pixel of layout, so matching the legend costs nothing in tappability. */
+.lav-mseg button::after{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px}
+.lav-mseg button.on{background:${T.brass};color:${T.card}}
+/* An explicit class, never a bare descendant selector: a .lav-stage-descendant svg rule also
+   matches the AgentAvatar svg inside every node and stretches each one to the container width
+   (found live in the mock -- 44px avatars blew up to 126px and collapsed the cards). NOTE this
+   block lives inside a JS template literal: a backtick in a CSS comment here ends the string. */
+.lav-medges{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:1}
+/* Bench node: an avatar, its code and its first name. No card, so the state distinctions live on
+   the avatar's own glow instead of a card border -- same five meanings, same tokens. */
+.lav-mnode{position:absolute;transform:translate(-50%,-50%);width:56px;text-align:center;z-index:2}
+.lav-mava{width:38px;height:38px;margin:0 auto;display:flex;align-items:center;justify-content:center;
+  transition:filter .3s}
+.lav-mcode{font-family:${mono};font-size:7px;font-weight:700;letter-spacing:.06em;color:${T.muted};
+  text-transform:uppercase;margin-top:2px;line-height:1.1}
+.lav-mname{font-family:${body};font-size:8px;font-weight:600;color:${T.navy};line-height:1.1}
+.lav-mnode.is-recovering .lav-mava{filter:drop-shadow(0 0 7px ${rgba(T.flag, 0.9)})}
+.lav-mnode.is-active .lav-mava{filter:drop-shadow(0 0 8px ${rgba(T.brass, 0.9)})}
+.lav-mnode.is-done .lav-mava{filter:drop-shadow(0 0 5px ${rgba(T.mossLight, 0.85)})}
+.lav-mnode.is-assembly .lav-mava{filter:drop-shadow(0 0 7px ${rgba(ASSEMBLY_COLOR, 0.85)})}
+.lav-mnode.is-orch .lav-mava{filter:drop-shadow(0 0 9px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.9)})}
+/* Active view's connector: positioned HTML in the same percentage space the two cards are laid out
+   in, deliberately NOT an svg in a preserveAspectRatio box -- that drifts off the cards at stage
+   heights nobody tested (found live in the mock). Colour and word are the edge's own. */
+.lav-mconn{position:absolute;left:50%;top:37%;bottom:39%;width:0;z-index:1}
+.lav-mconn .ln{position:absolute;left:-1.2px;top:0;bottom:9px;width:2.4px}
+.lav-mconn.up .ln{top:9px;bottom:0}
+.lav-mconn .hd{position:absolute;left:-6px;bottom:0;width:0;height:0;
+  border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid transparent}
+.lav-mconn.up .hd{bottom:auto;top:0;border-top:none;border-bottom:9px solid transparent}
+.lav-mconn .wd{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-family:${mono};
+  font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+/* The decision panel. Anchored to the bottom of the CANVAS box, not the screen, so the status strip
+   and the pinned routing feed stay readable while the human decides -- and capped at 74% so the
+   hops that led to the decision are still on screen behind it. */
+.lav-mgate{position:absolute;left:0;right:0;bottom:0;z-index:20;max-height:74%;display:flex;
+  flex-direction:column;background:${T.card};border-top:2px solid ${T.brass};
+  border-radius:14px 14px 0 0;box-shadow:0 -10px 30px ${rgba(T.navy, 0.3)}}
+.lav-mgate-grab{width:34px;height:4px;border-radius:3px;background:${T.line};margin:7px auto 4px}
+.lav-mgate-badge{font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;color:${T.brassDeep};padding:0 13px 7px}
+.lav-mgate-body{flex:1;min-height:0;overflow-y:auto;padding:0 13px}
+.lav-mgate-actions{display:flex;gap:9px;padding:11px 13px 14px;flex:none}
+.lav-mgate-actions button{flex:1;min-height:44px;border-radius:7px;border:none;cursor:pointer;
+  font-family:${body};font-size:14px;font-weight:700}
+.lav-mgate-actions button:disabled{cursor:default;opacity:.5}
+.lav-mgate-reject{background:${T.card};border:1.5px solid ${T.flag};color:${T.flag}}
+.lav-mgate-accept{background:${T.navy};color:${T.card}}
 `;
 
 /**
@@ -1048,6 +1166,251 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     return m;
   }, [traceRows]);
 
+  // ── FEATURE: MOB-4b -- the mobile canvas ───────────────────────────────────
+  // Every hook below runs on both paths (they are declared unconditionally, above the branch), so
+  // crossing the breakpoint swaps the composition and nothing else. Not one derivation is repeated
+  // here: the engaged set, the edges, each edge's meaning colour and recency, the open-delegation
+  // set, the gate and the per-agent model/pattern reads are all the same values the desktop render
+  // consumes twenty lines below.
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState("bench");
+
+  // The mobile edge layer draws in CSS-PIXEL space (viewBox == the stage's own measured box), which
+  // is what lets ePath's ported control offset and LoopingArrow's arrowhead keep the size they were
+  // drawn for. A viewBox in percentage units would either bow the curve across a fifth of the canvas
+  // or, with preserveAspectRatio="none", stretch both non-uniformly at every stage height.
+  const mStageRef = useRef(null);
+  const [mBox, setMBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = mStageRef.current;
+    if (!el) return undefined;
+    const measure = () => setMBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
+
+  // Bench membership: the roster, with each agent's PERMANENT slot from its own roster index, minus
+  // everyone this run did not call. net.engaged is deriveNetwork's own set (widened by LAV-9b to
+  // "addressed", the same set the desktop cards read) -- there is no second engaged set anywhere.
+  const benchNodes = useMemo(() => {
+    const total = roster.length;
+    return roster
+      .map((a, i) => ({ a, slot: mobileSlot(i, total) }))
+      .filter(({ a }) => net.engaged.includes(a.id));
+  }, [roster, net]);
+  // Slot -> pixel, for the edge layer. An agent with no entry here was not called, and every edge
+  // touching it is skipped rather than drawn to a point where nothing is rendered.
+  const benchPoints = useMemo(() => {
+    const m = new Map();
+    for (const n of benchNodes) m.set(n.a.id, { x: (n.slot.x / 100) * mBox.w, y: (n.slot.y / 100) * mBox.h });
+    return m;
+  }, [benchNodes, mBox]);
+
+  // Each real observed edge with the look the desktop loop already gives it -- open beats pulsed
+  // beats resting, motion only while the run is live. Folded once here so the render below stays a
+  // map, and so the legend can read the same colours the lines are actually drawn in.
+  const mobileEdges = useMemo(() => edges.map(e => {
+    const open = visuallyOpenKeys.has(e.key);
+    const ck = canonicalEdgeKey(e.from, e.to);
+    const pulsed = activity.colors.get(ck) || null;
+    const active = recentOrder.indexOf(ck) !== -1;
+    return {
+      key: e.key, from: e.from, to: e.to, handoff: e.handoff, active,
+      stroke: open ? DISPATCH_COLOR : (pulsed || e.color),
+      animated: open || (running && !!pulsed),
+      arrowColor: open ? DISPATCH_COLOR : pulsed,
+    };
+  }), [edges, visuallyOpenKeys, activity, recentOrder, running]);
+
+  // The legend's words are EDGE_MEANING_LABEL's, in the map's own order -- nothing is authored here
+  // and nothing re-orders as meanings arrive. Only the meanings this run has REALLY produced are
+  // listed, which is what keeps the row near the three items 402px fits; a colour the map has no
+  // word for (LINK_COLOR at rest) contributes none, exactly as the on-line label rule already works.
+  // Past three the row wraps and eats canvas height -- known, accepted, tracked as MOB-5.
+  const mobileLegend = useMemo(() => {
+    const lit = new Set(mobileEdges.map(e => e.stroke));
+    return [...EDGE_MEANING_LABEL.keys()].filter(c => lit.has(c));
+  }, [mobileEdges]);
+  // Gated on `running` for the same reason the node class is: assemblyActive can still hold an
+  // agent after the stream ends, and a legend entry for a tint no node is wearing would be a word
+  // with nothing on the canvas behind it.
+  const mobileAssemblyLit = running && net.assemblyActive.size > 0;
+
+  // Active view's subject: the most recently active edge (recentOrder is already ranked by the fold
+  // index of each edge's last real pulse). recentOrder holds CANONICAL keys, which are direction-
+  // agnostic by design, so the dispatcher/recipient split comes from sessionEdges' own entry -- that
+  // key is only ever minted from a real `delegation` event and therefore always runs dispatcher->target.
+  const activeHandoff = useMemo(() => {
+    const ck = recentOrder[0];
+    if (!ck) return null;
+    const e = edges.find(x => canonicalEdgeKey(x.from, x.to) === ck);
+    if (!e) return null;
+    return { from: e.from, to: e.to, color: activity.colors.get(ck) || e.color };
+  }, [recentOrder, edges, activity]);
+  const agentById = useMemo(() => new Map(roster.map(a => [a.id, a])), [roster]);
+
+  // The desktop node card, rendered at a mobile position. Same classes, same state chain, same slot
+  // contents -- the Active view is the desktop card at a different coordinate, not a second card.
+  const mobileFullCard = (a, topPct) => {
+    if (!a) return null;
+    const cls = ["lav-node"];
+    const recovering = recoveringAgentId === a.id;
+    if (recovering) cls.push("is-recovering");
+    if (net.orchestrators.has(a.id)) cls.push("is-orch");
+    else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
+    else if (running && net.activeId === a.id) cls.push("is-active");
+    else if (net.done.has(a.id)) cls.push("is-done");
+    const pulsing = net.orchestrators.has(a.id)
+      || (running && (net.assemblyActive.has(a.id) || net.activeId === a.id));
+    const bubble = pulsing ? net.bubbles[a.id] : null;
+    const patternLabel = latestClassifiedPattern(spansByAgent.get(a.id), spanPatterns);
+    const modelTag = modelByAgent.get(a.id)?.model || null;
+    return (
+      <div key={a.id} className={cls.join(" ")} style={{ left: "50%", top: `${topPct}%` }}>
+        <div className={`lav-bubble${topPct < 34 ? " down" : ""}${bubble ? " show" : ""}`}>{bubble || ""}</div>
+        <div className="lav-card">
+          <div className="lav-spin"/>
+          <div className="lav-ring"/>
+          {modelTag && <div className="lav-model" title={modelTag}>{modelFamily(modelTag)}</div>}
+          <div className="lav-ava"><AgentAvatar who={a.id} size={50}/></div>
+          <div className="lav-code">{a.code}</div>
+          <div className="lav-name">{a.name}</div>
+          <div className="lav-role">{a.role}</div>
+          <div className="lav-slot">
+            {recovering && <span className="lav-recov">recovering</span>}
+            {!recovering && patternLabel && <span className="lav-pill" title={patternLabel}>{patternLabel}</span>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (isMobile) {
+    // The Active connector points the way the edge's own meaning runs: a report-back really did
+    // travel this same physical line backwards (the rule canonicalEdgeKey already encodes), so its
+    // arrowhead sits at the top rather than contradicting the word beside it.
+    const connReversed = activeHandoff?.color === REPORT_COLOR;
+    const connWord = activeHandoff ? (EDGE_MEANING_LABEL.get(activeHandoff.color) ?? null) : null;
+    const soloAgent = net.activeId ? agentById.get(net.activeId) : null;
+    return (
+      <div className="lav-stagewrap">
+        <FeatureBadge id="MOB-4"/>
+        <style>{NET_CSS}</style>
+        <div className="lav-stage" ref={mStageRef}>
+          {/* Chrome: legend hard left, view toggle hard right, one row. The Choreographed/Static
+              control is deliberately absent -- it tunes a choreography this layout does not use. */}
+          <div className="lav-mchrome">
+            {(mobileLegend.length > 0 || mobileAssemblyLit) && (
+              <div className="lav-mlegend">
+                {mobileLegend.map(c => (
+                  <span key={c}><span className="sw" style={{ background: c }}/>{EDGE_MEANING_LABEL.get(c)}</span>
+                ))}
+                {mobileAssemblyLit && <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>}
+              </div>
+            )}
+            <div className="lav-mseg">
+              <button type="button" className={mobileView === "active" ? "on" : ""}
+                onClick={() => setMobileView("active")}>Active</button>
+              <button type="button" className={mobileView === "bench" ? "on" : ""}
+                onClick={() => setMobileView("bench")}>Bench</button>
+            </div>
+          </div>
+
+          {mobileView === "bench" ? (
+            <>
+              {/* The real observed edges, between the two agents' own permanent slots -- never a hub
+                  star. The desktop travelling Pulse dots are absent by construction: their `d` was
+                  baked in the 1200x640 space at emit time and means nothing here; the looping arrow
+                  on every live edge is the same motion carried by geometry this canvas owns. */}
+              {mBox.w > 0 && (
+                <svg className="lav-medges" viewBox={`0 0 ${mBox.w} ${mBox.h}`}>
+                  <LavGlowDefs/>
+                  {mobileEdges.map(e => {
+                    const a = benchPoints.get(e.from), b = benchPoints.get(e.to);
+                    if (!a || !b) return null;
+                    const d = ePath(a, b);
+                    return (
+                      <g key={e.key}>
+                        <path d={d} fill="none" stroke={e.stroke} strokeLinecap="round"
+                          strokeWidth={(e.animated || e.active || e.handoff) ? 2.2 : 1.6}
+                          strokeDasharray={(e.animated || e.active) ? undefined : "2 7"}
+                          opacity={(e.animated || e.active) ? 1 : 0.9}/>
+                        {e.animated && <LoopingArrow d={d} color={e.arrowColor}/>}
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
+              {benchNodes.map(({ a, slot }) => {
+                const cls = ["lav-mnode"];
+                if (recoveringAgentId === a.id) cls.push("is-recovering");
+                if (net.orchestrators.has(a.id)) cls.push("is-orch");
+                else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
+                else if (running && net.activeId === a.id) cls.push("is-active");
+                else if (net.done.has(a.id)) cls.push("is-done");
+                return (
+                  <div key={a.id} className={cls.join(" ")}
+                    style={{ left: `${slot.x}%`, top: `${slot.y}%` }}>
+                    <div className="lav-mava"><AgentAvatar who={a.id} size={38}/></div>
+                    <div className="lav-mcode">{a.code}</div>
+                    <div className="lav-mname">{String(a.name || "").split(" ")[0]}</div>
+                  </div>
+                );
+              })}
+            </>
+          ) : activeHandoff ? (
+            <>
+              {mobileFullCard(agentById.get(activeHandoff.from), 24)}
+              <div className={`lav-mconn${connReversed ? " up" : ""}`}>
+                <div className="ln" style={{ background: activeHandoff.color }}/>
+                <div className="hd" style={connReversed
+                  ? { borderBottomColor: activeHandoff.color }
+                  : { borderTopColor: activeHandoff.color }}/>
+                {connWord && <div className="wd" style={{ color: activeHandoff.color }}>{connWord}</div>}
+              </div>
+              {mobileFullCard(agentById.get(activeHandoff.to), 76)}
+            </>
+          ) : (
+            /* No hand-off yet: the agent actually working, alone and centred. No active agent means
+               an empty canvas -- there is no placeholder card here, ever. */
+            mobileFullCard(soloAgent, 50)
+          )}
+
+          {/* The decision panel replaces desktop's "You" node treatment wholesale. Gated on the SAME
+              open gate desktop gates its own panel on: `resolving` keeps desktop's node on stage
+              through the hand-back, but it carries only { confirmation_id, agentId, capability_slug,
+              resolution } -- no proposed_action, no critique -- and it stays set for the whole
+              re-entered run, so a panel held open on it would cover 74% of a live canvas with an
+              empty card. Tapping Accept closes it, which is the behaviour the QA checklist asks for.
+              Every word inside is the gate's own or CHI's own; nothing is authored here. */}
+          {gate && (
+            <div className="lav-mgate">
+              <div className="lav-mgate-grab"/>
+              <div className="lav-mgate-badge">Needs Your Decision</div>
+              <div className="lav-mgate-body">
+                <ConfirmationCardContent agent={requester}
+                  proposedAction={gate.proposed_action} critique={gate.critique}/>
+              </div>
+              <div className="lav-mgate-actions">
+                <button type="button" className="lav-mgate-reject" disabled={!onResolveConfirmation}
+                  onClick={() => onResolveConfirmation?.("reject")}>
+                  Reject
+                </button>
+                <button type="button" className="lav-mgate-accept" disabled={!onResolveConfirmation}
+                  onClick={() => onResolveConfirmation?.("accept")}>
+                  Accept
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="lav-stagewrap">
       <FeatureBadge id="LAV-1"/>
@@ -1096,12 +1459,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
       </div>
       <div className="lav-stage"><div className="lav-inner">
         <svg className="lav-svg" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <filter id="lavGlow" x="-60%" y="-60%" width="220%" height="220%">
-              <feGaussianBlur stdDeviation="4" result="lavBlur"/>
-              <feMerge><feMergeNode in="lavBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
+          <LavGlowDefs/>
           <g>
             {/* FEATURE: LAV-9a -- no spotlight. EVERY edge this run has really carried traffic on is
                 drawn solid in its OWN last meaning colour, and every one of them is arrow-animated
