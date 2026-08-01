@@ -1,3 +1,9 @@
+// DeepBench v7.0.38 | AgentNetwork.jsx | LAV-11 -- the Answer drawer's title is now conditional: it
+// reads "Answer: Agent guardrail catch" when the run just completed was south-korea-coop (John's
+// deliberate guardrail-catch demo question, LAV-11's other file), else the existing plain "Answer".
+// Keyed on the QUESTION id (a new answerQuestionId prop, threaded from LiveAgentViewScreen.jsx),
+// never on the gate outcome -- if this question ever starts clearing the pre-display gate, the
+// resulting mislabel is CHI-98's concern to resolve, not this ticket's; flagged at the conditional.
 // DeepBench v7.0.35 | AgentNetwork.jsx | LAV-10 -- the moment orchestration STARTS now declares itself.
 // Until now an agent holding open delegations only got a different border/ring (is-orch) -- the same
 // visual weight as every other card, with no announcement. On the rising edge of deriveNetwork's own
@@ -708,8 +714,10 @@ const NET_CSS = `
  *  onResolveConfirmation -- LAV-1f: dispatches the human's decision ('accept' | 'reject')
  *  answerQa   -- LAV-7b: the run's real terminal answer in QaEvidenceCard's shape, or null (LAV-7a)
  *  answerText -- LAV-7b: that same terminal turn's plain message when it is not a qa result, or null
+ *  answerQuestionId -- LAV-11: the id of the question that produced the current answer (captured at
+ *    Run-click time by LiveAgentViewScreen.jsx), or null. Drives the Answer drawer's title only.
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -1054,7 +1062,12 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             height cap at all. Same props the Agent Routing drawer already uses (MI-34/MI-55) --
             Drawer applies overflowY:auto itself the moment maxHeight is passed, so this is the
             existing mechanism, not a new one. */}
-        <Drawer title="Answer" defaultOpen={false} maxHeight={280} resizable>
+        {/* FEATURE: LAV-11 -- title keyed on the QUESTION id, not the gate outcome (John's literal
+            spec). If south-korea-coop ever starts passing the pre-display gate, this label would
+            then read as a guardrail catch that didn't happen -- that mislabel edge is CHI-98's to
+            resolve, not this ticket's. */}
+        <Drawer title={answerQuestionId === "south-korea-coop" ? "Answer: Agent guardrail catch" : "Answer"}
+          defaultOpen={false} maxHeight={280} resizable>
           {answerQa
             ? <QaEvidenceCard qa={answerQa}/>
             : answerText

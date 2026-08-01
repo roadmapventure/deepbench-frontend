@@ -1,3 +1,14 @@
+// DeepBench v7.0.38 | LiveAgentViewScreen.jsx | LAV-11 -- swaps the LAV-8 question set: measured
+// per-trace final gate verdicts (2026-08-01, durable_hops) showed vietnam-reseller only clears the
+// pre-display gate 56% of the time, so John replaced it with training-turnover-benchmark (75%
+// answer rate). south-korea-coop stays -- John's explicit call -- as a deliberate guardrail-catch
+// showcase (0/5, never clears the gate; CHI-98 tracks that gap). Its picker option is decorated
+// "Guardrail catch demo: <label>" at this file's option-build point only (chiQuestions.js's
+// exported label is never touched, and the undecorated label is still what gets sent to
+// runQuestion -- decorating the string actually sent would change the real question asked). The
+// run's question id is captured into ranQuestionId at Run-click time (not read live off `picked`,
+// which the select allows changing again once a run is in flight) and threaded down to
+// AgentNetwork so its Answer drawer can title itself for this one question (LAV-11's other file).
 // DeepBench v7.0.29 | LiveAgentViewScreen.jsx | LAV-8 -- the LAV screen now offers exactly the 3
 // highest-movement questions (by id, from the shared chiQuestions.js exports, in this fixed order):
 // upgrade-cycles (ROTATING_POOL), south-korea-coop, vietnam-reseller (both FIXED_DRAWER_TAIL). Picked
@@ -93,13 +104,19 @@ const PAGE_TITLE = "Live Multi-Agent Routing";
 const PAGE_SUBTITLE = "Harness, Loop, Pattern Behavior Display";
 const PICKER_PLACEHOLDER = "Choose a question and watch the agents work…";
 
-// FEATURE: LAV-8 -- exactly the 3 highest-movement questions, in this order, looked up by id against
-// the shared exports (never copied label strings, so a future label edit in chiQuestions.js still
-// propagates here with no change needed). upgrade-cycles lives in ROTATING_POOL; south-korea-coop and
-// vietnam-reseller live in FIXED_DRAWER_TAIL -- both source arrays are searched, order is driven by
-// LAV_QUESTION_IDS alone. The CHI screen's own ALL_QUESTIONS-equivalent (MarketIntelligenceScreen.jsx)
-// is untouched and keeps all 23.
-const LAV_QUESTION_IDS = ["upgrade-cycles", "south-korea-coop", "vietnam-reseller"];
+// FEATURE: LAV-11 -- vietnam-reseller replaced by training-turnover-benchmark (measured 75% answer
+// rate vs. vietnam-reseller's 56% pre-display gate clear rate); south-korea-coop kept deliberately
+// as the guardrail-catch demo (0/5, tracked by CHI-98). Still exactly 3, still looked up by id
+// against the shared exports (never copied label strings, so a future label edit in chiQuestions.js
+// still propagates here with no change needed). upgrade-cycles and training-turnover-benchmark live
+// in ROTATING_POOL/FIXED_DRAWER_TAIL respectively (both source arrays are searched below); order is
+// driven by LAV_QUESTION_IDS alone. The CHI screen's own ALL_QUESTIONS-equivalent
+// (MarketIntelligenceScreen.jsx) is untouched and keeps all 23.
+const LAV_QUESTION_IDS = ["upgrade-cycles", "training-turnover-benchmark", "south-korea-coop"];
+// FEATURE: LAV-11 -- the id whose picker option gets the guardrail-catch prefix. Kept as a named
+// constant rather than a string literal at each use site (the option-label decoration below and
+// AgentNetwork's drawer-title decision, threaded via ranQuestionId) so both stay in lockstep.
+const GUARDRAIL_DEMO_QUESTION_ID = "south-korea-coop";
 const LAV_QUESTION_SOURCE = [...ROTATING_POOL, ...FIXED_DRAWER_TAIL];
 const ALL_QUESTIONS = LAV_QUESTION_IDS
   .map(id => LAV_QUESTION_SOURCE.find(q => q.id === id))
@@ -331,6 +348,10 @@ export default function LiveAgentViewScreen() {
     runQuestion, resolveConfirmation } = useHarnessStream();
 
   const [picked, setPicked] = useState("");
+  // FEATURE: LAV-11 -- captured at Run-click time, not read live off `picked` (the select is not
+  // disabled while a run is in flight, so `picked` can change again before the run goes terminal).
+  // This is the id AgentNetwork's Answer drawer keys its title on.
+  const [ranQuestionId, setRanQuestionId] = useState(null);
   const [choreographed, setChoreographed] = useState(true);
   const [terminal, setTerminal] = useState(null);       // 'result' | 'error' | null (badge only)
   const [liveStatus, setLiveStatus] = useState(null);   // last non-null status, so terminal can freeze
@@ -562,6 +583,7 @@ export default function LiveAgentViewScreen() {
     const q = ALL_QUESTIONS.find(x => x.id === picked);
     if (!q || running || awaiting) return;
     setTerminal(null);
+    setRanQuestionId(q.id);
     runQuestion(q.label);
   };
 
@@ -603,7 +625,16 @@ export default function LiveAgentViewScreen() {
                 border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
                 cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
               <option value="">{PICKER_PLACEHOLDER}</option>
-              {ALL_QUESTIONS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
+              {/* FEATURE: LAV-11 -- south-korea-coop's option reads with a "Guardrail catch demo: "
+                  prefix, decorated here only. chiQuestions.js's exported label stays undecorated
+                  (CHI's own picker must keep reading it plain), and onRun still sends q.label --
+                  the undecorated string -- to runQuestion, so this prefix never reaches the harness
+                  as part of the actual question asked. */}
+              {ALL_QUESTIONS.map(q => (
+                <option key={q.id} value={q.id}>
+                  {q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}
+                </option>
+              ))}
             </select>
             <button onClick={onRun} disabled={!picked || running || awaiting}
               style={{background:T.navy,color:T.card,border:"none",fontFamily:body,fontWeight:600,fontSize:12,
@@ -689,7 +720,7 @@ export default function LiveAgentViewScreen() {
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
             pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
-            answerQa={answerQa} answerText={answerText}/>
+            answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>
