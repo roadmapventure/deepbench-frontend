@@ -18,6 +18,7 @@
 | `OPENAI_API_KEY` | OpenAI embeddings (`text-embedding-3-small`) | ✅ |
 | `VITE_FETCH_API_URL` | Railway backend base URL | ✅ |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel protection bypass for automated QA testing | dev only |
+| `IPINFO_TOKEN` | ipinfo.io token for the caller IP→org lookup (`lib/ip-org-resolver.js`, `LOG-121`). **Optional by design** — absent, the resolver uses the anonymous tier, which is sufficient at this volume. A missing token must degrade to the anonymous endpoint, never to an error, so this is never a required var. Each distinct IP is resolved exactly once ever (`ip_org_cache`), so steady-state usage is zero requests. | optional |
 
 ---
 

@@ -1,3 +1,4 @@
+// DeepBench v7.0.39 | AIActivityPanel.jsx | LOG-121 -- drawer order runs By Agent, then the new By Platform User (two sub-tables under one header, closed by default, plus a seventh stat tile), then By Service; LOG-124 -- no caller address is ever rendered unblurred
 // DeepBench v6.3.199 | AIActivityPanel.jsx | LOG-107a -- scroll fade uses the depth variant (a same-colour fade was invisible on this panel)
 // DeepBench v6.3.197 | AIActivityPanel.jsx | LOG-107 -- scroll-fade hint, per-drawer item counts, header hover affordance
 // DeepBench v6.3.196 | AIActivityPanel.jsx | LOG-105 -- By Pattern row Calls/Cost render through RollingNumber; cost rolls until the log hydrates instead of showing a false <$0.01
@@ -51,6 +52,11 @@ const CHECKLIST = [
 // FEATURE: LOG-92 -- thousands separator for >= $1,000 (John's 0,000 spec); two decimals kept.
 const fmt$ = n => n < 0.01 ? `<$0.01` : `$${n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const fmtMs = ms => ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
+// FEATURE: LOG-121 -- By Platform User helpers. fmtDay stays deliberately coarse: the drawer answers
+// "who," not "when," and a to-the-second timestamp beside a caller reads as surveillance.
+const fmtPct = n => `${((n || 0) * 100).toFixed(1)}%`;
+const fmtDay = ts => { const d = ts ? new Date(ts) : null; return d && !isNaN(d) ? d.toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "—"; };
+const sumBy = (rows, key) => rows.reduce((n, r) => n + (r[key] || 0), 0);
 
 // FEATURE: S-AI-AUDIT-SVCDIR -- one platform_services directory row (replaces the old
 // static-catalog-driven ServiceRow, deleted that session; LOG-86 later removed the roadmap tier
@@ -96,6 +102,47 @@ function PlatformServiceRow({ d }) {
     </div>
   );
 }
+
+// FEATURE: LOG-121 -- one row of either By Platform User sub-table. Deliberately ONE component for
+// both: the two sections are two cuts of the same rows, and giving them two visual grammars is how
+// they would start to look like two unrelated numbers. Follows the By Agent row exactly (1px T.line
+// block, display font for the primary label, mono 8px uppercase column keys, T.brassDeep on cost) --
+// the new section matches the existing ones; the existing ones are not restyled to match it.
+function PlatformUserRow({ primary, secondary, stats, active = true }) {
+  return (
+    <div style={{border:`1px solid ${T.line}`,marginBottom:6,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+      <div style={{width:8,height:8,borderRadius:"50%",background:active?T.moss:T.lineSoft,flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:display,fontSize:12,fontWeight:600,color:T.navy}}>{primary}</div>
+        {secondary && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{secondary}</div>}
+      </div>
+      <div style={{display:"flex",gap:14,flexShrink:0}}>
+        {stats.map(([k,v])=>(
+          <div key={k} style={{textAlign:"right"}}>
+            <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8}}>{k}</div>
+            <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:k==="Cost"?T.brassDeep:T.ink}}>{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// FEATURE: LOG-121 -- each sub-table ends with its own total, which is the drawer's own honesty
+// check made visible: the two sections partition one row set, so their totals must match each other
+// and the header's Total Calls / Total Cost. A reader can see that hold -- and see it break.
+function PlatformUserTotal({ calls, cost }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:14,padding:"5px 12px 9px",borderTop:`1px solid ${T.lineSoft}`,marginTop:2}}>
+      <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:.8,marginRight:"auto"}}>Total</div>
+      <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.ink}}>{calls.toLocaleString()} calls</div>
+      <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.brassDeep}}>{fmt$(cost)}</div>
+    </div>
+  );
+}
+
+// Same sub-header treatment the By Service drawer already uses for its layer groups.
+const PU_SUBHEAD = {fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4};
 
 // FEATURE: AI-23 patch — PatternRow with "more" text expand
 // FEATURE: AI-30 — PatternRow HITL special columns + Parallelization partial badge
@@ -297,7 +344,10 @@ export default function AIActivityPanel({ onClose }) {
   // tile and drawer below gates its zero/empty-state copy on it.
   // FEATURE: LOG-97 -- `log` is destructured purely to hand the already-hydrated entries to
   // usePatternClassification(), which sums each pattern's cost from them. No new fetch.
-  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded } = useAIActivity();
+  // FEATURE: LOG-121 -- bySource/byCaller/platformUserCount drive the new By Platform User drawer
+  // and its stat tile. All three come from the SAME hook read the header tiles use, so the drawer
+  // cannot disagree with Total Calls / Total Cost -- there is no second query to drift from.
+  const { log, byPattern, byLLM, byAgent, modelsInUse, totalCost, totalCalls, patternsSorted, agentsSorted, platformServices, platformServiceCount, logLoaded, bySource, byCaller, platformUserCount } = useAIActivity();
   // FEATURE: LOG-38 -- Log Displayer read path for the By Pattern section body (classified rows +
   // single reclassification count). LOG-92: also feeds the "Patterns Logged" stat tile.
   // FEATURE: LOG-97 -- passing `log` overrides each row's cost with the in-memory sum (the view's
@@ -308,7 +358,9 @@ export default function AIActivityPanel({ onClose }) {
   // FEATURE: AI-23 patch — per-section collapse state (LOG-86: roadmap key removed with the Platform Roadmap drawer)
   // FEATURE: S-AI-AUDIT-SVCDIR -- service now defaults closed too (§19m kickoff: By Service
   // drawer closed on open). The zeroClosed state is gone with the "Not yet called" collapse card.
-  const [sections, setSections] = useState({ pattern:true, service:false, llm:true, agent:false });
+  // FEATURE: LOG-121 -- platformUser defaults closed, like service: the drawer holds two sub-tables
+  // and opening by default would push By Service off the fold on every panel open.
+  const [sections, setSections] = useState({ pattern:true, service:false, llm:true, agent:false, platformUser:false });
   // FEATURE: LOG-36 -- inactivePtnClosed/uncatalogedPtnClosed removed with the collapse cards they
   // drove: with the catalog seed loop gone there is no "not yet active" bucket to collapse, and
   // every row is by definition uncatalogued-or-governed real activity, one flat list.
@@ -327,7 +379,7 @@ export default function AIActivityPanel({ onClose }) {
   // changes content height without firing a scroll event, which is why `sections` leads the deps
   // array; the hook's own MutationObserver covers content swaps as well.
   const scrollRef = useRef(null);
-  const { canScrollMore, onScroll } = useScrollFadeHint(scrollRef, [sections, classified.length, agentsSorted.length, platformServices.length]);
+  const { canScrollMore, onScroll } = useScrollFadeHint(scrollRef, [sections, classified.length, agentsSorted.length, platformServices.length, byCaller.length]);
 
   return (
     <>
@@ -368,6 +420,11 @@ export default function AIActivityPanel({ onClose }) {
             ["Active Agents",  AGENTS.length,        false,                                 v => Math.round(v).toLocaleString()],
             ["Patterns Logged",classified.length,    !patternsLoaded,                       v => Math.round(v).toLocaleString()],
             ["Models in Use",  modelsInUse,          loading,                               v => Math.round(v).toLocaleString()],
+            // FEATURE: LOG-121 -- seventh tile, appended. Distinct callers behind the By Platform
+            // User drawer, so tile and drawer count the same thing by construction (both are
+            // byCaller.length). Same RollingNumber treatment as its siblings; no existing tile,
+            // label, or order changes.
+            ["Platform Users", platformUserCount,    loading,                               v => Math.round(v).toLocaleString()],
           ].map(([k,v,isLoading,format])=>(
             <div key={k}>
               <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1}}>{k}</div>
@@ -499,6 +556,51 @@ export default function AIActivityPanel({ onClose }) {
                     </div>
                   );
                 })
+            )}
+
+            {/* FEATURE: LOG-121 -- the drawer's name, its position (immediately after the agents
+                block), and its two-section structure collapsing as ONE unit are John's explicit
+                calls; do not rename, reorder, or split them. Section one answers "what kind of
+                caller," section two "which caller" -- two cuts of the same rows, which is why each
+                carries its own total and why those totals must agree. The UI split is the whole
+                point of the feature: before this, John's own clicking, a QA session's scripts and an
+                outside visitor all landed in one undifferentiated pile.
+                FEATURE: LOG-124 -- every address shown here is already blurred (xxx.xx before the
+                last two octets). The real value is still logged and still readable with the service
+                key; the public key cannot read it, and nothing here reconstructs it. */}
+            <SectionHeader label="By Platform User" open={sections.platformUser} onToggle={()=>toggle('platformUser')} count={logLoaded ? platformUserCount : undefined}/>
+            {sections.platformUser && (
+              // FEATURE: LOG-98 -- loading branch first; the empty-state copy is post-load only.
+              loading
+                ? <><AuditRowSkeleton/><AuditRowSkeleton/><AuditRowSkeleton/></>
+                : bySource.length === 0
+                ? <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",padding:"6px 0"}}>No attributed calls logged yet.</div>
+                : (
+                  <>
+                    <div style={{...PU_SUBHEAD,marginTop:0}}>By Source</div>
+                    {bySource.map(s => (
+                      <PlatformUserRow
+                        key={s.source}
+                        primary={s.source}
+                        secondary={`${fmtPct(s.pctCost)} of cost · avg ${s.avgCost != null ? fmt$(s.avgCost) : "—"} · last ${fmtDay(s.lastSeen)}`}
+                        stats={[["Calls", s.calls.toLocaleString()], ["Cost", fmt$(s.cost)]]}
+                        active={s.calls > 0}
+                      />
+                    ))}
+                    <PlatformUserTotal calls={sumBy(bySource,'calls')} cost={sumBy(bySource,'cost')}/>
+                    <div style={{...PU_SUBHEAD,marginTop:12}}>By Caller</div>
+                    {byCaller.map((c, i) => (
+                      <PlatformUserRow
+                        key={`${c.label}·${i}`}
+                        primary={c.label}
+                        secondary={[c.org, c.city, c.device, c.ips.join(" · ")].filter(Boolean).join(" · ") || "—"}
+                        stats={[["Calls", c.calls.toLocaleString()], ["Cost", fmt$(c.cost)]]}
+                        active={c.calls > 0}
+                      />
+                    ))}
+                    <PlatformUserTotal calls={sumBy(byCaller,'calls')} cost={sumBy(byCaller,'cost')}/>
+                  </>
+                )
             )}
 
             {/* FEATURE: S-AI-AUDIT-SVCDIR -- By Service rebuilt on the platform_services directory

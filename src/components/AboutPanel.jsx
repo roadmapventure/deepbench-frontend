@@ -1,3 +1,4 @@
+// DeepBench v7.0.39 | AboutPanel.jsx | LOG-124 -- the logged-calls tile stops asking ai_activity_log for '*' (it only ever wanted the count), so a column-level revoke on caller_ip cannot 403 this panel
 // DeepBench v6.3.171 | AboutPanel.jsx | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.134 | AboutPanel.jsx | LOG-36 -- "AI Patterns" stat tile reads the live logged count, not the static catalog length
 // DeepBench v6.2.13 | AboutPanel.jsx | SH-21 mobile-responsive About DeepBench panel + scroll hint
@@ -457,7 +458,11 @@ export default function AboutPanel({ onClose }) {
   const [stats, setStats] = useState({ loggedCalls: null, patternsUsed: null, services: null, schema: null, platform: null });
   useEffect(() => {
     Promise.all([
-      supabase.from("ai_activity_log").select("*", { count: "exact", head: true }),
+      // FEATURE: LOG-124 -- this tile only ever wanted a row count, and `head: true` returns no rows
+      // either way, so naming one non-sensitive column is behaviourally identical. It exists solely
+      // so the column-level revoke on caller_ip cannot 403 the About panel: `*` expands server-side
+      // to every column, including the one being withdrawn.
+      supabase.from("ai_activity_log").select("id", { count: "exact", head: true }),
       supabase.from("ai_pattern_classification_rollup").select("pattern_slug"),
       supabase.from("platform_services").select("*", { count: "exact", head: true }),
       supabase.rpc("platform_schema_stats").single(),

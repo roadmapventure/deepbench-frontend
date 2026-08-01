@@ -1,3 +1,4 @@
+// DeepBench v7.0.39 | useAIActivity.js | LOG-121 -- By Platform User: buildBySource()/buildByCaller() (two reconciling cuts of one row set) + the known_callers/ip_org_cache read; LOG-124 -- hydrateFromSupabase() stops asking for '*' and reads caller_ip_masked, never the raw address
 // DeepBench v7.0.15 | useAIActivity.js | HAR-02a -- computeCallCost() gains optional cache-token params (creation 1.25x input rate, read 0.1x); the two row-based read-time call sites pass the new ai_activity_log columns. Historical rows (NULL fields) and every omitting caller price byte-identically
 // DeepBench v6.3.218 | useAIActivity.js | LOG-112 -- buildActivitySummary() stops reading the frozen legacy patterns_used field: its per-agent byPattern bucket is replaced by a plain `rows` list of each included row's id + latency, and the new exported buildAgentPatternRows() joins those ids to the VERIFIED pattern names the Log Displayer derived at read time (ai_pattern_classification_rollup.log_ids, LOG-97's existing read -- no new query). An agent whose rows matched no gold pattern gets no buckets at all
 // DeepBench v6.3.211 | useAIActivity.js | CHI-90 -- buildActivitySummary()'s per-agent `calls` is now gated by isCountableCall(), so the CHI Agents drawer counts real model calls exactly as AI Audit's byAgent does; the raw every-logged-row count it used to hold moves to a new `operations` field (drives the drawer's active/potential split only, never rendered)
@@ -666,6 +667,222 @@ export function computeByAgentCapabilities(log, assignments, nameBySlug) {
   return out;
 }
 
+// ── By Platform User (LOG-121 part b) ────────────────────────────────────────
+// FEATURE: LOG-121 -- who set the platform's AI calls off, in two cuts of ONE row set: By Source
+// (what kind of caller) and By Caller (which caller). They are built from the same rows through the
+// same identity resolution, so their totals reconcile by construction rather than by convention --
+// and the Node test asserts it rather than trusting it.
+//
+// FEATURE: LOG-124 -- everything below reads `caller_ip_masked`, the generated blurred copy
+// (136.60.33.12 -> xxx.xx.33.12), never the real column. `ai_activity_log` has RLS off and this hook
+// reads it straight from the browser with the anon key that ships in the public bundle, so a real
+// address in this path is a real address published to every visitor. The true value keeps being
+// logged exactly as part `a` writes it and stays readable with the service key; what changed is only
+// who may read it. Nothing here may reconstruct, un-blur, or re-request the real address.
+
+// The public deployment. Anything else is the dev preview -- which is what separates John's and the
+// public's traffic from a QA session's, per the LOG-121 design harvest.
+export const PRODUCTION_HOST = 'deepbench.roadmapventure.com';
+const PUBLIC_CALLER = 'Public';
+const INTERNAL_CALLER = 'Internal (QA)';
+const UNATTRIBUTED = 'Unattributed';
+
+// FEATURE: LOG-124 -- mirrors the generated column's own expression so a value that arrives already
+// blurred is returned untouched (idempotent), and any address reaching this module by another route
+// is blurred here rather than rendered. Never the inverse: there is no un-mask.
+export function maskIp(ip) {
+  if (typeof ip !== 'string') return null;
+  const v = ip.trim();
+  if (!v) return null;
+  if (v.startsWith('xxx.') || v.startsWith('xxxx:')) return v; // already blurred
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v)) return v.replace(/^\d{1,3}\.\d{1,3}\./, 'xxx.xx.');
+  return `xxxx:${v.slice(-9)}`;
+}
+
+// A row's blurred address, whichever shape it arrives in (a hydrated log entry carries
+// caller_ip_masked; a raw fixture may carry the unblurred column, which is blurred on the way past).
+function ipKeyOf(row) {
+  return maskIp(row?.caller_ip_masked ?? row?.caller_ip ?? null);
+}
+
+// FEATURE: LOG-121 -- identity resolution, most specific first (the order is John's, locked in the
+// kickoff): a known_callers match on visitor_id, then one on the address, then the name any OTHER
+// row from that same address already earned, then the host-derived fallback.
+//
+// The third step is what keeps the `visitor_id IS NULL` rows honest. NULL there does not mean
+// "unknown person" -- part `a` deliberately logs NULL on the request that MINTS a visitor cookie,
+// and on every request from a client that refuses cookies. Those rows must group by address, never
+// be dropped and never be collapsed into one anonymous lump; when a labelled sibling shares the
+// address, they belong to that caller, not to a stub beside it.
+function buildIdentityIndex(rows, known, orgs) {
+  const nameByVisitor = new Map();
+  const nameByIp = new Map();
+  for (const k of known || []) {
+    if (!k || !k.display_name || k.match_value == null) continue;
+    if (k.match_type === 'visitor_id') nameByVisitor.set(String(k.match_value), k.display_name);
+    else if (k.match_type === 'caller_ip') {
+      const m = maskIp(String(k.match_value));
+      if (m) nameByIp.set(m, k.display_name);
+    }
+  }
+  const orgByIp = new Map();
+  const cityByIp = new Map();
+  for (const o of orgs || []) {
+    const m = ipKeyOf(o);
+    if (!m) continue;
+    if (o.org && !orgByIp.has(m)) orgByIp.set(m, o.org);
+    if (o.city && !cityByIp.has(m)) cityByIp.set(m, o.city);
+  }
+  const derivedNameByIp = new Map();
+  for (const row of rows || []) {
+    const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
+    const name = vid ? nameByVisitor.get(vid) : undefined;
+    if (!name) continue;
+    const m = ipKeyOf(row);
+    if (m && !derivedNameByIp.has(m)) derivedNameByIp.set(m, name);
+  }
+  return { nameByVisitor, nameByIp, derivedNameByIp, orgByIp, cityByIp };
+}
+
+// One row -> one caller. `key` is the grouping identity, `name` the source-level display name,
+// `label` the caller-level one. Deliberately different: By Source answers "whose traffic is this"
+// (John / Public / Internal QA), By Caller answers "which caller is this" and an anonymous group is
+// named by its org, falling back to its blurred address so two of them can never merge on screen.
+function identityForRow(row, idx) {
+  const ip = ipKeyOf(row);
+  const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
+  const org = ip ? idx.orgByIp.get(ip) || null : null;
+  const city = ip ? idx.cityByIp.get(ip) || null : null;
+  const labelled = (vid && idx.nameByVisitor.get(vid))
+    || (ip && idx.nameByIp.get(ip))
+    || (ip && idx.derivedNameByIp.get(ip))
+    || null;
+  if (labelled) return { key: `name:${labelled}`, name: labelled, label: labelled, ip, org, city };
+  // Unlabelled. A row with neither an address nor a visitor id is a pre-LOG-121 row: there is no
+  // fact to attribute it with and none is derivable (§19i -- no backfill), so it says so plainly
+  // instead of being guessed at or dropped.
+  if (!ip && !vid) return { key: 'unattributed', name: UNATTRIBUTED, label: UNATTRIBUTED, ip: null, org: null, city: null };
+  const host = row?.request_host || null;
+  const name = host === PRODUCTION_HOST ? PUBLIC_CALLER : host ? INTERNAL_CALLER : UNATTRIBUTED;
+  // A visitor id is a real identity even without a name; an address is the fallback grouping.
+  return vid
+    ? { key: `visitor:${vid}`, name, label: name, ip, org, city }
+    : { key: `ip:${ip}`, name, label: org || ip, ip, org, city };
+}
+
+// Shared accumulation so the two sections cannot drift: `calls` counts real model calls through
+// LOG-81's single isCountableCall() definition (matching the header's Total Calls tile), while
+// `cost` sums every row (matching Total Cost -- AI-51 already zeroed the duplicate half at hydrate).
+function accumulate(bucket, row) {
+  if (isCountableCall(row)) bucket.calls += 1;
+  bucket.cost += row.cost || 0;
+  const t = row.ts ? Date.parse(row.ts) : NaN;
+  if (!Number.isNaN(t)) {
+    if (bucket._first == null || t < bucket._first) { bucket._first = t; bucket.firstSeen = row.ts; }
+    if (bucket._last == null || t > bucket._last) { bucket._last = t; bucket.lastSeen = row.ts; }
+  }
+}
+
+/**
+ * FEATURE: LOG-121 -- By Source: one row per kind of caller. `ui` splits by resolved identity
+ * ("UI — John", "UI — Internal (QA)", "UI — Public"), which is the drawer's whole point; every other
+ * source renders as a single row, and a NULL call_source renders as Unattributed rather than
+ * vanishing. Returns [{ source, calls, cost, pctCost, avgCost, lastSeen }].
+ */
+export function buildBySource(rows, known = [], orgs = []) {
+  const idx = buildIdentityIndex(rows, known, orgs);
+  const groups = new Map();
+  let totalCost = 0;
+  for (const row of rows || []) {
+    const raw = row?.call_source || null;
+    const source = raw === 'ui'
+      ? `UI — ${identityForRow(row, idx).name}`
+      : raw ? humanizeSlug(raw) : UNATTRIBUTED;
+    if (!groups.has(source)) groups.set(source, { source, calls: 0, cost: 0, firstSeen: null, lastSeen: null, _first: null, _last: null });
+    accumulate(groups.get(source), row);
+    totalCost += row.cost || 0;
+  }
+  return [...groups.values()]
+    .map(({ _first, _last, firstSeen, ...g }) => ({
+      ...g,
+      pctCost: totalCost > 0 ? g.cost / totalCost : 0,
+      avgCost: g.calls > 0 ? g.cost / g.calls : null,
+    }))
+    .sort((a, b) => b.cost - a.cost || b.calls - a.calls || a.source.localeCompare(b.source));
+}
+
+/**
+ * FEATURE: LOG-121 -- By Caller: one row per distinct caller, the same rows cut the other way.
+ * Returns [{ label, device, org, city, calls, cost, firstSeen, lastSeen, ips[] }].
+ */
+export function buildByCaller(rows, known = [], orgs = []) {
+  const idx = buildIdentityIndex(rows, known, orgs);
+  const groups = new Map();
+  for (const row of rows || []) {
+    const id = identityForRow(row, idx);
+    if (!groups.has(id.key)) {
+      groups.set(id.key, {
+        label: id.label, org: id.org, city: id.city, calls: 0, cost: 0,
+        firstSeen: null, lastSeen: null, ips: [], _first: null, _last: null, _devices: new Map(),
+      });
+    }
+    const g = groups.get(id.key);
+    if (!g.org && id.org) g.org = id.org;
+    if (!g.city && id.city) g.city = id.city;
+    if (id.ip && !g.ips.includes(id.ip)) g.ips.push(id.ip);
+    if (row.device_type) g._devices.set(row.device_type, (g._devices.get(row.device_type) || 0) + 1);
+    accumulate(g, row);
+  }
+  return [...groups.values()]
+    .map(({ _first, _last, _devices, ...g }) => ({
+      ...g,
+      // The device this caller mostly uses. Part `a`'s own accepted limit stands: desktop-vs-mobile
+      // is reliable, tablet is not a category to trust (modern iPads send a desktop UA).
+      device: [..._devices.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null,
+    }))
+    .sort((a, b) => b.cost - a.cost || b.calls - a.calls || String(a.label).localeCompare(String(b.label)));
+}
+
+// FEATURE: LOG-121 -- the two small read-time tables behind the drawer, fetched once per page load
+// with the same module-level cache shape as fetchCapabilityDirectory() above (never cache a
+// failure). `known_callers` is the label table: adding a row there renames a caller on the next
+// reload, with no deploy and no code change -- which is why the drawer never hardcodes a name.
+// Both tables have RLS off, so the ordinary anon client reads them with no policy work.
+const EMPTY_CALLER_DIR = { known: [], orgs: [] };
+let _callerDirCache = null;
+let _callerDirPromise = null;
+
+export function fetchCallerDirectory() {
+  if (_callerDirCache) return Promise.resolve(_callerDirCache);
+  if (!_callerDirPromise) {
+    _callerDirPromise = Promise.all([
+      supabase.from('known_callers').select('match_type, match_value, display_name, note'),
+      // FEATURE: LOG-124 -- the blurred column on BOTH sides of the join. The org cache's real
+      // column is revoked from the anon key for the same reason the log's is.
+      supabase.from('ip_org_cache').select('caller_ip_masked, org, city, region, country'),
+    ]).then(([k, o]) => {
+      if (k.error || o.error) {
+        console.warn('[caller directory] read failed:', (k.error || o.error).message);
+        _callerDirPromise = null; // allow a later mount to retry; never cache a failure
+        return EMPTY_CALLER_DIR;
+      }
+      _callerDirCache = { known: k.data || [], orgs: o.data || [] };
+      return _callerDirCache;
+    });
+  }
+  return _callerDirPromise;
+}
+
+export function useCallerDirectory() {
+  const [dir, setDir] = useState(() => _callerDirCache || EMPTY_CALLER_DIR);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCallerDirectory().then(d => { if (!cancelled) setDir(d); });
+    return () => { cancelled = true; };
+  }, []);
+  return dir;
+}
+
 // ── AI type catalog (PRD Section 9) ──────────────────────────────────────────
 export const AI_TYPES = {
   rag_briefing:       { label:"RAG-Augmented Briefing",      desc:"Pulls agent role prompt + training docs, calls Claude to generate procurement briefing",                             model:"claude-haiku-4-5",      location:"AI Review tab",                  phase:1 },
@@ -816,9 +1033,15 @@ export async function hydrateFromSupabase(tenantId = null) {
     const rows = [];
     let from = 0;
     while (true) {
+      // FEATURE: LOG-124 -- an explicit projection replaces select('*'), and it is what makes the
+      // column-level revoke safe: `*` expands server-side to every column including caller_ip, so a
+      // single surviving `*` anywhere would 403 the whole audit the moment the grant is withdrawn.
+      // Enumerated from the live table definition, not from memory -- omitting a column here does
+      // not error, it silently blanks whatever metric consumed it. caller_ip_masked is listed;
+      // caller_ip deliberately is not, and must never be added back.
       let q = supabase
         .from('ai_activity_log')
-        .select('*')
+        .select('id,ai_type,feature,model,agent_id,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,latency_ms,knowledge_tier,cost_usd,patterns_used,created_at,call_source,caller_ip_masked,device_type,visitor_id,request_host')
         .order('created_at', { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
       if (tenantId) q = q.eq('tenant_id', tenantId);
@@ -853,6 +1076,17 @@ export async function hydrateFromSupabase(tenantId = null) {
         : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens)),
       patternsUsed: paired.has(row.id) ? [] : (row.patterns_used || []),
       ts:        row.created_at,
+      // FEATURE: LOG-121 -- the five attribution fields keep their COLUMN names verbatim, against
+      // this file's camelCase house style and deliberately so: buildBySource()/buildByCaller() then
+      // read one shape whether they are handed hydrated entries or raw rows, instead of each caller
+      // remembering to rename five fields (the SES-57 mirror-payload class of bug).
+      call_source:      row.call_source || null,
+      // FEATURE: LOG-124 -- the blurred copy only. The real address is never fetched, never held in
+      // browser memory, and never rendered.
+      caller_ip_masked: row.caller_ip_masked || null,
+      device_type:      row.device_type || null,
+      visitor_id:       row.visitor_id || null,
+      request_host:     row.request_host || null,
       // FEATURE: LOG-81 -- stamped here so isCountableCall() can stay a pure per-entry predicate
       // (the pairing decision needs the whole row set, which only this hydrate pass has).
       isPairedDup: paired.has(row.id),
@@ -1054,6 +1288,9 @@ export function useAIActivity() {
   // Supabase read each per page load, same shape as usePatternVocabulary()'s cache).
   const serviceDirectory = usePlatformServiceDirectory();
   const { assignments: capabilityAssignments, nameBySlug: capabilityNameBySlug } = useCapabilityDirectory();
+  // FEATURE: LOG-121 -- the By Platform User drawer's two read-time tables (cached module-level,
+  // one Supabase read each per page load, same shape as the two directory reads above).
+  const { known: knownCallers, orgs: ipOrgs } = useCallerDirectory();
 
   // Aggregate by type
   const byType = {};
@@ -1215,9 +1452,16 @@ export function useAIActivity() {
   const platformServiceCount = (serviceDirectory || []).length;
   const assignedCapabilityCount = assignedCapabilitySlugs.size;
 
+  // FEATURE: LOG-121 -- the By Platform User drawer's two sections, built from the SAME `log` the
+  // header tiles are built from, so their totals reconcile with Total Calls / Total Cost as well as
+  // with each other. platformUserCount is the distinct-caller count behind the new stat tile.
+  const bySource = buildBySource(log, knownCallers, ipOrgs);
+  const byCaller = buildByCaller(log, knownCallers, ipOrgs);
+  const platformUserCount = byCaller.length;
+
   // FEATURE: LOG-98 -- logLoaded is read at render time, not stored in hook state: notify()
   // already re-renders every consumer the moment hydration completes, so the value is never stale.
-  return { log, logLoaded: isLogHydrated(), byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount };
+  return { log, logLoaded: isLogHydrated(), byType, byLLM, byAgent, byService, byPattern, servicesActive, servicesCatalogTotal: SERVICE_CATALOG.length, patternsLoggedCount, modelsInUse, totalCost, totalCalls, servicesSorted, patternsSorted, agentsSorted, platformServices, unregisteredServices, platformServiceCount, assignedCapabilityCount, bySource, byCaller, platformUserCount };
 }
 
 export { MODEL_PROVIDER };
