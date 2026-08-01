@@ -116,6 +116,23 @@ known defect that would break or dirty that run:
 > network hang in R4). The 828 s reading looks like top-end variance, not a stable 4.3× regression — `CHI-96` stays
 > measure-first, downgraded urgency.
 
+> **Pre-regression round 6 — 2026-08-01, `design-arch-beta-0729`, independent confirmation of `SES-64` (v7.0.23,
+> `29b2327` verified in checkout — driver-local fix). Verdict: CONFIRMED, and this run exercised the exact branch the
+> fix exists for.**
+>
+> | Case | R5 | R6 | R6 attribution |
+> |---|---|---|---|
+> | 24 `news-first-card` | FAIL (`SES-64`) | ✅ **PASS** | **Article degraded again — and the driver selected `honest-gap` for all three artifacts, which passed.** The class-selection mechanism worked live on its target condition, independently of the fix session's own degraded-hit PASS. |
+> | 6 `upgrade-cycles` | PASS | ✅ PASS | Stable. 392 s — `CHI-96` sequence now 193 → 828 → 394 → 392; two consecutive ~6.5-min readings, 828 increasingly isolated as top-end variance. |
+> | 9 `vitrine-tech` | FAIL | ❌ FAIL | Same owned class as R5: `theory_test` + `forecast_draft` fail `asked_metric_present` under honest-gap — `AGT-50` + `DAT-16` residue. Stable, expected, no new information. |
+> | 12 `vietnam-reseller` | PASS | ❌ FAIL | **New mode: `infra_death: continue loop exceeded cap (10) without recovery` at 361 s.** Consistent with **`LOO-27`** (open, bucket 1) — its recorded mechanism killed case 23, the *other* honest-gap case, the identical way at 532 s. The driver does not capture the interior hop chain on an infra death, so this is class-consistent attribution, not a proven chain. Case 12 has now failed four different ways in six rounds (platform-language R3, `AGT-52` rejection R4, pass R5, continue-cap R6) — it is the platform's canary, not a fix regression. |
+>
+> **Set state after six rounds: 2 stable greens (6, 24 — both former never-passers), 2 reds, both owned by open rows
+> (`AGT-50`+`DAT-16` residue; `LOO-27`). No unattributed failure. The pre-regression instrument has done its job — the
+> systematic crash classes from the 0/24 run are gone, and what remains is a short, named fix list. Per the bucket-1
+> regression-first strategy (John, 2026-07-28: run first, schedule fixes only for what actually fires), the next step is
+> the full 24-case run, not more sampling.**
+
 
 > **Pre-regression round 3 — 2026-07-30, `design-arch-beta-0729` ("i have finished the 3 tickets. do you pre-test again?").** Same 4 cases.
 > Nothing this round depended on a Vercel deploy: `SES-65` and `DAT-16` Part 1 are driver-local, `DAT-16b` and `AGT-44` are
