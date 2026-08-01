@@ -1,3 +1,14 @@
+// DeepBench v7.0.31 | AgentNetwork.jsx | LAV-9b -- node/queue behaviour round 3b: an agent named as a
+// delegation target joins the canvas at the moment it is ADDRESSED, not only once it has produced a
+// credited hop of its own -- which is the single root cause behind a live line pointing at a card
+// still shrunk in the queue (solid during the run, dashed after it: same node, same missing
+// promotion). This deliberately makes the canvas's "engaged" a WIDER set than the AGENTS ENGAGED
+// meter's (LiveAgentViewScreen.jsx's own independent count, untouched here): the canvas shows who
+// was addressed, the counter shows who actually spoke, and the two are allowed to disagree. The
+// black activity bubble is now gated on THAT agent currently pulsing rather than on the run merely
+// being live, so a finished agent's last line stops hanging over its card while someone else works.
+// Arc radii and the bench-stack step are retuned for breathing room between the 132px cards; no new
+// token, no new control, and nothing here invents an agent, an edge or a state.
 // DeepBench v7.0.30 | AgentNetwork.jsx | LAV-9a -- canvas round 3a: the resting-edge look stops being
 // a spotlight. EVERY edge that has really carried traffic this run stays solid and arrow-animated at
 // the same time, each in its OWN meaning colour (Delegate / Report back / Hand-off / Re-dispatch), so
@@ -86,7 +97,12 @@ const PATTERN_SETTLE_MS = 2500;
 const LOOP_LAP_MS = 900;
 // Choreography anchors, ported verbatim from the prototype's computeTargets().
 const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
-const ARC_RX = 235, ARC_RY = 215, ARC_SPREAD = (162 * Math.PI) / 180;
+// FEATURE: LAV-9b -- widened ~17% so adjacent kids on the arc keep more chord distance between
+// their 132px-wide cards when several agents are engaged at once (the crowding John flagged).
+// Checked against the canvas's other fixed points at this new size: arc rightmost point
+// (MID.x + ARC_RX = 835) still clears STACKX (1098) by 263px, and the arc's angular range never
+// swings left of MID.x, so LEAD (270) is untouched -- this widening cannot newly overlap either.
+const ARC_RX = 275, ARC_RY = 245, ARC_SPREAD = (162 * Math.PI) / 180;
 // FEATURE: LAV-1f -- the human's anchor: LEAD mirrored across the canvas. While a gate is open the
 // requesting agent IS the lead (see `lead` below), so the human materializes directly opposite the
 // agent asking, and the hand-off pulse runs straight between the two. Derived from the ported
@@ -227,6 +243,14 @@ export function deriveNetwork(runHops) {
       const k = edgeKey(id, h.secondaryAgentId);
       if (!edgeSeen.has(k)) { edgeSeen.add(k); edges.push({ key: k, from: id, to: h.secondaryAgentId }); }
       openByTarget.set(h.secondaryAgentId, id);
+      // FEATURE: LAV-9b -- a delegation target is "on stage" the moment it's named, not only once it
+      // produces its own credited hop. Deliberately a DIFFERENT definition of "engaged" than
+      // LiveAgentViewScreen.jsx's AGENTS ENGAGED meter, which stays scoped to "actually produced a
+      // credited event" -- confirmed with John: the canvas shows "addressed," the counter shows
+      // "actually spoke," and the two are allowed to disagree. This is the single root cause behind
+      // all three of John's "not coming forward" symptoms (solid line to a still-queued node during
+      // the run, dashed line to a still-queued node after it -- same node, same missing promotion).
+      if (!engaged.includes(h.secondaryAgentId)) engaged.push(h.secondaryAgentId);
     }
     if (h.type === "delegation_complete" || h.type === "delegation_return") {
       if (id) { openByTarget.delete(id); finished.add(id); }
@@ -368,7 +392,10 @@ export function computeTargets({ ids, home, choreographed, engaged, lead, benchO
     ids.forEach(id => { if (id !== leadId && !kids.includes(id)) benched.add(id); });
     const order = benchOrder.filter(id => benched.has(id));
     benched.forEach(id => { if (!order.includes(id)) order.push(id); });
-    const m = order.length, step = m > 1 ? Math.min(52, 468 / (m - 1)) : 0, y0 = 305 - (step * (m - 1)) / 2;
+    // FEATURE: LAV-9b -- bench-stack cards render at 0.56 scale (~67px tall); the old 52px step cap
+    // meant adjacent queued cards could overlap. Raised the cap and the total span so the stack has
+    // room to breathe within the canvas's 640px height (VH) without changing the queue's meaning.
+    const m = order.length, step = m > 1 ? Math.min(58, 520 / (m - 1)) : 0, y0 = 305 - (step * (m - 1)) / 2;
     order.forEach((id, i) => { t[id] = { x: STACKX, y: y0 + i * step }; });
     return { targets: t, benched, benchOrder: order };
   }
@@ -1040,7 +1067,15 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
             else if (running && net.activeId === a.id) cls.push("is-active");
             else if (net.done.has(a.id)) cls.push("is-done");
-            const bubble = running ? net.bubbles[a.id] : null;
+            // FEATURE: LAV-9b -- the bubble is gated on THIS agent currently carrying one of the
+            // three pulsing states above (is-orch / is-assembly / is-active), not on the whole run
+            // merely being live. Previously any agent that had ever produced text kept showing it
+            // for the rest of the run, even long after moving to is-done and someone else becoming
+            // active. Mirrors the class-assignment conditions immediately above exactly, so the
+            // black bubble and the node's own pulsing skin can never disagree.
+            const pulsing = net.orchestrators.has(a.id)
+              || (running && (net.assemblyActive.has(a.id) || net.activeId === a.id));
+            const bubble = pulsing ? net.bubbles[a.id] : null;
             const start = posRef.current[a.id] || home[a.id] || { x: VW / 2, y: VH / 2 };
             const down = start.y < VH * 0.34;
             // FEATURE: LAV-5b -- the LAST pattern this agent was really classified on, kept after
