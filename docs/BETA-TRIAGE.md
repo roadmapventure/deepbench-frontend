@@ -271,10 +271,24 @@ expansion), `CHI-62` (Architecture — the escalate path has **zero traversals e
 
 ### Bucket 3 — mobile
 
-**Empty — and that is the finding.** There are **zero open `MOB-*` rows anywhere** (the only
-two ever filed are done/archived). Nothing tracked says mobile is broken, but nothing has
-tested it either. **Bucket 3 needs a dedicated mobile QA sweep of CHI + Bench to either green
-the bucket or populate it** — that sweep is the queue.
+**No longer empty — populated 2026-08-01 by `design-lav-mobile-0801`.** The 2026-07-28 finding
+below stood until Live Agent View got its first mobile treatment; that work both closed the
+biggest gap and surfaced two smaller ones.
+
+| # | ID (Type) | State |
+|---|---|---|
+| ~~1~~ | ~~`MOB-4` (Feature)~~ | ✅ **DONE 2026-08-01 (`S-MOB-4a` v7.0.36 + `S-MOB-4b` v7.0.37) — off the queue.** LAV had no mobile branch at all; it now has the full CHI-§21-shaped composition with a two-view canvas. 12 of 13 QA items verified live at 402×874; the stability guarantee (an agent occupies the same slot on every run) proven by diffing two different runs — zero movement across all 5 shared agents. Archived. |
+| 2 | `MOB-6` (Tech Debt) | The mobile decision panel shipped and is code-verified but **cannot be exercised from LAV** — all 303 gates in 30 days come from `data-analysis`, which LAV's 3-question picker never invokes. Post-beta (additive; nothing regressed), but it is the one unverified surface of `MOB-4`. |
+| 3 | `MOB-5` (Tech Debt) | Mobile LAV's legend row wraps if more than 3 of the 6 possible edge meanings light at once (~23px slack at 402px). Cosmetic only, deliberately not worked around. Post-beta. |
+
+**Still true, and still the rest of this bucket's queue:** CHI and Bench have had **no**
+dedicated mobile QA sweep. LAV is now covered; those two are not. **The sweep is still
+unscheduled** — greening bucket 3 needs it.
+
+**Device standard, new:** mobile QA runs at **402 × 874 (iPhone 16 Pro)**, locked in
+`STYLE-GUIDE.md` §22 (John, 2026-08-01). Before this, the 768px breakpoint was the only
+responsive number written down, so each mobile session picked its own test width and the
+evidence was not comparable across sessions.
 
 ### Bucket 4 — AI Audit Log screen accuracy
 
@@ -291,6 +305,7 @@ fixed, 2 re-scoped, 1 standing gate.
 | 3 | `LOG-42`→`63`→`59`→`53` (Architecture) | False-`rag` family, all write sites confirmed live: ungated `rag_retrieved` flag; `conversations.js`/`rag.js` stamp `rag` on pure writes / pre-search; catalog reads tagged `rag` with zero chunk ids; **380 false-tagged agent-selection rows in the last 7 days** (latest 20 min before the check). Write-time stamping was never replaced — it runs parallel to the §19k signature track. |
 | 4 | `LOG-102` (Observability) | Dishonest catch (`0` / "No classified patterns yet." as fact) confirmed in source — **now unblocked**, its "after `LOG-99`" gate cleared today. |
 | 5 | `LOG-106` (Feature) | By Service raw-render confirmed (no rolling counters; skeleton gate releases at directory load). By Agent confirmed already covered (gated on `logLoaded`). |
+| 5b | `LOG-125` (Observability) | **NEW 2026-08-01, found while QA-ing `MOB-4`; measured, not inferred.** ~50 `ai_activity_log` rows in 14 days carry a model-**invented** `agent_id` *and* a model-invented `feature` slug on the display/format leg — ~35 fake ids (`display-agent-001`, `display_primary`, a raw UUID, `store`) against ~30 fake feature slugs. Several carry `call_source:'ui'`, so these are real production turns, not test debris; most recent is today. The AI Audit screen therefore gains ~35 phantom agents and ~30 phantom services, and since §19k parses `intent` from `feature`, all of them are unclassifiable. **This bucket's ship bar is literally "labels aren't invented or hardcoded," so this is a direct hit.** Same class as the `ID Decoys` pattern (`DAT-7`, `AGT-37`) but at scale and on two fields at once — fix structurally at the `logActivity()` write seam, not with another Skill-wording attempt. |
 | 6 | `LOG-104` (Data) | Pagination still `.order('created_at')` with no tie-break and no dedup on append. **Scope grew 2026-07-29 (`S-LOG-112` QA): a second call site, and worse — `useAgentActivitySummary()` (`useAgents.js`) pages ~16.4k rows over 17 `.range()` calls with NO `.order()` at all, feeding the whole CHI Agents drawer. Fix both sites together.** |
 | 7 | `LOG-82` (Tech Debt) | Stale model ids confirmed (`claude-sonnet-4-5` literal; private cost/provider maps that never import `shared/models.js`). |
 | 8 | `CHI-15` (Observability) | Still valid — **near-duplicate of `CHI-67` (bucket 2), same drawer, same label collision; merge proposed, John's call.** |
