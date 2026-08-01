@@ -1,3 +1,9 @@
+// DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch3 --
+// A3/A4 re-anchored again: stable run is now format 1, identity 2, behavior 3, guardrails 4,
+// intent 5 -- intent LAST in the stable phase, restoring the intent->task adjacency whose loss the
+// live A/B caught as a deterministic routing regression (case 6 upgrade-cycles direct-instead-of-
+// forecast 4/4; case 5 reseller-reqs 10-continue-cap breach 2/2). "Guardrails sorts last within
+// stable" is superseded by "intent sorts last within stable". B1/B2/B3 untouched.
 // DeepBench v7.0.16 | tests/regression/AGT-44-platform-language-guardrail.js | HAR-02b-patch2 --
 // B3 re-anchored to the SHIPPED S-AGT-44b (v7.0.7) state: channel-intelligence is attached again
 // (AGT-44 reopen, done + archived), and the mitigation that makes it safe is now asserted -- the
@@ -167,31 +173,41 @@ async function assemblerContract() {
 
   // A3. The guardrails section renders positioned per the platform's declared order. A constraint the
   //     model reads before the instructions it constrains is a constraint it discounts -- so it still
-  //     comes AFTER the agent's own stable instructions (format/intent/identity/behavior). Since
-  //     S-HAR-02b's stable-first reorder it is the LAST section of the STABLE phase (order 5,
-  //     prompt_phase 'stable'), before every volatile per-call section (knowledge/RAG included --
-  //     knowledge moved to the volatile tail because its content is fetched per call; "after
-  //     knowledge" was the pre-reorder claim and is deliberately no longer asserted).
-  assert.equal(g.order, 5, `guardrails order is ${g.order}, not 5 -- the stable-first layout moved`);
+  //     comes AFTER the agent's own identity/behavior. Since S-HAR-02b-patch3 the stable run is
+  //     format 1, identity 2, behavior 3, guardrails 4, intent 5: guardrails is the last section
+  //     BEFORE intent, and every volatile per-call section renders after the whole stable run
+  //     (knowledge/RAG included -- knowledge moved to the volatile tail because its content is
+  //     fetched per call; "after knowledge" was the pre-reorder claim and is deliberately no
+  //     longer asserted).
+  assert.equal(g.order, 4, `guardrails order is ${g.order}, not 4 -- the stable-first layout moved`);
   assert.equal(g.prompt_phase, "stable",
     `guardrails prompt_phase is '${g.prompt_phase}', not 'stable' -- a volatile guardrails section would fall out of the cacheable prefix and re-order it after per-call content`);
-  for (const slug of ["identity", "behavior", "intent"]) {
+  for (const slug of ["identity", "behavior"]) {
     const other = sectionBySlug(withGuardrails.sections, slug);
     assert.ok(other, `fixture set produced no '${slug}' section -- the ordering comparison would be vacuous`);
     assert.ok(g.order > other.order,
       `guardrails order (${g.order}) must be greater than '${slug}' order (${other.order})`);
   }
-  // Sorted output, not just numerically greater: buildSections() sorts by order, so guardrails must
-  // physically be the last stable-phase section, and every volatile section must sort after it.
+  // S-HAR-02b-patch3: "guardrails sorts last within the stable phase" is SUPERSEDED -- intent does.
+  // The first stable-first cut kept intent at 2, which inserted identity/behavior/guardrails between
+  // the Intent section's instructions and the CURRENT TASK text they govern; the live A/B caught
+  // that as a deterministic routing regression (case 6 upgrade-cycles routed direct instead of
+  // forecast, 4/4) plus a 10-continue-cap breach (case 5 reseller-reqs, 2/2). Intent instructions
+  // must sit adjacent to the task tail: intent is now order 5, the LAST stable section, with
+  // guardrails at 4 directly before it.
+  const intentSection = sectionBySlug(withGuardrails.sections, "intent");
+  assert.ok(intentSection, "fixture set produced no 'intent' section -- the adjacency assertion would be vacuous");
+  assert.ok(g.order < intentSection.order,
+    `guardrails order (${g.order}) must be less than intent order (${intentSection.order}) -- intent must stay the last stable section (intent->task adjacency)`);
   const stableSections = withGuardrails.sections.filter(s => s.prompt_phase === "stable");
-  assert.equal(stableSections[stableSections.length - 1].slug, "guardrails",
-    "the guardrails section must sort last within the stable phase");
+  assert.equal(stableSections[stableSections.length - 1].slug, "intent",
+    "the intent section must sort last within the stable phase -- its instructions must sit directly adjacent to the volatile task tail (S-HAR-02b-patch3, case 6 deterministic 4/4)");
   const volatileSections = withGuardrails.sections.filter(s => s.prompt_phase !== "stable");
   assert.ok(volatileSections.length > 0,
     "fixture set produced no volatile section -- the stable/volatile boundary comparison would be vacuous");
   for (const v of volatileSections) {
-    assert.ok(v.order > g.order,
-      `volatile section '${v.slug}' (order ${v.order}) sorts before guardrails (order ${g.order}) -- per-call content is interleaving into the stable prefix`);
+    assert.ok(v.order > intentSection.order,
+      `volatile section '${v.slug}' (order ${v.order}) sorts before the last stable section (intent, order ${intentSection.order}) -- per-call content is interleaving into the stable prefix`);
   }
 
   // A4. ...and still BEFORE VOICE. VOICE is appended by assemblePrompt() at a hardcoded order and must
@@ -200,8 +216,8 @@ async function assemblerContract() {
   const src = fs.readFileSync(path.join(ROOT, "api", "prompt", "db-assembly.js"), "utf8");
   const skillOrderLiteral = src.match(/const SKILL_ORDER = \{([^}]*)\}/);
   assert.ok(skillOrderLiteral, "SKILL_ORDER literal not found in api/prompt/db-assembly.js -- the file changed shape");
-  assert.ok(/guardrails\s*:\s*5/.test(skillOrderLiteral[1]),
-    "SKILL_ORDER.guardrails is no longer 5 -- S-HAR-02b's stable-first table puts it last in the stable run (1-5). NOTE: skill_types.guardrails.display_order stays 6 in Supabase (display metadata, deliberately NOT a SKILL_ORDER mirror since the renumbering)");
+  assert.ok(/guardrails\s*:\s*4/.test(skillOrderLiteral[1]),
+    "SKILL_ORDER.guardrails is no longer 4 -- S-HAR-02b-patch3's stable run is format 1, identity 2, behavior 3, guardrails 4, intent 5 (intent LAST, adjacent to the task tail). NOTE: skill_types.guardrails.display_order stays 6 in Supabase (display metadata, deliberately NOT a SKILL_ORDER mirror since the renumbering)");
   const voiceOrder = Number((src.match(/slug:\s*'voice'[\s\S]*?order:\s*(\d+)/) || [])[1]);
   assert.ok(Number.isFinite(voiceOrder), "the VOICE section's order literal not found in api/prompt/db-assembly.js");
   const orderValues = [...skillOrderLiteral[1].matchAll(/:\s*(\d+)/g)].map(m => Number(m[1]));

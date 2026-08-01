@@ -1,3 +1,7 @@
+// DeepBench v7.0.16 | api/prompt/db-assembly.js | HAR-02b-patch3 -- intent moved to order 5, LAST in
+// the stable run, restoring the intent->task adjacency the first stable-first cut broke (live A/B:
+// case 6 routing 4/4, case 5 continue-cap 2/2). Stable run is now format 1, identity 2, behavior 3,
+// guardrails 4, intent 5; volatile tail unchanged. See the SKILL_ORDER comment for the full record.
 // DeepBench v7.0.16 | api/prompt/db-assembly.js | HAR-02b -- stable-first prompt reorder: every
 // section carries prompt_phase ('stable' = agent-constant content, 'volatile' = per-call content)
 // and order values are renumbered so ALL stable sections sort before ALL volatile ones (Anthropic
@@ -28,12 +32,18 @@ export const config = { maxDuration: 30, runtime: "nodejs" };
 
 // FEATURE: HAR-02b -- stable sections (agent-constant content) occupy orders 1-5; volatile sections
 // (per-call content: prior-conversation 10, current-task/task-details 11, reflect 12, knowledge-* 13,
-// voice 100) occupy 10+. knowledge moved 5 -> 13 (RAG content is fetched per call) and guardrails
-// 6 -> 5 (closing the gap so the stable run is contiguous); relative order within each group is
-// exactly what it was before the renumbering. skill_types.guardrails.display_order (6) is display
-// metadata in Supabase and deliberately NOT changed to track this -- SKILL_ORDER is a render-order
-// constant, not a display-order mirror, as of this renumbering.
-const SKILL_ORDER = { format: 1, intent: 2, identity: 3, behavior: 4, knowledge: 13, guardrails: 5 };
+// voice 100) occupy 10+. knowledge moved 5 -> 13 (RAG content is fetched per call).
+// FEATURE: HAR-02b-patch3 -- intent moved to 5, LAST in the stable run (John-approved regression
+// fix). The pre-reorder layout had the Intent section's instructions immediately adjacent to the
+// CURRENT TASK text (orders 2 -> 2.5); the first stable-first cut inserted identity/behavior/
+// guardrails between them, which deterministically broke routing classification (live A/B: case 6
+// upgrade-cycles routed direct instead of forecast, 4/4) and tripped the 10-continue cap (case 5
+// reseller-reqs, 2/2). Intent at 5 restores the intent->task adjacency -- the volatile tail
+// (prior-conversation/current-task) starts directly after it -- while staying fully
+// cache-compatible: phase membership and section content are unchanged, only stable-run order.
+// skill_types display_order values in Supabase are display metadata and deliberately NOT changed
+// to track any of this -- SKILL_ORDER is a render-order constant, not a display-order mirror.
+const SKILL_ORDER = { format: 1, identity: 2, behavior: 3, guardrails: 4, intent: 5, knowledge: 13 };
 
 // FEATURE: HAR-02b -- prompt_phase per skill type. 'stable' renders in the cacheable prefix;
 // 'volatile' renders in the per-call tail. knowledge is volatile because its content is fetched
