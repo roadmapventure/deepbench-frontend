@@ -1,6 +1,7 @@
 // DeepBench v7.0.34 | api/prompt/request-receivable.js | LOG-121 -- handler wrapped in
 // withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
 // site in this file changes
+// DeepBench v7.0.17 | api/prompt/request-receivable.js | HAR-02c -- prompt caching on: buildCallBody() places the stable run into a cached `system` block ({type:'ephemeral'}) and stamps a second send-time-only breakpoint on the conversation tail (stamped copy, history never mutated -- durable_hops replays it); split-less callers (legacy + every checkpoint-resumed hop) fall back byte-identically, uncached
 // DeepBench v7.0.15 | api/prompt/request-receivable.js | HAR-02a -- capture usage.cache_creation_input_tokens/cache_read_input_tokens (normalized to 0, summed across the parse retry) and pass them to logActivity() at both write sites; NULL/0 until S-HAR-02b/c enable caching
 // DeepBench v7.0.13 | api/prompt/request-receivable.js | LOO-28 -- trait-conditional parallel tool use on the AUTO tool_choice branch only (disable_parallel_tool_use: !enableParallelToolUse); forced branch + guardrails inline call stay hardcoded true (HAR-20). parseModelTurn() now collects ALL tool_use blocks into an additive tool_calls array (singular fields untouched); a turn mixing the terminal schema tool with harness calls is incoherent and routes through the existing parse-retry machinery once, then fails loudly
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
@@ -117,7 +118,56 @@ const DELEGATE_TO_AGENT_TOOL = {
 // the guardrails inline call stay disable_parallel_tool_use: true verbatim -- HAR-20's fix for
 // multiple emissions of the SAME schema tool was a real live failure class and is not touched.
 // Omitted (every existing caller) is byte-identical: !false === true.
-export function buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [] }) {
+// FEATURE: HAR-02c -- strip any cache_control key found on the content blocks of an incoming
+// history message, into fresh block objects (never mutating the originals). Belt-and-suspenders:
+// the send-time stamp below never persists (durable_hops stores runLoop()'s own history array,
+// which this file only ever copies), but a marker that leaked into a checkpoint before this rule
+// would otherwise accumulate one breakpoint per hop and blow Anthropic's 4-breakpoint limit.
+function stripCacheControl(content) {
+  if (!Array.isArray(content)) return content;
+  return content.map(b => {
+    if (b && typeof b === 'object' && 'cache_control' in b) {
+      const { cache_control, ...rest } = b;
+      return rest;
+    }
+    return b;
+  });
+}
+
+// FEATURE: HAR-02c -- the conversation breakpoint, stamped at send time on a COPY of the history,
+// never on conversation_history itself (it is persisted to durable_hops and replayed across
+// checkpoint/resume). Normalizes a plain-string final message to block-array form, then stamps
+// {type:'ephemeral'} on the final message's LAST content block -- a tool_result block accepts
+// cache_control directly, so it is stamped as-is, never wrapped. Each hop's stamp moves to the new
+// tail, so the prior hops are reread from cache (lookback is 20 blocks; loop hops add ~2 each).
+function stampConversationTail(history) {
+  const messages = history.map(m => ({ ...m, content: stripCacheControl(m.content) }));
+  const last = messages[messages.length - 1];
+  const blocks = Array.isArray(last.content)
+    ? last.content.map(b => ({ ...b }))
+    : (typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : null);
+  if (blocks && blocks.length > 0) {
+    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } };
+    messages[messages.length - 1] = { ...last, content: blocks };
+  }
+  return messages;
+}
+
+// FEATURE: HAR-02c -- prompt caching turned on (HAR-02 part 3/3). New optional params
+// systemPromptStable/systemPromptVolatile (S-HAR-02b's split, threaded from execute.js via
+// callModel()). When the split is present, the stable run goes into the real Anthropic `system`
+// field as a content block carrying a cache_control breakpoint ({type:'ephemeral'}, the 5-min
+// default TTL), and the volatile text takes the position the whole systemPrompt string held
+// before. Marking is unconditional -- no per-capability opt-in (§19b); a below-minimum prefix
+// (Haiku 4.5 floor: 4096 tokens) silently no-ops at zero cost. Two breakpoints max out of
+// Anthropic's 4: the stable system block + the conversation tail (stampConversationTail above).
+// When the split is ABSENT the old single-systemPrompt shape is returned byte-identically, with
+// zero cache_control anywhere -- and that fallback is a live path, not just legacy: durable_hops
+// persists only the concatenated system_prompt, so every checkpoint-resumed hop legitimately
+// arrives split-less and runs uncached (safe degradation, deliberately accepted -- never try to
+// re-derive the split here). Degenerate empty stable half: the `system` field is omitted
+// entirely rather than sending an empty text block (Anthropic rejects empty text blocks).
+export function buildCallBody({ format_contract, systemPrompt, systemPromptStable = undefined, systemPromptVolatile = undefined, model, max_tokens, temperature, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [] }) {
   const isJson = format_contract.output_type === 'json';
   const schemaTool = (isJson && format_contract.schema)
     ? { name: format_contract.skill_profile_slug, description: 'Return structured output', input_schema: format_contract.schema }
@@ -127,7 +177,31 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0;
 
+  // FEATURE: HAR-02c -- the split is "present" when either half carries real text. Both-empty
+  // (ai-enrichment's degenerate guard path) takes the fallback exactly like a split-less caller.
+  const hasSplit = (typeof systemPromptStable === 'string' && systemPromptStable.length > 0)
+    || (typeof systemPromptVolatile === 'string' && systemPromptVolatile.length > 0);
+  // Empty stable half: omit `system` entirely (never an empty block). Spread below on BOTH branches.
+  const cachedSystem = (hasSplit && systemPromptStable)
+    ? { system: [{ type: 'text', text: systemPromptStable, cache_control: { type: 'ephemeral' } }] }
+    : {};
+  // Volatile takes the slot the whole systemPrompt held: the tools branch's first user message /
+  // the no-tools branch's message default. Empty volatile keeps the pre-existing placeholder text
+  // (an empty user content string would be rejected by Anthropic).
+  const splitMessages = hasSplit
+    ? (conversation_history.length > 0
+      ? stampConversationTail(conversation_history)
+      : [{ role: 'user', content: systemPromptVolatile || 'Please complete the task as instructed.' }])
+    : null;
+
   if (tools.length === 0) {
+    if (hasSplit) {
+      return {
+        model, max_tokens, ...cachedSystem,
+        ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+        messages: splitMessages,
+      };
+    }
     return {
       model, max_tokens, system: systemPrompt,
       ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
@@ -141,6 +215,20 @@ export function buildCallBody({ format_contract, systemPrompt, model, max_tokens
   // parallel emission surfaced as a spurious missing-required-fields throw. The auto branch has carried
   // this flag since AI-35 -- this closes the same gap on the forced-tool_choice branch, used by every
   // schema-only intent (no harness tools, no web search).
+  // FEATURE: HAR-02c -- split present: same tools/tool_choice as the fallback directly below,
+  // plus the cached `system` block; volatile (or the stamped history copy) in messages.
+  if (hasSplit) {
+    return {
+      model, max_tokens, tools,
+      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+      ...cachedSystem,
+      tool_choice: needsAutoChoice
+        ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
+        : { type: 'tool', name: schemaTool.name, disable_parallel_tool_use: true },
+      messages: splitMessages,
+    };
+  }
+
   return {
     model, max_tokens, tools,
     ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
@@ -355,7 +443,14 @@ export function buildParseRetryCorrection(llmContent, correctionText) {
 // FEATURE: LOO-28 -- enableParallelToolUse threaded through to buildCallBody(), same opt-in
 // contract as canRequestHelp/enableWebSearch. Omitted by every caller except execute.js's
 // runLoop() when the calling intent's trait is on -- byte-identical otherwise.
-export async function callModel({ systemPrompt, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [], deadline = null }) {
+// FEATURE: HAR-02c -- system_prompt_stable/system_prompt_volatile (S-HAR-02b's split, delivered by
+// execute.js's runLoop() under exactly these snake_case keys) now destructured and threaded into
+// buildCallBody() at this file's single internal call site. Undefined for every split-less caller
+// (api/plan.js, confirmation.js, sendRequest()'s own non-precomputed path, every checkpoint-resumed
+// hop) -- buildCallBody() falls back byte-identically, uncached. The parse-retry below deliberately
+// reuses the SAME callBody via spread (never a second buildCallBody() call), so the stable block is
+// bit-identical between retries -- exactly what makes the cache pay on the retry.
+export async function callModel({ systemPrompt, system_prompt_stable = undefined, system_prompt_volatile = undefined, model, max_tokens, temperature, format_contract, canRequestHelp = false, enableWebSearch = false, webSearchMaxUses = undefined, enableParallelToolUse = false, conversation_history = [], deadline = null }) {
   const effectiveDeadline = deadline || (Date.now() + 55000);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -370,7 +465,7 @@ export async function callModel({ systemPrompt, model, max_tokens, temperature, 
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
   const hasSchemaTool = !!schemaTool;
 
-  const callBody = buildCallBody({ format_contract, systemPrompt, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, enableParallelToolUse, conversation_history });
+  const callBody = buildCallBody({ format_contract, systemPrompt, systemPromptStable: system_prompt_stable, systemPromptVolatile: system_prompt_volatile, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, enableParallelToolUse, conversation_history });
 
   const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
   let llmData = await llmRes.json();
