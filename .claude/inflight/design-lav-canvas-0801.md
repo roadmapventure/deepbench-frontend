@@ -1,0 +1,1 @@
+design-lav-canvas-0801 — LAV UX/UI follow-up: agents overlapping the prompt box/legend, remove agent id from card, active-line labels not showing consistently, agents still hiding behind the queue on some lines. 4 items, working one at a time.
