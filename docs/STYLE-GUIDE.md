@@ -630,6 +630,8 @@ Below `MOBILE_BREAKPOINT` (768px, `useIsMobile()` — Section 22), `MarketIntell
 
 `src/hooks/useIsMobile.js` is the platform's single breakpoint source — `MOBILE_BREAKPOINT = 768`, a `matchMedia`-backed hook returning a boolean, re-evaluated on resize/orientation change. Any future responsive branch imports this hook; never re-derive a breakpoint constant or a second `window.innerWidth`/`matchMedia` check inline in a screen file — one source, cross-referenced everywhere it's used (Category M).
 
+**QA device — locked 2026-08-01 (John's explicit call, `design-lav-mobile-0801`): iPhone 16 Pro, `402 × 874` CSS px (DPR 3).** Every mobile design and every mobile Manual QA item is checked at that viewport unless the item is specifically about another width. Root cause this closes: the breakpoint was the *only* responsive number ever written down, so each mobile session picked its own test width and none of them agreed — mobile QA evidence was not comparable across sessions. The breakpoint (768) is where the branch flips; this is where it gets judged. Note when mocking in a device frame: the bezel must be `content-box` or outside the element, or the viewport actually under test is smaller than 402×874.
+
 ## Section 23 — Splash Modal: Mobile Sizing (Locked 2026-07-13 · S-MI-45-design)
 
 `WelcomeSplash.jsx`'s overlay/panel mechanic (navy blur backdrop, brass-bordered panel, dismiss-on-backdrop-click + × button, `sessionStorage` gate) is unchanged on mobile — same component, same copy, same dismiss logic, zero behavior change. Only the panel's sizing branches on `useIsMobile()`: desktop keeps `width: 80vw, maxWidth: 960, maxHeight: 88vh`; mobile uses `width: 75vw, height: 75vh` (no `maxWidth` cap needed — 75vw of a phone viewport is always well under 960px). Internal padding and the headline's `clamp()` type scale reduce proportionally on mobile so hero content doesn't overflow the smaller panel; content and structure are otherwise identical to desktop.
@@ -942,3 +944,32 @@ Any future Evidence entry type (`CHI-46`'s news/web-finding cards, a future `CHI
 - **Trace console anatomy:** 172px tall; header shows the 8-char first id segment (no "trace" word) + `+N`; both panes scroll with `scrollbar-width:thin` + `ScrollFadeHint` (`bg: CON_BG` — reuse from `SharedUI.jsx`, never reimplement); every line numbered oldest = 1 top → newest highest at bottom; sticky field-label headers (`# / time / event / call id / detail`; waterfall `agent · intent / timeline / duration`). Event type strings still print verbatim — headers label columns, they rename nothing. Model-call lines label the token split: `in X / out Y tok`.
 - **Prompt box:** 4-line clamp; the preview starts after a leading `=== OUTPUT FORMAT ===` block (`promptPreviewText()`); the popover always renders the full untouched streamed text — the record is never altered, only where the preview window starts.
 - **Right rail:** the Agent Routing feed only — CHI's row components (`RoutingHopCard`/`QuestionDivider`, imported from `MarketIntelligenceScreen.jsx`), full-height scroll, slim uppercase `Agent Routing · N hops` header; no Drawer chrome, no other drawers on this screen.
+
+**Everything in this section describes the DESKTOP composition.** Mobile is a different composition, not a reflow of it — Section 42.
+
+---
+
+## Section 42 — Live Agent View: Mobile Composition (Locked 2026-08-01 · `design-lav-mobile-0801` / `MOB-4`)
+
+Below `MOBILE_BREAKPOINT` (768px, `useIsMobile()` — Section 22), `LiveAgentViewScreen.jsx` and `AgentNetwork.jsx` render **a different composition of the same shared components**, not a CSS reflow of the desktop grid — the same construction Section 21 locked for CHI, and for the same reason: the desktop canvas is a 1200×640 viewBox with 132px fixed-pixel node cards, and eleven `mi`-roster cards cannot coexist on a 402px screen. Desktop (`≥768px`) renders Section 41's composition completely unchanged; this rule governs the mobile branch only, by construction.
+
+**Shell — the CHI mobile shell with the canvas in chat's slot:**
+- **Title row:** one 17px `display` line with the focus-area status tag inline; `PAGE_SUBTITLE` is **not** rendered here (Section 21's CHI-88 treatment) — it renders at the top of the Harness Trace overlay instead. Beneath it, a right-justified boxless `Harness Trace ›` CTA (`body` 12px, `T.brassDeep`), mirroring CHI's `Agent & Data Info ›`.
+- **Tabs:** `Canvas` | `Answer`. Canvas is default. **Answer is a tab and only a tab — there is no Answer pill on the mobile canvas** (John's explicit call, 2026-08-01; desktop keeps its `LAV-7b` drawer).
+- **Picker + Run renders on the Canvas tab only**, not as shared chrome (Section 21's locked rule). Picker font is **16px** — the standing mobile-input floor.
+- **Status strip is permanent and tab-independent:** mode badge · short elapsed · Tokens · Est. Cost, with the status line beneath. **Active Spans and Agents Engaged are suppressed on mobile** — four 8px labels across 402px are unreadable. Elapsed uses `formatElapsedShort`/`formatExpectationShort` (`m:ss · >Nm`); §19o's expectation is shortened, never dropped.
+- **Pinned Agent Routing feed** below the tab body, visible under both tabs, unchanged content.
+- **Harness Trace overlay** carries the trace console, the span waterfall and the assembled-prompt box; `← Back to Canvas` is the only dismissal (Section 21's unchanged convention).
+
+**Canvas — two user-picked views of one canvas:**
+- **`Active | Bench` toggle sits hard right of a top chrome row whose legend sits hard left**, so the legend can grow rightward into the middle. Toggle matches the legend's visual height (19px); a transparent `::after` extends its touch box to ~36px so that costs nothing in tappability. The Choreographed/Static toggle is **not** rendered on mobile.
+- **`Bench` is the default view** and renders **only the agents the run actually called**. An uncalled agent's slot stays empty — the gap is the information. Nodes are avatar + code + first name; no role, model tag or pattern pill at that size. Edges are the real observed set (`sessionEdges`), never a decorative star.
+- **Every agent holds a permanent slot, derived from its index in the roster** (`mobileSlot(index, total)`) — never from engagement order. Same agent, same place, every run, so the user learns where to look. `roster[0]` takes the hub. No hand-authored position table and no hand-listed agent id, exactly as `homeLayout()`'s standing rule at `AgentNetwork.jsx` L281 requires; a new agent joining the bench group claims the next slot with no code change.
+- **This deliberately diverges from desktop**, where `computeTargets()` moves the lead agent to a fixed `LEAD` anchor and arcs the engaged around it. Mobile holds still on purpose. Do not "fix" it to match.
+- **`Active`** shows the current hand-off as two full-size cards with the connector and its own legend word between them; idle renders one card or nothing, never a placeholder.
+- **No auto-switch.** An earlier pass had the view widen automatically on the first `delegation_return`; Bench-as-default supersedes it. The toggle is the only thing that moves the view.
+- **Decision panel:** a confirmation gate renders as a panel anchored to the bottom edge of the **canvas** — not the screen — so the status strip and routing feed stay visible while deciding. Carries `ConfirmationCardContent` verbatim plus Reject/Accept at ≥44px. It replaces desktop's "You" canvas node, which mobile cannot use: Bench nodes are 38px and the human has no roster index, so `mobileSlot` has no slot for one.
+
+**Known limitation:** the chrome row fits 3 legend items at 402px with ~23px of slack, and there are 6 possible edge meanings. More than three lighting at once wraps the legend to a second line. Accepted, tracked as `MOB-5`, deliberately not worked around.
+
+Mock of record: `docs/mocks/lav-mobile-mock.html` (three 402×874 frames — Bench, Active, decision panel).
