@@ -1,3 +1,11 @@
+// DeepBench v7.0.25 | LiveAgentViewScreen.jsx | LAV-7a -- John's round-2 UX pass, part 1 of 3: elapsed
+// time moves off the strip's right end to sit immediately after the mode badge (the live-activity
+// cluster reads left-to-right in one place); the question picker + Run button leave the title block and
+// become a single centered row under it, with the bar's own padding/gap tightened so the freed height
+// falls through to the canvas; promptPreviewText skips EVERY leading OUTPUT FORMAT block instead of one;
+// and the screen now computes the run's real terminal answer (answerQa/answerText) and hands it to
+// AgentNetwork for LAV-7b's Answer drawer to render. The meters' 2x2 block is deliberately UNCHANGED --
+// see the note at its call site for why the wrap this session was asked to look for cannot occur.
 // DeepBench v7.0.19 | LiveAgentViewScreen.jsx | LAV-5a -- John's round-1 UX pass, items 1/3/5/6/7/23/24:
 // the question picker reads as the primary CTA (white), the status strip carries the live status message
 // + elapsed instead of the question that was run, the four meters move out of the title bar into the strip's
@@ -177,13 +185,22 @@ const PROMPT_DASH = "—";
 // first, deliberately, for prompt caching). The PREVIEW starts after a leading OUTPUT FORMAT block; the
 // popover keeps the full untouched text -- the record is never altered, only where the preview window
 // starts. Exported for the session's test and future reuse.
+// FEATURE: LAV-7a -- loops instead of stripping one block. Found live 2026-08-01: Alex Reeves's
+// screen-controls capability had TWO Format Skill Profiles attached in Supabase (a duplicate-
+// attachment data bug, fixed this session -- capability_skill_profiles row d1bff23b-... deleted),
+// so a single-strip skip left the second copy showing. The loop is defense in depth: it makes the
+// preview correct regardless of how many leading OUTPUT FORMAT blocks the real prompt happens to
+// carry, without asserting there will only ever be one or two.
+// The loop stops at `blocks.length - 1`, never `blocks.length`: LAV-5a's `blocks.length > 1` guard
+// carried a real invariant -- the preview is NEVER blank -- and an unbounded loop silently drops it
+// (a prompt that is nothing but format blocks would strip to ""). The bound is that same guard,
+// restated per-iteration: the last block is never consumable, so there is always something to show.
 export function promptPreviewText(text) {
   if (typeof text !== "string" || !text) return text;
   const blocks = text.split("\n\n---\n\n");
-  if (blocks.length > 1 && /^===\s*OUTPUT FORMAT\s*===/.test(blocks[0])) {
-    return blocks.slice(1).join("\n\n---\n\n");
-  }
-  return text;
+  let start = 0;
+  while (start < blocks.length - 1 && /^===\s*OUTPUT FORMAT\s*===/.test(blocks[start])) start += 1;
+  return start > 0 ? blocks.slice(start).join("\n\n---\n\n") : text;
 }
 
 function PromptBox({ prompt, agents, traceRows }) {
@@ -508,6 +525,19 @@ export default function LiveAgentViewScreen() {
     ? `elapsed ${formatElapsed(clock - base)} | ${liveStatus?.expectation || formatExpectation(liveStatus?.expectationMs ?? 120000)}`
     : null;
 
+  // ── Task 4: the run's real terminal answer, for LAV-7b's Answer drawer ──────────────────────
+  // FEATURE: LAV-7a -- the real terminal answer, mapped to QaEvidenceCard's exact shape (the same
+  // snake_case -> camelCase field the CHI screen itself performs at its own qaEvidence build site,
+  // MarketIntelligenceScreen.jsx ~L3989-3998). Nothing is authored here: every field is the harness's
+  // own terminal frame, spread verbatim. kind !== "qa" (a guardrail failure or a non-qa/escalate turn)
+  // still carries a real message -- passed as plain text for the drawer to render as prose, never
+  // forced into the qa card shape it does not have the fields for. This session computes and passes
+  // them only; the drawer that renders them is LAV-7b's, inside AgentNetwork.jsx.
+  const answerQa = result && result.kind === "qa"
+    ? { ...result, keyDataPoints: result.key_data_points }
+    : null;
+  const answerText = result && result.kind !== "qa" ? (result.text || null) : null;
+
   // FEATURE: LAV-1f -- an open gate blocks a new question. Not a timer and not a default decision:
   // the run genuinely has not finished, and letting a new one start would silently abandon a gate
   // the harness is still holding open. The gate stays pending until a human resolves it.
@@ -526,8 +556,16 @@ export default function LiveAgentViewScreen() {
         <FeatureBadge id="LAV-5"/>
 
         {/* ── Title bar ── */}
-        <div style={{background:T.paper,borderBottom:`1px solid ${T.line}`,padding:"11px 24px",
-          display:"flex",alignItems:"flex-start",gap:20,flexShrink:0}}>
+        {/* FEATURE: LAV-7a -- two stacked rows instead of one flex row with a trailing spacer. Row 1 is
+            the page identity, still left-aligned and unchanged in copy; row 2 is the question picker +
+            Run, centered across the full bar as the visually primary action rather than tucked under
+            the subtitle. The vertical padding (11px -> 8px) and the picker's old marginTop:10 (now a
+            6px column gap) are tightened together, so the bar is measurably shorter than round-1's --
+            and since the canvas row below is `flex:1`, every pixel freed here lands on the canvas with
+            no canvas-side change. FEATURE: LAV-5a -- the meters left this bar for the status strip
+            below; nothing sits to the right of the title any more, so the old spacer div is gone. */}
+        <div style={{background:T.paper,borderBottom:`1px solid ${T.line}`,padding:"8px 24px",
+          display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
           <div>
             <div style={{fontFamily:display,fontSize:24,fontWeight:700,color:T.navy,lineHeight:1}}>
               {/* FEATURE: LAV-1f -- was a hardcoded status word written here by LAV-1b; the focus area's
@@ -539,34 +577,39 @@ export default function LiveAgentViewScreen() {
             <div style={{fontFamily:mono,fontSize:11.5,color:T.muted,marginTop:4,letterSpacing:"0.02em"}}>
               {PAGE_SUBTITLE}
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
-              {/* FEATURE: LAV-5a -- white, not cream: the picker is this screen's primary call to action
-                  and has to read as the one thing to touch against the T.paper title bar. */}
-              <select value={picked} onChange={e => setPicked(e.target.value)} aria-label="Pick a question"
-                style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,background:T.white,
-                  border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
-                  cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
-                <option value="">{PICKER_PLACEHOLDER}</option>
-                {ALL_QUESTIONS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
-              </select>
-              <button onClick={onRun} disabled={!picked || running || awaiting}
-                style={{background:T.navy,color:T.card,border:"none",fontFamily:body,fontWeight:600,fontSize:12,
-                  padding:"8px 14px",borderRadius:6,letterSpacing:"0.3px",whiteSpace:"nowrap",
-                  cursor: (!picked || running || awaiting) ? "default" : "pointer",
-                  opacity: (!picked || running || awaiting) ? 0.45 : 1}}>
-                Run ▸
-              </button>
-            </div>
           </div>
-          {/* FEATURE: LAV-5a -- the meters left the title bar for the status strip below (they now sit
-              directly above the rail they describe). The right side of the title bar is empty space. */}
-          <div style={{flex:1}}/>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {/* FEATURE: LAV-5a -- white, not cream: the picker is this screen's primary call to action
+                and has to read as the one thing to touch against the T.paper title bar. */}
+            <select value={picked} onChange={e => setPicked(e.target.value)} aria-label="Pick a question"
+              style={{maxWidth:560,minWidth:360,fontFamily:body,fontSize:12.5,color:T.ink,background:T.white,
+                border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
+                cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
+              <option value="">{PICKER_PLACEHOLDER}</option>
+              {ALL_QUESTIONS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
+            </select>
+            <button onClick={onRun} disabled={!picked || running || awaiting}
+              style={{background:T.navy,color:T.card,border:"none",fontFamily:body,fontWeight:600,fontSize:12,
+                padding:"8px 14px",borderRadius:6,letterSpacing:"0.3px",whiteSpace:"nowrap",
+                cursor: (!picked || running || awaiting) ? "default" : "pointer",
+                opacity: (!picked || running || awaiting) ? 0.45 : 1}}>
+              Run ▸
+            </button>
+          </div>
         </div>
 
         {/* ── Status strip ── */}
         <div style={{display:"flex",alignItems:"center",gap:14,padding:"8px 24px",background:T.cardAlt,
           borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
           <ModeBadge mode={mode} detail={badgeDetail}/>
+          {/* FEATURE: LAV-7a -- elapsed sits here, immediately after the mode badge, instead of at the
+              strip's right end. Same styling, same value, same `elapsedText &&` guard -- only the slot
+              moved: badge + clock + status message are one left-to-right reading of "what is happening
+              and how long has it been", and splitting the clock off to the far right made the eye cross
+              the whole strip to assemble it. */}
+          {elapsedText && (
+            <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{elapsedText}</div>
+          )}
           {/* FEATURE: LAV-5a -- the strip carries live activity, not the question. The question is
               already on screen in the picker directly above, so repeating it here spent the widest
               line on the page on a string the user just chose; the live status message takes that
@@ -587,13 +630,19 @@ export default function LiveAgentViewScreen() {
               {status?.message || ""}
             </div>
           )}
-          {elapsedText && (
-            <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,flexShrink:0}}>{elapsedText}</div>
-          )}
           {/* FEATURE: LAV-5a -- the four meters, unchanged in what they measure (every tile is still Σ
               over real ai_activity_log rows or a count over real ledger events), re-laid-out as a 2x2
               block at the strip's right end so they sit as two lines above the rail. Est. Cost rounds
               to cents -- John's call; the 4-decimal figure read as noise at this size. */}
+          {/* FEATURE: LAV-7a -- deliberately UNCHANGED, and that is the root-cause finding, not a skip.
+              LAV-7a was asked to add fixed column widths IF a browser/zoom state could wrap this grid
+              from 2 rows to 4. It cannot: this block is a flex item with flexShrink:0, so its flex base
+              size is its max-content width and nothing can compress it; `auto` tracks inside a
+              max-content-sized grid resolve to max-content too, so neither the label nor the value can
+              wrap. A fixed `width` per tile would therefore be a fix for a mechanism that isn't running.
+              What genuinely reads as "4 lines" is the Meter tile itself -- label ABOVE value -- so a 2x2
+              block of them is 4 lines of TEXT in 2 grid rows. Collapsing that means one row of four
+              tiles, which changes the strip's proportions; John's call, not this session's. */}
           <div style={{display:"grid",gridTemplateColumns:"auto auto",columnGap:18,rowGap:2,flexShrink:0}}>
             <Meter label="Active Spans" value={activeSpans} sup={peakSpans || null}/>
             <Meter label="Tokens" value={formatTokens(tokenTotal)} unit="tok"/>
@@ -610,11 +659,16 @@ export default function LiveAgentViewScreen() {
         {/* FEATURE: LAV-1d -- position:relative so the prompt box can sit as a bottom overlay
             beside AgentNetwork's own legend (which is absolute at left:12/bottom:8 inside it),
             clear of the 300px rail. */}
+        {/* FEATURE: LAV-7a -- `answerQa`/`answerText` below are new optional props, both null until this
+            run goes terminal. LAV-7b adds the receiving `answerQa = null, answerText = null` defaults
+            and the Answer drawer that renders them; passing them ahead of that render is a no-op on
+            today's AgentNetwork, which simply ignores props it does not destructure. */}
         <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
           <AgentNetwork roster={roster} hops={canvasHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
-            pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}/>
+            pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
+            answerQa={answerQa} answerText={answerText}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>

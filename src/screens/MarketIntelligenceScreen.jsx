@@ -1,3 +1,9 @@
+// DeepBench v7.0.25 | MarketIntelligenceScreen.jsx | LAV-7a -- export-in-place only, zero behavior change,
+// exactly as LAV-5a did below: QaEvidenceCard / groupKeyDataPoints / ActualDataPointsTable /
+// TheorizedDataPointsTable gained the `export` keyword and nothing else in this file changed. The Live
+// Agent View's LAV-7b Answer drawer renders the REAL answer with CHI's own card rather than a second
+// answer-rendering component, so there stays exactly one Q&A card implementation platform-wide. CHI
+// itself still calls all four internally, unchanged.
 // DeepBench v7.0.19 | MarketIntelligenceScreen.jsx | LAV-5a -- export-in-place only, zero behavior change:
 // groupEventsIntoHops / QuestionDivider / RoutingHopCard / AGENT_ROUTING_EMPTY_TEXT gained the `export`
 // keyword (same move LAV-1a made for AuditColumn). The Live Agent View's right rail is now a routing-only
@@ -861,7 +867,7 @@ function groupDataSources(rows) {
 // vs Theorized (Analysis) groups, reusing describeDataType() (STYLE-GUIDE.md §19) -- no new
 // taxonomy. Mirrors groupDataSources()'s existing bucket-by-describeDataType() pattern exactly
 // (Category M -- one mapping, one call site per row).
-function groupKeyDataPoints(points) {
+export function groupKeyDataPoints(points) {
   const actual = [];
   const theorized = [];
   for (const p of (points || [])) {
@@ -874,7 +880,7 @@ function groupKeyDataPoints(points) {
 
 // FEATURE: MI-63 -- Title/Amount adjacent columns (John's explicit layout ask) so Amount scans
 // top-to-bottom at a glance; Type badge reuses describeDataType()'s existing color/label exactly.
-function ActualDataPointsTable({ rows }) {
+export function ActualDataPointsTable({ rows }) {
   if (!rows.length) return null;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -909,7 +915,7 @@ function ActualDataPointsTable({ rows }) {
 // reasoned_from_section, some don't) -- never a capability_slug/msg.kind check. qa-answer-format
 // never sets this field, so a Q&A card's Theorized table renders 3 columns automatically, no
 // special-case branch needed.
-function TheorizedDataPointsTable({ rows }) {
+export function TheorizedDataPointsTable({ rows }) {
   if (!rows.length) return null;
   const showSection = rows.some(r => r.reasoned_from_section);
   return (
@@ -1849,7 +1855,7 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
 // render the identical card without duplicating the JSX (Category M). Visual output is byte-identical
 // to the prior chat-rendered card; only the reviewChoice buttons' handler signatures changed (Task 2 —
 // onGoodThanks/onReview no longer take a message index, they operate on qaEvidence directly).
-function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
+export function QaEvidenceCard({ qa, onGoodThanks, onReview }) {
   const { actual: actualPoints, theorized: theorizedPoints } = groupKeyDataPoints(qa.keyDataPoints);
   return (
     // FEATURE: CHI-18 — flex:1 makes this card's own background/border stretch to fill the scroll
