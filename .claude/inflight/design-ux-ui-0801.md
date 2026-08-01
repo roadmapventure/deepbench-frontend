@@ -1,1 +1,0 @@
-design-ux-ui-0801 — LAV UX/UI round 3. 8 items scoped, 3 kickoff docs written (LAV-9a/b/c, v7.0.30-v7.0.32), LAV-10 (item 9, orchestration showcase) split out as its own future design pass. About to spawn the 3 paired coding sessions and self-verify QA.
