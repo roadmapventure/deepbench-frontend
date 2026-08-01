@@ -1,3 +1,4 @@
+// DeepBench v7.0.43 | useAIActivity.js | LOG-127 -- By Platform User stops over-merging callers: the fourth, host-derived bucket is gone (exactly three -- a known caller's name, Public, Unattributed) and the hardcoded production-host constant with it; identity donation now folds a cookie-less `ui` row only into the ONE visitor seen at its address+host, never regression/script traffic and never a row carrying its own different visitor id
 // DeepBench v7.0.39 | useAIActivity.js | LOG-121 -- By Platform User: buildBySource()/buildByCaller() (two reconciling cuts of one row set) + the known_callers/ip_org_cache read; LOG-124 -- hydrateFromSupabase() stops asking for '*' and reads caller_ip_masked, never the raw address
 // DeepBench v7.0.15 | useAIActivity.js | HAR-02a -- computeCallCost() gains optional cache-token params (creation 1.25x input rate, read 0.1x); the two row-based read-time call sites pass the new ai_activity_log columns. Historical rows (NULL fields) and every omitting caller price byte-identically
 // DeepBench v6.3.218 | useAIActivity.js | LOG-112 -- buildActivitySummary() stops reading the frozen legacy patterns_used field: its per-agent byPattern bucket is replaced by a plain `rows` list of each included row's id + latency, and the new exported buildAgentPatternRows() joins those ids to the VERIFIED pattern names the Log Displayer derived at read time (ai_pattern_classification_rollup.log_ids, LOG-97's existing read -- no new query). An agent whose rows matched no gold pattern gets no buckets at all
@@ -680,11 +681,13 @@ export function computeByAgentCapabilities(log, assignments, nameBySlug) {
 // logged exactly as part `a` writes it and stays readable with the service key; what changed is only
 // who may read it. Nothing here may reconstruct, un-blur, or re-request the real address.
 
-// The public deployment. Anything else is the dev preview -- which is what separates John's and the
-// public's traffic from a QA session's, per the LOG-121 design harvest.
-export const PRODUCTION_HOST = 'deepbench.roadmapventure.com';
+// FEATURE: LOG-127 -- exactly three buckets, split by WHO, never by which URL: a known caller's own
+// name, `Public` for everyone else, and `Unattributed` for a row that can't even prove a real
+// request happened. The fourth bucket this replaces (an internal-QA label, selected by comparing a
+// row's host against a hardcoded production-host constant) split "everyone else" by which deployment
+// the request hit -- a distinction that was never asked for. That constant went with it; it had no
+// other consumer anywhere in the repo.
 const PUBLIC_CALLER = 'Public';
-const INTERNAL_CALLER = 'Internal (QA)';
 const UNATTRIBUTED = 'Unattributed';
 
 // FEATURE: LOG-124 -- mirrors the generated column's own expression so a value that arrives already
@@ -706,14 +709,25 @@ function ipKeyOf(row) {
 }
 
 // FEATURE: LOG-121 -- identity resolution, most specific first (the order is John's, locked in the
-// kickoff): a known_callers match on visitor_id, then one on the address, then the name any OTHER
-// row from that same address already earned, then the host-derived fallback.
+// kickoff): a known_callers match on visitor_id, then one on the address, then the single
+// unambiguous cookie-gap fold below, then Public/Unattributed.
 //
 // The third step is what keeps the `visitor_id IS NULL` rows honest. NULL there does not mean
 // "unknown person" -- part `a` deliberately logs NULL on the request that MINTS a visitor cookie,
 // and on every request from a client that refuses cookies. Those rows must group by address, never
-// be dropped and never be collapsed into one anonymous lump; when a labelled sibling shares the
-// address, they belong to that caller, not to a stub beside it.
+// be dropped and never be collapsed into one anonymous lump.
+//
+// FEATURE: LOG-127 -- that third step is now narrow. It used to be `derivedNameByIp`: any row
+// sharing an address with ANY known_callers-labelled row inherited that name, with no check on the
+// row's own visitor id or call_source. Live, that painted one QA label onto 210 calls from the
+// regression driver plus 2 other distinct, real, unidentified visitors at John's home address. The
+// corrected rule folds a cookie-less `ui` row into the one browser identity already seen at its
+// exact address+host pair, and only when that pair has EXACTLY ONE distinct visitor id on record.
+// Two or more is precisely the case where donation must not guess, so no entry is recorded for that
+// pair at all and the row stays in its own address-keyed bucket. It never fires for a row that
+// already carries its own (different) visitor id, and never for non-`ui` traffic --
+// regression/script/session-test is not a visit and must never inherit a human name. Strictly
+// narrower than what shipped: it can only ever reduce the set of rows a name applies to.
 function buildIdentityIndex(rows, known, orgs) {
   const nameByVisitor = new Map();
   const nameByIp = new Map();
@@ -733,37 +747,64 @@ function buildIdentityIndex(rows, known, orgs) {
     if (o.org && !orgByIp.has(m)) orgByIp.set(m, o.org);
     if (o.city && !cityByIp.has(m)) cityByIp.set(m, o.city);
   }
-  const derivedNameByIp = new Map();
+  // FEATURE: LOG-127 -- one pass over the rows: every real browser visitor ever seen at each
+  // address+host pair. Only `ui` rows carrying their own visitor id count as evidence of a visit.
+  const uiVisitorsByIpHost = new Map();
   for (const row of rows || []) {
+    if (row?.call_source !== 'ui') continue;
     const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
-    const name = vid ? nameByVisitor.get(vid) : undefined;
-    if (!name) continue;
+    if (!vid) continue;
     const m = ipKeyOf(row);
-    if (m && !derivedNameByIp.has(m)) derivedNameByIp.set(m, name);
+    if (!m) continue;
+    const key = `${m}|${row.request_host || ''}`;
+    let seen = uiVisitorsByIpHost.get(key);
+    if (!seen) { seen = new Set(); uiVisitorsByIpHost.set(key, seen); }
+    seen.add(vid);
   }
-  return { nameByVisitor, nameByIp, derivedNameByIp, orgByIp, cityByIp };
+  // Derived from that, never from a second scan: only the pairs where exactly one visitor was ever
+  // seen. A pair with 2+ distinct visitors gets no entry at all, which is what makes an ambiguous
+  // address structurally unable to resolve to a guess.
+  const soleVisitorByIpHost = new Map();
+  for (const [key, seen] of uiVisitorsByIpHost) {
+    if (seen.size === 1) soleVisitorByIpHost.set(key, [...seen][0]);
+  }
+  return { nameByVisitor, nameByIp, soleVisitorByIpHost, orgByIp, cityByIp };
 }
 
 // One row -> one caller. `key` is the grouping identity, `name` the source-level display name,
 // `label` the caller-level one. Deliberately different: By Source answers "whose traffic is this"
-// (John / Public / Internal QA), By Caller answers "which caller is this" and an anonymous group is
-// named by its org, falling back to its blurred address so two of them can never merge on screen.
+// (a known caller's name / Public / Unattributed -- LOG-127: exactly three, never a fourth split by
+// which host was hit), By Caller answers "which caller is this" and an anonymous group is named by
+// its org, falling back to its blurred address so two of them can never merge on screen.
 function identityForRow(row, idx) {
   const ip = ipKeyOf(row);
   const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
+  const host = row?.request_host || null;
   const org = ip ? idx.orgByIp.get(ip) || null : null;
   const city = ip ? idx.cityByIp.get(ip) || null : null;
-  const labelled = (vid && idx.nameByVisitor.get(vid))
-    || (ip && idx.nameByIp.get(ip))
-    || (ip && idx.derivedNameByIp.get(ip))
-    || null;
-  if (labelled) return { key: `name:${labelled}`, name: labelled, label: labelled, ip, org, city };
+  // Tier 1/2: an explicit known_callers label on THIS row's own visitor id or address always wins.
+  const directLabel = (vid && idx.nameByVisitor.get(vid)) || (ip && idx.nameByIp.get(ip)) || null;
+  if (directLabel) return { key: `name:${directLabel}`, name: directLabel, label: directLabel, ip, org, city };
+  // Tier 3 (LOG-127): this row is genuinely the cookie-not-back-yet gap of ONE real visit -- fold it
+  // into that visit, but only when the address+host has exactly one candidate. Never fires for a row
+  // that already carries its own (different) visitor id, and never for non-'ui' traffic.
+  if (!vid && row?.call_source === 'ui' && ip) {
+    const soleVid = idx.soleVisitorByIpHost.get(`${ip}|${host || ''}`);
+    if (soleVid) {
+      const soleLabel = idx.nameByVisitor.get(soleVid);
+      const name = soleLabel || PUBLIC_CALLER;
+      const key = soleLabel ? `name:${soleLabel}` : `visitor:${soleVid}`;
+      return { key, name, label: name, ip, org, city };
+    }
+  }
   // Unlabelled. A row with neither an address nor a visitor id is a pre-LOG-121 row: there is no
   // fact to attribute it with and none is derivable (§19i -- no backfill), so it says so plainly
   // instead of being guessed at or dropped.
   if (!ip && !vid) return { key: 'unattributed', name: UNATTRIBUTED, label: UNATTRIBUTED, ip: null, org: null, city: null };
-  const host = row?.request_host || null;
-  const name = host === PRODUCTION_HOST ? PUBLIC_CALLER : host ? INTERNAL_CALLER : UNATTRIBUTED;
+  // FEATURE: LOG-127 -- a request carrying SOME host is Public whichever host it hit; only a row
+  // with no host at all stays Unattributed, which is a genuinely different fact (we can't even prove
+  // a real request happened), not a naming choice.
+  const name = host ? PUBLIC_CALLER : UNATTRIBUTED;
   // A visitor id is a real identity even without a name; an address is the fallback grouping.
   return vid
     ? { key: `visitor:${vid}`, name, label: name, ip, org, city }
@@ -785,7 +826,7 @@ function accumulate(bucket, row) {
 
 /**
  * FEATURE: LOG-121 -- By Source: one row per kind of caller. `ui` splits by resolved identity
- * ("UI — John", "UI — Internal (QA)", "UI — Public"), which is the drawer's whole point; every other
+ * ("UI — John", "UI — Public"), which is the drawer's whole point; every other
  * source renders as a single row, and a NULL call_source renders as Unattributed rather than
  * vanishing. Returns [{ source, calls, cost, pctCost, avgCost, lastSeen }].
  */
