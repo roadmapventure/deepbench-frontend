@@ -1,3 +1,8 @@
+// DeepBench v7.0.28 | LiveAgentViewScreen.jsx | LAV-7a-patch -- the meters block becomes a literal 2-row
+// table: ALL four labels on row 1, ALL four values on row 2, each value under its own label. This is the
+// layout John's original wording specified ("header in one line, numbers below them on the 2nd line");
+// LAV-7a's finding that a 2x2 grid of label-above-value tiles can't wrap further was correct, but the fix
+// was this shape, not a width constraint. The standalone Meter tile had no other caller and is removed.
 // DeepBench v7.0.25 | LiveAgentViewScreen.jsx | LAV-7a -- John's round-2 UX pass, part 1 of 3: elapsed
 // time moves off the strip's right end to sit immediately after the mode badge (the live-activity
 // cluster reads left-to-right in one place); the question picker + Run button leave the title block and
@@ -148,23 +153,8 @@ function ModeBadge({ mode, detail }) {
   );
 }
 
-// FEATURE: LAV-1c -- one title-bar meter tile (ported .meters/.m visual). `sup` is the ACTIVE
-// SPANS peak superscript; `unit` the muted trailing unit. A meter with nothing real behind it is
-// handed "—" by its caller and prints exactly that.
-function Meter({ label, value, unit, sup }) {
-  return (
-    <div style={{minWidth:64}}>
-      <div style={{fontFamily:mono,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:T.muted}}>
-        {label}
-      </div>
-      <div style={{fontFamily:mono,fontSize:15,fontWeight:700,color:T.navy,marginTop:2}}>
-        {value}
-        {unit && <span style={{fontSize:10,color:T.muted,fontWeight:500}}> {unit}</span>}
-        {sup && <span style={{fontSize:10,color:T.muted,fontWeight:500}}> peak {sup}</span>}
-      </div>
-    </div>
-  );
-}
+// FEATURE: LAV-7a-patch -- the LAV-1c `Meter` tile (label above value) is deleted here: the meters
+// block is now a literal 2-row table rendered inline, and this file was its only call site.
 
 // FEATURE: LAV-1d -- rgba shades composed from imported tokens, never written as literals
 // (.claude/rules/design-tokens.md). Same helper HarnessTraceConsole.jsx uses.
@@ -631,23 +621,27 @@ export default function LiveAgentViewScreen() {
             </div>
           )}
           {/* FEATURE: LAV-5a -- the four meters, unchanged in what they measure (every tile is still Σ
-              over real ai_activity_log rows or a count over real ledger events), re-laid-out as a 2x2
-              block at the strip's right end so they sit as two lines above the rail. Est. Cost rounds
-              to cents -- John's call; the 4-decimal figure read as noise at this size. */}
-          {/* FEATURE: LAV-7a -- deliberately UNCHANGED, and that is the root-cause finding, not a skip.
-              LAV-7a was asked to add fixed column widths IF a browser/zoom state could wrap this grid
-              from 2 rows to 4. It cannot: this block is a flex item with flexShrink:0, so its flex base
-              size is its max-content width and nothing can compress it; `auto` tracks inside a
-              max-content-sized grid resolve to max-content too, so neither the label nor the value can
-              wrap. A fixed `width` per tile would therefore be a fix for a mechanism that isn't running.
-              What genuinely reads as "4 lines" is the Meter tile itself -- label ABOVE value -- so a 2x2
-              block of them is 4 lines of TEXT in 2 grid rows. Collapsing that means one row of four
-              tiles, which changes the strip's proportions; John's call, not this session's. */}
-          <div style={{display:"grid",gridTemplateColumns:"auto auto",columnGap:18,rowGap:2,flexShrink:0}}>
-            <Meter label="Active Spans" value={activeSpans} sup={peakSpans || null}/>
-            <Meter label="Tokens" value={formatTokens(tokenTotal)} unit="tok"/>
-            <Meter label="Est. Cost" value={costTotal == null ? "—" : `$${costTotal.toFixed(2)}`}/>
-            <Meter label="Agents Engaged" value={agentsEngaged}/>
+              over real ai_activity_log rows or a count over real ledger events), moved out of the title
+              bar to the strip's right end. (Its 2x2 layout is superseded by LAV-7a-patch below.) Est.
+              Cost rounds to cents -- John's call; the 4-decimal figure read as noise at this size. */}
+          {/* FEATURE: LAV-7a-patch -- literal 2-row spec: ALL labels on row 1, ALL values on row 2,
+              each value under its own label. Replaces the 2x2 tile grid (S-LAV-7a correctly found that
+              grid couldn't wrap further -- the fix is this shape, not a width constraint). */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4, auto)",columnGap:16,rowGap:2,flexShrink:0}}>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:T.muted}}>Active Spans</div>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:T.muted}}>Tokens</div>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:T.muted}}>Est. Cost</div>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:T.muted}}>Agents Engaged</div>
+            <div style={{fontFamily:mono,fontSize:15,fontWeight:700,color:T.navy}}>
+              {activeSpans}{peakSpans ? <span style={{fontSize:10,color:T.muted,fontWeight:500}}> peak {peakSpans}</span> : null}
+            </div>
+            <div style={{fontFamily:mono,fontSize:15,fontWeight:700,color:T.navy}}>
+              {formatTokens(tokenTotal)}<span style={{fontSize:10,color:T.muted,fontWeight:500}}> tok</span>
+            </div>
+            <div style={{fontFamily:mono,fontSize:15,fontWeight:700,color:T.navy}}>
+              {costTotal == null ? "—" : `$${costTotal.toFixed(2)}`}
+            </div>
+            <div style={{fontFamily:mono,fontSize:15,fontWeight:700,color:T.navy}}>{agentsEngaged}</div>
           </div>
         </div>
 
