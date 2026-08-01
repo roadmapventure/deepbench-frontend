@@ -1,3 +1,13 @@
+// DeepBench v7.0.30 | AgentNetwork.jsx | LAV-9a -- canvas round 3a: the resting-edge look stops being
+// a spotlight. EVERY edge that has really carried traffic this run stays solid and arrow-animated at
+// the same time, each in its OWN meaning colour (Delegate / Report back / Hand-off / Re-dispatch), so
+// a busy run visibly shows N agents talking at once instead of one line moving while the rest sit
+// static. Words are scarcer than lines: only the 2 most-recently-active edges carry a full-opacity
+// label, the 3rd carries a fading one, older ones carry none. The moment the run ends the motion
+// stops everywhere (motion means "happening right now") and a delegation left genuinely unresolved
+// settles immediately into sessionEdges' own brass Hand-off look instead of being stuck in the
+// in-flight blue forever. Replaces LAV-5b's single `litEdge`, which is deleted here. Nothing invents
+// an edge or a colour: every line's colour is the last real pulse pulsesForHop() emitted on it.
 // DeepBench v7.0.26 | AgentNetwork.jsx | LAV-7b -- canvas round 2b: the legend and the
 // Choreographed/Static toggle move into ONE right-aligned row at the top of the canvas, the freed
 // top-left corner takes a new "Answer" drawer (closed by default -- this screen is about the agent
@@ -277,6 +287,48 @@ export function sessionEdges(hops, runHops, running) {
   }));
 }
 
+// FEATURE: LAV-9a -- an edge is ONE physical line, drawn in the direction its delegation first ran; a
+// report-back travels that SAME line backwards. So activity has to be folded on the pair, not on the
+// direction: `pulsesForHop` emits a report-back as target->dispatcher, which is the reverse of the
+// only key `sessionEdges` ever creates, and keying activity directionally would mean REPORT_COLOR
+// could never reach a rendered line at all. This is the exact direction-agnostic rule LAV-5b's
+// deleted `isLitEdge()` carried inline; it is preserved here as a named key so the fold, the render
+// lookup and the ranking all agree by construction rather than by three matching call sites.
+export function canonicalEdgeKey(from, to) {
+  return from <= to ? edgeKey(from, to) : edgeKey(to, from);
+}
+
+// FEATURE: LAV-9a -- every edge's own last-known meaning colour and how recently it last carried a
+// pulse, folded once over this run's hops. No new imperative pulse-tracking state: the existing
+// pulsesForHop() already knows exactly which hops are real pulses and what colour each one is; this
+// just keeps the LAST one per edge instead of only the single most-recent one across all edges.
+// `order` is the fold index of that edge's last pulse -- ranking by it (descending) is the entire
+// "most recent N" rule below, with no separate timer-based bookkeeping duplicating the ledger.
+export function edgeActivity(runHops) {
+  const colors = new Map();   // canonical key -> meaning colour
+  const order = new Map();    // canonical key -> fold index of its last pulse
+  runHops.forEach((h, i) => {
+    for (const p of pulsesForHop(h, i, runHops.slice(0, i))) {
+      const k = canonicalEdgeKey(p.from, p.to);
+      colors.set(k, p.color);
+      order.set(k, i);
+    }
+  });
+  return { colors, order };
+}
+
+// FEATURE: LAV-9a -- the last-N-labels-visible rule, as a pure rank lookup: the 2 most-recently-
+// active edges get a full-opacity label, the 3rd gets a fading one, anything older gets none. A
+// single named export so the render loop and the Node test both read the exact same tiers.
+export const LABEL_FULL_COUNT = 2;
+export const LABEL_FADE_COUNT = 3;
+export function labelOpacityForRank(rank) {
+  if (rank < 0) return 0;
+  if (rank < LABEL_FULL_COUNT) return 1;
+  if (rank < LABEL_FADE_COUNT) return 0.45;
+  return 0;
+}
+
 // ── layout ───────────────────────────────────────────────────────────────────
 // The home grid is COMPUTED from roster order -- there is no hand-authored position table and no
 // hand-listed agent id anywhere in this file (kickoff SCOPE RULES).
@@ -330,14 +382,6 @@ function ePath(a, b) {
   const len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len, ny = dx / len, c = 18;
   return `M ${a.x} ${a.y} Q ${mx + nx * c} ${my + ny * c} ${b.x} ${b.y}`;
-}
-
-// FEATURE: LAV-5b -- an edge is ONE physical line, drawn in the direction the delegation first ran.
-// A report-back pulse travels that same line backwards, so the lit-line match is direction-agnostic
-// on the pair and nothing wider: a pulse can only ever light the line it actually crossed.
-export function isLitEdge(litEdge, edge) {
-  if (!litEdge?.key || !edge?.key) return false;
-  return litEdge.key === edge.key || litEdge.key === edgeKey(edge.to, edge.from);
 }
 
 // FEATURE: LAV-5b -- where one edge's word sits and how it is turned, so it rides the line rather
@@ -596,6 +640,14 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
   const edges = useMemo(() => sessionEdges(hops, runHops, running), [hops, runHops, running]);
+  // FEATURE: LAV-9a -- what each line has really carried this run, and how recently. Both are pure
+  // folds over runHops, so a re-render can never disagree with the ledger the way the old imperative
+  // single-lit-edge state could. `recentOrder` is most-recent-first; an edge's index in it IS its
+  // rank, which is the whole input to the label tiers.
+  const activity = useMemo(() => edgeActivity(runHops), [runHops]);
+  const recentOrder = useMemo(
+    () => [...activity.order.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k),
+    [activity]);
 
   // FEATURE: LAV-1f -- the human is on stage from the moment a real gate opens until the decision
   // it dispatched has come back. `gate` is the open gate (controls render only for it); `human` is
@@ -686,18 +738,31 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const [visuallyOpenKeys, setVisuallyOpenKeys] = useState(() => new Set());
   useEffect(() => {
     const now = Date.now();
-    setVisuallyOpenKeys(prev => {
-      const next = new Set(prev);
-      for (const k of openEdgeKeys) {
-        if (!openSinceRef.current.has(k)) openSinceRef.current.set(k, now);
-        next.add(k);
-      }
-      return next;
-    });
+    // FEATURE: LAV-9a -- only a LIVE run can put an edge into the visually-open state. Guarding this
+    // on `running` is what makes the settle below final: this updater also writes openSinceRef, and
+    // React runs it during the following render (after the loop below has already run), so without
+    // the guard a key cleared on the terminal pass would be re-added a moment later and stay stuck.
+    if (running) {
+      setVisuallyOpenKeys(prev => {
+        const next = new Set(prev);
+        for (const k of openEdgeKeys) {
+          if (!openSinceRef.current.has(k)) openSinceRef.current.set(k, now);
+          next.add(k);
+        }
+        return next;
+      });
+    }
     const timers = [];
     for (const [k, since] of openSinceRef.current) {
-      if (openEdgeKeys.has(k)) continue;           // still really open -- nothing to schedule
-      const remaining = LOOP_LAP_MS - (now - since);
+      // FEATURE: LAV-9a -- while the run is still going, a key the ledger still calls open has
+      // nothing to schedule (it may yet close for real). Once the run is over, nothing can close it
+      // any further -- every tracked key settles immediately, floor included, so a delegation left
+      // genuinely unresolved at terminal can never get stuck looping past the run that opened it.
+      // Root cause of the stuck arrow: this effect only re-ran when `openEdgeKeys` changed
+      // reference, and once the last hop lands `runHops` stops changing -- so nothing ever fired
+      // again to release it. `running` in the dep array below is what wakes it at terminal.
+      if (openEdgeKeys.has(k) && running) continue;
+      const remaining = running ? LOOP_LAP_MS - (now - since) : 0;
       const clear = () => {
         openSinceRef.current.delete(k);
         setVisuallyOpenKeys(prev => { const n = new Set(prev); n.delete(k); return n; });
@@ -705,16 +770,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
       if (remaining <= 0) clear(); else timers.push(setTimeout(clear, remaining));
     }
     return () => timers.forEach(clearTimeout);
-  }, [openEdgeKeys]);
+  }, [openEdgeKeys, running]);
 
   // ── pulses: one per newly-observed delegation-family hop, on the real pair it crossed ──
   const [pulses, setPulses] = useState([]);
-  // FEATURE: LAV-5b -- the one line left lit by the most recent pulse, `{ key, color }`. A pulse is
-  // over in 900ms, which is too fast to follow; the line it crossed keeps its meaning colour until
-  // the NEXT pulse fires, so at any moment the canvas shows exactly one lit line and exactly one
-  // word. Cleared by the same ledger reset a question_boundary produces. Assembly hops emit no
-  // pulses (pulsesForHop returns [] for them), so they can never light a line.
-  const [litEdge, setLitEdge] = useState(null);
   const seenRef = useRef(0);
   const pulseIdRef = useRef(0);
   useEffect(() => {
@@ -722,23 +781,25 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     // pulse/lit-edge ledger already does. A new question is a new run: an edge left open by the
     // previous one is not open now, and must not keep looping into the next question.
     if (runHops.length < seenRef.current) {
-      seenRef.current = 0; setPulses([]); setLitEdge(null);
+      seenRef.current = 0; setPulses([]);
       openSinceRef.current.clear(); setVisuallyOpenKeys(new Set());
       return;
     }
     if (runHops.length === seenRef.current) return;
+    // FEATURE: LAV-9a -- this effect now drives ONLY the travelling `Pulse` dots (the in-flight
+    // dispatch/return animation). The resting look of every line comes from edgeActivity(), a pure
+    // fold over the same runHops -- so there is no longer any imperative "which line is lit" state
+    // to keep in sync with the ledger, and no batch-ordering rule deciding which single edge wins.
     const fresh = [];
-    let lit = null;
     for (let i = seenRef.current; i < runHops.length; i++) {
       for (const p of pulsesForHop(runHops[i], i, runHops.slice(0, i))) {
         const a = posRef.current[p.from], b = posRef.current[p.to];
         if (!a || !b) continue;
         fresh.push({ id: ++pulseIdRef.current, d: ePath(a, b), color: p.color });
-        lit = { key: edgeKey(p.from, p.to), color: p.color };  // last pulse of the batch wins
       }
     }
     seenRef.current = runHops.length;
-    if (fresh.length) { setPulses(cur => [...cur, ...fresh]); setLitEdge(lit); }
+    if (fresh.length) setPulses(cur => [...cur, ...fresh]);
   }, [runHops]);
 
   const dropPulse = (id) => setPulses(cur => cur.filter(p => p.id !== id));
@@ -877,7 +938,11 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           rendered by the one implementation platform-wide. The empty state is screen chrome (the
           same register as the rail's own empty text), never a stand-in for an agent's words. */}
       <div className="lav-answer">
-        <Drawer title="Answer" defaultOpen={false}>
+        {/* FEATURE: LAV-9a -- a long answer used to grow straight past the canvas: this drawer had no
+            height cap at all. Same props the Agent Routing drawer already uses (MI-34/MI-55) --
+            Drawer applies overflowY:auto itself the moment maxHeight is passed, so this is the
+            existing mechanism, not a new one. */}
+        <Drawer title="Answer" defaultOpen={false} maxHeight={280} resizable>
           {answerQa
             ? <QaEvidenceCard qa={answerQa}/>
             : answerText
@@ -913,35 +978,46 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             </filter>
           </defs>
           <g>
-            {/* FEATURE: LAV-5b -- one edge, one optional word. The lit line takes the meaning colour
-                of the pulse that just crossed it and goes solid; every other edge keeps exactly the
-                LAV-1b resting look. The word comes from EDGE_MEANING_LABEL keyed on the colour
-                actually drawn, so a resting LINK_COLOR edge (not in the map) carries none and the
-                brass hand-off carries "Hand-off" -- no separate branch decides which lines speak. */}
-            {/* FEATURE: LAV-7b -- an edge that is genuinely open takes visual precedence over the
-                lit-edge look for exactly as long as it is open, and hands straight back to LAV-5b's
-                mechanism the moment it closes (past its floor): solid in the delegation colour with a
-                travelling arrowhead, and NO word riding it. A static "Delegate" beside a moving arrow
-                would read as a contradiction -- the motion already says the delegation is in flight,
-                and the word's whole job is to describe a line that has stopped. */}
+            {/* FEATURE: LAV-9a -- no spotlight. EVERY edge this run has really carried traffic on is
+                drawn solid in its OWN last meaning colour, and every one of them is arrow-animated
+                simultaneously while the run is live -- that simultaneity IS the statement "N agents
+                are talking at once", which a single lit line could never make. Motion means
+                "happening right now", so it stops everywhere the moment `running` goes false; the
+                colours stay, because what those lines carried is still true after the run.
+                Words are scarcer than lines: rank 0-1 full, rank 2 fading, older silent, so a busy
+                canvas stays readable instead of stacking a word onto every line. The word itself
+                still comes from EDGE_MEANING_LABEL keyed on the colour actually drawn, so a line
+                with no real pulse this run (LINK_COLOR at rest, not in the map) carries none.
+                An edge that is genuinely still open keeps taking precedence, in the delegation
+                colour with NO word: a static "Delegate" beside a moving arrow would contradict
+                itself -- the motion already says it is in flight, and the word's job is to describe
+                a line that has stopped. */}
             {edges.map(e => {
               const open = visuallyOpenKeys.has(e.key);
-              const lit = !open && isLitEdge(litEdge, e);
-              const stroke = open ? DISPATCH_COLOR : (lit ? litEdge.color : e.color);
-              const label = open ? null : (EDGE_MEANING_LABEL.get(stroke) ?? null);
+              // Direction-agnostic on the pair: a report-back really did cross THIS line, backwards.
+              const ck = canonicalEdgeKey(e.from, e.to);
+              const pulsed = activity.colors.get(ck) || null;
+              const rank = recentOrder.indexOf(ck);
+              const active = rank !== -1;                 // carried a real pulse this run
+              const stroke = open ? DISPATCH_COLOR : (pulsed || e.color);
+              const animated = open || (running && !!pulsed);
+              const arrowColor = open ? DISPATCH_COLOR : pulsed;
+              const labelOpacity = labelOpacityForRank(rank);
+              const label = open || !active ? null : (EDGE_MEANING_LABEL.get(pulsed) ?? null);
               const a = posRef.current[e.from] || home[e.from];
               const b = posRef.current[e.to] || home[e.to];
               return (
                 <g key={e.key}>
                   <path ref={el => { edgeRefs.current[e.key] = el; }} d={ePath(a, b)}
-                    fill="none" stroke={stroke} strokeWidth={(open || lit || e.handoff) ? 2.2 : 1.6}
-                    strokeDasharray={(open || lit) ? undefined : "2 7"} strokeLinecap="round"
-                    opacity={(open || lit) ? 1 : 0.9}/>
-                  {open && <LoopingArrow d={ePath(a, b)} color={DISPATCH_COLOR}/>}
+                    fill="none" stroke={stroke} strokeWidth={(animated || active || e.handoff) ? 2.2 : 1.6}
+                    strokeDasharray={(animated || active) ? undefined : "2 7"} strokeLinecap="round"
+                    opacity={(animated || active) ? 1 : 0.9}/>
+                  {animated && <LoopingArrow d={ePath(a, b)} color={arrowColor}/>}
                   {label && (
                     <text ref={el => { labelRefs.current[e.key] = el; }}
                       transform={edgeLabelTransform(a, b) || undefined} textAnchor="middle" dy="-5"
-                      style={{ fontFamily: body, fontSize: 9.5, fill: T.muted }}>{label}</text>
+                      style={{ fontFamily: body, fontSize: 9.5, fill: T.muted, opacity: labelOpacity,
+                        transition: "opacity .8s" }}>{label}</text>
                   )}
                 </g>
               );
