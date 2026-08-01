@@ -206,6 +206,13 @@ export function edgeKey(from, to) { return `${from}>${to}`; }
 
 export function deriveNetwork(runHops) {
   const engaged = [];            // first-engagement order (sequential truth -- one agent at a time)
+  // FEATURE: LAV-9b-patch -- `engaged` (widened by LAV-9b) now means "on stage" -- true the instant an
+  // agent is named as a delegation target, before it has said anything. `selfEngaged` is the narrower,
+  // pre-LAV-9b meaning -- "has a hop really credited to its own id" -- kept separately so `done` below
+  // can still test the ORIGINAL condition instead of inheriting the widened one. Without this, a
+  // freshly-addressed-but-silent agent (in `engaged`, not `activeId`, not an orchestrator) fell into
+  // `done` and wore the finished-look moss border before it had done anything.
+  const selfEngaged = new Set();
   const bubbles = {};            // agentId -> its latest activity text this run
   const openByTarget = new Map();// targetId -> dispatcherId, while that delegation is unreturned
   const finished = new Set();    // agents whose hop completed this run
@@ -224,6 +231,7 @@ export function deriveNetwork(runHops) {
     const assembly = isAssemblyHop(h);
     if (id) {
       if (!engaged.includes(id)) engaged.push(id);
+      selfEngaged.add(id);
       // An assembly frame carries the hook's own composed `message` in data, which is plumbing
       // wording -- the canvas speaks the approved copy instead, built from the same real fields.
       const text = assembly
@@ -258,7 +266,7 @@ export function deriveNetwork(runHops) {
   }
 
   const orchestrators = new Set([...openByTarget.values()]);
-  const done = new Set([...engaged, ...finished].filter(a => a !== activeId && !orchestrators.has(a)));
+  const done = new Set([...selfEngaged, ...finished].filter(a => a !== activeId && !orchestrators.has(a)));
   // FEATURE: AA-179b -- who renders in the assembly tint: anyone holding an open step, plus the
   // agent whose OWN latest hop was an assembly frame. The second half is what gives a
   // completion-only frame (every fetch -- they emit no start) the standard short active window the
