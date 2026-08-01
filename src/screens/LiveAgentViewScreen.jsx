@@ -1,3 +1,10 @@
+// DeepBench v7.0.29 | LiveAgentViewScreen.jsx | LAV-8 -- the LAV screen now offers exactly the 3
+// highest-movement questions (by id, from the shared chiQuestions.js exports, in this fixed order):
+// upgrade-cycles (ROTATING_POOL), south-korea-coop, vietnam-reseller (both FIXED_DRAWER_TAIL). Picked
+// by John (2026-08-01) from measured durable_hops/ai_activity_log movement across all 23 CHI questions
+// -- deepest chains, most agents on screen, most consistent mover. The CHI screen and chiQuestions.js
+// itself are untouched; this file's picker/onRun already consumed a flat {id,label} list, so no
+// rotation/drawer degrade logic was needed here.
 // DeepBench v7.0.28 | LiveAgentViewScreen.jsx | LAV-7a-patch -- the meters block becomes a literal 2-row
 // table: ALL four labels on row 1, ALL four values on row 2, each value under its own label. This is the
 // layout John's original wording specified ("header in one line, numbers below them on the 2nd line");
@@ -61,7 +68,7 @@ import {
   groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT,
 } from "./MarketIntelligenceScreen.jsx";
 import AgentNetwork from "../components/AgentNetwork.jsx";
-import { STATIC_QUESTION, ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
+import { ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 import { supabase } from "../lib/supabase.js";
 // FEATURE: LAV-1c -- the EST. COST meter's sumCost() delegates row-by-row to computeCallCost()
 // (AA-181, useAIActivity.js), the platform's single pricing source. No local pricing lives here.
@@ -86,7 +93,17 @@ const PAGE_TITLE = "Live Multi-Agent Routing";
 const PAGE_SUBTITLE = "Harness, Loop, Pattern Behavior Display";
 const PICKER_PLACEHOLDER = "Choose a question and watch the agents work…";
 
-const ALL_QUESTIONS = [STATIC_QUESTION, ...ROTATING_POOL, ...FIXED_DRAWER_TAIL];
+// FEATURE: LAV-8 -- exactly the 3 highest-movement questions, in this order, looked up by id against
+// the shared exports (never copied label strings, so a future label edit in chiQuestions.js still
+// propagates here with no change needed). upgrade-cycles lives in ROTATING_POOL; south-korea-coop and
+// vietnam-reseller live in FIXED_DRAWER_TAIL -- both source arrays are searched, order is driven by
+// LAV_QUESTION_IDS alone. The CHI screen's own ALL_QUESTIONS-equivalent (MarketIntelligenceScreen.jsx)
+// is untouched and keeps all 23.
+const LAV_QUESTION_IDS = ["upgrade-cycles", "south-korea-coop", "vietnam-reseller"];
+const LAV_QUESTION_SOURCE = [...ROTATING_POOL, ...FIXED_DRAWER_TAIL];
+const ALL_QUESTIONS = LAV_QUESTION_IDS
+  .map(id => LAV_QUESTION_SOURCE.find(q => q.id === id))
+  .filter(Boolean);
 
 // FEATURE: LAV-1c -- the real ai_activity_log columns this screen reads, verified fresh against
 // lib/activity-log.js's writer (~L75-96). Explicit list, not `*`: this is a 3-second poll on a
