@@ -1,3 +1,14 @@
+// DeepBench v7.0.35 | AgentNetwork.jsx | LAV-10 -- the moment orchestration STARTS now declares itself.
+// Until now an agent holding open delegations only got a different border/ring (is-orch) -- the same
+// visual weight as every other card, with no announcement. On the rising edge of deriveNetwork's own
+// `orchestrators` set (an agent that is NEWLY holding an open delegation, not one still holding one)
+// a one-shot burst fires: a canvas-wide radial flash immediately, then ~150ms later -- while that
+// flash is still fading, so the two read as one event -- the orchestrator's own card ripples, then
+// each of its currently-engaged delegates in the order they joined, staggered ~100ms apart. That
+// stagger IS the statement "one agent's loop requires all N of these agents at once", the same thing
+// LAV-9a said with edges, said here with nodes. No new event type, no invented state, no new colour
+// (BURST_COLOR is the exact token is-orch's own spin ring already means), and no spatial change:
+// cards stay exactly where they already sit -- light and motion only, one shot, never persistent.
 // DeepBench v7.0.31 | AgentNetwork.jsx | LAV-9b -- node/queue behaviour round 3b: an agent named as a
 // delegation target joins the canvas at the moment it is ADDRESSED, not only once it has produced a
 // credited hop of its own -- which is the single root cause behind a live line pointing at a card
@@ -95,6 +106,15 @@ const PATTERN_SETTLE_MS = 2500;
 // than two. Module scope because both LoopingArrow and the component's floor effect read it, and it
 // must be exactly one value.
 const LOOP_LAP_MS = 900;
+// FEATURE: LAV-10 -- one-shot orchestration-start burst. BURST_COLOR reuses the exact token
+// is-orch's own spin ring already means (~L607) -- this is more of that same signal, not a new one.
+// CASCADE_GAP is deliberately shorter than CANVAS_MS so the canvas flash is still fading when the
+// contributor cascade starts -- the two read as one connected event, not two.
+export const BURST_COLOR = ACTION_TEXT_COLORS_FETCH.CLICK;
+const BURST_CANVAS_MS = 450;
+const BURST_CASCADE_GAP_MS = 150;
+const BURST_STAGGER_MS = 100;
+const BURST_RIPPLE_MS = 500;
 // Choreography anchors, ported verbatim from the prototype's computeTargets().
 const LEAD = { x: 270, y: 305 }, MID = { x: 560, y: 305 }, STACKX = 1098;
 // FEATURE: LAV-9b -- widened ~17% so adjacent kids on the arc keep more chord distance between
@@ -595,6 +615,25 @@ const NET_CSS = `
 .lav-node.is-orch .lav-spin{opacity:1;animation:spin 6s linear infinite}
 .lav-node.is-orch .lav-card{border-color:${ACTION_TEXT_COLORS_FETCH.CLICK};
   box-shadow:0 12px 30px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.35)},0 0 0 3px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.2)}}
+/* FEATURE: LAV-10 -- the canvas-wide flash, a radial wash that fades in and out once. Lives inside
+   .lav-inner (clipped to the 1200x640 canvas itself), so it never covers the Answer drawer/legend/
+   toggle, which sit outside .lav-stage entirely. */
+@keyframes lavOrchFlash{0%{opacity:0}18%{opacity:.55}100%{opacity:0}}
+.lav-orch-flash{position:absolute;inset:0;pointer-events:none;z-index:10;
+  background:radial-gradient(circle at 50% 50%, ${rgba(BURST_COLOR, 0.55)}, transparent 70%);
+  animation:lavOrchFlash ${BURST_CANVAS_MS}ms ease-out}
+/* FEATURE: LAV-10 -- one contributor's own one-shot ripple, brighter/faster than is-active's
+   continuous lavRipple. MUST come after .is-active/.is-assembly's own .lav-ring rules above in
+   source order: CSS does not merge two matching rules' animation shorthand, the later one in the
+   stylesheet wins outright, and a contributor mid-burst can carry is-active/is-assembly/is-orch at
+   the same time as is-orch-burst. NOTE this whole block lives inside a JS template literal, so a
+   backtick in a CSS comment here would end the string -- keep this comment backtick-free. The
+   "both" fill-mode holds the 0% state during each node's own
+   animation-delay, so a later contributor in the cascade stays invisible until its turn instead of
+   flashing early. */
+@keyframes lavOrchBurstRipple{0%{opacity:0;transform:scale(.5)}15%{opacity:.9}100%{opacity:0;transform:scale(2.6)}}
+.lav-node.is-orch-burst .lav-ring{border-color:${BURST_COLOR};border-width:3px;
+  animation:lavOrchBurstRipple ${BURST_RIPPLE_MS}ms ease-out both}
 .lav-node.is-benched{transform:translate(-50%,-50%) scale(.56);opacity:.62;filter:saturate(.7);z-index:1}
 .lav-node.is-benched .lav-card{box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
 .lav-node.is-benched .lav-bubble{display:none}
@@ -839,6 +878,44 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
 
   const dropPulse = (id) => setPulses(cur => cur.filter(p => p.id !== id));
 
+  // ── FEATURE: LAV-10 -- the orchestration-start burst ────────────────────────
+  // Rising-edge detection on deriveNetwork's own `orchestrators` set: no new event type, no
+  // invented state. `knownOrchestratorsRef` is everyone already seen orchestrating THIS run;
+  // anyone in `net.orchestrators` not yet in it just started, which is the one moment this burst is
+  // for -- not every render while it continues. Resets on the same runHops-length-shrink signal
+  // every other run-scoped ledger in this file already uses for "a new question started" (see the
+  // pulses effect above).
+  const knownOrchestratorsRef = useRef(new Set());
+  const burstLenRef = useRef(0);
+  const burstKeyRef = useRef(0);
+  const burstTimerRef = useRef(null);
+  const [burst, setBurst] = useState(null); // { contributors: string[], key: number } | null
+  useEffect(() => {
+    if (runHops.length < burstLenRef.current) knownOrchestratorsRef.current = new Set();
+    burstLenRef.current = runHops.length;
+
+    const fresh = [...net.orchestrators].filter(id => !knownOrchestratorsRef.current.has(id));
+    net.orchestrators.forEach(id => knownOrchestratorsRef.current.add(id));
+    if (!fresh.length) return;
+
+    // Contributors: the newest orchestrator, then whichever currently-engaged agents are its arc
+    // "kids" right now -- computeTargets already treats every engaged id except the lead as one arc
+    // (~L403), so this reuses that exact set instead of inventing a parallel notion of "who's
+    // involved." If two agents somehow both start orchestrating in the same tick (the ledger
+    // doesn't rule it out), the last of the batch is the one this fires for -- the same last-wins
+    // convention this file already uses for a batch of pulses.
+    const orchestratorId = fresh[fresh.length - 1];
+    const kids = net.engaged.filter(id => id !== orchestratorId);
+    const contributors = [orchestratorId, ...kids];
+
+    if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+    burstKeyRef.current += 1;
+    setBurst({ contributors, key: burstKeyRef.current });
+    const totalMs = BURST_CASCADE_GAP_MS + contributors.length * BURST_STAGGER_MS + BURST_RIPPLE_MS;
+    burstTimerRef.current = setTimeout(() => setBurst(null), totalMs);
+  }, [net, runHops.length]);
+  useEffect(() => () => { if (burstTimerRef.current) clearTimeout(burstTimerRef.current); }, []);
+
   // ── LAV-1f: the two real hand-offs a gate produces, one pulse each, never repeated ──────────
   // Both use the report-back colour: control genuinely changes hands here (agent -> human, then
   // human -> agent), which is the same meaning REPORT_COLOR already carries on the legend -- not a
@@ -1075,6 +1152,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
             else if (running && net.activeId === a.id) cls.push("is-active");
             else if (net.done.has(a.id)) cls.push("is-done");
+            // FEATURE: LAV-10 -- additive, not exclusive with the state classes above: a card can be
+            // is-active/is-orch AND is-orch-burst at once while its cascade turn plays.
+            const burstIdx = burst ? burst.contributors.indexOf(a.id) : -1;
+            if (burstIdx !== -1) cls.push("is-orch-burst");
             // FEATURE: LAV-9b -- the bubble is gated on THIS agent currently carrying one of the
             // three pulsing states above (is-orch / is-assembly / is-active), not on the whole run
             // merely being live. Previously any agent that had ever produced text kept showing it
@@ -1097,7 +1178,12 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                 <div className={`lav-bubble${down ? " down" : ""}${bubble ? " show" : ""}`}>{bubble || ""}</div>
                 <div className="lav-card">
                   <div className="lav-spin"/>
-                  <div className="lav-ring"/>
+                  {/* FEATURE: LAV-10 -- this contributor's own place in the cascade, expressed as
+                      the one-shot ripple's start delay. Nothing else about the ring changes. */}
+                  <div className="lav-ring"
+                    style={burstIdx !== -1
+                      ? { animationDelay: `${BURST_CASCADE_GAP_MS + burstIdx * BURST_STAGGER_MS}ms` }
+                      : undefined}/>
                   {/* FEATURE: LAV-5b -- the family name, so the tag stays clear of the avatar; the
                       full id is one hover away. The overflow/ellipsis rule above stays as the safety
                       net for an id that doesn't parse and therefore renders verbatim. */}
@@ -1146,6 +1232,9 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             </div>
           )}
         </div>
+        {/* FEATURE: LAV-10 -- keyed so React remounts it (restarting the CSS animation) every time a
+            new orchestration starts, even if one is still finishing. */}
+        {burst && <div key={`lav-orch-flash-${burst.key}`} className="lav-orch-flash"/>}
       </div></div>
     </div>
   );
