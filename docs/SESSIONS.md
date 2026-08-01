@@ -6359,9 +6359,9 @@ Recorded because this cost two QA cycles and produced one false "the fix didn't 
 
 **0728b — regression-first strategy (John's ruling).** John's call, recorded above bucket 1's table in `docs/BETA.md`: no bucket-1 fix sessions until the `SES-29` run produces its failure list — the 16 rows are suspects, not a queue, because most failure rates predate `HAR-17`-done's auto-recovery (v6.3.181–183). Expectation set explicitly: the first run will not be clean (`LOO-013`'s case-24 misroute is structural); that is the diagnosis working.
 
-**0728c — bucket-2 source verification (John suspected staleness; he was right).** All 20 bucket-2 rows re-traced through current source + live Supabase via 4 read-only sub-agents. Results, all recorded in `BETA.md` §3 bucket 2: **12 confirmed still valid** (each now with current file:line evidence); **4 likely already fixed with rows never updated** — `CHI-29` (ScrollFadeHint shipped), `CHI-26` (duplicate status strip removed), `CHI-28` (header already "Focus Area Audit"), `AA-161` (`intelligence-review-format.max_tokens` already 3000 in Supabase — the row's named root cause); **1 effective duplicate** — `LOO-26` → `CHI-87` (chat-path trigger already seeded by `c6ccdf7`; merge proposed, awaiting John); **4 live-only** — `CHI-19` (weakened: `ci-answer-intent` now instructs entity naming — confirmed in Supabase), `CHI-83`, `CHI-22`, `CHI-62` (escalate path has zero traversals ever in `durable_hops`). Supabase facts verified directly this session, not from rows: `max_tokens` 3000, the `high/medium/low` vs `sourced/inferred/synthesized/na` confidence-vocabulary mismatch (`MI-70` confirmed real), zero escalate hops.
+**0728c — bucket-2 source verification (John suspected staleness; he was right).** All 20 bucket-2 rows re-traced through current source + live Supabase via 4 read-only sub-agents. Results, all recorded in `BETA-TRIAGE.md` §3 bucket 2: **12 confirmed still valid** (each now with current file:line evidence); **4 likely already fixed with rows never updated** — `CHI-29` (ScrollFadeHint shipped), `CHI-26` (duplicate status strip removed), `CHI-28` (header already "Focus Area Audit"), `AA-161` (`intelligence-review-format.max_tokens` already 3000 in Supabase — the row's named root cause); **1 effective duplicate** — `LOO-26` → `CHI-87` (chat-path trigger already seeded by `c6ccdf7`; merge proposed, awaiting John); **4 live-only** — `CHI-19` (weakened: `ci-answer-intent` now instructs entity naming — confirmed in Supabase), `CHI-83`, `CHI-22`, `CHI-62` (escalate path has zero traversals ever in `durable_hops`). Supabase facts verified directly this session, not from rows: `max_tokens` 3000, the `high/medium/low` vs `sourced/inferred/synthesized/na` confidence-vocabulary mismatch (`MI-70` confirmed real), zero escalate hops.
 
-**0728d — persistence of the above.** Verify-then-close annotations written onto the 4 likely-fixed `FEATURES.md` rows + the `LOO-26` duplicate note (so no session starts a fix from a stale claim); `BETA.md` §8 gains open item 5: source-verify buckets 4/5 before scheduling from them — bucket 2's measured staleness was 25% (4 fixed + 1 dup of 20), all dead the same way: **a session fixed the thing and never updated the row** (the `SES-27` (Architecture) drift class, now with a measured rate).
+**0728d — persistence of the above.** Verify-then-close annotations written onto the 4 likely-fixed `FEATURES.md` rows + the `LOO-26` duplicate note (so no session starts a fix from a stale claim); `BETA-TRIAGE.md` §8 gains open item 5: source-verify buckets 4/5 before scheduling from them — bucket 2's measured staleness was 25% (4 fixed + 1 dup of 20), all dead the same way: **a session fixed the thing and never updated the row** (the `SES-27` (Architecture) drift class, now with a measured rate).
 
 **Close-out:** docs touched across the three passes: `docs/BETA.md`, `docs/FEATURES.md` (5 row annotations), `docs/SESSIONS.md` (this entry). No `CLAUDE-STATE.md` window change (the parent `beta-doc-0728` entry stands for the whole conversation). Inflight markers removed per pass.
 
@@ -6369,7 +6369,7 @@ Recorded because this cost two QA cycles and produced one false "the fix didn't 
 
 ## beta-doc-0728e — Bucket-4 (AI Audit accuracy) staleness sweep (2026-07-28 late evening, addendum to beta-doc-0728, docs-only, no version bump)
 
-**John's ask, same conversation:** sweep bucket 4 the way bucket 2 was swept. All 15 rows re-traced through current source (4 read-only sub-agents) + live Supabase (direct SQL). Results recorded in `docs/BETA.md` §3 bucket 4 and as row annotations in `FEATURES.md`/`FEATURES-NEXT.md`.
+**John's ask, same conversation:** sweep bucket 4 the way bucket 2 was swept. All 15 rows re-traced through current source (4 read-only sub-agents) + live Supabase (direct SQL). Results recorded in `docs/BETA-TRIAGE.md` §3 bucket 4 and as row annotations in `FEATURES.md`/`FEATURES-NEXT.md`.
 
 **Confirmed (8), one escalated:** `LOG-91` — the agent-turn/request-receivable double-write is ACTIVE, 1,186 new pairs in 24 h (4,291 total by trace-pairing; the row's own naive same-timestamp key finds zero — the pairing is by trace, a measurement-method note worth keeping). `LOG-81` confirmed at scale (~5,800 zero-token rows: librarian 2,404, agent-directory 1,734, agent-turn 1,439 — the last being LOG-91's other halves; LOG-91 + LOG-81 + LOG-60's denominator = one counting conversation with John). False-`rag` family (`LOG-42`/`63`/`59`/`53`) all write sites live, 380 false-tagged agent-selection rows in the last 7 days; write-time pattern stamping runs parallel to §19k, never replaced (LOG-65's own text confirms). `LOG-102` (unblocked — its "after LOG-99" gate cleared today), `LOG-106`, `LOG-104`, `LOG-82`, `CHI-15` (near-dup of `CHI-67`, merge proposed — second cross-row dup found today after LOO-26→CHI-87).
 
@@ -6429,7 +6429,7 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 
 ## beta-doc-0728g — Bucket-5 (Agent Routing drawer) staleness sweep (2026-07-28 night, addendum to beta-doc-0728, docs-only, no version bump)
 
-**Last unswept bucket — every beta queue now carries verified-current evidence.** All 13 rows re-traced through current source (3 read-only sub-agents) + live Supabase. Recorded in `docs/BETA.md` §3 bucket 5 + row annotations.
+**Last unswept bucket — every beta queue now carries verified-current evidence.** All 13 rows re-traced through current source (3 read-only sub-agents) + live Supabase. Recorded in `docs/BETA-TRIAGE.md` §3 bucket 5 + row annotations.
 
 **Confirmed (9):** `LOG-71` (resume paths pass no `signatureConfig` — and `LOG-103` verified as its DUPLICATE, observed-row side; merge proposed), `LOG-72` (quantified: 27 vocabulary entries, only 9 with criteria — 16 active patterns can't match; headline MISSING SIGNAL already resolved by LOG-77-item-9), `LOG-39` (shrunk — fact half exists via `tool_calls`; remaining = Layer B criteria row), `LOO-005` (LOG-77-9's provenance capture is facts-only, reasoning still uncaptured), `LOO-003` (`delegation_task` scalar clobber), `CHI-17`, `CHI-24` (`replaces.key` written, never read), `CHI-64` — **shared-root CONFIRMED with `CHI-87` + `LOO-26`: one bug (unseeded `lastEventAtRef` on mount-path `fetchNewsCards`), three rows, two buckets; one fix closes all three**, `CHI-11` (re-anchored to the `ai_call_patterns` view; `AI-52` folds in — its verification ran: both hyp intents uniformly `["rag","structured-output"]`, 190+ rows).
 
@@ -6445,7 +6445,7 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 
 **John's ask: promote the bonus to bucket 6 and verify its levers.** Metric grounded first (per the interrogate-the-metric discipline): `ai_pattern_reclassification_count` = log rows with NO `ai_call_patterns` match — signature-classification coverage, not legacy naming. Live: **20,727** of 24,689 rows (4,538 classified).
 
-**Headline finding — the old lever list aimed at the wrong metric.** `LOG-45`/`LOG-46`/`LOG-47`/`LOG-44` (slug renames/destinations) move NONE of this count; they remain label-honesty backlog but are out of bucket 6. The real structure: **6,818 rows have no `call_facts` — honestly unclassifiable forever (§19k no-backfill), so the floor is ~6.8K**; the other **13,909 carry signature material and fail only for lack of matching criteria** (only 9 of 27 vocabulary entries have criteria). Verified levers: (1) criteria authoring through Susan Smith — Trainer's governed path against the top facts-bearing populations (`agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753 — top-6 = 12,776, landing the count ~7,951, under goal); (2) `LOG-71` resume config fix stops pool growth; (3) the bucket-4 counting conversation can legitimately drop the floor further (librarian/agent-directory facts-less ops); (4) minor: `LOG-73`/`LOG-77`/`LOG-55`. Recorded as `docs/BETA.md` §5 (Bucket 6). Ship rule unchanged — bonus starts after the five gates are green.
+**Headline finding — the old lever list aimed at the wrong metric.** `LOG-45`/`LOG-46`/`LOG-47`/`LOG-44` (slug renames/destinations) move NONE of this count; they remain label-honesty backlog but are out of bucket 6. The real structure: **6,818 rows have no `call_facts` — honestly unclassifiable forever (§19k no-backfill), so the floor is ~6.8K**; the other **13,909 carry signature material and fail only for lack of matching criteria** (only 9 of 27 vocabulary entries have criteria). Verified levers: (1) criteria authoring through Susan Smith — Trainer's governed path against the top facts-bearing populations (`agent-turn` 6,720, `guardrails-check` 2,209, `channel-intelligence` 1,459, `screen-controls` 828, `project-manager` 807, `quality-gate` 753 — top-6 = 12,776, landing the count ~7,951, under goal); (2) `LOG-71` resume config fix stops pool growth; (3) the bucket-4 counting conversation can legitimately drop the floor further (librarian/agent-directory facts-less ops); (4) minor: `LOG-73`/`LOG-77`/`LOG-55`. Recorded as `docs/BETA-TRIAGE.md` §5 (Bucket 6). Ship rule unchanged — bonus starts after the five gates are green.
 
 **Close-out:** docs touched: `docs/BETA.md`, `docs/SESSIONS.md`. Inflight marker removed in close-out commit.
 
@@ -6553,7 +6553,7 @@ John approved a pre-regression prep list, now `docs/BETA.md` §2b: `SES-28` (vac
 
 **The defect, in one sentence.** `LOG-67` froze the §19k config-half onto every agent-turn row at write time, but only `runCapability()` ever supplied it — so any hop that resumed after a checkpoint logged a fact-half-only row that no config-half criterion could ever match.
 
-**Root cause, read fresh.** `resumeCapability()` re-enters `runLoop()` at **three** sites (`execute.js` 1289 / 1326 / 1343). The `LOG-71` row and `BETA.md` §3 bucket 5 both said "both resume re-entries" — that was wrong, and fixing only two would have left the post-dispatch continuation broken. `durable_hops` had no `signature_config` column (verified against `information_schema`, 29 columns), so `resumeCapability()` — which rebuilds its entire world from that one row — had nothing to pass.
+**Root cause, read fresh.** `resumeCapability()` re-enters `runLoop()` at **three** sites (`execute.js` 1289 / 1326 / 1343). The `LOG-71` row and `BETA-TRIAGE.md` §3 bucket 5 both said "both resume re-entries" — that was wrong, and fixing only two would have left the post-dispatch continuation broken. `durable_hops` had no `signature_config` column (verified against `information_schema`, 29 columns), so `resumeCapability()` — which rebuilds its entire world from that one row — had nothing to pass.
 
 **Quantified before deciding anything.** Of 1,979 `agent-turn` rows written on/after 2026-07-26 (fully post-`LOG-67`-deploy), **221 (11.2%) carried a fact-half with no config-half, and 214 of those (97%) had a `span_id` matching a `durable_hops` row.** The control is what makes it causal rather than correlated: among the *healthy* config-bearing rows, only **17%** span-match a durable row. Seven rows were left unexplained and stated as such.
 
@@ -6846,7 +6846,7 @@ Caught by John immediately after the kickoff was pushed, from a one-line compreh
 
 **Answer given: no to the comparison, yes to the goal.** The 0/24 run failed on **Owen — Proofreader's live judge verdicts** (all 24 artifacts failed ≥1 of 4 content criteria). Those are model judgments on prose that does not exist until the run generates it — no ticket-closure list predicts them, so any "preliminary guess" from a paper diff would have been an invented correlation presented as analysis. The cheaper and strictly stronger instrument was already in the repo: `scripts/chi-true-regression.mjs --only <case>`. **The goal was right; the mechanism was the weak part.** Named **"pre-regression check"** at John's instruction (2026-07-29) — not "probe".
 
-**Method — 3 cases, one per failure class from the 0/24 run**, rather than 3 cheap or 3 adjacent ones: case 9 `vitrine-tech` (write-denial class), case 6 `upgrade-cycles` (`[object Object]` class, *and* the `edit` resolution `SES-31a` verified only on `accept`), case 12 `vietnam-reseller` (hollow-answer class). `smartphone-growth` deliberately excluded — already known to pass post-`SES-31a`, so re-running it would have produced a reassuring result with zero information. Full table, timings, and criteria breakdown: `docs/BETA.md` §3 bucket 1.
+**Method — 3 cases, one per failure class from the 0/24 run**, rather than 3 cheap or 3 adjacent ones: case 9 `vitrine-tech` (write-denial class), case 6 `upgrade-cycles` (`[object Object]` class, *and* the `edit` resolution `SES-31a` verified only on `accept`), case 12 `vietnam-reseller` (hollow-answer class). `smartphone-growth` deliberately excluded — already known to pass post-`SES-31a`, so re-running it would have produced a reassuring result with zero information. Full table, timings, and criteria breakdown: `docs/BETA-TRIAGE.md` §3 bucket 1.
 
 **Result: 1 PASS / 2 FAIL in 9 min** (vs 2 h 2 m for 24 cases). **Neither of the two mechanical classes reproduced** — zero write denials, zero `[object Object]`, zero infra deaths. Both previously-crashing cases ran start-to-finish and emitted real quantitative business content. Of the 4 failing artifacts, **all 4 failed `platform_language_detected` and 3 failed nothing else.**
 
@@ -6868,7 +6868,7 @@ Caught by John immediately after the kickoff was pushed, from a one-line compreh
 
 **John's ask:** *"i have completed a lot of tickets. they created a lot more tickets. you were going to pre-test regression and see where we are. do i still run that test?"* — 26 commits had landed on `dev` since round 1.
 
-**Answer: yes, and it ran here rather than being handed back.** Same 3 cases plus **case 24** (`news-first-card`), added because `CHI-92`/`SES-57`/`SES-62` had just made #24 able to reach a verdict for the first time — and it is the first surface an Apple reviewer touches. **2 PASS / 2 FAIL in 16 min** (round 1: 1 PASS / 2 FAIL). Per-case table: `docs/BETA.md` §3 bucket 1.
+**Answer: yes, and it ran here rather than being handed back.** Same 3 cases plus **case 24** (`news-first-card`), added because `CHI-92`/`SES-57`/`SES-62` had just made #24 able to reach a verdict for the first time — and it is the first surface an Apple reviewer touches. **2 PASS / 2 FAIL in 16 min** (round 1: 1 PASS / 2 FAIL). Per-case table: `docs/BETA-TRIAGE.md` §3 bucket 1.
 
 **The headline result — `AGT-44` verified by a session that did not fix it.** `platform_language_detected` went from **4 failing artifacts to 0** on the deployed build. Case 9's `theory_test` and `forecast_draft` both flipped to pass; case 6's `theory_test` flipped to pass. This is the check the fixing session structurally could not perform on itself, and it is why the pre-regression check is worth keeping as a separate step rather than folding into each fix session's own QA. **`AGT-44` also chose the right shape** — one shared Guardrails Skill carrying the standard to every artifact-producing agent, zero code — instead of the third instruction wording the `AGT-37`/`DAT-7` history warned against.
 
@@ -6916,7 +6916,7 @@ Caught by John immediately after the kickoff was pushed, from a one-line compreh
 
 **John's ask:** *"i have finished the 3 tickets. do you pre-test again?"* — `AGT-47`, `SES-65`, `DAT-16`.
 
-**Result: 1 PASS / 3 FAIL in 29 min** (round 2: 2 PASS / 2 FAIL in 16 min). Per-case table and deploy reasoning: `docs/BETA.md` §3 bucket 1.
+**Result: 1 PASS / 3 FAIL in 29 min** (round 2: 2 PASS / 2 FAIL in 16 min). Per-case table and deploy reasoning: `docs/BETA-TRIAGE.md` §3 bucket 1.
 
 **Both in-scope fixes are confirmed working.** `AGT-47` took case 6 `upgrade-cycles` — the longest journey in the set — from FAIL to a clean PASS on both artifacts. `DAT-16` Part 1 is confirmed: case 9's `answer` artifact now passes. That is real, measured progress on the two hardest items of the morning.
 
@@ -7021,3 +7021,115 @@ The independent tiebreaker this session tried to buy — its own case-6 run with
 **Live QA (deploy gate PASSED, serving `56935bd`):** case 6 `upgrade-cycles` full run — `REPORT_JSON.trace_ids` = **10 vs 8** on every pre-fix run; the 2 new ids (`9764d277…`, `df63501b…`) verified in `ai_activity_log` as exactly the draft and edit re-draft `data-analysis:data-patch-intent` chains. Journey terminal `edit_then_accept`, both artifacts pass Owen Marsh — The Proofreader. `SES-67` ✅ closed.
 
 **The QA run's `case_pass: false` became `HAR-30` (Task Success Rate, bucket 1):** `journey_deviation (expected forecast, got direct)`. Attribution by deterministic A/B rather than assertion — 3 direct `ci-routing-intent` calls per arm, same live Skill data: pre-`HAR-02b` deployment (`d8162a0`) → `forecast` 3/3; `HAR-02b` window without `SES-67`'s commit (`d76cc79`) → `qa` 3/3; tip → `qa` 3/3. Both `HAR-02b` patch commits are test-file-only, so the flip is `5f051f3` itself (stable-first reorder, `db-assembly.js`/`ai-enrichment.js`/`execute.js`). Same failure shape `AGT-44`/`AGT-54` closed, new mechanism (section *order*, not Skill delivery). Filed to the in-flight `HAR-02` chain (part 2/3) to root-cause before part 3 closes — not fixed blind here, and `S-HAR-02b` was not reverted (John's call to make).
+
+---
+
+## STANDARDS.md narrative moved 2026-08-01 (SES-68)
+
+Moved verbatim out of `docs/STANDARDS.md` during its 45 KB → baseline trim. Every block below is
+the "found live" history behind a rule that **still stands** in `STANDARDS.md` — the rule statement
+itself was left in place there, with a one-clause `history: docs/SESSIONS.md` pointer back to this
+appendix. Nothing here is itself a rule, a test category, or a checklist item; read it as evidence,
+not as standing instruction.
+
+### From Section 1 (Session Naming & Versioning) — version must strictly increment every session
+
+This broke 2026-07-02: `S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, and `S-ARCH-LOOP-PATCH-01` all stamped `v6.0.0` into their version headers instead of incrementing session-over-session, because nothing in `CLAUDE-DESIGN.md`'s kickoff-doc checklist explicitly said to bump it — the old checklist only said to "confirm current version," not increment past it.
+
+### From Section 2 (Session Scope Rules), rule 5 — `run-all.js` is the gate
+
+Before `SES-28`, a bare invocation exited 0 having tested nothing — `LOG-86`'s kickoff doc specced exactly that and would have shipped a red suite reporting green.
+
+### From Section 2 (Session Scope Rules), rule 5 — run the suite against current dependencies
+
+Found live: the installed tree was two weeks older than `package.json`, so `LOG-77-9` failed on a missing `@vercel/functions` that was never a code problem.
+
+### From Section 5 (Always Required) — a Skill's instruction text and its output schema change together (`AGT-36b`)
+
+Found live: `qg-content-context-intent` gained a fifth criterion in `method` while its schema still declared five keys, so Owen — Proofreader emitted nothing for it; the driver's explicit-`false` guard then failed *every* case in the class, i.e. the change silently accomplished the opposite of its purpose. The kickoff doc that specced it named only `method` — so this check belongs here, where a session looks before committing, not in any one kickoff.
+
+### From Section 5 (Always Required) — every Manual QA item tests only the change under test (`S-SES-62`)
+
+Found live: `SES-57`'s item 6 ("Marcus states the gap") tested its own payload plumbing, `CHI-91`'s Skill clause, **and** whether `api/fetch-article.js` ever reports a failure at all — the last of which is `CHI-95`. `SES-57` shipped correct and was held open for a day on an item that was never testing it.
+
+Corollary narrative, same session (the surviving rule is "do not size a blocker from two samples"):
+
+The claim that `CHI-95` made the honest-gap path unreachable came from two measured URLs; the first live run produced a real `401`, a populated reason, and the clause firing verbatim — so the "blocker" had been over-scoped and the moved criterion was already satisfied.
+
+### From Section 6 (Browser Test Checklist) — "Why this is step 0 — the measured reality"
+
+Across the 156 commits on `origin/dev` since 2026-07-28 12:00 CST, compared against every `dev` deployment Vercel actually produced:
+
+| Metric | Value |
+|---|---|
+| Median lag from commit → first build containing it | 37 s |
+| p90 lag | 852 s (14 min) |
+| Max lag | 2,973 s (49.5 min) |
+| Commits waiting > 5 min | 44 / 156 (28%) |
+| Commits waiting > 10 min | 31 / 156 (20%) |
+
+A ~46-minute window that evening produced no `dev` build at all, covering ~8 commits from six different sessions.
+
+### From Section 7 (Manual QA Checklist Rules) — Status column vocabulary
+
+This exists because free-texted status phrasing silently evaded the `session-hygiene` skill's Done-row archival check for weeks — the check only matched the literal string `✅ Done`, so any other completion phrasing never got flagged for archiving to `docs/FEATURES-ARCHIVE.md`. Found 2026-07-16; 12 backlogged rows recovered in one sweep once the check was broadened to match any Status cell starting with `✅` (see `.claude/skills/session-hygiene/SKILL.md` Section 3).
+
+### From Section 10 (Change Log) — root-cause tails
+
+The dated change statements stay in `STANDARDS.md` Section 10; only these root-cause narratives moved.
+
+- **2026-06-15 (Architect Review mandatory + Category M added):** Root cause: AiBadge labels set from SVC design intent without verifying PATTERN_CATALOG active status — Reflection listed on Playbook badge while marked inactive in catalog.
+- **2026-06-24 (Section 11 — agent build completeness):** Root cause: Victoria Chen shipped without standard fields; RosterScreen crashed on `trainableBy.toUpperCase()`.
+- **2026-06-24 (Section 12 — canonical model ID + SERVICE_CATALOG roadmap):** Root cause: short-form model IDs in logAICall() call sites split model rows in AI Audit; services shipped without updating roadmap field left live services listed in Platform Roadmap.
+- **2026-07-02 (Section 1 strengthened):** Root cause: 4 consecutive sessions (`S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, `S-ARCH-LOOP-PATCH-01`) all stamped `v6.0.0` because the kickoff-doc checklist only said to confirm the current version, not increment it. `CLAUDE-DESIGN.md` Step 4 now has an explicit version-assignment step.
+- **2026-07-02 (Category L scoping breadth):** Root cause: `S-ARCH-AGENT-LOOP-03` ran 4 full live tests (25 min, repeated 55s-timeout retries) for a 4-row data-only session where 3 rows re-exercised a mechanism already proven live twice by prior sessions — only 1 row (`qg-review-intent`'s `delegate_to_agent`-from-`task_context` path) was actually novel.
+- **2026-07-07 (root cause protocol gains Step 1):** Root cause: John gets Claude status-page incident emails and had no standing step connecting them to QA-failure diagnosis — an upstream incident could otherwise get root-caused as a DeepBench code defect.
+- **2026-07-08 (Category L loop-closure proof specificity):** Root cause: `AA-110`/`S-APPLE-05`'s "enablement" keyword check was satisfiable from pre-existing seeded content, not uniquely tied to the new write being tested.
+- **2026-07-16 (Section 7 Status column vocabulary):** Root cause: free-texted completion phrasing (`✅ Fixed and verified`, `✅ Closed`, etc.) evaded the `session-hygiene` skill's literal `✅ Done` Done-row check for weeks; 12 rows recovered in a broadened sweep. `session-hygiene` SKILL.md Section 3 updated to match any `✅`-prefixed Status cell going forward.
+- **2026-07-28 (Section 6 rewritten, `SES-015`, v6.3.209):** Root cause: the section assumed "after every Vercel deploy," but Vercel does not reliably build every push to `dev` — measured p90 lag 852 s, max 2,973 s, 20% of 156 commits waiting >10 min, plus a ~46-minute window that produced no `dev` build at all. Section now also carries the two-path sufficiency split (`api/` routes are never edge-cached, so the SHA gate alone suffices; frontend HTML *is* edge-cached and needs the bundle-grep second layer) and the 402 / poke-commit remedy. Supersedes `docs/BETA.md` §2b's bundle-grep-only prescription, which cannot cover the serverless regression path it was listed to protect.
+
+---
+
+## CLAUDE-DESIGN.md narrative moved 2026-08-01 (`SES-68`)
+
+`CLAUDE-DESIGN.md` is read by every design session, so its incident retellings were costing tokens on every run. The rules themselves stayed in that file, each with its one-line "why" and a pointer here. Nothing below is a rule; each block is the full story behind one rule that still lives in `CLAUDE-DESIGN.md`.
+
+### From Standing Rule — Backlog Capture, "criterion changes require an immediate full re-sweep" (added 2026-07-17)
+
+Found live 2026-07-17: the criterion was broadened (more categories added) and, without an explicit ask to "redo the pass," the old classification would have silently stood — a re-sweep surfaced 14 rows in `FEATURES-NEXT.md`/`FEATURES-LATER.md` that fit the new criterion but hadn't been touched since the old one applied.
+
+### From Standing Rule — Backlog Capture, "read full row text before any tier move" (added 2026-07-17)
+
+Found live 2026-07-17: two rows (`AGT-005`, `SE-02`) looked like reasonable promotion candidates from a truncated view, but each carried its own explicit "stays here" rationale in the full text (one pointed to an already-promoted sibling row, the other was tied to a track John had already explicitly deferred) — a summary-only read would have moved both incorrectly, silently reversing a prior deliberate decision.
+
+### From Standing Rule — Backlog Capture, "file same-investigation rows together for tier consistency" (added 2026-07-17)
+
+Found live 2026-07-17: `S-ARCH-COMPETENCY-MODEL-design`'s ~11 output rows (`AGT-001` through `AGT-015`) ended up scattered inconsistently across all 3 tiers — some Now, some Next, one in Later — with no indication the split was deliberate, because each was filed in isolation at the moment it was found rather than cross-checked against its siblings.
+
+### From Standing Rule — Backlog Capture, "the *number*, not just the prefix" (added 2026-07-28, `SES-18`)
+
+Root cause this closes (found 2026-07-28): the claim step was documented *only* in the session-setup skill — a document read once at 8am while making a worktree — while this section, the one actually in front of a session at the moment it types an ID, described how to choose a prefix and said nothing about the number. Sessions that never re-read the setup skill at close-out had no instruction telling them to claim, and the single-ID claim shape made hand-counting the path of least resistance for the multi-row filings that are this repo's normal case (51 such commits in history, 7 in the two days before this was found). Three live collisions came out of that gap — `CHI-42` and `CHI-48` (two unrelated rows each), and `CHI-76`, where a session claimed *correctly* and still collided because another session had hand-minted 76 fifteen minutes earlier. `CHI-42`'s wrong ID reached shipped Supabase Skill content before anyone noticed.
+
+### From Standing Rule — Backlog Capture, the `task_773e8b06` incident (added 2026-07-15, John's explicit call)
+
+This is exactly what went wrong with `task_773e8b06`: never anchored to a durable ID at creation, so multiple sessions repeated "`task_773e8b06` is running separately, not blocking" as unverified fact for a full day, and the task's own session later failed to recognize a third-person mention of its own opaque ID as being about itself — see [[feedback-coordination-note-self-reference]]. A real ID at spawn time would have prevented both failure modes: sessions cite "blocked on `AA-191`," not "blocked on some session I have to go check on," and a session reading about its own backlog row doesn't have the same self-reference ambiguity a bare process ID does.
+
+### From Step 4.6 Architect Review — "Re-run that grep against a fresh `origin/dev`" (added 2026-07-29, `SES-46`)
+
+**Found live 2026-07-29 (`design-ses-33`):** that session measured the `SES-33` Vercel deploy stall, scoped a `scripts/check-deploy-freshness.js` gate, got John's approval, and wrote the full kickoff doc — then discovered on its pre-write rebase that `SES-015` had shipped `scripts/check-deploy-current.js` doing exactly that, already wired into `STANDARDS.md` §6 and the CHI runbook, in the ~2 hours between its scoping read and its kickoff write. The shipped version was also strictly better (ancestor test, not SHA equality — under concurrent sessions the deployed tip is normally *ahead* of the commit under test, so equality would fail constantly and the gate would be ignored within a day). Nothing was lost only because the rebase happened before the push; the whole session was wasted regardless.
+
+### From Step 4.6 Architect Review — "Search by shape, not by name" (added 2026-07-21, `CHI-53`'s citation_missing fix)
+
+This session first designed a fix for "Owen can't see the news article Marcus was given" by searching narrowly for content-propagation code (`task_context`, `delegate_to_agent`) — and missed that the same screen already had a fully-proven mechanism for tracking a related multi-call sequence and knowing when each stage completes: the Agent Routing drawer's own hop-numbering/event-building code (`buildHopEvent`/`onEvent`, `CHI-23`/`AA-164`), which the session had already read earlier in the same conversation for an unrelated reason and never connected back.
+
+### From Step 4.6 Architect Review — "Multi-site bug pattern → shared-service check" (added 2026-07-16, `AA-192`)
+
+**Concretely, this session first proposed changing a client-side helper's signature and reapplying that fix at 3 separate call sites (`DashboardScreen.jsx`, `PersonnelScreen.jsx`, `TeachScreen.jsx`) — all 3 shared one underlying route (`api/brief.js`) that was simply never migrated onto the shared `logActivity()` service everything else already uses.** Migrating the shared route once (root) collapsed 3 parallel per-site fixes into 1 route fix + trivial "delete the now-redundant client call" cleanups, and fixed a bigger co-located bug (wrong model logged, not just missing tokens) at the source instead of 3 times.
+
+### From Step 4.6 Architect Review — "Secondary backlog IDs need a closure gate" (added 2026-07-28, `SES-32`)
+
+**Found live 2026-07-28 (`design-log-60`):** `docs/kickoffs/v6.3.203-LOG-81-model-call-counting.md` said "also settles `LOG-60` (Observability)'s denominator question" in its Section 1 Feature line and nowhere else — no gate, no close-out step — while `LOG-60`'s own row, amended by that same design conversation, read "Close this row when `LOG-81`'s QA passes." Both halves of the hand-off existed in writing and neither pointed at an action, so `LOG-60` was on track to survive `LOG-81`'s close-out as a stale `❌ Missing` row describing already-shipped work. A gate was in fact available and unused — QA item 4 ("classified distinct + not yet classified = header Total Calls exactly") is literally `LOG-60`'s reconciliation question restated. It was caught only because John happened to open a session on `LOG-60` itself. Same close-out-leak family as `SES-27`, different mechanism: `SES-27` is one row's own scope outrunning its checkmark; this is a second row that no session's close-out owns.
+
+### From Step 4.6 Architect Review — "Locked-section staleness check" (added 2026-07-02, `S-ARCH-AGENT-LOOP-02-design`)
+
+Root cause this session: §19d's "Two delegation paths" paragraph (written by `S-ARCH-OWNERSHIP-02-design`) described a fast path as current and legitimate, but `CLAUDE-STATE.md`'s own session summary — already read at Step 1 of *this same session* — said that exact path was "eliminated entirely" by a later same-day session. The contradiction sat unreconciled until John caught the downstream mistake it caused.

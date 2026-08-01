@@ -6,6 +6,104 @@
 
 ---
 
+## Section Index (added 2026-08-01, SES-68 — read only the governing section, not the whole file)
+
+Document order, not numeric order — §17/§18 sit between §19n and §19o. Sub-headings are indented
+under their governing section. Nothing below this index was edited when it was added.
+
+- **§0.** The Product Pitch [LOCKED]
+- **§0b.** The DEEP / BENCH Model [LOCKED]
+- **§1.** The Platform Architecture — 5 Layers + Cross-Cutting Concerns [LOCKED, rewritten 2026-07-17]
+  - Product Focus Area / Screen
+  - Platform
+  - Data Model
+  - Platform Services
+  - Scaffold
+  - Harness
+  - Loop
+  - Functional Objectives (cross-cutting, not a layer)
+- **§1a.** Agent Capability Services — Detail
+- **§2.** The Platform Model [LOCKED — Vocabulary + Structure]
+  - Vocabulary
+  - The Hierarchy
+  - The Three Visions
+  - Six Skill Types
+  - Technical Services
+  - Skills — Universal Properties
+  - Capabilities
+  - Competencies and Agents
+  - Deliverables
+  - Key Rules [LOCKED]
+  - DB Architecture — Current State
+- **§3.** Identity / Persona Replication Capability
+  - Three Training Material Types
+- **§4.** Per-Agent LLM Assignment + BYOK [LOCKED — Design Target]
+- **§5.** The Service Adapter Layer [LOCKED]
+- **§6.** Frontend / Backend Distribution [LOCKED]
+- **§7.** Repos and Branch Strategy [LOCKED]
+- **§8.** Routing
+- **§9.** Database — Current + Target State
+  - Current tables
+  - Target state — S-INFRA-01 (do not build yet, design toward)
+- **§10.** Auth [LOCKED]
+- **§11.** External Services
+- **§12.** AI Call Rules [LOCKED]
+  - Capability Badge Rule [LOCKED]
+- **§13.** Session Seam Line Rules [LOCKED]
+- **§14.** Agent Configuration Model [LOCKED]
+- **§15.** Step State Architecture [LOCKED]
+  - Step Color Coding [LOCKED]
+- **§16.** NIGP Migration Plan (S-MIGRATE-01)
+- **§19.** Agent Collaboration Model — Prompt Architect + Display Specialists [LOCKED S-PM-08-design 2026-06-23]
+  - The Founding Principle of the Prompt Service (NEVER VIOLATE)
+  - Dan Bingham — AI Prompt Strategist (PS-01)
+  - Content Specialists vs. Display Specialists
+  - agents Table in Supabase
+- **§19b.** The Generic Capability Executor [LOCKED S-APPLE-03-design 2026-07-01]
+- **§19c.** The Library / Data Room Model [LOCKED S-LIBRARIAN-03-design 2026-07-02]
+- **§19d.** The Agent Loop — True Agentic Orchestration [LOCKED `S-ARCH-AGENT-LOOP-01-design`, v6.0.0, 2026-07-02]
+- **§19e.** Resource Ownership Brokers [LOCKED `S-ARCH-AGENT-LOOP-02-design`, 2026-07-02]
+- **§19f.** The Reasoning Layer [LOCKED `S-ARCH-REASONING-LAYER-01-design`, 2026-07-03]
+- **§19g.** The Generic Visualization Layer [LOCKED `S-ARCH-VIZ-01-design`, 2026-07-06]
+- **§19h.** Live Agent-Orchestration Visibility [LOCKED `S-MI-42`, 2026-07-09]
+- **§19i.** AI Pattern Tracking — The Three-Layer Model [LOCKED, rewritten 2026-07-21, supersedes the Four-Source Trust Model below]
+  - Layer A — Call Facts (write-time, generic, no pattern names)
+  - Layer B — Classification Rules (versioned, evaluated at read time, re-derivable without a backfill)
+  - Layer C — Pattern Vocabulary (citation-governed, answers questions (1)-(3) above)
+  - Layer C — Self-Maintenance Mechanism [added 2026-07-21, `design-ai-35-0721`]
+  - Archived — Four-Source Trust Model [superseded 2026-07-21 by the Three-Layer Model above — kept for history, not current]
+- **§19j.** Deliberately-Empty Findings — "I checked and found nothing" [discovery `design-chi-65-0723`, 2026-07-23 — NOT LOCKED, two open questions below]
+  - The gap
+  - Decided
+  - Open — not decided, do not build against either
+  - The screen holds no content policy [decided 2026-07-23 — supersedes this session's own earlier fallback proposal]
+  - Scope for the next (coding) session
+  - Why a reviewer is second, not first
+  - Fault classification (`HAR-15`, 2026-07-28)
+- **§19k.** AI Pattern Tracking — The Runtime Signature Model [discovery `design-log-38-0724`, 2026-07-24]
+  - The signature
+  - Storage — snapshot the values, derive the name
+  - The Log Displayer — a plain view, generic match, no per-pattern code
+  - Self-maintenance trigger
+  - What this eliminates
+  - Build breakdown (each its own kickoff-gated coding session; run in parallel where deps allow)
+  - Signature field order [locked `design-log-64-0724` (LOG-64 POC), 2026-07-24]
+  - LOG-65 POC 2 outcomes — anomaly gate + criteria shape [locked `design-log-65-0724`, 2026-07-24/25]
+  - Signature field value vocabulary [LOG-52, sourced from the Log Writer's emit contract, not from log sampling]
+  - Locked constraints (also in `.claude/rules/ai-pattern-signature.md`)
+  - Rename/supersede path (`LOG-51`) [shipped v6.3.178 — closes §19l seal condition 2's rename half]
+- **§19l.** AI Pattern Tracking — Chief-Architect Review Verdict & Approved Completion Scopes [discovery `log-52-0727`, 2026-07-28 — John approved all four scopes verbatim]
+- **§19m.** Platform Services Directory — Service vs. Capability [discovery `ai-audit-screen-0727`, 2026-07-28]
+- **§19n.** CHI Journey Steps & Single Vocabulary [discovery `ui-updates-0727`, 2026-07-28]
+- **§17.** v4 Preservation [LOCKED]
+- **§18.** Archived — Prior Models (superseded by Section 2)
+  - 18a — Agent Profile Model / Three Competencies (superseded 2026-06-18)
+  - 18b — Capability Spectrum Model (superseded 2026-06-15)
+- **§19o.** End-to-End Reliability — Failure Compounding & the Transient-Recovery Constraint [discovery `chi-e2e-design`, 2026-07-28]
+- **§19p.** Hop-Event Span Identity — Identity Travels With the Event [discovery `michelle-patterns`, 2026-07-28]
+
+---
+
 ## 0. The Product Pitch [LOCKED]
 
 > "Your team, without the headcount or loss of domain knowledge."

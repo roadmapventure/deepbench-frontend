@@ -27,7 +27,7 @@ Sub-session rule:
 
 Design sessions carry the same version tag as the coding session whose kickoff doc they produce — e.g. `S-APPLE-01a-design (v5.3.0)` pairs with `S-APPLE-01a (v5.3.0)`. Locked in `CLAUDE-DESIGN.md` ("Standing Rule — Version-Paired Session Naming"), applies from S-APPLE-01a-design (v5.3.0) onward.
 
-**Every session gets a version strictly greater than `CLAUDE-STATE.md`'s current "Version in dev" — never reuse it, even for sessions within the same major-version architecture track.** This broke 2026-07-02: `S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, and `S-ARCH-LOOP-PATCH-01` all stamped `v6.0.0` into their version headers instead of incrementing session-over-session, because nothing in `CLAUDE-DESIGN.md`'s kickoff-doc checklist explicitly said to bump it — the old checklist only said to "confirm current version," not increment past it. Fixed in `CLAUDE-DESIGN.md` Step 4 (explicit version-assignment step) and Step 5c (close-out bump, unchanged instruction but now backstopped by the assignment-time check).
+**Every session gets a version strictly greater than `CLAUDE-STATE.md`'s current "Version in dev" — never reuse it, even for sessions within the same major-version architecture track.** Enforced by `CLAUDE-DESIGN.md` Step 4 (explicit version-assignment step) and Step 5c (close-out bump, unchanged instruction but now backstopped by the assignment-time check). History: `docs/SESSIONS.md`.
 
 Branch: commit directly to `dev`. No feature branches.
 `dev → main` only when John explicitly confirms.
@@ -41,8 +41,8 @@ Branch: commit directly to `dev`. No feature branches.
 3. Max 4 tasks per kickoff doc
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
 5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a). Two rules on invoking it, both from real false results found 2026-07-28 (`SES-28`):
-   - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. Before `SES-28`, a bare invocation exited 0 having tested nothing — `LOG-86`'s kickoff doc specced exactly that and would have shipped a red suite reporting green.
-   - **Run it against current dependencies.** A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree, which may predate `package-lock.json` — run `npm install` in the worktree first. Found live: the installed tree was two weeks older than `package.json`, so `LOG-77-9` failed on a missing `@vercel/functions` that was never a code problem.
+   - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. (history: `docs/SESSIONS.md`)
+   - **Run it against current dependencies.** A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree, which may predate `package-lock.json` — run `npm install` in the worktree first. (history: `docs/SESSIONS.md`)
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
@@ -63,7 +63,7 @@ Every kickoff doc must have these 11 sections in order:
 7. **SCOPE RULES** (what NOT to touch)
 8. **NODE.JS TEST** (full code written out — not described, not referenced)
 9. **CLAUDE CODE VERIFICATION CHECKLIST** — session-specific checks only (see "Standing rules by reference" below)
-10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — worktrees share local refs, so a bare `dev` refspec silently targets whichever local branch happens to be named `dev`, not this session's worktree; see `CLAUDE.md`'s "Push with `HEAD:dev`, never bare `dev`" hard rule)
+10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — canonical statement and rationale: `CLAUDE.md`'s "Push with `HEAD:dev`, never bare `dev`" hard rule)
 11. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
 **Standing rules by reference (added 2026-07-01).** Claude Code carries persistent cross-session memory now — the "Claude Code has no memory" premise this rule used to rest on is out of date. A kickoff doc no longer needs to restate a standing rule in full prose; naming it is enough (e.g. "STANDARDS.md Section 11 applies to all 6 agents" instead of re-listing all 23 fields; "Category M applies — see STANDARDS.md Section 5" instead of re-deriving the checklist). This applies specifically to **standing rules** — things that are true every session and don't change: the 23-field agent standard, the AI Audit wiring requirement, the Always Required / Category J/K/L/M checklist items in Section 5, the known bug patterns in Section 8.
@@ -81,7 +81,7 @@ It does **not** apply to **session-specific facts** — the exact field values, 
 - [ ] Category K tests if touching mergedSteps or Supabase JSONB
 - [ ] Category L live API test if touching any api/ endpoint
 - [ ] Category M consistency test if touching any cross-referenced data (see Section 4)
-- [ ] Verification checklist (Section 9) lists only session-specific checks — standing categories referenced by name, not re-derived
+- [ ] Verification checklist (kickoff doc section 9 above, not STANDARDS.md Section 9) lists only session-specific checks — standing categories referenced by name, not re-derived
 - [ ] Manual QA is session-specific
 - [ ] Session-specific facts (values, fields, files, scope) fully spelled out — no "as discussed" for anything that isn't a standing rule
 - [ ] Design tokens present if UI work
@@ -202,8 +202,8 @@ Complete every item before committing. This is the canonical "standing checklist
 - [ ] Node.js test — ALL TESTS PASS
 - [ ] `npm run build` — zero errors
 - [ ] Zero red errors in browser console after deploy
-- [ ] **A Skill's instruction text and its output schema change together** — any session adding, removing or renaming a field an agent is told to produce must edit **both** `skill_profiles.method`/`objective` **and** `traits.schema` (`properties` *and* `required`), then prove the field arrives with one real live call. *(Added 2026-07-29, `AGT-36b`.)* An instruction naming a field the schema does not declare is one the model structurally cannot obey, and **every string-level check still passes** — the `method` text greps clean, the build is green, the unit tests are green, and the missing field only shows up as a `undefined` in live output. Found live: `qg-content-context-intent` gained a fifth criterion in `method` while its schema still declared five keys, so Owen — Proofreader emitted nothing for it; the driver's explicit-`false` guard then failed *every* case in the class, i.e. the change silently accomplished the opposite of its purpose. The kickoff doc that specced it named only `method` — so this check belongs here, where a session looks before committing, not in any one kickoff.
-- [ ] **Every Manual QA item tests only the change under test.** *(Added 2026-07-29, `S-SES-62`.)* Before issuing a kickoff, read each QA item and ask what would have to be true for it to pass. If any item also depends on a *different* row's behavior, it is that row's acceptance criterion, not this one's — move it there and say so. An item that bundles two or three tickets' behavior makes a correct, shipped fix look unverifiable, and the honest-looking response is to leave the row open indefinitely. Found live: `SES-57`'s item 6 ("Marcus states the gap") tested its own payload plumbing, `CHI-91`'s Skill clause, **and** whether `api/fetch-article.js` ever reports a failure at all — the last of which is `CHI-95`. `SES-57` shipped correct and was held open for a day on an item that was never testing it. Corollary, same session: **do not size a blocker from two samples.** The claim that `CHI-95` made the honest-gap path unreachable came from two measured URLs; the first live run produced a real `401`, a populated reason, and the clause firing verbatim — so the "blocker" had been over-scoped and the moved criterion was already satisfied. Run `CLAUDE-DESIGN.md` Step 4's generalization counter-example check against a *severity* claim too, not only a scope-narrowing one.
+- [ ] **A Skill's instruction text and its output schema change together** — any session adding, removing or renaming a field an agent is told to produce must edit **both** `skill_profiles.method`/`objective` **and** `traits.schema` (`properties` *and* `required`), then prove the field arrives with one real live call. *(Added 2026-07-29, `AGT-36b`.)* An instruction naming a field the schema does not declare is one the model structurally cannot obey, and **every string-level check still passes** — the `method` text greps clean, the build is green, the unit tests are green, and the missing field only shows up as a `undefined` in live output. (history: `docs/SESSIONS.md`)
+- [ ] **Every Manual QA item tests only the change under test.** *(Added 2026-07-29, `S-SES-62`.)* Before issuing a kickoff, read each QA item and ask what would have to be true for it to pass. If any item also depends on a *different* row's behavior, it is that row's acceptance criterion, not this one's — move it there and say so. An item that bundles two or three tickets' behavior makes a correct, shipped fix look unverifiable, and the honest-looking response is to leave the row open indefinitely. Corollary, same session: **do not size a blocker from two samples.** Run `CLAUDE-DESIGN.md` Step 4's generalization counter-example check against a *severity* claim too, not only a scope-narrowing one. (history for both: `docs/SESSIONS.md`)
 
 ### Feature ID Badge Audit (every session)
 - [ ] FeatureBadge added for this session's feature ID
@@ -286,17 +286,7 @@ Coverage is an **ancestor** test, not equality: the gate passes when the serving
 
 ### Why this is step 0 — the measured reality
 
-Across the 156 commits on `origin/dev` since 2026-07-28 12:00 CST, compared against every `dev` deployment Vercel actually produced:
-
-| Metric | Value |
-|---|---|
-| Median lag from commit → first build containing it | 37 s |
-| p90 lag | 852 s (14 min) |
-| Max lag | 2,973 s (49.5 min) |
-| Commits waiting > 5 min | 44 / 156 (28%) |
-| Commits waiting > 10 min | 31 / 156 (20%) |
-
-A ~46-minute window that evening produced no `dev` build at all, covering ~8 commits from six different sessions.
+Measured across the 156 commits on `origin/dev` since 2026-07-28 12:00 CST, against every `dev` deployment Vercel actually produced: median commit→build lag **37 s**, p90 **852 s** (14 min), max **2,973 s** (49.5 min), **44/156 (28%)** waiting >5 min, **31/156 (20%)** waiting >10 min — plus a ~46-minute window that produced no `dev` build at all. Full table and history: `docs/SESSIONS.md`.
 
 ### Two QA paths, different sufficiency — do not collapse them
 
@@ -368,7 +358,7 @@ A bug that fails QA once should not fail QA twice. If it does, the root cause an
 If FAIL: write a patch kickoff doc targeting the confirmed root cause only.
 If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 
-**Feature inventory Status column vocabulary (added 2026-07-16).** The `Status` column in `docs/FEATURES.md`, `docs/FEATURES-NEXT.md`, and `docs/FEATURES-LATER.md` must be exactly one of `✅ Done`, `🔶 Partial`, or `❌ Missing` — no other text in that cell. Any elaboration (what shipped, what's still open, measured results, caveats) goes in the Feature cell's own prose, which is already the norm for how these rows are written — every row in these files already carries full narrative detail there. Do not append descriptive text to the Status cell itself (e.g. `✅ Fixed and verified`, `✅ Closed`, `✅ Root cause fixed and measured`, `🔶 Partial (visual redesign needed)`). This exists because free-texted status phrasing silently evaded the `session-hygiene` skill's Done-row archival check for weeks — the check only matched the literal string `✅ Done`, so any other completion phrasing never got flagged for archiving to `docs/FEATURES-ARCHIVE.md`. Found 2026-07-16; 12 backlogged rows recovered in one sweep once the check was broadened to match any Status cell starting with `✅` (see `.claude/skills/session-hygiene/SKILL.md` Section 3). When archiving a row to `docs/FEATURES-ARCHIVE.md`, normalize its Status cell to exactly `✅ Done` regardless of what completion phrasing the source row used.
+**Feature inventory Status column vocabulary (added 2026-07-16).** The `Status` column in `docs/FEATURES.md`, `docs/FEATURES-NEXT.md`, and `docs/FEATURES-LATER.md` must be exactly one of `✅ Done`, `🔶 Partial`, or `❌ Missing` — no other text in that cell. Any elaboration (what shipped, what's still open, measured results, caveats) goes in the Feature cell's own prose, which is already the norm for how these rows are written — every row in these files already carries full narrative detail there. Do not append descriptive text to the Status cell itself (e.g. `✅ Fixed and verified`, `✅ Closed`, `✅ Root cause fixed and measured`, `🔶 Partial (visual redesign needed)`). It exists because free-texted phrasing evaded the `session-hygiene` skill's Done-row archival check — history: `docs/SESSIONS.md`. When archiving a row to `docs/FEATURES-ARCHIVE.md`, normalize its Status cell to exactly `✅ Done` regardless of what completion phrasing the source row used.
 
 ---
 
@@ -397,9 +387,11 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 
 ## Section 10: Change Log
 
+**Root-cause narratives for these entries moved 2026-08-01 (`SES-68`) — history: `docs/SESSIONS.md`.** Every dated change statement below is unchanged; only the "Root cause: …" tails were relocated verbatim.
+
 | Date | Change |
 |------|--------|
-| 2026-06-15 | Architect Review added as mandatory Step 6 in CLAUDE-DESIGN.md kickoff doc generation: duplicate functionality check, cross-reference integrity check, layer violation check, schema alignment check. Category M added — cross-reference consistency tests required for any session touching shared constants, slugs, or status flags across multiple files. Kickoff doc compliance checklist updated with Architect Review gate and Category M requirement. Root cause: AiBadge labels set from SVC design intent without verifying PATTERN_CATALOG active status — Reflection listed on Playbook badge while marked inactive in catalog. |
+| 2026-06-15 | Architect Review added as mandatory Step 6 in CLAUDE-DESIGN.md kickoff doc generation: duplicate functionality check, cross-reference integrity check, layer violation check, schema alignment check. Category M added — cross-reference consistency tests required for any session touching shared constants, slugs, or status flags across multiple files. Kickoff doc compliance checklist updated with Architect Review gate and Category M requirement. |
 | 2026-06-15 | AI Pattern Check added as mandatory Section 3 in kickoff doc (11 sections total). Design sessions must check PATTERN_CATALOG + SERVICE_CATALOG before choosing implementation approach. |
 | 2026-06-06b | Sub-session versioning, category J |
 | 2026-06-06c | Drive scope rule |
@@ -407,14 +399,14 @@ If NEW REQUIREMENT: add to `docs/FEATURES.md`.
 | 2026-06-07a | Category L added — live API integration tests. Retry logic test requirements. Payload integrity test requirements. Bug pattern library added (8 patterns). |
 | 2026-06-09 | BUG-9 added — `readAsDataURL` binary corruption on PDF extract. `readAsArrayBuffer` + Uint8Array + btoa mandated for all file upload. L test requirements added for api/extract.js. |
 | 2026-06-09 | BUG-10 added — missing `pdf-parse` + `jszip` in package.json. Dependency audit rule added: every api/ import must exist in package.json dependencies before commit. |
-| 2026-06-24 | Section 11 added — agent build completeness standard. Every agent must ship all 23 required fields + AVATAR_CFG + AGENT_PRONOUNS + Supabase row in one session. No partial entries. Root cause: Victoria Chen shipped without standard fields; RosterScreen crashed on `trainableBy.toUpperCase()`. |
-| 2026-06-24 | Section 12 added — canonical model ID standard (BUG-20) and SERVICE_CATALOG roadmap update rule (BUG-22). Root cause: short-form model IDs in logAICall() call sites split model rows in AI Audit; services shipped without updating roadmap field left live services listed in Platform Roadmap. |
-| 2026-07-02 | Section 1 strengthened — version must strictly increment every session, never be reused. Root cause: 4 consecutive sessions (`S-ARCH-AGENT-LOOP-01`, `S-APPLE-02b`, `S-ARCH-PM-BROKER-01`, `S-ARCH-LOOP-PATCH-01`) all stamped `v6.0.0` because the kickoff-doc checklist only said to confirm the current version, not increment it. `CLAUDE-DESIGN.md` Step 4 now has an explicit version-assignment step. |
-| 2026-07-02 | Category L scoping breadth guidance added — full live round trips required for genuinely novel mechanism paths, not one-for-one for every data row reapplying an already-proven mechanism to a structurally identical shape. Root cause: `S-ARCH-AGENT-LOOP-03` ran 4 full live tests (25 min, repeated 55s-timeout retries) for a 4-row data-only session where 3 rows re-exercised a mechanism already proven live twice by prior sessions — only 1 row (`qg-review-intent`'s `delegate_to_agent`-from-`task_context` path) was actually novel. |
-| 2026-07-07 | Mandatory root cause protocol gains Step 1 (renumbering the rest) — check `https://status.claude.com/api/v2/summary.json` for an Anthropic-side incident (Claude API / Claude Sonnet / Claude Code) overlapping the failure's timestamp before doing any code-level root-causing. Root cause: John gets Claude status-page incident emails and had no standing step connecting them to QA-failure diagnosis — an upstream incident could otherwise get root-caused as a DeepBench code defect. |
-| 2026-07-08 | Category L strengthened — loop-closure proof specificity requirement. Root cause: `AA-110`/`S-APPLE-05`'s "enablement" keyword check was satisfiable from pre-existing seeded content, not uniquely tied to the new write being tested. |
-| 2026-07-28 | Section 6 rewritten (`SES-015`, v6.3.209) — `node scripts/check-deploy-current.js` becomes step 0 of every browser test, and a non-zero exit stops the run rather than warning. Root cause: the section assumed "after every Vercel deploy," but Vercel does not reliably build every push to `dev` — measured p90 lag 852 s, max 2,973 s, 20% of 156 commits waiting >10 min, plus a ~46-minute window that produced no `dev` build at all. Section now also carries the two-path sufficiency split (`api/` routes are never edge-cached, so the SHA gate alone suffices; frontend HTML *is* edge-cached and needs the bundle-grep second layer) and the 402 / poke-commit remedy. Supersedes `docs/BETA.md` §2b's bundle-grep-only prescription, which cannot cover the serverless regression path it was listed to protect. |
-| 2026-07-16 | Section 7 gains a Status column vocabulary rule — `docs/FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`'s Status cell must be exactly `✅ Done` / `🔶 Partial` / `❌ Missing`, no appended descriptive text. Root cause: free-texted completion phrasing (`✅ Fixed and verified`, `✅ Closed`, etc.) evaded the `session-hygiene` skill's literal `✅ Done` Done-row check for weeks; 12 rows recovered in a broadened sweep. `session-hygiene` SKILL.md Section 3 updated to match any `✅`-prefixed Status cell going forward. |
+| 2026-06-24 | Section 11 added — agent build completeness standard. Every agent must ship all 23 required fields + AVATAR_CFG + AGENT_PRONOUNS + Supabase row in one session. No partial entries. |
+| 2026-06-24 | Section 12 added — canonical model ID standard (BUG-20) and SERVICE_CATALOG roadmap update rule (BUG-22). |
+| 2026-07-02 | Section 1 strengthened — version must strictly increment every session, never be reused. `CLAUDE-DESIGN.md` Step 4 now has an explicit version-assignment step. |
+| 2026-07-02 | Category L scoping breadth guidance added — full live round trips required for genuinely novel mechanism paths, not one-for-one for every data row reapplying an already-proven mechanism to a structurally identical shape. |
+| 2026-07-07 | Mandatory root cause protocol gains Step 1 (renumbering the rest) — check `https://status.claude.com/api/v2/summary.json` for an Anthropic-side incident (Claude API / Claude Sonnet / Claude Code) overlapping the failure's timestamp before doing any code-level root-causing. |
+| 2026-07-08 | Category L strengthened — loop-closure proof specificity requirement. |
+| 2026-07-28 | Section 6 rewritten (`SES-015`, v6.3.209) — `node scripts/check-deploy-current.js` becomes step 0 of every browser test, and a non-zero exit stops the run rather than warning. Canonical statement of the rewritten rule — including the two-path sufficiency split, the 402 / poke-commit remedy, and the `docs/BETA.md` §2b supersession — is Section 6 itself; root cause: `docs/SESSIONS.md`. |
+| 2026-07-16 | Section 7 gains a Status column vocabulary rule — canonical statement is Section 7; root cause: `docs/SESSIONS.md`. `session-hygiene` SKILL.md Section 3 updated to match any `✅`-prefixed Status cell going forward. |
 
 ---
 
