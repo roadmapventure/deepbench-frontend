@@ -1,3 +1,4 @@
+// DeepBench v7.0.46 | AIActivityPanel.jsx | LOG-129 -- By Source/By Device/By Caller each showed TWO hairlines 4px apart: PU_SUBHEAD's own borderBottom plus the PU_TABLE borderTop directly beneath it. PU_SUBHEAD's is dropped (it is used by these three sub-heads only); the table keeps its own top edge
 // DeepBench v7.0.45 | AIActivityPanel.jsx | LOG-129 -- By Platform User renders as a real table: the per-row card box (PlatformUserRow) is replaced by a shared PlatformUserTableHead/PlatformUserTableRow pair driven by one column model, and a third section, By Device, sits between By Source and By Caller
 // DeepBench v7.0.39 | AIActivityPanel.jsx | LOG-121 -- drawer order runs By Agent, then the new By Platform User (two sub-tables under one header, closed by default, plus a seventh stat tile), then By Service; LOG-124 -- no caller address is ever rendered unblurred
 // DeepBench v6.3.199 | AIActivityPanel.jsx | LOG-107a -- scroll fade uses the depth variant (a same-colour fade was invisible on this panel)
@@ -155,8 +156,12 @@ function PlatformUserTotal({ calls, cost }) {
   );
 }
 
-// Same sub-header treatment the By Service drawer already uses for its layer groups.
-const PU_SUBHEAD = {fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:4};
+// Same sub-header treatment the By Service drawer already uses for its layer groups, minus the
+// hairline: that drawer's group header has nothing beneath it, but every one of these three is
+// immediately followed by a PU_TABLE whose own borderTop draws the line. Carrying both rendered
+// TWO rules 4px apart (lineSoft under the header, then line atop the table). The table's is the
+// one that stays -- it is the table's own top edge and must survive independently of the header.
+const PU_SUBHEAD = {fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,padding:"8px 0 4px",marginBottom:4};
 
 // FEATURE: LOG-129 -- the column sets, module scope so they are not rebuilt per render and so the
 // head and the body rows are literally reading one object. By Device is By Source's shape with one
