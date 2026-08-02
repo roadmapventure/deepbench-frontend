@@ -1,3 +1,16 @@
+// DeepBench v7.0.50 | LiveAgentViewScreen.jsx | LAV-16 -- the Console Boot Dial's mount boolean is
+// derived here, as a pure function of three things this file already has: `running`, `awaiting`, and
+// `canvasRunHops`. No new state, no new ref, no new effect, no new event type -- deriveBooting() is a
+// one-line predicate over existing values, and both <AgentNetwork> call sites gain the same two
+// props. What makes it correct on a SECOND run is the mechanism that was already here and was
+// verified this session rather than assumed: useHarnessStream logs a `question_boundary` marker at
+// every run after the first, runStart advances past it, and canvasRunHops therefore comes back empty
+// while `running` is already true -- so the predicate returns true again with nothing added to reset
+// it. The predicate tests `h.agentId`, NOT a `delegation` type: engaged/activeId are both set inside
+// deriveNetwork()'s single `if (id)` block, so the first hop carrying ANY agentId -- a real
+// delegation or a quiet assembly_work fetch -- is what actually promotes an agent out of the bench
+// queue into the choreograph LEAD slot. Anything narrower would leave the dial up over a canvas that
+// had already come alive.
 // DeepBench v7.0.49 | LiveAgentViewScreen.jsx | LAV-15 -- this screen folds the run's ledger into the
 // new Run Tasks feed and hands it to AgentNetwork, which renders it as a drawer under the Answer
 // drawer. The fold happens HERE because this file is the only one that holds both halves of the pair
@@ -450,6 +463,24 @@ const MOB_METER_VALUE = {fontFamily:mono,fontSize:13,fontWeight:700,color:T.navy
 // The two mobile tabs, in render order. `canvas` is the default (STYLE-GUIDE.md §42).
 const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
 
+/**
+ * FEATURE: LAV-16 -- is this run still inside the dead-canvas window?
+ *
+ * Extracted to module scope for exactly one reason: so a Node test can exercise THIS expression
+ * rather than a hand-copied twin of it. It is still a pure derivation of values the screen already
+ * holds -- no state, no ref, no effect, and no memo, because it is one `some()` over a list that is
+ * empty for the whole window it describes.
+ *
+ * @param running      the harness hook's own run flag -- false on terminal, on stream error and on
+ *                     cancel, which is why every one of those paths dismisses the dial for free
+ * @param awaiting     a human gate is open (or the decision is in flight); the canvas is not dead,
+ *                     it is waiting on the user, and the dial must not cover the decision panel
+ * @param canvasRunHops the RUN-scoped, prompt_assembled-filtered hop list already fed to the canvas
+ */
+export function deriveBooting({ running, awaiting, canvasRunHops }) {
+  return running && !awaiting && !canvasRunHops.some(h => h.agentId);
+}
+
 export default function LiveAgentViewScreen() {
   const agents = useAgents();
   const { events, status, running, result, error, recovery, prompt, traceIds, pending, resolving,
@@ -670,6 +701,11 @@ export default function LiveAgentViewScreen() {
     : null;
   const badgeDetail = awaiting ? ((pending || resolving)?.capability_slug ?? null) : errorDetail;
 
+  // FEATURE: LAV-16 -- the Console Boot Dial's mount boolean. Derived, never stored: see
+  // deriveBooting() above for why the predicate reads `agentId` rather than a delegation type, and
+  // why a second run in the same session re-enters this state with nothing here to reset.
+  const booting = deriveBooting({ running, awaiting, canvasRunHops });
+
   // Same math AgentWorkingIndicator uses (~L718): turnStartedAt survives every hop swap, so the
   // elapsed figure is the whole question's time, not the current hop's. Frozen at terminal because
   // the hook nulls `status` in its finally block.
@@ -856,12 +892,18 @@ export default function LiveAgentViewScreen() {
                   it (STYLE-GUIDE 42: Answer is a tab and only a tab, and Run Tasks sits in that
                   same left column). A prop added to one call site and not the other is exactly how
                   a screen's two payloads drift apart unnoticed (SES-57). */}
+              {/* FEATURE: LAV-16 -- `booting`/`statusMessage` are mirrored onto BOTH call sites.
+                  The dial mounts inside .lav-stagewrap, which both AgentNetwork branches share
+                  verbatim, so the mobile canvas gets it with no mobile-specific prop. A prop added
+                  to one call site and not the other is exactly how a screen's two payloads drift
+                  apart unnoticed (SES-57). */}
               <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
                 traceRows={traceRows} recoveringAgentId={recoveringAgentId}
                 choreographed={choreographed} onToggleChoreographed={setChoreographed}
                 pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
                 answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
-                runTaskEntries={runTaskEntries}/>
+                runTaskEntries={runTaskEntries}
+                booting={booting} statusMessage={status?.message ?? null}/>
             </div>
           ) : (
             /* Answer: CHI's own QaEvidenceCard for a real qa result, the terminal frame's own text
@@ -1052,12 +1094,16 @@ export default function LiveAgentViewScreen() {
         <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
           {/* FEATURE: LAV-12 -- run-scoped `hops`, same reversal as the mobile call site above. */}
           {/* FEATURE: LAV-15 -- the desktop call site, where the Run Tasks drawer actually renders. */}
+          {/* FEATURE: LAV-16 -- the desktop half of the same mirrored pair; see the mobile call
+              site above. `statusMessage` is the run's OWN live status line, not copy authored
+              here -- the dial renders whatever the harness is actually saying. */}
           <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
             pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
             answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
-            runTaskEntries={runTaskEntries}/>
+            runTaskEntries={runTaskEntries}
+            booting={booting} statusMessage={status?.message ?? null}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>

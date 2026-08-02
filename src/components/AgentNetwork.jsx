@@ -1,3 +1,12 @@
+// DeepBench v7.0.50 | AgentNetwork.jsx | LAV-16 -- the Console Boot Dial gets its mount point here,
+// and it is deliberately ONE mount point serving both layouts: `.lav-stagewrap` is the wrapper class
+// the mobile return (~L1400) and the desktop return (~L1520) share verbatim, and NET_CSS gives it
+// position:relative in both, so an inset-0 child of it lands over the whole stage either way with no
+// mobile-specific branch, no media query and no second component. Its z-index sits above every other
+// stage layer (.lav-orch-flash 10, .lav-legend/.lav-mgate 20, .lav-you 30) so it covers the resting
+// node grid on desktop and the Single/Bench canvas on mobile. This file adds no derivation of its
+// own: `booting` and `statusMessage` arrive already derived from LiveAgentViewScreen, which is the
+// only place that holds the run-scoped ledger, and this component just renders them.
 // DeepBench v7.0.49 | AgentNetwork.jsx | LAV-15 -- the "Run Tasks" drawer joins the canvas, directly
 // under the Answer drawer. The two now share one absolutely-positioned left column (.lav-leftstack)
 // whose bottom is anchored to the bottom of the stage wrap -- which IS the top of the harness trace
@@ -144,6 +153,10 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 // owns the run-scoped ledger and its arrival clocks) and arrive here already folded, so this file
 // stays a renderer and holds no stream-derivation of its own.
 import RunTasks from "./RunTasks.jsx";
+// FEATURE: LAV-16 -- the boot dial. It owns its own clock, its own 45s ceiling and its own
+// reduced-motion behaviour; this file decides only WHETHER it is mounted, off a boolean the screen
+// derived. Nothing about the dial is re-implemented here and no state is added for it.
+import ConsoleBootDial from "./ConsoleBootDial.jsx";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
@@ -926,7 +939,7 @@ const NET_CSS = `
  *    the desktop composition only -- the mobile branch returns before the drawer stack (STYLE-GUIDE
  *    42). Passed at BOTH <AgentNetwork> call sites regardless, so the two payloads cannot drift.
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [] }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [], booting = false, statusMessage = null }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -1388,6 +1401,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     return (
       <div className="lav-stagewrap">
         <FeatureBadge id="MOB-4"/>
+        <FeatureBadge id="LAV-16"/>
         <style>{NET_CSS}</style>
         <div className="lav-stage" ref={mStageRef}>
           {/* Chrome: legend hard left, view toggle hard right, one row. The Choreographed/Static
@@ -1497,6 +1511,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             </div>
           )}
         </div>
+        {/* FEATURE: LAV-16 -- the mobile half of the ONE mount point. Same class, same component,
+            same props as the desktop branch below: `.lav-stagewrap` is the shared box, so the dial
+            covers the Single card and the Bench grid alike with nothing written for mobile. */}
+        {booting && <ConsoleBootDial statusMessage={statusMessage}/>}
       </div>
     );
   }
@@ -1504,6 +1522,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   return (
     <div className="lav-stagewrap">
       <FeatureBadge id="LAV-1"/>
+      <FeatureBadge id="LAV-16"/>
       <style>{NET_CSS}</style>
       {/* FEATURE: LAV-7b -- the answer, one click away and closed by default. This screen exists to
           show the agent communication, not the answer; the answer is available to anyone who wants
@@ -1709,6 +1728,11 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             new orchestration starts, even if one is still finishing. */}
         {burst && <div key={`lav-orch-flash-${burst.key}`} className="lav-orch-flash"/>}
       </div></div>
+      {/* FEATURE: LAV-16 -- the desktop half. A SIBLING of .lav-stage rather than a child of
+          .lav-inner: .lav-inner carries a transform and therefore its own stacking context, so a
+          dial placed inside it could not rise above the left drawer stack no matter its z-index,
+          and it would also be clipped to the 1200x640 canvas instead of covering the whole stage. */}
+      {booting && <ConsoleBootDial statusMessage={statusMessage}/>}
     </div>
   );
 }
