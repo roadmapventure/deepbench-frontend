@@ -1,3 +1,14 @@
+// DeepBench v7.0.49 | LiveAgentViewScreen.jsx | LAV-15 -- this screen folds the run's ledger into the
+// new Run Tasks feed and hands it to AgentNetwork, which renders it as a drawer under the Answer
+// drawer. The fold happens HERE because this file is the only one that holds both halves of the pair
+// it needs: `runHops` (the run-scoped ledger slice) and `runHopTimes` (its index-aligned arrival
+// clocks) -- the same pair the HARNESS TRACE console already consumes, so the two surfaces cannot
+// disagree about when a hop landed. `runHops`, NOT `canvasRunHops`: the canvas list is a FILTERED
+// copy, and filtering breaks the index alignment the arrival clocks depend on. buildRunTaskEntries()
+// re-applies the same prompt_assembled exclusion itself, on the aligned pair, so the feed's content
+// still matches the canvas's while its timing stays honest. Run-relative arrival is measured from
+// liveStatus.turnStartedAt -- the question's own start, not the first frame's arrival. No new state,
+// no new fetch, no new event type; the two <AgentNetwork> call sites both gain the one new prop.
 // DeepBench v7.0.41 | LiveAgentViewScreen.jsx | LAV-13 -- the Routing badge dot now pulses. A run's
 // first delegation can be 10+ seconds out; until then the canvas is empty and the badge is the only
 // thing on screen that could signal life, so a steady badge read as a frozen screen (John, live).
@@ -115,6 +126,10 @@ import {
   groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT, QaEvidenceCard,
 } from "./MarketIntelligenceScreen.jsx";
 import AgentNetwork from "../components/AgentNetwork.jsx";
+// FEATURE: LAV-15 -- the pure fold only. The drawer that renders these entries is mounted inside
+// AgentNetwork (it lives on the canvas, beneath the Answer drawer); this file owns the derivation
+// because it owns the ledger and its arrival clocks.
+import { buildRunTaskEntries } from "../components/RunTasks.jsx";
 import { ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 import { supabase } from "../lib/supabase.js";
 // FEATURE: LAV-1c -- the EST. COST meter's sumCost() delegates row-by-row to computeCallCost()
@@ -268,6 +283,11 @@ const rgba = (hex, a) =>
 
 const PROMPT_IDLE_BODY = "Waiting for a request…";
 const PROMPT_DASH = "—";
+// FEATURE: LAV-15 -- the leftmost x the canvas-overlay prompt box may reach: AgentNetwork's
+// .lav-leftstack occupies left 12 + width 280 (= 292) for its full height now that Run Tasks is
+// under the Answer drawer, and 12px of clearance puts this at 304. Named rather than inlined so the
+// dependency on that column's geometry is visible from both ends.
+const PROMPT_BOX_LEFT_BOUND = 304;
 
 // FEATURE: LAV-1d -- the ported .promptbox visual: a bottom overlay beside the canvas legend.
 // It renders the REAL streamed system prompt and nothing else -- no placeholder prompt text ever,
@@ -333,7 +353,18 @@ function PromptBox({ prompt, agents, traceRows, inline = false }) {
         title={hasText ? "Click to read the full assembled prompt" : undefined}
         style={{...(inline
             ? {position:"static",width:"100%"}
-            : {position:"absolute",right:314,bottom:8,zIndex:7,width:"min(660px, 52%)"}),
+            // FEATURE: LAV-15 -- `left` is new; `right`/`bottom`/`zIndex` and the 660px ceiling are
+            // unchanged. LAV-15's Run Tasks drawer makes the canvas's left column full-height
+            // (AgentNetwork's .lav-leftstack: left 12 + width 280 = a 292px right edge), and this
+            // box's old right-anchored `width:min(660px,52%)` puts its LEFT edge at
+            // 0.48*rowWidth - 314, which crosses 292 below a ~1262px row -- i.e. the drawer would
+            // have covered the prompt box at those widths. Bounding the left edge at 304 (12px of
+            // clearance) makes the box narrow instead of disappear underneath. `marginLeft:auto`
+            // keeps it right-anchored while over-constrained, so at every width where the old rule
+            // already cleared the column (>=1278px row) this renders in the identical place at the
+            // identical size. Never widens it: maxWidth is still the same 660px.
+            : {position:"absolute",left:PROMPT_BOX_LEFT_BOUND,right:314,bottom:8,zIndex:7,
+               maxWidth:660,marginLeft:"auto"}),
           background:rgba(T.paper, 0.94),border:`1px solid ${T.line}`,borderRadius:8,padding:"6px 11px",
           boxShadow:`0 2px 8px ${rgba(T.navy, 0.16)}`,cursor: hasText ? "pointer" : "default"}}>
         <div style={{fontFamily:mono,fontWeight:600,fontSize:8,letterSpacing:"0.1em",
@@ -666,6 +697,15 @@ export default function LiveAgentViewScreen() {
     : null;
   const answerText = result && result.kind !== "qa" ? (result.text || null) : null;
 
+  // ── LAV-15: the Run Tasks feed ──────────────────────────────────────────────────────────────
+  // Newest first, numbered ascending, one entry per completed hop. Nothing here is fetched or
+  // enriched: every line is composed from fields the frames themselves carried. The feed persists
+  // after the run goes terminal (the ledger is not cleared on a terminal frame) and resets on the
+  // next run, because `runHops` is the slice since the last question boundary.
+  const runTaskEntries = useMemo(
+    () => buildRunTaskEntries(runHops, runHopTimes, { runStartedAt: base, agents }),
+    [runHops, runHopTimes, base, agents]);
+
   // FEATURE: LAV-1f -- an open gate blocks a new question. Not a timer and not a default decision:
   // the run genuinely has not finished, and letting a new one start would silently abandon a gate
   // the harness is still holding open. The gate stays pending until a human resolves it.
@@ -811,11 +851,17 @@ export default function LiveAgentViewScreen() {
                   A deliberate reversal of the LAV-1b/1c-era "edges persist across runs" choice: a
                   line from question A survived into question B, whose node/queue state is run-scoped,
                   so it read as a line pointing at a card sitting in the queue. */}
+              {/* FEATURE: LAV-15 -- runTaskEntries is mirrored onto this mobile call site even
+                  though the mobile branch of AgentNetwork returns before the drawer stack renders
+                  it (STYLE-GUIDE 42: Answer is a tab and only a tab, and Run Tasks sits in that
+                  same left column). A prop added to one call site and not the other is exactly how
+                  a screen's two payloads drift apart unnoticed (SES-57). */}
               <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
                 traceRows={traceRows} recoveringAgentId={recoveringAgentId}
                 choreographed={choreographed} onToggleChoreographed={setChoreographed}
                 pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
-                answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}/>
+                answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
+                runTaskEntries={runTaskEntries}/>
             </div>
           ) : (
             /* Answer: CHI's own QaEvidenceCard for a real qa result, the terminal frame's own text
@@ -1005,11 +1051,13 @@ export default function LiveAgentViewScreen() {
             today's AgentNetwork, which simply ignores props it does not destructure. */}
         <div style={{position:"relative",flex:1,display:"flex",alignItems:"stretch",minHeight:0}}>
           {/* FEATURE: LAV-12 -- run-scoped `hops`, same reversal as the mobile call site above. */}
+          {/* FEATURE: LAV-15 -- the desktop call site, where the Run Tasks drawer actually renders. */}
           <AgentNetwork roster={roster} hops={canvasRunHops} runHops={canvasRunHops} running={running}
             traceRows={traceRows} recoveringAgentId={recoveringAgentId}
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
             pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
-            answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}/>
+            answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
+            runTaskEntries={runTaskEntries}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
             padding:"12px 14px",overflowY:"auto",minHeight:0}}>

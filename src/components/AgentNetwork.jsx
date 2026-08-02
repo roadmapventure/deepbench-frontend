@@ -1,3 +1,13 @@
+// DeepBench v7.0.49 | AgentNetwork.jsx | LAV-15 -- the "Run Tasks" drawer joins the canvas, directly
+// under the Answer drawer. The two now share one absolutely-positioned left column (.lav-leftstack)
+// whose bottom is anchored to the bottom of the stage wrap -- which IS the top of the harness trace
+// console, the console being this component's next sibling on the screen. The Answer drawer's own
+// props, title logic, height cap and default-closed state are all untouched; only its containing
+// block moved, and it renders at the identical left:12/top:12/width:280 it always has. The column is
+// pointer-events:none with its two drawers pointer-events:auto, so the empty space beside the canvas
+// stays as transparent to the pointer as it was before this stack existed. Run Tasks is desktop-only
+// by construction: the mobile branch returns before this block, per STYLE-GUIDE 42's locked "Answer
+// is a tab and only a tab" composition -- nothing new is hidden with a media query.
 // DeepBench v7.0.44 | AgentNetwork.jsx | MOB-8 -- the mobile canvas view toggle's "Active" label and
 // view-key are renamed "Single" (John's call, 2026-08-01); Bench, the geometry, the styling and the
 // behaviour in both views are all unchanged. This file already uses "active" for a different concept
@@ -130,6 +140,10 @@ import { QaEvidenceCard } from "../screens/MarketIntelligenceScreen.jsx";
 // FEATURE: MOB-4b -- the platform's ONE breakpoint source (STYLE-GUIDE 22). This file asks no width
 // question of its own; the hook is the only thing that decides which composition renders.
 import { useIsMobile } from "../hooks/useIsMobile.js";
+// FEATURE: LAV-15 -- the Run Tasks feed. Its entries are derived in LiveAgentViewScreen.jsx (which
+// owns the run-scoped ledger and its arrival clocks) and arrive here already folded, so this file
+// stays a renderer and holds no stream-derivation of its own.
+import RunTasks from "./RunTasks.jsx";
 
 // ── canvas space (ported viewBox) ────────────────────────────────────────────
 const VW = 1200, VH = 640;
@@ -753,8 +767,24 @@ const NET_CSS = `
   color:${T.muted};padding:6px 13px;cursor:pointer}
 .lav-seg button.on{background:${T.navy};color:${T.card}}
 /* FEATURE: LAV-7b -- the Answer drawer takes the slot .lav-seg just vacated, at the same z-index, so
-   nothing else on this canvas needs its stacking order changed. */
-.lav-answer{position:absolute;left:12px;top:12px;width:280px;z-index:8}
+   nothing else on this canvas needs its stacking order changed.
+   FEATURE: LAV-15 -- the absolute positioning moves off .lav-answer and onto the column that now
+   holds both drawers. Identical rendered geometry for the Answer drawer (left 12, top 12, width
+   280, z-index 8); what changes is that Run Tasks can sit directly beneath it and take every
+   remaining pixel down to the column's floor. The 6px bottom is .lav-stage's own bottom inset (NB:
+   no backticks in this comment -- it lives inside a JS template literal, see the .lav-medges note
+   below), so the stack ends exactly where the canvas stage does, which is the top edge of the
+   harness trace console -- that console being this component's next sibling on the screen.
+   pointer-events are granted to the DRAWERS, never to the boxes around them: this column spans the
+   canvas's left third for its whole height, and a collapsed Run Tasks drawer whose empty column box
+   still caught the pointer would be an invisible shield over that third of the canvas. */
+.lav-leftstack{position:absolute;left:12px;top:12px;bottom:6px;width:280px;z-index:8;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.lav-answer{flex:0 0 auto;pointer-events:auto}
+/* Takes the leftover height and gives it to the drawer inside, which measures it and scrolls.
+   The box stays transparent to the pointer; its child, the drawer itself, does not. */
+.lav-runtasks{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;pointer-events:none}
+.lav-runtasks > *{pointer-events:auto}
 /* FEATURE: LAV-1f -- the You node. Same node geometry as an agent card so it sits in the same
    choreography, deliberately different skin (dashed brass, no code/role row, silhouette avatar) so
    it can never be mistaken for an agent card. */
@@ -891,8 +921,12 @@ const NET_CSS = `
  *  answerText -- LAV-7b: that same terminal turn's plain message when it is not a qa result, or null
  *  answerQuestionId -- LAV-11: the id of the question that produced the current answer (captured at
  *    Run-click time by LiveAgentViewScreen.jsx), or null. Drives the Answer drawer's title only.
+ *  runTaskEntries -- LAV-15: this run's Run Tasks feed, already folded (newest first, numbered) by
+ *    buildRunTaskEntries() at the screen, which owns the ledger and its arrival clocks. Rendered by
+ *    the desktop composition only -- the mobile branch returns before the drawer stack (STYLE-GUIDE
+ *    42). Passed at BOTH <AgentNetwork> call sites regardless, so the two payloads cannot drift.
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [] }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -1476,25 +1510,33 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           it and never competes with the canvas for attention. The card is CHI's own QaEvidenceCard,
           rendered by the one implementation platform-wide. The empty state is screen chrome (the
           same register as the rail's own empty text), never a stand-in for an agent's words. */}
-      <div className="lav-answer">
-        {/* FEATURE: LAV-9a -- a long answer used to grow straight past the canvas: this drawer had no
-            height cap at all. Same props the Agent Routing drawer already uses (MI-34/MI-55) --
-            Drawer applies overflowY:auto itself the moment maxHeight is passed, so this is the
-            existing mechanism, not a new one. */}
-        {/* FEATURE: LAV-11 -- title keyed on the QUESTION id, not the gate outcome (John's literal
-            spec). If south-korea-coop ever starts passing the pre-display gate, this label would
-            then read as a guardrail catch that didn't happen -- that mislabel edge is CHI-98's to
-            resolve, not this ticket's. */}
-        <Drawer title={answerQuestionId === "south-korea-coop" ? "Answer: Agent guardrail catch" : "Answer"}
-          defaultOpen={false} maxHeight={280} resizable>
-          {answerQa
-            ? <QaEvidenceCard qa={answerQa}/>
-            : answerText
-              ? <div style={{ fontFamily: body, fontSize: 11.5, lineHeight: 1.5, color: T.ink }}>{answerText}</div>
-              : <div style={{ fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>
-                  No answer yet — appears here once a run completes.
-                </div>}
-        </Drawer>
+      {/* FEATURE: LAV-15 -- one left column, Answer on top and Run Tasks directly under it, running
+          down to the top of the harness trace console. The Answer drawer's own markup below is
+          byte-unchanged; only this wrapper is new. */}
+      <div className="lav-leftstack">
+        <div className="lav-answer">
+          {/* FEATURE: LAV-9a -- a long answer used to grow straight past the canvas: this drawer had no
+              height cap at all. Same props the Agent Routing drawer already uses (MI-34/MI-55) --
+              Drawer applies overflowY:auto itself the moment maxHeight is passed, so this is the
+              existing mechanism, not a new one. */}
+          {/* FEATURE: LAV-11 -- title keyed on the QUESTION id, not the gate outcome (John's literal
+              spec). If south-korea-coop ever starts passing the pre-display gate, this label would
+              then read as a guardrail catch that didn't happen -- that mislabel edge is CHI-98's to
+              resolve, not this ticket's. */}
+          <Drawer title={answerQuestionId === "south-korea-coop" ? "Answer: Agent guardrail catch" : "Answer"}
+            defaultOpen={false} maxHeight={280} resizable>
+            {answerQa
+              ? <QaEvidenceCard qa={answerQa}/>
+              : answerText
+                ? <div style={{ fontFamily: body, fontSize: 11.5, lineHeight: 1.5, color: T.ink }}>{answerText}</div>
+                : <div style={{ fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>
+                    No answer yet — appears here once a run completes.
+                  </div>}
+          </Drawer>
+        </div>
+        {/* FEATURE: LAV-15 -- open by default, never auto-dismissing, and reset by the next run
+            because its entries are folded from the RUN-scoped ledger slice, not the session's. */}
+        <RunTasks entries={runTaskEntries}/>
       </div>
       {/* FEATURE: LAV-7b -- legend then toggle, one row, top-right. */}
       <div className="lav-topright">
