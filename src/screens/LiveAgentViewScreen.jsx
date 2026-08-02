@@ -136,7 +136,7 @@ const MI_ROSTER_TAB = "mi";
 // FEATURE: LAV-1b -- page identity. John's explicit dual-naming call (2026-07-31): the page title
 // and the nav label are deliberately different strings and are not to be unified. The nav label is
 // LAV-1e's job; nothing in this file touches nav.
-const PAGE_TITLE = "Live Multi-Agent Routing";
+const PAGE_TITLE = "Live Multi-Agent Console";
 const PAGE_SUBTITLE = "Harness, Loop, Pattern Behavior Display";
 const PICKER_PLACEHOLDER = "Choose a question and watch the agents work…";
 

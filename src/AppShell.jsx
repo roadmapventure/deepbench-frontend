@@ -113,8 +113,8 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
       // FEATURE: SH-23 -- release-status per Work focus area (Bench item gets none)
       { label: "Work", items: [
         // FEATURE: LAV-1e -- Live Agent View first; nav label deliberately differs from the screen's
-        // own title ("Live Multi-Agent Routing") -- dual naming is John's call, do not unify.
-        { label: "Live Agent View", icon: "◎", path: "/", active: isLAV, status: FOCUS_AREA_STATUS.liveAgentView },
+        // own title ("Live Multi-Agent Console") -- dual naming is John's call, do not unify.
+        { label: "Live Agent Console", icon: "◎", path: "/", active: isLAV, status: FOCUS_AREA_STATUS.liveAgentView },
         { label: "Channel Sales Intelligence", icon: "◈", path: "/channel-intelligence", active: isMI, status: FOCUS_AREA_STATUS.channelSales },
         { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend, status: FOCUS_AREA_STATUS.projectMgmt },
         { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend, status: FOCUS_AREA_STATUS.spendAnalysis },
@@ -231,7 +231,7 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
               {/* FEATURE: SH-23 -- status per focus area */}
               {/* FEATURE: LAV-1e -- Live Agent View first; see the mobile NAV_GROUPS note on dual naming */}
               {[
-                {label:"Live Agent View",            icon:"◎", path:"/",                    status:FOCUS_AREA_STATUS.liveAgentView},
+                {label:"Live Agent Console",         icon:"◎", path:"/",                    status:FOCUS_AREA_STATUS.liveAgentView},
                 {label:"Channel Sales Intelligence", icon:"◈", path:"/channel-intelligence", status:FOCUS_AREA_STATUS.channelSales},
                 {label:"Project Management",         icon:"📋", path:"/work",          status:FOCUS_AREA_STATUS.projectMgmt},
                 {label:"Spend Analysis",             icon:"💰", path:"/work/1/analyze", status:FOCUS_AREA_STATUS.spendAnalysis},
