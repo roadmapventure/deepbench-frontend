@@ -7409,3 +7409,38 @@ LAV-14 (UI, Post-beta): small, single-item rename request — nav label "Live Ag
 - Segment scope confirmed: zero theory/hypothesis intents in either window — the LAV console genuinely stops at the analysis, matching John's premise.
 
 **Honest framing recorded:** this is 1/1 per question — a live smoke PASS on the exact surface John demos, not the 5-consecutive "100%" bar. Repeatable on demand at ≈ $0.30 per both-question pass. One stray extra run: the landing page's embedded widget fired Q1 once at 22:58 before John redirected to the LAV screen (~$0.12, excluded from the QA record).
+
+---
+
+## 2026-08-02 — S-LAV-15-design / S-LAV-15 (v7.0.49) — `Run Tasks` drawer on the Agent Console
+
+**Worktree:** `design-lav-15-0802` (design branch, switched to `session/lav-15-run-tasks-coding` for the code step). **Commits:** `2fe10ec` (path correction), `a0867d1` (build), close-out following.
+
+### The session had no design work to do
+
+John opened with "design lav-15." The kickoff doc already existed and had been respecced by him earlier the same day (`8c5a576`). Rather than re-designing, the session verified that premise fresh and said so: all six kickoff-referenced files present, `origin/dev` unmoved, no `RunTasks` anywhere in `src/` on `origin/dev`, and `dev_version_counter` sitting at `7.0.49` claimed by `design-scaling-arch-0731` — the very session that wrote the doc, so no collision. John's answer was "build it."
+
+**Process note worth keeping:** "build it" reversed a decision recorded *in the kickoff itself* — that doc said "John runs this session himself … the manual path applies." Two lines (the CONTEXT paragraph and the Manual QA Checklist heading) would have told the spawned coding agent that a human owned its QA. Both were corrected to the automated-loop path *before* spawning, and the `FEATURES.md` session cell with them. A stale process instruction inside a kickoff doc is read by the agent as authoritative; correcting it is part of flipping the path, not bookkeeping to do afterward.
+
+### Transient API failure mid-build — resumed, not restarted
+
+The first `Agent` spawn died after ~6 minutes and 16 tool uses with `ENOTFOUND` — a network failure, not a task failure. Before deciding, the session checked disk rather than assuming: clean working tree, zero commits ahead of `origin/dev`, no `RunTasks.jsx`. Nothing had persisted, so `SendMessage` resumed the same agent from its transcript, preserving ~118K tokens of orientation reads instead of paying for them twice. The resumed run completed normally. Worth repeating: **check the worktree before choosing resume-vs-restart** — the two look identical from the notification alone, and a resume onto half-written files would be the bad case.
+
+### QA — all 5 items PASS, verified live
+
+Deploy gate confirmed dev serving `a0867d1` before anything was trusted (`scripts/check-deploy-current.js`, per the standing Vercel-quota hazard). Screenshots were unavailable — the browser pane never composites frames (`document.hidden` is permanently true) — so verification ran on DOM text and computed geometry, which is the sharper instrument anyway. The `LAV-14` viewport quirk did **not** recur: `window.innerWidth` read a true 1600.
+
+- **Placement/geometry:** `.lav-leftstack` at left 12, width 280, bottom **822**; trace console (`.lavc`) top **828** — the 6px stage-floor gap, confirming the drawer expands to the trace console top as specced. Title is literally `Run Tasks` in the DOM with CSS `text-transform: uppercase`, the identical treatment `Answer` gets.
+- **Live run** (`training-turnover-benchmark`): 18 entries, contiguously numbered 18→1 newest-first, Asked/Did/Content on three lines, time signatures in the `arrived M:SS into the run · took Ns` form, **no summary entry**, feed persisted after the run button re-enabled.
+- **Guardrail demo** (`south-korea-coop`): feed reset 18→4 on the new run, gate entry carried the blocked-verdict wording, and `LAV-11`'s `Answer: Agent guardrail catch` drawer title was unaffected.
+- **Facts cross-checked, not trusted:** `eleanor · the_library · 10 chunks`, `michelle · roster · 22 chunks`, `michelle · knowledge · 4 chunks` and both delegation strings all appear verbatim in the raw trace console for the same run; all five agent name/role pairs (Michelle Manning — Project Manager, Marcus Webb — GEO CSO Expert, Owen Marsh — The Proofreader, Eleanor Voss — The Librarian, Alex Reeves — Screen Controls Editor) match `src/data/agents.js` exactly. No invented numbers or names.
+
+### The finding that mattered: a completion report's own enumeration was wrong
+
+The kickoff asked the coding session to enumerate missing stream fields so an enrichment ticket could be filed. It produced 8, each presented as freshly verified against named source lines. Live QA **disproved 3 of them**: delegation `reasoning` renders (Michelle's pick rationale appears in full on entry 16), PM-brokered hand-offs *do* carry a rich `task_description` (entry 12), and `assembly_work_complete` is emphatically not inert — it fires live and drives 8 of the 18 entries. Three others (gate per-criterion scores, `qa_answer` headline, citation source) were confirmed real and are what `LAV-17` actually scopes.
+
+Nothing shipped wrong — the feature is *better* than its own report claimed. The lesson is narrower and worth stating: **a completion report's negative claims ("field X is absent") are exactly the ones live QA is positioned to falsify, and scoping a follow-up ticket off an unverified list would have sent a future session hunting for gaps that don't exist.** `LAV-17` therefore carries an explicit caution to re-measure. Same family as `feedback-interrogate-the-metric` — a correct-looking report supporting a wrong conclusion.
+
+### Follow-ups filed
+
+`LAV-17` (Feature, Post-beta) — the three real line-richness gaps, with the re-measure caution. `LAV-18` (UI, Post-beta) — the coding session bounded the assembled-prompt box's left edge at 304px to avoid a collision with the now-full-height drawer stack; an unrequested appearance change, so John's call per the UI approval gate, and **the one QA item not directly observed** (the box did not render in any reachable state at 1600px or 1380px). `MOB-9` (UI, Post-beta) — `Run Tasks` is desktop-only by construction, consistent with §42's locked "Answer is a tab and only a tab"; a mobile home for the feed is a design question, not a port. The coding session also added a sixth hop kind (`error`) beyond the five specced — its own judgment call, accepted.
