@@ -117,8 +117,17 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 | AZ-04 | CSV upload to Supabase Storage | ❌ Missing | S-future (SH-07) |
 | AZ-05 | CSV load from Supabase Storage on return | ❌ Missing | S-future (SH-07) |
 | AZ-15 | Tab: AI Review (3-stage, RAG-augmented) | 🔶 Partial | — |
-| AZ-18 | Demo task pre-loaded: Austin FY2025 | 🔶 Partial | Blocked by SH-07 |
+| AZ-18 | Demo task pre-loaded: Austin FY2025. **Desktop auto-load removed by `SPA-1` (v7.0.51, 2026-08-02)** — desktop now lands on the data-source chooser; the demo loads only via the Load Demo card. Mobile's copy of the auto-load still runs (see `MOB-10`). | 🔶 Partial | Blocked by SH-07 |
 | AZ-20 | **New, found live-verifying `AZ-19` (✅ Done, moved to `docs/FEATURES-ARCHIVE.md`) against the real deployed dev URL.** On the mobile column-mapping page, selecting a new file updates the "Now Analyzing" label (`fileName`, context state) immediately, but tapping "← Back" before completing mapping/`Run Analysis` returns to Page 1 showing that new filename label next to the *previous* file's KPI/chart numbers (`data` doesn't recompute until analysis actually runs) — label and figures can go out of sync. No crash; edge case only. First live-reachable on mobile because `AZ-19`'s "← Back" is the first control that lets a user return to the dashboard without completing analysis on the newly-selected file — no desktop equivalent existed to expose this before. **Moved here from `FEATURES.md`'s now tier 2026-07-14 (doc-hygiene pass)** — Spend Analyzer scope, not MI loop/speed/harness/charts. | ❌ Missing | S-future |
+
+---
+
+## SPEND ANALYSIS — SPA
+
+| ID | Feature | Status | Session |
+|----|---------|--------|---------|
+| SPA-1 | Spend Analysis lands on the data-source chooser (desktop). The nav item routes to the demo task, and `AZ-18`'s auto-load skipped the existing chooser (Load Demo / Fetch State Data / Upload) straight to the Austin dashboard; John wants the choice offered. Fix: demo task early-returns out of the auto-load effect entirely — the `tasks` row `id=1` has a `csv_path`, so removing only the demo branch would fall through to `SH-07`'s Storage auto-load and skip the chooser anyway (verified live against Supabase at design time). Mobile untouched (`MOB-10`). Post-beta. | 🔨 In progress | S-SPA-1 (v7.0.51) |
+| MOB-10 | Mobile Spend Analysis parity for `SPA-1`: mobile's landing (`MobileAnalyzerHome`) has no Load Demo card, so its copy of the Austin auto-load was deliberately kept when `SPA-1` removed desktop's. Needs a real design pass: give mobile a data-source choice (demo card or equivalent) before removing its auto-load — a visual change, John approval required. Post-beta. | ❌ Missing | S-future |
 
 ---
 
