@@ -4,6 +4,25 @@
 > Google Drive retired as source of truth. GitHub is single master.
 
 ---
+## S-LOG-130 (v7.0.48, `c596b62`, 2026-08-02, worktree `log-130-claude-session-qa`) — An identity for non-browser QA calls
+
+**`LOG-130` (Observability, Post-beta) ✅ done + archived, self-verified live.** A small follow-up on `LOG-121`/`LOG-127`/`LOG-129`, prompted by John noticing the drawer's lone `Script` row and asking directly whether it was Claude's own testing.
+
+**The use case, plainly.** John: *"if you did not call from the UI, you did it during session checks — call it 'Claude Session QA' — I want to make sure we are tracking how much QA you test before a release."* The gap wasn't a missing label, it was a missing *identity slot*: the By Platform User drawer can only name a caller when it has a `visitor_id`, and `visitor_id` had exactly one source — the `db_visitor` browser cookie. A raw script call (exactly what a design session runs to verify a fix live against a real route) has no cookie and never will, so even a call both John and the session knew came from Claude had nothing to attach a name to.
+
+**Mechanism, decided conversationally before any code.** A new header, `x-db-visitor-id`, read into the same `visitor_id` field a cookie already fills — but gated to `call_source !== 'ui'` only, so a real browser can never use it to impersonate a labelled caller (its identity comes from its cookie, full stop). This mirrors the accepted-limits posture `call_source` itself already carries: self-declared, spoofable by a caller who wants to lie about it, and that's fine — its job is separating traffic John controls, not holding a security boundary.
+
+**The core claim the design made — and the reason this session is worth reading even though it shipped almost no code:** because `LOG-121`/`LOG-127`'s identity-resolution machinery (`buildIdentityIndex`/`identityForRow` in `useAIActivity.js`) already resolves *any* `visitor_id` against `known_callers` regardless of how that id arrived, giving a non-browser caller an id to carry was the entire fix. Nothing downstream needed to change. Proven true in one file: `lib/request-context.js` alone, no touch to `useAIActivity.js`, `AIActivityPanel.jsx`, or `activity-log.js` — the same pattern already proven the same day when labelling John's mobile visitor rendered correctly with zero code change.
+
+**Coding session ran real negative controls in both directions**, not just a green run: the unpatched gate fails the "header fills visitorId for a non-ui call" assertion, and the same code with the `ui` exemption stripped fails the "a browser call must never take an identity from this header" assertion — the actual security property, proven to actually depend on the code rather than passing by accident.
+
+**QA, self-verified live, both directions.** A curl call tagged `x-db-call-source: session-test` + `x-db-visitor-id: claude-session-qa` landed with exactly that `visitor_id`. The identical `x-db-visitor-id` header sent alongside real browser signals (`Sec-Fetch-*`/`sec-ch-ua`) was correctly ignored — `visitor_id` stayed null, `call_source` resolved `ui`, and the row fell into the generic "Public" bucket, proving the gate holds against the exact bypass attempt it exists to stop. One `known_callers` row (`claude-session-qa` → "Claude Session QA," inserted directly per the standing rule that this table is data, never seeded from application code) then rendered correctly on the very next tagged call: `Session Test` in By Source, `Claude Session QA` in By Caller, both sections and the header tile still reconciling exactly (22,822 calls / $228.57).
+
+**Deliberately kept separate from "Claude (QA)."** That existing label names one specific labelled *browser* visit; John's phrasing ("if you did not call from the UI... call it X") asked for the non-browser case to get its own name, not to be merged into the browser one — the two answer genuinely different questions (interactive exercise of the product vs. automated verification), and collapsing them would have lost that distinction without being asked to.
+
+**No backfill**, holding the line set at `LOG-127`: the two pre-existing `Script` rows from the day before keep no name, even though this session is highly confident (exact timestamp match to a specific manual probe) about what they were — confidence isn't the same as a captured fact, and §19i's rule doesn't carve out an exception for high confidence.
+
+---
 ## S-LOG-129 + patch (v7.0.45–v7.0.46, `075f820`, 2026-08-01, worktree `log-129-device-table-layout`) — By Platform User: real table layout, By Device
 
 **`LOG-129` (Observability, Post-beta) ✅ done + archived, self-verified live.** A follow-up on `LOG-121`/`LOG-127` (both archived) — John reviewed the drawer he'd just approved and asked for two changes, both confirmed conversationally before any kickoff was written.
