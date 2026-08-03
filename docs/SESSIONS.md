@@ -7447,6 +7447,41 @@ Nothing shipped wrong — the feature is *better* than its own report claimed. T
 
 ---
 
+## 2026-08-02 — S-LAV-16-design / S-LAV-16 (v7.0.50) — Console Boot Dial
+
+**Worktree:** `design-lav-boot-dial-0802` (design branch, switched to `session/lav-16-boot-dial-coding` for the code step). **Commits:** `9700306` (build), `1574a25` (exit-fade patch), close-out following.
+
+### Discovery corrected the premise before any code was written
+
+John's opening ask assumed a "first agent node appears" event existed and asked discovery to confirm which one. Reading `AgentNetwork.jsx` directly disproved the premise: every roster agent renders a `.lav-node` card unconditionally from first paint — there is no event that creates a node. What actually happens is a real, already-named mechanism: **"Choreographed" mode** (a toggle, default on) holds unengaged agents in a **bench queue** and promotes the first engaged agent to the **`LEAD`** choreography slot the instant `net.engaged` gets its first entry (`deriveNetwork()`, `AgentNetwork.jsx:303-313`/`:477-479`) — set by the first `runHops` entry carrying *any* `agentId`, not specifically a `delegation`-typed one. When John was later asked to resolve the one open design call, his own phrasing — "as soon as an agent's avatar appears on the choreograph screen from the queue" — matched this exact mechanism verbatim, confirming the corrected trigger rather than requiring a re-explanation.
+
+Also found live: this is not a new problem. `LiveAgentViewScreen.jsx:1-3` records `LAV-13` (v7.0.41) shipping a pulsing status badge as a stopgap for the identical dead-window complaint John had already hit once before.
+
+### Kickoff scope, verified rather than assumed
+
+The screen already exposed everything the fix needed — `canvasRunHops`, `running`, `awaiting` — so the kickoff specified a single pure derivation (`deriveBooting()`) with an explicit hard rule against any new state/ref/effect. Before finalizing scope, checked the mobile-only rendering branch (`AgentNetwork.jsx` ~L1355) that discovery had initially flagged as unverified: it shares the exact same `.lav-stagewrap` wrapper class as the desktop branch, so one mount point works unmodified on both layouts — turning what could have been a separate `MOB`-prefixed follow-up into a zero-cost inclusion in the same session.
+
+### Build caught a real spec gap; patched same session rather than shipping it broken
+
+The coding session's own completion report flagged, unprompted, that the kickoff's literal `{booting && <ConsoleBootDial/>}` mount expression (John's own requested seam — "one boolean, no new state machine") gives React no exit transition: a conditionally-rendered child is removed from the DOM instantly, with no chance for the approved "~250ms fade out" to play. Rather than accept a silently-broken piece of an already-approved behavior spec, this was fixed as an immediate same-session follow-up: `useLingeringMount(booting, 250)` keeps the dial mounted ~250ms past `booting` going false, with a `leaving` prop driving a CSS opacity transition (no new keyframe, consistent with the "no new global keyframes" constraint even at the patch level).
+
+### QA — all 5 items PASS, verified live
+
+Deploy gate confirmed dev serving `1574a25` before anything was trusted. This session's browser pane runs `document.hidden: true` (confirmed directly), so the rAF-driven numeral and the CSS `fadeIn` opacity both read frozen at their initial values throughout — the same documented `reference-chi-live-qa-input` limitation, not a regression; verified by checking `document.hidden` directly rather than assuming from the frozen readouts alone. React's `<select>` also silently ignored `form_input`'s native value-set (DOM value changed, React's internal `onChange` never fired) until the same value-tracker-reset + dispatched `change` event technique that memo already documents for chat inputs was applied — worth folding into that reference for future `<select>`-driven QA.
+
+Given animation playback was unobservable in this environment, the mount/unmount *timing* was verified independently of it — through DOM presence, not visual animation — via a single atomic in-page JS polling script (avoiding the round-trip latency that made naive step-by-step `javascript_tool` calls miss the boot window entirely on the first two attempts):
+
+- **Mount:** `.lav-bootdial` present at the first 100ms poll tick (~117ms after the click), `position:absolute`, `inset:0`, `z-index:40`, parented inside `.lav-stagewrap` — above the node range (2-9) and `.lav-orch-flash` (10) as specced.
+- **Unmount trigger:** the dial's `leaving` class began at the *exact same* 100ms sample as the first `.lav-node.is-active`/`.is-orch`/`.is-assembly` appearing (both at t=1000ms in one captured run) — direct proof the dismissal fires on the corrected trigger, not a delegation-only subset of it.
+- **Lingering-exit timing:** the dial actually left the DOM ~230ms after `leaving` began (target 250ms; the gap is explained by the poll's own 100ms granularity, not a timing defect).
+- **Caption:** showed the run's real live status text (`"Marcus is thinking…"`, sourced from `useHarnessStream`'s own `writeStatus` call) rather than invented copy, on both desktop and mobile.
+- **Mobile (375×812):** identical mount point, z-index, and caption behavior confirmed on both the Single and Bench views — no separate code path needed, matching the desktop/mobile parity finding above.
+- **Reduced motion:** the `@media (prefers-reduced-motion: reduce)` rule (`animation-duration:14s` on the sweep, `animation:none` on the breathing scale) confirmed present in the deployed component's own `<style>` tag — accepted as indirect evidence since a live OS-level toggle wasn't reachable from this environment, same allowance the kickoff's own checklist named in advance.
+
+No follow-up backlog rows filed — everything discovery corrected or QA found was resolved inside this same session, not deferred.
+
+---
+
 ## 2026-08-02 — S-SPA-1-design / S-SPA-1 (v7.0.51, `cc87b34`, worktree `design-spend-landing`) — Spend Analysis lands on the data-source chooser (desktop)
 
 **John's ask (verbatim intent):** "Currently on spend analysis, it opens with austin data loaded. However, i need the option to load a new data set. We have that screen available already. Can you make that screen be the new landing when spend analysis is chosen?"
