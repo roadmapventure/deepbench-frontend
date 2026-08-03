@@ -1,3 +1,4 @@
+// DeepBench v7.0.51 | AnalyzerScreen.jsx | SPA-1 -- Spend Analysis lands on data-source chooser (desktop demo auto-load removed)
 // DeepBench v6.3.138 | AnalyzerScreen.jsx | S-SH-23 -- focus-area release-status labels
 // DeepBench v6.2.10 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage | AZ-21 title rename
 
@@ -47,7 +48,7 @@ const NAV_GROUPS = [
 ];
 
 // FEATURE: AZ-01 — CSV upload + PapaParse
-// FEATURE: AZ-18 — Austin demo pre-load
+// FEATURE: AZ-18 — Austin demo pre-load (mobile only since SPA-1; desktop lands on chooser)
 // FEATURE: SH-07 — Auto-load CSV from Storage on return visit
 // ── Data source landing screen ──────────────────────────────────────────────
 function DataSourceScreen({ taskId }) {
@@ -62,19 +63,10 @@ function DataSourceScreen({ taskId }) {
     if (!taskId) { console.log("No taskId, skipping"); return; }
     console.log("Starting auto-load for taskId:", taskId);
     setAutoLoaded(true);
-    if (taskId === "1") {
-      console.log("Demo task detected, loading Austin CSV");
-      (async () => {
-        try {
-          const res = await fetch("/Austin_2025Data_.csv");
-          if (!res.ok) throw new Error("Could not load demo file");
-          const blob = await res.blob();
-          // autoAnalyze=true: full parse, skip mapping screen, go direct to dashboard
-          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }), null, true);
-        } catch (e) { setError("Demo failed: " + e.message); }
-      })();
-      return;
-    }
+    // FEATURE: SPA-1 — demo task lands on the data-source chooser; no auto-load.
+    // tasks row id=1 HAS a csv_path in Supabase, so falling through to the
+    // SH-07 Storage path below would auto-load anyway — the early return is load-bearing.
+    if (taskId === "1") return;
     setStorageLoading(true);
     (async () => {
       try {
