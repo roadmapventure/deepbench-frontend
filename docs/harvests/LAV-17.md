@@ -44,4 +44,17 @@ data source): `docs/SESSIONS.md` entry `design-list-arch-0802`.
 5-receipt shape vs. today's 18 frames. The fold is client-side display logic; its mechanics
 are this ticket's kickoff design question (split desktop/client vs `api/` halves there).
 Client-side companion ticket: `LAV-19` (UI) — drawer rename to `Run Assembly · <N> events`
-plus the critique-on-pass display line.
+plus the critique-on-pass display line. **Shipped 2026-08-02 (`v7.0.53`, archived) — including
+the candidates slice: `candidates_considered` now rides the `request_help` `delegation_complete`
+event.**
+
+## Constructor asymmetry — read before adding ANY further event field (S-LAV-19, 2026-08-02)
+
+Two client constructors hand-rebuild the delegation event payload from a **named field list**
+(`SES-57` mirror-payload class): `src/hooks/useHarnessStream.js` (Agent Console — carries
+`candidates_considered` as of `v7.0.53`) and `src/screens/MarketIntelligenceScreen.jsx`'s
+`onDelegationProgress` (~L3764, CHI — deliberately does NOT; no Run Assembly surface there).
+They are now asymmetric. Any kickoff executing this ticket's enrichment must list **both**
+constructors in scope per new field, or the field silently dies before render on one screen
+while fixture tests pass — exactly how `LAV-15`'s Task 3b would have failed without the
+coding session's catch.
