@@ -4,6 +4,15 @@
 > Google Drive retired as source of truth. GitHub is single master.
 
 ---
+## design-list-arch-0802 (discovery, docs-only — no version claimed, 2026-08-02, worktree `design-list-arch-0802`) — Why the Run Tasks feed reads generic, and the fix direction
+
+**Discovery session, John as chief architect: why doesn't `LAV-15-done` (Feature)'s Run Tasks drawer deliver the receipt-level insight its approved design mock showed?** Root cause, verified against source not inferred: the mock was assembled from `durable_hops`/`ai_activity_log` content, but `LAV-15`'s kickoff scoped the build to the live harness stream only ("do NOT reach into api/ or Supabase") — and the stream's frames were authored as a canvas presence ticker, carrying ids/slugs/spans but not what the delegate produced (`execute.js` ~L751/L792; only the `request_help` completion carries `reasoning`, via `LOO-012`). The drawer's honest-degrade rule then correctly renders template lines. The one rich entry in John's own screenshot (Michelle Manning — Project Manager's full pick reasoning) is the one hop type where content already travels with the event — proof the format works when fed.
+
+**Decided (John): Option A — enrich the stream at the executor's event seam;** DB-read-at-render ruled out (second story vs. the canvas, late entries, first render-time DB dependency). Written as `ARCHITECTURE.md` §19q with invariants (frame carries what it credits; existing values only, no new model calls, no Rule-#1 conditionals; per-criterion gate scores don't exist and must not be re-promised). Direction recorded on `LAV-17` (Feature, Post-beta); `LAV-19` (UI, Post-beta) filed for John's rename — header becomes `Run Assembly · <N> events` in the Agent Routing panel idiom — plus the critique-on-pass display line (pending his explicit yes at kickoff).
+
+**Process gap closed in the same pass (why the deviation happened at all):** the design→kickoff translation silently swapped the mock's data source — the coding session faithfully built its kickoff. New mandatory Architect Review bullet in `CLAUDE-DESIGN.md` Step 4: the **mock-fidelity source check** — every line of a John-approved example traces to its exact source field in the kickoff doc; unsourceable lines are flagged to John at the Step 8b stop-gate, and a scope constraint that severs a mock from its data source is itself a John-level scope decision. Also recorded honestly in §19q: the mock's "5/5 on five criteria" line was itself unbackable — no per-criterion scores exist anywhere — so part of the original promise was the mock's own fault, not the kickoff's.
+
+---
 ## S-LOG-130 (v7.0.48, `c596b62`, 2026-08-02, worktree `log-130-claude-session-qa`) — An identity for non-browser QA calls
 
 **`LOG-130` (Observability, Post-beta) ✅ done + archived, self-verified live.** A small follow-up on `LOG-121`/`LOG-127`/`LOG-129`, prompted by John noticing the drawer's lone `Script` row and asking directly whether it was Claude's own testing.

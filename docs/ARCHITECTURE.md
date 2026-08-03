@@ -2065,3 +2065,43 @@ than blank.
 Build ticket: `LOG-95` (Platform-Logging) — thread span identity through the three unwired shapes
 (`execute.js` event/result construction + the drawer's hop-event build sites). Discovery only;
 needs its own design session + Architect Review before coding.
+
+## 19q. Run Assembly Feed — Content Travels With the Event [discovery `design-list-arch-0802`, 2026-08-02]
+
+**The problem this settles:** `LAV-15`'s Run Tasks drawer (renamed **Run Assembly**, `LAV-19`)
+shipped reading only the live harness stream, whose frames were authored as a presence ticker for
+the canvas — so most entries degrade to template lines ("Alex has finished."). The design mock
+John approved was assembled from `durable_hops`/`ai_activity_log` content the stream never
+carries. Confirmed live 2026-08-02: only the `request_help` completion carries `reasoning`
+(`LOO-012`); the `delegate_to_agent` completions (`execute.js` ~L751/L792) carry ids, slugs, and
+span identity — no content about what the delegate produced.
+
+**Decision (John, 2026-08-02): enrich the stream at the event seam — the executor attaches, to
+each hop event it emits, the substantive content it already holds at that moment** (the delegate's
+returned summary/reasoning on `delegation_complete`, the gate's `eval` carried whole, the
+delegation task contract where known). The drawer stays a pure client-side fold of one stream.
+This extends §19p's principle from identity to content: what a frame credits, it carries.
+
+**Ruled out — drawer reads the durable tables post-hop (the mock's own source):** a second data
+path that can disagree with the canvas mid-run (the console's one-story rule: feed and canvas
+derive from the same frames), lands entries only after the durable write, and adds the console's
+first render-time DB dependency. The durable tables remain the *audit* source; the stream is the
+*display* source, and enrichment makes the stream sufficient.
+
+**Invariants:**
+- A hop event crediting completed work carries the content the executor already holds for that
+  work. A content-less completion frame is the bug, not a display problem.
+- Enrichment attaches **existing values only** — never a new model call, never a render-time DB
+  read, no per-agent/per-capability conditionals (Rule #1, §19d). Where the executor genuinely
+  holds nothing, the line still degrades honestly (§19j — the screen holds no content policy).
+- **Known non-derivable line, do not re-promise it:** per-criterion gate scores exist nowhere
+  (`gate.eval` = `result` + `critique` only, verified on `LAV-17`'s row). Any "scored X/5"
+  display requires a quality-gate capability change first — a separate decision, not enrichment.
+
+Build ticket: `LAV-17` (Feature) — upstream event enrichment in `api/`, re-measure its 8-item
+degradation list first (3 of 8 already disproven live). Client-side companion: `LAV-19` (UI).
+Process rule this discovery added: the mock-fidelity source check, `CLAUDE-DESIGN.md` Step 4
+Architect Review. Enforceable subset lives here as the invariants above — deliberately not a
+path-scoped `.claude/rules/` file: the constraint governs one seam (`execute.js` event emission)
+already covered by `.claude/rules/hop-event-span-identity.md`'s trigger, and a second rules file
+on the same paths would dilute it.
