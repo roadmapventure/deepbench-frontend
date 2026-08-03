@@ -1,3 +1,8 @@
+// DeepBench v7.0.53 | api/capabilities/execute.js | LAV-19 -- one additive field on one existing
+// event (§19q's smallest slice): the request_help delegation_complete emit that already carries
+// `reasoning` now also carries `candidates_considered`, the same delegateResult.content.candidates
+// value lastHelpSelection reads two lines above. No new call, no recomputation, no other event
+// touched, span identity fields byte-identical
 // DeepBench v7.0.34 | api/capabilities/execute.js | LOG-121 -- handler wrapped in
 // withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
 // site in this file changes
@@ -729,7 +734,12 @@ async function dispatchDelegation({
       // via lastHelpSelection) to this event, restoring the content the old Shape-2 "agent_selection"
       // declaration used to carry before LOO-009b removed it as a redundant crediting mechanism —
       // redundant for crediting, not for content, which is the gap this closes.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the PM -- her own resolved span
+      // FEATURE: LAV-19 (§19q) — the same candidate list `lastHelpSelection` read two lines above
+      // (delegateResult.content.candidates), attached to the event that credits the pick. Nothing
+      // recomputed, no new call, no roster filter: whatever the broker's own response returned is
+      // what travels. §19q's rule — what a frame credits, it carries — applied to the one field the
+      // Run Assembly feed needs to say who was actually weighed. Span identity fields untouched.
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null, candidates_considered: delegateResult?.content?.candidates ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the PM -- her own resolved span
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
         : { delegation_task: tool_input.task_description || tool_input.skill_needed };

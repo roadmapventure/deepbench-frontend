@@ -1,3 +1,10 @@
+// DeepBench v7.0.53 | useHarnessStream.js | LAV-19 -- one field added to the delegation_complete /
+// delegation_return ledger payload: `candidates_considered`, carried straight off the frame. This
+// hand-rebuilt payload names every field it keeps (LOO-012's list), so a field added to the emit in
+// api/capabilities/execute.js reaches the client's `evt` but is dropped here unless it is named --
+// the reason this file is in LAV-19's diff at all. CHI's mirror constructor
+// (MarketIntelligenceScreen.jsx onDelegationProgress) is deliberately NOT changed: it has no Run
+// Assembly surface, so it stays byte-identical.
 // DeepBench v7.0.8 | useHarnessStream.js | AA-179a -- captures the assembly event family
 // (`assembly_work` / `assembly_work_complete`, AA-179c's enrichment-seam emit) into the same run
 // ledger, via a plain append with a real arrival-delta duration. Inert until AA-179c ships: no
@@ -203,7 +210,10 @@ export function useHarnessStream() {
     lastEventAtRef.current = now;
     if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
       const attributedAgentId = evt.type === 'delegation_complete' ? evt.toAgentId : evt.fromAgentId;
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-19 (§19q) -- candidates_considered joins the named field list for the same
+      // reason LOO-012 added reasoning/task/toCapabilitySlug: this payload is hand-rebuilt, so an
+      // unnamed field on the frame never reaches the ledger. Carried verbatim, never derived.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;

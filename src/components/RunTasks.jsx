@@ -1,3 +1,11 @@
+// DeepBench v7.0.53 | RunTasks.jsx | LAV-19 -- three display changes, all John-approved live
+// 2026-08-02: (1) the drawer header becomes "Run Assembly · <N> events", the Agent Routing panel's
+// own idiom, replacing the "Run Tasks" title plus its separate count chip; (2) Owen Marsh -- The
+// Proofreader's verbatim eval.critique now renders on a PASS verdict too, not only on revise -- the
+// field already streams, this renders more of what the agent actually wrote; (3) a routing hop
+// carrying candidates_considered gains "Weighed <first names> --" ahead of its reasoning clause,
+// first names only (John's explicit spec), resolved through the roster map this file already holds.
+// Every one of the three degrades to the pre-change line when its field is absent (§19j).
 // DeepBench v7.0.49 | RunTasks.jsx | LAV-15 -- the "Run Tasks" drawer on the Live Multi-Agent
 // Console: one entry per completed hop, each saying what the hop was Asked to do, what it Did, and
 // what happened to the Content. Newest on top, numbered ascending (newest = highest), never
@@ -14,9 +22,10 @@ import { Drawer, ScrollFadeHint, useScrollFadeHint } from "./SharedUI.jsx";
 // Raw `ms` never renders and this file does not re-derive the format.
 import { formatLavDuration } from "./HarnessTraceConsole.jsx";
 
-// John's canonical drawer name (2026-08-02) -- verbatim, never re-worded.
-export const RUN_TASKS_TITLE = "Run Tasks";
-export const RUN_TASKS_EMPTY_TEXT = "No run tasks yet — run a question and each completed hop lands here.";
+// John's canonical drawer name (2026-08-02, LAV-19 -- supersedes "Run Tasks", his own rewording).
+// Verbatim, never re-worded again without him.
+export const RUN_ASSEMBLY_TITLE = "Run Assembly";
+export const RUN_ASSEMBLY_EMPTY_TEXT = "No events yet — run a question and each completed hop lands here.";
 
 // ── derivation ────────────────────────────────────────────────────────────────
 // Boundary markers and harness plumbing, deliberately excluded -- not hops.
@@ -49,6 +58,32 @@ export const RUN_TASK_KIND = {
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const countOf = (v) => (Array.isArray(v) ? v.length : null);
 const text = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+// "Run Assembly · 3 events" -- the live count lives IN the header, matching the Agent Routing
+// panel's own "Agent Routing · {n} hop{s}" treatment (LiveAgentViewScreen.jsx ~L444), which is why
+// the drawer no longer passes a separate `count` chip. Exported so the count and the wording are
+// asserted together rather than eyeballed.
+export const formatRunAssemblyTitle = (n) => `${RUN_ASSEMBLY_TITLE} · ${plural(n, "event")}`;
+
+// "Weighed Marcus, Alex, Riley" -- who the picker actually considered, FIRST NAMES ONLY (John's
+// explicit spec, 2026-08-02). Reads only the candidate list the frame carries; the roster map is a
+// name lookup, never a filter, so this can never widen or narrow what the broker really weighed
+// (Rule #1 / §19d -- no roster-derived candidate set). An agent_id the roster does not know renders
+// as itself rather than being dropped. Repeated ids collapse (one agent can appear as two
+// capability candidates -- "Alex, Alex" would read as a bug, not as data). Returns null when the
+// frame carries no usable list, and the caller then renders today's exact line.
+function weighedClause(candidates, byId) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+  const names = [];
+  for (const c of candidates) {
+    const id = typeof c === "string" ? text(c) : text(c?.agent_id);
+    if (!id) continue;
+    const full = text(byId?.get?.(id)?.name);
+    const first = full ? full.split(/\s+/)[0] : id;
+    if (!names.includes(first)) names.push(first);
+  }
+  return names.length ? `Weighed ${names.join(", ")}` : null;
+}
 
 // An assembly frame's kind depends on the work it reports -- a fetch is retrieval, every other
 // assembly step is drafting work. Keyed on the frame's own `work` field, never on the agent.
@@ -111,8 +146,14 @@ function deriveAsked(evt) {
 // already carries the platform's composed sentence (describeDelegationEvent, via the hook) -- that
 // verbatim line is the Did line, so the feed and the Agent Routing rail can never tell two
 // different stories about the same hop.
-function deriveDid(evt) {
+// `byId` is the roster map buildRunTaskEntries already builds, threaded in for one job only:
+// turning a candidate's agent_id into a first name (LAV-19). Nothing else here reads it.
+function deriveDid(evt, byId) {
   const d = evt.data || {};
+  // Present on the picker's frames only -- agent_selection has always carried it, and LAV-19 put it
+  // on the request_help delegation_complete emit. Null everywhere else, which is what keeps every
+  // other event type's line byte-identical.
+  const weighed = weighedClause(d.candidates_considered, byId);
   switch (evt.type) {
     case "intent_routing": {
       const intent = text(d.intent);
@@ -120,7 +161,10 @@ function deriveDid(evt) {
     }
     case "agent_selection": {
       const why = text(d.reasoning);
-      return why ? `Selected the next agent — ${why}` : "Selected the next agent.";
+      // The Weighed clause sits immediately before the reasoning clause. With no candidates the
+      // filter leaves exactly the pre-LAV-19 two cases, byte for byte.
+      const parts = [weighed, why].filter(Boolean);
+      return parts.length ? `Selected the next agent — ${parts.join(" — ")}` : "Selected the next agent.";
     }
     case "qa_answer": {
       const cites = countOf(d.citations);
@@ -139,7 +183,11 @@ function deriveDid(evt) {
       }
       const verdict = text(ev.result);
       if (!verdict) return "Reviewed the draft.";
-      const critique = verdict === "revise" ? text(ev.critique) : null;
+      // FEATURE: LAV-19 -- the gate writes a critique on a PASS verdict too and it was being thrown
+      // away; the verdict no longer gates it. `revise` is unchanged (it already showed it), the
+      // guardrail-block branch above is untouched, and a verdict with no critique still reads
+      // exactly as before -- the screen still authors nothing (§19j).
+      const critique = text(ev.critique);
       return critique
         ? `Scored the draft — verdict ${verdict}: ${critique}`
         : `Scored the draft — verdict ${verdict}.`;
@@ -163,8 +211,11 @@ function deriveDid(evt) {
     case "delegation_complete": {
       const msg = text(d.message);
       const why = text(d.reasoning);
-      if (msg && why) return `${msg} — ${why}`;
-      return msg || why;
+      // Same ordering rule as agent_selection: composed sentence, then who was weighed, then why.
+      // A completion with no candidates (every delegate_to_agent completion, today and after
+      // LAV-19) joins exactly the two fields it always did.
+      const parts = [msg, weighed, why].filter(Boolean);
+      return parts.length ? parts.join(" — ") : null;
     }
     case "assembly_work":
     case "assembly_work_complete": {
@@ -273,7 +324,7 @@ export function buildRunTaskEntries(events, eventTimes, { runStartedAt = null, a
       agentName: agent?.name || evt.agentId || null,
       agentRole: agent?.role || null,
       asked: deriveAsked(evt),
-      did: deriveDid(evt),
+      did: deriveDid(evt, byId),
       content: deriveContent(evt),
       arrivedAtMs: at != null && base != null ? Math.max(0, at - base) : null,
       durationMs: evt.durationMs ?? null,
@@ -398,13 +449,15 @@ export default function RunTasks({ entries = [] }) {
 
   return (
     <div className="lav-runtasks" ref={boxRef}>
-      <Drawer title={RUN_TASKS_TITLE} count={entries.length} defaultOpen>
+      {/* The count now lives in the title itself (LAV-19), so no `count` chip is passed -- passing
+          both would print the number twice. */}
+      <Drawer title={formatRunAssemblyTitle(entries.length)} defaultOpen>
         <div ref={bodyWrapRef} style={{ position: "relative", minHeight: 0 }}>
           <div ref={scrollRef} onScroll={onScroll}
             style={{ height: bodyH, overflowY: "auto", scrollbarWidth: "thin" }}>
             {entries.length === 0
               ? <div style={{ fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>
-                  {RUN_TASKS_EMPTY_TEXT}
+                  {RUN_ASSEMBLY_EMPTY_TEXT}
                 </div>
               : entries.map((e, i) => <RunTaskEntry key={e.key} entry={e} first={i === 0}/>)}
           </div>
