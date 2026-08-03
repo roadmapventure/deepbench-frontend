@@ -126,7 +126,6 @@ Areas: `SH`=Shell, `DB`=Dashboard, `AW`=Assign Work, `TI`=Task Instructions, `AZ
 
 | ID | Feature | Status | Session |
 |----|---------|--------|---------|
-| SPA-1 | Spend Analysis lands on the data-source chooser (desktop). The nav item routes to the demo task, and `AZ-18`'s auto-load skipped the existing chooser (Load Demo / Fetch State Data / Upload) straight to the Austin dashboard; John wants the choice offered. Fix: demo task early-returns out of the auto-load effect entirely — the `tasks` row `id=1` has a `csv_path`, so removing only the demo branch would fall through to `SH-07`'s Storage auto-load and skip the chooser anyway (verified live against Supabase at design time). Mobile untouched (`MOB-10`). Post-beta. | 🔨 In progress | S-SPA-1 (v7.0.51) |
 | MOB-10 | Mobile Spend Analysis parity for `SPA-1`: mobile's landing (`MobileAnalyzerHome`) has no Load Demo card, so its copy of the Austin auto-load was deliberately kept when `SPA-1` removed desktop's. Needs a real design pass: give mobile a data-source choice (demo card or equivalent) before removing its auto-load — a visual change, John approval required. Post-beta. | ❌ Missing | S-future |
 
 ---

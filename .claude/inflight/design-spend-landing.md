@@ -1,1 +1,0 @@
-Worktree `design-spend-landing` — S-SPA-1-design (v7.0.51): Spend Analysis (desktop) lands on the data-source chooser instead of Austin auto-load. Kickoff committed; coding session spawned in this worktree on `session/spa-1-coding`. Mobile parity filed as MOB-10 (FEATURES-LATER.md).

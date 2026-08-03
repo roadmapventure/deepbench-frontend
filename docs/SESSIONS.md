@@ -7444,3 +7444,21 @@ Nothing shipped wrong — the feature is *better* than its own report claimed. T
 ### Follow-ups filed
 
 `LAV-17` (Feature, Post-beta) — the three real line-richness gaps, with the re-measure caution. `LAV-18` (UI, Post-beta) — the coding session bounded the assembled-prompt box's left edge at 304px to avoid a collision with the now-full-height drawer stack; an unrequested appearance change, so John's call per the UI approval gate, and **the one QA item not directly observed** (the box did not render in any reachable state at 1600px or 1380px). `MOB-9` (UI, Post-beta) — `Run Tasks` is desktop-only by construction, consistent with §42's locked "Answer is a tab and only a tab"; a mobile home for the feed is a design question, not a port. The coding session also added a sixth hop kind (`error`) beyond the five specced — its own judgment call, accepted.
+
+---
+
+## 2026-08-02 — S-SPA-1-design / S-SPA-1 (v7.0.51, `cc87b34`, worktree `design-spend-landing`) — Spend Analysis lands on the data-source chooser (desktop)
+
+**John's ask (verbatim intent):** "Currently on spend analysis, it opens with austin data loaded. However, i need the option to load a new data set. We have that screen available already. Can you make that screen be the new landing when spend analysis is chosen?"
+
+**What existed:** the chooser John remembered is `AnalyzerScreen.jsx`'s `DataSourceScreen` (desktop stage `"overview"`) — Load Demo (City of Austin) / Fetch State Data / Upload Your Own File — already the default stage. It was invisible because `AZ-18`'s mount effect auto-fetched `/Austin_2025Data_.csv` for `taskId === "1"` (the nav route's demo task) with `autoAnalyze=true`, skipping mapping and landing on the dashboard.
+
+**The design finding that shaped the fix:** deleting only the demo branch would have failed silently — Architect Review's schema check found `tasks` id=1 carries `csv_path='global/1/Austin_2025Data_.csv'`, so execution would have fallen through to `SH-07`'s Storage auto-load and skipped the chooser anyway. Fix: full early return for the demo task before both load paths. `loadDemo`, the `SH-07` Storage path (non-demo return visits), and `MobileAnalyzerHome`'s auto-load copy all deliberately byte-identical.
+
+**Scope split (John's explicit call):** desktop only. Mobile's landing has no Load Demo card — removing its auto-load would strand mobile users with no one-tap Austin; filed `MOB-10` (Post-beta, `FEATURES-LATER.md`) for a real mobile design pass. `AZ-18`'s legacy row annotated.
+
+**Coding session (Sonnet 5, mechanical tier):** clean run — 1 file, 6 insertions/14 deletions matching the kickoff verbatim, 9/9 test checks, build clean, pushed `cc87b34`.
+
+**QA (design session, live against dev):** deploy gate PASS (cc87b34 serving). Chooser renders at `/work/1/analyze` desktop; network log discriminates the fix's path — zero Austin/Storage fetches across two desktop loads; the single CSV fetch in the log belonged to the pane's initial mobile-layout render, which doubles as the mobile-unchanged check passing. Load Demo → auto-mapped Column Mapping → Run Analysis → full dashboard ($372,988,798 / 11,711 rows). Fetch card → `/work/1/fetch`. Console clean. Documented indirect acceptances: `SH-07` non-demo auto-load (source diff; no other `tasks` row has `csv_path` to exercise live) and Upload's native picker (pane can't drive it). **Pane note for future QA:** the browser pane starts at `innerWidth 0` → mobile layout; `resize_window` with explicit `width`/`height` (not a preset) restores desktop, then reload — softer instance of the `S-LAV-14` quirk, workable this time. Also: the first-visit splash overlay eats clicks aimed at the page beneath (`elementFromPoint` proved it) — close it before clicking.
+
+**Flagged for John (Tier 2):** the demo is now 2 clicks — Load Demo, then Run Analysis on the auto-mapped mapping screen — where auto-load was 0. That's the chooser flow's pre-existing behavior (`loadDemo` doesn't pass `autoAnalyze`); making the card one-click is a trivial follow-up if he wants it.
