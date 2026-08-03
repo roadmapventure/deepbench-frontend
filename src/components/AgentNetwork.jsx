@@ -1,3 +1,21 @@
+// DeepBench v7.0.52 | AgentNetwork.jsx | LAV-20/MOB-11 -- the canvas stops narrating and starts
+// leaving a trace. Three things move, and they are one decision: (1) the legend names exactly the
+// three routing meanings that can really cross a line -- Delegate / Result / Iterate -- so Link,
+// Hand-off and Assembly work leave the legend while their canvas behaviours stay; (2) WHILE a run is
+// live every solid line carries its own word, in-flight blue included ("Delegate" -- LAV-9a's
+// deliberate no-word-while-open rule and its 2-full/3-fading recency cap are both deleted, not
+// relaxed: John's call is that a line the user can see is a line the user can read); (3) the moment
+// the run ends EVERY session-observed edge settles to the original dashed tan LINK_COLOR trace --
+// thin, wordless, arrowless, motionless -- so what remains on the canvas is how much communication
+// was carried, not who said what. That settle is what makes brass unreachable: an unresolved
+// delegation can no longer be distinguished after terminal, so HANDOFF_COLOR and its map entry are
+// removed rather than left as a colour nothing can ever wear (flagged to John twice, accepted).
+// The one render rule both layouts read is edgeRenderStyle() -- desktop and the mobile Bench fold
+// call the same pure function, so the two compositions cannot drift on this. MOB-11: the mobile
+// mini-node's three LIVE states (is-active / is-assembly / is-orch) now breathe instead of holding a
+// static drop-shadow -- desktop's lavRipple/spin semantics expressed on the only element a mini node
+// has, its avatar glow, with no new DOM and no new global keyframe. is-done and is-recovering stay
+// deliberately still: motion means "happening right now" here, exactly as it does on the edges.
 // DeepBench v7.0.50 | AgentNetwork.jsx | LAV-16 -- the Console Boot Dial gets its mount point here,
 // and it is deliberately ONE mount point serving both layouts: `.lav-stagewrap` is the wrapper class
 // the mobile return (~L1400) and the desktop return (~L1520) share verbatim, and NET_CSS gives it
@@ -221,22 +239,29 @@ const YOU_LABEL = "You";
 const rgba = (hex, a) =>
   `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
 
-// Pulse/edge vocabulary. Four real meanings, four tokens -- the legend renders these same values.
-export const LINK_COLOR = T.line;                              // an observed path, at rest
+// Pulse/edge vocabulary. Three routing meanings the legend names, plus the at-rest trace colour.
+// FEATURE: LAV-20 -- HANDOFF_COLOR (T.brass -- "dispatched, never returned before terminal") is
+// deleted here, not merely unlisted. It was only ever reachable through sessionEdges' `!running`
+// branch, and the post-run settle below now renders EVERY session edge, resolved or not, as the
+// LINK_COLOR trace -- so no line can wear brass again. Keeping the constant would leave a named
+// meaning nothing on this canvas can ever mean.
+export const LINK_COLOR = T.line;                              // an observed path at rest -- the post-run trace
 export const DISPATCH_COLOR = ACTION_TEXT_COLORS_FETCH.CLICK;  // a delegation going out
 export const REPORT_COLOR = T.moss;                            // control/result coming back
 export const REDISPATCH_COLOR = T.flag;                        // the same pair crossed again this run
-export const HANDOFF_COLOR = T.brass;                          // dispatched, never returned before terminal
 
 // FEATURE: LAV-5b -- the legend's own words, keyed by the meaning colours defined immediately above.
-// The lit-line label and the legend below both render from this one map, so they can never disagree,
-// and a colour that is not a routing meaning (LINK_COLOR at rest, ASSEMBLY_COLOR) is deliberately
-// absent: `get` returns undefined and the line carries NO word. Never a default label.
+// The lit-line label and both legends render from this one map, so they can never disagree, and a
+// colour that is not a routing meaning (LINK_COLOR at rest, ASSEMBLY_COLOR) is deliberately absent:
+// `get` returns undefined and the line carries NO word. Never a default label.
+// FEATURE: LAV-20 -- John's three canonical words, verbatim and exhaustive: "Report back" ->
+// "Result", "Re-dispatch" -> "Iterate", Hand-off removed with its colour. This map is now the whole
+// legend on BOTH layouts -- the desktop row iterates it directly rather than hand-listing chips, so
+// a fourth meaning could never appear on a line without appearing in the legend too.
 export const EDGE_MEANING_LABEL = new Map([
   [DISPATCH_COLOR,   "Delegate"],
-  [REPORT_COLOR,     "Report back"],
-  [REDISPATCH_COLOR, "Re-dispatch"],
-  [HANDOFF_COLOR,    "Hand-off"],
+  [REPORT_COLOR,     "Result"],
+  [REDISPATCH_COLOR, "Iterate"],
 ]);
 
 // FEATURE: LAV-5b -- "claude-haiku-4-5-20251001" -> "Haiku". Parsed from the real id, never a lookup
@@ -261,8 +286,11 @@ export function isAssemblyHop(hop) {
 
 // Assembly work is quiet infrastructure, not a routing decision: its own tint, distinct from brass
 // (routing), CLICK blue (orchestrating), moss (complete) and flag (error/recovery).
+// FEATURE: LAV-20 -- ASSEMBLY_LEGEND_LABEL ("Assembly work") is removed with the legend chip it was
+// the text of, on both layouts. The RING itself is untouched and still renders on any card doing
+// assembly work: John's decision was that the legend names three things, not that the canvas stops
+// showing assembly work. The tint below is therefore still very much alive.
 export const ASSEMBLY_COLOR = T.mutedDeep;
-export const ASSEMBLY_LEGEND_LABEL = "Assembly work";
 
 // A missing count renders this, never 0-as-a-guess and never invented copy
 // (.claude/rules/agent-section-rendering.md).
@@ -406,22 +434,24 @@ export function pulsesForHop(hop, index, priorHops) {
   return [];
 }
 
-// Every session-observed edge, with the colour that describes its last known meaning. An edge whose
-// delegation was still open when the run went terminal is the run's real hand-off (brass).
-export function sessionEdges(hops, runHops, running) {
+// Every session-observed edge, at its base colour.
+// FEATURE: LAV-20 -- that base colour is now ALWAYS LINK_COLOR, and the `handoff` flag is gone with
+// it. This function used to answer a second question -- "was this delegation still open when the run
+// went terminal?" -- and paint that edge brass. John's post-run settle removes the question: after
+// terminal every line is the same dashed tan trace, so an unresolved delegation is no longer
+// distinguishable on the canvas (raised with him twice, explicitly accepted). The open/pulsed
+// meanings a line wears WHILE running never came from here at all -- they come from the render rule
+// below, off edgeActivity() and the live open set -- so nothing that survives the run lost a source.
+// `runHops`/`running` are no longer parameters: an argument nothing reads is a claim this derivation
+// still depends on the run, and it does not.
+export function sessionEdges(hops) {
   const seen = new Map();
   for (const h of hops) {
     if (h.type !== "delegation" || !h.agentId || !h.secondaryAgentId) continue;
     const k = edgeKey(h.agentId, h.secondaryAgentId);
     if (!seen.has(k)) seen.set(k, { key: k, from: h.agentId, to: h.secondaryAgentId });
   }
-  const { openByTarget } = deriveNetwork(runHops);
-  const openKeys = new Set([...openByTarget.entries()].map(([to, from]) => edgeKey(from, to)));
-  return [...seen.values()].map(e => ({
-    ...e,
-    color: (!running && openKeys.has(e.key)) ? HANDOFF_COLOR : LINK_COLOR,
-    handoff: !running && openKeys.has(e.key),
-  }));
+  return [...seen.values()].map(e => ({ ...e, color: LINK_COLOR }));
 }
 
 // FEATURE: LAV-9a -- an edge is ONE physical line, drawn in the direction its delegation first ran; a
@@ -454,16 +484,41 @@ export function edgeActivity(runHops) {
   return { colors, order };
 }
 
-// FEATURE: LAV-9a -- the last-N-labels-visible rule, as a pure rank lookup: the 2 most-recently-
-// active edges get a full-opacity label, the 3rd gets a fading one, anything older gets none. A
-// single named export so the render loop and the Node test both read the exact same tiers.
-export const LABEL_FULL_COUNT = 2;
-export const LABEL_FADE_COUNT = 3;
-export function labelOpacityForRank(rank) {
-  if (rank < 0) return 0;
-  if (rank < LABEL_FULL_COUNT) return 1;
-  if (rank < LABEL_FADE_COUNT) return 0.45;
-  return 0;
+// FEATURE: LAV-20 -- ONE render rule for one edge, read by BOTH layouts (the desktop loop and the
+// mobile Bench fold call this same function), replacing LAV-9a's `labelOpacityForRank` and its
+// LABEL_FULL_COUNT/LABEL_FADE_COUNT tiers -- deleted, because John's decision is that every solid
+// line is named, which leaves the recency ranking nothing to rank.
+//
+// Two states, and `running` alone decides which:
+//   running  -- a line is SOLID if it is genuinely open or has really carried a pulse this run, and
+//               a solid line always carries its own word at full opacity: the open line reads
+//               "Delegate" (previously deliberately wordless -- the motion was supposed to say it),
+//               a pulsed line reads its last meaning's word. A session edge with no traffic THIS run
+//               stays the dashed, wordless trace it already was.
+//   !running -- EVERY edge is the trace: dashed, LINK_COLOR, thin, no word, no arrow, no motion. No
+//               colour is kept, so this branch reads no per-edge state at all -- that total
+//               independence is what makes the settle land in one render rather than waiting on the
+//               visual-open floor to drain.
+// The word always comes from EDGE_MEANING_LABEL keyed on the colour ACTUALLY drawn, so a stroke the
+// map has no word for can never invent one.
+export function edgeRenderStyle({ open, pulsed, active, running }) {
+  if (!running) {
+    return { stroke: LINK_COLOR, solid: false, animated: false, arrowColor: null,
+             width: 1.6, dash: "2 7", opacity: 0.9, label: null };
+  }
+  const stroke = open ? DISPATCH_COLOR : (pulsed || LINK_COLOR);
+  const animated = open || !!pulsed;
+  const solid = animated || !!active;
+  return {
+    stroke,
+    solid,
+    animated,
+    arrowColor: open ? DISPATCH_COLOR : pulsed,
+    width: solid ? 2.2 : 1.6,
+    dash: solid ? undefined : "2 7",
+    opacity: solid ? 1 : 0.9,
+    label: solid ? (EDGE_MEANING_LABEL.get(stroke) ?? null) : null,
+  };
 }
 
 // ── layout ───────────────────────────────────────────────────────────────────
@@ -777,10 +832,9 @@ const NET_CSS = `
   border-radius:20px;padding:6px 11px}
 .lav-legend span{display:inline-flex;align-items:center;gap:5px}
 .lav-legend .sw{width:15px;height:3px;border-radius:2px}
-/* FEATURE: AA-179b -- a RING swatch, not a bar. The five bars above are edge/pulse colours; this
-   one is a node state, and drawing it as a bar would imply an assembly edge exists. It never does. */
-.lav-legend .sw-ring{width:11px;height:11px;border-radius:50%;border:2px solid ${ASSEMBLY_COLOR};
-  background:transparent}
+/* FEATURE: LAV-20 -- AA-179b's ring swatch rule is deleted here (and in .lav-mlegend below) because
+   no legend renders a .sw-ring any more. The ring on the NODE (.lav-ring, is-assembly) is untouched
+   and still the canvas's statement that a card is doing assembly work. */
 .lav-seg{display:flex;align-items:stretch;background:${T.card};flex-shrink:0;
   border:1px solid ${T.line};border-radius:8px;overflow:hidden;box-shadow:0 2px 6px ${rgba(T.navy, 0.16)}}
 .lav-seg button{border:none;background:transparent;font-family:${body};font-weight:600;font-size:11px;
@@ -843,10 +897,6 @@ const NET_CSS = `
   font-family:${mono};font-size:7px;color:${T.muted};line-height:1}
 .lav-mlegend span{display:inline-flex;align-items:center;gap:3px}
 .lav-mlegend .sw{width:11px;height:2px;border-radius:1px;flex:none}
-/* A RING, not a bar -- assembly work is a node state and never an edge, exactly as the desktop
-   legend's own sw-ring says. */
-.lav-mlegend .sw-ring{width:9px;height:9px;border-radius:50%;border:2px solid ${ASSEMBLY_COLOR};
-  background:transparent;flex:none}
 .lav-mseg{display:flex;align-items:stretch;height:19px;flex:none;margin-left:auto;padding:1px;
   background:${T.card};border:1px solid ${T.brass};border-radius:20px;
   box-shadow:0 2px 7px ${rgba(T.navy, 0.14)}}
@@ -888,11 +938,42 @@ const NET_CSS = `
    literal, so a backtick here ends the string. That is what broke this build once already.) */
 .lav-mrole{font-family:${mono};font-size:7px;color:${T.muted};line-height:1.15;margin-top:1px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* FEATURE: MOB-11 -- the three LIVE mini-node states breathe; the two settled ones do not.
+   John, live on his phone: the Bench view read as a dead screen because a working agent got the
+   same static drop-shadow a finished one did, while desktop has said "working" with continuous
+   motion since LAV-1 (.lav-ring lavRipple on is-active/is-assembly, .lav-spin on is-orch). A mini
+   node has neither a ring element nor a spin element -- 38px of avatar and two lines of text is the
+   whole node -- so the motion goes on the ONE surface it does have, the avatar's own glow, as a
+   keyframed scale + shadow breath. No new DOM, no new global keyframe in tokens.js, and no change
+   to which class any node gets: this is the existing five filter rules, three of them animated.
+   Cadence carries the same meaning split desktop draws: is-active/is-assembly breathe at lavRipple's
+   own 1.1s (something is happening right now), is-orch breathes slowly at 2.4s -- holding open
+   delegations is a sustained state, which is what desktop's languid 6s spin says there.
+   is-done and is-recovering stay deliberately static: motion means "happening right now" on this
+   canvas, exactly as it does on the edges after LAV-20's settle. Scale stays <=1.1 so a breathing
+   node cannot collide with its neighbour -- MOB-7 measured only a 6px gutter between ring slots. */
+@keyframes lavMobBreathActive{
+  0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px ${rgba(T.brass, 0.55)})}
+  50%{transform:scale(1.09);filter:drop-shadow(0 0 13px ${rgba(T.brass, 1)})}}
+@keyframes lavMobBreathAssembly{
+  0%,100%{transform:scale(1);filter:drop-shadow(0 0 5px ${rgba(ASSEMBLY_COLOR, 0.5)})}
+  50%{transform:scale(1.07);filter:drop-shadow(0 0 12px ${rgba(ASSEMBLY_COLOR, 0.95)})}}
+@keyframes lavMobBreathOrch{
+  0%,100%{transform:scale(1);filter:drop-shadow(0 0 7px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.55)})}
+  50%{transform:scale(1.06);filter:drop-shadow(0 0 15px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 1)})}}
 .lav-mnode.is-recovering .lav-mava{filter:drop-shadow(0 0 7px ${rgba(T.flag, 0.9)})}
-.lav-mnode.is-active .lav-mava{filter:drop-shadow(0 0 8px ${rgba(T.brass, 0.9)})}
 .lav-mnode.is-done .lav-mava{filter:drop-shadow(0 0 5px ${rgba(T.mossLight, 0.85)})}
-.lav-mnode.is-assembly .lav-mava{filter:drop-shadow(0 0 7px ${rgba(ASSEMBLY_COLOR, 0.85)})}
-.lav-mnode.is-orch .lav-mava{filter:drop-shadow(0 0 9px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.9)})}
+/* The filter on each live rule below is the resting/reduced-motion baseline -- the state still reads
+   correctly if the animation never plays; the animation then takes it over while it does. */
+.lav-mnode.is-active .lav-mava{filter:drop-shadow(0 0 8px ${rgba(T.brass, 0.9)});
+  animation:lavMobBreathActive 1.1s ease-in-out infinite}
+.lav-mnode.is-assembly .lav-mava{filter:drop-shadow(0 0 7px ${rgba(ASSEMBLY_COLOR, 0.85)});
+  animation:lavMobBreathAssembly 1.1s ease-in-out infinite}
+.lav-mnode.is-orch .lav-mava{filter:drop-shadow(0 0 9px ${rgba(ACTION_TEXT_COLORS_FETCH.CLICK, 0.9)});
+  animation:lavMobBreathOrch 2.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){
+  .lav-mnode.is-active .lav-mava,.lav-mnode.is-assembly .lav-mava,.lav-mnode.is-orch .lav-mava{
+    animation:none}}
 /* Single view's connector: positioned HTML in the same percentage space the two cards are laid out
    in, deliberately NOT an svg in a preserveAspectRatio box -- that drifts off the cards at stage
    heights nobody tested (found live in the mock). Colour and word are the edge's own. */
@@ -970,7 +1051,9 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
-  const edges = useMemo(() => sessionEdges(hops, runHops, running), [hops, runHops, running]);
+  // FEATURE: LAV-20 -- sessionEdges() no longer takes the run: it answers only "which pairs has this
+  // session ever observed", and the whole running/settled distinction is edgeRenderStyle()'s.
+  const edges = useMemo(() => sessionEdges(hops), [hops]);
   // FEATURE: LAV-9a -- what each line has really carried this run, and how recently. Both are pure
   // folds over runHops, so a re-render can never disagree with the ledger the way the old imperative
   // single-lit-edge state could. `recentOrder` is most-recent-first; an edge's index in it IS its
@@ -1348,35 +1431,32 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     return m;
   }, [benchNodes, mBox]);
 
-  // Each real observed edge with the look the desktop loop already gives it -- open beats pulsed
-  // beats resting, motion only while the run is live. Folded once here so the render below stays a
-  // map, and so the legend can read the same colours the lines are actually drawn in.
+  // Each real observed edge with the look the desktop loop gives it -- literally the same look, off
+  // the same edgeRenderStyle() call (FEATURE: LAV-20). Folded once here so the render below stays a
+  // map, and so the legend can read the same colours the lines are actually drawn in. The post-run
+  // trace settle therefore reaches the mobile Bench canvas with no mobile-specific branch at all.
   const mobileEdges = useMemo(() => edges.map(e => {
-    const open = visuallyOpenKeys.has(e.key);
     const ck = canonicalEdgeKey(e.from, e.to);
-    const pulsed = activity.colors.get(ck) || null;
-    const active = recentOrder.indexOf(ck) !== -1;
-    return {
-      key: e.key, from: e.from, to: e.to, handoff: e.handoff, active,
-      stroke: open ? DISPATCH_COLOR : (pulsed || e.color),
-      animated: open || (running && !!pulsed),
-      arrowColor: open ? DISPATCH_COLOR : pulsed,
-    };
+    const s = edgeRenderStyle({
+      open: visuallyOpenKeys.has(e.key),
+      pulsed: activity.colors.get(ck) || null,
+      active: recentOrder.indexOf(ck) !== -1,
+      running,
+    });
+    return { key: e.key, from: e.from, to: e.to, ...s };
   }), [edges, visuallyOpenKeys, activity, recentOrder, running]);
 
   // The legend's words are EDGE_MEANING_LABEL's, in the map's own order -- nothing is authored here
   // and nothing re-orders as meanings arrive. Only the meanings this run has REALLY produced are
-  // listed, which is what keeps the row near the three items 402px fits; a colour the map has no
-  // word for (LINK_COLOR at rest) contributes none, exactly as the on-line label rule already works.
-  // Past three the row wraps and eats canvas height -- known, accepted, tracked as MOB-5.
+  // listed; a colour the map has no word for (LINK_COLOR -- every line once the run settles)
+  // contributes none, exactly as the on-line label rule already works, so the mobile legend empties
+  // itself at terminal along with the lines. FEATURE: LAV-20 -- the row can no longer exceed three
+  // entries (the map is three), which retires MOB-5's wrap risk here, and the assembly chip
+  // `mobileAssemblyLit` is gone per John's "only have [3]" -- the ring on the node stays.
   const mobileLegend = useMemo(() => {
     const lit = new Set(mobileEdges.map(e => e.stroke));
     return [...EDGE_MEANING_LABEL.keys()].filter(c => lit.has(c));
   }, [mobileEdges]);
-  // Gated on `running` for the same reason the node class is: assemblyActive can still hold an
-  // agent after the stream ends, and a legend entry for a tint no node is wearing would be a word
-  // with nothing on the canvas behind it.
-  const mobileAssemblyLit = running && net.assemblyActive.size > 0;
 
   // Single view's subject: the most recently active edge (recentOrder is already ranked by the fold
   // index of each edge's last real pulse). recentOrder holds CANONICAL keys, which are direction-
@@ -1442,12 +1522,11 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           {/* Chrome: legend hard left, view toggle hard right, one row. The Choreographed/Static
               control is deliberately absent -- it tunes a choreography this layout does not use. */}
           <div className="lav-mchrome">
-            {(mobileLegend.length > 0 || mobileAssemblyLit) && (
+            {mobileLegend.length > 0 && (
               <div className="lav-mlegend">
                 {mobileLegend.map(c => (
                   <span key={c}><span className="sw" style={{ background: c }}/>{EDGE_MEANING_LABEL.get(c)}</span>
                 ))}
-                {mobileAssemblyLit && <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>}
               </div>
             )}
             <div className="lav-mseg">
@@ -1474,9 +1553,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                     return (
                       <g key={e.key}>
                         <path d={d} fill="none" stroke={e.stroke} strokeLinecap="round"
-                          strokeWidth={(e.animated || e.active || e.handoff) ? 2.2 : 1.6}
-                          strokeDasharray={(e.animated || e.active) ? undefined : "2 7"}
-                          opacity={(e.animated || e.active) ? 1 : 0.9}/>
+                          strokeWidth={e.width} strokeDasharray={e.dash} opacity={e.opacity}/>
                         {e.animated && <LoopingArrow d={d} color={e.arrowColor}/>}
                       </g>
                     );
@@ -1596,15 +1673,16 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
       </div>
       {/* FEATURE: LAV-7b -- legend then toggle, one row, top-right. */}
       <div className="lav-topright">
+        {/* FEATURE: LAV-20 -- exactly three chips, and they are not authored here: the row IS
+            EDGE_MEANING_LABEL, in the map's own order, so the legend and the words riding the lines
+            are the same three strings by construction and a rename can only ever happen once. Link
+            left because after this session's settle the tan line is the trace itself, not a meaning
+            to look up; Hand-off left because it became unreachable; Assembly work left because John
+            asked for three -- its RING still renders on the cards, both layouts. */}
         <div className="lav-legend">
-          <span><span className="sw" style={{ background: LINK_COLOR }}/>Link</span>
-          <span><span className="sw" style={{ background: HANDOFF_COLOR }}/>Hand-off</span>
-          <span><span className="sw" style={{ background: DISPATCH_COLOR }}/>Delegate</span>
-          <span><span className="sw" style={{ background: REPORT_COLOR }}/>Report back</span>
-          <span><span className="sw" style={{ background: REDISPATCH_COLOR }}/>Re-dispatch</span>
-          {/* FEATURE: AA-179b -- the one node-state entry on this legend, and the reason the canvas
-              can be read honestly: a ring with no arrow touching it is assembly work. */}
-          <span><span className="sw-ring"/>{ASSEMBLY_LEGEND_LABEL}</span>
+          {[...EDGE_MEANING_LABEL].map(([c, word]) => (
+            <span key={word}><span className="sw" style={{ background: c }}/>{word}</span>
+          ))}
         </div>
         <div className="lav-seg">
           <button className={choreographed ? "on" : ""} onClick={() => onToggleChoreographed(true)}>Choreographed</button>
@@ -1618,48 +1696,38 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             {/* FEATURE: LAV-9a -- no spotlight. EVERY edge this run has really carried traffic on is
                 drawn solid in its OWN last meaning colour, and every one of them is arrow-animated
                 simultaneously while the run is live -- that simultaneity IS the statement "N agents
-                are talking at once", which a single lit line could never make. Motion means
-                "happening right now", so it stops everywhere the moment `running` goes false; the
-                colours stay, because what those lines carried is still true after the run.
-                Words are scarcer than lines: rank 0-1 full, rank 2 fading, older silent, so a busy
-                canvas stays readable instead of stacking a word onto every line. The word itself
-                still comes from EDGE_MEANING_LABEL keyed on the colour actually drawn, so a line
-                with no real pulse this run (LINK_COLOR at rest, not in the map) carries none.
-                An edge that is genuinely still open keeps taking precedence, in the delegation
-                colour with NO word: a static "Delegate" beside a moving arrow would contradict
-                itself -- the motion already says it is in flight, and the word's job is to describe
-                a line that has stopped. */}
+                are talking at once", which a single lit line could never make.
+                FEATURE: LAV-20 -- and every one of those solid lines is now NAMED, in-flight blue
+                included ("Delegate"). LAV-9a's scarcity rule (rank 0-1 full, rank 2 fading, older
+                silent) and LAV-7b's deliberate silence on an open line are both gone: John's call is
+                that if the user can see the line, the user can read what crossed it. Then the run
+                ends and every line -- named or not, resolved or not -- settles to the dashed tan
+                LINK_COLOR trace, which is the ONLY thing left on the canvas: how much communication
+                this run carried. Both branches live in edgeRenderStyle() above, shared verbatim with
+                the mobile Bench fold; this loop only supplies the three per-edge facts and draws. */}
             {edges.map(e => {
               const open = visuallyOpenKeys.has(e.key);
               // Direction-agnostic on the pair: a report-back really did cross THIS line, backwards.
               const ck = canonicalEdgeKey(e.from, e.to);
-              const pulsed = activity.colors.get(ck) || null;
-              const rank = recentOrder.indexOf(ck);
-              const active = rank !== -1;                 // carried a real pulse this run
-              const stroke = open ? DISPATCH_COLOR : (pulsed || e.color);
-              const animated = open || (running && !!pulsed);
-              const arrowColor = open ? DISPATCH_COLOR : pulsed;
-              // FEATURE: LAV-12 -- while the line is genuinely animating (solid + arrow, running),
-              // its label is always fully visible -- the recency-ranked fade only governs the
-              // SETTLED view after the run ends, when there's no "active" left to prioritize by.
-              // `label` itself (whether a <text> renders at all) is unchanged: still gated on
-              // `active` (this edge carried a real pulse this run) and never on a genuinely-open one.
-              const labelOpacity = running ? 1 : labelOpacityForRank(rank);
-              const label = open || !active ? null : (EDGE_MEANING_LABEL.get(pulsed) ?? null);
+              const s = edgeRenderStyle({
+                open,
+                pulsed: activity.colors.get(ck) || null,
+                active: recentOrder.indexOf(ck) !== -1,   // carried a real pulse this run
+                running,
+              });
               const a = posRef.current[e.from] || home[e.from];
               const b = posRef.current[e.to] || home[e.to];
               return (
                 <g key={e.key}>
                   <path ref={el => { edgeRefs.current[e.key] = el; }} d={ePath(a, b)}
-                    fill="none" stroke={stroke} strokeWidth={(animated || active || e.handoff) ? 2.2 : 1.6}
-                    strokeDasharray={(animated || active) ? undefined : "2 7"} strokeLinecap="round"
-                    opacity={(animated || active) ? 1 : 0.9}/>
-                  {animated && <LoopingArrow d={ePath(a, b)} color={arrowColor}/>}
-                  {label && (
+                    fill="none" stroke={s.stroke} strokeWidth={s.width}
+                    strokeDasharray={s.dash} strokeLinecap="round"
+                    opacity={s.opacity}/>
+                  {s.animated && <LoopingArrow d={ePath(a, b)} color={s.arrowColor}/>}
+                  {s.label && (
                     <text ref={el => { labelRefs.current[e.key] = el; }}
                       transform={edgeLabelTransform(a, b) || undefined} textAnchor="middle" dy="-5"
-                      style={{ fontFamily: body, fontSize: 9.5, fill: T.muted, opacity: labelOpacity,
-                        transition: "opacity .8s" }}>{label}</text>
+                      style={{ fontFamily: body, fontSize: 9.5, fill: T.muted }}>{s.label}</text>
                   )}
                 </g>
               );
