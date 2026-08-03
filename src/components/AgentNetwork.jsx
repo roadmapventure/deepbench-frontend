@@ -7,6 +7,13 @@
 // node grid on desktop and the Single/Bench canvas on mobile. This file adds no derivation of its
 // own: `booting` and `statusMessage` arrive already derived from LiveAgentViewScreen, which is the
 // only place that holds the run-scoped ledger, and this component just renders them.
+// Same version, completing this feature's own approved spec: the dial has to FADE out on the first
+// agent node appearing, and `{booting && <ConsoleBootDial/>}` cannot do that -- React drops the DOM
+// node the frame `booting` flips false, so only the enter fade ever played. `useLingeringMount`
+// below keeps the node mounted ~250ms past that flip and reports `leaving` for the window, which is
+// what the dial's exit transition rides. The hook is called ONCE, unconditionally, above the
+// `if (isMobile)` branch -- calling it inside either return path would make it conditional across
+// two mutually-exclusive renders, which is exactly what the Rules of Hooks forbid.
 // DeepBench v7.0.49 | AgentNetwork.jsx | LAV-15 -- the "Run Tasks" drawer joins the canvas, directly
 // under the Answer drawer. The two now share one absolutely-positioned left column (.lav-leftstack)
 // whose bottom is anchored to the bottom of the stage wrap -- which IS the top of the harness trace
@@ -915,6 +922,26 @@ const NET_CSS = `
 .lav-mgate-accept{background:${T.navy};color:${T.card}}
 `;
 
+// FEATURE: LAV-16 -- keep something mounted for `ms` after its `active` flag goes false, so the thing
+// leaving gets a frame to animate in. React's own conditional render has no exit hook: the instant
+// the boolean flips, the DOM node is gone and any transition on it is gone with it. `leaving` is the
+// signal a child uses to run its own exit style; when `active` comes back the timer's cleanup drops
+// it and the child is simply live again, so a re-entered window (a second run) never inherits a
+// half-finished fade. Deliberately generic and deliberately tiny -- it holds no LAV-16 knowledge.
+function useLingeringMount(active, ms) {
+  const [mounted, setMounted] = useState(active);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (active) { setMounted(true); setLeaving(false); return; }
+    if (!mounted) return;
+    setLeaving(true);
+    const t = setTimeout(() => { setMounted(false); setLeaving(false); }, ms);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+  return { mounted, leaving };
+}
+
 /**
  * Pure presentation of the harness stream. No fetching, no timers that invent state.
  *  roster   -- agent objects that may appear on this canvas (idle baseline + anyone seen streaming)
@@ -1270,6 +1297,14 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     return m;
   }, [traceRows]);
 
+  // FEATURE: LAV-16 -- the dial's mount, held ~250ms past `booting` going false so the exit fade has
+  // somewhere to run. ONE call, here, above the isMobile branch: both returns below read the same
+  // pair, so the two layouts cannot drift and the hook order is identical on either path. 250 is the
+  // spec's fade duration and is matched by the transition in ConsoleBootDial.jsx; the canvas
+  // underneath is already painted (the roster renders from first paint), so nothing flashes in the
+  // gap. The dial's own 45s ceiling still short-circuits inside the component, untouched.
+  const { mounted: bootDialMounted, leaving: bootDialLeaving } = useLingeringMount(booting, 250);
+
   // ── FEATURE: MOB-4b -- the mobile canvas ───────────────────────────────────
   // Every hook below runs on both paths (they are declared unconditionally, above the branch), so
   // crossing the breakpoint swaps the composition and nothing else. Not one derivation is repeated
@@ -1513,8 +1548,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
         </div>
         {/* FEATURE: LAV-16 -- the mobile half of the ONE mount point. Same class, same component,
             same props as the desktop branch below: `.lav-stagewrap` is the shared box, so the dial
-            covers the Single card and the Bench grid alike with nothing written for mobile. */}
-        {booting && <ConsoleBootDial statusMessage={statusMessage}/>}
+            covers the Single card and the Bench grid alike with nothing written for mobile. The
+            mount boolean is the lingering one, not `booting` itself, so the exit fade runs here too
+            rather than being a desktop-only nicety. */}
+        {bootDialMounted && <ConsoleBootDial statusMessage={statusMessage} leaving={bootDialLeaving}/>}
       </div>
     );
   }
@@ -1732,7 +1769,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           .lav-inner: .lav-inner carries a transform and therefore its own stacking context, so a
           dial placed inside it could not rise above the left drawer stack no matter its z-index,
           and it would also be clipped to the 1200x640 canvas instead of covering the whole stage. */}
-      {booting && <ConsoleBootDial statusMessage={statusMessage}/>}
+      {bootDialMounted && <ConsoleBootDial statusMessage={statusMessage} leaving={bootDialLeaving}/>}
     </div>
   );
 }

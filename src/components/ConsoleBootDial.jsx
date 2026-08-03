@@ -18,6 +18,17 @@
 // already exist -- `fadeIn` to enter, `spin` for the radar sweep, `borderPulse` for the frame accent;
 // the single component-scoped keyframe below is the breathing scale, which none of those three
 // covers, and it stays in this file's own <style> tag rather than growing tokens.js.
+// Same version, completing this feature's own approved spec: leaving is now a FADE, not a cut. The
+// parent (AgentNetwork's useLingeringMount) holds this component mounted ~250ms past the moment the
+// first agent node appears and passes `leaving` for that window; all this file does with it is drop
+// its own opacity to 0 and let a plain `transition:opacity .25s ease` carry it -- no fourth keyframe,
+// global or scoped, because a transition already expresses a one-way A-to-B change. The `is-leaving`
+// class kills the enter animation for that window: `fadeIn` also drives opacity, and an animation
+// outranks inline style in the cascade, so leaving the two live together would let a re-fired enter
+// animation stomp the exit. They are mutually exclusive by construction anyway -- a component cannot
+// be freshly mounting and leaving in the same frame -- and the class states that rather than assuming
+// it. Everything else here is untouched: same pinned clock, same 45s ceiling, same reduced-motion
+// block (reduced motion calms movement; it never withholds either fade).
 // FEATURE: LAV-16
 import { useEffect, useRef, useState } from "react";
 import { T, display, mono } from "../tokens.js";
@@ -93,7 +104,10 @@ const CORNERS = [
 const DIAL_CSS = `
 .lav-bootdial{position:absolute;inset:0;z-index:40;display:flex;align-items:center;
   justify-content:center;pointer-events:none;background:${rgba(T.navyDeep, 0.94)};
-  animation:fadeIn .25s ease-out}
+  animation:fadeIn .25s ease-out;transition:opacity .25s ease}
+/* The exit. The fadeIn animation is dropped for this window so only one thing is driving opacity;
+   the parent keeps this node mounted for exactly the transition's own .25s, then unmounts it. */
+.lav-bootdial.is-leaving{animation:none}
 .lav-bootdial-panel{position:relative;padding:20px 24px 16px;border-radius:16px;
   border:1px solid ${rgba(T.brass, 0.33)};animation:borderPulse 2.8s ease-in-out infinite}
 .lav-bootdial-corner{position:absolute;width:12px;height:12px}
@@ -128,8 +142,11 @@ const CAPTION_STYLE = { fontFamily: mono, fontSize: 10, lineHeight: 1.45, color:
 /**
  * @param statusMessage the run's own live status line (LiveAgentViewScreen passes
  *                      `status?.message ?? null`). Null falls back to one neutral authored line.
+ * @param leaving       AgentNetwork's useLingeringMount says this dial's window has closed and the
+ *                      node is being held open only long enough to fade. Never derived here: this
+ *                      file still holds no stream knowledge and no state machine.
  */
-export default function ConsoleBootDial({ statusMessage = null }) {
+export default function ConsoleBootDial({ statusMessage = null, leaving = false }) {
   // The run's start, pinned once. The `if (!current)` guard is what makes React 18 StrictMode's
   // dev-only double-invoke a no-op here instead of a restart -- a second render body sees a truthy
   // ref and leaves it alone, so the numeral never jumps back to 1 in development.
@@ -162,7 +179,8 @@ export default function ConsoleBootDial({ statusMessage = null }) {
   const caption = statusMessage || BOOT_DIAL_FALLBACK_CAPTION;
 
   return (
-    <div className="lav-bootdial" aria-hidden="true">
+    <div className={`lav-bootdial${leaving ? " is-leaving" : ""}`}
+      style={{ opacity: leaving ? 0 : 1 }} aria-hidden="true">
       <style>{DIAL_CSS}</style>
       <div className="lav-bootdial-panel">
         {CORNERS.map(c => (
