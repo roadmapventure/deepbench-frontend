@@ -1,3 +1,12 @@
+// DeepBench v7.0.55 | AgentNetwork.jsx | LAV-21b -- the left stack's second drawer becomes the
+// Assembly view (§19r): the deliverable itself, built live in stages, in the Run Assembly feed's
+// slot. The feed is HIDDEN, NOT DELETED -- RunTasks.jsx is untouched, the screen still folds and
+// still passes `runTaskEntries`, and the shared `.lav-runtasks,.lav-assembly` CSS block still
+// carries its column geometry, so restoring it is re-adding ONE mount line here and nothing else.
+// The Answer drawer above it is renamed Deliverable (John, 2026-08-04); its behaviour --
+// default-closed, maxHeight 280, resizable, and LAV-11's guardrail-catch title variant -- is
+// otherwise unchanged, and the title string now comes from AssemblyView's exported constant so the
+// two drawer names can only ever be renamed together.
 // DeepBench v7.0.52 | AgentNetwork.jsx | LAV-20/MOB-11 -- the canvas stops narrating and starts
 // leaving a trace. Three things move, and they are one decision: (1) the legend names exactly the
 // three routing meanings that can really cross a line -- Delegate / Result / Iterate -- so Link,
@@ -174,10 +183,13 @@ import { QaEvidenceCard } from "../screens/MarketIntelligenceScreen.jsx";
 // FEATURE: MOB-4b -- the platform's ONE breakpoint source (STYLE-GUIDE 22). This file asks no width
 // question of its own; the hook is the only thing that decides which composition renders.
 import { useIsMobile } from "../hooks/useIsMobile.js";
-// FEATURE: LAV-15 -- the Run Tasks feed. Its entries are derived in LiveAgentViewScreen.jsx (which
-// owns the run-scoped ledger and its arrival clocks) and arrive here already folded, so this file
-// stays a renderer and holds no stream-derivation of its own.
-import RunTasks from "./RunTasks.jsx";
+// FEATURE: LAV-21b -- the Assembly view replaces the Run Tasks/Run Assembly feed in the left stack.
+// Same contract as the feed it succeeds: its stages are folded in LiveAgentViewScreen.jsx (which
+// owns the run-scoped ledger and its arrival clocks) and arrive here already built, so this file
+// stays a renderer and holds no stream-derivation of its own. The `import RunTasks` line that used
+// to sit here is gone with its mount -- restoring the feed is re-adding that import and its one
+// mount line; nothing else about it was removed.
+import AssemblyView, { DELIVERABLE_TITLE } from "./AssemblyView.jsx";
 // FEATURE: LAV-16 -- the boot dial. It owns its own clock, its own 45s ceiling and its own
 // reduced-motion behaviour; this file decides only WHETHER it is mounted, off a boolean the screen
 // derived. Nothing about the dial is re-implemented here and no state is added for it.
@@ -857,8 +869,11 @@ const NET_CSS = `
 .lav-answer{flex:0 0 auto;pointer-events:auto}
 /* Takes the leftover height and gives it to the drawer inside, which measures it and scrolls.
    The box stays transparent to the pointer; its child, the drawer itself, does not. */
-.lav-runtasks{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;pointer-events:none}
-.lav-runtasks > *{pointer-events:auto}
+/* FEATURE: LAV-21b -- one block, two class names: the Assembly view inherits the feed's exact
+   column geometry and pointer-events discipline, and .lav-runtasks stays declared so re-mounting
+   RunTasks is a single line of JSX with no CSS to restore alongside it. */
+.lav-runtasks,.lav-assembly{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;pointer-events:none}
+.lav-runtasks > *,.lav-assembly > *{pointer-events:auto}
 /* FEATURE: LAV-1f -- the You node. Same node geometry as an agent card so it sits in the same
    choreography, deliberately different skin (dashed brass, no code/role row, silhouette avatar) so
    it can never be mistaken for an agent card. */
@@ -1046,8 +1061,13 @@ function useLingeringMount(active, ms) {
  *    buildRunTaskEntries() at the screen, which owns the ledger and its arrival clocks. Rendered by
  *    the desktop composition only -- the mobile branch returns before the drawer stack (STYLE-GUIDE
  *    42). Passed at BOTH <AgentNetwork> call sites regardless, so the two payloads cannot drift.
+ *    LAV-21b: still received and still built by the screen, but no longer mounted -- the feed is
+ *    hidden, not deleted, and this prop is what a one-line restore reads.
+ *  assemblyStages -- LAV-21b: this run's Assembly stages, already folded by buildAssemblyStages()
+ *    at the screen. { sections, running, terminal }. Same desktop-only render / both-call-sites
+ *    passing discipline as runTaskEntries above (SES-57).
  */
-export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [], booting = false, statusMessage = null }) {
+export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [], assemblyStages = null, booting = false, statusMessage = null }) {
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -1656,7 +1676,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               spec). If south-korea-coop ever starts passing the pre-display gate, this label would
               then read as a guardrail catch that didn't happen -- that mislabel edge is CHI-98's to
               resolve, not this ticket's. */}
-          <Drawer title={answerQuestionId === "south-korea-coop" ? "Answer: Agent guardrail catch" : "Answer"}
+          {/* FEATURE: LAV-21b -- "Answer" becomes "Deliverable" (John, 2026-08-04). Title strings
+              only; every other behaviour of this drawer is byte-unchanged. */}
+          <Drawer title={answerQuestionId === "south-korea-coop"
+            ? `${DELIVERABLE_TITLE}: Agent guardrail catch` : DELIVERABLE_TITLE}
             defaultOpen={false} maxHeight={280} resizable>
             {answerQa
               ? <QaEvidenceCard qa={answerQa}/>
@@ -1667,9 +1690,11 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
                   </div>}
           </Drawer>
         </div>
-        {/* FEATURE: LAV-15 -- open by default, never auto-dismissing, and reset by the next run
-            because its entries are folded from the RUN-scoped ledger slice, not the session's. */}
-        <RunTasks entries={runTaskEntries}/>
+        {/* FEATURE: LAV-21b -- the Assembly view, in the slot LAV-15's feed held. Open by default,
+            never auto-dismissing, and reset by the next run because its stages are folded from the
+            RUN-scoped ledger slice, not the session's. Restoring the feed is re-adding exactly one
+            line here: <RunTasks entries={runTaskEntries}/> (plus its import above). */}
+        <AssemblyView stages={assemblyStages} running={running}/>
       </div>
       {/* FEATURE: LAV-7b -- legend then toggle, one row, top-right. */}
       <div className="lav-topright">

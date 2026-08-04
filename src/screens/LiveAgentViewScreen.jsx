@@ -1,3 +1,13 @@
+// DeepBench v7.0.55 | LiveAgentViewScreen.jsx | LAV-21b -- two additions, both of them one
+// expression each. (1) `assemblyStages`: the Assembly drawer's fold (§19r), built here for the same
+// reason the Run Assembly feed's is -- this file owns the run-scoped ledger and its index-aligned
+// arrival clocks. It is fed `runHops`, the UNFILTERED slice, NOT `canvasRunHops`: a `prompt_assembled`
+// frame is plumbing to the canvas but a start signal to the Assembly view, and filtering would also
+// break the index alignment the arrival clocks depend on. Mirrored onto BOTH <AgentNetwork> call
+// sites even though only the desktop composition renders it (SES-57 payload parity). (2) the question
+// picker's options are numbered 1-3 from the map index at both call sites, so a question can be
+// referred to by number; the existing label expression -- LAV-11's guardrail-demo decoration
+// included -- is otherwise byte-identical, and the number is never hand-written.
 // DeepBench v7.0.50 | LiveAgentViewScreen.jsx | LAV-16 -- the Console Boot Dial's mount boolean is
 // derived here, as a pure function of three things this file already has: `running`, `awaiting`, and
 // `canvasRunHops`. No new state, no new ref, no new effect, no new event type -- deriveBooting() is a
@@ -143,6 +153,9 @@ import AgentNetwork from "../components/AgentNetwork.jsx";
 // AgentNetwork (it lives on the canvas, beneath the Answer drawer); this file owns the derivation
 // because it owns the ledger and its arrival clocks.
 import { buildRunTaskEntries } from "../components/RunTasks.jsx";
+// FEATURE: LAV-21b -- the Assembly drawer's pure fold. Same input contract as buildRunTaskEntries
+// above; both stay built here so the feed can be re-mounted with no change to this file.
+import { buildAssemblyStages } from "../components/AssemblyView.jsx";
 import { ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 import { supabase } from "../lib/supabase.js";
 // FEATURE: LAV-1c -- the EST. COST meter's sumCost() delegates row-by-row to computeCallCost()
@@ -742,6 +755,16 @@ export default function LiveAgentViewScreen() {
     () => buildRunTaskEntries(runHops, runHopTimes, { runStartedAt: base, agents }),
     [runHops, runHopTimes, base, agents]);
 
+  // ── LAV-21b: the Assembly drawer's stages ───────────────────────────────────────────────────
+  // The same ledger slice and the same arrival clocks the feed above reads, folded a second way --
+  // one stream, two views, so the drawer and the canvas can never disagree about a hop (§19q).
+  // `running`/`terminal` are passed because the fold needs to know whether a still-open ghost is a
+  // live prediction or one the run ended without ever answering.
+  const assemblyStages = useMemo(
+    () => buildAssemblyStages(runHops, runHopTimes,
+      { runStartedAt: base, agents, running, terminal: !!terminal }),
+    [runHops, runHopTimes, base, agents, running, terminal]);
+
   // FEATURE: LAV-1f -- an open gate blocks a new question. Not a timer and not a default decision:
   // the run genuinely has not finished, and letting a new one start would silently abandon a gate
   // the harness is still holding open. The gate stays pending until a human resolves it.
@@ -803,9 +826,11 @@ export default function LiveAgentViewScreen() {
                     prefix included. Mirrored deliberately at rebase time: a mobile picker that
                     silently dropped the decoration would offer a different-reading question set at
                     one width, and onRun still sends the undecorated q.label from either branch. */}
-                {ALL_QUESTIONS.map(q => (
+                {/* FEATURE: LAV-21b -- numbered from the map index, never hand-written, so the
+                    numbers stay correct and in order if the list ever changes. */}
+                {ALL_QUESTIONS.map((q, i) => (
                   <option key={q.id} value={q.id}>
-                    {q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}
+                    {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
                   </option>
                 ))}
               </select>
@@ -902,7 +927,7 @@ export default function LiveAgentViewScreen() {
                 choreographed={choreographed} onToggleChoreographed={setChoreographed}
                 pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
                 answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
-                runTaskEntries={runTaskEntries}
+                runTaskEntries={runTaskEntries} assemblyStages={assemblyStages}
                 booting={booting} statusMessage={status?.message ?? null}/>
             </div>
           ) : (
@@ -1006,9 +1031,11 @@ export default function LiveAgentViewScreen() {
                   (CHI's own picker must keep reading it plain), and onRun still sends q.label --
                   the undecorated string -- to runQuestion, so this prefix never reaches the harness
                   as part of the actual question asked. */}
-              {ALL_QUESTIONS.map(q => (
+              {/* FEATURE: LAV-21b -- numbered from the map index, the same expression the mobile
+                  picker above uses; the decorated label itself is unchanged. */}
+              {ALL_QUESTIONS.map((q, i) => (
                 <option key={q.id} value={q.id}>
-                  {q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}
+                  {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
                 </option>
               ))}
             </select>
@@ -1102,7 +1129,7 @@ export default function LiveAgentViewScreen() {
             choreographed={choreographed} onToggleChoreographed={setChoreographed}
             pending={pending} resolving={resolving} onResolveConfirmation={resolveConfirmation}
             answerQa={answerQa} answerText={answerText} answerQuestionId={ranQuestionId}
-            runTaskEntries={runTaskEntries}
+            runTaskEntries={runTaskEntries} assemblyStages={assemblyStages}
             booting={booting} statusMessage={status?.message ?? null}/>
           <PromptBox prompt={prompt} agents={agents} traceRows={traceRows}/>
           <aside style={{width:300,flexShrink:0,borderLeft:`1px solid ${T.line}`,background:T.paperDeep,
