@@ -1,3 +1,12 @@
+// DeepBench v7.0.56 | AssemblyView.jsx | LAV-21c -- delegated work fills its stage. On the console's
+// real Q&A runs the final formatting resolves BY DELEGATION (Michelle Manning brokers Alex Reeves'
+// `qa-answer-format` intent, so the work streams as a `delegation_complete`, not a `display_format`
+// hop -- LOO-010 removed the client-side display_format crediting for delegated resolutions). The
+// fold ignored delegation completions categorically, so the Final form stage never appeared on those
+// runs even though LAV-21a put the declared work (`toIntentSlug`) on the ledger. §19r as written: a
+// stage lights from the hop's DECLARED WORK, and a completion whose slug maps to a stage IS declared
+// work. A completion whose slug maps to nothing still builds no section -- honest degrade, no
+// storyboard. This is still not an agent -> stage map: the key is the intent slug (Rule #1).
 // DeepBench v7.0.55 | AssemblyView.jsx | LAV-21b -- the Assembly drawer: the deliverable itself,
 // rendered as a document whose stages fill with the agents' real streamed output as the hops land
 // (ARCHITECTURE.md §19r). It takes the Run Assembly feed's slot in the Live Agent Console's left
@@ -44,9 +53,13 @@ export const STAGE_LABEL = {
 // Declared work -> stage. Keys are the pipeline's own existing intent slugs (runQaWithQualityGate's
 // callCapability calls, MarketIntelligenceScreen.jsx L1499/L1517/L1587) -- cross-referenced
 // constants, not invented data. An unknown slug maps to nothing (unlabelled in-progress section).
+// FEATURE: LAV-21c -- `qa-answer-format` is the slug the Q&A journey's formatting delegation really
+// carries (verified this session against Supabase `durable_hops.intent_slug`: 23 rows, and there is
+// no `qa-answer-format-intent`). It joins the map as declared work, on the same footing as the other
+// three; it is NOT a special case and nothing keys off it by name.
 export const STAGE_OF_INTENT = {
   "ci-answer-intent": "draft", "qg-review-intent": "verification",
-  "ci-answer-display-intent": "final",
+  "ci-answer-display-intent": "final", "qa-answer-format": "final",
 };
 
 // Declared work -> stage for a COMPLETED hop. Event types only; the assembly family is keyed on its
@@ -160,7 +173,16 @@ export function buildAssemblyStages(events, eventTimes, {
     }
 
     // ── a completion that IS a stage ──────────────────────────────────────────────────────────
-    const stage = COMPLETION_STAGE[evt.type];
+    // Two ways a completion declares its stage, and neither is the agent. A TYPED completion
+    // declares it by event type (the map above). A DELEGATED resolution declares it through the
+    // hand-off contract it just completed -- `toIntentSlug`, the same field a delegation START is
+    // ghosted from below, read through the same STAGE_OF_INTENT map. `delegation_return` (a
+    // hand-back, not work) and any completion whose slug is absent or maps to nothing fall through
+    // untouched and build no section, exactly as in v7.0.55. (LAV-21c)
+    const stage = COMPLETION_STAGE[evt.type]
+      ?? (evt.type === "delegation_complete"
+        ? (STAGE_OF_INTENT[typeof d.toIntentSlug === "string" ? d.toIntentSlug : ""] ?? null)
+        : null);
     if (stage) {
       // Resolve the ghost this completion answers: same stage first, else the same worker's still
       // shimmering section. Either way the COMPLETION's own derived stage wins over the ghost's
