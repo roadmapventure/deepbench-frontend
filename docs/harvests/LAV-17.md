@@ -58,3 +58,21 @@ They are now asymmetric. Any kickoff executing this ticket's enrichment must lis
 constructors in scope per new field, or the field silently dies before render on one screen
 while fixture tests pass — exactly how `LAV-15`'s Task 3b would have failed without the
 coding session's catch.
+
+## Constructor asymmetry — widened by S-LAV-21a (v7.0.54, 2026-08-04)
+
+`useHarnessStream.js` (Agent Console) now additionally carries — and CHI's
+`MarketIntelligenceScreen.jsx` `onDelegationProgress` (~L3764) deliberately does NOT:
+`toCapabilitySlug` + `toIntentSlug` on delegation **starts**, `toIntentSlug` on delegation
+**completions**, `toIntentSlug` on `prompt_assembled`, and `parent_span_id` + `toCapabilitySlug`
+on `assembly_work*` frames (the last pair doubly moot on CHI — its constructor drops assembly
+frames before the events array). Per this file's standing rule: any kickoff enriching further
+fields must decide **both** constructors per field.
+
+## Related gap found live by S-LAV-21b QA — now `LAV-22` (Observability, Beta-gate bucket 5)
+
+A capability completion that resolves via internal delegation (`LOO-010` path) streams NO typed
+hop at all — on the guardrail-demo run, the gate ran, delegated, finished, and no `proofreader`
+frame ever existed for any consumer (Agent Routing drawer included). §19q's invariant family:
+the seam fix is the executor emitting the resolving capability's own typed completion. Sequence
+with this ticket — same emit sites.
