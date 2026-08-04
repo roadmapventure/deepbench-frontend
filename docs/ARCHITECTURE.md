@@ -2105,3 +2105,47 @@ Architect Review. Enforceable subset lives here as the invariants above — deli
 path-scoped `.claude/rules/` file: the constraint governs one seam (`execute.js` event emission)
 already covered by `.claude/rules/hop-event-span-identity.md`'s trigger, and a second rules file
 on the same paths would dilute it.
+
+## 19r. Deliverable Build View — Watching the Answer Get Built [discovery `design-build-view-0803` (continuation of `design-list-arch-0802`'s thread), 2026-08-03]
+
+**The problem John named:** the console shows the *how* of multi-agent work (choreography,
+lines, avatars) but not the *what* — the deliverable taking shape. His framing: hiring
+contractors to build a house, you see each contractor's tangible output per level; today the
+platform shows "a question, busy agents, then a final output," which reads to a skeptic as
+decoration around a single answer.
+
+**Decisions (John, 2026-08-03):**
+- **A live build view, during the run** — the answer document rendered as a skeleton whose
+  stages fill as the agents complete them (evidence → draft claims → verification → final
+  form, for the Q&A journey). Post-run "document explains itself" provenance is explicitly
+  out of scope for now — noted as a future direction only.
+- **Placement: the Run Assembly drawer's slot.** `LAV-19`'s receipts feed is **hidden, not
+  deleted** — component, derivation, and the §19q event enrichment all stay in the code (the
+  build view consumes the same folded entries), but the drawer unmounts and the build view
+  takes its column space. John's call: the receipts feed "did not work" as the audience-facing
+  visual. Restoring it later is a mount change, not a rebuild.
+- **Deterministic frame, agent-authored content.** The skeleton's structure, stage
+  transitions, and fill timing derive from streamed events — never a per-run model call. The
+  content *inside* stages is the agents' real output (claims, citations, verdict text), which
+  is already model-authored in the honest sense. An AI narration layer, if ever wanted, is a
+  real agent Capability on top — a later, separate decision.
+
+**Invariants:**
+- **The level is declared by the work, never keyed on the agent.** A stage lights from the
+  hop's own declared work (event type / capability_slug / intent_slug) and from span
+  parentage (§19p — a helper's hop belongs to the job whose span it hangs under). The same
+  agent legitimately builds different levels in one run (proven on the 2026-08-03 live run:
+  Eleanor's fetch for the draft vs. her fetch for Owen's review; Michelle brokering inside two
+  different jobs). An `agent_id → stage` map violates Rule #1 (§19d) and is factually wrong
+  mid-run.
+- **No hardcoded journey storyboard.** Stages derive from the hop kinds actually streaming,
+  same posture as §19n's "step numbers from arrival order, never a path map." A guardrail-block
+  run or a future journey must produce its own correct skeleton without a code change.
+- **Honest degrade stands (§19j/§19q).** A stage whose content fields haven't streamed shows
+  its real state, never invented fragments. Evidence-card content (record titles, not just
+  chunk counts) requires `LAV-17`'s enrichment — the build view is that ticket's first
+  full consumer, not a reason to bypass it.
+
+Build ticket: `LAV-21` (Feature). Visual design (skeleton look, fill treatment, stage
+labels/naming) is NOT settled here — that is the design session's mock, John's approval gate,
+including the feature's user-facing name.

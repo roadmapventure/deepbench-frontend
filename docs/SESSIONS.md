@@ -4,6 +4,15 @@
 > Google Drive retired as source of truth. GitHub is single master.
 
 ---
+## design-build-view-0803 (discovery, docs-only — no version claimed, 2026-08-03, worktree `design-build-view-0803`) — Deliverable Build View: watching the answer get built
+
+**Discovery continuation of the run-list thread (`design-list-arch-0802` → `S-LAV-19`), reframed by John after seeing the shipped receipts feed live: the feed is honest but "did not work" as the audience-facing visual.** His deeper diagnosis, in his own framing: the console proves agents *communicate* (the how) but never shows the deliverable *being built* (the what) — like watching contractors mill around a lot and then a finished house appears. The demo-killer isn't missing data; it's that nothing on screen accumulates.
+
+**Decided (John, 2026-08-03), recorded as `ARCHITECTURE.md` §19r:** a live Deliverable Build View **during the run** (post-run provenance explicitly deferred); it **takes the Run Assembly drawer's slot — `LAV-19`'s feed hidden, not deleted** (derivation + §19q enrichment become inputs, restore is a mount change); **deterministic frame, agent-authored content** (no per-run model call builds the visual — John asked about AI-generated visuals; settled as: the content is already genuinely model-authored, the frame must not be). Invariants: stage lights from the hop's **declared work + span parentage**, never an `agent_id → stage` map — John asked "do we know each agent's purpose deterministically?" and the verified answer is that the *work* declares the level, the same agent builds different levels in one run (Eleanor's draft-fetch vs. review-fetch, live-proven); no hardcoded journey storyboard (§19n posture); honest degrade stands, with `LAV-17` (Feature) as the content prerequisite (record titles still don't stream).
+
+**Filed: `LAV-21` (Feature, Post-beta)** — the build view, S-next, design session must produce the mock (visual, stage labels, user-facing name all John's approval gates) and sequence `LAV-17` first or alongside. No kickoff written — visual architecture is deliberately unsettled per discovery discipline.
+
+---
 ## S-LAV-19-design/S-LAV-19 (v7.0.53, `7de7c66`, 2026-08-02, worktree `design-lav-19-0802`) — Run Assembly: rename + two agent-authored display lines
 
 **`LAV-19` (UI, Post-beta) ✅ done + archived, self-verified live.** Same-day execution of the `design-list-arch-0802` discovery's client companion: John's three approved changes — drawer header `Run Assembly · <N> events` (Agent Routing panel idiom), Owen Marsh — The Proofreader's `eval.critique` verbatim on **pass** verdicts, Michelle Manning — Project Manager's weighed candidates by **first name only**.
