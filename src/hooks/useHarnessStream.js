@@ -1,3 +1,15 @@
+// DeepBench v7.0.54 | useHarnessStream.js | LAV-21a -- four fields the server ALREADY emits are now
+// carried into the client ledger, so LAV-21's Assembly view can label a stage from the hop's own
+// declared work and nest sub-entries by span parentage (§19r): `toCapabilitySlug`/`toIntentSlug` on
+// the delegation START build (the completion build already had the slug, and now takes the intent
+// too, so the pair is symmetric), `toIntentSlug` on the `prompt_assembled` ledger event (the hook
+// already read it into setPrompt -- the value demonstrably arrives, it just never reached the
+// ledger), and `parent_span_id` + `toCapabilitySlug` on the assembly frames' copy list. All carried
+// verbatim off the frame, none derived or defaulted; the assembly loop's existing `v != null` guard
+// keeps a missing field absent rather than null (§19j). Nothing renders differently: this changes
+// what the ledger CARRIES, never what the Run Assembly feed SHOWS. CHI's mirror constructor
+// (MarketIntelligenceScreen.jsx onDelegationProgress) stays byte-identical for all four -- no
+// Assembly surface there -- widening the LAV-19 asymmetry recorded in docs/harvests/LAV-17.md.
 // DeepBench v7.0.53 | useHarnessStream.js | LAV-19 -- one field added to the delegation_complete /
 // delegation_return ledger payload: `candidates_considered`, carried straight off the frame. This
 // hand-rebuilt payload names every field it keeps (LOO-012's list), so a field added to the emit in
@@ -166,9 +178,13 @@ export function useHarnessStream() {
       const promptAt = Date.now();
       const promptDurationMs = resolveDelegationDuration(promptAt, lastEventAtRef.current);
       lastEventAtRef.current = promptAt;
+      // FEATURE: LAV-21a (§19r) -- toIntentSlug joins the named field list. setPrompt above already
+      // reads it off the same frame, so the value is known to arrive; it was simply absent from the
+      // LEDGER copy, which is what LAV-21's Assembly fold reads. Verbatim, never derived.
       appendEvent(buildHopEvent('prompt_assembled', evt.agentId ?? null, {
         message: `${evt.agentId ?? "—"} · ${evt.prompt_chars ?? 0} chars`,
         prompt_chars: evt.prompt_chars ?? 0,
+        toIntentSlug: evt.toIntentSlug ?? null,
         trace_id: evt.trace_id ?? null, span_id: evt.span_id ?? null,
       }, promptDurationMs, {}));
       return;
@@ -194,9 +210,15 @@ export function useHarnessStream() {
         ? `${who} · ${evt.source} · ${evt.matchCount ?? 0} chunks`
         : `${who} · ${evt.work}${evt.type === 'assembly_work_complete' && evt.tokens != null ? ` · ${evt.tokens} tok` : ''}`;
       const assemblyData = { message: assemblyMessage };
+      // FEATURE: LAV-21a (§19r) -- parent_span_id and toCapabilitySlug join the copy list: the
+      // enrichment seam emits both on every assembly frame (api/prompt/ai-enrichment.js), and the
+      // Assembly view nests a helper's step under the job whose span it hangs from (§19p) and labels
+      // it from the declared capability, never from the agent. Both go through the same `v != null`
+      // guard below, so a frame that carries neither is stored exactly as it is today.
       for (const [k, v] of Object.entries({
         work: evt.work, source: evt.source, matchCount: evt.matchCount, tokens: evt.tokens,
         model: evt.model, forAgentId: evt.forAgentId, trace_id: evt.trace_id, span_id: evt.span_id,
+        parent_span_id: evt.parent_span_id, toCapabilitySlug: evt.toCapabilitySlug,
       })) {
         if (v != null) assemblyData[k] = v;
       }
@@ -213,11 +235,24 @@ export function useHarnessStream() {
       // FEATURE: LAV-19 (§19q) -- candidates_considered joins the named field list for the same
       // reason LOO-012 added reasoning/task/toCapabilitySlug: this payload is hand-rebuilt, so an
       // unnamed field on the frame never reaches the ledger. Carried verbatim, never derived.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-21a -- toIntentSlug joins it here for symmetry with the start build below: the
+      // declared-work pair (capability + intent) is what §19r labels a stage from, so both halves
+      // travel together on both ends of a hop rather than one end carrying half of it.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    // FEATURE: LAV-21a (§19r) -- the delegation START frame is where a stage's declared work first
+    // becomes known (execute.js emits toCapabilitySlug/toIntentSlug on every one of them), and it is
+    // the frame the Assembly ghost section is labelled from. Both were dropped by this hand-rebuilt
+    // payload's named field list (the SES-57 mirror class). Carried verbatim off the frame.
+    // KNOWN DOWNSTREAM EFFECT (found this session, reported to the design session): RunTasks.jsx's
+    // deriveAsked already reads `d.toCapabilitySlug` on the `delegation` case as the middle rung of
+    // its own degrade ladder, so a surviving delegate_to_agent START entry's Asked line moves from
+    // "Take the delegated work." to "Take the <slug> work." -- the ladder's intended rung, reached
+    // now that the field exists. Only reachable for a start row logEvent's pending-row path never
+    // replaced (a run ending on a gate or an error before the delegate logs anything).
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 / §19o -- a recovered hop is never silent. The hook owns the user-visible half

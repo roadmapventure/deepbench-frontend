@@ -1,3 +1,8 @@
+// DeepBench v7.0.54 | RunTasks.jsx | LAV-21a -- `deriveAsked` / `deriveDid` / `deriveContent` go
+// from module-private to exported, and nothing else changes: no derivation body, no RUN_TASK_KIND
+// entry, no buildRunTaskEntries logic, no render JSX. LAV-21's Assembly view folds the SAME composed
+// lines this feed already writes (§19q's one-story rule) instead of authoring a parallel narration
+// of the same hops, which is only possible if the three derivations are reachable from outside.
 // DeepBench v7.0.53 | RunTasks.jsx | LAV-19 -- three display changes, all John-approved live
 // 2026-08-02: (1) the drawer header becomes "Run Assembly · <N> events", the Agent Routing panel's
 // own idiom, replacing the "Run Tasks" title plus its separate count chip; (2) Owen Marsh -- The
@@ -94,7 +99,7 @@ function assemblyKind(data) {
 // "What was this hop asked to do." Derived from the delegation contract where the stream carries
 // one (`data.task`, execute.js's own `tool_input.task_description || skill_needed`), otherwise from
 // the tool/intent level. Returns null when the stream carries nothing to say -- never a placeholder.
-function deriveAsked(evt) {
+export function deriveAsked(evt) {
   const d = evt.data || {};
   switch (evt.type) {
     case "intent_routing":
@@ -148,7 +153,7 @@ function deriveAsked(evt) {
 // different stories about the same hop.
 // `byId` is the roster map buildRunTaskEntries already builds, threaded in for one job only:
 // turning a candidate's agent_id into a first name (LAV-19). Nothing else here reads it.
-function deriveDid(evt, byId) {
+export function deriveDid(evt, byId) {
   const d = evt.data || {};
   // Present on the picker's frames only -- agent_selection has always carried it, and LAV-19 put it
   // on the request_help delegation_complete emit. Null everywhere else, which is what keeps every
@@ -241,7 +246,7 @@ function deriveDid(evt, byId) {
 // "What happened to the content." One of created / changed / unchanged; `unchanged` always carries
 // the reason word, per John's spec. Null when this hop's effect on content is genuinely not
 // derivable from the frame -- the line is then omitted rather than guessed.
-function deriveContent(evt) {
+export function deriveContent(evt) {
   const d = evt.data || {};
   switch (evt.type) {
     case "intent_routing":
