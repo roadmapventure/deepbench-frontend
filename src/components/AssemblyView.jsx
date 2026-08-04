@@ -1,3 +1,13 @@
+// DeepBench v7.0.57 | AssemblyView.jsx | LAV-21d -- only the work's OWN completion fills a stage.
+// LAV-21c let any `delegation_complete` carrying a mapped `toIntentSlug` fill that stage, and live QA
+// found a double-fill: a brokerage chain emits TWO completions carrying the same picked target's
+// slug -- the outer `request_help` one (Michelle Manning's hand-off resolving, crediting the
+// REQUESTER) and the inner `delegate_to_agent` one (the delegate's real work). One piece of work,
+// two Final form sections. The discriminator the frames already carry is `viaTool`
+// (useHarnessStream.js's completion build): `delegate_to_agent` = the declared WORK (§19r), while
+// `request_help` = the HAND-OFF, which is routing and builds no section by the locked derivation.
+// So the mapped fill is gated on `delegate_to_agent` alone; `request_help`, `critique` and an absent
+// `viaTool` are byte-identical to v7.0.55 for that path.
 // DeepBench v7.0.56 | AssemblyView.jsx | LAV-21c -- delegated work fills its stage. On the console's
 // real Q&A runs the final formatting resolves BY DELEGATION (Michelle Manning brokers Alex Reeves'
 // `qa-answer-format` intent, so the work streams as a `delegation_complete`, not a `display_format`
@@ -76,6 +86,11 @@ const COMPLETION_STAGE = {
 // work, not a stage marker).
 const ROUTING_INTENT_SLUGS = new Set(["agent-selection-intent"]);
 const ROUTING_TOOLS = new Set(["request_help"]);
+
+// LAV-21d: the one `viaTool` value on a completion frame that means "the delegate finished the
+// declared work" rather than "a hand-off resolved." Only that frame may fill a stage from its
+// `toIntentSlug`; the brokerage chain's outer completion carries the same slug but is routing.
+const WORK_COMPLETION_TOOL = "delegate_to_agent";
 
 // Assembly `work` values that are drafting effort rather than retrieval; they hang under the Draft
 // stage as sub-entries. Anything else non-fetch does the same -- this set only decides which START
@@ -179,8 +194,13 @@ export function buildAssemblyStages(events, eventTimes, {
     // ghosted from below, read through the same STAGE_OF_INTENT map. `delegation_return` (a
     // hand-back, not work) and any completion whose slug is absent or maps to nothing fall through
     // untouched and build no section, exactly as in v7.0.55. (LAV-21c)
+    // ...and the slug alone is not enough (LAV-21d): a brokerage chain's OUTER completion carries the
+    // picked target's slug too, so the same work would fill the stage twice -- once credited to the
+    // requester. `viaTool` is the frame's own discriminator between the two: WORK_COMPLETION_TOOL is
+    // the delegate doing the declared work; every other value (`request_help` -- the hand-off, i.e.
+    // routing, which builds nothing per ROUTING_TOOLS above -- `critique`, or none at all) is not.
     const stage = COMPLETION_STAGE[evt.type]
-      ?? (evt.type === "delegation_complete"
+      ?? (evt.type === "delegation_complete" && d.viaTool === WORK_COMPLETION_TOOL
         ? (STAGE_OF_INTENT[typeof d.toIntentSlug === "string" ? d.toIntentSlug : ""] ?? null)
         : null);
     if (stage) {
