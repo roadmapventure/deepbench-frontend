@@ -2198,3 +2198,22 @@ present), `LAV-17`/`LAV-22` (emit-seam carriers: task words on starts, account o
 record titles; the typed-hop gap is the account's missing carrier for delegated resolutions),
 `LAV-26` (the narration Skill content itself). `CHI-99` tracks the confidence-tier metadata gap
 this session's live run exposed.
+
+**Routing-story extension (John, 2026-08-07, `design-discovery-0806` → `S-LAV-28` v7.0.61).**
+The per-event table above scoped this contract to the Assembly side and left the routing story
+("Delegation starts/returns, brokerage — none") to the canvas and rail. John extended the third
+authorship register to the **working-status line**: during a hop it renders the *requester's own
+task words* (the dispatch's `task_description`, authored by the asking agent's model turn —
+carried on every delegation START frame), and on completion the *doer's own `account`* (same
+§19s narration field, carried on every typed completion). The asker authors the ask; the doer
+authors the outcome; nobody narrates anyone else. The five `describeDelegationEvent` templates
+demote to the degrade register (same never-blank/never-invented posture as above — not deleted).
+Unchanged by this extension: the Agent Routing rail's row *structure* (its per-hop sentence
+changes only because it shares `describeDelegationEvent`'s one line — no rail-specific copy),
+and the scripted pre-dispatch chrome ("Marcus is thinking…") — at that instant no inter-agent
+message exists; the user's own question on screen is the instruction. Vocabulary note for future
+sessions: a frame's `type`+`viaTool` is the message's *performative*, its from/to+span identity
+the *envelope*, and the task/account/reasoning/critique fields its *content* (FIPA-ACL's
+decomposition, used as vocabulary only — the platform implements no ACL protocol); this
+contract's rule in those terms is that the platform renders performative+envelope as structure
+and never authors content.
