@@ -1,1 +1,0 @@
-design-lav-28b — patch pair for LAV-28's content QA FAIL (John, 2026-08-07): S-LAV-28b (harness — universal account injection, 5-word ask_line on dispatch tools, depth≥2 completion emits → closes LAV-22) then S-LAV-28c (client — ask_line display + mirror lists + content/context QA). Design session orchestrates both, owns QA + close-out.
