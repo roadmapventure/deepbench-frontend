@@ -2217,3 +2217,35 @@ the *envelope*, and the task/account/reasoning/critique fields its *content* (FI
 decomposition, used as vocabulary only — the platform implements no ACL protocol); this
 contract's rule in those terms is that the platform renders performative+envelope as structure
 and never authors content.
+
+**Receipt format + universal harness enforcement (John, 2026-08-07, `design-lav-28b` —
+supersedes this section's "required in the Intent's output schema" mechanism; same rule,
+stronger home).** John's ruling, verbatim anchor: *"The code we create is agent agnostic —
+every agent must obey its functionality ask."* Per-intent schema rows proved the wrong
+enforcement home (the v7.0.61 build covered 4 intents; a real run used 7, and every uncovered
+hop degraded to a template). The requirement now lives once, in the harness:
+
+- **`account` — the doer's receipt.** Injected structurally by the generic contract assembler
+  into **every** JSON-schema intent contract (idempotent; the injected spec supersedes any
+  row-authored copy). Format, enforced by the field's own schema description + content QA:
+  the act performed, **ten words or fewer**, past tense, **client language** (passages,
+  records, sources — never chunks, intents, schemas, tokens), one true count when natural,
+  and **never the deliverable's findings** — a receipt that restates findings is a FAIL even
+  when accurate. Intents with no JSON contract (free-text output) have no field to require and
+  keep the template degrade; they are counted, not converted.
+- **`ask_line` — the asker's headline.** Both dispatch tools require it: **five words or
+  fewer**, same language rules, authored by the requester **in the same tool call** as the
+  full task. The full instruction still travels untruncated and drives the work; the headline
+  drives the display. The platform never truncates a task into a headline — an absent
+  headline degrades, it is never synthesized.
+- **Trust classes unchanged:** both fields are *content* (agent-asserted), never envelope;
+  never read by routing, gates, or classification (§19k untouched); consumed by display and
+  audited by QA only.
+- **Content/context QA is part of the contract:** mechanical gates over every run's frames —
+  word caps, act-verb presence, a findings firewall (no 5-word sequence shared with the
+  deliverable), a jargon denylist, and number-truth (every count spoken must equal the
+  platform's measured value on the same frames) — persisted as a regression test, plus a
+  per-stage truthfulness read at ship time. "The QA must test context and content of what is
+  created, not simply output" (John, same exchange).
+
+Build: `S-LAV-28b` (v7.0.62, harness) + `S-LAV-28c` (v7.0.63, display + gates).
