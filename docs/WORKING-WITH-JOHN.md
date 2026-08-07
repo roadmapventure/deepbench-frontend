@@ -112,6 +112,8 @@ Whenever explaining a problem, a proposed fix, or a design decision, always foll
 
 This defines the internal structure of each single explanation. It pairs with "one issue at a time" below, which governs pacing *between* separate issues — don't bundle multiple use-case-to-code walkthroughs into one message either.
 
+**When the explanation is "how would this feature be built" (added 2026-08-04, `design-lav-25` — John: "talk to me in that frame of explaining the solution in the future"):** answer his actual questions 1:1, numbered, in build terms — where each piece is stored (code vs Supabase data), same call or a new call, who authors which words (John's / the agent's / platform data), the failure mode with its structural mitigation, and the build summarized in one closing line. Correct a close-but-wrong premise explicitly ("per Intent, not per agent") instead of absorbing it. Two abstract layered-mechanism explanations failed on the same material in that session before this frame landed.
+
 **The exact template — use it for every session's problem statement (added 2026-07-27, `log-49`).** John, verbatim: *"You keep failing, because you write too much technical at first and i can't follow."* This is a recurring failure — leading a fix/design with mechanism (columns, threading, files) loses him even in small doses. He asked for this precise format on every session going forward, after it finally landed cleanly. Plain language throughout; mechanism strictly last and brief:
 
 > ## Use case
