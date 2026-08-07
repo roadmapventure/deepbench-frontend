@@ -258,7 +258,11 @@ export function useHarnessStream() {
       // FEATURE: LAV-25 (§19s) -- `account` joins the list on the same footing, for the same reason:
       // §19s puts the agent's own account of the completed work on the COMPLETION frame, and this
       // payload drops anything it does not name.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-28c (§19s) -- `ask_line` joins the named list on both builds, same SES-57
+      // mirror reason and same shape-parity footing as `task`/`account`: the sibling list in
+      // MarketIntelligenceScreen.jsx names the identical pair, and a fork between the two IS that
+      // bug class. The five-word headline is what the Assembly ghost's Asked line renders.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
@@ -278,7 +282,7 @@ export function useHarnessStream() {
     // its degrade ladder, so carrying the field is the whole of that change -- the slug fallback
     // below it stays exactly where it is for the frames that still carry no task words (all of them
     // today: verified absent from every delegation start frame on the harvest run).
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 / §19o -- a recovered hop is never silent. The hook owns the user-visible half

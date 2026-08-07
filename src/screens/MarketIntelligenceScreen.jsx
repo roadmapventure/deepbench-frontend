@@ -1343,7 +1343,18 @@ export function describeDelegationEvent(evt, agents) { // FEATURE: LAV-1a -- exp
   }
   // The START frame only. Deliberately not `else` -- an unrecognized future type carrying a `task`
   // field must not be rendered as a hand-off sentence; it falls to the templates below like today.
+  // FEATURE: LAV-28c (§19s Receipt-format amendment) -- the requester authors TWO things in the one
+  // dispatch call: `ask_line`, the five-word headline meant for display, and `task`, the full
+  // untruncated instruction that actually drives the work. The headline wins here because that is
+  // what it is for; `task` stays as the rung below it so every older frame (and any dispatch whose
+  // model omitted the headline) reads exactly as it did in v7.0.61. The platform never truncates
+  // `task` into a headline -- an absent headline degrades one rung, it is never synthesized.
+  // Same agentWords() type guard as `account` above: an ask_line that arrived as an object, a
+  // number, or whitespace has no words to render and falls through rather than reaching a template
+  // literal (CHI-65's class, one layer earlier than JSX).
   if (evt.type === 'delegation') {
+    const askLine = agentWords(evt.ask_line);
+    if (askLine) return `${fromName} → ${toName} — “${askLine}”`;
     const task = agentWords(evt.task);
     if (task) return `${fromName} → ${toName} — “${task}”`;
   }
@@ -3804,7 +3815,11 @@ export default function MarketIntelligenceScreen() {
       // so a field the frame carries but the list does not name silently vanishes before it reaches
       // the ledger (the SES-57 mirror class); the sibling list in useHarnessStream.js already names
       // it, and a fork between the two is exactly what that class is. Carried verbatim, never derived.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-28c (§19s) -- `ask_line` joins the named list on both builds, for the same
+      // SES-57 mirror reason and on the same shape-parity footing `task`/`account` already ride:
+      // the two lists must never fork again, so each names the whole receipt pair regardless of
+      // which end of a hop actually carries a value for it.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
@@ -3812,7 +3827,7 @@ export default function MarketIntelligenceScreen() {
     // pair useHarnessStream.js's START build already names: `task` is the requester's own words (now
     // emitted on every delegation start, LAV-17's carrier half) and `account` rides for shape parity
     // so neither list can drift from the other again.
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, account: evt.account ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 -- recovery visibility, John's exact design 2026-07-28: tell the user we hit a

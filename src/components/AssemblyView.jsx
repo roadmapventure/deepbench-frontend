@@ -1,3 +1,20 @@
+// DeepBench v7.0.63 | AssemblyView.jsx | LAV-28c -- the deep-leg completion fold, plus the receipt
+// pair's display side. S-LAV-28b proved live (World 3c, both captured runs) that every deep-leg
+// completion streams as `delegation_return` and that ZERO `delegation_complete` frames stream at
+// all, so a fold that fills a stage only on `delegation_complete` left every delegated stage
+// permanently unfilled: ask shown, no account, no ✓ -- John's exact symptom. Four changes:
+//   T1  a `delegation_return` fills the stage its own SPAN declared (buildDeclaredWorkBySpan +
+//       completedWorkStage). Span parentage only -- no depth conditional, no agent conditional, no
+//       literal slug; brokerage hand-backs still build nothing via the same ROUTING_INTENT_SLUGS
+//       data the start path uses. `delegation_complete`'s existing branch is byte-identical.
+//   T2  a revision sub-entry with neither an ask nor an account is no longer pushed -- it rendered
+//       as a bare agent name under a finished stage (the "trailing bare-name entries").
+//   T3  a stage's Asked line prefers the requester's five-word `ask_line` headline, degrading to
+//       today's `deriveAsked` ladder when a frame carries none (§19s: never truncated, never
+//       synthesized).
+// NOT a fold bug, confirmed on both captures and reported up: the duplicate "Fetched N chunks"
+// lines are TWO REAL fetches (a 74-chunk catalog fetch and a 10-chunk library fetch, distinct
+// sources, distinct counts) -- honest data, left exactly as it is.
 // DeepBench v7.0.60 | AssemblyView.jsx | LAV-25b (patch to LAV-25) -- a ghost carrying real work
 // survives terminal. Live QA on v7.0.59 found the Evidence stage rendering correctly mid-run and
 // then VANISHING at terminal: Eleanor Voss's evidence visit resolves via `delegation_return` only
@@ -178,6 +195,61 @@ function accountOf(d) {
   return typeof d.account === "string" && d.account.trim() ? d.account.trim() : null;
 }
 
+// FEATURE: LAV-28c (§19s Receipt-format amendment) -- the requester's five-word headline is what a
+// stage's Asked line is FOR; the full `task` instruction travels untruncated and drives the work,
+// and stays the rung immediately below. Same content-first priority describeDelegationEvent applies
+// to the working-status line, so the two surfaces can never headline one hop two different ways
+// (§19q's one-story rule). A frame with no headline degrades to deriveAsked's own existing ladder,
+// byte-identically to v7.0.61 -- the platform never truncates `task` into a headline and never
+// synthesizes an absent one. Trim-or-null posture matches accountOf above.
+function askedOf(evt, d) {
+  const headline = typeof d.ask_line === "string" && d.ask_line.trim() ? d.ask_line.trim() : null;
+  return headline || deriveAsked(evt);
+}
+
+// FEATURE: LAV-28c -- an execution's OWN declared work, indexed by the span that ran it (§19p).
+// `prompt_assembled` is the one frame where an execution declares what it was assembled to do
+// (`toIntentSlug`) alongside the span it runs under (`span_id`). The delegation START carries the
+// same slug but the REQUESTER's span, so indexing that frame instead would file delegated work
+// under the asker -- which is why this reads prompt frames only.
+//
+// Why a PRE-PASS and not a running lookup: the ledger is not in frame-arrival order. A completion
+// REPLACES its own start row in place (useHarnessStream.js's logEvent pending-row path,
+// MI-52/LOO-009b), so the completion inherits the start's earlier position and lands AHEAD of the
+// delegate's own prompt frame in the array this folds. Verified on both S-LAV-28b capture runs.
+// First declaration per span wins; a span that never declared work is simply absent, and its
+// completion then builds nothing rather than guessing a stage.
+function buildDeclaredWorkBySpan(list) {
+  const bySpan = new Map();
+  for (const evt of list) {
+    if (!evt || evt.type !== "prompt_assembled") continue;
+    const d = evt.data || {};
+    const span = d.span_id ?? null;
+    const slug = typeof d.toIntentSlug === "string" && d.toIntentSlug ? d.toIntentSlug : null;
+    if (span == null || !slug || bySpan.has(span)) continue;
+    bySpan.set(span, slug);
+  }
+  return bySpan;
+}
+
+// FEATURE: LAV-28c -- the stage a `delegation_return` completes, read off the work its own span
+// declared. S-LAV-28b's live verdict (World 3c, both captured runs): every deep-leg completion
+// streams as `delegation_return` and ZERO `delegation_complete` frames stream at all, so a fold
+// that fills a stage only on `delegation_complete` leaves every delegated stage permanently
+// unfilled -- ask shown, no account, no ✓, which is exactly John's reported symptom.
+//
+// A return carries no `toIntentSlug` and no `viaTool` of its own (verified on both captures), so it
+// cannot name its stage directly -- it names its SPAN, and the span's own prompt frame named the
+// work. That is span parentage, and it is depth-agnostic by construction: nothing here reads a
+// nesting level, an agent id, or a literal slug. Routing hand-backs resolve through the same
+// ROUTING_INTENT_SLUGS data the start path uses (a broker's span declares the routing intent), so
+// a brokerage return still builds nothing -- Rule #1 holds, no agent is named anywhere.
+function completedWorkStage(d, declaredWorkBySpan) {
+  const slug = declaredWorkBySpan.get(d.span_id ?? null) ?? null;
+  if (!slug || ROUTING_INTENT_SLUGS.has(slug)) return null;
+  return STAGE_OF_INTENT[slug] ?? null;
+}
+
 // §19p made visible: a helper's fetch belongs to the job whose span it hangs under. Span identity
 // first; `forAgentId` -- the enrichment seam's own "who this fetch was run for" field -- is the
 // documented fallback for the runs where the prompt frame carried no span. Both are the frame's own
@@ -209,6 +281,9 @@ export function buildAssemblyStages(events, eventTimes, {
   const times = Array.isArray(eventTimes) ? eventTimes : [];
   const byId = new Map((Array.isArray(agents) ? agents : []).map(a => [a.id, a]));
   const base = runStartedAt != null ? runStartedAt : (times.find(t => t != null) ?? null);
+  // FEATURE: LAV-28c -- span -> declared work, built before the main pass (see the helper's own
+  // header for why the ledger's order makes a running lookup insufficient).
+  const declaredWorkBySpan = buildDeclaredWorkBySpan(list);
 
   const sections = [];                                   // open order; reversed at the end
   const open = (props) => { const s = { subEntries: [], ...props }; sections.push(s); return s; };
@@ -274,9 +349,18 @@ export function buildAssemblyStages(events, eventTimes, {
     // requester. `viaTool` is the frame's own discriminator between the two: WORK_COMPLETION_TOOL is
     // the delegate doing the declared work; every other value (`request_help` -- the hand-off, i.e.
     // routing, which builds nothing per ROUTING_TOOLS above -- `critique`, or none at all) is not.
+    // ...and a THIRD way, added by LAV-28c because it is the only way the platform actually reports
+    // a completed deep leg today: a `delegation_return` declares its stage through the work its own
+    // SPAN declared (completedWorkStage above). `delegation_complete`'s branch is untouched and
+    // still gated on WORK_COMPLETION_TOOL -- both families are now the same completion family
+    // wherever a stage fills, which is S-LAV-28b's verdict, without loosening LAV-21d's
+    // double-fill guard on the family that already worked.
     const stage = COMPLETION_STAGE[evt.type]
       ?? (evt.type === "delegation_complete" && d.viaTool === WORK_COMPLETION_TOOL
         ? (STAGE_OF_INTENT[typeof d.toIntentSlug === "string" ? d.toIntentSlug : ""] ?? null)
+        : null)
+      ?? (evt.type === "delegation_return"
+        ? completedWorkStage(d, declaredWorkBySpan)
         : null);
     if (stage) {
       // Resolve the ghost this completion answers: same stage first, else the same worker's still
@@ -320,18 +404,30 @@ export function buildAssemblyStages(events, eventTimes, {
     // own account when one streamed, and nothing at all when none did).
     const revisionHost = ghostStage ? findLast(s => s.filled && s.stage === ghostStage) : null;
     if (revisionHost) {
-      revisionHost.subEntries.push({
-        key, ...whoOf(worker, byId), did: account, asked: deriveAsked(evt), timeSignature,
-      });
+      // FEATURE: LAV-28c -- a sub-entry with neither an ask nor an account SAYS NOTHING, and
+      // .claude/rules/agent-section-rendering.md is explicit: render nothing where the agent
+      // returned nothing. It rendered as a bare agent name under a finished stage -- the "trailing
+      // bare-name entries" in John's paste. Root cause: once a stage is FILLED, every later
+      // `prompt_assembled` frame for that same work takes this revision path, and a prompt frame
+      // carries no task words and no account, so the push was structurally empty. LAV-25's T3
+      // revision case is unaffected: a real re-delegation start carries the hand-back's own words
+      // (or an account, or both) and still nests exactly as it did.
+      const revisionAsked = askedOf(evt, d);
+      if (revisionAsked || account) {
+        revisionHost.subEntries.push({
+          key, ...whoOf(worker, byId), did: account, asked: revisionAsked, timeSignature,
+        });
+      }
       continue;
     }
     open({
       key, stage: ghostStage, ghost: true, filled: false, ...whoOf(worker, byId),
       did: null, content: null, timeSignature: null,
-      // The delegation contract where the frame carried one; null for a prompt frame, which has no
+      // The requester's five-word headline where the frame carried one, the full delegation
+      // contract below it (askedOf); null for a prompt frame, which carries neither and has no
       // deriveAsked case at all -- and then the stage label stands alone rather than being padded
       // with copy no agent wrote.
-      asked: deriveAsked(evt),
+      asked: askedOf(evt, d),
       spanId: d.span_id ?? null,
     });
   }
