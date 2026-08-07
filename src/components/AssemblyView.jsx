@@ -1,3 +1,22 @@
+// DeepBench v7.0.59 | AssemblyView.jsx | LAV-25 -- the Assembly Content Contract's client slice
+// (ARCHITECTURE.md §19s, measured on the run in docs/harvests/LAV-25.md). Four changes, none of
+// which touches the Agent Routing rail (its copy is shared with CHI's beta surface, scoped out):
+//   T1  `library-evidence-intent` / `library-record-lookup-intent` (both created by S-LAV-23) join
+//       STAGE_OF_INTENT, so the run's REAL Library evidence stops living in an unlabelled ghost that
+//       gets dropped at terminal; and prompt-assembly BRIEFING fetches (`roster`/`knowledge`) build
+//       nothing at all -- no section, no sub-entry. Keyed on the frame's own `source` field, never on
+//       the agent and never on the capability. Library sources are untouched.
+//   T2  the single "Question answered · build complete" cap becomes three John-locked strings keyed
+//       on the run's REAL end state. It read BUILD COMPLETE over a blocked answer on the harvest run
+//       and over a hard error on the three before it.
+//   T3  a delegation start whose declared work maps to a stage that is ALREADY FILLED (the gate's
+//       revision round re-delegating `ci-answer-intent`) nests as a sub-entry under that stage
+//       instead of opening a second Draft ghost above the filled one.
+//   T4  render-if-present narration: when a frame carries the agent's own `account` of its work
+//       (§19s, delivered by LAV-17/LAV-22 -- absent from every frame today), it renders as the
+//       content line INSTEAD of the derived template sentence; absent, today's template line renders
+//       byte-identically (the §19s degrade). A start's `task` words already feed `deriveAsked`'s top
+//       rung, so carrying the field in useHarnessStream.js is the whole of that half.
 // DeepBench v7.0.57 | AssemblyView.jsx | LAV-21d -- only the work's OWN completion fills a stage.
 // LAV-21c let any `delegation_complete` carrying a mapped `toIntentSlug` fill that stage, and live QA
 // found a double-fill: a brokerage chain emits TWO completions carrying the same picked target's
@@ -50,7 +69,15 @@ export const DELIVERABLE_TITLE = "Deliverable";              // the Answer drawe
 export const ASSEMBLY_LIVE_TEXT = "Assembly under way…";     // live run, no sections yet
 export const ASSEMBLY_EMPTY_TEXT =
   "No build yet — run a question and watch the answer assemble here.";
-export const ASSEMBLY_TERMINAL_TEXT = "Question answered · build complete";
+// FEATURE: LAV-25 (T2, §19s) -- the terminal cap is CHROME (register 1: John's words verbatim), and
+// it now tells the truth about how the run actually ended. One string per real end state, chosen
+// from the screen's own result/error state -- never derived from an agent's words, never a default.
+// The run in docs/harvests/LAV-25.md ended on a gate BLOCK and the cap still read
+// "QUESTION ANSWERED · BUILD COMPLETE"; the three failed runs before it read the same over an error.
+// Verbatim, never re-worded without John.
+export const ASSEMBLY_TERMINAL_ANSWERED_TEXT = "Build complete — answer delivered";
+export const ASSEMBLY_TERMINAL_BLOCKED_TEXT = "Build stopped — the reviewer blocked the draft";
+export const ASSEMBLY_TERMINAL_ERROR_TEXT = "Build stopped — the run hit an error";
 // An in-progress section whose start frame declared no work we can map. It is labelled as what it
 // honestly is -- something running -- never as a guessed stage.
 export const IN_PROGRESS_LABEL = "In progress";
@@ -67,10 +94,27 @@ export const STAGE_LABEL = {
 // carries (verified this session against Supabase `durable_hops.intent_slug`: 23 rows, and there is
 // no `qa-answer-format-intent`). It joins the map as declared work, on the same footing as the other
 // three; it is NOT a special case and nothing keys off it by name.
+// FEATURE: LAV-25 (T1, §19s) -- the two Library intents S-LAV-23 created join the map on exactly the
+// same footing as the other four: they are declared work the pipeline really carries
+// (`library-evidence-intent` is Eleanor's agent-decided evidence retrieval, `library-record-lookup-intent`
+// her record verification inside the gate's round). Verified against the harvest run's own frames.
+// Without them the run's real Library evidence -- the 74-chunk catalog + 10-chunk library pair --
+// opened an UNLABELLED ghost, which is a prediction, which is dropped at terminal: the one piece of
+// genuine evidence in the run vanished from the finished document. Still not an agent -> stage map.
 export const STAGE_OF_INTENT = {
   "ci-answer-intent": "draft", "qg-review-intent": "verification",
   "ci-answer-display-intent": "final", "qa-answer-format": "final",
+  "library-evidence-intent": "evidence", "library-record-lookup-intent": "verification",
 };
+
+// FEATURE: LAV-25 (T1, §19s) -- prompt-assembly BRIEFING fetches: the roster/knowledge material every
+// agent's prompt is built from before it does any work. It is internal briefing, not part of the
+// deliverable, and it was FOUNDING the Evidence stage -- so at terminal "Evidence" credited plumbing
+// while the run's real Library evidence had been dropped. Keyed on the frame's own `source` field
+// (api/prompt/ai-enrichment.js's `fetch_instruction.source`, the same value ASSEMBLY_ATTRIBUTION
+// reads), never on which agent ran the fetch and never on the capability. The Library sources
+// (`the_library`, `the_library_catalog`) are deliberately absent: those ARE deliverable work.
+const BRIEFING_FETCH_SOURCES = new Set(["roster", "knowledge"]);
 
 // Declared work -> stage for a COMPLETED hop. Event types only; the assembly family is keyed on its
 // own `work` field below because one event type legitimately reports two different kinds of work.
@@ -117,6 +161,15 @@ function whoOf(agentId, byId) {
   };
 }
 
+// FEATURE: LAV-25 (T4, §19s) -- the agent's OWN one-sentence account of the work it just did, read
+// verbatim off the frame that carried it (authorship register 3). Returns null for a frame that
+// carries none, which is every frame today (LAV-17/LAV-22 are the emit-seam carriers) -- and the
+// caller then composes exactly the template sentence it composes now. Same trim-or-null posture as
+// RunTasks.jsx's own private `text` helper; a whitespace-only account is not an account.
+function accountOf(d) {
+  return typeof d.account === "string" && d.account.trim() ? d.account.trim() : null;
+}
+
 // §19p made visible: a helper's fetch belongs to the job whose span it hangs under. Span identity
 // first; `forAgentId` -- the enrichment seam's own "who this fetch was run for" field -- is the
 // documented fallback for the runs where the prompt frame carried no span. Both are the frame's own
@@ -132,10 +185,17 @@ function sectionOwnsFetch(section, d) {
  * buildRunTaskEntries (LiveAgentViewScreen's `runHops` + `runHopTimes` -- the UNFILTERED slice,
  * because a `prompt_assembled` frame is a start signal here rather than plumbing to hide).
  *
- * @returns { sections, running, terminal } -- sections NEWEST FIRST by the time each one opened.
+ * `blocked` / `error` are the run's REAL end state, passed straight from the screen's existing
+ * terminal bookkeeping (LiveAgentViewScreen's `result.kind === "qa_failed"` -- the gate's own
+ * guardrail-block return -- and its `terminal === "error"`). They decide nothing about the sections;
+ * they choose which of the three locked cap strings the terminal cap shows (T2/§19s).
+ *
+ * @returns { sections, running, terminal, terminalText } -- sections NEWEST FIRST by the time each
+ *          one opened.
  */
 export function buildAssemblyStages(events, eventTimes, {
   runStartedAt = null, agents = [], running = false, terminal = false,
+  blocked = false, error = false,
 } = {}) {
   const list = Array.isArray(events) ? events : [];
   const times = Array.isArray(eventTimes) ? eventTimes : [];
@@ -157,10 +217,17 @@ export function buildAssemblyStages(events, eventTimes, {
     const key = `${evt.id ?? i}-${evt.type}`;
     const arrivedAtMs = at != null && base != null ? Math.max(0, at - base) : null;
     const timeSignature = formatTimeSignature({ arrivedAtMs, durationMs: evt.durationMs ?? null });
-    const did = deriveDid(evt, byId);
+    // FEATURE: LAV-25 (T4) -- the agent's own account when the frame carried one, the feed's own
+    // composed template sentence otherwise. One substitution point covers every place a content line
+    // is written below (sections and sub-entries alike), because they all read this same `did`.
+    const account = accountOf(d);
+    const did = account || deriveDid(evt, byId);
 
     // ── a fetch: evidence, either on its own or nested under the job it was run for ──────────
     if (evt.type === "assembly_work_complete" && d.work === "fetch") {
+      // FEATURE: LAV-25 (T1) -- briefing fetches leave Assembly entirely: no section, no sub-entry,
+      // no Evidence founding. Placed before every branch below so there is exactly one exit.
+      if (BRIEFING_FETCH_SOURCES.has(d.source)) continue;
       const sub = { key, ...whoOf(evt.agentId, byId), did, timeSignature };
       const host = findLast(s => !s.filled && s.stage !== "draft" && sectionOwnsFetch(s, d));
       if (host) { host.subEntries.push(sub); continue; }
@@ -236,6 +303,20 @@ export function buildAssemblyStages(events, eventTimes, {
       ? findLast(s => !s.filled && s.stage === ghostStage)
       : findLast(s => !s.filled && s.stage == null && s.agentId != null && s.agentId === worker);
     if (already) continue;
+    // FEATURE: LAV-25 (T3, §19s) -- the REVISION case. The gate re-delegates `ci-answer-intent` after
+    // the Draft has already filled, and a second Draft ghost above the finished Draft claims the
+    // stage was never reached. That work is real, so it is not dropped either: it nests under the
+    // stage it belongs to, carrying the hand-back's own task words. The stage stays filled -- a
+    // revision round is work INSIDE a stage, not a new one -- and if the run ends before the round
+    // resolves the sub-entry stays put with no invented completion line (its `did` is the agent's
+    // own account when one streamed, and nothing at all when none did).
+    const revisionHost = ghostStage ? findLast(s => s.filled && s.stage === ghostStage) : null;
+    if (revisionHost) {
+      revisionHost.subEntries.push({
+        key, ...whoOf(worker, byId), did: account, asked: deriveAsked(evt), timeSignature,
+      });
+      continue;
+    }
     open({
       key, stage: ghostStage, ghost: true, filled: false, ...whoOf(worker, byId),
       did: null, content: null, timeSignature: null,
@@ -251,7 +332,12 @@ export function buildAssemblyStages(events, eventTimes, {
   // true -- dropped, never left standing as a stage that did not happen.
   const keepGhosts = !!running && !terminal;
   const visible = sections.filter(s => keepGhosts || !s.ghost);
-  return { sections: visible.reverse(), running: !!running, terminal: !!terminal };
+  // FEATURE: LAV-25 (T2) -- an errored run is an errored run even if a gate blocked earlier in it:
+  // the error is how the run actually ENDED, so it wins. Nothing else can reach the answered string.
+  const terminalText = error
+    ? ASSEMBLY_TERMINAL_ERROR_TEXT
+    : (blocked ? ASSEMBLY_TERMINAL_BLOCKED_TEXT : ASSEMBLY_TERMINAL_ANSWERED_TEXT);
+  return { sections: visible.reverse(), running: !!running, terminal: !!terminal, terminalText };
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -309,6 +395,13 @@ function SubEntry({ entry }) {
   return (
     <div style={SUB_ENTRY}>
       <AgentRow who={entry} small/>
+      {/* FEATURE: LAV-25 (T3) -- what this nested piece of work was ASKED to do, present only on the
+          revision sub-entries a delegation start opens (every other sub-entry carries no `asked` key
+          at all, so their markup is byte-identical to v7.0.57). Same muted treatment the ghost box
+          gives the same field, so one kind of line reads one way wherever it appears. */}
+      {entry.asked && (
+        <div style={{ ...CONTENT_LINE, fontSize: 10.5, color: T.muted }}>{entry.asked}</div>
+      )}
       {entry.did && <div style={{ ...CONTENT_LINE, fontSize: 10.5 }}>{entry.did}</div>}
     </div>
   );
@@ -367,6 +460,11 @@ function StageSection({ section, first }) {
 export default function AssemblyView({ stages = null, running = false }) {
   const sections = stages?.sections ?? [];
   const terminal = !!stages?.terminal;
+  // FEATURE: LAV-25 (T2) -- the fold decides which of the three locked strings is true of this run;
+  // the drawer renders whatever it was handed and authors no cap of its own. A `stages` object from
+  // before this change carries no `terminalText`, and then no cap renders at all rather than a
+  // guessed one (§19j).
+  const terminalText = typeof stages?.terminalText === "string" ? stages.terminalText : null;
   const boxRef = useRef(null);
   const bodyWrapRef = useRef(null);
   const scrollRef = useRef(null);
@@ -404,7 +502,7 @@ export default function AssemblyView({ stages = null, running = false }) {
               ? <div style={EMPTY_TEXT}>{running ? ASSEMBLY_LIVE_TEXT : ASSEMBLY_EMPTY_TEXT}</div>
               : (
                 <>
-                  {terminal && <div style={TERMINAL_CAP}>{ASSEMBLY_TERMINAL_TEXT}</div>}
+                  {terminal && terminalText && <div style={TERMINAL_CAP}>{terminalText}</div>}
                   {sections.map((s, i) => (
                     <StageSection key={s.key} section={s} first={i === 0}/>
                   ))}

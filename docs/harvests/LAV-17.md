@@ -69,6 +69,16 @@ on `assembly_work*` frames (the last pair doubly moot on CHI — its constructor
 frames before the events array). Per this file's standing rule: any kickoff enriching further
 fields must decide **both** constructors per field.
 
+## Constructor asymmetry — widened again by S-LAV-25 (v7.0.59, 2026-08-06)
+
+`useHarnessStream.js` now additionally carries — and CHI's `onDelegationProgress` deliberately does
+NOT (still no Assembly surface there, same LAV-19/LAV-21a precedent): `account` on delegation
+starts, completions, `delegation_return` and `assembly_work*` frames, plus `task` on delegation
+**starts** (the completion build has carried `task` since `LOO-012`). Both are §19s narration
+carriers and forward-carry only — no frame emits either field yet; `LAV-17`/`LAV-22` are the emit
+seam. Standing rule unchanged: any kickoff enriching further fields decides **both** constructors
+per field.
+
 ## Related gap found live by S-LAV-21b QA — now `LAV-22` (Observability, Beta-gate bucket 5)
 
 A capability completion that resolves via internal delegation (`LOO-010` path) streams NO typed

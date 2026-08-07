@@ -760,10 +760,18 @@ export default function LiveAgentViewScreen() {
   // one stream, two views, so the drawer and the canvas can never disagree about a hop (§19q).
   // `running`/`terminal` are passed because the fold needs to know whether a still-open ghost is a
   // live prediction or one the run ended without ever answering.
+  // FEATURE: LAV-25 (T2, §19s) -- the run's REAL end state, so the drawer's terminal cap can stop
+  // saying "build complete" over a blocked or errored run. Both values are state this screen already
+  // holds: `result.kind === "qa_failed"` is runQaWithQualityGate's own return for a gate guardrail
+  // block (MarketIntelligenceScreen.jsx ~L1529-1551 -- the only place that kind is produced), and
+  // `terminal === "error"` is this screen's existing terminal badge state, set from the hook's
+  // `error`. Nothing is derived from the ledger or re-classified here; the fold picks one of three
+  // locked strings from these two flags and authors nothing itself.
   const assemblyStages = useMemo(
     () => buildAssemblyStages(runHops, runHopTimes,
-      { runStartedAt: base, agents, running, terminal: !!terminal }),
-    [runHops, runHopTimes, base, agents, running, terminal]);
+      { runStartedAt: base, agents, running, terminal: !!terminal,
+        blocked: result?.kind === "qa_failed", error: terminal === "error" }),
+    [runHops, runHopTimes, base, agents, running, terminal, result]);
 
   // FEATURE: LAV-1f -- an open gate blocks a new question. Not a timer and not a default decision:
   // the run genuinely has not finished, and letting a new one start would silently abandon a gate

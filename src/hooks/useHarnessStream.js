@@ -1,3 +1,16 @@
+// DeepBench v7.0.59 | useHarnessStream.js | LAV-25 -- two narration fields join this hand-rebuilt
+// ledger payload's named field list so the Assembly drawer can render them the MOMENT they stream
+// (§19s): `account` -- the agent's own one-sentence account of the work it just did -- on the
+// delegation start, the completion, the `delegation_return` and the assembly frames, and `task` on
+// the delegation START (the completion build has carried it since LOO-012; the start build never
+// did). This is FORWARD-CARRY, not a fix to something already arriving: the harvest run's start
+// frames carry no `task` key and no frame anywhere carries `account` -- LAV-17/LAV-22 are the emit
+// seam that will produce them. Same `?? null` verbatim posture as candidates_considered (LAV-19),
+// same `v != null` guard on the assembly copy list, nothing derived and nothing defaulted. Nothing
+// renders differently today: this changes what the ledger CARRIES, never what any view SHOWS.
+// SES-57 mirror note: CHI's hand-mirrored constructor (MarketIntelligenceScreen.jsx's
+// onDelegationProgress) is deliberately NOT changed -- it has no Assembly surface -- widening the
+// LAV-19/LAV-21a asymmetry recorded in docs/harvests/LAV-17.md.
 // DeepBench v7.0.54 | useHarnessStream.js | LAV-21a -- four fields the server ALREADY emits are now
 // carried into the client ledger, so LAV-21's Assembly view can label a stage from the hop's own
 // declared work and nest sub-entries by span parentage (§19r): `toCapabilitySlug`/`toIntentSlug` on
@@ -219,6 +232,10 @@ export function useHarnessStream() {
         work: evt.work, source: evt.source, matchCount: evt.matchCount, tokens: evt.tokens,
         model: evt.model, forAgentId: evt.forAgentId, trace_id: evt.trace_id, span_id: evt.span_id,
         parent_span_id: evt.parent_span_id, toCapabilitySlug: evt.toCapabilitySlug,
+        // FEATURE: LAV-25 (§19s) -- the agent's own account of this assembly step. Through the same
+        // `v != null` guard as every field above, so a frame carrying none is stored exactly as it
+        // is today and the drawer composes exactly today's template line.
+        account: evt.account,
       })) {
         if (v != null) assemblyData[k] = v;
       }
@@ -238,7 +255,10 @@ export function useHarnessStream() {
       // FEATURE: LAV-21a -- toIntentSlug joins it here for symmetry with the start build below: the
       // declared-work pair (capability + intent) is what §19r labels a stage from, so both halves
       // travel together on both ends of a hop rather than one end carrying half of it.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-25 (§19s) -- `account` joins the list on the same footing, for the same reason:
+      // §19s puts the agent's own account of the completed work on the COMPLETION frame, and this
+      // payload drops anything it does not name.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
@@ -252,7 +272,13 @@ export function useHarnessStream() {
     // "Take the delegated work." to "Take the <slug> work." -- the ladder's intended rung, reached
     // now that the field exists. Only reachable for a start row logEvent's pending-row path never
     // replaced (a run ending on a gate or an error before the delegate logs anything).
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    // FEATURE: LAV-25 (§19s) -- `task` and `account` join the START build's named list. `task` is the
+    // requester's own words for what it asked for, which §19s renders as the stage's "Asked" line
+    // from ghost-open onward; RunTasks.jsx's deriveAsked ALREADY reads `d.task` as the top rung of
+    // its degrade ladder, so carrying the field is the whole of that change -- the slug fallback
+    // below it stays exactly where it is for the frames that still carry no task words (all of them
+    // today: verified absent from every delegation start frame on the harvest run).
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 / §19o -- a recovered hop is never silent. The hook owns the user-visible half
