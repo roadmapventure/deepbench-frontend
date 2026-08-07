@@ -33,6 +33,12 @@ known defect that would break or dirty that run:
 > Jordan Ellsworth — Web Search Expert's own Skill. The "expect failures" framing still stands on
 > the remaining 15 rows; case 24 specifically is no longer the known-bad one.
 >
+> **Added 2026-08-04 (`design-lav-25`):** `CHI-99` (Task Success Rate) joins the suspects — and
+> unlike the pre-`HAR-17` rows it fired live TODAY: `ci-answer-intent` can't see `data_type`
+> metadata, mis-tags the confidence tier, and the gate blocks the answer (observed on console
+> question 1, post-`LAV-23`; possibly a `LAV-23` regression — diagnose before the re-baseline
+> run, since a block-instead-of-answer fails this bucket's bar outright). Row: `docs/FEATURES.md`.
+>
 > **Corrected 2026-07-29 (`S-CHI-92-design`) — the sentence above is wrong, and this is a QA
 > lesson worth keeping.** `LOO-013`'s routing fix was real, but its "3 cards, no errors"
 > verification **counted cards without reading them**: all three were `<UNKNOWN>` in every field

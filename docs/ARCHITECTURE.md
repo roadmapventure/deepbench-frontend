@@ -2149,3 +2149,52 @@ decoration around a single answer.
 Build ticket: `LAV-21` (Feature). Visual design (skeleton look, fill treatment, stage
 labels/naming) is NOT settled here — that is the design session's mock, John's approval gate,
 including the feature's user-facing name.
+
+## 19s. Assembly Content Contract — Agent-Narrated Build [design `design-lav-25`, John, 2026-08-04]
+
+**The decision:** the Assembly drawer's in-stage content is the **agents' own account of their
+work**, not screen-authored templates. Each Intent's Skill instructs the model to return, in the
+same call it is already making, a one-sentence plain-business account of what it did (its
+"narration"); the executor attaches it to the hop's frame; the drawer renders it verbatim (§19j).
+The requester's own task words (already on every delegation server-side) render as the stage's
+"Asked" line from ghost-open onward. Approved against the mocked run in `docs/harvests/LAV-25.md`.
+
+**The three authorship registers (John's frame — every rendered line is exactly one):**
+1. **Template** — screen chrome in code, John's words verbatim: stage labels, the terminal cap,
+   degrade fallbacks. Nothing else may be screen-authored.
+2. **Platform data** — deterministic values off the frame (counts, sources, slugs, timings).
+3. **Agent-authored** — the narration account + task words + critiques, rendered verbatim,
+   varying run to run. Never used for pattern classification (§19k's signature stays
+   platform-observed facts only — a model must not grade its own homework).
+
+**Per-event-type contract (Assembly side; the Agent Routing rail is deliberately untouched by
+this contract — its copy is shared with CHI's beta surface):**
+
+| Event / content | Assembly home | Line source |
+|---|---|---|
+| Prompt-assembly briefing fetches (roster/knowledge) | **excluded** — internal briefing, not deliverable work; they no longer found the Evidence stage | — |
+| Library evidence retrieval (`library-evidence-intent`) | Evidence stage | Asked = requester's task words; fill = agent account |
+| Record verification (`library-record-lookup-intent`) | nested under Verification (span parentage, §19p) | agent account |
+| Draft (`ci-answer-intent`) | Draft stage | agent account |
+| Gate review (`qg-review-intent`) | Verification stage | agent account + verbatim critique (exists today) |
+| Revision round-trips (gate → drafter re-entry) | sub-entries under the existing Draft stage — never a second Draft section | hand-back task words + re-draft account |
+| Delegation starts/returns, brokerage | none (routing; canvas + rail own that story) | — |
+| Terminal cap | chrome, keyed on the run's REAL end state (answered / blocked / error) — never "build complete" on a blocked or errored run | template |
+
+**Invariants:**
+- Placement is the frame's job, never the words': stage derives from declared work
+  (intent slug → stage map + span parentage, §19r). The narration is cargo.
+- The account field is **required in the Intent's output schema** (structural enforcement, not
+  prose instruction). When a model still omits it, the pre-contract template line renders as the
+  degrade — a stage never shows an invented account and never goes blank while degrade templates
+  exist (Tier-2 call, John may revisit).
+- The instruction is per-Intent Skill content (Supabase, Trainer governance), agent-agnostic —
+  no agent named anywhere (Rule #1, §19d). It shapes the *kind* of account, never the words.
+- One story stands (§19q): both displays fold the same frames; this contract allocates, it never
+  forks data.
+
+Build tickets: `S-LAV-25` (client, `v7.0.59` kickoff — map entries, exclusions, cap, render-if-
+present), `LAV-17`/`LAV-22` (emit-seam carriers: task words on starts, account on completions,
+record titles; the typed-hop gap is the account's missing carrier for delegated resolutions),
+`LAV-26` (the narration Skill content itself). `CHI-99` tracks the confidence-tier metadata gap
+this session's live run exposed.
