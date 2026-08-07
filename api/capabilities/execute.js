@@ -1,3 +1,14 @@
+// DeepBench v7.0.61 | api/capabilities/execute.js | LAV-28 (§19s routing-story extension) -- every
+// delegation-family emit now carries the words the routing story is told in: `task` (the requester's
+// own dispatch words, verbatim off tool_input / delegateTaskContext.delegation_task) on all three
+// START frames, and `account` (the doer's own one-sentence narration, off the resolved result's
+// .content) on every completion/return. The two originator-credit completions carry account: null
+// explicitly -- no completed result exists at that instant and §19s forbids inventing one. Plus
+// LAV-22's typed-hop gap: the critique dispatch emitted a START with no matching completion anywhere
+// in its resolution block, so the critique agent's resolved work streamed no hop at all; a
+// delegation_complete now fires on the resolved path only (never on HAR-18's checkpointed null),
+// crediting the critique execution's own span (§19p). Additive fields only -- no emit removed, no
+// span identity changed, no agent-id/capability-slug conditional
 // DeepBench v7.0.53 | api/capabilities/execute.js | LAV-19 -- one additive field on one existing
 // event (§19q's smallest slice): the request_help delegation_complete emit that already carries
 // `reasoning` now also carries `candidates_considered`, the same delegateResult.content.candidates
@@ -678,9 +689,21 @@ async function dispatchDelegation({
     // parity-restoration principle: tool_input.task_description/skill_needed is the same real field
     // the delegateTaskContext below already reads, not new data.
     if (delegationRequired) {
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p)
+      // FEATURE: LAV-28 (§19s routing-story extension) -- `account: null` is DELIBERATE and explicit
+      // here, not an oversight: this emit credits the requester's own turn at the moment it decides
+      // to ask for help, before any nested execution has resolved. There is no completed result in
+      // scope to read an account off, and §19s forbids inventing one -- the status line degrades to
+      // its template, which is the correct honest outcome. Named rather than omitted so every
+      // delegation-family frame carries the field uniformly (the SES-57 omitted-vs-defaulted class).
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p)
     }
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): PM's execution not started yet -- null, never fabricated
+    // FEATURE: LAV-28 (§19s routing-story extension, LAV-17's carrier half) -- the requester's own
+    // task words, authored by its model turn, ride the START frame so the working-status line can
+    // render the instruction verbatim during the hop instead of the "is asking who should help"
+    // template. Exactly the same tool_input fields the delegateTaskContext below already reads --
+    // carried, never derived (§19q: what a frame credits, it carries). Verified absent from every
+    // start frame on the LAV-25 harvest run, which is why the line had nothing to say.
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): PM's execution not started yet -- null, never fabricated
     // FEATURE: LOO-001 -- requesting_agent_id threaded into Michelle's task_context (generic,
     // always-present field, never omitted) so her own reasoning can recognize and reject a
     // self-referral, per the no_match output LOO-002 adds. tool_input itself never carries this
@@ -739,11 +762,20 @@ async function dispatchDelegation({
       // recomputed, no new call, no roster filter: whatever the broker's own response returned is
       // what travels. §19q's rule — what a frame credits, it carries — applied to the one field the
       // Run Assembly feed needs to say who was actually weighed. Span identity fields untouched.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null, candidates_considered: delegateResult?.content?.candidates ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the PM -- her own resolved span
+      // FEATURE: LAV-28 (§19s) -- `account` joins this emit on exactly the same footing `reasoning`
+      // and `candidates_considered` already sit on: the broker's own completed execution is in scope
+      // (delegateResult), so the frame that credits her work carries her own one-sentence account of
+      // it. Read off the resolved result, never recomputed, never a second call.
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', reasoning: rec.reasoning ?? null, candidates_considered: delegateResult?.content?.candidates ?? null, account: delegateResult?.content?.account ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the PM -- her own resolved span
       const delegateTaskContext = (task_context && typeof task_context === 'object')
         ? { ...task_context, delegation_task: tool_input.task_description || tool_input.skill_needed }
         : { delegation_task: tool_input.task_description || tool_input.skill_needed };
-      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+      // FEATURE: LAV-28 (LAV-17's carrier half) -- the task words this dispatch is about to hand the
+      // recommended agent are already assembled one line above as delegateTaskContext.delegation_task
+      // (the same value that reaches durable_hops.task_context->>'delegation_task'). Reading THAT
+      // rather than re-deriving from tool_input keeps the frame and the durable row provably the same
+      // string -- the equality QA item 1 asserts against.
+      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, task: delegateTaskContext.delegation_task ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
       const autoResolvedResult = await runCapability({
         capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -758,7 +790,11 @@ async function dispatchDelegation({
       // terminal agent. Nested is_final-in-is_final chains need no special handling: _onEvent is
       // already threaded into the nested runCapability() call above, so a deeper final hand-off
       // fires its OWN delegation_complete at its own level automatically.
-      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: autoResolvedResult?.span_id ?? null }); // LOG-95 (§19p): credits the recommended target's own execution
+      // FEATURE: LAV-28 (§19s) -- the doer's own account of the work this frame credits, read off the
+      // execution that just resolved (autoResolvedResult, NOT delegateResult -- that one is the
+      // broker's pick, already credited above). Wrong-result attribution here would put the picker's
+      // sentence on the worker's hop, §19p's "worse than blank" case applied to content.
+      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', account: autoResolvedResult?.content?.account ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: autoResolvedResult?.span_id ?? null }); // LOG-95 (§19p): credits the recommended target's own execution
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = pmAgentId;
@@ -786,9 +822,14 @@ async function dispatchDelegation({
       // genuinely happens first — while the 'delegation' placeholder (and the target's later claim
       // on it) correctly becomes the second, later hop. Content unchanged from LOO-011/LOO-012 — only
       // the firing point moved.
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p): credits the current agent's own execution
+      // FEATURE: LAV-28 (§19s) -- `account: null`, explicit and deliberate, same reason as the
+      // request_help originator credit above: this frame fires BEFORE the nested dispatch, so no
+      // completed result exists to account for. Never fabricated; the line degrades to its template.
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null, account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p): credits the current agent's own execution
     }
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+    // FEATURE: LAV-28 (LAV-17's carrier half) -- the dispatching agent's own words for what it is
+    // asking (tool_input.task, its model turn's authorship), carried verbatim on the START frame.
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', task: task ?? null, trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -799,7 +840,7 @@ async function dispatchDelegation({
     }
     if (willResolveFinal) {
       // FEATURE: LOO-009 — unchanged: credits the target, claiming the 'delegation' placeholder above.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', account: delegateResult?.content?.account ?? null, trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution -- LAV-28 (§19s): and its own account
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = targetAgentId;
@@ -807,7 +848,11 @@ async function dispatchDelegation({
   }
 
   if (returningFromAgentId) {
-    onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: span_id }); // LOG-95 (§19p): row credits the returning delegate
+    // FEATURE: LAV-28 (§19s) -- a return credits the RETURNING delegate (fromAgentId, MI-48), so the
+    // account it carries is that delegate's own: delegateResult is precisely the execution handing
+    // back here, on both branches that set returningFromAgentId (the broker's, and the
+    // delegate_to_agent target's). One read, no per-branch conditional.
+    onEvent({ type: 'delegation_return', toAgentId: agent_id, toCapabilitySlug: capability_slug, fromAgentId: returningFromAgentId, fromCapabilitySlug: returningFromCapabilitySlug, account: delegateResult?.content?.account ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: span_id }); // LOG-95 (§19p): row credits the returning delegate
   }
   // FEATURE: LOO-28 -- a fan prong returns its tool_result content instead of appending it: the
   // Anthropic protocol requires every tool_use id in the assistant turn to be answered in the
@@ -1094,12 +1139,16 @@ async function runLoop({
         // written now, unchanged shape, before the critique/confirmation logic runs.
         logAgentTurn(heldTurnLog);
         let critique = null;
+        // FEATURE: LAV-28 (LAV-22) -- hoisted out of the block below so the completion emit added
+        // after the HAR-18 in_progress guard can name the credited agent. Declaration site only; the
+        // resolveCapabilityHolder() call, its position, and its value are unchanged.
+        let critiqueAgentId = null;
         if (critiqueCapabilitySlug) {
           if (hopCounter.n >= MAX_LOOP_DEPTH) {
             return { status: 'depth_exceeded', depth: MAX_LOOP_DEPTH, agent_id, capability_slug, trace_id, span_id };
           }
           hopCounter.n++;
-          const critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
+          critiqueAgentId = await resolveCapabilityHolder(critiqueCapabilitySlug);
           // FEATURE: MI-42 -- fires the instant the target is resolved, before the nested call's own
           // latency -- never speculative, the critique agent is always real by the time this fires.
           onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: critiqueAgentId, toCapabilitySlug: critiqueCapabilitySlug, toIntentSlug: critiqueIntentSlug, viaTool: 'critique', trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): critique execution not started yet
@@ -1129,6 +1178,20 @@ async function runLoop({
         if (critique?.status === 'in_progress') {
           console.error(`[execute] critique dispatch checkpointed mid-flight (job ${critique.job_id}); proceeding without critique`);
           critique = null;
+        }
+        // FEATURE: LAV-28 (LAV-22, §19p/§19s) -- the critique START emitted above had NO matching
+        // typed completion anywhere in this resolution block (verified this session: zero onEvent
+        // calls between the await and the confirmation insert). The critique agent's real, resolved
+        // work therefore streamed no delegation_complete at all, so its hop never landed in the
+        // routing story -- LAV-22's "delegated resolution with no typed hop" seam, at its source.
+        // Fires only on a genuinely resolved critique: `critique` is null both when no critique
+        // capability is configured (no start frame was emitted either -- pairing preserved) and on
+        // HAR-18's checkpointed path just above, where no result exists to credit. Same field shape
+        // as dispatchDelegation()'s delegate_to_agent completion; §19p: to_span_id is the CRITIQUE
+        // execution's own span, never this requester's. No agent-id/slug conditional -- the credited
+        // ids are whatever resolveCapabilityHolder() returned (Rule #1, §19d).
+        if (critique) {
+          onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: critiqueAgentId, toCapabilitySlug: critiqueCapabilitySlug, toIntentSlug: critiqueIntentSlug, viaTool: 'critique', account: critique?.content?.account ?? null, trace_id, from_span_id: span_id, to_span_id: critique?.span_id ?? null });
         }
         const confirmation_id = await insertPendingConfirmation({
           tenant_id, agent_id, capability_slug, intent_slug,

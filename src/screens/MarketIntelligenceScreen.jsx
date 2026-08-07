@@ -1,3 +1,12 @@
+// DeepBench v7.0.61 | MarketIntelligenceScreen.jsx | LAV-28 (§19s routing-story extension) --
+// describeDelegationEvent() renders content-first: the doer's own `account` on a completion/return,
+// the requester's own `task` words on a start, and only then the five existing templates, which are
+// unchanged byte-for-byte and are now the degrade path (§19s: never blank, never invented). One
+// function, so the CHI status line, the hook's status writer and RunTasks' Did line all move
+// together. Non-string content (object/number/whitespace) degrades rather than stringifying into the
+// line. Also: both hand-rebuilt onDelegationProgress payloads name `task`/`account` so the fields
+// survive into the ledger (SES-57 mirror class). No visual change -- same fonts, colors, layout,
+// same CSS clamp; only the sentence string differs.
 // DeepBench v7.0.25 | MarketIntelligenceScreen.jsx | LAV-7a -- export-in-place only, zero behavior change,
 // exactly as LAV-5a did below: QaEvidenceCard / groupKeyDataPoints / ActualDataPointsTable /
 // TheorizedDataPointsTable gained the `export` keyword and nothing else in this file changed. The Live
@@ -1304,10 +1313,40 @@ function firstNameFor(id, agentById) {
 // Agent Routing drawer's own row headers explicitly out of scope (still full names). MI-52 reverses
 // that scope note per John's direct instruction this session: RoutingEventRow now also renders
 // first name only (see below), via the same firstNameFor() helper this function calls.
+// FEATURE: LAV-28 (§19s) -- the agent-authored registers are strings or they are nothing. A frame
+// whose `task`/`account` arrived as an object, a number, or whitespace has no words to render, so it
+// falls through to the template rather than reaching a template literal (which would stringify an
+// object into the status line -- CHI-65's class, one layer earlier than JSX). Trimmed for the
+// emptiness test only; the value rendered is the agent's own, untouched.
+function agentWords(v) {
+  return (typeof v === 'string' && v.trim()) ? v : null;
+}
+
+// FEATURE: LAV-28 (§19s routing-story extension, John 2026-08-07) -- this one function is the whole
+// working-status line for CHI, the hook's status writer, and RunTasks' Did line, so the three
+// authorship registers get allocated here exactly once. Priority: the doer's own account on a
+// completion, then the requester's own task words on a start, then -- unchanged, byte-identical --
+// the five templates below, which are now the DEGRADE path, never deleted (§19s: never blank, never
+// invented). The em-dash + curly quotes match the existing status-line typography; clamping is
+// display-only CSS, so the string is never sliced here.
 export function describeDelegationEvent(evt, agents) { // FEATURE: LAV-1a -- exported in place (no body change) for src/hooks/useHarnessStream.js
   const agentById = (id) => agents.find(a => a.id === id);
   const fromName = firstNameFor(evt.fromAgentId, agentById);
   const toName = firstNameFor(evt.toAgentId, agentById);
+  // FEATURE: LAV-28 -- register 3, content-first. The credited agent is the same one each type's
+  // template already names (MI-48's attribution: a return names the RETURNING delegate, fromName; a
+  // complete names who finished, toName) -- content changes the words, never who the line is about.
+  if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
+    const account = agentWords(evt.account);
+    const credit = evt.type === 'delegation_complete' ? toName : fromName;
+    if (account) return `${credit} — “${account}”`;
+  }
+  // The START frame only. Deliberately not `else` -- an unrecognized future type carrying a `task`
+  // field must not be rendered as a hand-off sentence; it falls to the templates below like today.
+  if (evt.type === 'delegation') {
+    const task = agentWords(evt.task);
+    if (task) return `${fromName} → ${toName} — “${task}”`;
+  }
   if (evt.type === 'delegation_return') {
     return `${fromName} is back — wrapping up…`; // FEATURE: MI-48 -- was toName (named who control
     // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
@@ -3761,11 +3800,19 @@ export default function MarketIntelligenceScreen() {
       // identity (pickCreditedSpan handles delegation_complete AND delegation_return correctly --
       // no branch-local span logic), so RoutingActivityLine's ai_call_patterns join works on
       // live streamed rows too, not only the result-shape-built ones.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-28 (§19s) -- `account` joins the named field list. This payload is hand-rebuilt,
+      // so a field the frame carries but the list does not name silently vanishes before it reaches
+      // the ledger (the SES-57 mirror class); the sibling list in useHarnessStream.js already names
+      // it, and a fork between the two is exactly what that class is. Carried verbatim, never derived.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    // FEATURE: LAV-28 (§19s) -- same SES-57 mirror reason as the completion build above, and the same
+    // pair useHarnessStream.js's START build already names: `task` is the requester's own words (now
+    // emitted on every delegation start, LAV-17's carrier half) and `account` rides for shape parity
+    // so neither list can drift from the other again.
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, account: evt.account ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 -- recovery visibility, John's exact design 2026-07-28: tell the user we hit a
