@@ -1,3 +1,7 @@
+// DeepBench v7.0.60 | tests/regression/LAV-25-assembly-contract.js | LAV-25b -- group 1c added: the
+// terminal filter keeps a ghost that is HOLDING REAL WORK, replayed from the live stream's real
+// frame set (delegation start + fetches + `delegation_return`, NO typed completion). See group 1c's
+// own header for the live FAIL it holds and its mutation.
 // DeepBench v7.0.59 | tests/regression/LAV-25-assembly-contract.js | LAV-25 -- the Assembly Content
 // Contract's client slice (ARCHITECTURE.md §19s), asserted against the REAL buildAssemblyStages.
 //
@@ -134,6 +138,75 @@ export default async function run() {
       `library-record-lookup-intent must map to Verification, got ${sections[0].stage}`);
   }
 
+  // ── 1c. The REAL live shape: a ghost carrying real work survives terminal ────────────────────
+  // LAV-25b. Group 1 above feeds a `delegation_complete` that the live stream does NOT send for
+  // Eleanor's evidence visit -- her delegation resolves via `delegation_return` only (LAV-22's
+  // carrier gap, open), so no typed completion ever fills the Evidence section. Live QA 2026-08-07
+  // on v7.0.59: the stage rendered correctly mid-run, then VANISHED at terminal, taking the run's
+  // only real evidence (74-chunk catalog + 10-chunk library) with it -- the old terminal filter
+  // dropped every ghost regardless of what it was holding. Group 1's completion frame is exactly
+  // what masked this (SES-69: never assert against a frame the live stream does not send).
+  //
+  // MUTATION (re-runnable): revert AssemblyView.jsx's terminal filter to
+  // `keepGhosts || !s.ghost` and this group FAILS on its first assertion.
+  {
+    const evidenceFrames = [
+      hop("delegation", "michelle",
+        { viaTool: "delegate_to_agent", toIntentSlug: "library-evidence-intent",
+          toCapabilitySlug: "the-library", span_id: "span-ev",
+          task: "Pull the records that speak to this question." },
+        { secondaryAgentId: "eleanor" }),
+      hop("assembly_work_complete", "eleanor",
+        { work: "fetch", source: "the_library_catalog", matchCount: 74, parent_span_id: "span-ev" }),
+      hop("assembly_work_complete", "eleanor",
+        { work: "fetch", source: "the_library", matchCount: 10, parent_span_id: "span-ev" }),
+      // The hand-back the live run really streams. It is not work, so the fold ignores it and the
+      // section is still an unfilled ghost when the run ends.
+      hop("delegation_return", "eleanor",
+        { toIntentSlug: "library-evidence-intent", span_id: "span-ev",
+          message: "Eleanor is back — wrapping up…" }),
+    ];
+    const { sections } = fold(mod, evidenceFrames, { running: false, terminal: true });
+    assert.strictEqual(sections.length, 1,
+      `an unfilled Evidence ghost holding real fetches must SURVIVE terminal, got ${sections.length} sections`);
+    const [evidence] = sections;
+    assert.strictEqual(evidence.stage, "evidence",
+      `the surviving section keeps its declared stage, got ${evidence.stage}`);
+    assert.strictEqual(evidence.subEntries.length, 2,
+      `both Library fetches survive with it, got ${evidence.subEntries.length}`);
+    assert.strictEqual(evidence.ghost, true,
+      "nothing filled it, so it is still honestly a ghost -- surviving is not the same as completing");
+    // `filled` IS the ✓ render flag: StageSection renders the ✓ only under `section.filled`. An
+    // unfilled stage must never wear one -- it did not complete.
+    assert.strictEqual(evidence.filled, false,
+      "the surviving section must carry NO ✓ -- `filled` is the flag StageSection gates the ✓ on");
+    assert.strictEqual(evidence.did, null,
+      `no completion streamed, so no completion line may be invented (§19j), got ${evidence.did}`);
+    assert.strictEqual(evidence.content, null, "no headline is invented for it either");
+    assert.strictEqual(evidence.asked, "Pull the records that speak to this question.",
+      `the start frame's own words still render, got ${evidence.asked}`);
+
+    // The discriminating half of the pair: the SAME terminal opts, a ghost holding nothing at all.
+    // That one is a prediction that never came true and must still drop -- otherwise this group
+    // would pass just as well against a filter that keeps every ghost at terminal.
+    const emptyGhost = [
+      hop("delegation", "michelle",
+        { viaTool: "delegate_to_agent", toIntentSlug: "qg-review-intent", span_id: "span-vg" },
+        { secondaryAgentId: "owen" }),
+      hop("delegation_return", "owen",
+        { toIntentSlug: "qg-review-intent", span_id: "span-vg", message: "Owen is back — wrapping up…" }),
+    ];
+    const dropped = fold(mod, emptyGhost, { running: false, terminal: true });
+    assert.strictEqual(dropped.sections.length, 0,
+      `a ghost holding NO real work must still drop at terminal, got ${dropped.sections.length} sections`);
+    // ...and both are present mid-run, so the difference above is the terminal filter's doing and
+    // not an accident of how either set of frames folds.
+    assert.strictEqual(fold(mod, evidenceFrames, { running: true, terminal: false }).sections.length, 1,
+      "the evidence ghost is present mid-run");
+    assert.strictEqual(fold(mod, emptyGhost, { running: true, terminal: false }).sections.length, 1,
+      "the empty ghost is present mid-run too -- terminal is what separates them");
+  }
+
   // ── 2. Briefing fetches are excluded entirely ───────────────────────────────────────────────
   // roster/knowledge are the prompt-assembly briefing (§19s: internal, not deliverable work). Before
   // LAV-25 the first one FOUNDED the Evidence stage, so terminal "Evidence" credited plumbing.
@@ -255,7 +328,7 @@ export default async function run() {
       "present vs absent must produce different lines -- otherwise this assertion proves nothing");
   }
 
-  return "LAV-25 assembly content contract: 5/5 groups PASS";
+  return "LAV-25 assembly content contract: 6/6 groups PASS";
 }
 
 selfRun(import.meta.url, run);

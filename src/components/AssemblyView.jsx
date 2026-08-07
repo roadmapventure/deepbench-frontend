@@ -1,3 +1,11 @@
+// DeepBench v7.0.60 | AssemblyView.jsx | LAV-25b (patch to LAV-25) -- a ghost carrying real work
+// survives terminal. Live QA on v7.0.59 found the Evidence stage rendering correctly mid-run and
+// then VANISHING at terminal: Eleanor Voss's evidence visit resolves via `delegation_return` only
+// (no typed completion streams for it -- LAV-22's carrier gap, open), so the section never fills,
+// stays a ghost, and the terminal filter dropped it along with her real 74+10-chunk Library fetches.
+// The terminal filter now drops a ghost only when it holds no real work; a surviving one renders
+// unfilled -- no ✓, no shimmer, no invented headline or completion line (§19j). One change, in
+// `buildAssemblyStages`'s final filter plus the shimmer's render gate.
 // DeepBench v7.0.59 | AssemblyView.jsx | LAV-25 -- the Assembly Content Contract's client slice
 // (ARCHITECTURE.md §19s, measured on the run in docs/harvests/LAV-25.md). Four changes, none of
 // which touches the Agent Routing rail (its copy is shared with CHI's beta surface, scoped out):
@@ -330,8 +338,19 @@ export function buildAssemblyStages(events, eventTimes, {
 
   // A ghost is a prediction. Once the run is over, an unresolved one is a prediction that never came
   // true -- dropped, never left standing as a stage that did not happen.
+  // FEATURE: LAV-25b (T1, §19s) -- ...unless it is HOLDING REAL WORK. A ghost that accumulated
+  // sub-entries is no longer only a prediction: those sub-entries are hops that actually landed. Live
+  // QA 2026-08-07 (v7.0.59, console question 1): Eleanor Voss's evidence visit resolves via
+  // `delegation_return` only -- no typed completion streams for it (LAV-22's carrier gap, open) -- so
+  // the Evidence section never fills, stays a ghost, and the old filter dropped it at terminal along
+  // with her real 74-chunk catalog + 10-chunk library fetches. The run's only genuine evidence
+  // vanished from the finished document at the exact moment it mattered. A ghost with ZERO
+  // sub-entries still drops exactly as before -- that one really is a prediction that never came
+  // true. The surviving section stays unfilled, so it renders with no ✓, no shimmer once terminal,
+  // and no invented headline or completion line (§19j): its label, its `asked` line if the start
+  // frame carried one, and the real work underneath it.
   const keepGhosts = !!running && !terminal;
-  const visible = sections.filter(s => keepGhosts || !s.ghost);
+  const visible = sections.filter(s => keepGhosts || !s.ghost || s.subEntries.length > 0);
   // FEATURE: LAV-25 (T2) -- an errored run is an errored run even if a gate blocked earlier in it:
   // the error is how the run actually ENDED, so it wins. Nothing else can reach the answered string.
   const terminalText = error
@@ -407,7 +426,10 @@ function SubEntry({ entry }) {
   );
 }
 
-function StageSection({ section, first }) {
+// FEATURE: LAV-25b (T1) -- `terminal` reaches here for exactly one reason: a ghost that survives
+// terminal because it holds real work must not keep shimmering. Shimmer means "still coming"; once
+// the run is over nothing else is coming, so the box renders what actually landed and nothing more.
+function StageSection({ section, first, terminal = false }) {
   const label = section.stage ? STAGE_LABEL[section.stage] : IN_PROGRESS_LABEL;
   const isError = section.stage === "error";
   return (
@@ -434,8 +456,12 @@ function StageSection({ section, first }) {
               {section.asked}
             </div>
           )}
-          <ShimmerBar/>
-          <ShimmerBar width="72%"/>
+          {!terminal && (
+            <>
+              <ShimmerBar/>
+              <ShimmerBar width="72%"/>
+            </>
+          )}
           {section.subEntries.map(s => <SubEntry key={s.key} entry={s}/>)}
         </div>
       ) : (
@@ -504,7 +530,7 @@ export default function AssemblyView({ stages = null, running = false }) {
                 <>
                   {terminal && terminalText && <div style={TERMINAL_CAP}>{terminalText}</div>}
                   {sections.map((s, i) => (
-                    <StageSection key={s.key} section={s} first={i === 0}/>
+                    <StageSection key={s.key} section={s} first={i === 0} terminal={terminal}/>
                   ))}
                 </>
               )}
