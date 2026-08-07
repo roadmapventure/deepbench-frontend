@@ -1,1 +1,0 @@
-design-discovery-0806 — discovery → design: LAV-28 (Feature, Beta-gate bucket 5) — agent-authored working status, §19s routing-story extension; folds LAV-17/LAV-22/LAV-26. Kickoff v7.0.61 committed; S-LAV-28 coding session (Opus 5) spawned into this worktree on branch session/lav-28-coding. Design session owns QA + close-out. (opened 2026-08-06, kickoff 2026-08-07)
