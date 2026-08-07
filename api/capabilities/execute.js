@@ -1,3 +1,11 @@
+// DeepBench v7.0.62 | api/capabilities/execute.js | LAV-28b (§19s Receipt format) -- `ask_line` (the
+// requester's own 5-word headline, authored in the same tool call as the full task) now rides every
+// delegation-family frame that already carries `task`: both request_help/delegate_to_agent START
+// frames, the PM-recommendation relay (which carries the ORIGINAL requester's headline -- the broker
+// relays the ask, never re-authors it), and the two originator-credit frames. Carried verbatim via
+// normalizeAskLine(); absent stays null and the display degrades -- never synthesized from task words.
+// Also re-injects the universal `account` receipt onto the format-override contract, which replaces
+// db-assembly's contract wholesale and would otherwise be the one JSON contract with no receipt.
 // DeepBench v7.0.61 | api/capabilities/execute.js | LAV-28 (§19s routing-story extension) -- every
 // delegation-family emit now carries the words the routing story is told in: `task` (the requester's
 // own dispatch words, verbatim off tool_input / delegateTaskContext.delegation_task) on all three
@@ -86,14 +94,14 @@
 // jobs that genuinely throw are now marked 'status: failed' with a real error instead of sitting
 // orphaned -- DB bookkeeping only, the HTTP error contract is unchanged.
 
-import { assemblePrompt, mergeCallFacts } from '../prompt/db-assembly.js';
+import { assemblePrompt, mergeCallFacts, injectAccountField } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 // FEATURE: LOG-49 -- extractSelfReportedClaims + its allowlist live in request-receivable.js (a
 // single shared constant, extensible in one place); imported here so the agent-turn write path uses
 // the identical set as the model-call write path.
 // FEATURE: LOG-77-9 -- extractDelegationProvenanceFacts shares the same home (pure extractor,
 // generic delegation vocabulary, no capability-specific read). See request-receivable.js.
-import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationProvenanceFacts } from '../prompt/request-receivable.js';
+import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationProvenanceFacts, normalizeAskLine } from '../prompt/request-receivable.js';
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
@@ -695,7 +703,7 @@ async function dispatchDelegation({
       // scope to read an account off, and §19s forbids inventing one -- the status line degrades to
       // its template, which is the correct honest outcome. Named rather than omitted so every
       // delegation-family frame carries the field uniformly (the SES-57 omitted-vs-defaulted class).
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p)
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, ask_line: normalizeAskLine(tool_input.ask_line), account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p)
     }
     // FEATURE: LAV-28 (§19s routing-story extension, LAV-17's carrier half) -- the requester's own
     // task words, authored by its model turn, ride the START frame so the working-status line can
@@ -703,7 +711,10 @@ async function dispatchDelegation({
     // template. Exactly the same tool_input fields the delegateTaskContext below already reads --
     // carried, never derived (§19q: what a frame credits, it carries). Verified absent from every
     // start frame on the LAV-25 harvest run, which is why the line had nothing to say.
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): PM's execution not started yet -- null, never fabricated
+    // FEATURE: LAV-28b (§19s Receipt format) -- and its 5-word headline, authored by the same model
+    // turn in the same tool call. `task` stays untouched and untruncated: the two travel together so
+    // the display can pick the headline while the work still gets the full instruction.
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: pmAgentId, toCapabilitySlug: 'project-manager', toIntentSlug: 'agent-selection-intent', viaTool: 'request_help', task: tool_input.task_description || tool_input.skill_needed || null, ask_line: normalizeAskLine(tool_input.ask_line), trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): PM's execution not started yet -- null, never fabricated
     // FEATURE: LOO-001 -- requesting_agent_id threaded into Michelle's task_context (generic,
     // always-present field, never omitted) so her own reasoning can recognize and reject a
     // self-referral, per the no_match output LOO-002 adds. tool_input itself never carries this
@@ -775,7 +786,13 @@ async function dispatchDelegation({
       // (the same value that reaches durable_hops.task_context->>'delegation_task'). Reading THAT
       // rather than re-deriving from tool_input keeps the frame and the durable row provably the same
       // string -- the equality QA item 1 asserts against.
-      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, task: delegateTaskContext.delegation_task ?? null, trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+      // FEATURE: LAV-28b (§19s Receipt format) -- the ORIGINAL requester's own ask_line, off the same
+      // request_help tool_input whose task_description became delegateTaskContext.delegation_task one
+      // line above. This frame relays that ask onward, so the headline that travels is the ask's, not
+      // a new one: Michelle brokers the request, she does not re-author it. The broker's tool call has
+      // no ask_line of its own to read here (agent-selection-intent returns a pick, not a dispatch),
+      // and §19s forbids synthesizing one -- absent stays null and the display degrades.
+      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, task: delegateTaskContext.delegation_task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
       const autoResolvedResult = await runCapability({
         capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -825,11 +842,12 @@ async function dispatchDelegation({
       // FEATURE: LAV-28 (§19s) -- `account: null`, explicit and deliberate, same reason as the
       // request_help originator credit above: this frame fires BEFORE the nested dispatch, so no
       // completed result exists to account for. Never fabricated; the line degrades to its template.
-      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null, account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p): credits the current agent's own execution
+      onEvent({ type: 'delegation_complete', fromAgentId: null, fromCapabilitySlug: null, toAgentId: agent_id, toCapabilitySlug: capability_slug, toIntentSlug: intent_slug, viaTool: 'delegate_to_agent', task: task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), account: null, trace_id, from_span_id: null, to_span_id: span_id }); // LOG-95 (§19p): credits the current agent's own execution
     }
     // FEATURE: LAV-28 (LAV-17's carrier half) -- the dispatching agent's own words for what it is
     // asking (tool_input.task, its model turn's authorship), carried verbatim on the START frame.
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', task: task ?? null, trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+    // FEATURE: LAV-28b (§19s Receipt format) -- plus its 5-word headline from the same tool call.
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', task: task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
     delegateResult = await runCapability({
       capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
@@ -1581,7 +1599,12 @@ export async function runCapability({
       // with system_prompt (the invariant S-HAR-02c's breakpoints rely on). The override is
       // per-call display shaping, so it belongs in the volatile tail; the stable half is untouched.
       enriched.system_prompt_volatile = (enriched.system_prompt_volatile || '') + '\n\n---\n\n' + formatSection;
-      enriched.format_contract = formatContract;
+      // FEATURE: LAV-28b (§19s Receipt format) -- this assignment REPLACES db-assembly's contract
+      // wholesale, so without re-injecting here a format-override call would be the one JSON contract
+      // in the platform with no receipt field -- the exact per-path coverage gap this session exists
+      // to close. injectAccountField is idempotent and pure, so re-running it on an already-injected
+      // contract is a no-op and the override's own schema is never mutated.
+      enriched.format_contract = injectAccountField(formatContract);
     }
     display_agent_card = displayAgentCard;
   }

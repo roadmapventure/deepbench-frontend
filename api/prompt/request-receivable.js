@@ -3,6 +3,11 @@
 // site in this file changes
 // DeepBench v7.0.17 | api/prompt/request-receivable.js | HAR-02c -- prompt caching on: buildCallBody() places the stable run into a cached `system` block ({type:'ephemeral'}) and stamps a second send-time-only breakpoint on the conversation tail (stamped copy, history never mutated -- durable_hops replays it); split-less callers (legacy + every checkpoint-resumed hop) fall back byte-identically, uncached
 // DeepBench v7.0.15 | api/prompt/request-receivable.js | HAR-02a -- capture usage.cache_creation_input_tokens/cache_read_input_tokens (normalized to 0, summed across the parse retry) and pass them to logActivity() at both write sites; NULL/0 until S-HAR-02b/c enable caching
+// DeepBench v7.0.62 | api/prompt/request-receivable.js | LAV-28b -- ask_line (ASK_LINE_SPEC, 5-word
+// display headline) added to REQUEST_HELP_TOOL and DELEGATE_TO_AGENT_TOOL, in properties AND required,
+// so every dispatch is authored with its headline in the same tool call as the full task (§19s Receipt
+// format). normalizeAskLine() is the only transform the harness may apply -- empty/absent to null,
+// otherwise byte-identical; the platform never truncates a task into a headline.
 // DeepBench v7.0.13 | api/prompt/request-receivable.js | LOO-28 -- trait-conditional parallel tool use on the AUTO tool_choice branch only (disable_parallel_tool_use: !enableParallelToolUse); forced branch + guardrails inline call stay hardcoded true (HAR-20). parseModelTurn() now collects ALL tool_use blocks into an additive tool_calls array (singular fields untouched); a turn mixing the terminal schema tool with harness calls is incoherent and routes through the existing parse-retry machinery once, then fails loudly
 // DeepBench v6.3.224 | api/prompt/request-receivable.js | AGT-37 -- sendRequest() accepts an optional handler_context and forwards it verbatim to the write handler; never merged into prompt_request, never read here, never reaches the model
 // DeepBench v6.3.204 | api/prompt/request-receivable.js | LOG-91 -- precomputed_turn path no longer writes its own ai_activity_log row (the same model call's agent-turn row is the single record); its unique facts return to the caller as _terminal_log instead
@@ -50,17 +55,38 @@ const KNOWN_HANDLERS = Object.keys(HANDLERS);
 // no fast path. delegate_to_agent's agent_id is only ever the model's own tool-call argument,
 // filled in from a candidate it was actually given -- never a static field anywhere in the
 // platform. ARCHITECTURE.md §19d/§19e.
+// FEATURE: LAV-28b (§19s Receipt-format amendment) -- the asker's headline, required on BOTH dispatch
+// tools. Authored by the requester in the SAME tool call as the full instruction, which is the whole
+// point: the platform never truncates a task into a headline (§19q -- carried, never derived), so the
+// full `task`/`task_description` keeps driving the work untouched while this drives the display. An
+// absent headline degrades to the template; it is never synthesized from task words.
+export const ASK_LINE_SPEC = {
+  type: 'string',
+  maxLength: 48,
+  description: "A headline of this ask in FIVE words or fewer, plain business language — shown to the user while the work runs (e.g. 'Find upgrade-cycle data by country'). Your full instruction goes in the task field as always; this is its display headline, in your own words."
+};
+
+// FEATURE: LAV-28b -- the one normalization the harness is allowed to apply to an ask_line: absent,
+// non-string, or whitespace-only becomes an explicit null (the degrade signal S-LAV-28c's fold reads),
+// and anything else is returned BYTE-IDENTICAL -- never trimmed, never truncated, never rewritten.
+// The trim is a test for emptiness only, never applied to the returned value.
+export function normalizeAskLine(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  return value;
+}
+
 const REQUEST_HELP_TOOL = {
   name: 'request_help',
   description: 'Ask the platform to find an agent who can help with a skill need you cannot resolve yourself. This always routes to whoever currently holds the project-manager capability -- you cannot and should not name a specific colleague.',
   input_schema: {
     type: 'object',
-    required: ['skill_needed', 'task_description', 'reasoning'],
+    required: ['skill_needed', 'task_description', 'reasoning', 'ask_line'],
     properties: {
       skill_needed: { type: 'string', description: 'Plain-language description of the capability or expertise needed' },
       task_description: { type: 'string', description: 'The specific task that needs to be done' },
       context: { type: 'string', description: 'Any relevant context for whoever picks this up' },
       reasoning: { type: 'string', maxLength: 300, description: 'Why you are asking for help rather than completing this yourself -- 1-2 concise sentences, not an analysis' },
+      ask_line: ASK_LINE_SPEC,
     },
   },
 };
@@ -73,13 +99,14 @@ const DELEGATE_TO_AGENT_TOOL = {
   description: 'Dispatch a task to a specific agent and capability chosen from candidates you were actually given (e.g. by request_help). Never use an agent_id you were not given as a candidate. Set is_final true for a hand-off where nothing more is expected of you once the delegate responds.',
   input_schema: {
     type: 'object',
-    required: ['agent_id', 'capability_slug', 'task', 'reasoning'],
+    required: ['agent_id', 'capability_slug', 'task', 'reasoning', 'ask_line'],
     properties: {
       agent_id: { type: 'string' },
       capability_slug: { type: 'string' },
       intent_slug: { type: ['string', 'null'] },
       task: { type: 'string', description: 'The task for the chosen agent to perform' },
       reasoning: { type: 'string', maxLength: 300, description: 'Why you chose this candidate -- 1-2 concise sentences, not an analysis' },
+      ask_line: ASK_LINE_SPEC,
       is_final: { type: 'boolean', description: 'Set true only when this delegation fully completes your task and no further judgment from you is needed -- the delegate\'s own output becomes the final result, credited to them. Omit or set false when you need to see the delegate\'s result before finishing your own turn (e.g. reviewing a regenerated answer before deciding whether it now passes).' },
     },
   },

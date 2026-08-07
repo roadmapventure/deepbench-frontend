@@ -1,3 +1,10 @@
+// DeepBench v7.0.62 | api/prompt/db-assembly.js | LAV-28b -- universal `account` receipt injected
+// into EVERY JSON-schema format contract at the one seam where buildSections() returns it, replacing
+// LAV-26's per-row schema fields as the enforcement home (§19s Receipt-format amendment). Applied to
+// the assembled contract, never to the Supabase row's own traits object -- injectAccountField() is
+// pure and copies. Covers the Intent branch AND the Format branch in one call; a contract whose
+// schema declares no `properties` (schema:null, JSON null, or the degenerate `{}`) has no output
+// shape to extend and passes through untouched, keeping the template degrade.
 // DeepBench v7.0.34 | api/prompt/db-assembly.js | LOG-121 -- handler wrapped in
 // withRequestContext(). This route reaches no logActivity() call today -- wrapping it is inert now
 // and means a logging site added here later cannot silently lose attribution.
@@ -66,6 +73,50 @@ const DEFAULT_FORMAT_CONTRACT = {
   guardrails: { must: [], must_not: [] }
 };
 const DEFAULT_SYNTHESIS = { enabled: false };
+
+// FEATURE: LAV-28b (§19s Receipt-format amendment) -- the doer's receipt, injected structurally into
+// every JSON output contract. The schema `description` IS the instruction: field and rule travel
+// together in the same tool definition the model is already being handed, so there is no separate
+// prompt edit to keep in sync and no per-intent Skill content to maintain (LAV-26's per-row fields
+// covered 4 intents; a real 7-intent run degraded 3 hops to templates, which is what moved
+// enforcement here). Never a signature/criteria key (`.claude/rules/ai-pattern-signature.md`) --
+// this is agent-asserted content, consumed by display and audited by QA only.
+export const ACCOUNT_FIELD_SPEC = {
+  type: "string",
+  maxLength: 100,
+  description: "The act you performed this turn, in TEN words or fewer, past tense, plain business language a client understands (say passages, records, sources — never chunks, intents, schemas, tokens). Include one true count when natural (e.g. 'Pulled ten cited passages'). State only what you did — never the findings themselves; those belong in your other fields. Written fresh each turn, never a stock phrase."
+};
+
+// FEATURE: LAV-28b -- pure, exported, and idempotent. Three properties the callers depend on:
+//   1. PURE -- returns a new contract; the row's own `traits` object (whose `schema` the contract
+//      holds by reference today) is never written to. A mutating version would poison the Skill
+//      Profile for every later call in the same process.
+//   2. IDEMPOTENT -- the 4 LAV-26 rows already declare `account`; the injected spec REPLACES their
+//      wording (the platform's rule wins over a row's copy) and `required` never double-appends.
+//      Safe to call twice on the same contract, which the format-override seam in execute.js does.
+//   3. STRUCTURALLY SCOPED -- injects only where the schema declares a `properties` object, i.e.
+//      where an output shape actually exists to extend. `schema: null` (the html DEFAULT_FORMAT_
+//      CONTRACT), an explicit JSON null, and the degenerate `{}` all pass through by returning the
+//      SAME contract reference. This is a structural test, never a per-intent/agent/capability
+//      conditional (`.claude/rules/capabilities-are-data.md`) -- a free-text output has no field to
+//      require, so those intents keep §19s's template degrade and are counted, never converted.
+export function injectAccountField(formatContract) {
+  const schema = formatContract?.schema;
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return formatContract;
+  const properties = schema.properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return formatContract;
+
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  return {
+    ...formatContract,
+    schema: {
+      ...schema,
+      // Spread first, `account` second: a row-authored account is overwritten by the platform spec.
+      properties: { ...properties, account: { ...ACCOUNT_FIELD_SPEC } },
+      required: required.includes("account") ? [...required] : [...required, "account"],
+    },
+  };
+}
 
 function getSupabaseHeaders(key) {
   return {
@@ -395,7 +446,15 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   // reads (design decision 3: a delegation_required intent never fans -- its entire job is a
   // single terminal hand-off, and two finals is undefined). No identity conditional anywhere
   // (.claude/rules/capabilities-are-data.md).
-  return { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse: enableParallelToolUse && !delegationRequired };
+  // FEATURE: LAV-28b -- the one contract seam. Deliberately here, at the return, rather than inline
+  // in the Intent branch's `if (traits.schema)` block: TWO branches assign `formatContract` (Intent
+  // ~L270 and Format ~L336), either can win depending on profile order, and 2 of 5 Format Skill
+  // Profiles carry a real JSON schema (`screen-controls-format`, `execution-plan` -- measured in
+  // Supabase this session). Injecting in the Intent branch alone would leave a Format-sourced
+  // contract without the receipt, which is exactly the per-row coverage gap this session exists to
+  // remove. One call, after both branches have settled, covers every JSON contract this function can
+  // return -- "every agent must obey its functionality ask" (John, 2026-08-07).
+  return { sections, formatContract: injectAccountField(formatContract), synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse: enableParallelToolUse && !delegationRequired };
 }
 
 function buildLabel(typeSlug, name) {
