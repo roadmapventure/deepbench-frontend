@@ -1,0 +1,1 @@
+design-mobile-ux-0807 — S-MOB-15-design (v7.0.69): mobile Agent Console text-cluster rework (MOB-15, UI, Post-beta). Kickoff committed (docs/kickoffs/v7.0.69-MOB-15-mobile-console-text-cluster.md); coding session spawned on session/mob-15-coding in this same worktree; design session owns QA + close-out.
