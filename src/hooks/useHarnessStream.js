@@ -209,6 +209,13 @@ export function useHarnessStream() {
         prompt_chars: evt.prompt_chars ?? 0,
         toIntentSlug: evt.toIntentSlug ?? null,
         trace_id: evt.trace_id ?? null, span_id: evt.span_id ?? null,
+        // FEATURE: LAV-36 PATCH-1 -- `parent_span_id` joins the named field list, same reason
+        // toIntentSlug did above and the same SES-57 class: the executor emits it on every
+        // prompt_assembled frame (execute.js ~L1149) and this hand-rebuilt LEDGER copy silently
+        // dropped it. Assembly's fold reads the ledger, so without this the span parentage that
+        // decides which of two same-stage completions owns the stage line (§19s) is invisible
+        // client-side. Verbatim, never derived.
+        parent_span_id: evt.parent_span_id ?? null,
       }, promptDurationMs, {}));
       return;
     }

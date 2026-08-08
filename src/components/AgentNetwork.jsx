@@ -1,3 +1,5 @@
+// DeepBench v7.0.75 | AgentNetwork.jsx | LAV-37 -- console first-draw cleanup (grid clears chrome
+// overlays / role wrap / waterfall pane tint)
 // DeepBench v7.0.69 | AgentNetwork.jsx | MOB-15 -- the mobile edge legend joins the Single|Bench
 // toggle as one right-aligned cluster (two declarations in NET_CSS's mobile section: .lav-mchrome
 // space-between -> flex-end, .lav-mseg loses its auto margin). Mobile-scoped selectors only -- no JSX
@@ -549,9 +551,11 @@ export function edgeRenderStyle({ open, pulsed, active, running }) {
 // ── layout ───────────────────────────────────────────────────────────────────
 // The home grid is COMPUTED from roster order -- there is no hand-authored position table and no
 // hand-listed agent id anywhere in this file (kickoff SCOPE RULES).
-// FEATURE: LAV-12 -- verified this session: this formula's y-range (~102 to ~538 for VH=640)
-// already sits inside [TOP_SAFE_Y, BOTTOM_SAFE_Y] (85-555) without any change -- only the arc and
-// bench-stack math (below) swung outside it.
+// FEATURE: LAV-37 -- y-range widened from [0.16, 0.84] (~102 to ~538 for VH=640) to [0.22, 0.74]
+// (~141 to ~474 for VH=640) so the idle first-draw grid clears the pixel-fixed chrome overlays
+// (.lav-topright, the prompt box) that sit outside homeLayout()'s percentage-of-canvas space. Still
+// inside [TOP_SAFE_Y, BOTTOM_SAFE_Y] (85-555). Run-time choreography (computeTargets, arc/bench
+// math) is untouched -- this is the idle grid only.
 export function homeLayout(ids) {
   const n = ids.length, out = {};
   if (!n) return out;
@@ -563,7 +567,7 @@ export function homeLayout(ids) {
     const c = i - r * cols;
     out[id] = {
       x: VW * ((c + 0.5) / inRow),
-      y: rows === 1 ? VH / 2 : VH * (0.16 + 0.68 * (r / (rows - 1))),
+      y: rows === 1 ? VH / 2 : VH * (0.22 + 0.52 * (r / (rows - 1))),
     };
   });
   return out;
@@ -772,7 +776,8 @@ export const NET_CSS = `
   transition:border-color .3s,box-shadow .35s}
 .lav-ava{width:50px;height:50px;margin:0 auto 4px;position:relative;z-index:2;display:flex;justify-content:center}
 .lav-name{font-family:${body};font-weight:700;font-size:12.5px;color:${T.navy};line-height:1.15;margin-top:1px}
-.lav-role{font-family:${body};font-size:9.5px;color:${T.muted};margin-top:1px;line-height:1.2}
+.lav-role{font-family:${body};font-size:9.5px;color:${T.muted};margin-top:1px;line-height:1.2;
+  overflow-wrap:anywhere}
 /* FEATURE: LAV-1c -- the slot LAV-1b reserved, now filled. Still renders NOTHING without real
    data: no pattern match means no pill, no row means no model tag (§19l honest-unclassified). */
 .lav-slot{height:15px;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:4px}
