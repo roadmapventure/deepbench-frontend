@@ -1,2 +1,0 @@
-Worktree `design-chi-99` — design session for `CHI-99` (Task Success Rate, Beta-gate bucket 1).
-Diagnosed: LAV-23 tag-paraphrase regression + latent `consolidated` vocabulary gap. John locked consolidated→caps-at-inferred (§19f). Kickoff `v7.0.67-CHI-99-consolidated-confidence-tier.md` committed; coding session S-CHI-99 (Sonnet 5) spawned from this worktree on `session/chi-99-coding`; design session owns live QA + close-out.
