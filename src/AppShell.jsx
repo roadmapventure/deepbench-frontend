@@ -1,3 +1,6 @@
+// DeepBench v7.0.77 | AppShell.jsx | HAR-33 -- access-gate popup mounted once at shell level: the
+// gate-intercept side-effect import wraps window.fetch, AccessGateModal renders the refusal. No
+// per-screen change; every screen renders inside this shell.
 // DeepBench v7.0.73 | AppShell.jsx | CHI-100 -- shell height consumes the desktop-only vh compensation variable (see tokens.js), mobile falls back to 100vh
 // DeepBench v7.0.4 | AppShell.jsx | LAV-1e -- nav flip: "Live Agent View" added as the first Work item (desktop dropdown + mobile NAV_GROUPS), Channel Sales Intelligence repointed to /channel-intelligence, isMI/isLAV active-state derivations updated
 // DeepBench v6.3.139 | AppShell.jsx | S-SH-23b -- widen Work dropdown so focus-area names fit one line + right-justify the (Beta)/(Alpha) status
@@ -20,6 +23,10 @@ import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
 import AIDiamond from "./components/AIDiamond.jsx";
 import AboutPanel from "./components/AboutPanel.jsx";
+// FEATURE: HAR-33 — side-effect import: wraps window.fetch once so any gated 403 anywhere in the
+// app reaches the modal below. Observation-only; screens keep their own error handling.
+import "./lib/gate-intercept.js";
+import AccessGateModal from "./components/AccessGateModal.jsx";
 
 // ── Global style injection ────────────────────────────────────────────────────
 let _styleInjected = false;
@@ -373,6 +380,8 @@ export function AppShell({ children, headerProps = {}, toast }) {
       {aboutOpen && <AboutPanel onClose={()=>setAboutOpen(false)}/>}
       {aiPanelOpen && <AIActivityPanel onClose={()=>setAiPanelOpen(false)}/>}
       {toast && <Toast toast={toast}/>}
+      {/* FEATURE: HAR-33 — one instance, shell level; subscribes itself to the fetch intercept. */}
+      <AccessGateModal />
       <DebugOverlay />
     </div>
   );
