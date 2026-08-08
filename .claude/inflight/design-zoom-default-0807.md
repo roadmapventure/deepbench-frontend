@@ -1,1 +1,0 @@
-design-zoom-default-0807 — S-CHI-100-design (v7.0.73): CHI-100 (UI, Beta-gate bucket 2) desktop 80% render default (zoom + vh compensation), John-approved; root cause measured (CHI chat input/Send clip below fold at 1242×575). CHI-101 (UI, Post-beta) filed for the residual overflow. Automated coding session (Sonnet 5) + design-session QA in progress.
