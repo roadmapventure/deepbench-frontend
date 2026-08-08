@@ -1,3 +1,5 @@
+// DeepBench v7.0.80 | LiveAgentViewScreen.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability:
+// narration pill / solid-brass armed Answer tab / tappable tracker chips.
 // DeepBench v7.0.71 | LiveAgentViewScreen.jsx | LAV-34 -- desktop status strip: the live-status
 // narration (§19s content -- the asker's task words during a hop, the doer's `account` on
 // completion) is promoted from 11px muted italic mono into a brass-tinted pill with a pulsing
@@ -979,7 +981,11 @@ export default function LiveAgentViewScreen() {
                   className={alert ? "lav-mtab-alert" : undefined}
                   style={{flex:1,fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.11em",
                     textTransform:"uppercase",padding:"10px 4px",border:"none",cursor:"pointer",
-                    background: on ? T.cardAlt : "none", color: on ? T.navy : T.muted,
+                    /* FEATURE: MOB-19 -- an armed Answer tab gets a solid brass fill (inline style
+                       beats the class, so the loud state has to live in the style object, not CSS);
+                       overrides the plain on/off values below. Arming/clearing logic untouched. */
+                    background: alert ? T.brass : (on ? T.cardAlt : "none"),
+                    color: alert ? T.navy : (on ? T.navy : T.muted),
                     borderBottom: `2px solid ${on ? T.brass : "transparent"}`}}>
                   {label}
                 </button>
@@ -1047,6 +1053,9 @@ export default function LiveAgentViewScreen() {
               The swap is app-static by construction: it changes which children RENDER inside a box
               whose flex, height, padding, border and background are written once, outside the
               conditional. Nothing above it moves, and the canvas never reflows. */}
+          {/* FEATURE: MOB-18 -- LAV-34's desktop brass pill, mounted here too so the mobile
+              narration pill's dot can pulse via the same .lav-status-dot-live class. */}
+          <style>{LAV_STATUS_PILL_CSS}</style>
           <AssemblyTrackerBand stages={assemblyStages} running={running} openKey={openStageKey}
             onToggle={k => setOpenStageKey(prev => (prev === k ? null : k))}/>
           <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.paperDeep,
@@ -1060,18 +1069,30 @@ export default function LiveAgentViewScreen() {
               </div>
             ) : (
               <>
-                {/* The narration moved down from the status strip, both branches verbatim --
-                    `awaiting` still outranks the streamed message, and neither line is restyled. */}
+                {/* The narration moved down from the status strip; `awaiting` still outranks the
+                    streamed message and is byte-unchanged. FEATURE: MOB-18 -- the streamed-message
+                    branch is now a brass pill (LAV-34's desktop treatment), not 10.5px muted italic
+                    mono. Empty/absent message still renders the bare spacer exactly as before --
+                    never an empty capsule (LAV-34 rule). */}
                 {awaiting ? (
                   <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.brassDeep,
                     textTransform:"uppercase",letterSpacing:"0.02em",flexShrink:0}}>
                     Needs Your Decision
                   </div>
-                ) : (
-                  <div style={{fontFamily:mono,fontSize:10.5,color:T.muted,fontStyle:"italic",
-                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>
-                    {status?.message || ""}
+                ) : status?.message ? (
+                  <div style={{display:"inline-flex",alignItems:"center",gap:6,
+                    background:rgba(T.brass,0.14),border:`1px solid ${T.brass}`,borderRadius:20,
+                    padding:"2px 9px",flexShrink:0,maxWidth:"100%"}}>
+                    <span className={running ? "lav-status-dot-live" : undefined}
+                      style={{width:7,height:7,borderRadius:"50%",background:T.brass,flexShrink:0}}/>
+                    <div style={{fontFamily:mono,fontSize:10.5,fontWeight:600,color:T.brassDeep,
+                      minWidth:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {status.message}
+                    </div>
                   </div>
+                ) : (
+                  <div style={{fontFamily:mono,fontSize:10.5,color:T.muted,
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}/>
                 )}
                 {/* Same AgentRoutingRail, same events, unchanged. */}
                 <div style={{flex:1,minHeight:0,overflowY:"auto"}}>
