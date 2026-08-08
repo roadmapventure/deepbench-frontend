@@ -1,3 +1,5 @@
+// DeepBench v7.0.68 | AgentNetwork.jsx | LAV-33 -- Deliverable drawer run-complete cue (brass
+// borderPulse until first open)
 // DeepBench v7.0.65 | AgentNetwork.jsx | LAV-32b (§19s four-surface standard) -- the canvas bubble is
 // the BUBBLE lane and nothing else: while an agent holds an open assignment its bubble shows the ask
 // that engaged it, in the asker's own five words (`ask_line`), verbatim and quoted; with no open
@@ -743,7 +745,7 @@ function LoopingArrow({ d, color }) {
 }
 
 // ── component-scoped CSS (GLOBAL_CSS already owns spin/fadeIn/slideUp/aiBlink) ─
-const NET_CSS = `
+export const NET_CSS = `
 .lav-stagewrap{flex:1;position:relative;overflow:hidden;padding:10px 6px 6px;background:${T.paper};
   min-width:0;min-height:0}
 .lav-stage{position:absolute;inset:10px 6px 6px;container-type:size}
@@ -1023,7 +1025,26 @@ const NET_CSS = `
 .lav-mgate-actions button:disabled{cursor:default;opacity:.5}
 .lav-mgate-reject{background:${T.card};border:1.5px solid ${T.flag};color:${T.flag}}
 .lav-mgate-accept{background:${T.navy};color:${T.card}}
+/* FEATURE: LAV-33 -- the Deliverable drawer's run-complete cue. Closed by design (LAV-7b), so
+   nothing signals an answer arrived until the user opens it; this reuses the existing brass
+   borderPulse attention idiom (Console Boot Dial frame, .upload-blink) rather than inventing a
+   second one. Targets the Drawer's own outermost bordered div (its direct DOM child), never the
+   drawer content, which is untouched. */
+.lav-answer-alert > div{animation:borderPulse 2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.lav-answer-alert > div{animation:none;border-color:${T.brass}}}
 `;
+
+// FEATURE: LAV-33 -- pure predicate for the Deliverable drawer's run-complete cue. Arms the moment
+// an answer is present and the drawer is closed; a rising edge on hasAnswer (no previous answer ->
+// an answer, e.g. a fresh run whose result was cleared to null at kickoff -- verified live in
+// useHarnessStream.js's runQuestion, LAV-33's report) always re-arms regardless of the previous
+// armed state, so a second run's answer cues again even if the first cue was never dismissed.
+// Once armed, `armed` just carries forward until an open (or the answer disappearing) clears it.
+export function deliverableCueNext({ armed, hasAnswer, hadAnswer, drawerOpen }) {
+  if (!hasAnswer || drawerOpen) return false;
+  if (!hadAnswer) return true;
+  return armed;
+}
 
 // FEATURE: LAV-16 -- keep something mounted for `ms` after its `active` flag goes false, so the thing
 // leaving gets a frame to animate in. React's own conditional render has no exit hook: the instant
@@ -1075,6 +1096,21 @@ function useLingeringMount(active, ms) {
  *    passing discipline as runTaskEntries above (SES-57).
  */
 export default function AgentNetwork({ roster, hops, runHops, running, traceRows = [], recoveringAgentId = null, choreographed, onToggleChoreographed, pending = null, resolving = null, onResolveConfirmation = null, answerQa = null, answerText = null, answerQuestionId = null, runTaskEntries = [], assemblyStages = null, booting = false, statusMessage = null }) {
+  // FEATURE: LAV-33 -- the Deliverable drawer's run-complete cue. Controlled open state (was
+  // `defaultOpen` only) so the cue effect and the toggle handler can both see and clear it. `hadAnswer`
+  // tracks the previous render's answer-presence in a ref so the effect can tell "just arrived" from
+  // "still here" without re-deriving it from runHops; recomputed on every answer-presence / drawerOpen
+  // change via deliverableCueNext, the exported pure predicate above.
+  const [delivOpen, setDelivOpen] = useState(false);
+  const [delivCue, setDelivCue] = useState(false);
+  const hasAnswer = (answerQa ?? answerText) != null;
+  const hadAnswerRef = useRef(false);
+  useEffect(() => {
+    const hadAnswer = hadAnswerRef.current;
+    hadAnswerRef.current = hasAnswer;
+    setDelivCue(armed => deliverableCueNext({ armed, hasAnswer, hadAnswer, drawerOpen: delivOpen }));
+  }, [hasAnswer, delivOpen]);
+
   const ids = useMemo(() => roster.map(a => a.id), [roster]);
   const home = useMemo(() => homeLayout(ids), [ids]);
   const net = useMemo(() => deriveNetwork(runHops), [runHops]);
@@ -1681,7 +1717,7 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
           down to the top of the harness trace console. The Answer drawer's own markup below is
           byte-unchanged; only this wrapper is new. */}
       <div className="lav-leftstack">
-        <div className="lav-answer">
+        <div className={`lav-answer${delivCue ? " lav-answer-alert" : ""}`}>
           {/* FEATURE: LAV-9a -- a long answer used to grow straight past the canvas: this drawer had no
               height cap at all. Same props the Agent Routing drawer already uses (MI-34/MI-55) --
               Drawer applies overflowY:auto itself the moment maxHeight is passed, so this is the
@@ -1692,9 +1728,13 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               resolve, not this ticket's. */}
           {/* FEATURE: LAV-21b -- "Answer" becomes "Deliverable" (John, 2026-08-04). Title strings
               only; every other behaviour of this drawer is byte-unchanged. */}
+          {/* FEATURE: LAV-33 -- controlled open state (was `defaultOpen` only) so the run-complete
+              cue can see and clear on open; `onToggle` receives the Drawer's own next-open boolean
+              (SharedUI.jsx's `willOpen`, MI-72b's controlled-mode contract), so this is a direct
+              wire, not a new toggle handler. */}
           <Drawer title={answerQuestionId === "south-korea-coop"
             ? `${DELIVERABLE_TITLE}: Agent guardrail catch` : DELIVERABLE_TITLE}
-            defaultOpen={false} maxHeight={280} resizable>
+            open={delivOpen} onToggle={setDelivOpen} maxHeight={280} resizable>
             {answerQa
               ? <QaEvidenceCard qa={answerQa}/>
               : answerText
