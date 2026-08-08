@@ -1,3 +1,14 @@
+// DeepBench v7.0.70 | LiveAgentViewScreen.jsx | MOB-17 -- mobile Answer tab run-complete cue (brass
+// borderPulse until first visit). Desktop shipped LAV-33: the Deliverable drawer pulses from
+// run-completion until first open. On mobile the same content lives behind the Answer tab, but the
+// tab-independent status strip already pulses "Question Answered" at terminal (LAV-9c) -- so the
+// user knows the run finished, but nothing on the tab bar points at WHERE to tap. Reuses LAV-33's
+// exact predicate (deliverableCueNext, imported from AgentNetwork.jsx) rather than a hand-written
+// twin: `drawerOpen` here means "the user is on the Answer tab," which is this surface's equivalent
+// of opening the drawer. Chrome only -- the Answer tab's underline/glow via a new `.lav-mtab-alert`
+// class reusing the existing brass borderPulse keyframe (tokens.js GLOBAL_CSS); the tab LABEL stays
+// "Answer" (John, 2026-08-07 -- do not rename it) and the tab BODY is untouched. The CSS is exported
+// as MOB_TAB_CUE_CSS so the regression test can assert on the real string.
 // DeepBench v7.0.69 | LiveAgentViewScreen.jsx | MOB-15 -- the mobile bottom text cluster. The run's
 // text story consolidates into two fixed clusters on a phone: the status strip keeps §19o's
 // expectation row (badge · elapsed · Tokens · Est. Cost) and gives up its second row, and the
@@ -159,7 +170,10 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import {
   groupEventsIntoHops, QuestionDivider, RoutingHopCard, AGENT_ROUTING_EMPTY_TEXT, QaEvidenceCard,
 } from "./MarketIntelligenceScreen.jsx";
-import AgentNetwork from "../components/AgentNetwork.jsx";
+// FEATURE: MOB-17 -- deliverableCueNext is LAV-33's exported pure predicate for the Deliverable
+// drawer's run-complete cue; reused verbatim here rather than re-derived so the desktop drawer and
+// the mobile Answer tab cannot drift on when the cue arms/clears.
+import AgentNetwork, { deliverableCueNext } from "../components/AgentNetwork.jsx";
 // FEATURE: LAV-15 -- the pure fold only. The drawer that renders these entries is mounted inside
 // AgentNetwork (it lives on the canvas, beneath the Answer drawer); this file owns the derivation
 // because it owns the ledger and its arrival clocks.
@@ -490,6 +504,16 @@ const MOB_METER_VALUE = {fontFamily:mono,fontSize:13,fontWeight:700,color:T.navy
 // The two mobile tabs, in render order. `canvas` is the default (STYLE-GUIDE.md §42).
 const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
 
+// FEATURE: MOB-17 -- the Answer tab button's run-complete cue. Same brass borderPulse idiom LAV-33's
+// Deliverable drawer uses (tokens.js GLOBAL_CSS defines the keyframe; not redefined here). The
+// button's own inline style already carries `border:"none"` plus a 2px `borderBottom`, so this
+// pulses the underline color and its soft glow with no layout shift -- deliberately not a full
+// border. Exported as a named const so the regression test can import and assert on the real string.
+export const MOB_TAB_CUE_CSS = `
+.lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.lav-mtab-alert{animation:none;border-bottom-color:${T.brass}}}
+`;
+
 /**
  * FEATURE: LAV-16 -- is this run still inside the dead-canvas window?
  *
@@ -766,6 +790,22 @@ export default function LiveAgentViewScreen() {
     : null;
   const answerText = result && result.kind !== "qa" ? (result.text || null) : null;
 
+  // FEATURE: MOB-17 -- the mobile Answer tab's run-complete cue, driven by LAV-33's own predicate
+  // (deliverableCueNext) rather than a hand-written twin. `drawerOpen` here is "the user is on the
+  // Answer tab" -- switching to it is this surface's equivalent of opening the drawer. Semantics fall
+  // out of the predicate: arms on the answer's rising edge while on Canvas; never arms if already on
+  // Answer; clears the moment the user switches to it; re-arms next run (the harness clears `result`
+  // at run start, so `hasAnswer` genuinely re-falls-then-rises -- verified live in LAV-33).
+  const hasAnswer = (answerQa ?? answerText) != null;
+  const hadAnswerRef = useRef(false);
+  const [answerTabCue, setAnswerTabCue] = useState(false);
+  useEffect(() => {
+    const hadAnswer = hadAnswerRef.current;
+    hadAnswerRef.current = hasAnswer;
+    setAnswerTabCue(armed =>
+      deliverableCueNext({ armed, hasAnswer, hadAnswer, drawerOpen: mobileTab === "answer" }));
+  }, [hasAnswer, mobileTab]);
+
   // ── LAV-15: the Run Tasks feed ──────────────────────────────────────────────────────────────
   // Newest first, numbered ascending, one entry per completed hop. Nothing here is fetched or
   // enriched: every line is composed from fields the frames themselves carried. The feed persists
@@ -910,11 +950,17 @@ export default function LiveAgentViewScreen() {
           </div>
 
           {/* ── Tab bar ── */}
+          {/* FEATURE: MOB-17 -- the Answer tab button gains .lav-mtab-alert (brass borderPulse, the
+              same idiom LAV-33's Deliverable drawer uses) for as long as answerTabCue is armed.
+              Chrome only: the tab label stays exactly "Answer" and the tab body is untouched. */}
+          <style>{MOB_TAB_CUE_CSS}</style>
           <div style={{display:"flex",background:T.paper,borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
             {MOB_TABS.map(([key, label]) => {
               const on = mobileTab === key;
+              const alert = key === "answer" && answerTabCue;
               return (
                 <button key={key} type="button" onClick={() => setMobileTab(key)}
+                  className={alert ? "lav-mtab-alert" : undefined}
                   style={{flex:1,fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.11em",
                     textTransform:"uppercase",padding:"10px 4px",border:"none",cursor:"pointer",
                     background: on ? T.cardAlt : "none", color: on ? T.navy : T.muted,
