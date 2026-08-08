@@ -18,6 +18,7 @@
 | `OPENAI_API_KEY` | OpenAI embeddings (`text-embedding-3-small`) | ✅ |
 | `VITE_FETCH_API_URL` | Railway backend base URL | ✅ |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel protection bypass for automated QA testing | dev only |
+| `GATE_BYPASS_SECRET` | Edge gate bypass for QA tooling (`HAR-33`). A request to `/api/*` carrying header `x-db-gate-bypass: <this value>` skips `middleware.js`'s per-IP access gate entirely, so Claude QA scripts and the regression drivers keep working against an IP that is capped or blocked. **Where set:** Vercel project env, all environments (production / preview / development) — value lives only in the Vercel dashboard, never in this repo, a kickoff doc, or a log line. Unset ⇒ the bypass is inert (an empty header can never match), never an open door. | dev/QA |
 | `IPINFO_TOKEN` | ipinfo.io token for the caller IP→org lookup (`lib/ip-org-resolver.js`, `LOG-121`). **Optional by design** — absent, the resolver uses the anonymous tier, which is sufficient at this volume. A missing token must degrade to the anonymous endpoint, never to an error, so this is never a required var. Each distinct IP is resolved exactly once ever (`ip_org_cache`), so steady-state usage is zero requests. | optional |
 
 ---
