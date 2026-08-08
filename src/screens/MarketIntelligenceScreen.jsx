@@ -1,3 +1,16 @@
+// DeepBench v7.0.66 | MarketIntelligenceScreen.jsx | LAV-32c (§19s panel lane) -- QA patch on 32b.
+// 32b stripped the panel row's CONTENT but left the per-event row STRUCTURE, so a hop that logged
+// three frames still rendered three rows -- live hop 12 (Michelle, agent-selection + two briefing
+// fetches) printed the same pattern set and a duration three times over. §19s allots the panel ONE
+// line per hop ("Per hop: agent, bare pattern names, hop time. Nothing else -- no fetch rows"), so
+// the collapse now happens at the group: RoutingHopCard renders exactly one RoutingActivityLine and
+// hands it the whole hop. The line unions the group's pattern names (order preserved, deduped, and
+// still no line at all when the group is unclassified -- §19l) and shows ONE duration, the hop's
+// terminal measured frame, which is the same completion frame the Assembly drawer reads its `took`
+// from -- that identity is the point (drawer VERIFICATION Owen `took 0:51` == panel hop 10 `0:51`).
+// Sub-event durations are gone: under the arrival-delta timing model the OLDEST frame in a hop
+// absorbs the gap that belongs to the hop before it, so summing or maxing would credit one agent
+// with another's wait. Style, fonts, geometry and the dot untouched; status/bubble/drawer untouched.
 // DeepBench v7.0.65 | MarketIntelligenceScreen.jsx | LAV-32b (§19s four-surface standard) -- two of
 // the four lanes live in this file and both are narrowed to exactly what §19s allots them.
 // STATUS lane: describeDelegationEvent() becomes pure COMMUNICATION NARRATION -- three verbs
@@ -2796,8 +2809,14 @@ export function RoutingHopCard({ hop, agentById, terse }) { // FEATURE: LAV-5a -
         <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{primary ? firstNameFor(hop.agentId, agentById) : hop.agentId}</span>
         <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{primary ? primary.role : ""}</span>
       </div>
+      {/* FEATURE: LAV-32c (§19s) -- ONE line per hop, always. The map over hop.events was the last
+          surviving piece of the per-event row model: 32b emptied those rows of everything but the
+          patterns chip and the duration, which turned a 3-frame hop into the same two values printed
+          three times (live hop 12). The group, not the frame, is what §19s gives a line to, so the
+          card hands the whole hop down and the line below folds it. The wrapper keeps its column/gap
+          styling untouched -- a single-frame hop renders byte-identically to what it renders today. */}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {hop.events.map(evt => <RoutingActivityLine key={evt.id} evt={evt} terse={terse}/>)}
+        <RoutingActivityLine hop={hop} terse={terse}/>
       </div>
     </div>
   );
@@ -2890,15 +2909,88 @@ function useTracePatterns(traceId, spanId) {
 // Style is untouched: the pattern names keep the mono/9/muted slot they already had and the time
 // takes the body/11.5/ink slot the sentence had, so the row's fonts, colors and geometry are the
 // same ones it renders today.
-function RoutingActivityLine({ evt, terse }) {
-  // `terse` still reaches describePipelineEvent because the COLOR is still read from it (the dot's
-  // meaning is platform data, not copy, and §19s trims copy only). The flag is inert for color --
-  // it only ever elided a summary -- and is kept threaded so the call sites stay unchanged.
-  const { color } = describePipelineEvent(evt, { terse });
-  const spanPatterns = useTracePatterns(evt.data?.trace_id, evt.data?.span_id);
-  const names = evt.data?.span_id != null ? spanPatterns[evt.data.span_id] : null;
-  const patternLabel = names && names.length > 0 ? names.join(', ') : null;
-  const hopDuration = formatHopDuration(evt.durationMs ?? null);
+// FEATURE: LAV-32c (§19s) -- CHI-01's "one activity line per event" premise, stated at the top of
+// this block, is RETIRED here: 32b left that structure standing while emptying it, so a multi-frame
+// hop repeated one pattern set and one duration per frame. This component now folds the whole HOP
+// into the single line §19s allots it (hopPatternNames / hopTerminalDurationMs / hopTraceIdentity,
+// just above -- each pure and exported for test). It is also what implements §19s's "no fetch rows"
+// on this surface: a briefing fetch stops having a row of its own without any per-event-type test
+// here, which is the only way to do it that stays universal (Rule #1, §19d).
+// FEATURE: LAV-32c (§19s) -- the three pure folds the panel's one-line-per-hop render is made of,
+// exported so the regression/session tests exercise the real decision rather than a restatement of
+// it (the SES-69 discipline LAV-25's suite already follows).
+//
+// `hop.events` is NEWEST-FIRST (groupEventsIntoHops/CHI-27: index 0 is the hop's most recent frame,
+// the last index its oldest). All three folds scan in that same array order, so "terminal first" is
+// one stated convention covering identity, duration and name order alike.
+//
+// hopPatternNames: the group's pattern names as ONE ordered set. Union across every frame's credited
+// span (a hop's frames can carry different spans -- §19p credits the executing child, not the
+// requester), first-seen order preserved, deduped, because §19s allots the panel one bare name list
+// per hop and a name repeated per frame is exactly the defect this patch exists to remove. A group
+// whose frames match no gold pattern yields [] -> the caller renders NO line (§19l's honest
+// unclassified state, expressed structurally -- never a placeholder).
+export function hopPatternNames(events, spanPatterns) {
+  const out = [];
+  const seen = new Set();
+  for (const evt of Array.isArray(events) ? events : []) {
+    const spanId = evt?.data?.span_id;
+    if (spanId == null) continue;                       // no span identity -> nothing to join on (LOG-88)
+    const names = spanPatterns?.[spanId];
+    if (!Array.isArray(names)) continue;
+    for (const name of names) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+// hopTerminalDurationMs: the hop's ONE duration -- its terminal (newest) measured frame. That frame
+// is the hop's completion, which is the same frame the Assembly drawer reads its `took` from, so the
+// two surfaces agree by construction rather than by coincidence (§19s: "times match drawer `took`
+// values"). Deliberately NOT the sum and NOT the max: durations here are arrival deltas
+// (turnTracking.js resolveDelegationDuration), so a hop's OLDEST frame carries the gap since the
+// previous hop's last frame -- time the previous agent spent, not this one's. Crediting it here
+// would make the panel lie in the one direction it is least able to detect. A frame with no measured
+// duration is skipped rather than treated as zero, and a group with nothing measured returns null,
+// which formatHopDuration/the caller render as no time line at all -- never a fabricated 0:00.
+export function hopTerminalDurationMs(events) {
+  for (const evt of Array.isArray(events) ? events : []) {
+    const ms = evt?.durationMs;
+    if (ms != null && Number.isFinite(ms)) return ms;
+  }
+  return null;
+}
+
+// hopTraceIdentity: the one trace/span pair the group's single useTracePatterns call is keyed on.
+// The trace map is per-TRACE (every frame in a run shares the trace), so any frame carrying one
+// answers for the hop; the span is only the bounded-refetch driver (LOG-95b needsSpanRefetch), and
+// the terminal frame's span is the right driver because it is the hop's own execution -- the one
+// whose log row lands last and is therefore the one the frozen map is most likely to be missing.
+export function hopTraceIdentity(events) {
+  for (const evt of Array.isArray(events) ? events : []) {
+    const traceId = evt?.data?.trace_id;
+    if (traceId != null) return { traceId, spanId: evt?.data?.span_id ?? null };
+  }
+  return { traceId: null, spanId: null };
+}
+
+function RoutingActivityLine({ hop, terse }) {
+  // FEATURE: LAV-32c -- takes the whole HOP, not one frame. `terse` still reaches
+  // describePipelineEvent because the COLOR is still read from it (the dot's meaning is platform
+  // data, not copy, and §19s trims copy only). The flag is inert for color -- it only ever elided a
+  // summary -- and is kept threaded so the call sites stay unchanged. The dot reads the hop's
+  // terminal frame, the same frame RoutingHopCard's border-left already reads (CHI-01's "most
+  // recent / most decision-relevant outcome" rule), so border and dot cannot disagree.
+  const events = Array.isArray(hop?.events) ? hop.events : [];
+  const { color } = describePipelineEvent(events[0], { terse });
+  const { traceId, spanId } = hopTraceIdentity(events);
+  const spanPatterns = useTracePatterns(traceId, spanId);
+  const names = hopPatternNames(events, spanPatterns);
+  const patternLabel = names.length > 0 ? names.join(', ') : null;
+  const hopDuration = formatHopDuration(hopTerminalDurationMs(events));
   return (
     <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
       <span style={{width:6,height:6,borderRadius:"50%",background:color,marginTop:5,flexShrink:0}}/>

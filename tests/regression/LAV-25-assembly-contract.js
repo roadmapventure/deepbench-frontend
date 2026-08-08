@@ -38,7 +38,11 @@ const SOURCE = path.join(REPO_ROOT, "src/components/AssemblyView.jsx");
 const stubSupabase = {
   name: "lav25-stub-supabase",
   setup(build) {
-    build.onResolve({ filter: /(^|[\\/])lib[\\/]supabase\.js$/ }, () => ({
+    // FEATURE: LAV-32c -- broadened from `lib/supabase.js` to cover the bare `./supabase.js`
+    // specifier used from INSIDE src/lib (tracePatterns.js), which the widened dependency tree above
+    // now reaches. The old filter missed it, so a real client was still constructed and threw
+    // "supabaseUrl is required" -- the second half of this file's silent load failure.
+    build.onResolve({ filter: /(^|[\\/])supabase\.js$/ }, () => ({
       path: "lav25-stub-supabase", namespace: "lav25-stub",
     }));
     build.onLoad({ filter: /.*/, namespace: "lav25-stub" }, () => ({
@@ -56,6 +60,16 @@ async function loadAssemblyView() {
       entryPoints: [SOURCE],
       bundle: true, format: "esm", platform: "node", outfile,
       loader: { ".js": "jsx", ".jsx": "jsx" },
+      // FEATURE: LAV-32c -- this file had been failing to LOAD (every assertion below unrun) since
+      // v7.0.64. S-LAV-32a gave AssemblyView.jsx its `formatHopDuration` import from
+      // MarketIntelligenceScreen.jsx, which pulls that whole screen -- and its module-scope
+      // `import.meta.env.VITE_FETCH_API_URL` read -- into this bundle. Vite injects import.meta.env;
+      // a bare `node` compile has none, so the read threw at import and the suite reported a FAIL
+      // that said nothing about the Assembly contract. Empty object: those reads yield undefined,
+      // which the consumers tolerate (they are URLs used at call time, and this test calls out to
+      // nothing). Found by S-LAV-32c and proven pre-existing by re-running it against a pristine
+      // HEAD checkout of the screen.
+      define: { "import.meta.env": "{}" },
       plugins: [stubSupabase],
       logLevel: "silent",
     });
