@@ -1,3 +1,12 @@
+// DeepBench v7.0.71 | LiveAgentViewScreen.jsx | LAV-34 -- desktop status strip: the live-status
+// narration (§19s content -- the asker's task words during a hop, the doer's `account` on
+// completion) is promoted from 11px muted italic mono into a brass-tinted pill with a pulsing
+// live dot (T.brass/T.brassDeep, reusing tokens.js's `aiBlink` keyframe). Chrome only -- no words
+// added or reworded, `status?.message` still renders verbatim. Empty message stays a bare
+// `flex:1` spacer (no empty capsule); the dot pulses only while `running` is truthy. The
+// `awaiting` "Needs Your Decision" branch is unchanged and still outranks this pill. Exported as
+// LAV_STATUS_PILL_CSS so the regression test can assert on the real string, same idiom as
+// MOB_TAB_CUE_CSS below.
 // DeepBench v7.0.70 | LiveAgentViewScreen.jsx | MOB-17 -- mobile Answer tab run-complete cue (brass
 // borderPulse until first visit). Desktop shipped LAV-33: the Deliverable drawer pulses from
 // run-completion until first open. On mobile the same content lives behind the Answer tab, but the
@@ -512,6 +521,13 @@ const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
 export const MOB_TAB_CUE_CSS = `
 .lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.lav-mtab-alert{animation:none;border-bottom-color:${T.brass}}}
+`;
+
+// FEATURE: LAV-34 -- the desktop strip's live-status pill dot pulses only while the run is live;
+// reduced-motion users get the pill with a static dot (same posture as MOB_TAB_CUE_CSS above).
+export const LAV_STATUS_PILL_CSS = `
+.lav-status-dot-live{animation:aiBlink 1.1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.lav-status-dot-live{animation:none}}
 `;
 
 /**
@@ -1163,6 +1179,7 @@ export default function LiveAgentViewScreen() {
         {/* ── Status strip ── */}
         <div style={{display:"flex",alignItems:"center",gap:14,padding:"8px 24px",background:T.cardAlt,
           borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
+          <style>{LAV_STATUS_PILL_CSS}</style>
           <ModeBadge mode={mode} detail={badgeDetail}/>
           {/* FEATURE: LAV-7a -- elapsed sits here, immediately after the mode badge, instead of at the
               strip's right end. Same styling, same value, same `elapsedText &&` guard -- only the slot
@@ -1186,11 +1203,18 @@ export default function LiveAgentViewScreen() {
               textTransform:"uppercase",letterSpacing:"0.02em"}}>
               Needs Your Decision
             </div>
-          ) : (
-            <div style={{fontFamily:mono,fontSize:11,color:T.muted,fontStyle:"italic",flex:1,minWidth:0,
-              whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-              {status?.message || ""}
+          ) : status?.message ? (
+            <div style={{display:"inline-flex",alignItems:"center",gap:8,flex:1,minWidth:0,
+              background:rgba(T.brass,0.14),border:`1px solid ${T.brass}`,borderRadius:16,padding:"4px 12px"}}>
+              <span className={running ? "lav-status-dot-live" : undefined}
+                style={{width:8,height:8,borderRadius:"50%",background:T.brass,flexShrink:0}}/>
+              <div style={{fontFamily:mono,fontSize:12.5,color:T.brassDeep,fontWeight:600,minWidth:0,
+                whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                {status.message}
+              </div>
             </div>
+          ) : (
+            <div style={{flex:1,minWidth:0}}/>
           )}
           {/* FEATURE: LAV-5a -- the four meters, unchanged in what they measure (every tile is still Σ
               over real ai_activity_log rows or a count over real ledger events), moved out of the title
