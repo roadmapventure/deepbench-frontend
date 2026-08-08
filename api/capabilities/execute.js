@@ -1,3 +1,12 @@
+// DeepBench v7.0.72 | api/capabilities/execute.js | LOO-33 -- a dispatch's intent_slug is now
+// resolved by the harness from its own roster data on BOTH dispatch seams, never trusted from the
+// model's echo of the candidate list (which drops the optional field ~1 in 5 brokered picks, filing
+// real work as `<capability>:none:depthN`). New resolveDispatchIntent(): validated echo -> single-
+// intent stamp -> the capability's own declared capabilities.default_intent_slug (data, §19b) ->
+// honest blank; any fetch failure degrades to the raw echo, never worse than before. Four brokered
+// reads and three direct-path reads now consume it; the originator-credit emit (the CURRENT agent's
+// own intent) and the fan/pre-dispatch hop-budget estimates are deliberately untouched. No new event
+// field, no span-identity change (§19p), no per-capability conditional
 // DeepBench v7.0.64 | api/capabilities/execute.js | LAV-32a (§19s four-surface standard) -- every one
 // of the 11 delegation-family emits now also carries `capability_phrase`, the RECEIVING capability's
 // John-approved display phrase, so the elapsed-status line can narrate the communication off the
@@ -499,6 +508,59 @@ async function resolveCapabilityHolder(capability_slug) {
   return agentId;
 }
 
+// FEATURE: LOO-33 -- the platform carries the envelope: a dispatch's intent_slug is resolved
+// from the harness's own roster data, never trusted from a model's echo of the candidate
+// list (the transcription drops the optional field ~1 in 5 brokered picks). Ladder: a valid
+// echoed intent wins (the picker's reasoned choice, validated by membership); a single-intent
+// capability stamps deterministically; a multi-intent capability falls to its own declared
+// default_intent_slug (data, §19b -- same authorship class as display_phrase); else null,
+// honestly blank, exactly the pre-LOO-33 behavior. On any fetch failure this degrades to the
+// raw echo -- resolution must never make a dispatch worse than it was before this feature.
+export async function resolveDispatchIntent(capability_slug, echoedIntentSlug) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) return { intent_slug: echoedIntentSlug || null, resolution: 'unverified' };
+  const headers = getSupabaseHeaders(supabaseKey);
+  try {
+    const linkRes = await fetch(
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=skill_profile_slug`,
+      { headers }
+    );
+    if (!linkRes.ok) throw new Error('link fetch failed');
+    const linkRows = await linkRes.json();
+    let intents = [];
+    if (linkRows.length) {
+      const intentRes = await fetch(
+        `${supabaseUrl}/rest/v1/skill_profiles?slug=in.(${encodeURIComponent(linkRows.map(r => r.skill_profile_slug).join(','))})&skill_type_slug=eq.intent&select=slug`,
+        { headers }
+      );
+      if (!intentRes.ok) throw new Error('intent fetch failed');
+      intents = (await intentRes.json()).map(r => r.slug);
+    }
+    if (echoedIntentSlug && intents.includes(echoedIntentSlug)) {
+      return { intent_slug: echoedIntentSlug, resolution: 'echo' };
+    }
+    if (intents.length === 1) {
+      return { intent_slug: intents[0], resolution: 'single' };
+    }
+    if (intents.length > 1) {
+      const capRes = await fetch(
+        `${supabaseUrl}/rest/v1/capabilities?slug=eq.${encodeURIComponent(capability_slug)}&select=default_intent_slug&limit=1`,
+        { headers }
+      );
+      if (!capRes.ok) throw new Error('capability fetch failed');
+      const capRows = await capRes.json();
+      const def = capRows?.[0]?.default_intent_slug || null;
+      if (def && intents.includes(def)) {
+        return { intent_slug: def, resolution: 'default' };
+      }
+    }
+    return { intent_slug: null, resolution: 'none' };
+  } catch (e) {
+    return { intent_slug: echoedIntentSlug || null, resolution: 'unverified' };
+  }
+}
+
 // FEATURE: S-ARCH-DISPLAY-LOOP-01 -- shared helper, extracted from fetchFormatOverride()'s inline
 // agent-card lookup so the new terminal-delegation path (is_final branch below) and the existing
 // bundled format-override path share one fetch, never two copies of the same lookup.
@@ -842,6 +904,8 @@ async function dispatchDelegation({
       if (!rec?.recommended_agent_id || !matchedCandidate) {
         throw new Error(`request_help: delegationRequired capability's agent-selection-intent response had no valid recommended_agent_id matching a real candidate (capability_slug: ${capability_slug}/${intent_slug})`);
       }
+      // FEATURE: LOO-33 -- envelope resolved from the harness's own roster, never her echo.
+      const resolvedIntent = (await resolveDispatchIntent(rec.recommended_capability_slug, matchedCandidate.intent_slug ?? null)).intent_slug;
       // FEATURE: LOO-009d — the broker's own leg (this request_help call to pmAgentId) just
       // resolved with a real pick. This delegationRequired path takes an early 'final' return
       // below and never reaches the ordinary returningFromAgentId/delegation_return block further
@@ -877,9 +941,9 @@ async function dispatchDelegation({
       // a new one: Michelle brokers the request, she does not re-author it. The broker's tool call has
       // no ask_line of its own to read here (agent-selection-intent returns a pick, not a dispatch),
       // and §19s forbids synthesizing one -- absent stays null and the display degrades.
-      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, task: delegateTaskContext.delegation_task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), capability_phrase: await capabilityPhrase(rec.recommended_capability_slug), trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+      onEvent({ type: 'delegation', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: resolvedIntent, viaTool: 'delegate_to_agent', reasoning: rec.reasoning ?? null, task: delegateTaskContext.delegation_task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), capability_phrase: await capabilityPhrase(rec.recommended_capability_slug), trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
       const autoResolvedResult = await runCapability({
-        capability_slug: rec.recommended_capability_slug, intent_slug: matchedCandidate.intent_slug || null,
+        capability_slug: rec.recommended_capability_slug, intent_slug: resolvedIntent,
         agent_id: rec.recommended_agent_id, task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
         _trace_id: trace_id, _parent_span_id: span_id,
       });
@@ -896,13 +960,18 @@ async function dispatchDelegation({
       // execution that just resolved (autoResolvedResult, NOT delegateResult -- that one is the
       // broker's pick, already credited above). Wrong-result attribution here would put the picker's
       // sentence on the worker's hop, §19p's "worse than blank" case applied to content.
-      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: matchedCandidate.intent_slug || null, viaTool: 'delegate_to_agent', account: autoResolvedResult?.content?.account ?? null, capability_phrase: await capabilityPhrase(rec.recommended_capability_slug), trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: autoResolvedResult?.span_id ?? null }); // LOG-95 (§19p): credits the recommended target's own execution
-      return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: matchedCandidate.intent_slug || null, lastHelpSelection, job_id }) };
+      onEvent({ type: 'delegation_complete', fromAgentId: pmAgentId, fromCapabilitySlug: 'project-manager', toAgentId: rec.recommended_agent_id, toCapabilitySlug: rec.recommended_capability_slug, toIntentSlug: resolvedIntent, viaTool: 'delegate_to_agent', account: autoResolvedResult?.content?.account ?? null, capability_phrase: await capabilityPhrase(rec.recommended_capability_slug), trace_id, from_span_id: delegateResult?.span_id ?? null, to_span_id: autoResolvedResult?.span_id ?? null }); // LOG-95 (§19p): credits the recommended target's own execution
+      return { outcome: 'final', result: await finalizeDelegation({ delegateResult: autoResolvedResult, targetAgentId: rec.recommended_agent_id, targetCapabilitySlug: rec.recommended_capability_slug, targetIntentSlug: resolvedIntent, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = pmAgentId;
     returningFromCapabilitySlug = 'project-manager';
   } else if (via_tool === 'delegate_to_agent') {
     const { agent_id: targetAgentId, capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug, task } = tool_input;
+    // FEATURE: LOO-33 -- same envelope resolution as the brokered seam: the dispatching
+    // agent's named intent is validated against the roster, never trusted raw. An unknown
+    // capability yields an empty roster list and resolves to null -- behavior identical to
+    // today for that failure (tracked separately as LOO-34, refusal policy not this session).
+    const resolvedTargetIntent = (await resolveDispatchIntent(targetCapabilitySlug, targetIntentSlug ?? null)).intent_slug;
     const delegateTaskContext = (task_context && typeof task_context === 'object') ? { ...task_context, delegation_task: task } : { delegation_task: task };
     // FEATURE: LOO-014 — delegationRequired/tool_input.is_final are both already known here, before
     // any dispatch happens — neither depends on the nested call's result. Computed once, reused
@@ -932,9 +1001,9 @@ async function dispatchDelegation({
     // FEATURE: LAV-28 (LAV-17's carrier half) -- the dispatching agent's own words for what it is
     // asking (tool_input.task, its model turn's authorship), carried verbatim on the START frame.
     // FEATURE: LAV-28b (§19s Receipt format) -- plus its 5-word headline from the same tool call.
-    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', task: task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), capability_phrase: await capabilityPhrase(targetCapabilitySlug), trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
+    onEvent({ type: 'delegation', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: resolvedTargetIntent, viaTool: 'delegate_to_agent', task: task ?? null, ask_line: normalizeAskLine(tool_input.ask_line), capability_phrase: await capabilityPhrase(targetCapabilitySlug), trace_id, from_span_id: span_id, to_span_id: null }); // LOG-95 (§19p): target's execution not started yet
     delegateResult = await runCapability({
-      capability_slug: targetCapabilitySlug, intent_slug: targetIntentSlug || null, agent_id: targetAgentId,
+      capability_slug: targetCapabilitySlug, intent_slug: resolvedTargetIntent, agent_id: targetAgentId,
       task_context: delegateTaskContext, tenant_id, _hop_counter: hopCounter, _deadline: deadline, _onEvent: onEvent,
       _trace_id: trace_id, _parent_span_id: span_id,
     });
@@ -943,7 +1012,7 @@ async function dispatchDelegation({
     }
     if (willResolveFinal) {
       // FEATURE: LOO-009 — unchanged: credits the target, claiming the 'delegation' placeholder above.
-      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: targetIntentSlug || null, viaTool: 'delegate_to_agent', account: delegateResult?.content?.account ?? null, capability_phrase: await capabilityPhrase(targetCapabilitySlug), trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution -- LAV-28 (§19s): and its own account
+      onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: resolvedTargetIntent, viaTool: 'delegate_to_agent', account: delegateResult?.content?.account ?? null, capability_phrase: await capabilityPhrase(targetCapabilitySlug), trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution -- LAV-28 (§19s): and its own account
       return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = targetAgentId;
