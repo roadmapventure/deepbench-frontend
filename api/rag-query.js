@@ -1,8 +1,11 @@
+// DeepBench v7.0.34 | api/rag-query.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.2.13 | api/rag-query.js | RAG query handler — thin wrapper over api/lib/rag.js
 // FEATURE: AA-43 — delegates to shared queryRAG module. External/frontend callers use this endpoint.
 import { queryRAG } from "../lib/rag.js";
+import { withRequestContext } from "../lib/request-context.js";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -19,3 +22,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withRequestContext(handler);

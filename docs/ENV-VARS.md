@@ -18,6 +18,7 @@
 | `OPENAI_API_KEY` | OpenAI embeddings (`text-embedding-3-small`) | ✅ |
 | `VITE_FETCH_API_URL` | Railway backend base URL | ✅ |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel protection bypass for automated QA testing | dev only |
+| `IPINFO_TOKEN` | ipinfo.io token for the caller IP→org lookup (`lib/ip-org-resolver.js`, `LOG-121`). **Optional by design** — absent, the resolver uses the anonymous tier, which is sufficient at this volume. A missing token must degrade to the anonymous endpoint, never to an error, so this is never a required var. Each distinct IP is resolved exactly once ever (`ip_org_cache`), so steady-state usage is zero requests. | optional |
 
 ---
 
@@ -57,6 +58,16 @@
 | `PORT` | Auto-set by Railway |
 | `ALLOWED_ORIGINS` | CORS — nigp.roadmapventure.com |
 | `VERCEL_API_BASE` | NIGP frontend URL |
+
+---
+
+## Local Claude Code Tooling (not a deployed-app env var)
+
+| Variable | Purpose | Where it lives |
+|----------|---------|-----------------|
+| `VERCEL_TOKEN` | Auth for the Vercel CLI (`vercel logs`, `vercel inspect`), so a Claude Code session can pull real function logs itself instead of asking John to check the dashboard. Read automatically by the CLI — never passed as a `--token` flag or typed into a prompt. | Persistent Windows environment variable on John's machine only — **not** in this repo, `.env.local`, or any Vercel/Railway dashboard. Added 2026-07-16. |
+
+If a session's shell doesn't see it (`echo $VERCEL_TOKEN` empty in Bash), that session's process likely started before the variable was set — see `CLAUDE-DESIGN.md` Step 5b for the fallback.
 
 ---
 

@@ -2,7 +2,7 @@
 // FEATURE: TC-01 — Upload + ingest + RAG
 // src/screens/TeachScreen.jsx — v5.0.0
 // DeepBench v5 — Teach an agent (/bench/:agentId/teach)
-// Upload doc → extract text → AI metadata → form → save to Supabase via /api/ingest
+// Upload doc → extract text → AI metadata → form → save to Supabase via /api/load-entries
 
 import { useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -13,7 +13,6 @@ import { Corners, AgentAvatar, Toast } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, JURISDICTIONS, FLAG_TRIGGERS } from "../data/agents.js";
 import { priorityInfo } from "../utils.js";
-import { logAICall } from "../hooks/useAIActivity.js";
 
 // ── Extract text from uploaded file via /api/extract ─────────────────────────
 // FEATURE: PE-10 patch 2 — readAsArrayBuffer → Uint8Array → btoa (binary-safe, no readAsDataURL)
@@ -62,13 +61,12 @@ Return ONLY the JSON. No explanation.`;
         agent_id: agentId,
         tenant_id: TENANT_ID,
         skipRag: true,
+        ai_type: "extraction",
       }),
     });
     const data = await res.json();
     const raw = data.content?.[0]?.text || "";
     const clean = raw.replace(/```json|```/g, "").trim();
-    // FEATURE: AI-18 — susan owns document extraction capability
-    logAICall({type:"extraction",model:"claude-haiku-4-5",location:"Teach Agent screen",agentId:"susan"});
     return JSON.parse(clean);
   } catch (e) {
     return null;
@@ -159,7 +157,7 @@ export default function TeachScreen() {
     if (!form.title || !extractedText) { showToast("Title and document text are required", "⚠"); return; }
     setIsSaving(true);
     try {
-      const res = await fetch("/api/ingest", {
+      const res = await fetch("/api/load-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

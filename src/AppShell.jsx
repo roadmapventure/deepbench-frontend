@@ -1,10 +1,19 @@
-// DeepBench v5.1.33 | AppShell.jsx | AI Audit button tooltip
+// DeepBench v7.0.4 | AppShell.jsx | LAV-1e -- nav flip: "Live Agent View" added as the first Work item (desktop dropdown + mobile NAV_GROUPS), Channel Sales Intelligence repointed to /channel-intelligence, isMI/isLAV active-state derivations updated
+// DeepBench v6.3.139 | AppShell.jsx | S-SH-23b -- widen Work dropdown so focus-area names fit one line + right-justify the (Beta)/(Alpha) status
+// DeepBench v6.3.138 | AppShell.jsx | S-SH-23 -- focus-area release-status labels
+// DeepBench v6.2.0 | AppShell.jsx | S-MOBILE-NAV-01 — mobile header collapse (SH-19): logo + shrunk subtitle + hamburger opening an 82%-width right-side drawer (Work/Bench/Platform nav groups); Work dropdown's "Market Intelligence" item renamed "Channel Sales Intelligence" (MI-46)
+// DeepBench v6.1.45 | AppShell.jsx | S-MI-44 — Work dropdown click-interception fix (MI-44): nav wrapper needed its own zIndex (transform creates a new stacking context, the backdrop's zIndex:998 was painting above it regardless of the dropdown's own zIndex:999) + subtle gold down-arrow dropdown hint
+// DeepBench v6.1.40 | AppShell.jsx | S-MI-32 — root height fix (MI-32/33, minHeight→height so the flex/scroll chain gets a real viewport-bounded size) + Work/Bench nav restructure with Work dropdown (MI-36)
+// DeepBench v6.1.3 | AppShell.jsx | S-MI-21/SH-16 — Market Intelligence nav tab moved to 1st position
+// DeepBench v6.0.18 | AppShell.jsx | SH-15 — Market Intelligence nav tab, / now defaults to MI
+// DeepBench v6.1.5 | AppShell.jsx | S-MI-23 — header AI status dot suppressed on MI route
 // FEATURE: SH-05 — AppShell header, Work Dashboard / Bench Dashboard nav tabs, AI dot, activity panel trigger, about panel
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { T, display, body, mono, GLOBAL_CSS } from "./tokens.js";
+import { T, display, body, mono, GLOBAL_CSS, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "./tokens.js";
 import { useAIStatus } from "./hooks/useAIStatus.js";
+import { useIsMobile } from "./hooks/useIsMobile.js";
 import { Toast } from "./components/SharedUI.jsx";
 import AIActivityPanel from "./components/AIActivityPanel.jsx";
 import DebugOverlay from "./components/DebugOverlay.jsx";
@@ -74,17 +83,120 @@ function NavTab({ isActive, onClick, icon, label, hasBorderLeft }) {
 
 // ── App Header ────────────────────────────────────────────────────────────────
 // FEATURE: SH-05 — App header (logo, Work Dashboard / Bench Dashboard nav tabs, AI status dot, AI panel trigger, about button)
+// FEATURE: SH-19 — mobile header collapse (hamburger → 82%-width right-side drawer), gated by useIsMobile()
 export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightContent, onAIPanel = ()=>{}, showAIPanel = true }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, cleanup } = useAIStatus();
+  const isMobile = useIsMobile();
   const [aboutHovered, setAboutHovered] = useState(false);
   const [auditTipShow, setAuditTipShow] = useState(false);
+  const [workMenuOpen, setWorkMenuOpen] = useState(false);      // desktop Work dropdown — unchanged
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);  // NEW — mobile hamburger drawer
 
   useEffect(() => () => cleanup(), [cleanup]);
 
-  const isWork  = location.pathname === "/" || location.pathname.startsWith("/work");
+  const isWork  = location.pathname.startsWith("/work");
   const isBench = location.pathname.startsWith("/bench");
+  // FEATURE: LAV-1e — "/" now serves the Live Agent View; Channel Intelligence moved to
+  // /channel-intelligence. isMI keeps its existing meaning — "the Channel Intelligence screen is
+  // what's rendering" — so it follows that screen to its new route rather than staying pinned to
+  // "/". That keeps both of its consumers correct: this nav entry's active state, and MI-23's
+  // header AI-dot suppression (the dot is hidden on CHI because CHI shows its own chat-embedded
+  // version). isLAV is true on both paths that render the Live Agent View — no redirect by design.
+  const isMI    = location.pathname === "/channel-intelligence";
+  const isLAV   = location.pathname === "/" || location.pathname === "/live-agent-view";
+  const isSpend = location.pathname.startsWith("/work/1/analyze");
+
+  if (isMobile) {
+    const NAV_GROUPS = [
+      // FEATURE: SH-23 -- release-status per Work focus area (Bench item gets none)
+      { label: "Work", items: [
+        // FEATURE: LAV-1e -- Live Agent View first; nav label deliberately differs from the screen's
+        // own title ("Live Multi-Agent Console") -- dual naming is John's call, do not unify.
+        { label: "Live Agent Console", icon: "◎", path: "/", active: isLAV, status: FOCUS_AREA_STATUS.liveAgentView },
+        { label: "Channel Sales Intelligence", icon: "◈", path: "/channel-intelligence", active: isMI, status: FOCUS_AREA_STATUS.channelSales },
+        { label: "Project Management", icon: "📋", path: "/work", active: isWork && !isSpend, status: FOCUS_AREA_STATUS.projectMgmt },
+        { label: "Spend Analysis", icon: "💰", path: "/work/1/analyze", active: isSpend, status: FOCUS_AREA_STATUS.spendAnalysis },
+      ]},
+      { label: "Bench", items: [
+        { label: "Agent Roster", icon: "👥", path: "/bench", active: isBench },
+      ]},
+    ];
+
+    return (
+      <div style={{background:T.navy,color:T.card,padding:"0 14px",display:"flex",alignItems:"center",height:52,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:9,position:"relative"}}>
+        <div onClick={()=>navigate("/")} style={{width:30,height:30,borderRadius:"50%",background:T.brass,color:T.navy,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:display,fontWeight:700,fontSize:13,border:`2px solid ${T.card}`,flexShrink:0,cursor:"pointer"}}>
+          DB
+        </div>
+        <div>
+          <div style={{fontFamily:display,fontSize:13,fontWeight:600,letterSpacing:.2,lineHeight:1}}>DeepBench</div>
+          {/* FEATURE: MOB-001 — 5.5px measured genuinely illegible on real mobile render (confirmed live,
+              mobile-ui-audit-0717); revises the STYLE-GUIDE.md Section 24 locked value (was John-confirmed
+              at the time, S-MOBILE-NAV-01-design, but never checked against actual device rendering).
+              7.5px keeps "shrinks, does not drop" (still well under DeepBench's own 13px on this same header,
+              and under the desktop label's 9.5px) while landing in the same ~8-9.5px range every other
+              mono micro-label on the platform already uses (KPI strip labels, Agent Routing "LIVE" tag, etc.)
+              instead of sitting nearly 3px below all of them. See STYLE-GUIDE.md Section 24 amendment. */}
+          <div style={{fontFamily:body,fontSize:7.5,color:"#b8c5d8",letterSpacing:1,textTransform:"uppercase",marginTop:1}}>AI Workforce Platform</div>
+        </div>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setMobileMenuOpen(true)} aria-label="Open menu" style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>
+          <span style={{display:"block",width:18,height:2,background:T.brassLight,borderRadius:1,position:"relative"}}>
+            <span style={{position:"absolute",left:0,top:-6,width:18,height:2,background:T.brassLight,borderRadius:1}}/>
+            <span style={{position:"absolute",left:0,top:6,width:18,height:2,background:T.brassLight,borderRadius:1}}/>
+          </span>
+        </button>
+
+        {mobileMenuOpen && (
+          <div style={{position:"fixed",inset:0,zIndex:2000}}>
+            <div onClick={()=>setMobileMenuOpen(false)} style={{position:"absolute",inset:0,background:"rgba(18,36,60,.5)"}}/>
+            <div style={{position:"absolute",top:0,right:0,bottom:0,width:"82%",maxWidth:340,background:T.paperDeep,boxShadow:"-10px 0 28px rgba(18,36,60,.28)",display:"flex",flexDirection:"column"}}>
+              <div style={{flexShrink:0,background:T.navy,color:T.card,padding:"0 14px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`3px solid ${T.brass}`}}>
+                <span style={{fontFamily:display,fontSize:14,fontWeight:600}}>Menu</span>
+                <button onClick={()=>setMobileMenuOpen(false)} style={{background:"none",border:"none",fontSize:20,lineHeight:1,color:T.card,cursor:"pointer",padding:"2px 8px"}}>×</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"6px 0"}}>
+                {NAV_GROUPS.map(group => (
+                  <div key={group.label}>
+                    <div style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"12px 16px 4px"}}>{group.label}</div>
+                    {group.items.map(item => (
+                      <button key={item.path}
+                        onClick={()=>{ setMobileMenuOpen(false); navigate(item.path); }}
+                        style={{display:"flex",alignItems:"center",gap:10,width:"100%",
+                          padding: item.active ? "11px 16px 11px 13px" : "11px 16px",
+                          fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",
+                          borderBottom:`1px solid ${T.lineSoft}`,
+                          borderLeft: item.active ? `3px solid ${T.brass}` : "3px solid transparent",
+                          background: item.active ? "rgba(182,135,58,.09)" : "transparent",
+                          color: item.active ? T.navy : T.ink, fontWeight: item.active ? 600 : 400}}>
+                        <span style={{width:18,textAlign:"center",flexShrink:0}}>{item.icon}</span>{item.label}
+                        {/* FEATURE: SH-23 */}
+                        {item.status && <span style={FOCUS_STATUS_STYLE}> ({item.status})</span>}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <div style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"12px 16px 4px"}}>Platform</div>
+                {showAIPanel && (
+                  <button onClick={()=>{ setMobileMenuOpen(false); onAIPanel(); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 16px",fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",borderBottom:`1px solid ${T.lineSoft}`,background:"transparent",color:T.ink}}>
+                    <span style={{width:18,textAlign:"center",flexShrink:0}}>◆</span>AI Audit
+                  </button>
+                )}
+                {showHelp && (
+                  <button onClick={()=>{ setMobileMenuOpen(false); onHelp(); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 16px",fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",borderBottom:`1px solid ${T.lineSoft}`,background:"transparent",color:T.ink}}>
+                    <span style={{width:18,textAlign:"center",flexShrink:0}}>ⓘ</span>About DeepBench
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{background:T.navy,color:T.card,padding:"0 28px",display:"flex",alignItems:"center",height:60,borderBottom:`3px solid ${T.brass}`,flexShrink:0,gap:12,position:"relative"}}>
@@ -99,15 +211,42 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
         </div>
       </div>
 
-      {/* Work Dashboard / Bench Dashboard nav tabs — centered absolutely */}
-      <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch"}}>
-        <NavTab
-          isActive={isWork}
-          onClick={()=>navigate("/")}
-          icon="📋"
-          label="Work"
-          hasBorderLeft={true}
-        />
+      {/* FEATURE: MI-36 — Work/Bench nav, Work opens a dropdown (Market Intelligence / Project
+          Management / Spend Analysis). MI-32/33's scroll-height fix (same session) is what makes the
+          header behave as pinned/static now that the root has a definite height. */}
+      <div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",top:0,bottom:0,display:"flex",alignItems:"stretch",zIndex:1000}}>
+        <span style={{position:"relative",display:"flex"}}>
+          <NavTab
+            isActive={isWork || isMI || isLAV}
+            onClick={()=>setWorkMenuOpen(o=>!o)}
+            icon="📋"
+            label="Work"
+            hasBorderLeft={true}
+          />
+          {/* FEATURE: MI-44 -- small gold down-arrow hint, subtle, signals Work opens a dropdown */}
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:7,color:T.brassLight,pointerEvents:"none"}}>▼</span>
+          {workMenuOpen && (
+            // FEATURE: SH-23b -- widened so focus-area names stay on one line (was minWidth:220)
+            <div style={{position:"absolute",top:"100%",left:0,minWidth:280,background:T.card,border:`1px solid ${T.line}`,boxShadow:"0 8px 24px rgba(0,0,0,0.3)",zIndex:999}}>
+              {/* FEATURE: SH-23 -- status per focus area */}
+              {/* FEATURE: LAV-1e -- Live Agent View first; see the mobile NAV_GROUPS note on dual naming */}
+              {[
+                {label:"Live Agent Console",         icon:"◎", path:"/",                    status:FOCUS_AREA_STATUS.liveAgentView},
+                {label:"Channel Sales Intelligence", icon:"◈", path:"/channel-intelligence", status:FOCUS_AREA_STATUS.channelSales},
+                {label:"Project Management",         icon:"📋", path:"/work",          status:FOCUS_AREA_STATUS.projectMgmt},
+                {label:"Spend Analysis",             icon:"💰", path:"/work/1/analyze", status:FOCUS_AREA_STATUS.spendAnalysis},
+              ].map(item => (
+                <button key={item.path}
+                  onClick={()=>{ setWorkMenuOpen(false); navigate(item.path); }}
+                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 16px",background:"transparent",border:"none",borderBottom:`1px solid ${T.lineSoft}`,color:T.ink,fontFamily:body,fontSize:13,textAlign:"left",cursor:"pointer",whiteSpace:"nowrap"}}>
+                  <span>{item.icon}</span>{item.label}
+                  {/* FEATURE: SH-23b -- marginLeft:auto right-justifies the status to a shared column edge */}
+                  {item.status && <span style={{...FOCUS_STATUS_STYLE, marginLeft:"auto", paddingLeft:14}}>({item.status})</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </span>
         <NavTab
           isActive={isBench}
           onClick={()=>navigate("/bench")}
@@ -116,11 +255,18 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           hasBorderLeft={false}
         />
       </div>
+      {/* click-outside-to-close backdrop — rendered as a sibling of the transformed nav wrapper above,
+          not nested inside it: `transform` on an ancestor creates a new containing block for
+          position:fixed descendants, which shrank this backdrop's fixed:inset(0) down to that
+          ancestor's own box instead of the full viewport (found via live QA, S-MI-32). */}
+      {workMenuOpen && (
+        <div onClick={()=>setWorkMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:998}}/>
+      )}
 
       <div style={{flex:1}}/>
 
-      {/* AI status dot */}
-      {status.active && (
+      {/* AI status dot — FEATURE: MI-23 — suppressed on MI route, which shows its own chat-embedded version instead */}
+      {status.active && !isMI && (
         <div style={{display:"flex",alignItems:"center",gap:6,marginRight:8}}>
           <span style={{width:7,height:7,borderRadius:"50%",background:T.brass,display:"inline-block",animation:"aiBlink 1.2s ease-in-out infinite"}}/>
           <span style={{fontFamily:mono,fontSize:10,color:T.brassLight,letterSpacing:.3}}>{status.message}</span>
@@ -218,7 +364,7 @@ export function AppShell({ children, headerProps = {}, toast }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   return (
-    <div style={{minHeight:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
+    <div style={{height:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
       <AppHeader {...headerProps} onHelp={()=>setAboutOpen(true)} onAIPanel={()=>setAiPanelOpen(o=>!o)}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
         {children}

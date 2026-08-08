@@ -753,7 +753,11 @@ where needed. Use the plan_task tool to return a structured plan.`;
 
         {/* Breadcrumb */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,fontFamily:mono,fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase"}}>
-          <button onClick={()=>navigate("/")} style={{background:"transparent",border:"none",color:T.brass,cursor:"pointer",fontFamily:mono,fontSize:9,letterSpacing:1,textTransform:"uppercase",padding:0}}>Work Dashboard</button>
+          {/* FEATURE: MOB-001 — "Work Dashboard" breadcrumb was calling navigate("/"), which lands on
+              Channel Intelligence (the current temporary home route, docs/SCREEN-INVENTORY.md), not the
+              real Work Dashboard the label promises. Stale from before Channel Intelligence took over "/".
+              Found live during a mobile sweep; reproduces identically on desktop (not mobile-specific). */}
+          <button onClick={()=>navigate("/work")} style={{background:"transparent",border:"none",color:T.brass,cursor:"pointer",fontFamily:mono,fontSize:9,letterSpacing:1,textTransform:"uppercase",padding:0}}>Work Dashboard</button>
           {/* FEATURE: WO-01 — S-RENAME-01 UI label rename */}
           <span>›</span><span style={{color:T.ink}}>Work Order Instructions</span>
         </div>

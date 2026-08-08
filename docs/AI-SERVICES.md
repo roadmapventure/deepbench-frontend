@@ -33,6 +33,8 @@ AI Usage            — aggregate telemetry: calls, cost, latency
 
 **Connection to the Agent Profile Model.** The Method layer in ARCHITECTURE.md Section 2 has been renamed to AI Pattern layer. What was listed there (RAG Query, LLM Call, Playwright, Embeddings, Document Extraction) were Patterns, not Methods. In the Agent Profile Model, a Capability or Deliverable points to the AI Service(s) it uses — not directly to Patterns. The Service encapsulates Pattern selection.
 
+**Correction (`§19i`, `ARCHITECTURE.md`, 2026-07-16) — the "Service uses 0–N Patterns" line above describes design-time intent, not what may be logged as having actually happened on a real call.** A Service's declared Pattern list (this file's `SVC-XX` catalog entries, or a Skill Profile's `technical_services` field) is documentation of what the Service is *built* to use — it must never be the source `ai_activity_log.patterns_used` reads from for a specific call. That distinction wasn't drawn clearly when `AI-50a`/`b`/`c` (2026-07-14) first wired real per-call pattern data, and the gap it left (declaration alone treated as sufficient to log) is fully specified in `ARCHITECTURE.md §19i` — read that section before touching any pattern-logging code, not this one.
+
 ---
 
 ## 2. AI Patterns Catalog

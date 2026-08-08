@@ -1,3 +1,4 @@
+<!-- DeepBench v6.3.213 | CLAUDE-DESIGN.md | SES-46 -- re-run the duplicate-functionality grep against a fresh origin/dev before writing the kickoff doc -->
 # DeepBench — Design Session Guide (Claude Code)
 > For Claude.ai web/Desktop design sessions, use DeepBench-Session-Init.md instead.
 
@@ -14,48 +15,153 @@ Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
 
 This separation is what enforces branch discipline. A coding session starts cold, reads the kickoff doc, and switches to `dev` as its first act. Blurring the boundary is how code ends up on `main` without a review gate.
 
+**Mechanized 2026-07-21 (`SES-010`).** A local `PreToolUse` hook (`C:/Projects/.claude/hooks/block-design-session-code.js`) now denies any Edit/Write targeting `src/` or `api/` when the current worktree's branch matches `session/design-*` — a real backstop, not just a discipline reminder. Same caveat as `CLAUDE.md`'s concurrent-sessions note: this hook is local to the machine it was set up on, not part of the repo.
+
+---
+
+## Standing Rule — Decision Autonomy Tiers
+
+**Moved 2026-07-17 to `docs/WORKING-WITH-JOHN.md`** (the "How to Work With John" interaction-pattern reference, `SES-003`) — that doc is now the canonical home for this and other communication/decision-making patterns. Read it there; it's already a mandatory Step 1 read below, so this doesn't add a lookup that wasn't already happening.
+
+---
+
+## Standing Rule — Automated Design→Code→Verify Loop (added 2026-07-02, John)
+
+**Once a kickoff doc is committed, the design session spawns the coding session itself** — via the `Agent` tool, foreground, no `isolation` param. **Revised 2026-07-07 (concurrent-sessions rule, see `CLAUDE.md`):** "operates directly on the real working tree" now means this design session's own manually-created worktree (see `CLAUDE.md`'s concurrent-sessions hard rule), not the shared main checkout — the spawned coding agent inherits that isolation rather than getting a second nested one, and pushes straight to `dev` from there via the fetch-rebase-push-retry discipline `CLAUDE.md` specifies. Before this change (single-session use), "the real working tree" meant the shared checkout directly; with multiple concurrent sessions that assumption breaks, hence the worktree requirement.
+
+**Corrected 2026-07-16 (found live, see `CLAUDE.md`'s "Sub-agents inherit the worktree, never nest one" hard rule):** the prompt is NOT the bare kickoff-doc line alone — that was found to silently fail the "inherits isolation" intent stated above, because nothing in a bare prompt actually tells the spawned agent which worktree to use, so its own normal session-start flow would create a *second* one (or worse, default to the shared checkout, exactly the bug this note exists to prevent). Prepend the design session's own worktree path as an explicit first line, then the existing bordered block unchanged.
+
+**Corrected again 2026-07-22 (found live, flagged by a `fix-dev-push-refspec-0716`-style process-gap report, John's go-ahead):** reusing the design session's own worktree unmodified is now structurally impossible for the code-writing step — `SES-010`'s `block-design-session-code.js` hook (see this file's own note above) denies any `Edit`/`Write` to `src/`/`api/` whenever the current branch matches `session/design-*`, which is exactly how every design worktree's branch is named. This note (written 2026-07-16) was never reconciled with that hook when it landed 2026-07-21 — a real gap, not resolved automatically just because both notes happened to live in the same file.
+
+**Fix, matching the workaround already in organic use by other sessions today (`design-chi-58-0722`'s worktree, checked out on `session/chi-58-drawer-copy-coding` rather than its original `session/design-chi-58-...` branch):** before spawning the coding agent, the design session itself switches its own worktree to a fresh, non-`design-*`-prefixed branch — same directory, same files, same kickoff-doc commit already sitting in history, just a differently-named branch so the hook's pattern match no longer applies:
+
+```
+git -C "<worktree-path>" checkout -b "session/<short-topic>-coding"
+```
+
+Then spawn with the same prompt shape as before, updated to reflect the branch switch:
+
+```
+Operate against C:/Projects/deepbench-frontend/.claude/worktrees/<this-session's-short-name>/ — never the shared checkout. Do not set up a separate worktree. This worktree has already been switched to branch session/<short-topic>-coding (from session/<original-design-branch>) specifically so SES-010's design-branch code-write hook doesn't block your edits — do not switch it back.
+Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
+Stop once your own Node.js test passes, npm run build succeeds, and you've committed and pushed your build to dev. Report that result back and stop there — do NOT run the kickoff doc's Manual QA Checklist (Section 11), do NOT update CLAUDE-STATE.md's close-out entries or move any row to FEATURES-ARCHIVE.md, and do NOT remove this worktree or its branch. Those are the parent design session's own next steps, not yours.
+```
+
+This preserves everything the 2026-07-07/2026-07-16 notes above were actually for (one worktree, no `.env.local` re-copy, no duplicated git overhead, coding agent inherits isolation rather than getting a second nested worktree) — the only change is the branch name, which was never the point of "inherits isolation" in the first place, just an accident of how design worktrees happen to get named.
+
+**Confirmed as the standard, 2026-07-22 (`design-session-0722`, John's explicit call).** This branch-rename approach — not the competing "spin up a second worktree" workaround some sessions used the same day — is the one every future session should follow. See `CLAUDE-STATE.md`'s resolved process-gap note for the decision record.
+
+This doesn't weaken "self-contained, no other context" for the task itself — the coding agent still gets nothing beyond the kickoff doc and `CLAUDE-STATE.md` for *what to build*; the worktree/branch lines are orientation (*where* to work), not task context, the same distinction `CLAUDE.md`'s "Sub-agents inherit the worktree, never nest one" hard rule draws for every other sub-agent spawn. **This does not weaken the No-Coding-in-Design-Sessions rule above** — the design session's own reasoning process still writes zero code; it only spawns a fresh, memory-less agent that does, the automated equivalent of John opening a second window and pasting the prompt himself.
+
+**Stop-line added 2026-07-21 (`SES-020`, found live in `design-ai-35-0721`).** Before this line existed, a spawned coding agent — given read access to this same `CLAUDE-DESIGN.md` per `CLAUDE.md`'s "Sub-agents inherit the worktree, never nest one" hard rule (its second clause — sub-agents touching naming/architecture/backlog read the current docs as part of their own bootstrap), and nothing in its own prompt telling it where its job ends — read the full Step 4→Step 5 sequence documented below and reasonably executed all of it: build, test, push, **and then also ran QA, closed out `CLAUDE-STATE.md`/`FEATURES.md` itself, and removed the parent design session's own shared worktree** before the design session got a chance to independently verify anything. The design session only caught it by cross-checking Supabase directly after the fact — exactly the "self-verification as rubber stamp" failure mode `feedback-manual-qa-gate`/Step 5b's own wording already warns against, just one level removed (the coding agent rubber-stamping itself, not the design session rubber-stamping the coding agent). The boundary needed to live in the prompt text itself, not only in this surrounding prose the coding agent has no particular reason to read as a scope limit on its own actions.
+
+**When the coding agent finishes** (tests pass, build succeeds, committed and pushed to `dev`, and it has stopped per the line above), its full report returns directly into the design session — no manual paste needed. The design session then runs Step 5 (below) **itself**: Manual QA Checklist verified directly against live systems (Supabase, `git status`, Vercel logs where reachable), not handed to John to run, and not handed back to the coding agent either. Accept on indirect evidence, explicitly documented, for whatever genuinely can't be checked directly (e.g. no Vercel connection in this environment) — same as established precedent, just no longer gated on John confirming it.
+
+**Still stop and ask John, mid-flow, when:** the coding agent's own report surfaces a genuine scope conflict, an ambiguous finding, or a decision the kickoff doc didn't already resolve — same bar that already makes sessions stop today (e.g. `S-ARCH-AGENT-LOOP-02` halting rather than patching inline, per John's call at the time). Routine PASS-through-to-close-out needs no human checkpoint; a real judgment call still does.
+
+**Always report the outcome to John at the end regardless** — what shipped, test results, QA results, PASS/FAIL — even though he didn't have to run anything himself. Automating the loop removes his manual steps, not his visibility into what happened.
+
+**This supersedes `feedback-manual-qa-gate`'s "wait for John's PASS/FAIL" for this flow specifically** — the design session is now the one confirming PASS/FAIL. That memory's underlying concern (never silently closing out after a completion report without real verification) still fully applies — it's just the design session doing the verifying now, not John.
+
+---
+
+## Standing Rule — Version-Paired Session Naming
+
+Every design session must be tagged with the version number of the kickoff doc(s) it produces, matching the version the paired coding session will carry. This makes the design ↔ coding pairing visible at a glance in `CLAUDE-STATE.md` and `docs/FEATURES.md`.
+
+Format: `S-[FEATURE-ID]-design (v[X.X.X])` for the design session, `S-[FEATURE-ID] (v[X.X.X])` for the coding session that executes its kickoff doc. Sub-sessions (`a`/`b`) each get their own version per the existing sub-session versioning rule (`STANDARDS.md` Section 1).
+
+Applies from S-APPLE-01a-design (v5.3.0) onward.
+
+---
+
+## Standing Rule — Every Ticket/Prompt Names Its Model (added 2026-07-28, John's explicit call)
+
+**Every ready-to-paste session prompt, kickoff doc, and backlog row that will become a session states which Claude model the session should run on — and whenever a session hands John a prompt to kick off, it tells him the model explicitly in chat, not just inside the doc.** A prompt without a model line is incomplete from 2026-07-28 onward; add one when touching any older prompt a session is about to hand to John.
+
+Defaults (John's explicit call 2026-08-01, `design-scaling-arch-0731` — "Fable for design/diagnosis, Opus 5 for coding, Sonnet 5 for mechanical" is now the documented default; John can override per ticket; verify the current model lineup rather than trusting this list as permanent):
+- **Design / discovery sessions, root-cause diagnosis, and anything touching LOCKED architecture, naming, or taxonomy** → the most capable model available (today: **Fable 5**; **Opus 5** if Fable isn't in the picker). Judgment density is the driver, not code volume — this is the only tier where Fable quota is well spent.
+- **Coding sessions executing a well-specified kickoff doc** → **Opus 5**. **In the Automated Design→Code→Verify Loop, pass the kickoff's model explicitly on the `Agent` spawn call (`model` param) — never omit it.** Corrected 2026-08-01: the previous wording here ("the spawned coding agent inherits the design session's model") silently ran every automated coding session on the design session's Fable, at 2× Opus per-token price with always-on thinking — the root cause of Fable quota exhausting in ~2 days. A kickoff doc good enough to execute unattended is exactly what makes Opus 5 sufficient; if a coding session seems to *need* Fable, the kickoff was underspecified — fix the design, not the model.
+- **Mechanical tickets** (Supabase-content-only edits, one-file prescribed fixes, doc sweeps, archiving batches) → **Sonnet 5**.
+- **Data-only / mechanical runs** (Susan Smith — Trainer governance invocations, seeds, doc-only bookkeeping) → **Sonnet 5** is sufficient.
+
+---
+
+## Standing Rule — Skill/Capability Disclosure When Updating Agent Competencies
+
+**Moved 2026-07-17 to `docs/WORKING-WITH-JOHN.md`** (`SES-003`) — same consolidation as Decision Autonomy Tiers. Read it there; it's already a mandatory Step 1 read below.
+
 ---
 
 ## Standing Rule — Backlog Capture
 
-**Any feature, agent, or requirement named during a design session must be written to `docs/FEATURES.md` immediately — not deferred to session close-out.**
+**Any feature, agent, or requirement named during a design session must be written to the right feature-inventory file immediately — not deferred to session close-out.**
 
-This applies to items mentioned casually in conversation, not just items with a full spec. A one-line placeholder with ❌ Missing status is enough. Do not let the session end without the entry existing in FEATURES.md.
+This applies to items mentioned casually in conversation, not just items with a full spec. A one-line placeholder with ❌ Missing status is enough. Do not let the session end without the entry existing.
+
+**(added 2026-07-07 — 3-file split, criterion updated 2026-07-17)** The feature inventory is split across three files by John's priority rule: "Any enhancement for the CI page to work before showing to Apple, to keep from an architect's scrutiny or enduser frustration: from backend to frontend, that is task success rate, end-end q&a, speed, loop, harness, agent model, AI auditing/log, UX/UI, db data model cleanup or seeding, goes to Now. Anything for the CI page outside of the previous is Next, and anything not related to making CI successful goes to Later." — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md` (other CI), `docs/FEATURES-LATER.md` (everything else). Classify a new item into the right file when you add it; when genuinely unsure between now/next, ask John rather than guessing.
+
+**(added 2026-07-17 — criterion changes require an immediate full re-sweep)** Whenever the now/next/later criterion itself is edited (not just applied to a new row), immediately run a full reclassification pass across all 3 files before doing anything else — do not just apply the new wording prospectively to rows added from this point forward. (found live 2026-07-17 — a re-sweep surfaced 14 already-filed rows the broadened criterion had silently left misclassified; full story: `docs/SESSIONS.md`) Don't wait to be asked twice; a criterion edit and a reclassification sweep are one atomic action, not two.
+
+**(added 2026-07-17 — read full row text before any tier move)** When moving a row between `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`, read that row's complete text first — never rely on a truncated summary to decide. A row's own "stays here" rationale often lives only in the part a summary truncates. (found live 2026-07-17, `AGT-005`/`SE-02` — full story: `docs/SESSIONS.md`)
+
+**(added 2026-07-17 — file same-investigation rows together for tier consistency)** When one design session/investigation produces multiple backlog rows (e.g. a single audit that surfaces 8+ findings), review all of that investigation's rows together for now/next/later placement before filing, rather than classifying each one independently as it's written. Filing each row in isolation scatters one investigation's output across all 3 tiers with no sign the split was deliberate. (found live 2026-07-17, `S-ARCH-COMPETENCY-MODEL-design`'s ~11 rows — full story: `docs/SESSIONS.md`)
+
+**(added 2026-07-08 — Type tag, John's explicit call)** Every row in `docs/FEATURES.md` and `docs/FEATURES-NEXT.md` also gets a `Type` tag (Task Success Rate/Speed/Architecture/Feature/Tech Debt/Data/Observability — full definitions in `docs/FEATURES.md`'s "Type Taxonomy" section). Assign the type that actually fits when logging a new item; if none of the existing types genuinely fit, add a new one to the taxonomy rather than forcing a close-but-wrong tag. Do not apply this retroactively to `docs/FEATURES-LATER.md` or `docs/FEATURES-ARCHIVE.md` unless a session is already touching a row there for another reason.
+
+**(added 2026-07-17 — new-ID prefix, `SCREEN-INVENTORY.md`)** Before assigning a new item's ID, check `docs/SCREEN-INVENTORY.md`'s taxonomy for the correct `[SCREEN-CODE]` (e.g. `CHI`, `PRO`) or `[PLATFORM-LAYER-CODE]` (`HAR`/`LOO`/`LOG`/`MCP`/`MKT`/`DAT`/`AGT`) prefix — do not default to an old `[AREA]-[NUMBER]` prefix (`MI`/`AA`/`AI`/etc.) by pattern-matching nearby rows, even ones logged recently. This convention has been active since 2026-07-15, but the rule previously lived only in `docs/FEATURES.md`'s "Feature ID Format" section — not on this file's own mandatory Step 1 reading list — so it was easy to miss; found live 2026-07-17 (naming-convention audit) that 3 rows logged that same week still used a retired prefix (`MI-73`/`MI-74`/`AI-46d`, recoded to `CHI-15`/`CHI-16`/`LOG-22`) despite the rule being live. When genuinely unsure which code fits, or whether an existing legacy-prefixed row (like `AA-194`) should be recoded, ask John rather than guessing — the convention applies prospectively only, existing IDs are never silently renamed.
+
+**(added 2026-07-28, `SES-18` — the *number*, not just the prefix)** The rule above governs the letters; the number is claimed atomically from Supabase's `feature_id_counter`, **never** by reading the highest existing ID in the `FEATURES*.md` files, never by reading the counter table and adding one, and never by hand-counting up from an ID you claimed a moment ago. Exact SQL: `.claude/skills/session-setup/SKILL.md` step 3b. **Claim once for the whole block** — the SQL takes an `<N>`, so filing eight rows is one call returning eight consecutive numbers, not eight calls and not one call plus seven guesses.
+
+Root cause this closes: the claim step was documented *only* in the session-setup skill — read once at 8am while making a worktree — while this section, the one actually in front of a session at the moment it types an ID, said nothing about the number. (found live 2026-07-28, `SES-18` — three real ID collisions, one of which reached shipped Supabase Skill content; full story: `docs/SESSIONS.md`)
+
+**(added 2026-07-15, John's explicit call — the `task_773e8b06` incident)** A `spawn_task` chip's `task_XXXXXXXX` ID is Claude Code's own session-tracking mechanism, not part of this project's feature-tracking system — it must never be the only identifier a piece of DeepBench work is known by. If a finding is significant enough to spin off via `spawn_task`, give it a real backlog ID (whichever of `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md` fits) in the same breath the task is spawned, and cite that ID — never the raw `task_XXXXXXXX` — in any coordination note or cross-reference to that work afterward. An unanchored `task_XXXXXXXX` gets repeated across sessions as unverified fact, and the task's own session can fail to recognize a third-person mention of its own opaque ID as being about itself — see [[feedback-coordination-note-self-reference]]. (found live 2026-07-15, the `task_773e8b06` incident — full story: `docs/SESSIONS.md`)
 
 ---
 
 ## Step 1 — Orient (read these, in order, stop when you have enough)
 
-1. `CLAUDE-STATE.md` — current version, next session, open blockers
-2. `docs/FEATURES.md` — feature backlog and session queue
-3. `docs/SESSIONS.md` — session log (only if you need version history)
+**Your session worktree should already exist by this point** (`CLAUDE.md`'s router sets it up as the very first action, before any reads). Read all three of these — and everything else this session touches — from that worktree path, never the shared checkout at `C:/Projects/deepbench-frontend` directly. A worktree freshly branched from `origin/dev` is correct by construction, so no separate fetch+`git show` freshness check is needed (retired 2026-07-15 — see `CLAUDE.md`).
+
+**Mandatory, added 2026-07-15 (was previously an optional skill run "if you thought to"; with 5-7 concurrent sessions, drift compounds too fast for that to be reliable):** run the `session-hygiene` skill's checks 1, 2, 3, and 5 now, before Step 1's reads — sizes/greps only, costs near-nothing. **As of 2026-07-21 (`SES-010`):** these checks (plus 3c/5b/5c/5d) are now one script, `node scripts/check-session-docs.js` — run that directly instead of re-deriving each grep. On John's own machine it also fires automatically after `git worktree add` via a local hook, but don't rely on that being present everywhere; run it explicitly. Check 5 (stale worktrees) matters most under real concurrency: don't assume `.claude/inflight/`'s files are a complete picture of what's on disk (retargeted from `CLAUDE-STATE.md`'s old shared "In flight now" list, 2026-07-21, `SES-011`). Report any findings briefly, same as the skill always has; don't silently fix without flagging first.
+
+1. `docs/WORKING-WITH-JOHN.md` — communication/decision-making patterns (short, added 2026-07-17 per `SES-003`)
+2. `CLAUDE-STATE.md` — current version, next session, open blockers
+3. `docs/FEATURES.md` — **now** feature backlog (MI speed/loop/harness/charts) and session queue. Read `docs/FEATURES-NEXT.md` (other MI backlog) or `docs/FEATURES-LATER.md` (everything else) only when the session's actual scope is there.
+4. `docs/SESSIONS.md` — session log (only if you need version history)
 
 Report back after Step 1:
-- Current version in dev
+- Current version in dev (state it as the `origin/dev` version you just fetched, not whatever the shared checkout's file said before that fetch)
 - Next scheduled session
 - Any open blocking questions
-- "What would you like to work on?"
+- **(Rewritten 2026-07-17 — was a bare "What would you like to work on?")** "What would you like to work on, and which Product Focus Area/Screen (or Platform Layer, if it's cross-cutting) does it primarily touch? See `docs/SCREEN-INVENTORY.md` for the list." Ask for the area up front, before any scoping conversation starts — this is what makes Step 2's architecture read below mandatory instead of a self-assessed guess made with no context yet.
 
 ---
 
 ## Step 2 — Pull in context only when the session needs it
 
+**(Tightened 2026-07-17 — `docs/ARCHITECTURE.md`'s row below was previously self-assessed — "does this touch layer boundaries?" — decided by the session itself before it had enough context to judge that reliably. Found live: this let already-locked architecture get silently re-proposed or contradicted, requiring John to catch and correct it after the fact, repeatedly, instead of the session starting from what's already decided.)** Once Step 1's closing question has an answer naming a Product Focus Area/Screen/Platform Layer, reading `docs/ARCHITECTURE.md` for whatever's locked in that area is **mandatory before proposing any scope** — not conditional on the session's own judgment that the topic "sounds architectural." A cross-reference index mapping each Product Focus Area/Screen to its governing `ARCHITECTURE.md` section numbers is planned (tracked, not yet built — see John before assuming one exists); until it lands, this means actually reading the relevant sections with real attention, not skimming past ones that don't look related at a glance.
+
 | Read this | When |
 |-----------|------|
 | `docs/STANDARDS.md` | Generating a kickoff doc |
 | `docs/PRD.md` + `docs/MOCK-NOTES.md` | Any design or UX session |
-| `docs/ARCHITECTURE.md` | Session touches layer boundaries, migration work, or S-MIGRATE / S-BENCH / S-INFRA chain |
+| `docs/ARCHITECTURE.md` | **Now mandatory once Step 1 names an area** (see above) — no longer only "if session touches layer boundaries, migration work, or S-MIGRATE/S-BENCH/S-INFRA chain" |
 | `docs/STYLE-GUIDE.md` | Any session with UI work — read before designing, update at close |
 | `docs/ENV-VARS.md` | Features that call external services |
 | Relevant source files in `src/` | Read before designing against any existing component |
 
-Do not pre-load all of these. Read only what the session requires.
+Do not pre-load all of these. Read only what the session requires — but "requires" no longer excludes `ARCHITECTURE.md` by default; see above.
 
 ---
 
 ## Step 3 — What This App Is
 
-DeepBench v5.1 — AI agent workforce platform for government procurement intelligence.
+**Rewritten 2026-07-17 (John's explicit call) — dropped the hardcoded version number and platform-scope description that used to live here.** Both had gone stale and directly conflicted with other sources (the version number here said "v5.1" long after `CLAUDE-STATE.md` had moved past v6.3.x; the scope description said "government procurement intelligence" after the platform's scope had already been corrected to general enterprise, `S-PM-05-design`, 2026-06-23). Root cause: this file is read at every design session's Step 1/3, but rarely *edited* — a fact restated here goes stale the moment its real source of truth changes elsewhere, with nothing forcing this copy to catch up. Fixed by not duplicating either fact at all:
+
+- **Version:** never state one here — read `CLAUDE-STATE.md`'s "Version in dev" line fresh, same as everywhere else in this repo. Version numbers live in git/Supabase's `dev_version_counter`, not in prose.
+- **What DeepBench is / who it's for:** see `docs/ARCHITECTURE.md` §0 (The Product Pitch, LOCKED) — the single authoritative source, not restated here.
+
 - Live: `https://deepbench.roadmapventure.com`
 - Dev: `https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app`
 - Owner: John Leonard / Roadmap Venture
@@ -65,24 +171,47 @@ DeepBench v5.1 — AI agent workforce platform for government procurement intell
 
 ## Step 4 — How to Generate a Kickoff Doc
 
-1. Read `docs/FEATURES.md` — confirm feature ID, status, dependencies
+1. Read `docs/FEATURES.md` — confirm feature ID, status, dependencies. If the feature isn't there, check `docs/FEATURES-NEXT.md`/`docs/FEATURES-LATER.md` before assuming it's undocumented — it may simply live in a different priority tier.
 2. Read `docs/STANDARDS.md` — confirm relevant test categories
 3. Read `docs/SESSIONS.md` — confirm current version and next session
 4. For UI work: read `docs/PRD.md` + `docs/MOCK-NOTES.md` + `docs/STYLE-GUIDE.md`
 5. Read relevant source files in `src/` directly — confirm what already exists
-6. **Architect Review** — mandatory before writing any task spec. Check all four:
+6. **Architect Review** — mandatory before writing any task spec. Check all of the following:
    - **Duplicate functionality:** grep for any function, component, hook, or constant the session plans to create. If it already exists anywhere in the codebase, reuse it — do not build a parallel implementation.
+   - **Re-run that grep against a fresh `origin/dev` immediately before writing the kickoff doc (added 2026-07-29, `SES-46`):** the check above is written as a one-time action, but with 5-7 concurrent sessions its answer has a shelf life of minutes — a worktree is only current as of the moment it was branched. Do `git -C "<worktree>" fetch origin dev` then re-grep `origin/dev`, not the working tree, as the last step before Step 4.11. It is the same fetch already required before pushing; this just also does it *earlier*, when it can still change the scope. **(found live 2026-07-29, `design-ses-33` — an entire kickoff doc written for a gate another session had already shipped, strictly better, in the ~2 hours since the scoping read; full story: `docs/SESSIONS.md`)**
+   - **Search by shape, not by name (added 2026-07-21, `CHI-53`'s citation_missing fix — John caught this, not the session itself):** the duplicate-functionality check above only fires if the session searches for the literal thing it's about to build. (found live 2026-07-21, `CHI-53` — a name-narrow search missed an already-proven mechanism on the same screen that the session had read earlier in that same conversation; full story: `docs/SESSIONS.md`) Before proposing any new mechanism for related calls/agents to share state, know sequence, or know completion, first ask what this screen or capability *already* tracks that shape of thing for — any field, any purpose — not just whether the literal thing being proposed exists under its own name. Default to extending an already-proven mechanism over introducing a parallel one, even when the existing mechanism's current field/purpose differs from the new need.
+   - **Multi-site bug pattern → shared-service check (added 2026-07-16, John caught this, not the session itself — see `AA-192`):** if the same bug shape shows up at 2+ call sites, the default hypothesis is a missing/incomplete migration onto an existing shared service, not N independent bugs needing N independent patches. Before scoping per-site fixes, check: (a) does `ARCHITECTURE.md` already LOCK a shared-service rule this bug shape violates (e.g. §12/§13's "every Layer 3 route logs via the shared server-side service, no client-side guessing")? (b) is there a prior migration effort (like `AA-190`'s 9-site `logActivity()` migration) whose site list this call site is conspicuously absent from — that absence is itself the finding, not a reason to assume it's out of scope. **(found live 2026-07-16, `AA-192` — 3 proposed per-site fixes collapsed into 1 route fix, and surfaced a bigger co-located bug, once the unmigrated shared route was the target; full story: `docs/SESSIONS.md`)** Ask explicitly: "is this fix touching the shared thing, or patching around it in every place that calls it?"
    - **Cross-reference integrity:** for every catalog, constant, status flag, or label the session touches, verify every file that references it agrees on the current value and state. A contradiction between files (e.g. a pattern marked active on a badge but inactive in the catalog) must be resolved in this design session — never deferred to coding.
+   - **Secondary backlog IDs need a closure gate (added 2026-07-28, `SES-32`):** if a kickoff doc names any backlog ID other than its own primary feature — "also settles `X`", "folds in `X`", "supersedes `X`", "closes `X`" — treat that sentence as an obligation, not a footnote. The kickoff must (a) name the specific Manual QA Checklist item that acts as `X`'s gate, and (b) list `X` in the close-out step that archives the primary row (Step 5c). If you cannot name a gate whose passing would actually prove `X` resolved, then don't claim it's settled — leave `X` open and state what it's still waiting on. **(found live 2026-07-28, `design-log-60` — both halves of a hand-off existed in writing, neither pointed at an action, and `LOG-60` was on track to survive `LOG-81`'s close-out as a stale `❌ Missing` row describing already-shipped work. Same close-out-leak family as `SES-27`, different mechanism: `SES-27` is one row's own scope outrunning its checkmark; this is a second row that no session's close-out owns. Full story: `docs/SESSIONS.md`)**
    - **Layer violations:** confirm every new piece of logic lands in the correct architecture layer. Capability logic belongs in Layer 3 (`api/capabilities/`), not inline in React components (Layer 2). Flag violations before speccing the task.
    - **Schema alignment:** for any DB column read or written, verify the column name and type against the actual Supabase schema or existing code before speccing the task. Never assume a column exists because a design doc mentions it.
+   - **Delegation legitimacy (added 2026-07-02, S-ARCH-AGENT-LOOP-02-design):** for every hand-off, backup, or review decision point the session specs, write out `ARCHITECTURE.md` §19d's sniff-test answer for *that specific relationship* — does the requesting agent actually reason about whether/who to ask, or is this a fixed relationship (even one expressed as a capability_slug rather than an agent_id)? Citing that a delegation mechanism exists in the doc is not the same as confirming this use of it passes the test. Also re-check the full relevant source file for an existing generic primitive before declaring any mechanism unbuilt — don't stop at the one function/branch shape you expected it to take. **Confirmed gap (2026-07-02, `S-ARCH-AGENT-LOOP-03-design`):** reading a dispatch file's branch structure (e.g. `execute.js`'s `if (turn.tool_name === ...)` shape) is not the same as reading each tool's actual description/docstring (e.g. the `REQUEST_HELP_TOOL`/`DELEGATE_TO_AGENT_TOOL` literals in `request-receivable.js`) — a mechanism's real legitimacy rule can live entirely in the tool description text, not in the control flow around it. A session concluded new harness code was needed for a "return reviewed work to its original author" case before re-reading `delegate_to_agent`'s own description closely enough to see it already permits any legitimately-supplied candidate (task_context included, not only `request_help`'s returned list — `request_help` is only cited as an example source, per the tool's own wording). Before declaring any mechanism unbuilt: read the full text of every related tool/function definition, not just the branches that dispatch to it. **Scripted-value check (added 2026-07-06, `S-ARCH-DISPLAY-LOOP-01-design`, `PLATFORM-AGENT-RULEBOOK.md` AR-2.8):** for any new live tool-call argument that's meant to express agent judgment (e.g. a boolean like `is_final` on a delegation tool), read the exact `method`/instructional text a session plans to write for it — if that text tells the model the literal value to output rather than a criterion to reason from, it's a static trait wearing a tool-call-argument costume, the same failure class as `AA-98`, just one layer further down the stack (a harness-level argument instead of a capability's own output field). Caught this session before the kickoff doc was executed, not after.
+   - **Generalization counter-example check (added 2026-07-21, `SES-012`):** before writing any scope-justifying claim that treats two or more call sites, relationships, or paths as interchangeable, structurally equivalent, or "both legitimate" — the kind of claim that lets a session narrow scope to fix one instance and treat the rest as covered — actively try to construct or find a concrete counter-example where the generalization doesn't hold, not just confirm the cases already in front of you. If a counter-example exists, widen the scope to cover it, or drop the generalization and treat each case independently. Root cause this fixes: `LOO-011`'s design session concluded "a `delegationRequired` requester does no real work by definition" without testing that claim against an unexamined capability — `LOO-013`/`LOO-015` later found it false for `web-search-news`, costing two more sessions to catch what one counter-example check would have caught immediately.
+   - **Locked-section staleness check (added 2026-07-02, S-ARCH-AGENT-LOOP-02-design):** before trusting any `ARCHITECTURE.md` LOCKED section's body text, check whether it contradicts a fact already sitting in this session's context — a `CLAUDE-STATE.md` session summary, a prior message this conversation. (found live 2026-07-02, `S-ARCH-AGENT-LOOP-02-design` — a LOCKED §19d paragraph contradicted a `CLAUDE-STATE.md` summary this same session had already read at Step 1, and sat unreconciled until John caught the downstream mistake; full story: `docs/SESSIONS.md`) LOCKED means "don't casually re-litigate the decision," not "immune to going stale when a same-day follow-up session changes it without looping back to amend the earlier prose." If a locked section and an already-known fact disagree, the disagreement itself is the finding — stop and resolve it before proposing scope, never resolve it silently in the direction the locked section implies just because it's marked LOCKED.
+
+   - **Harness/Scaffold/Loop model impact (added 2026-07-20, `SES-001` close-out — found live: a real tool, `web_search`/`HAR-05`, shipped without `ARCHITECTURE.md` §1's Loop entry or the backlog row tracking its own gap (`LOO-008`) ever being updated to reflect it — sat wrong until an unrelated stress test caught it by chance, potentially months later):** if this session adds, removes, or changes a Harness tool (a new entry in `harnessTools`), a gate/rule (Evaluation's `must`/`must_not`, `requires_human_confirmation`, a new hardcoded platform-wide limit), or a resolution mechanism (Equipment), the kickoff doc must include a task updating the relevant `§1` entry (Scaffold/Harness/Loop) in the same commit. Check `§1`'s current text against what's being built before finalizing scope, not after.
+   - **Mock-fidelity source check (added 2026-08-02, discovery `design-list-arch-0802` — `LAV-15` shipped a generic feed after its kickoff silently severed the approved mock from the mock's own data source):** when a kickoff implements an example, mock, or worked sample John approved, the kickoff doc must trace every substantive line of that example to the exact field/column/event it will be derived from. Any line with no live source gets flagged to John at the Step 8b stop-gate — "this line cannot appear as mocked; its data doesn't exist / lives outside this session's scope" — never silently degraded into a follow-up ticket he hasn't seen. A scope constraint ("no `api/`", "stream-only") that cuts the mock off from its data source is itself a scope decision John must approve with that consequence stated, not an implementation detail. (Found live: the `LAV-15` mock was assembled from `durable_hops`/`ai_activity_log`; its kickoff scoped the build to the harness stream, which carries almost none of that content — every generic line in the shipped drawer traces to that one unstated swap. Full story: `docs/ARCHITECTURE.md` §19q.)
+   - **Sibling-surface check (added 2026-08-07, `design-display-contract` — the four-rounds lesson):** if this session changes what any run-content display shows (status line, Assembly drawer, routing panel, canvas bubbles — or any future sibling), the kickoff must enumerate EVERY surface that renders that content class and mark each one in-scope or excluded **by name, with the reason written down**. A surface nobody mentions is not out of scope — it is the next session's complaint. Found live: the agent-authored receipt content took four rounds (LAV-25, LAV-28, 28b/c, LAV-32) to reach the user's whole field of view because each round fixed only the surface named in that round's complaint; the routing rail was excluded silently-by-inheritance and the canvas bubble was never inventoried at all. The authoritative surface list + per-surface content rules: `ARCHITECTURE.md` §19s's four-surface standard.
+   - **Desktop/mobile parity check (added 2026-07-17):** if this session's fix touches a UI element that exists on both desktop and mobile, check whether the same issue exists on the mobile counterpart. If the mobile fix is trivial (same root cause, small change, fits this session's file/task budget) — include it in this session. If it requires real design work (a different mobile UX approach, a new mock, more effort than the desktop fix itself) — log it immediately as its own row under the `MOB` prefix (see `docs/SCREEN-INVENTORY.md`), never silently drop it.
 
    If any check reveals a contradiction, duplication, or violation — resolve it now. Do not write a kickoff doc that contains a known inconsistency.
 
-7. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, explicitly mark N/A in the kickoff doc. Do not skip this step.
+7. **AI Pattern Check** — before deciding on implementation approach, ask: does this feature have an opportunity to use an AI pattern not yet wired in DeepBench? Check `PATTERN_CATALOG` and `SERVICE_CATALOG` (in `src/hooks/useAIActivity.js`). Name the pattern and the service that would carry it. If yes, include it in the design. If no, mark N/A in the kickoff doc — a single line is enough ("N/A — no api/ route touched"), not a justifying paragraph. Do not skip the section itself.
 8. If UI work: describe mock for John's approval before writing the kickoff doc
+8b. **Mandatory stop-gate, all sessions, added 2026-07-15 (was previously only a memory rule, never written into this doc — that gap is why a kickoff doc has started before John was ready more than once):** after scoping is done (Architect Review + AI Pattern Check + mock if UI), stop here. Summarize the proposed fix in plain conversational language — not kickoff-doc prose — restating the specific scope/approach about to be written (exact copy if any, exact files, exact behavior change), and wait for an explicit yes to *that specific thing*. Do not write or save the kickoff doc file until that yes lands. A vague "keep going" / "sounds good" only approves continuing the topic, not the specific scope just shown — especially once other exchanges have happened in between. If genuinely unsure whether the last reply approved the specific proposal or just the general direction, ask once, plainly, rather than proceeding on an assumption.
 9. **Serverless function check:** Count files in `api/`. If the session adds a new `api/` file, the count must stay at or under 12 (Vercel Hobby limit). If adding one would reach 13+, the kickoff doc must include a merge task for an existing pair of related `api/` files — or route the new capability to Railway instead. State the pre/post count explicitly in the kickoff doc scope section.
-10. Write kickoff doc with all 11 required sections
-11. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+10. **Assign the version — claim it atomically, never read-and-increment.** **Rewritten 2026-07-15:** the old instruction ("read `CLAUDE-STATE.md`'s Version in dev and increment locally") broke twice under real concurrency — 4 sessions all stamping `v6.0.0` on 2026-07-02, and `AZ-19`/`S-MOBILE-ROSTER-01` both independently claiming `v6.2.4` on a later date — because two sessions reading the same "current" number at nearly the same moment both compute the same "next" one before either pushes. Fixed at the source: claim the version from a single atomic Supabase counter instead of computing it yourself. Run via the Supabase MCP `execute_sql` (project `rallojeqnkgtxgsdsnqm`):
+    ```sql
+    UPDATE dev_version_counter
+    SET patch = patch + 1, updated_at = now(), updated_by_session = '<short-session-name>'
+    WHERE id = 1
+    RETURNING major, minor, patch;
+    ```
+    Postgres serializes concurrent `UPDATE`s to the same row, so this is race-free by construction — no separate re-check-before-push step needed, unlike the old scheme. Use the returned `major.minor.patch` as-is: this is the version that goes in the kickoff filename, the "SESSION" header, and every file's version-header comment. Do this once, right when you're about to need the number (not far ahead of time) — small gaps in the sequence from an abandoned or redirected session are fine and expected, only collisions were ever the actual problem.
+11. Write kickoff doc with all 11 required sections
+12. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`
+
+**Standing rules by reference (added 2026-07-01, see STANDARDS.md Section 3):** Claude Code has persistent cross-session memory now — a kickoff doc does not need to restate a standing rule (23-field agent standard, AI Audit wiring requirement, Section 5 verification checklist categories, known bug patterns) in full prose. Name it instead: "STANDARDS.md Section 11 applies" is sufficient. Session-specific facts — exact values, files, scope, test assertions for *this* session — still must be fully spelled out. This shrinks Section 3 (AI Pattern Check, when N/A) and Section 9 (Verification Checklist) the most; it does not change Section 5 (TASKS) or Section 8 (Node.js test), which are inherently session-specific content, not restated rules.
 
 **Mandatory kickoff doc compliance check — AI Audit wiring (never skip):**
 Every kickoff doc for any `api/` route must explicitly spec:
@@ -91,53 +220,52 @@ Every kickoff doc for any `api/` route must explicitly spec:
 - [ ] `AI_TYPE_TO_SERVICE` mapping entry for the new service slug
 If wiring these would push the session over 4 tasks or 3 files — split into `a` (build) and `b` (audit wiring). Never defer audit wiring to an unscheduled future session. Applies to deterministic routes too (`ai_type: 'deterministic'`).
 
+**Added 2026-07-07 (John's explicit call — documentation writing was a real chunk of a ~90-min session that should take ~10 min): entry length caps, all three files.** "One-line" in step 10 below means an actual short line — 1-2 plain sentences, not a single run-on sentence with a dozen clauses strung together with em-dashes (that technically has no line break but reads as a paragraph). Default to 2-4 sentences for any `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`/`FEATURES-ARCHIVE.md` row and any `CLAUDE-STATE.md` entry: what shipped, why, and the one caveat that matters, if any. Long narrative (root-cause detail, multiple named sub-findings, full verification blow-by-blow) is only worth it when the finding is genuinely novel or surprising enough that a future session would otherwise re-discover it the hard way — that's the exception, not the default. The code's own comments and the kickoff doc already carry implementation detail; don't restate it in the tracking docs.
+
+**Where the detail goes when a row exceeds the cap (added 2026-07-28, `SES-25a`):** `docs/harvests/<ID>.md` — the convention already in use by 9 files and cited by 9 `FEATURES.md` rows. Write the narrative there, leave the row a pointer. This is a **move, never a delete**: append the material to the harvest file and confirm it landed *before* trimming the row. Three rows already carry inline blocks that claim to be duplicates of their harvest file and are only partially so (`LOG-37`: 7 of 20 clauses; the rest exists nowhere else) — assuming a duplicate without diffing it is how open questions get destroyed (`SES-27`). Enforced by `scripts/check-session-docs.js` check 3d.
+
 **Mandatory close-out steps (do not skip):**
-9. Update `docs/FEATURES.md` — mark designed features, add new feature IDs, update session order table
-10. Update `CLAUDE-STATE.md` — set next session, clear resolved blockers
+8c. **Backlog-completeness sweep (added 2026-07-16, `S-CHI-AUDIT-GROUPING-01`'s own item #1 got missed by exactly this gap).** Before touching any file, list every named feature, gap, bug, or idea this session's conversation actually discussed — not just what shipped. This includes anything scoped out, deferred, or explicitly saved for "a future session" during the walkthrough, not only side-findings surfaced mid-research. For each one, confirm it already has a row in `docs/FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md` (any status) — if not, add a `❌ Missing` placeholder row now, before writing the kickoff doc or closing out. The Backlog Capture rule above already says "immediately," not "at close-out" — this step exists because that instruction was being satisfied inconsistently in practice: findings hit during active research got logged reliably (there was a natural checkpoint — "before writing the kickoff doc"), but a large item discussed early in the conversation and then explicitly deferred had no equivalent checkpoint and was missed. Root cause confirmed live: `CHI-03` (Chat/Evidence architectural separation) was discussed at length, explicitly scoped as its own future session, and then never actually written to any feature-inventory file — a follow-up session couldn't find it and had to be told directly before the gap was caught. This sweep is the checkpoint that catches that class of miss; do it as a deliberate list-and-check pass, not from memory of "I'm pretty sure I mentioned that already."
+
+**Claim the IDs for whatever this sweep turns up, in one call per prefix (added 2026-07-28, `SES-18`).** This step is the single biggest producer of multi-row filings in the repo's history, and therefore the single biggest source of hand-counted IDs — you finish the list-and-check pass holding N missing items and need N IDs at once. Count them per prefix first, then claim each prefix's block with the `<N>` form in `.claude/skills/session-setup/SKILL.md` step 3b. Do not claim one and count up.
+9. Update the feature inventory file(s) that own the rows this session touched — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md`, or `docs/FEATURES-LATER.md`, whichever the feature ID actually lives in. Mark designed features, add new feature IDs to the correct now/next/later file (also update the session queue in `CLAUDE-STATE.md`, next step). The old "session order table" at the bottom of `FEATURES.md` was moved to `docs/SESSIONS.md` 2026-07-01.
+10. Update `CLAUDE-STATE.md` — set next session, add this session to "Last 3 sessions" as a **one-line** entry (session, version, commit, one clause on what/why — see the length-cap note above), and write the session's full detail directly to `docs/SESSIONS.md` in that same commit — do not leave the full paragraph sitting in `CLAUDE-STATE.md` for a future close-out to migrate "when it's about to fall off"; that deferred-migration step is what let `CLAUDE-STATE.md` balloon past its 4.6 KB baseline before (found and fixed 2026-07-07, doc-cleanup session). Also clear resolved blockers, and delete your own `.claude/inflight/<short-session-name>.md` file (`.claude/skills/session-setup/SKILL.md` step 5). **This same discipline applies to the "Session Queue" section below "Last 3 sessions":** if this session's item(s) in a Queue track just shipped, collapse them into that track's existing one-line "Done, collapsed" pointer immediately — don't leave a done item sitting there in full-paragraph form for a later pass to notice (found and fixed 2026-07-15, same drift class as the free-text section above, verified item-by-item against `FEATURES.md`/`FEATURES-ARCHIVE.md` before collapsing, not assumed from memory).
 11. If UI work: update `docs/STYLE-GUIDE.md` with any rules locked this session
+11b. **Mandatory, added 2026-07-15:** run the `session-hygiene` skill's checks 1-3 one more time against the files as they'll actually be committed, before the push in the next step — confirms this session's own close-out didn't reintroduce the drift it's supposed to prevent (un-archived Done rows, a 4th "Last 3 sessions" entry, an oversized file). Fix any hit before pushing, not after.
 12. Commit and push `docs/FEATURES.md`, `CLAUDE-STATE.md`, and the kickoff doc to `dev`
-13. End with a clearly bordered code block — the exact Claude Code coding session start prompt:
-    ```
-    Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
-    ```
+13. Show the full bordered code block from the Automated Design→Code→Verify Loop rule above (worktree line + kickoff-read line + the stop-line, not the shorter illustration near the top of this doc) for the record, then immediately use it as the `Agent` tool prompt — proceed straight to Step 5, no pause waiting for John to start a session manually.
 
 ---
 
 ## Step 5 — How to Close a Session
 
-### 5a — Wait for Claude Code to confirm
-Node.js tests pass + `npm run build` succeeds. Do not proceed until both confirmed.
+### 5a — Spawn the coding session and wait for its report
+Per the Automated Design→Code→Verify Loop rule above: spawn via `Agent`, foreground, the full bordered prompt (worktree line + kickoff-read line + stop-line), **with the `model` param set to the kickoff doc's model line (default Opus 5; Sonnet 5 for mechanical tickets) — never omitted. An omitted `model` inherits this design session's model (usually Fable 5) and burns Fable quota on execution work (the 2026-08-01 correction in the Standing Rule above).** Wait for its own report — Node.js tests pass + `npm run build` succeeds, committed and pushed to `dev`, **then stopped** (no QA, no close-out, worktree still present — `SES-020`). If a report claims it already ran QA/closed out/removed the worktree anyway, that's the stop-line not being followed, not a shortcut to accept — verify independently regardless, same as if it had stopped correctly. (If John instead ran a coding session manually and pastes a completion report himself — still valid, same as before — proceed from here identically either way.)
 
-### 5b — Present Manual QA Checklist (mandatory)
-When John pastes the Claude Code completion report, respond with the Manual QA Checklist from Section 10 of the kickoff doc:
-> "Before I close this out — please run these manual checks on the dev URL and report back PASS or FAIL for each item."
+### 5b — Run the Manual QA Checklist directly (no longer a human hand-off)
+Take the Manual QA Checklist from Section 11 of the kickoff doc and verify each item directly — query Supabase, check `git status`/`git log`, hit the dev URL, check Vercel logs. Accept on indirect evidence only where genuinely unreachable, documented explicitly (not silently skipped). For UI/frontend work, use the preview tools to actually exercise the feature — don't skip to indirect evidence when a live check is possible.
 
-⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until John reports QA results.
+**Vercel function logs (added 2026-07-16 — was previously unreachable from this environment, now fixed):** the Vercel CLI is installed globally and John's machine has a persistent `VERCEL_TOKEN` environment variable set (not stored in this repo — see `docs/ENV-VARS.md`'s "Local Claude Code Tooling" section). Pull logs directly: `vercel logs <deployment-url>` (the CLI reads `VERCEL_TOKEN` automatically) or `vercel inspect <deployment-url> --logs` for a specific deployment. If a command reports no auth / can't find the token, don't conclude Vercel access is unavailable — check `echo $VERCEL_TOKEN` (Bash) first: if empty, this session's shell process started before the variable was set (a known Windows `setx`-vs-already-running-process gap) and a fresh session/terminal is needed, not a real access gap. Only fall back to "documented explicitly as unreachable" (the old default) after that check comes back empty.
+
+**Added 2026-07-07 (a backend-only fix took ~90 min end to end this way — John's explicit call to cut this) — scope re-verification to what the coding session didn't already prove:**
+- **Backend/harness-only session (no UI touched):** if the coding session's own Category L live test already exercised the real pipeline end to end, do **one** quick spot-check (a single real scenario), not a full independent re-run of every Manual QA scenario. You are confirming the coding report is honest, not re-deriving its evidence from scratch.
+- **UI/frontend session:** the existing rule stands unchanged — exercise the feature live via the preview tools. **Added 2026-07-15:** the in-app Browser preview tools (screenshot/read_page/computer/navigate) are always available, no setup needed — default to those. `claude-in-chrome` (real Chrome, needed only for logged-in-session or extension-specific testing) is deferred and must be loaded via `ToolSearch` before its first use each session — an unloaded tool erroring is not the same as "no browser access." Confirm the account's Chrome extension is actually disconnected (e.g. via `list_connected_browsers`) before reporting no access, rather than assuming it from a load failure.
+- Either way, do not re-run a scenario multiple times "to be sure" once it passes once — if a transient/already-tracked issue fires (e.g. a known flaky backend call), note it and move on; don't loop retrying it to build extra confidence beyond what's already documented for that known issue.
+
+⛔ Do NOT update FEATURES.md or CLAUDE-STATE.md until this verification is actually done — self-verification is not a rubber stamp, it carries the same weight the John-confirmed gate used to.
 
 ### 5c — Act on QA results
-- **All PASS** → Mark feature IDs ✅ Done in `docs/FEATURES.md`, update `CLAUDE-STATE.md` (bump version, set next session), commit and push both to dev.
+- **All PASS** → Move the feature ID's row from whichever of `docs/FEATURES.md`/`docs/FEATURES-NEXT.md`/`docs/FEATURES-LATER.md` it actually lives in to `docs/FEATURES-ARCHIVE.md` (✅ Done rows do not stay in any of the 3 active files — that's what caused `FEATURES.md` to balloon to 127.8 KB before the 2026-07-01 cleanup, and to 122 KB again before the 2026-07-07 now/next/later split), update `CLAUDE-STATE.md` (bump version, set next session), commit and push all touched files to dev.
+- **All PASS — secondary IDs too (added 2026-07-28, `SES-32`)** → the archive step above covers the primary feature ID; also discharge every *other* backlog ID this kickoff named as settled, folded in, or superseded, each against the gate its kickoff named (Step 4's "Secondary backlog IDs need a closure gate"). A secondary ID whose gate passed gets closed and archived in this same commit; one whose gate failed stays open with the measured reason written onto its row. Never let a secondary ID inherit the primary's ✅ by adjacency, and never let it silently stay open either — say which of the two happened.
 - **Any FAIL** → Full root cause analysis first. Read complete execution path. Compare against NIGP reference. A bug that fails QA once must not fail QA twice. Generate a patch kickoff doc.
-- **New requirement found** → Add to `docs/FEATURES.md` as ❌ Missing. Commit and push.
+- **New requirement found** → Add to the correct now/next/later file as ❌ Missing (see Backlog Capture rule above). Commit and push.
+- **Either way — report the full outcome to John** before ending the session: what shipped, test results, QA results, PASS/FAIL per item.
 
 ---
 
-## Step 6 — Agent Roster (quick ref)
+## Step 6 — Agent Roster
 
-| Code | Name | Role |
-|------|------|------|
-| JR-01 | Chloe Okafor | Junior Procurement Analyst |
-| SR-02 | Mike Alvarez | Senior Procurement Analyst |
-| PR-04 | Bob Whitfield | Professional Analyst / Legal |
-| MK-05 | Christy Park | Marketing Designer |
-| CN-03 | Robyn Castellanos | NIGP Consultant / Strategist |
-| DR-06 | Brent Matthews | Web Agent (Railway + Playwright) |
-| IR-07 | Pat Smiley | Intern Researcher (isIntern:true, no RAG) |
-| PP-01 | Michelle Manning | Project Manager — stub until S-BENCH-01 |
-| TR-08 | Susan Smith | Trainer Agent — stub until S-BENCH-01b |
-| PS-01 | Dan Bingham | AI Prompt Strategist — owns DB Assembly + AI Enrichment. Full persona in S-DAN-01. Quip: "The right prompt doesn't ask for the answer — it makes the answer inevitable." |
-| TBD | Screen Controls Editor | Display agent — maps content to defined UI screen fields (persona + name in S-EDITOR-01) |
-| TBD | HTML Display Editor | Display agent — web HTML formatting and visual hierarchy (persona + name in S-EDITOR-01) |
-| TBD | PDF Assembly Editor | Display agent — professional PDF document layout (persona + name in S-EDITOR-01) |
+Current roster lives in `src/data/agents.js` — read it directly, do not rely on a hardcoded table here. A static roster list in this doc goes stale the moment any agent session ships (this table listed 14 agents when the real count was 20 before removal — including a "stub until S-BENCH-01" note on Michelle Manning after S-BENCH-01 had already shipped). If you need "who exists right now," grep `agents.js` for the `AGENTS` array.
 
 ---
 

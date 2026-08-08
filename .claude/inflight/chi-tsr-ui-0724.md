@@ -1,0 +1,1 @@
+chi-tsr-ui-0724 — worktree `chi-tsr-ui-0724`, branch `session/chi-tsr-ui-0724`. UI updates for "tsr" on the CHI (Channel Intelligence) screen and its drawers — awaiting John's clarification of what "tsr" refers to and the specific changes. Created 2026-07-24 from origin/dev.

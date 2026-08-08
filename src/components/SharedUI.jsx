@@ -1,13 +1,41 @@
-// DeepBench v5.2.3 | SharedUI.jsx | AiBadge built prop for greyed/dashed unbuilt pattern state
+// DeepBench v6.3.200 | SharedUI.jsx | S-CHI-88a -- DecisionFooter gains an opt-in, default-off `compact` variant (one ellipsized prompt line, content-sized secondary + flexed primary side by side, >=30px touch floor) for CHI-88's pinned mobile footer slot; all desktop callers byte-identical
+// DeepBench v6.3.199 | SharedUI.jsx | LOG-107a -- ScrollFadeHint gains an opt-in, default-off `depth` variant (soft navy edge) so the fade reads as depth over a background it would otherwise match
+// DeepBench v6.3.188 | SharedUI.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
+// DeepBench v6.3.143 | SharedUI.jsx | S-CHI-71 (pass 3) -- new shared DecisionFooter: the one standardized CHI user-interaction area (cream field + tan text + navy CTA), modeled on the chat input
+// DeepBench v6.3.141 | SharedUI.jsx | S-CHI-71 (pass 2) -- Evidence-column drawer scroll-to-top + flat interaction footer + navy primary CTAs
+// DeepBench v6.3.137 | SharedUI.jsx | CHI-66 — Drawer wraps its own children in an ErrorBoundary
+// (variant "inline"), so a render error in one drawer's content is contained to that drawer instead
+// of unmounting the screen that owns the conversation state. Card is deliberately NOT wrapped.
+// DeepBench v6.2.24 | SharedUI.jsx | MI-55 — Drawer gains an opt-in `resizable` prop (Agent Routing
+// only): drag-to-resize grip handle, floor locked at the passed maxHeight, ceiling clamped to
+// min(80vh, real content scrollHeight) via the new exported clampDrawerHeight() pure helper. Not
+// persisted — plain component state, resets to the default on every reload. Every other Drawer call
+// site (Agents/Data Sources/Analysis/Agent Reasoning) doesn't pass `resizable` — byte-unaffected.
+// DeepBench v6.2.22 | SharedUI.jsx | MI-53 REVERTED 2026-07-14 — the data-patch-display-intent hop
+// this file's ConfirmationCard change depended on let Michelle's agent-selection route an unconfirmed
+// correction to a write-capable agent (Eleanor Voss/library-write-intent), which executed a real
+// the_library INSERT before any human confirmation -- reverted at John's explicit direction pending
+// a proper fix to delegate_to_agent's target-capability restriction (task_773e8b06). ConfirmationCard
+// is back to its pre-MI-53 generic Object.entries(proposedAction) rendering, unchanged from
+// S-MARKET-INTEL-01d. STYLE-GUIDE.md §16's MI-53 amendment reverted alongside this.
+// DeepBench v6.1.41 | SharedUI.jsx | S-MI-34/MI-34 — Drawer gets an optional maxHeight prop (opt-in,
+// no behavior change for any drawer that doesn't pass it) so a single drawer can cap its height with
+// an internal scroll instead of growing to full natural height
+// DeepBench v6.1.11 | SharedUI.jsx | MI-27 — UserAvatar, generic non-agent "You" attribution avatar
+// DeepBench v6.0.23 | SharedUI.jsx | S-ARCH-VIZ-01 — generic ChartRenderer + CHART_RENDERERS
+// registry (ARCHITECTURE.md §19g), first type bar_pair, capability-agnostic
+// DeepBench v6.0.36 | SharedUI.jsx | MI-17 — generic Drawer component
 // FEATURE: AI-01 — AiBadge component
 // src/components/SharedUI.jsx — v5.0.0
 // DeepBench v5 — Shared Treasury UI components
 // Used across all screens. Import from here, never re-define in screen files.
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { T, display, body, mono, fmtFull, fmtPct, fmt } from "../tokens.js";
 import AIDiamond from "./AIDiamond.jsx";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import { AVATAR_CFG } from "../data/agents.js";
+import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from "recharts";
 
 // ── Corners — brass SVG corner ornaments ─────────────────────────────────────
 export const Corners = ({ color = T.brass }) => (
@@ -17,6 +45,34 @@ export const Corners = ({ color = T.brass }) => (
     <svg width="10" height="10" style={{position:"absolute",bottom:4,left:4,color}} viewBox="0 0 10 10" fill="currentColor"><path d="M0 10h4v-1H1V6H0v4z"/></svg>
     <svg width="10" height="10" style={{position:"absolute",bottom:4,right:4,color}} viewBox="0 0 10 10" fill="currentColor"><path d="M10 10H6v-1h3V6h1v4z"/></svg>
   </>
+);
+
+// ── Shimmer loading primitives ────────────────────────────────────────────────
+// FEATURE: LOG-98 -- shared copy of the CHI-38/CHI-73 shimmer treatment so a second surface (the
+// AI Audit panel) can use it. MarketIntelligenceScreen.jsx still has its own private copy; folding
+// it onto this one is LOG-100 (kept out of scope here only by the 3-file cap). Reuses tokens.js's
+// existing `shimmer` keyframe -- no new keyframe, no new color. Absolutely positioned; the parent
+// must have position:"relative" and overflow:"hidden" so the sweep doesn't bleed past its edges.
+export const ShimmerSweep = () => (
+  <div style={{position:"absolute",inset:0,background:`linear-gradient(90deg,transparent 0%,rgba(182,135,58,0.28) 50%,transparent 100%)`,backgroundSize:"200% 100%",animation:"shimmer 1.2s linear infinite",pointerEvents:"none"}}/>
+);
+
+// FEATURE: LOG-98 -- a placeholder shaped like the audit panel's real rows (PatternRow / By-LLM /
+// By-Agent all share the same bordered box with a title line, a sub-line, and right-side stats) so
+// nothing jumps size when real data lands.
+export const AuditRowSkeleton = () => (
+  <div style={{border:`1px solid ${T.lineSoft}`,marginBottom:6,padding:"9px 12px",position:"relative",overflow:"hidden",display:"flex",alignItems:"center",gap:10}}>
+    <div style={{width:8,height:8,borderRadius:"50%",background:T.lineSoft,flexShrink:0}}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{height:11,width:"46%",background:T.line,marginBottom:5}}/>
+      <div style={{height:9,width:"72%",background:T.line,opacity:0.6}}/>
+    </div>
+    <div style={{display:"flex",gap:12,flexShrink:0}}>
+      <div style={{height:11,width:34,background:T.line,opacity:0.7}}/>
+      <div style={{height:11,width:34,background:T.line,opacity:0.7}}/>
+    </div>
+    <ShimmerSweep/>
+  </div>
 );
 
 // ── Card — standard Treasury card wrapper ─────────────────────────────────────
@@ -40,6 +96,60 @@ export const PctBar = ({ pct, color = T.brass, width = 80 }) => (
     <span style={{color:T.brassDeep,fontSize:11,minWidth:38,fontWeight:600,fontFamily:mono}}>{fmtPct(pct)}</span>
   </div>
 );
+
+// FEATURE: S-ARCH-VIZ-01 — ChartRenderer + CHART_RENDERERS registry (ARCHITECTURE.md §19g)
+// ── ChartRenderer — generic visualization dispatch, ARCHITECTURE.md §19g ────
+// Dispatch by chart_type string only, same shape as the backend HANDLERS
+// registry (request-receivable.js). Never branches on capability identity —
+// any Format Skill's visualization output renders through this, unmodified.
+function BarPairChart({ data }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {(data || []).map((m, i) => {
+        const curNum = Number(m.current);
+        const projNum = Number(m.projected);
+        const cur = Number.isFinite(curNum) ? curNum : 0;
+        const proj = Number.isFinite(projNum) ? projNum : 0;
+        const maxVal = Math.max(cur, proj, 1);
+        const barData = [{ name: "now", value: cur }, { name: "proj", value: proj }];
+        return (
+          <div key={i} style={{display:"flex",flexDirection:"column",gap:4,padding:"6px 0",borderBottom:`1px solid ${T.lineSoft}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontFamily:body,fontSize:11.5,color:T.ink}}>
+              <span>{m.metric}</span>
+              <span style={{color:T.muted}}>{m.current} <span style={{color:T.brassDeep}}>→</span> {m.projected} {m.unit || ""}</span>
+            </div>
+            <ResponsiveContainer width="100%" height={46}>
+              <BarChart data={barData} layout="vertical" margin={{left:0,right:0,top:0,bottom:0}}>
+                <XAxis type="number" domain={[0, maxVal]} hide/>
+                <YAxis type="category" dataKey="name" width={30} tick={{fill:T.muted,fontSize:9,fontFamily:mono}} axisLine={false} tickLine={false}/>
+                <Bar dataKey="value" radius={[0,2,2,0]} barSize={9}>
+                  <Cell fill={T.mutedDeep}/>
+                  <Cell fill={T.brass}/>
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Registered chart_type -> renderer. Adding a type: register a renderer here +
+// extend the enum in whichever skill's schema opts in. Never edit ChartRenderer
+// itself, never add a capability/screen conditional here or at any call site.
+export const CHART_RENDERERS = { bar_pair: BarPairChart };
+
+export const ChartRenderer = ({ type, data, caption }) => {
+  const Renderer = CHART_RENDERERS[type];
+  if (!Renderer) return null;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {caption && <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{caption}</div>}
+      <Renderer data={data}/>
+    </div>
+  );
+};
 
 // ── SkillBar — agent skill level bar ─────────────────────────────────────────
 export const SkillBar = ({ skill, color = T.brass, size = 6 }) => (
@@ -188,6 +298,27 @@ export function AgentAvatar({ who, size = 68, ring = true }) {
   );
 }
 
+// FEATURE: MI-27 -- generic "You" attribution avatar for human-authored chat content (the
+// Submitted Hypothesis card). Deliberately separate from AgentAvatar: STYLE-GUIDE.md Section 17's
+// avatar-mandatory rule is scoped to *agent* attribution specifically -- the human submitter has
+// no agent identity to represent, so this is a plain silhouette, never an illustrated agent
+// portrait or an AVATAR_CFG/roster entry. Approved by John via live HTML mock, Option A (a plain
+// navy circle + simple figure, distinguishable at a glance from every illustrated agent avatar).
+export function UserAvatar({ size = 16 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", background: T.navy,
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      border: `1.5px solid ${T.brassLight}`,
+    }}>
+      <svg viewBox="0 0 24 24" fill="none" width={size * 0.55} height={size * 0.55}>
+        <circle cx="12" cy="8" r="4" fill={T.brassLight} />
+        <path d="M4 20c0-4.5 3.6-7 8-7s8 2.5 8 7" stroke={T.brassLight} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
 // FEATURE: AI-28
 // ── FlagCard — collapsible procurement flag card ──────────────────────────────
 export const FlagCard = ({ severity, title, summary, detail, amount, count, recommendation, totalSpend }) => {
@@ -226,6 +357,282 @@ export const FlagCard = ({ severity, title, summary, detail, amount, count, reco
     </div>
   );
 };
+
+// FEATURE: MI-55 — pure, testable clamp helper for Drawer's drag-resize. Extracted out of render/
+// drag-handler logic specifically so it can be unit-tested without a real DOM (matches the existing
+// groupDataSources()/buildActivitySummary() pattern). Floor is always the drawer's own default
+// maxHeight (never shrinkable below it); ceiling is min(real content height, 80% of viewport) — never
+// empty padding space, never past 80vh.
+export function clampDrawerHeight(candidateHeight, floorHeight, contentHeight, viewportHeight) {
+  const ceiling = Math.min(contentHeight, viewportHeight * 0.8);
+  return Math.max(floorHeight, Math.min(candidateHeight, ceiling));
+}
+
+// FEATURE: MI-17 — generic collapsible drawer, same toggle interaction FlagCard already uses.
+// First Column 3 (Audit) drawer with real open/close state — Pipeline Log stays a static
+// always-expanded box, unchanged, out of scope this session. Reusable by any future Column 3
+// item (MI-06/07/09/15/16/18) — never rebuild this per-drawer.
+// FEATURE: MI-55 — new opt-in `resizable` prop (default false, backward-compatible — every existing
+// call site that doesn't pass it is byte-unaffected). When true and open, renders a drag handle at
+// the bottom of the content wrapper that lets the user grow the drawer past its default maxHeight,
+// clamped via clampDrawerHeight() above. Not persisted — dragHeight is plain component state, resets
+// to null (→ default maxHeight) on every remount/reload.
+// FEATURE: CHI-43 — new opt-in controlled `open`/`onToggle` props (STYLE-GUIDE.md §29 amendment).
+// Backward-compatible: no existing call site passes `open`, so `controlledOpen` is undefined for all
+// of them and `open` falls back to the same internal state as before, byte-identical behavior.
+// FEATURE: CHI-45 — headerRight adds an optional, always-visible (open or collapsed) slot in the
+// header row, next to the chevron, for content like HopBadge that should read as metadata on the
+// drawer itself rather than as part of the (collapsible) body content. See STYLE-GUIDE.md §29.
+// FEATURE: CHI-66 — the boundary around {children} below is per-drawer deliberately, not per-screen.
+// A boundary unmounts everything beneath it, so one placed at the app root or around the screen would
+// still take MarketIntelligenceScreen down and destroy its unpersisted `messages` state — the whole
+// conversation. Sitting inside Drawer, a crash in one drawer's content is contained to that drawer:
+// the screen, the chat column and every prior turn stay mounted. The boundary goes inside the content
+// <div ref={contentRef}> so the padding, gap, maxHeight/overflowY and resize handle stay outside it
+// and a crashed drawer keeps its normal frame and header.
+// FEATURE: CHI-71 -- optional `scrollKey` rendered as data-drawer-key so useDrawerStack can locate
+// the newly-active drawer and bring its TOP into view (was: scroll the whole column to its bottom).
+export const Drawer = ({ title, count, children, defaultOpen = false, maxHeight, resizable = false, onOpen = undefined, open: controlledOpen = undefined, onToggle = undefined, headerRight = undefined, scrollKey = undefined }) => {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const [dragHeight, setDragHeight] = useState(null);
+  const contentRef = useRef(null);
+
+  // FEATURE: MI-72b — fires onOpen exactly on the closed->open transition (not on every toggle,
+  // not on open->closed). Used by the Agents drawer to bump a refreshKey and re-fetch fresh data
+  // each time it's opened, rather than only once at page load.
+  const toggle = () => {
+    const willOpen = !open;
+    if (willOpen && onOpen) onOpen();
+    if (isControlled) { if (onToggle) onToggle(willOpen); }
+    else { setInternalOpen(willOpen); }
+  };
+
+  const effectiveHeight = dragHeight == null
+    ? maxHeight
+    : clampDrawerHeight(dragHeight, maxHeight, contentRef.current?.scrollHeight ?? maxHeight, window.innerHeight);
+
+  const handleDragStart = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = effectiveHeight;
+    const onMouseMove = (moveEvent) => {
+      setDragHeight(startHeight + (moveEvent.clientY - startY));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  return (
+    <div data-drawer-key={scrollKey} style={{background:T.cardAlt,border:`1px solid ${T.lineSoft}`}}>
+      <div onClick={toggle}
+        style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer"}}>
+        <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.muted}}>{title}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {count!=null && (
+            <span style={{fontFamily:mono,fontSize:9,color:T.muted,background:T.paperDeep,padding:"2px 7px",borderRadius:10,border:`1px solid ${T.lineSoft}`}}>{count}</span>
+          )}
+          {headerRight}
+          <span style={{fontFamily:mono,fontSize:10,color:T.brassDeep}}>{open?"▲":"▼"}</span>
+        </div>
+      </div>
+      {open && (
+        <>
+          <div ref={contentRef}
+            style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:10, ...(maxHeight ? {maxHeight:effectiveHeight, overflowY:"auto"} : {})}}>
+            <ErrorBoundary variant="inline">{children}</ErrorBoundary>
+          </div>
+          {resizable && (
+            <div
+              onMouseDown={handleDragStart}
+              style={{height:6,width:"100%",cursor:"ns-resize",background:"transparent"}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background = T.brass;}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent";}}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// FEATURE: CHI-71 -- the single standardized Channel-Intelligence user-interaction area, modeled on the
+// chat input row: a cream field wrapper, a tan prompt, a light "field-style" secondary option on the
+// left, and one navy CTA on the right. Every Column-2 interaction footer renders through this so they
+// can't drift apart again.
+// FEATURE: CHI-88a — opt-in `compact` variant, default false (every desktop caller renders
+// byte-identically). CHI-88 pinned this footer on mobile, where it then took 126px of a 200px steps
+// wrapper — measured live — leaving the answer a 39px reading window. The height was mostly the
+// secondary button: at flex:1 with a 13px font, "Good, thanks" wrapped to 52px. Compact keeps every
+// element (the prompt is never dropped, just clamped to one ellipsized line) and instead sizes the
+// secondary to its content, gives the primary the remaining width, and trims padding/type. minHeight
+// 30 holds both buttons at the touch floor Clear already set (MOB-001).
+export const DecisionFooter = ({ prompt, secondaryLabel, onSecondary, primaryLabel, onPrimary, compact = false }) => (
+  <div style={{background:T.card,border:`1px solid ${T.line}`,padding:compact?"8px 12px":"14px 16px"}}>
+    {prompt && <div style={compact
+      ? {fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.4,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
+      : {fontFamily:body,fontSize:12,color:T.mutedDeep,lineHeight:1.4,marginBottom:10}}>{prompt}</div>}
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={onSecondary} style={compact
+        ? {flex:"0 0 auto",textAlign:"left",padding:"7px 10px",minHeight:30,border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}
+        : {flex:1,textAlign:"left",padding:"9px 12px",border:`1px solid ${T.lineSoft}`,background:T.card,color:T.muted,fontFamily:body,fontSize:13,cursor:"pointer"}}>{secondaryLabel}</button>
+      <button onClick={onPrimary} style={compact
+        ? {flex:1,minWidth:0,textAlign:"center",padding:"7px 10px",minHeight:30,background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:12,cursor:"pointer",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
+        : {padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>{primaryLabel}</button>
+    </div>
+  </div>
+);
+
+// FEATURE: CHI-29 — shared scroll-fade-hint mechanism, extracted from MI-50's mobile-only inline
+// copy (Agent Routing feed) so a second call site (Evidence & Interaction's analysis scroll box)
+// doesn't reimplement the same ref/state/scroll-math by hand. Bottom-edge fade gradient + bouncing
+// chevron, shown only when there's real unscrolled content below — same 4px threshold MI-50 used.
+// Caller supplies its own ref to the scrolling element; the returned onScroll goes on that same
+// element; ScrollFadeHint renders as an absolutely-positioned sibling inside a position:"relative"
+// ancestor whose bounds match the visible scroll viewport.
+// FEATURE: CHI-29 — second patch (S-CHI-26c): the original deps-only recheck was accidentally
+// coupled to how often the CALLER's deps array changes, not to the scrolling content's real size.
+// Works for the mobile Agent Routing feed (deps=[ordered.length] churns constantly as hops arrive)
+// but silently never recovers for a single atomic content change (Column 2's deps=[qaEvidence,
+// hypFlow], set once when an answer arrives) if the browser's layout isn't fully settled at that
+// exact instant (e.g. a webfont swap reflowing prose/table text after first paint). Fixed by making
+// the hook observe the scrolling element's actual content for changes, instead of trusting the
+// caller's deps array alone: a MutationObserver on the scroll container (catches new/changed DOM
+// content, e.g. QaEvidenceCard mounting) plus a document.fonts.ready hook (catches webfont-driven
+// reflow specifically) both re-run the same check(). deps is kept only to re-attach the observer
+// when the scrollRef's target element itself is swapped out (rare, but matches the original
+// contract) -- it is no longer the only thing that can trigger a recheck.
+export function useScrollFadeHint(scrollRef, deps) {
+  const [canScrollMore, setCanScrollMore] = useState(false);
+  const check = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    document.fonts?.ready?.then(check);
+    return () => mo.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return { canScrollMore, onScroll: check };
+}
+
+// FEATURE: LOG-107a -- `depth` variant. The default gradient fades to the caller's own background
+// colour, which is invisible wherever that background is what sits behind it -- fine on CHI (dense
+// prose is always dissolving under the edge) but a no-op on the AI Audit panel, whose bordered rows
+// leave blank T.card in the last 26px (John: "i don't see the gradient"; measured: gradient fades to
+// rgb(248,242,226) on a rgb(248,242,226) panel). `depth` instead darkens the edge with a soft navy,
+// so it reads as "content continues under here" regardless of what is behind it. Opt-in and
+// default-off: MarketIntelligenceScreen keeps its existing look untouched.
+export const ScrollFadeHint = ({ show, bg, depth = false, height = undefined }) => !show ? null : (
+  <div style={{
+    position:"absolute",left:0,right:0,bottom:0,
+    height: height ?? (depth ? 48 : 26),
+    background: depth
+      ? `linear-gradient(to bottom, ${T.navy}00, ${T.navy}1a)`
+      : `linear-gradient(to bottom, transparent, ${bg} 70%)`,
+    display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,pointerEvents:"none"}}>
+    <span style={{fontFamily:mono,fontSize:10,color:T.brass,animation:"dbounce 1.4s ease-in-out infinite"}}>⌄</span>
+  </div>
+);
+
+// FEATURE: MI-01d — generic pending_confirmation UI. Any capability whose Skill Profile sets
+// requires_human_confirmation: true surfaces here, unmodified per-capability — proposedAction/
+// critique are rendered generically from whatever fields that capability's own schema returned,
+// never a bespoke layout per agent. First frontend implementation of this gate anywhere on the
+// platform (confirmed by grep this design session: zero prior pending_confirmation/confirmation_id
+// UI exists) — lives here, not in a screen file, so it is reusable platform-wide going forward.
+// FEATURE: CHI-50 — split from the old monolithic ConfirmationCard: Content (agent header,
+// proposed fields, critique — read-only) and Actions (Reject/Edit/Accept, edit textarea — the
+// actual decision control) render in different places on the Channel Intelligence screen (a
+// drawer vs. the pinned footer). The "Needs Your Decision" badge that used to sit inline here
+// moved to the caller's Drawer headerRight (see MarketIntelligenceScreen.jsx) — visible whether
+// collapsed or open, same treatment CHI-45 gave the hop-range badge.
+export function ConfirmationCardContent({ agent, proposedAction, critique }) {
+  return (
+    <div style={{background:T.card,border:`1px solid ${T.brassLight}`,borderLeft:`4px solid ${T.brass}`,borderRadius:3}}>
+      <div style={{background:"#f6ecd8",padding:"7px 12px",display:"flex",alignItems:"center",gap:8}}>
+        {agent && <AgentAvatar who={agent.id} size={20}/>}
+        <span style={{fontFamily:body,fontSize:11.5,fontWeight:600,color:T.ink}}>{agent ? agent.name : "Agent"}</span>
+        <span style={{fontFamily:mono,fontSize:9,color:T.muted}}>{agent ? agent.role : ""}</span>
+      </div>
+      <div style={{padding:"11px 13px",display:"flex",flexDirection:"column",gap:8}}>
+        {Object.entries(proposedAction || {}).filter(([, v]) => v !== null && v !== "").map(([k, v]) => (
+          <div key={k} style={{fontFamily:body,fontSize:12,lineHeight:1.5,color:T.ink}}>
+            <span style={{fontFamily:mono,fontSize:9.5,color:T.muted,textTransform:"uppercase",letterSpacing:"0.04em",marginRight:6}}>{k.replace(/_/g," ")}:</span>
+            {typeof v === "object" ? JSON.stringify(v) : String(v)}
+          </div>
+        ))}
+        {critique && (
+          <div style={{padding:"8px 10px",background:T.cardAlt,border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11.5,color:T.mutedDeep}}>
+            {typeof critique === "object" ? JSON.stringify(critique) : critique}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// FEATURE: CHI-50 — the decision-control half of the old ConfirmationCard, unchanged internals
+// (editing/editText/busy state, resolve()), just no longer sharing a component with the
+// read-only content above.
+export function ConfirmationCardActions({ onResolve }) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const resolve = async (resolution, editedText = null) => {
+    setBusy(true);
+    try {
+      await onResolve(resolution, editedText);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return editing ? (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <textarea rows={2} value={editText} onChange={e=>setEditText(e.target.value)}
+        placeholder="Rewrite the correction…"
+        style={{padding:"9px 11px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:12,background:T.card,color:T.ink,resize:"vertical"}}/>
+      <div style={{display:"flex",gap:6}}>
+        <button disabled={busy||!editText.trim()} onClick={()=>resolve("edit", editText.trim())}
+          style={{flex:1,padding:"7px 6px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11,cursor:busy?"default":"pointer"}}>
+          Resubmit
+        </button>
+        <button disabled={busy} onClick={()=>setEditing(false)}
+          style={{flex:1,padding:"7px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div style={{display:"flex",gap:6}}>
+      <button disabled={busy} onClick={()=>resolve("reject")}
+        style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.line}`,fontFamily:body,fontSize:11,color:T.ink,cursor:busy?"default":"pointer"}}>
+        Reject
+      </button>
+      <button disabled={busy} onClick={()=>setEditing(true)}
+        style={{flex:1,padding:"8px 6px",background:"transparent",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:11,color:T.muted,cursor:busy?"default":"pointer"}}>
+        Edit
+      </button>
+      <button disabled={busy} onClick={()=>resolve("accept")}
+        style={{flex:1,padding:"8px 6px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:11,fontWeight:600,cursor:busy?"default":"pointer"}}>
+        Accept
+      </button>
+    </div>
+  );
+}
 
 // ── Recharts shared components ────────────────────────────────────────────────
 export const PctBarLabel = ({ x, y, width, height, value, total }) => {

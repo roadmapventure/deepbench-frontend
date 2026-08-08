@@ -1,30 +1,29 @@
+// DeepBench v6.2.11 | WelcomeSplash.jsx | S-SPLASH-03 — mobile no-scroll: panelMobile.overflowY
+// locked to "hidden", full mobile-specific typography/spacing scale added for hero body content.
+// Zero copy changed, panel size/interactions unchanged. FEATURE: SH-22 — see STYLE-GUIDE.md §23
+// DeepBench v6.2.0 | WelcomeSplash.jsx | S-MOBILE-NAV-01 — rename (MI-46): capability strip
+// "Market Intelligence" → "Channel Sales Intelligence", display-text only, see STYLE-GUIDE.md §25.
+// DeepBench v6.1.46 | WelcomeSplash.jsx | S-MI-45 — mobile sizing: panel branches on useIsMobile()
+// to a 75vw × 75vh panelMobile (vs. desktop's 80vw/max960/88vh), same overlay/dismiss mechanic and
+// copy, zero behavior change. FEATURE: MI-45 — see STYLE-GUIDE.md §23
 // DeepBench v5.2.41 | WelcomeSplash.jsx | S-SPLASH-01 welcome splash modal
 // FEATURE: SH-14 — Welcome splash modal
+// DeepBench v6.1.12 | WelcomeSplash.jsx | S-SPLASH-02/SH-18 — stat counters replaced with static capability strip
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { T, display, mono } from "../tokens.js";
+import { useIsMobile } from "../hooks/useIsMobile.js"; // FEATURE: MI-45
 
 const STORAGE_KEY = "db_splash_dismissed";
 
 export default function WelcomeSplash() {
   const [visible, setVisible] = useState(false);
-  const countersRan = useRef(false);
+  const isMobile = useIsMobile(); // FEATURE: MI-45
 
   useEffect(() => {
     if (sessionStorage.getItem(STORAGE_KEY)) return;
     setVisible(true);
   }, []);
-
-  useEffect(() => {
-    if (!visible || countersRan.current) return;
-    countersRan.current = true;
-    const timer = setTimeout(() => {
-      animateCounter("splash-tasks-active", 6, 800);
-      animateCounter("splash-agents-active", 4, 600);
-      animateCounter("splash-tasks-done", 41, 1400);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [visible]);
 
   function dismiss() {
     sessionStorage.setItem(STORAGE_KEY, "1");
@@ -33,28 +32,40 @@ export default function WelcomeSplash() {
 
   if (!visible) return null;
 
+  // FEATURE: SH-22 — mobile uses a fully separate, smaller style scale so the whole
+  // panel fits within the fixed 75vh with zero scroll; panel size/behavior unchanged.
+  const s = isMobile ? {
+    panel: panelMobile, header: splashHeaderMobile, logoMark: logoMarkMobile, logoName: logoNameMobile,
+    body: heroBodyMobile, eyebrow: eyebrowMobile, eyebrowLine: eyebrowLineMobile, headline: headlineMobile,
+    subhead: subheadMobile, cta: ctaBtnMobile, pulse: pulseStripMobile, pulseLabel: pulseLabelMobile,
+    capItem: capabilityItemMobile, divider: dividerMobile, close: closeBtnMobile,
+  } : {
+    panel, header: splashHeader, logoMark, logoName, body: heroBody, eyebrow, eyebrowLine, headline,
+    subhead, cta: ctaBtn, pulse: pulseStrip, pulseLabel, capItem: capabilityItem, divider, close: closeBtn,
+  };
+
   return (
     <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
-      <div style={panel}>
+      <div style={s.panel}>
         {/* FEATURE: SH-14 — close button */}
-        <button style={closeBtn} onClick={dismiss} aria-label="Close">×</button>
+        <button style={s.close} onClick={dismiss} aria-label="Close">×</button>
 
         {/* Header */}
-        <div style={splashHeader}>
+        <div style={s.header}>
           <div style={logoWrap}>
-            <div style={logoMark}>DB</div>
-            <span style={logoName}>DeepBench</span>
+            <div style={s.logoMark}>DB</div>
+            <span style={s.logoName}>DeepBench</span>
           </div>
         </div>
 
         {/* Hero body */}
-        <div style={heroBody}>
-          <div style={eyebrow}>
-            <span style={eyebrowLine} />
+        <div style={s.body}>
+          <div style={s.eyebrow}>
+            <span style={s.eyebrowLine} />
             AI Consulting Management Platform
           </div>
 
-          <h1 style={headline}>
+          <h1 style={s.headline}>
             Your consulting practice,<br />
             running at{" "}
             <em style={{ fontStyle: "italic", color: T.brass }}>full capacity</em>
@@ -62,65 +73,34 @@ export default function WelcomeSplash() {
             around the clock.
           </h1>
 
-          <p style={subhead}>
+          <p style={s.subhead}>
             DeepBench gives your practice an AI workforce — agents that carry your methodology,
             work your pipeline, and deliver client-ready analysis while you focus on the work
             only you can do.
           </p>
 
-          <button style={ctaBtn} onClick={dismiss}>
-            Start or see your Consulting Management practice in action
+          <button style={s.cta} onClick={dismiss}>
+            See your Consulting Management practice in action
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ marginLeft: 8, flexShrink: 0 }}>
               <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
 
           {/* Pulse strip */}
-          <div style={pulseStrip}>
-            <div style={pulseLabel}>
-              <div style={pulseDot} />
-              Practice live
-            </div>
-            <StatBlock id="splash-tasks-active" desc="tasks in progress" />
-            <div style={divider} />
-            <StatBlock id="splash-agents-active" desc="agents working" />
-            <div style={divider} />
-            <StatBlock id="splash-tasks-done" desc="deliverables completed" />
-            <div style={divider} />
-            <div style={statBlock}>
-              <span style={statNumber}>$372M</span>
-              <span style={statDesc}>in spend analyzed</span>
+          <div style={s.pulse}>
+            <div style={s.pulseLabel}>Automate</div>
+            <div style={capabilityRow}>
+              <span style={s.capItem}>Channel Sales Intelligence</span>
+              <div style={s.divider} />
+              <span style={s.capItem}>Data Analysis</span>
+              <div style={s.divider} />
+              <span style={s.capItem}>Project Management</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-function StatBlock({ id, desc }) {
-  return (
-    <div style={statBlock}>
-      <span id={id} style={statNumber}>0</span>
-      <span style={statDesc}>{desc}</span>
-    </div>
-  );
-}
-
-function animateCounter(id, target, duration) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  let start = 0;
-  const step = target / (duration / 16);
-  const timer = setInterval(() => {
-    start += step;
-    if (start >= target) {
-      el.textContent = target;
-      clearInterval(timer);
-    } else {
-      el.textContent = Math.round(start);
-    }
-  }, 16);
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -146,6 +126,19 @@ const panel = {
   border: `1.5px solid ${T.brass}`,
   borderRadius: 6,
   boxShadow: "0 24px 64px rgba(18,36,60,0.38)",
+};
+
+// FEATURE: MI-45 — mobile panel sizing (STYLE-GUIDE.md §23): 75vw × 75vh, no maxWidth cap
+// (unnecessary at mobile widths — 75vw of a phone viewport is always well under 960px).
+// FEATURE: SH-22 — overflowY locked to "hidden" (overrides the inherited "auto" from ...panel);
+// structural no-scroll guarantee, not just a sizing target. See STYLE-GUIDE.md §23 amendment.
+const panelMobile = {
+  ...panel,
+  width: "75vw",
+  maxWidth: "none",
+  height: "75vh",
+  maxHeight: "75vh",
+  overflowY: "hidden",
 };
 
 const closeBtn = {
@@ -280,34 +273,19 @@ const pulseLabel = {
   gap: 6,
 };
 
-const pulseDot = {
-  width: 6,
-  height: 6,
-  background: T.moss,
-  borderRadius: "50%",
-};
-
-const statBlock = {
+const capabilityRow = {
   display: "flex",
-  alignItems: "baseline",
-  gap: 6,
+  alignItems: "center",
+  gap: 20,
+  flexWrap: "wrap",
 };
 
-const statNumber = {
+const capabilityItem = {
   fontFamily: display,
-  fontSize: 26,
+  fontSize: 16,
   fontWeight: 500,
   color: T.navy,
-  letterSpacing: "-0.5px",
-  minWidth: 44,
-  display: "inline-block",
-};
-
-const statDesc = {
-  fontFamily: "'Inter', sans-serif",
-  fontSize: 12,
-  fontWeight: 400,
-  color: T.muted,
+  letterSpacing: "-0.2px",
 };
 
 const divider = {
@@ -315,3 +293,22 @@ const divider = {
   height: 24,
   background: T.line,
 };
+
+// FEATURE: SH-22 — mobile-only typography/spacing scale (STYLE-GUIDE.md §23 amendment).
+// Roughly 40-60% of each desktop style's padding/font-size/margin values so the full hero
+// body fits within panelMobile's fixed 75vh with zero internal scroll. Zero copy changed —
+// style values only. Desktop objects above are untouched.
+const splashHeaderMobile   = { ...splashHeader, padding: "10px 14px" };
+const logoMarkMobile       = { ...logoMark, width: 22, height: 22, fontSize: 10 };
+const logoNameMobile       = { ...logoName, fontSize: 13 };
+const heroBodyMobile       = { padding: "18px 20px 20px" };
+const eyebrowMobile        = { ...eyebrow, fontSize: 8.5, marginBottom: 10, gap: 6 };
+const eyebrowLineMobile    = { ...eyebrowLine, width: 14 };
+const headlineMobile       = { ...headline, fontSize: "clamp(20px, 6vw, 26px)", lineHeight: 1.15, letterSpacing: "-0.3px", marginBottom: 10 };
+const subheadMobile        = { ...subhead, fontSize: 11.5, lineHeight: 1.5, maxWidth: "100%", marginBottom: 14 };
+const ctaBtnMobile         = { ...ctaBtn, fontSize: 12, padding: "10px 16px", marginBottom: 14 };
+const pulseStripMobile     = { ...pulseStrip, paddingTop: 10, gap: 14 };
+const pulseLabelMobile     = { ...pulseLabel, fontSize: 8 };
+const capabilityItemMobile = { ...capabilityItem, fontSize: 10.5 };
+const dividerMobile        = { ...divider, height: 16 };
+const closeBtnMobile       = { ...closeBtn, top: 8, right: 10, fontSize: 18, padding: "2px 6px" };

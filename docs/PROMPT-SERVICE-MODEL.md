@@ -170,6 +170,7 @@ use different LLMs and different budgets.
 | `llm_model` | `skill_profiles.llm_model` | 'claude-haiku-4-5' · 'claude-sonnet-4-6' · etc. |
 | `max_tokens` | `skill_profiles.max_tokens` | Token budget ceiling for this Skill's LLM call |
 | `api_key_source` | `skill_profiles.api_key_source` | 'platform' · 'byok' |
+| `temperature` | `skill_profiles.temperature` | Optional, `null` by default (Anthropic's own default applies, omitted from the call body entirely when unset). Added `AA-154`/`S-ARCH-TEMPERATURE-01` (v6.1.26) — set explicitly (e.g. `0`) on structured/analytical calls where sampling diversity is undesirable, same opt-in pattern as `llm_model`/`max_tokens`. |
 
 **DeepBench default** (when no Skill Profile specifies an LLM):
 - Provider: Anthropic
@@ -262,7 +263,6 @@ instruction (`fetch_instruction` field populated). Never both. Never neither.
         "method": "reflect",
         "model": "claude-haiku-4-5-20251001",
         "max_tokens": 1024,
-        "inserts_after": "knowledge",
         "declared_by": "planning-behavior"
       },
       "required": false,
@@ -358,7 +358,6 @@ Within each type, `capability_skill_profiles.display_order` determines ordering.
   "method": "reflect",
   "model": "claude-haiku-4-5-20251001",
   "max_tokens": 1024,
-  "inserts_after": "knowledge",
   "declared_by": "<skill_profile_slug>"
 }
 ```
@@ -497,9 +496,10 @@ as the agent persona — not a separate DB lookup. If no identity section exists
 runs on task_context only, producing a thin generic plan. No failure, no user notification.
 This degradation is expected and acceptable.
 
-**`inserts_after` fallback:** If the section named in `inserts_after` was omitted (e.g. RAG
-returned nothing and knowledge section was dropped), insert REFLECT output at the end of
-all currently rendered sections. Future: smarter positioning logic.
+**Placement (updated v7.0.16, `S-HAR-02b`):** the `inserts_after` field was removed — REFLECT
+placement is order-driven (the reflect section carries its own `order`, 12, rendering after the
+stable run and before RAG at 13, per `HAR-02`'s stable-first layout). Fallback: if no rendered
+section has a higher order, the REFLECT output appends at the end.
 
 After REFLECT, the rendered prompt is updated with the execution plan section inserted
 at the correct position.
@@ -763,6 +763,7 @@ tools:       [format_contract.schema as tool def]
 tool_choice: { type: "any" }   ← only when output_type is json/dashboard
 max_tokens:  builder_output.llm.max_tokens
 model:       builder_output.llm.model
+temperature: builder_output.llm.temperature   ← omitted entirely when unset (Anthropic default applies)
 stream:      resolved streaming flag (after auto-override)
 ```
 

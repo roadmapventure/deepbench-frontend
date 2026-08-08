@@ -1,4 +1,6 @@
-// DeepBench v5.1.2 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage
+// DeepBench v7.0.51 | AnalyzerScreen.jsx | SPA-1 -- Spend Analysis lands on data-source chooser (desktop demo auto-load removed)
+// DeepBench v6.3.138 | AnalyzerScreen.jsx | S-SH-23 -- focus-area release-status labels
+// DeepBench v6.2.10 | AnalyzerScreen.jsx | Analyzer + CSV auto-load from Storage | AZ-21 title rename
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -6,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Treemap, Legend, LineChart, Line, ReferenceLine, LabelList,
 } from "recharts";
-import { T, display, body, mono, PALETTE, fmtFull, fmtPct, fmt, shortLabel, parseAmt, toTC } from "../tokens.js";
+import { T, display, body, mono, PALETTE, fmtFull, fmtPct, fmt, shortLabel, parseAmt, toTC, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID, FETCH_API_BASE } from "../config.js";
 import { supabase } from "../lib/supabase.js";
 import { AppShell } from "../AppShell.jsx";
@@ -17,6 +19,7 @@ import {
 import { useAnalyzer, FIELD_DEFS } from "../contexts/AnalyzerContext.jsx";
 import { useFetch } from "../contexts/FetchContext.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 import AIReviewTab      from "./analyzer/AIReviewTab.jsx";
 import VendorDiversityTab from "./analyzer/VendorDiversityTab.jsx";
 import LocalSpendTab    from "./analyzer/LocalSpendTab.jsx";
@@ -45,7 +48,7 @@ const NAV_GROUPS = [
 ];
 
 // FEATURE: AZ-01 — CSV upload + PapaParse
-// FEATURE: AZ-18 — Austin demo pre-load
+// FEATURE: AZ-18 — Austin demo pre-load (mobile only since SPA-1; desktop lands on chooser)
 // FEATURE: SH-07 — Auto-load CSV from Storage on return visit
 // ── Data source landing screen ──────────────────────────────────────────────
 function DataSourceScreen({ taskId }) {
@@ -60,19 +63,10 @@ function DataSourceScreen({ taskId }) {
     if (!taskId) { console.log("No taskId, skipping"); return; }
     console.log("Starting auto-load for taskId:", taskId);
     setAutoLoaded(true);
-    if (taskId === "1") {
-      console.log("Demo task detected, loading Austin CSV");
-      (async () => {
-        try {
-          const res = await fetch("/Austin_2025Data_.csv");
-          if (!res.ok) throw new Error("Could not load demo file");
-          const blob = await res.blob();
-          // autoAnalyze=true: full parse, skip mapping screen, go direct to dashboard
-          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }), null, true);
-        } catch (e) { setError("Demo failed: " + e.message); }
-      })();
-      return;
-    }
+    // FEATURE: SPA-1 — demo task lands on the data-source chooser; no auto-load.
+    // tasks row id=1 HAS a csv_path in Supabase, so falling through to the
+    // SH-07 Storage path below would auto-load anyway — the early return is load-bearing.
+    if (taskId === "1") return;
     setStorageLoading(true);
     (async () => {
       try {
@@ -121,7 +115,8 @@ function DataSourceScreen({ taskId }) {
     <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 80px",position:"relative"}}>
       <FeatureBadge id="SH-07" />
       <div style={{fontFamily:mono,fontSize:10,letterSpacing:3,textTransform:"uppercase",color:T.brass,marginBottom:10}}>Roadmap Venture · Procurement Intelligence</div>
-      <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Government Spend Analyzer</div>
+      {/* FEATURE: SH-23 */}
+      <div style={{fontFamily:display,fontSize:32,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Spend Analyzer{FOCUS_AREA_STATUS.spendAnalysis && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.spendAnalysis})</span>}</div>
       <p style={{fontSize:13.5,color:T.muted,lineHeight:1.65,maxWidth:580,marginBottom:28}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>
 
       {/* Workflow strip */}
@@ -177,28 +172,161 @@ function DataSourceScreen({ taskId }) {
   );
 }
 
+// FEATURE: AZ-19 — Mobile combined landing + dashboard (Page 1); closes SH-20 (Analyzer instance)
+// ── Mobile Analyzer home: combined landing + dashboard ──────────────────────
+function MobileAnalyzerHome({ taskId }) {
+  const {
+    autoLoaded, setAutoLoaded, processFile, setError, error,
+    data, fileName, stage, setStage, setActiveTab, highFlags,
+  } = useAnalyzer();
+  const hiddenRef = useRef();
+
+  // Ported from DataSourceScreen's mount effect (AZ-18) — DataSourceScreen doesn't
+  // mount on mobile, so this session needs its own copy of the auto-load logic.
+  useEffect(() => {
+    if (autoLoaded) return;
+    if (!taskId) return;
+    setAutoLoaded(true);
+    if (taskId === "1") {
+      (async () => {
+        try {
+          const res = await fetch("/Austin_2025Data_.csv");
+          if (!res.ok) throw new Error("Could not load demo file");
+          const blob = await res.blob();
+          processFile(new File([blob], "Austin_2025Data_.csv", { type: "text/csv" }), null, true);
+        } catch (e) { setError("Demo failed: " + e.message); }
+      })();
+    }
+    // Non-demo taskId (Storage-loaded return visit) is out of scope for this session —
+    // desktop's DataSourceScreen still handles that path; mobile's first shipped
+    // destination is exclusively the /work/1/analyze demo route (S-MOBILE-NAV-01).
+  }, [taskId]);
+
+  const top15C = useMemo(() => data?.classArr.slice(0,15) || [], [data]);
+  const pieData = useMemo(() => {
+    if (!data) return [];
+    const top = data.classArr.slice(0,9);
+    const other = data.classArr.slice(9).reduce((s,x)=>s+x.total,0);
+    const r = top.map(x=>({name:x.displayLabel, value:x.total}));
+    if (other>0) r.push({name:"All Other", value:other});
+    return r;
+  }, [data]);
+  const kpis = data ? [
+    {label:"Total Spend",  value:fmtFull(data.totalSpend)},
+    {label:"Transactions", value:data.txCount.toLocaleString()},
+    {label:"Health Flags", value:data.flags.length, flagged:highFlags>0},
+    ...(data.hasVendor && data.vendorConc ? [{label:"Vendor HHI", value:data.vendorConc.hhi.toFixed(0), flagged:data.vendorConc.hhi>2500}] : []),
+  ] : [];
+
+  const loadYourData = () => hiddenRef.current.click();
+
+  return (
+    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"18px 16px 40px"}}>
+      <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,textTransform:"uppercase",color:T.brass,marginBottom:8}}>Roadmap Venture · Procurement Intelligence</div>
+      {/* FEATURE: SH-23 */}
+      <div style={{fontFamily:display,fontSize:22,fontWeight:700,color:T.navy,marginBottom:8,letterSpacing:"-.5px"}}>Spend Analyzer{FOCUS_AREA_STATUS.spendAnalysis && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.spendAnalysis})</span>}</div>
+      <p style={{fontSize:12.5,color:T.muted,lineHeight:1.6,marginBottom:16}}>Load procurement data from a demo dataset, a live state portal, or your own file.</p>
+
+      {/* Workflow strip — horizontal scroll instead of the desktop 5-col grid */}
+      <div style={{display:"flex",overflowX:"auto",gap:6,marginBottom:18,paddingBottom:4}}>
+        {[
+          {n:"01",label:"Load Data",   active:!data},
+          {n:"02",label:"Map Fields",  active:false},
+          {n:"03",label:"Analyze",     active:!!data},
+          {n:"04",label:"Act",         active:false},
+        ].map((s,i)=>(
+          <div key={i} style={{flex:"0 0 auto",background:s.active?T.navy:T.card,color:s.active?T.brass:T.navy,border:s.active?"none":`1px solid ${T.line}`,padding:"8px 10px",fontSize:9,fontWeight:600,whiteSpace:"nowrap"}}>{s.n} {s.label}</div>
+        ))}
+      </div>
+
+      {data && (
+        <div style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${T.line}`}}>
+          <div style={{fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:600,marginBottom:3,fontFamily:mono}}>Now Analyzing</div>
+          <div style={{fontFamily:display,fontSize:13.5,fontWeight:600,color:T.navy}}>{fileName.replace(/\.csv$/i,"")}</div>
+          <div style={{fontSize:10,color:T.muted,marginTop:2,fontFamily:mono}}>{data.txCount.toLocaleString()} rows</div>
+        </div>
+      )}
+
+      {data && (
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+            {kpis.map(k=>(
+              <div key={k.label} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 12px"}}>
+                <div style={{fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:4,fontFamily:mono}}>{k.label}</div>
+                <div style={{fontFamily:display,fontSize:15,color:k.flagged?T.flag:T.navy,fontVariantNumeric:"tabular-nums"}}>{k.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <Card title="Categories by Spend">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={top15C.slice(0,6).map(x=>({...x,label:x.displayLabel}))} layout="vertical" margin={{left:10,right:50,top:5,bottom:5}}>
+                <XAxis type="number" tickFormatter={fmt} tick={{fill:T.muted,fontSize:9,fontFamily:mono}} axisLine={false} tickLine={false}/>
+                <YAxis type="category" dataKey="label" width={90} tick={{fill:T.mutedDeep,fontSize:9,fontFamily:body}} axisLine={false} tickLine={false}/>
+                <Tooltip content={<Tip total={data.totalSpend}/>}/>
+                <Bar dataKey="total" radius={[0,3,3,0]}>
+                  {top15C.slice(0,6).map((_,i)=><Cell key={i} fill={PALETTE[i%PALETTE.length]} fillOpacity={0.9}/>)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <div style={{height:12}}/>
+
+          <Card title="Spend Distribution" subtitle="Share of total by category">
+            <div style={{width:"100%",height:260,position:"relative"}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{top:10,right:10,bottom:0,left:10}}>
+                  <Pie data={pieData} cx="50%" cy="42%" outerRadius={80} dataKey="value" nameKey="name" label={({percent})=>percent>0.08?`${(percent*100).toFixed(0)}%`:""}>
+                    {pieData.map((_,i)=><Cell key={i} fill={PALETTE[i%PALETTE.length]} stroke={T.paperDeep} strokeWidth={2}/>)}
+                  </Pie>
+                  <Tooltip content={<Tip/>}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <div style={{height:16}}/>
+        </>
+      )}
+
+      <div onClick={loadYourData} style={{padding:"12px 0",background:T.brass,color:T.navy,textAlign:"center",fontWeight:700,fontSize:13,fontFamily:display,cursor:"pointer"}}>Load your data →</div>
+      <input ref={hiddenRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) processFile(e.target.files[0], taskId); }}/>
+
+      {error && <div style={{marginTop:14,background:`${T.flag}10`,border:`1px solid ${T.flag}44`,padding:"12px 16px",color:T.flag,fontSize:13}}>⚠ {error}</div>}
+      <FeatureBadge id="AZ-19"/>
+    </div>
+  );
+}
+
 // FEATURE: AZ-02 — Column mapping screen
 // FEATURE: AZ-02 — Column mapping screen
 // ── Column mapping screen ───────────────────────────────────────────────────
 function MappingScreen({ taskId }) {
   const { columns, fileName, mapping, setMapping, error, runAnalysis, activeTab, setStage, setActiveTab } = useAnalyzer();
+  const isMobile = useIsMobile();
   return (
-    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"32px 28px 40px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+    <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding: isMobile ? "18px 16px 24px" : "32px 28px 40px"}}>
+      {isMobile && (
+        <div onClick={()=>{ setStage("analyze"); }} style={{display:"inline-block",fontSize:11,color:T.navy,border:`1px solid ${T.line}`,background:T.card,padding:"5px 10px",marginBottom:14,cursor:"pointer"}}>← Back</div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:10}}>
         <div>
-          <div style={{fontFamily:display,fontSize:22,fontWeight:600,color:T.navy,marginBottom:5}}>Confirm Column Mapping</div>
+          <div style={{fontFamily:display,fontSize: isMobile?18:22,fontWeight:600,color:T.navy,marginBottom:5}}>Confirm Column Mapping</div>
           <div style={{fontSize:13,color:T.muted}}>Found <strong style={{color:T.ink}}>{columns.length} columns</strong> in <strong style={{color:T.ink}}>{fileName}</strong>.</div>
         </div>
-        <div style={{display:"flex",gap:10}}>
-          {activeTab==="updatefile"&&<button onClick={()=>{setStage("analyze");setActiveTab("overview");}} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontSize:13,fontFamily:body}}>Cancel</button>}
-          <button onClick={()=>runAnalysis(taskId)} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
-        </div>
+        {!isMobile && (
+          <div style={{display:"flex",gap:10}}>
+            {activeTab==="updatefile"&&<button onClick={()=>{setStage("analyze");setActiveTab("overview");}} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontSize:13,fontFamily:body}}>Cancel</button>}
+            <button onClick={()=>runAnalysis(taskId)} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
+          </div>
+        )}
       </div>
       <div style={{display:"grid",gap:10}}>
         {Object.entries(FIELD_DEFS).map(([field,def])=>{
           const val = mapping[field]||"";
           return(
-            <div key={field} style={{background:T.card,border:`1px solid ${val?T.brass+"66":T.line}`,padding:"13px 18px",display:"grid",gridTemplateColumns:"1fr 1.3fr",gap:16,alignItems:"center",position:"relative"}}>
+            <div key={field} style={{background:T.card,border:`1px solid ${val?T.brass+"66":T.line}`,padding:"13px 18px",display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1.3fr",gap: isMobile?8:16,alignItems:isMobile?"stretch":"center",position:"relative"}}>
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3}}>
                   <span style={{fontSize:13,fontWeight:700,color:T.navy,fontFamily:display}}>{def.label}</span>
@@ -218,8 +346,8 @@ function MappingScreen({ taskId }) {
         })}
       </div>
       {error&&<div style={{marginTop:14,background:`${T.flag}10`,border:`1px solid ${T.flag}44`,padding:"12px 16px",color:T.flag,fontSize:14}}>⚠ {error}</div>}
-      <div style={{display:"flex",gap:10,marginTop:20,justifyContent:"flex-end"}}>
-        <button onClick={()=>runAnalysis(taskId)} style={{background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"12px 24px",cursor:"pointer",fontSize:15,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
+      <div style={{display:"flex",gap:10,marginTop:20,justifyContent:isMobile?"stretch":"flex-end"}}>
+        <button onClick={()=>runAnalysis(taskId)} style={{flex:isMobile?1:"none",background:`linear-gradient(135deg,${T.brass},${T.brassDeep})`,border:"none",color:T.navy,padding:"12px 24px",cursor:"pointer",fontSize:15,fontWeight:700,fontFamily:display}}>Run Analysis →</button>
       </div>
     </div>
   );
@@ -519,7 +647,11 @@ function AnalyzerView({ taskId }) {
       <div style={{width:200,flexShrink:0,background:T.paper,borderRight:`1px solid ${T.line}`,padding:"16px 0",display:"flex",flexDirection:"column",overflowY:"auto"}}>
         {data&&(
           <div style={{padding:"0 16px 12px",borderBottom:`1px solid ${T.line}`,marginBottom:10}}>
-            <div style={{fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:600,marginBottom:3,fontFamily:mono}}>Now Analyzing</div>
+            {/* FEATURE: SH-23 -- surface Spend status beside the "Now Analyzing" kicker at the kicker's own 8.5px */}
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:6,marginBottom:3}}>
+              <div style={{fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:600,fontFamily:mono}}>Now Analyzing</div>
+              {FOCUS_AREA_STATUS.spendAnalysis && <span style={{...FOCUS_STATUS_STYLE, fontSize:8.5}}>({FOCUS_AREA_STATUS.spendAnalysis})</span>}
+            </div>
             <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy,lineHeight:1.2}}>{fileName.replace(/\.csv$/i,"")}</div>
             <div style={{fontSize:10,color:T.muted,marginTop:2,fontFamily:mono}}>{data.txCount.toLocaleString()} rows</div>
           </div>
@@ -585,8 +717,9 @@ export default function AnalyzerScreen() {
   const { taskId } = useParams();
   const navigate   = useNavigate();
   const { stage, setStage, setActiveTab, data, fileName, loading, error } = useAnalyzer();
+  const isMobile = useIsMobile();
 
-  const headerRight = stage==="analyze"&&data ? (
+  const headerRight = (!isMobile && stage==="analyze" && data) ? (
     <button onClick={()=>{setStage("map");setActiveTab("updatefile");}} style={{background:"transparent",border:`1px solid rgba(248,242,226,.4)`,color:"#f8f2e2",padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:body}}>← Column Mapping</button>
   ) : null;
 
@@ -601,9 +734,18 @@ export default function AnalyzerScreen() {
 
   return (
     <AppShell headerProps={{ rightContent:headerRight }}>
-      {stage==="overview" && <DataSourceScreen taskId={taskId}/>}
-      {stage==="map"      && <MappingScreen taskId={taskId}/>}
-      {stage==="analyze"  && <AnalyzerView taskId={taskId}/>}
+      {isMobile ? (
+        <>
+          {stage!=="map" && <MobileAnalyzerHome taskId={taskId}/>}
+          {stage==="map" && <MappingScreen taskId={taskId}/>}
+        </>
+      ) : (
+        <>
+          {stage==="overview" && <DataSourceScreen taskId={taskId}/>}
+          {stage==="map"      && <MappingScreen taskId={taskId}/>}
+          {stage==="analyze"  && <AnalyzerView taskId={taskId}/>}
+        </>
+      )}
       {error&&stage!=="analyze"&&(
         <div style={{margin:"0 28px",background:`${T.flag}10`,border:`1px solid ${T.flag}44`,padding:"12px 16px",color:T.flag,fontSize:14}}>⚠ {error}</div>
       )}

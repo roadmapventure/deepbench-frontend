@@ -1,14 +1,15 @@
-// DeepBench v5.2.10 | DashboardScreen.jsx | S-RENAME-01 UI label rename
+// DeepBench v6.3.138 | DashboardScreen.jsx | S-SH-23 -- focus-area release-status labels
+// DeepBench v6.2.8 | DashboardScreen.jsx | DB-23 mobile composition
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { T, display, body, mono, GLOBAL_CSS } from "../tokens.js";
+import { T, display, body, mono, GLOBAL_CSS, FOCUS_AREA_STATUS, FOCUS_STATUS_STYLE } from "../tokens.js";
 import { TENANT_ID, CURRENT_USER } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, Toast, AgentAvatar, AiBadge, FeatureBadge } from "../components/SharedUI.jsx";
 import { useAgents } from "../hooks/useAgents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 import { setAIStatus, clearAIStatus } from "../hooks/useAIStatus.js";
-import { logAICall } from "../hooks/useAIActivity.js";
 import { FETCH_API_BASE } from "../config.js";
 import { supabase } from "../lib/supabase.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -162,16 +163,14 @@ function ChatPanel() {
 
   // ── Routing check (switchboard) — Haiku classifies question vs agent capability
   const checkRouting = async (userMsg, agent) => {
-    const t0 = Date.now();
     try {
       const others = agents.filter(a=>!a.isIntern&&a.id!==agent.id).map(a=>`${a.id}: ${a.name} — ${a.specialty}`).join("\n");
       const prompt = `Current agent: ${agent.name} (${agent.specialty})\nUser question: ${userMsg}\nOther available agents:\n${others}\n\nOnly suggest a different agent if the current agent is CLEARLY the wrong fit — meaning the question is completely outside their specialty. If the current agent can reasonably handle the question, reply isMatch: true even if another agent might be marginally better. Be conservative — most questions should stay with the current agent.\n\nReply JSON only: {"isMatch":true/false,"suggestId":"agent_id_or_null","suggestReason":"reason or null"}`;
       const res = await fetch("/api/brief",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({messages:[{role:"user",content:prompt}],agent_id:"chloe",tenant_id:TENANT_ID,skipRag:true,max_tokens:120})});
+        body:JSON.stringify({messages:[{role:"user",content:prompt}],agent_id:"chloe",tenant_id:TENANT_ID,skipRag:true,max_tokens:120,ai_type:"routing"})});
       const data = await res.json();
       const raw = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
       const parsed = JSON.parse(raw);
-      logAICall({type:"routing",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:data.usage?.output_tokens||0,location:"Chat panel",agentId:agent.id});
       return parsed;
     } catch { return {isMatch:true}; }
   };
@@ -200,7 +199,6 @@ function ChatPanel() {
     }
 
     setAIStatus(`${selectedAgent.name.split(" ")[0]} is thinking…`);
-    const t0 = Date.now();
     try {
       const res = await fetch("/api/brief", {
         method: "POST",
@@ -210,6 +208,7 @@ function ChatPanel() {
           agent_id: selectedAgent.id,
           tenant_id: TENANT_ID,
           ragContext: { queryText: userMsg, jurisdiction: "All", triggers: [] },
+          ai_type: "chat",
         }),
       });
       const json = await res.json();
@@ -217,7 +216,6 @@ function ChatPanel() {
       const ragRetrieved = json._debug?.rag_retrieved;
       const tier = ragRetrieved ? "trained" : json._debug?.similarity > 0.3 ? "trained" : "informed";
       const sourceDocs = json._debug?.rag_entries?.map(e=>e.title).filter(Boolean) || [];
-      logAICall({type:"chat",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:json.usage?.output_tokens||0,tier,agentId:selectedAgent.id,location:"Dashboard chat"});
 
       setMessages(prev => [...prev, {
         role: "assistant",
@@ -239,7 +237,6 @@ function ChatPanel() {
     if (!userMsg || !agent || loading) return;
     setLoading(true);
     setAIStatus(`${agent.name.split(" ")[0]} is thinking…`);
-    const t0 = Date.now();
     try {
       const res = await fetch("/api/brief", {
         method: "POST",
@@ -249,6 +246,7 @@ function ChatPanel() {
           agent_id: agent.id,
           tenant_id: TENANT_ID,
           ragContext: { queryText: userMsg, jurisdiction: "All", triggers: [] },
+          ai_type: "chat",
         }),
       });
       const json = await res.json();
@@ -256,7 +254,6 @@ function ChatPanel() {
       const ragRetrieved = json._debug?.rag_retrieved;
       const tier = ragRetrieved ? "trained" : json._debug?.similarity > 0.3 ? "trained" : "informed";
       const sourceDocs = json._debug?.rag_entries?.map(e=>e.title).filter(Boolean) || [];
-      logAICall({type:"chat",model:"claude-haiku-4-5",latencyMs:Date.now()-t0,tokens:json.usage?.output_tokens||0,tier,agentId:agent.id,location:"Dashboard chat"});
       setMessages(prev => [...prev, {
         role: "assistant",
         agentId: agent.id,
@@ -467,6 +464,9 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const isMobile = useIsMobile();
+  const [mobileTab, setMobileTab] = useState("active");          // NEW — DB-23, mobile-only Active/Completed toggle
+  const [showChatOverlay, setShowChatOverlay] = useState(false); // NEW — DB-23, mobile-only chat overlay
 
   // FEATURE: SH-06 — Supabase tasks integration
   useEffect(() => {
@@ -525,6 +525,117 @@ export default function DashboardScreen() {
     agentsWorking: 4,  // mock
   };
 
+  // FEATURE: DB-23 — mobile composition (stacked masthead, scroll stats, Active/Completed tabs, chat overlay)
+  if (isMobile) {
+    const mobileList    = mobileTab === "active" ? activeTasks : completedTasks;
+    const mobileVisible = drawerOpen ? mobileList : mobileList.slice(0, 3);
+    const mobileHidden  = Math.max(0, mobileList.length - mobileVisible.length);
+
+    return (
+      <AppShell toast={toast}>
+        <div style={{position:"relative",flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
+          <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"16px 16px 90px"}}>
+
+            {/* Masthead — stacked, CTA full-width below subheader */}
+            <div style={{marginBottom:12}}>
+              {/* FEATURE: SH-23 */}
+              <div style={{fontFamily:display,fontSize:22,fontWeight:500,color:T.navy,letterSpacing:"-.3px",lineHeight:1.1,marginBottom:4}}>Your work... Defined{FOCUS_AREA_STATUS.projectMgmt && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.projectMgmt})</span>}</div>
+              <div style={{fontFamily:body,fontStyle:"italic",fontSize:11.5,color:T.mutedDeep,lineHeight:1.4}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
+              <div style={{marginTop:10}}>
+                <button onClick={()=>navigate("/work/new")} style={{width:"100%",justifyContent:"center",background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"10px 20px",fontFamily:body,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:14}}>+</span> New Work Order
+                  <AiBadge label={AI_PAT.CREATE_TASK_FULL} style={{color:T.brassLight,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(210,183,130,0.3)"}}/>
+                </button>
+              </div>
+            </div>
+            <div style={{height:2,background:T.brass,marginBottom:16}}/>
+
+            {/* Stats strip — horizontal scroll, same 5 numbers, no data dropped */}
+            <div style={{background:T.navy,padding:"9px 14px",margin:"0 -16px 16px",display:"flex",gap:20,overflowX:"auto",WebkitOverflowScrolling:"touch",borderBottom:`3px solid ${T.brass}`}}>
+              {[["Active Work Orders",stats.active,T.card],["In Progress",stats.inProgress,T.brassLight],["Needs Review",stats.needsReview,T.brassLight],["Completed",stats.completed,T.brassLight],["Agents Working",stats.agentsWorking,T.brassLight]].map(([k,v,c])=>(
+                <div key={k} style={{flexShrink:0}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
+                  <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Active/Completed tabs */}
+            <div style={{display:"flex",borderBottom:`1px solid ${T.lineSoft}`,marginBottom:12}}>
+              {["active","completed"].map(tab => (
+                <button key={tab} onClick={()=>{ setMobileTab(tab); setDrawerOpen(false); }}
+                  style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                    color: mobileTab===tab ? T.brassDeep : T.muted, padding:"8px 4px", marginRight:20,
+                    background:"transparent", border:"none",
+                    borderBottom: mobileTab===tab ? `2px solid ${T.brass}` : "2px solid transparent", cursor:"pointer"}}>
+                  {tab === "active" ? "Active" : "Completed"}
+                </button>
+              ))}
+            </div>
+
+            {loading && mobileTab === "active" && (
+              <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
+                <div style={{fontFamily:mono,fontSize:13,color:T.brass,fontStyle:"italic"}}>Loading work orders…</div>
+              </div>
+            )}
+
+            {!loading && mobileList.length === 0 && (
+              <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
+                <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>
+                  {mobileTab === "active" ? "No active assignments — assign new work above." : "No completed work orders yet."}
+                </div>
+              </div>
+            )}
+
+            {mobileTab === "active"
+              ? mobileVisible.map(task => <TaskCard key={task.id} task={task} onClick={()=>navigate(`/work/${task.id}`)}/>)
+              : mobileVisible.map(task => (
+                  <div key={task.id} onClick={()=>navigate(`/work/${task.id}`)} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,marginBottom:6,opacity:.85,cursor:"pointer"}}>
+                    <span style={{fontFamily:mono,fontSize:10,color:T.moss}}>✓</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{task.title}</div>
+                      <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginTop:2}}>{task.type} · Completed {task.completedOn}</div>
+                    </div>
+                  </div>
+                ))}
+
+            {mobileHidden > 0 && (
+              <div onClick={()=>setDrawerOpen(true)} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:1.5,textTransform:"uppercase"}}>▾ Show more work orders</span>
+                <span style={{fontFamily:mono,fontSize:8,color:T.muted,fontWeight:600}}>{mobileHidden} more</span>
+              </div>
+            )}
+            {drawerOpen && mobileList.length > 3 && (
+              <div onClick={()=>setDrawerOpen(false)} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",cursor:"pointer",marginBottom:10}}>
+                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:1.5,textTransform:"uppercase"}}>▴ Show fewer</span>
+              </div>
+            )}
+
+            {/* Chat pill — pinned, opens full-screen overlay */}
+            <div style={{position:"sticky",bottom:14,marginTop:14,display:"flex",justifyContent:"center"}}>
+              <button onClick={()=>setShowChatOverlay(true)} style={{background:T.navyMid,border:`1px solid ${T.brass}`,color:T.brassLight,padding:"11px 20px",fontFamily:body,fontSize:12.5,fontWeight:600,display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 14px rgba(0,0,0,.35)",cursor:"pointer"}}>
+                <span style={{width:6,height:6,borderRadius:"50%",background:"#7fc97f",boxShadow:"0 0 0 2px rgba(127,201,127,.25)"}}/>
+                Chat with Agent
+              </button>
+            </div>
+          </div>
+
+          {showChatOverlay && (
+            <div style={{position:"absolute",inset:0,background:T.paperDeep,zIndex:5,display:"flex",flexDirection:"column"}}>
+              <div style={{flexShrink:0,background:T.navy,color:T.card,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`3px solid ${T.brass}`}}>
+                <span style={{fontFamily:display,fontSize:15,fontWeight:600}}>Chat With Agent</span>
+                <button onClick={()=>setShowChatOverlay(false)} style={{fontFamily:mono,fontSize:10,letterSpacing:"0.04em",textTransform:"uppercase",color:T.brassLight,border:"1px solid rgba(228,199,134,.4)",background:"transparent",padding:"5px 10px",cursor:"pointer"}}>← Back to Work Orders</button>
+              </div>
+              <div style={{flex:1,minHeight:0,overflowY:"auto",padding:14}}>
+                <ChatPanel/>
+              </div>
+            </div>
+          )}
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell toast={toast}>
       <div style={{flex:1,overflowY:"auto",background:T.paperDeep,padding:"24px 28px 48px"}}>
@@ -532,7 +643,8 @@ export default function DashboardScreen() {
         {/* Masthead */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
           <div>
-            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work... Defined</div>
+            {/* FEATURE: SH-23 */}
+            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your work... Defined{FOCUS_AREA_STATUS.projectMgmt && <span style={FOCUS_STATUS_STYLE}> ({FOCUS_AREA_STATUS.projectMgmt})</span>}</div>
             <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,lineHeight:1.5}}>Assign tasks, track progress, and chat with your agents — all in one place.</div>
           </div>
           {/* FEATURE: DB-06 — Assign New Work button */}

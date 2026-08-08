@@ -1,17 +1,26 @@
-// DeepBench v5.1.32 | load-entries.js | Knowledge entries — GET (list) + PATCH (edit/toggle) + DELETE
+// DeepBench v7.0.34 | api/load-entries.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
+// DeepBench v5.3.13 | load-entries.js | SH-11 — merged POST (ingest) handler; ingest.js retired to stay within Vercel Hobby 12-function limit
 // FEATURE: PE-03 — Training tab live wiring
 // FEATURE: PE-11 — Edit Course inline sub-view
+// FEATURE: SH-11 — Merged from ingest.js (2026-07-01) — second merge into this file, see history below
 // Merged from knowledge-entry.js to stay within Vercel Hobby 12-function limit
+// FEATURE: AG-27 — POST handler extracted to lib/knowledge-write.js's embedAndUpsertEntry(),
+// shared with writeLibrary()'s insert operation. GET/PATCH/DELETE untouched.
 
-export default async function handler(req, res) {
+import { embedAndUpsertEntry } from '../lib/knowledge-write.js';
+import { withRequestContext } from '../lib/request-context.js';
+
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
   if (!supabaseUrl) return res.status(500).json({ error: "SUPABASE_URL not configured" });
   if (!supabaseKey) return res.status(500).json({ error: "SUPABASE_SERVICE_KEY not configured" });
 
@@ -22,6 +31,19 @@ export default async function handler(req, res) {
   };
 
   try {
+    // ── POST — embed and upsert a new knowledge entry ─────────────────────────
+    if (req.method === "POST") {
+      try {
+        const saved = await embedAndUpsertEntry(req.body);
+        return res.status(200).json({ success: true, entry: saved });
+      } catch (err) {
+        // Preserves the pre-extraction status code: 400 for the one client-input validation
+        // error, 500 for everything else (config/embedding/upsert failures) — Category M.
+        const status = err.message === "title and content are required" ? 400 : 500;
+        return res.status(status).json({ error: err.message });
+      }
+    }
+
     // ── GET — fetch and format knowledge entries for an agent ─────────────────
     if (req.method === "GET") {
       const tenant_id = req.query.tenant_id || "global";
@@ -124,3 +146,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || "Internal server error" });
   }
 }
+
+export default withRequestContext(handler);

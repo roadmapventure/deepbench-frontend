@@ -1,3 +1,9 @@
+// DeepBench v6.2.17 | RosterScreen.jsx | RO-15 — mobile filter chip row gets a scroll-hint fade + chevron (SH-21 pattern reuse)
+// DeepBench v6.2.12 | RosterScreen.jsx | RO-14 — filter-name comment updated: "Market Intel" → "Channel Sales Intel"
+// DeepBench v6.2.5 | RosterScreen.jsx | S-MOBILE-ROSTER-01 — mobile-responsive layout (RO-13):
+// filter chips replace sidebar, 3-col stat grid + full-width button, single-column card grid.
+// DeepBench v6.2.0 | RosterScreen.jsx | S-MOBILE-NAV-01 — rename (RO-12): headline "Your bench." →
+// "Your agent roster.", display-text only (screen name, not the top-level nav tab), see STYLE-GUIDE.md §25.
 // DeepBench v5.2.37 | RosterScreen.jsx | RO-09 — sort agents by usage count
 // src/screens/RosterScreen.jsx — v5.0.0
 // DeepBench v5 — The Bench (/bench)
@@ -12,6 +18,8 @@ import { useAgents } from "../hooks/useAgents.js";
 import { useAgentUsageCounts } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
+import { BENCH_FILTERS } from "../data/agents.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
@@ -153,10 +161,15 @@ function AgentCard({ agent, onViewProfile, onAddTraining }) {
 }
 
 // FEATURE: RO-01 — All 7 agents
+// FEATURE: RO-10 — Bench screen category filter (All/Channel Sales Intel/Platform Wide/Spend Analysis/Special Interests)
 export default function RosterScreen() {
   const navigate = useNavigate();
   const agents   = useAgents();
   const usageCounts = useAgentUsageCounts();
+  // FEATURE: RO-13 — platform's single responsive breakpoint source, see STYLE-GUIDE.md §22
+  const isMobile = useIsMobile();
+
+  const [activeFilter, setActiveFilter] = useState("all");
 
   const sortedAgents = useMemo(() => {
     return [...agents].sort((a, b) => {
@@ -167,75 +180,198 @@ export default function RosterScreen() {
     });
   }, [agents, usageCounts]);
 
+  // FEATURE: RO-10 — nav item count badges always reflect group membership
+  // in the full roster, not the currently filtered subset.
+  const navItems = useMemo(() => {
+    const all = { id: "all", label: "All", count: agents.length };
+    const groups = BENCH_FILTERS.map(f => ({
+      id: f.id,
+      label: f.label,
+      count: agents.filter(a => a.benchGroups.includes(f.id)).length,
+    }));
+    return [all, ...groups];
+  }, [agents]);
+
+  // FEATURE: RO-10 — filtering happens on the already-sorted array, so
+  // RO-09's sort order is preserved within the filtered subset.
+  const filteredAgents = useMemo(() => {
+    if (activeFilter === "all") return sortedAgents;
+    return sortedAgents.filter(a => a.benchGroups.includes(activeFilter));
+  }, [sortedAgents, activeFilter]);
+
   const stats = {
-    size:        agents.length,
-    salary:      agents.reduce((s,a)=>s+a.salary,0),
-    value:       agents.reduce((s,a)=>s+a.value,0),
-    reportsPerMonth: agents.reduce((s,a)=>s+(a.reportCost>0?8:a.isIntern?2:3),0),
-    trainable:   agents.filter(a=>a.trainable).length,
+    size:        filteredAgents.length,
+    salary:      filteredAgents.reduce((s,a)=>s+a.salary,0),
+    value:       filteredAgents.reduce((s,a)=>s+a.value,0),
+    reportsPerMonth: filteredAgents.reduce((s,a)=>s+(a.reportCost>0?8:a.isIntern?2:3),0),
+    trainable:   filteredAgents.filter(a=>a.trainable).length,
   };
 
   return (
     <AppShell>
-      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 48px",background:T.paperDeep}}>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
-        {/* Masthead */}
-        <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
-          <div>
-            <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your bench.</div>
-            <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,maxWidth:560,lineHeight:1.5}}>
-              These are your agents. Click any team member to view their profile, assign them work, or add to their training. Ready to grow your bench? Add a new player and start building their expertise.
+        {/* ── Left sidebar filter nav — FEATURE: RO-10, pattern locked in STYLE-GUIDE.md §10 ── */}
+        {/* FEATURE: RO-13 — desktop-only, mobile renders a horizontal chip row inline below instead */}
+        {!isMobile && (
+          <div style={{width:180,flexShrink:0,background:T.card,borderRight:`1px solid ${T.line}`,display:"flex",flexDirection:"column",overflowY:"auto"}}>
+            {navItems.map(item => {
+              const isActive = activeFilter === item.id;
+              return (
+                <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
+                  width:"100%", textAlign:"left", padding:"8px 14px",
+                  fontFamily:body, fontSize:12,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? T.navy : T.mutedDeep,
+                  background: isActive ? `${T.brass}14` : "transparent",
+                  border:"none",
+                  borderLeft: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between",
+                }}>
+                  <span>{item.label}</span>
+                  <span style={{
+                    fontFamily:mono, fontSize:9, padding:"1px 6px",
+                    ...(isActive
+                      ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
+                      : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
+                  }}>{item.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Right content area ── */}
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px 48px",background:T.paperDeep}}>
+
+          {/* Masthead */}
+          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:14}}>
+            <div>
+              <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:6}}>Your agent roster.</div>
+              <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep,maxWidth:560,lineHeight:1.5}}>
+                These are your agents. Click any team member to view their profile, assign them work, or add to their training. Ready to grow your bench? Add a new player and start building their expertise.
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{height:2,background:T.brass,marginBottom:20}}/>
+          <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
-        {/* Bench stats strip */}
-        {/* FEATURE: RO-02 */}
-        <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:28,border:`1px solid rgba(182,135,58,.3)`,position:"relative"}}>
-          <Corners color={T.brass}/>
-          {[
-            ["Bench Size",        stats.size,                  T.card],
-            ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
-            ["Annual Value",      fmt$(stats.value),           T.mossLight],
-            ["Reports / Mo",      stats.reportsPerMonth,       T.card],
-            ["Trainable Agents",  stats.trainable,             T.brassLight],
-          ].map(([k,v,c])=>(
-            <div key={k}>
-              <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
-              <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+          {/* FEATURE: RO-13 — mobile filter chip row, horizontal adaptation of the Left Sidebar Nav
+              Pattern (STYLE-GUIDE.md §10): same brass-highlight logic, border axis left→bottom.
+              FEATURE: RO-15 — mobile scroll hint: fade gradient + chevron on the trailing edge,
+              static (not scroll-position-aware), same treatment as SH-21's About panel tab bar. */}
+          {isMobile && (
+            <div style={{position:"relative"}}>
+              <div style={{display:"flex",overflowX:"auto",gap:6,paddingBottom:10,marginBottom:12,borderBottom:`1px dashed ${T.lineSoft}`}}>
+                {navItems.map(item => {
+                  const isActive = activeFilter === item.id;
+                  return (
+                    <button key={item.id} onClick={() => setActiveFilter(item.id)} style={{
+                      flexShrink:0, textAlign:"left", padding:"8px 14px",
+                      fontFamily:body, fontSize:12,
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? T.navy : T.mutedDeep,
+                      background: isActive ? `${T.brass}24` : "transparent",
+                      border:"none",
+                      borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+                      cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                    }}>
+                      <span>{item.label}</span>
+                      <span style={{
+                        fontFamily:mono, fontSize:9, padding:"1px 6px",
+                        ...(isActive
+                          ? { background:T.card, border:"1px solid rgba(182,135,58,.5)", color:T.brassDeep }
+                          : { background:T.paperDeep, border:`1px solid ${T.lineSoft}`, color:T.mutedDeep }),
+                      }}>{item.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{position:"absolute",top:0,bottom:11,right:0,width:28,background:`linear-gradient(to right, transparent, ${T.paperDeep} 70%)`,display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:3,pointerEvents:"none"}}>
+                <span style={{fontFamily:mono,fontSize:10,color:T.brass}}>›</span>
+              </div>
             </div>
-          ))}
-          <div style={{flex:1}}/>
-          <button
-            onClick={() => navigate("/bench/new")}
-            style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:"5px 14px", cursor:"pointer", letterSpacing:.5 }}>
-            + Add a Player
-          </button>
-          <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
-        </div>
+          )}
 
-        {/* Agent grid */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
-          {sortedAgents.map(a=>(
-            <AgentCard key={a.id} agent={a}
-              onViewProfile={a=>navigate(`/bench/${a.id}`)}
-              onAddTraining={a=>navigate(`/bench/${a.id}?tab=training`)}
-            />
-          ))}
+          {/* Bench stats strip */}
+          {/* FEATURE: RO-02 */}
+          {/* FEATURE: RO-13 — mobile: 3-col stat grid + full-width button, workspace tag dropped */}
+          <div style={{background:T.navy,padding:"10px 20px",marginBottom:20,display:isMobile?"block":"flex",alignItems:"center",gap:28,border:`1px solid rgba(182,135,58,.3)`,position:"relative"}}>
+            <Corners color={T.brass}/>
+            {isMobile ? (
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {[
+                    ["Bench Size",        stats.size,                  T.card],
+                    ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
+                    ["Annual Value",      fmt$(stats.value),           T.mossLight],
+                    ["Reports / Mo",      stats.reportsPerMonth,       T.card],
+                    ["Trainable Agents",  stats.trainable,             T.brassLight],
+                  ].map(([k,v,c])=>(
+                    <div key={k}>
+                      <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
+                      <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => navigate("/bench/new")}
+                  style={{ width:"100%", marginTop:10, fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:6, cursor:"pointer", letterSpacing:.5 }}>
+                  + Add a Player
+                </button>
+              </>
+            ) : (
+              <>
+                {[
+                  ["Bench Size",        stats.size,                  T.card],
+                  ["Annual Salary",     fmt$(stats.salary),          T.brassLight],
+                  ["Annual Value",      fmt$(stats.value),           T.mossLight],
+                  ["Reports / Mo",      stats.reportsPerMonth,       T.card],
+                  ["Trainable Agents",  stats.trainable,             T.brassLight],
+                ].map(([k,v,c])=>(
+                  <div key={k}>
+                    <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.3,marginBottom:2}}>{k}</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div>
+                  </div>
+                ))}
+                <div style={{flex:1}}/>
+                <button
+                  onClick={() => navigate("/bench/new")}
+                  style={{ marginLeft:"auto", fontFamily:body, fontSize:12, color:T.brassLight, background:"transparent", border:`1px solid rgba(182,135,58,.4)`, padding:"5px 14px", cursor:"pointer", letterSpacing:.5 }}>
+                  + Add a Player
+                </button>
+                <div style={{fontFamily:body,fontSize:11,color:"#8fa3bf",fontStyle:"italic"}}>{CURRENT_USER.workspace}</div>
+              </>
+            )}
+          </div>
 
-          {/* Vacancy card */}
-          <div onClick={()=>navigate("/bench/new")}
-            style={{background:"repeating-linear-gradient(45deg,#ddd5be,#ddd5be 6px,#ebe5d5 6px,#ebe5d5 12px)",border:"1.5px dashed #786d52",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:30,minHeight:460,cursor:"pointer",transition:"border-color .15s"}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
-            onMouseLeave={e=>e.currentTarget.style.borderColor="#786d52"}>
-            <div style={{width:64,height:64,borderRadius:"50%",background:T.paperDeep,border:"1.5px dashed #786d52",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14}}>
-              <span style={{fontFamily:display,fontSize:26,color:T.muted}}>+</span>
+          {/* Agent grid — FEATURE: RO-10 empty state if the active filter has no agents */}
+          {filteredAgents.length === 0 ? (
+            <div style={{border:`1.5px dashed ${T.line}`,background:T.card,padding:"48px 20px",textAlign:"center",marginBottom:16}}>
+              <div style={{fontFamily:body,fontStyle:"italic",color:T.muted}}>No agents in this group yet.</div>
             </div>
-            <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:6}}>Vacancy · Position 08</div>
-            <div style={{fontFamily:display,fontSize:17,fontWeight:600,color:T.navy,textAlign:"center",marginBottom:5}}>Your New Agent</div>
-            <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,textAlign:"center",fontStyle:"italic",lineHeight:1.5,maxWidth:200,marginBottom:14}}>Build a custom agent trained on your expertise.</div>
-            <div style={{padding:"3px 10px",background:"rgba(182,135,58,.2)",border:`1px solid rgba(182,135,58,.6)`,fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700}}>+ Build Agent</div>
+          ) : null}
+          {/* FEATURE: RO-13 — mobile: single-column card grid, same AgentCard/vacancy tile */}
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
+            {filteredAgents.map(a=>(
+              <AgentCard key={a.id} agent={a}
+                onViewProfile={a=>navigate(`/bench/${a.id}`)}
+                onAddTraining={a=>navigate(`/bench/${a.id}?tab=training`)}
+              />
+            ))}
+
+            {/* Vacancy card — always renders regardless of activeFilter */}
+            <div onClick={()=>navigate("/bench/new")}
+              style={{background:"repeating-linear-gradient(45deg,#ddd5be,#ddd5be 6px,#ebe5d5 6px,#ebe5d5 12px)",border:"1.5px dashed #786d52",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:30,minHeight:460,cursor:"pointer",transition:"border-color .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
+              onMouseLeave={e=>e.currentTarget.style.borderColor="#786d52"}>
+              <div style={{width:64,height:64,borderRadius:"50%",background:T.paperDeep,border:"1.5px dashed #786d52",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14}}>
+                <span style={{fontFamily:display,fontSize:26,color:T.muted}}>+</span>
+              </div>
+              <div style={{fontFamily:mono,fontSize:10,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:6}}>Vacancy · Position 08</div>
+              <div style={{fontFamily:display,fontSize:17,fontWeight:600,color:T.navy,textAlign:"center",marginBottom:5}}>Your New Agent</div>
+              <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,textAlign:"center",fontStyle:"italic",lineHeight:1.5,maxWidth:200,marginBottom:14}}>Build a custom agent trained on your expertise.</div>
+              <div style={{padding:"3px 10px",background:"rgba(182,135,58,.2)",border:`1px solid rgba(182,135,58,.6)`,fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700}}>+ Build Agent</div>
+            </div>
           </div>
         </div>
       </div>

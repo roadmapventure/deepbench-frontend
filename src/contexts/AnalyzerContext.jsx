@@ -265,10 +265,10 @@ export function AnalyzerProvider({ children }) {
           reader.onload = async (e) => {
             try {
               const base64 = e.target.result.split(",")[1];
-              const res = await fetch("/api/upload-csv", {
+              const res = await fetch("/api/extract", {
                 method:  "POST",
                 headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ fileBase64: base64, taskId, tenantId: TENANT_ID }),
+                body:    JSON.stringify({ action: "upload-csv", fileBase64: base64, taskId, tenantId: TENANT_ID }),
               });
               const json = await res.json();
               if (json.path) console.log("CSV saved to Storage:", json.path);

@@ -1,3 +1,4 @@
+// DeepBench v6.3.99 | FetchContext.jsx | LOG-35b -- remove misplaced client-side guess-log
 // DeepBench v5.1.0 | FetchContext.jsx | Fetch agent state context — persists through navigation
 // src/contexts/FetchContext.jsx — v5.0.0
 // DeepBench v5 — Persistent fetch agent state
@@ -147,8 +148,12 @@ export function FetchProvider({ children }) {
         }, 100);
 
         // Browser-side memory accuracy patch
+        // FEATURE: LOG-35b -- removed the logAICall() that used to fire here. It asserted a
+        // summarization was happening at this exact moment; it wasn't -- this block only PATCHes
+        // step-count/timing, no AI call. The real summarization (triggered independently by
+        // Brent's own fetch-agent process, not from this code) is now logged where it actually
+        // happens, api/web-memory.js's POST handler (LOG-35b Task 1).
         if (data.success && agentId !== "pat") {
-          logAICall({type:"summarization",model:"claude-haiku-4-5",location:"Post-fetch web-memory save",agentId:"brent"});
           fetch("/api/web-memory", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

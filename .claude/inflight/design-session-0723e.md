@@ -1,0 +1,1 @@
+design-session-0723e — worktree `design-session-0723e`, branch `session/design-session-0723e`. Beta backlog prioritization for John (Anomalies + AI Audit Log buckets). Worktree recreated 2026-07-24 after a cleanup pass removed all worktrees mid-session; prior work (inflight marker) already on origin/dev.

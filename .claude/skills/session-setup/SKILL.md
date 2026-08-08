@@ -1,0 +1,220 @@
+---
+name: session-setup
+description: The step-by-step mechanics every DeepBench session runs at start and close — creating the isolated git worktree (branched from origin/dev) with a name-collision check, copying .env.local in, claiming a version number and feature/backlog IDs atomically from Supabase, creating and later deleting the per-session inflight file, and the fetch/rebase/push-HEAD:dev/cleanup sequence. Use this at the very start of ANY session (design, coding, audit, sweep) the moment CLAUDE.md's router says "set up your worktree," and again at close-out when pushing and removing the worktree. Also use it whenever you need the exact worktree, version-claim, feature-ID, inflight, or push commands rather than re-deriving them. The rules these procedures enforce are stated in CLAUDE.md; this skill is the how, with the why kept to a clause where it prevents a real mistake. Full "found live" history lives in docs/SESSIONS.md.
+---
+
+# Session Setup — Worktree, Counters, Inflight, Push
+
+CLAUDE.md's router points here for the commands. The **rules** (worktree isolation,
+`HEAD:dev`, atomic counters, no `cd &&` compounds) are stated as hard rules in CLAUDE.md and are
+not restated here — this file is the procedure that satisfies them. Run everything from step 1
+onward *before* any orientation read.
+
+All commands use `git -C "<path>" …` — never `cd "<path>" && …` (CLAUDE.md hard rule: a `cd &&`
+compound triggers a non-suppressible permission prompt).
+
+Supabase project for both counters: **`rallojeqnkgtxgsdsnqm`** (via the Supabase MCP `execute_sql`).
+
+---
+
+## Start of session
+
+### 1. Create the worktree (branch explicitly from `origin/dev`)
+
+First check for a name collision — multiple sessions on the same day will otherwise pick the same
+generic name, so include a topic hint, not just a date:
+
+```
+git -C "C:/Projects/deepbench-frontend" worktree list
+```
+
+If your intended `<short-session-name>` already exists, pick a more specific one. Then:
+
+```
+git -C "C:/Projects/deepbench-frontend" fetch origin dev
+git -C "C:/Projects/deepbench-frontend" worktree add ".claude/worktrees/<short-session-name>" -b "session/<short-session-name>" origin/dev
+```
+
+**Always branch explicitly from `origin/dev`.** This repo's remote default branch is `main`, not
+`dev` — any tool that branches from "the default branch" silently branches from the wrong place.
+Do **not** use the `EnterWorktree` tool: the session's working directory is `C:/Projects` (the
+parent of the repo), so `EnterWorktree` can't recognize it and errors with "not in a git
+repository."
+
+### 1b. Copy `.env.local` into the new worktree
+
+`.env.local` is gitignored, so `git worktree add` never brings it along; a worktree missing it hits
+a silent blank-page failure at Supabase-client construction the first time anything reads
+`import.meta.env`. Do this before any dev-server preview or Node test:
+
+```
+Copy-Item "C:/Projects/deepbench-frontend/.env.local" "C:/Projects/deepbench-frontend/.claude/worktrees/<short-session-name>/.env.local"
+```
+
+(or the Bash `cp` equivalent). Skip only for a pure-bookkeeping edit (see the exception below).
+
+### 1c. Work against the worktree path for the rest of the session
+
+Do all Read/Edit/Write/Bash work against the worktree's absolute path
+(`C:/Projects/deepbench-frontend/.claude/worktrees/<short-session-name>/…`), never the shared
+checkout. For git, use `git -C "<worktree-path>" <command>`.
+
+If this session spawns any sub-agent, state that absolute worktree path verbatim in the sub-agent's
+prompt (CLAUDE.md hard rule — a sub-agent given a bare task defaults to the shared checkout).
+
+### 2. Create your inflight file — right after the worktree, not later
+
+```
+.claude/inflight/<short-session-name>.md
+```
+
+One line: worktree name, plus a clause on the topic if known. Nothing else is required until there's
+real content to report. Create it as one of your first actions, *not* when you happen to edit
+something else. **Only ever edit or delete your own inflight file — never another session's**, and
+never a shared list for this purpose. Why it can't wait: a worktree mid-design-conversation that hasn't committed anything
+is byte-for-byte identical on disk to one that finished and was never cleaned up — both show zero
+commits ahead of `origin/dev` and zero uncommitted changes. This file is the only signal that tells
+`session-hygiene`'s staleness check (and other sessions) that a quiet worktree is still wanted.
+
+### 2b. Stage and push it in your **first** commit — creating it is not enough (`SES-23`)
+
+```
+git -C "<worktree-path>" add ".claude/inflight/<short-session-name>.md"
+```
+
+The marker only does its job once it's on `origin/dev` — that's the only copy `session-hygiene`'s
+check 5 and every concurrent session can see. A marker sitting untracked in your own worktree is
+invisible to all of them, so a session that creates it correctly and then commits only its actual
+work files (`git add docs/FEATURES.md`) still reads to everyone else as a finished, cleanable
+worktree while it's mid-flight.
+
+**Explicitly stage it — don't rely on `git add -A`/`git commit -a` happening to sweep it up.** If your
+first real commit is narrowly scoped to an explicit path list, add this path to that list. If a long
+session hasn't needed a commit yet, commit the marker on its own rather than leaving it untracked for
+hours; it's a pure append, so the lightweight bookkeeping path below covers it.
+
+*Found live 2026-07-23: four worktrees simultaneously — `design-chi-beta-triage-0722`,
+`design-log-23-0722`, `design-session-0723b`, `design-session-0723c` — each had a correctly-created
+marker on disk that had never been staged, so all four presented to `check-session-docs.js` as
+finished-and-abandoned during a housekeeping pass, two of them while under 45 minutes old. Nothing
+was lost, but only because the pass checked disk before acting on the flag. Before this step existed,
+every written instruction was satisfied and the marker still never reached `dev` — its only
+guaranteed appearance in git history was step 5's commit deleting it.*
+
+### 3. Claim your version number atomically (when you need one)
+
+Never read `CLAUDE-STATE.md` and increment — that races under 5–7 concurrent sessions and has caused
+real collisions (e.g. two sessions both claiming `v6.2.4`). Claim it atomically; Postgres serializes
+concurrent `UPDATE`s to the same row, so the claim itself is the reservation — no re-check before
+push:
+
+```sql
+UPDATE dev_version_counter
+SET patch = patch + 1, updated_at = now(), updated_by_session = '<short-session-name>'
+WHERE id = 1
+RETURNING major, minor, patch;
+```
+
+Use the returned `major.minor.patch` as-is in the kickoff filename, the `SESSION` header, and every
+file's version-header comment. `CLAUDE-STATE.md`'s "Version in dev" line is the highest *closed-out*
+version (updated at close-out per `CLAUDE-DESIGN.md` Step 5c) — not the source for claiming a new one.
+
+### 3b. Claim feature/backlog IDs atomically (when you create one)
+
+Every new ID (`CHI-`, `LOG-`, `SES-`, `LOO-`, any prefix from `docs/SCREEN-INVENTORY.md`'s taxonomy)
+is claimed the same way — never by reading the highest existing number in the `FEATURES*.md` files
+and incrementing. Same race, same fix (real collisions this closed: `AA-197`/`AA-198`,
+`CHI-13`/`CHI-14`, `HAR-02`/`AA-197`):
+
+**Claim all of a prefix's IDs in one call — set `<N>` to how many rows you're about to file** (`1`
+for a single row; `8` if you're logging eight `LOG-` findings at once). One call, one contiguous
+block:
+
+```sql
+INSERT INTO feature_id_counter (prefix, last_issued_number, updated_by_session)
+VALUES ('<PREFIX>', <N>, '<short-session-name>')
+ON CONFLICT (prefix) DO UPDATE
+  SET last_issued_number = feature_id_counter.last_issued_number + <N>,
+      updated_at = now(),
+      updated_by_session = EXCLUDED.updated_by_session
+RETURNING last_issued_number;
+```
+
+The returned `last_issued_number` is the **last** ID of your block; the block is
+`<PREFIX>-(returned − N + 1)` through `<PREFIX>-returned`. With `<N> = 1` that's just
+`<PREFIX>-returned`. Works whether the prefix is new (lazily starts at 1) or already has rows.
+
+**Never hand-count the second and later IDs of a multi-row filing** — claim once with the real `<N>`
+instead. That is the single mechanism behind every recorded collision this counter exists to prevent
+(`CHI-42`, `CHI-48`, `CHI-76`; earlier `AA-197`/`AA-198`, `CHI-13`/`CHI-14`, `HAR-02`/`AA-197`): a
+session files a block of rows, claims one number, and counts up from it by hand while a concurrent
+session claims the numbers it's counting into. Filing 2+ rows at once is the *normal* case, not the
+exception — 51 commits in this repo's history have done it — which is exactly why the batch form is
+the default shape above rather than a variant mentioned at the end.
+
+**`last_issued_number` holds the number already handed out, not the next free one** (renamed from
+`next_number` 2026-07-28, `SES-18` — the old name asserted the opposite of its contents and invited
+exactly the read-and-file mistake this section forbids). Reading this table is never how you get an
+ID; the `INSERT … ON CONFLICT` above is, because the write *is* the reservation.
+
+Confirm the prefix itself is legitimate against `docs/SCREEN-INVENTORY.md`'s taxonomy first; this
+table governs the number, not which prefixes are valid. Legacy area prefixes (`AA`, `MI`, `AI`, etc.)
+are frozen — never claim a new legacy-prefixed ID through this or any other mechanism.
+
+---
+
+## Close of session
+
+### 4. Fetch, rebase, then push `HEAD:dev`
+
+Before any push to `dev` (kickoff commit, close-out commit — anything), from inside the worktree:
+
+```
+git -C "<worktree-path>" fetch origin dev
+git -C "<worktree-path>" rebase origin/dev
+git -C "<worktree-path>" push origin HEAD:dev
+```
+
+Use `HEAD:dev`, never bare `git push origin dev` (CLAUDE.md hard rule — worktrees share local refs).
+If the push is rejected as non-fast-forward, another concurrent session merged first: re-fetch,
+re-rebase, retry once.
+
+### 5. Delete your inflight file in the close-out commit
+
+When you push your close-out commit, delete your own `.claude/inflight/<short-session-name>.md` in
+that same commit — it's your job to remove it, not the next session's to notice it's stale.
+
+### 6. Remove the worktree
+
+Once the worktree is merged into `dev` and pushed:
+
+```
+git -C "C:/Projects/deepbench-frontend" worktree remove ".claude/worktrees/<short-session-name>"
+git -C "C:/Projects/deepbench-frontend" branch -D "session/<short-session-name>"
+```
+
+---
+
+## Exception — lightweight bookkeeping path (`SES-011`)
+
+A session whose only pending edit is a **pure append** — zero deleted or modified lines — confined to
+either (a) a brand-new `.claude/inflight/<short-session-name>.md`, or (b) one new row appended to the
+end of `docs/FEATURES.md` / `FEATURES-NEXT.md` / `FEATURES-LATER.md`, may skip part of the ceremony:
+
+- If this session already has a worktree open, make the edit there — no second worktree.
+- If not, create one as normal (step 1) but **skip step 1b** (`.env.local` copy — no dev server or
+  Node test is involved).
+- Commit, fetch/rebase, push as normal (step 4) — no shortcut on the git safety steps.
+- **Skip step 6's immediate manual removal.** A worktree with zero commits ahead of `origin/dev`
+  after its push holds no unmerged work — `session-hygiene`'s checks 5/5b already flag it for
+  batched cleanup later.
+- **Before pushing, run `git -C "<worktree-path>" diff --stat` against the previous commit.** Any
+  deletion shown means this wasn't a qualifying edit — stop, and finish it as a normal
+  full-ceremony session instead.
+
+---
+
+*Rationale and the full "found live" history behind these procedures (the version/ID collisions,
+the sub-agent staleness incident, why the shared checkout is deliberately never kept in sync, the
+retired read-only-bootstrap check) live in `docs/SESSIONS.md`. This skill stays procedure-first on
+purpose — if it starts accumulating narrative, move the narrative there.*

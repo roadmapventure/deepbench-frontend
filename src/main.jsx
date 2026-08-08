@@ -1,4 +1,9 @@
-// DeepBench v5.2.41 | main.jsx | App entry point — React root + all routes
+// DeepBench v7.0.4 | main.jsx | LAV-1e — homepage flip: / serves LiveAgentViewScreen (transitional), Channel Intelligence moves to /channel-intelligence, /live-agent-view kept. WelcomeSplash untouched.
+// DeepBench v7.0.1 | main.jsx | LAV-1b — one route added: /live-agent-view (Live Agent View). No other change.
+// DeepBench v6.3.137 | main.jsx | CHI-66 — root React error boundary wrapping BrowserRouter
+// (inside StrictMode), so a render error anywhere in the tree shows a reload prompt instead of a
+// white screen. Per-Drawer protection lives in SharedUI.jsx's Drawer.
+// DeepBench v6.0.18 | main.jsx | SH-15 — / now routes to Market Intelligence, Work moved to /work
 // FEATURE: SH-14 — Welcome splash modal
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -6,6 +11,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FetchProvider }    from "./contexts/FetchContext.jsx";
 import { AnalyzerProvider } from "./contexts/AnalyzerContext.jsx";
 import WelcomeSplash        from "./components/WelcomeSplash.jsx";
+import ErrorBoundary        from "./components/ErrorBoundary.jsx";
 
 import DashboardScreen        from "./screens/DashboardScreen.jsx";
 import CreateWorkOrderScreen  from "./screens/CreateWorkOrderScreen.jsx";
@@ -17,27 +23,38 @@ import PersonnelScreen        from "./screens/PersonnelScreen.jsx";
 import TeachScreen            from "./screens/TeachScreen.jsx";
 import TestTeamScreen         from "./screens/TestTeamScreen.jsx";
 import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
+import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
+import LiveAgentViewScreen      from "./screens/LiveAgentViewScreen.jsx"; // FEATURE: LAV-1b
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
-      <WelcomeSplash />
-      <FetchProvider>
-        <AnalyzerProvider>
-          <Routes>
-            <Route path="/"                          element={<DashboardScreen />} />
-            <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
-            <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
-            <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />
-            <Route path="/work/:taskId/fetch"        element={<FetchScreen />} />
-            <Route path="/bench"                     element={<RosterScreen />} />
-            <Route path="/bench/new"                 element={<BenchNewScreen />} />
-            <Route path="/bench/test"                element={<TestTeamScreen />} />
-            <Route path="/bench/:agentId"            element={<PersonnelScreen />} />
-            <Route path="/bench/:agentId/teach"      element={<TeachScreen />} />
-          </Routes>
-        </AnalyzerProvider>
-      </FetchProvider>
-    </BrowserRouter>
+    <ErrorBoundary variant="page">
+      <BrowserRouter>
+        <WelcomeSplash />
+        <FetchProvider>
+          <AnalyzerProvider>
+            <Routes>
+              {/* FEATURE: LAV-1e — "/" now serves the Live Agent View. TRANSITIONAL: when LA-01 Home
+                  ships, "/" repoints again; nothing here is the permanent homepage. Channel Intelligence
+                  moved to its own /channel-intelligence route (John, 2026-07-31). Both "/" and
+                  /live-agent-view render the same component — no redirect by design. */}
+              <Route path="/"                          element={<LiveAgentViewScreen />} />
+              <Route path="/live-agent-view"           element={<LiveAgentViewScreen />} />
+              <Route path="/channel-intelligence"      element={<MarketIntelligenceScreen />} />
+              <Route path="/work"                      element={<DashboardScreen />} />
+              <Route path="/work/new"                  element={<CreateWorkOrderScreen />} />
+              <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
+              <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />
+              <Route path="/work/:taskId/fetch"        element={<FetchScreen />} />
+              <Route path="/bench"                     element={<RosterScreen />} />
+              <Route path="/bench/new"                 element={<BenchNewScreen />} />
+              <Route path="/bench/test"                element={<TestTeamScreen />} />
+              <Route path="/bench/:agentId"            element={<PersonnelScreen />} />
+              <Route path="/bench/:agentId/teach"      element={<TeachScreen />} />
+            </Routes>
+          </AnalyzerProvider>
+        </FetchProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );

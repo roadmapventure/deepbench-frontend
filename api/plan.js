@@ -1,3 +1,5 @@
+// DeepBench v7.0.34 | api/plan.js | LOG-121 -- handler wrapped in withRequestContext(); the
+// request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.2.35 | api/plan.js | BUG-17 wire dan-ai-enrichment into prompt-service + preview-prompt
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
@@ -6,6 +8,8 @@ import { assemblePrompt } from './prompt/db-assembly.js';
 import { enrichPrompt } from './prompt/ai-enrichment.js';
 import { sendRequest } from './prompt/request-receivable.js';
 import { queryRAG } from '../lib/rag.js';
+import { logActivity } from '../lib/activity-log.js';
+import { withRequestContext } from '../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -18,7 +22,7 @@ function getSupabaseHeaders(key) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -84,15 +88,22 @@ export default async function handler(req, res) {
         return res.end();
       }
 
+      let inputTokens = null;
+      let outputTokens = null;
+      const streamStart = Date.now();
+
       const reader = anthropicRes.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(l => l.trim());
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // last entry may be an incomplete line — hold it for the next read
         for (const line of lines) {
+          if (!line.trim()) continue;
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') continue;
@@ -100,11 +111,24 @@ export default async function handler(req, res) {
               const parsed = JSON.parse(data);
               if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                 res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+              } else if (parsed.type === 'message_start') {
+                inputTokens = parsed.message?.usage?.input_tokens ?? null;
+              } else if (parsed.type === 'message_delta') {
+                outputTokens = parsed.usage?.output_tokens ?? outputTokens;
               }
             } catch {}
           }
         }
       }
+
+      logActivity({
+        tenantId: tenant_id, agentId: agent_id || 'michelle',
+        aiType: 'goal_suggestion', feature: 'goal-suggestion',
+        model: 'claude-haiku-4-5-20251001',
+        inputTokens, outputTokens,
+        latencyMs: Date.now() - streamStart,
+        patternsUsed: ragContext ? ['streaming', 'rag'] : ['streaming'],
+      });
 
       res.write('data: [DONE]\n\n');
       return res.end();
@@ -442,3 +466,5 @@ Return JSON only, no markdown fences, no explanation.`;
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withRequestContext(handler);

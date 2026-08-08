@@ -1,4 +1,7 @@
-// DeepBench v5.2.31 | src/data/agents.js | AG-17p Victoria complete entry
+// DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
+// DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
+// DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
+// DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -16,6 +19,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 18, situational: 10,
     trainable: false, trainableBy: "RMV", revenueModel: "Freemium · Included",
     quip: '"I spot the obvious stuff fast."', color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "mike", name: "Mike Alvarez", role: "Senior Procurement Analyst",
@@ -25,6 +29,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 42, situational: 25,
     trainable: false, trainableBy: "RMV", revenueModel: "Teaser · 10% NIGP split",
     quip: '"Industry patterns are where I shine."', color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "bob", name: "Bob Whitfield", role: "Professional Procurement Analyst",
@@ -34,6 +39,7 @@ export const AGENTS = [
     docs: 50, classes: 10, chunks: 842, skill: 71, situational: 25,
     trainable: true, trainableBy: "Gov't", revenueModel: "Offer · 20% consultant split",
     quip: '"Legally, where are we?"', color: T.moss,
+    benchGroups: ["nigp"],
   },
   {
     id: "christy", name: "Christy Park", role: "Marketing Designer",
@@ -43,6 +49,7 @@ export const AGENTS = [
     docs: 0, classes: 0, chunks: 0, skill: 36, situational: 5,
     trainable: false, trainableBy: "RMV", revenueModel: "Split · 50% RMV",
     quip: '"Make it look like a cover story."', color: T.brass,
+    benchGroups: ["platform"],
   },
   {
     id: "robyn", name: "Robyn Castellanos", role: "NIGP Consultant",
@@ -52,6 +59,7 @@ export const AGENTS = [
     docs: 100, classes: 25, chunks: 1685, skill: 88, situational: 35,
     trainable: true, trainableBy: "NIGP", revenueModel: "Split · 50% NIGP · $260/rpt",
     quip: `"Next year's strategy, not last year's report."`, color: T.brass,
+    benchGroups: ["nigp"],
   },
   {
     id: "brent", name: "Brent Matthews", role: "Data Research Specialist",
@@ -62,6 +70,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV + Self", revenueModel: "Usage · Per Fetch",
     quip: `"If it's on a government server, I'll find it."`,
     color: T.moss, isWebAgent: true,
+    benchGroups: ["nigp"],
   },
   {
     id: "pat", name: "Pat Smiley", role: "Intern Researcher",
@@ -72,6 +81,7 @@ export const AGENTS = [
     trainable: false, trainableBy: "None", revenueModel: "Demo Only",
     quip: `"I'm just here to learn... I think."`,
     color: T.muted, isWebAgent: true, isIntern: true, noMemory: true,
+    benchGroups: ["special"],
   },
   {
     id: "michelle", name: "Michelle Manning", role: "Project Manager",
@@ -83,6 +93,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I map the mission before anyone moves."', color: T.brass,
     isPlanner: true,
+    benchGroups: ["mi", "platform"],
   },
   {
     id: "susan", name: "Susan Smith", role: "Trainer Agent",
@@ -94,6 +105,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"I turn knowledge into capability."', color: T.brass,
     isTrainer: true,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-13 — Dan Bingham (PS-01) AI Prompt Strategist
   {
@@ -106,6 +118,7 @@ export const AGENTS = [
     quip: `"The right prompt doesn't ask for the answer — it makes the answer inevitable."`,
     color: T.moss,
     isPromptArchitect: true,
+    benchGroups: ["mi", "platform"],
   },
   // FEATURE: AG-14 — Alex Reeves (ED-01) Screen Controls Editor
   {
@@ -117,6 +130,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"Content knows what to say. I decide where it lives on the screen."',
     color: T.brass,
+    benchGroups: ["mi", "platform"],
   },
   // FEATURE: AG-15 — Riley Torres (ED-02) HTML Display Editor
   {
@@ -128,6 +142,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: `"A well-structured page doesn't need instructions — it just reads itself."`,
     color: T.brass,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-16 — Claire Sutton (ED-03) PDF Assembly Editor
   {
@@ -139,6 +154,7 @@ export const AGENTS = [
     trainable: true, trainableBy: "RMV", revenueModel: "Included",
     quip: '"Every document is a first impression. I make sure it\'s the right one."',
     color: T.brass,
+    benchGroups: ["platform"],
   },
   // FEATURE: AG-17 — Victoria Chen (SP-01) Head of Product Strategy
   {
@@ -151,7 +167,116 @@ export const AGENTS = [
     quip: '"The catalog is the strategy. Everything else is execution."',
     color: T.navy,
     isProductStrategist: true,
+    benchGroups: ["special"],
   },
+  // FEATURE: AG-27 — Eleanor Voss (LB-01) The Librarian
+  {
+    id: "eleanor", name: "Eleanor Voss", role: "The Librarian",
+    code: "LB-01", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG Broker + Access Control",
+    specialty: "Data Room Access Control · Tenant Isolation · Retrieval Brokering",
+    salary: 110000, value: 130000, hourly: 58, reportHrs: 0, reportCost: 0,
+    docs: 0, classes: 0, chunks: 0, skill: 82, situational: 50,
+    trainable: false, trainableBy: "RMV", revenueModel: "Platform",
+    quip: `"Knowledge without access control isn't a library — it's a leak waiting to happen."`,
+    color: T.navy,
+    isLibrarian: true,
+    benchGroups: ["mi", "platform"],
+  },
+  // FEATURE: AG-18 — Marcus Webb (CI-01) GEO CSO Expert
+  {
+    id: "marcus", name: "Marcus Webb", role: "GEO CSO Expert",
+    code: "CI-01", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Deep Prompt",
+    specialty: "Channel Performance Analysis · Sourced Q&A · Intent Classification",
+    salary: 115000, value: 135000, hourly: 60, reportHrs: 2, reportCost: 120,
+    docs: 0, classes: 0, chunks: 0, skill: 82, situational: 38,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"I own the world's channels."`,
+    color: T.brass,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AG-21 — Priya Nair (CI-02) Forecast/Theory/Performance Expert
+  {
+    id: "priya", name: "Priya Nair", role: "Forecast/Theory/Performance Expert",
+    code: "CI-02", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Deep Prompt",
+    specialty: "Hypothesis Generation · Hypothesis Testing · Evidentiary Rigor",
+    salary: 110000, value: 130000, hourly: 57, reportHrs: 2, reportCost: 114,
+    docs: 0, classes: 0, chunks: 0, skill: 80, situational: 42,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"A theory that survives a hypothesis test earns the name forecast."`,
+    color: T.moss,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AG-19 — Nadia Farouk (CI-03) Data Expert
+  {
+    id: "nadia", name: "Nadia Farouk", role: "Data Expert",
+    code: "CI-03", hiredOn: "Jul 2026", trainer: "RMV", arch: "RAG + Data Pipeline",
+    specialty: "Corpus Retrieval · Data Integrity · Escalation Research",
+    salary: 105000, value: 120000, hourly: 55, reportHrs: 1, reportCost: 55,
+    docs: 0, classes: 0, chunks: 0, skill: 78, situational: 35,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"Nothing gets erased. Everything gets superseded."`,
+    color: T.moss,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AG-22 — Owen Marsh (CI-04) The Proofreader
+  {
+    id: "owen", name: "Owen Marsh", role: "The Proofreader",
+    code: "CI-04", hiredOn: "Jul 2026", trainer: "RMV", arch: "Structured Output",
+    specialty: "Guardrail Enforcement · Quality Scoring · Pre-Display Review",
+    salary: 95000, value: 105000, hourly: 50, reportHrs: 1, reportCost: 50,
+    docs: 0, classes: 0, chunks: 0, skill: 75, situational: 30,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"I don't argue with the answer. I argue with what's missing from it."`,
+    color: T.brass,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AG-23 — Sam Reyes (CI-05) The Intake Assistant
+  {
+    id: "sam", name: "Sam Reyes", role: "The Intake Assistant",
+    code: "CI-05", hiredOn: "Jul 2026", trainer: "RMV", arch: "LLM Routing",
+    specialty: "Commit Triage · Failure Triage · Pipeline Routing",
+    salary: 90000, value: 98000, hourly: 47, reportHrs: 1, reportCost: 47,
+    docs: 0, classes: 0, chunks: 0, skill: 70, situational: 28,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"Every decision needs somewhere to go next."`,
+    color: T.brass,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AG-20 — Elena Cho (CI-06) The Reasoner
+  {
+    id: "elena", name: "Elena Cho", role: "The Reasoner",
+    code: "CI-06", hiredOn: "Jul 2026", trainer: "RMV", arch: "Structured Output",
+    specialty: "Memory Consolidation · Pattern Synthesis · Institutional Knowledge",
+    salary: 115000, value: 130000, hourly: 60, reportHrs: 1, reportCost: 60,
+    docs: 0, classes: 0, chunks: 0, skill: 84, situational: 40,
+    trainable: true, trainableBy: "RMV", revenueModel: "Included",
+    quip: `"One correction, taught right, answers the next hundred questions."`,
+    color: T.navy,
+    benchGroups: ["mi"],
+  },
+  // FEATURE: AGT-026 — Jordan Ellsworth (CI-07) Web Search Expert
+  {
+    id: "jordan", name: "Jordan Ellsworth", role: "Web Search Expert",
+    code: "CI-07", hiredOn: "Jul 2026", trainer: "RMV", arch: "Tool Use + Web Search",
+    specialty: "Live Trade-Press Research · Channel & Competitor News · Source Verification",
+    salary: 95000, value: 110000, hourly: 50, reportHrs: 1, reportCost: 50,
+    docs: 0, classes: 0, chunks: 0, skill: 74, situational: 40,
+    trainable: true, trainableBy: "RMV",
+    revenueModel: "Per-report",
+    quip: `"If it's not in the search results yet, it's not news yet."`,
+    color: T.moss,
+    benchGroups: ["mi"],
+  },
+];
+
+// FEATURE: RO-10 — Bench screen category filter definitions. "all" is not
+// listed here — it is the unfiltered view, not a stored group.
+// FEATURE: RO-14 — old Market Intel label relabeled to Channel Sales Intel
+export const BENCH_FILTERS = [
+  { id: "mi",       label: "Channel Sales Intel" },
+  { id: "platform", label: "Platform Wide"     },
+  { id: "nigp",     label: "Spend Analysis"    }, // FEATURE: RO-11 — relabeled, was the old NIGP label
+  { id: "special",  label: "Special Interests" },
 ];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
@@ -174,6 +299,17 @@ export const AVATAR_CFG = {
   claire:{ skin:"#e8d5b5", hair:"#6a4a2a", collar:"#1e2e3a", extra:"bun",     border:T.brass },
   // FEATURE: AG-17 — Victoria Chen avatar
   victoria: { skin:"#e8d4b8", hair:"#1a1a2a", collar:"#2a1a3a", extra:"", border:T.navy },
+  // FEATURE: AG-27 — Eleanor Voss avatar
+  eleanor: { skin:"#d8c4a8", hair:"#c9c5bc", collar:"#1a2e3a", extra:"glasses", border:T.navy },
+  // FEATURE: AG-18/19/20/21/22/23 — Apple Channel avatars
+  marcus: { skin:"#d2a679", hair:"#3a2a1a", collar:"#1a2e4a", extra:"glasses", border:T.brass },
+  priya:  { skin:"#8a5a3a", hair:"#1a1a1a", collar:"#2a4a3a", extra:"",        border:T.moss  },
+  nadia:  { skin:"#c48b62", hair:"#2a1a12", collar:"#1e3a2e", extra:"",        border:T.moss  },
+  owen:   { skin:"#e0c2a0", hair:"#5a4a3a", collar:"#2a2a3a", extra:"glasses", border:T.brass },
+  sam:    { skin:"#d8b088", hair:"#3a2a1a", collar:"#2a3a52", extra:"",        border:T.brass },
+  elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
+  // FEATURE: AGT-026 — Jordan Ellsworth avatar
+  jordan: { skin:"#d0a888", hair:"#3a2e24", collar:"#1e3a44", extra:"headset", border:T.moss },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -195,6 +331,17 @@ export const AGENT_PRONOUNS = {
   claire:{ subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AG-17 — Victoria Chen pronouns
   victoria: { subject:"she", object:"her", possessive:"her" },
+  // FEATURE: AG-27 — Eleanor Voss pronouns
+  eleanor: { subject:"she", object:"her", possessive:"her" },
+  // FEATURE: AG-18/19/20/21/22/23 — Apple Channel pronouns
+  marcus: { subject:"he",   object:"him",  possessive:"his"   },
+  priya:  { subject:"she",  object:"her",  possessive:"her"   },
+  nadia:  { subject:"she",  object:"her",  possessive:"her"   },
+  owen:   { subject:"he",   object:"him",  possessive:"his"   },
+  sam:    { subject:"they", object:"them", possessive:"their" },
+  elena:  { subject:"she",  object:"her",  possessive:"her"   },
+  // FEATURE: AGT-026 — Jordan Ellsworth pronouns
+  jordan: { subject:"he", object:"him", possessive:"his" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
