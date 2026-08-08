@@ -1,0 +1,1 @@
+Worktree `design-console-cleanup-0808` — design session: desktop Live Agent Console first-draw layout cleanup, 4 labeled areas from John's screenshot (card under legend; role text overflowing card; card behind prompt box; waterfall/trace separation). Scoping with John; same conversation as S-LAV-33/S-MOB-17.
