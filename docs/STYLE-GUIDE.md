@@ -933,6 +933,7 @@ Any future Evidence entry type (`CHI-46`'s news/web-finding cards, a future `CHI
 | 2026-07-01 | S-LIBRARIAN-01c-design | Section 17 added — Agent Avatar Visibility Rule locked (AA-73): any agent-attribution UI, primary or collaboration credit, must render `AgentAvatar`, never name-only text. |
 | 2026-06-09 | S-BENCH-UX-02 | RO-08 resolved: AiBadge on brass = navy chip override; on moss = white chip override. Badge stays inside button. No badge on non-AI actions (file browse). |
 | 2026-07-06 | S-ARCH-VIZ-01-design | Section 18 added — `ChartRenderer`/`CHART_RENDERERS` generic visualization dispatch locked (`AA-117`, `ARCHITECTURE.md` §19g): one frontend rendering path for any capability's agent-chosen `visualization` output, first registered type `bar_pair`. |
+| 2026-08-07 | S-LAV-33-design | Section 41 bullet added — Deliverable drawer run-complete cue locked: brass `borderPulse` until first open, reduced-motion static-border fallback, chrome only. |
 
 ## Section 41 — Live Agent View: Round-1 UX Rules (Locked 2026-07-31 · S-LAV-5-design)
 
@@ -944,6 +945,7 @@ Any future Evidence entry type (`CHI-46`'s news/web-finding cards, a future `CHI
 - **Trace console anatomy:** 172px tall; header shows the 8-char first id segment (no "trace" word) + `+N`; both panes scroll with `scrollbar-width:thin` + `ScrollFadeHint` (`bg: CON_BG` — reuse from `SharedUI.jsx`, never reimplement); every line numbered oldest = 1 top → newest highest at bottom; sticky field-label headers (`# / time / event / call id / detail`; waterfall `agent · intent / timeline / duration`). Event type strings still print verbatim — headers label columns, they rename nothing. Model-call lines label the token split: `in X / out Y tok`.
 - **Prompt box:** 4-line clamp; the preview starts after a leading `=== OUTPUT FORMAT ===` block (`promptPreviewText()`); the popover always renders the full untouched streamed text — the record is never altered, only where the preview window starts.
 - **Right rail:** the Agent Routing feed only — CHI's row components (`RoutingHopCard`/`QuestionDivider`, imported from `MarketIntelligenceScreen.jsx`), full-height scroll, slim uppercase `Agent Routing · N hops` header; no Drawer chrome, no other drawers on this screen.
+- **Deliverable drawer run-complete cue (`LAV-33`, locked 2026-08-07):** from run-completion until the user first opens it, the Deliverable drawer's frame carries the existing brass `borderPulse` idiom (tokens.js — same keyframe as the Console Boot Dial frame and `.upload-blink`; never a second attention animation). Opening clears it; the next run's answer re-arms it. Never while a run is live. `prefers-reduced-motion`: animation off, static `T.brass` border instead (same pattern as `MOB-11`'s mobile breath states). Chrome only — drawer content untouched (§19s).
 
 **Everything in this section describes the DESKTOP composition.** Mobile is a different composition, not a reflow of it — Section 42.
 

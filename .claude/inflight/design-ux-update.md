@@ -1,1 +1,0 @@
-Worktree `design-ux-update` — design session S-LAV-33-design (v7.0.68): `LAV-33` (UI, Beta-gate bucket 5) — Deliverable drawer run-complete cue (brass borderPulse until first open) on the Live Agent Console. Kickoff `docs/kickoffs/v7.0.68-LAV-33-deliverable-drawer-cue.md`; coding via the automated loop (Sonnet 5), then self-QA.
