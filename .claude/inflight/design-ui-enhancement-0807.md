@@ -1,1 +1,0 @@
-design-ui-enhancement-0807 — S-LAV-34-design (v7.0.71): LAV-34 (UI, Beta-gate bucket 5) desktop status strip narration → brass pill w/ pulsing dot. Kickoff committed; automated coding session (Sonnet 5) + design-session QA in progress. Filed MOB-18 (UI, bucket 3) mobile counterpart.
