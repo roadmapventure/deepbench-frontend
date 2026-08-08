@@ -1,1 +1,2 @@
-Worktree `design-ip-security` — design session on IP security (topic to be confirmed with John), started 2026-08-08.
+Worktree `design-ip-security` — S-HAR-33-design (v7.0.76 backend / v7.0.77 popup), started 2026-08-08.
+`HAR-33` (Feature): per-IP access gate for the live URL — $5 trial cap (US), geo block (foreign), friendly popup; all state on `ip_org_cache`, enforcement via new Vercel Edge Middleware. Kickoffs committed; migration applied by this session (columns + `model_pricing` + `get_ip_stats()` + `ip_spend_report`); coding sessions a/b spawn next per the Automated Loop. Also filed: `HAR-34` (block alerting, Post-beta), `HAR-35` (CORS wildcard, Post-beta), `HAR-36` (per-user identity, Post-beta).
