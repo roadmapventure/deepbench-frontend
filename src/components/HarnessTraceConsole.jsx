@@ -1,3 +1,5 @@
+// DeepBench v7.0.75 | HarnessTraceConsole.jsx | LAV-37 -- console first-draw cleanup (grid clears
+// chrome overlays / role wrap / waterfall pane tint)
 // DeepBench v7.0.27 | HarnessTraceConsole.jsx | LAV-7c -- the events pane's sticky field-label row
 // no longer jumps on first scroll. `.lavc-events` carries `padding:6px 10px` and `.lavc-hdrow` is
 // pulled flush with `margin:-6px -10px 4px`, but sticky's `top:0` threshold measures from the
@@ -267,7 +269,8 @@ function JsonText({ value, indent }) {
 }
 
 // ── component CSS (GLOBAL_CSS already owns aiBlink/fadeIn/spin) ──────────────────────────────
-const CON_CSS = `
+// Exported (LAV-37) so the regression test can assert on the real string rather than a duplicate.
+export const CON_CSS = `
 .lavc{background:${CON_BG};color:${CON_TXT};border-top:2px solid ${CON_LINE};display:flex;
   flex-direction:column;flex-shrink:0;height:172px;transition:height .3s;min-height:0}
 .lavc.is-collapsed{height:34px}
@@ -291,7 +294,9 @@ const CON_CSS = `
    to the real scroll viewport's bounds. The flex ratio moved to the shell; the pane fills it. */
 .lavc-pane{position:relative;display:flex;min-width:0;min-height:0}
 .lavc-pane-ev{flex:1.3;border-right:1px solid ${CON_LINE}}
-.lavc-pane-wf{flex:1}
+/* LAV-37: darker than the shared console background so the waterfall reads as its own panel
+   against the navy surface -- the 1px divider above alone wasn't visible enough. */
+.lavc-pane-wf{flex:1;background:${rgba(T.navyDeep, 0.5)}}
 .lavc-events{flex:1;overflow:auto;scrollbar-width:thin;padding:6px 10px;min-width:0;
   font-family:${mono};font-size:11px;line-height:1.5}
 .lavc-wf{flex:1;overflow:auto;scrollbar-width:thin;padding:6px 10px;min-width:0}
