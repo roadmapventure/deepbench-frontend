@@ -936,6 +936,7 @@ Any future Evidence entry type (`CHI-46`'s news/web-finding cards, a future `CHI
 | 2026-08-07 | S-LAV-33-design | Section 41 bullet added — Deliverable drawer run-complete cue locked: brass `borderPulse` until first open, reduced-motion static-border fallback, chrome only. |
 | 2026-08-07 | S-MOB-17-design | Section 42 tabs bullet amended — mobile Answer tab run-complete cue locked (same `borderPulse` idiom + predicate as `LAV-33`); tab label locked as "Answer" per John. |
 | 2026-08-07 | S-LAV-34-design | Section 41 bullet added — status strip live-narration brass pill locked (`LAV-34`): brass wash + border, brassDeep 12.5px semibold, dot pulses `aiBlink` only while live, reduced-motion static, empty message = bare spacer. |
+| 2026-08-08 | S-CHI-100-design | Global rule locked (`CHI-100`, John's call): **desktop renders at 80%** — `zoom: 0.8` on `#root` at `min-width: 769px` (always `MOBILE_BREAKPOINT + 1`), every `100vh` inside the zoomed root must compensate via `calc(100vh / 0.8)` (currently the `GLOBAL_CSS` `#root` rule + `AppShell`'s `--shell-h`; a NEW `100vh`/`vh`-unit style anywhere in `src/` must consume the same compensation or it will render 80% tall with a blank band). Mobile is never zoomed. `zoom` may appear exactly once in `src/`. |
 
 ## Section 41 — Live Agent View: Round-1 UX Rules (Locked 2026-07-31 · S-LAV-5-design)
 

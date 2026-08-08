@@ -1,3 +1,4 @@
+// DeepBench v7.0.73 | tokens.js | CHI-100 -- desktop 80% render default: GLOBAL_CSS media block + vh compensation variable (see below)
 // DeepBench v7.0.4 | tokens.js | LAV-1e -- focus-area status flip: channelSales Beta->Alpha, projectMgmt/spendAnalysis Alpha->Pre-Alpha, new liveAgentView key (Beta)
 // DeepBench v6.3.171 | tokens.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
 // DeepBench v6.3.138 | tokens.js | S-SH-23 -- focus-area release-status labels
@@ -77,6 +78,14 @@ button:hover { opacity:.88; }
 ::-webkit-scrollbar-thumb:hover{background:#b6873a}
 select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23786d52'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 input[type=range]{cursor:pointer}
+/* FEATURE: CHI-100 -- desktop renders at 80% (John's call): controls must fit at 100% browser
+   zoom. 769px is MOBILE_BREAKPOINT+1 (useIsMobile.js) -- mobile stays true-size. Every
+   100vh inside the zoomed root lays out at 80% of the viewport, so the two vh sites
+   (this #root rule, AppShell's wrapper via the shell-height variable below) compensate
+   with calc(100vh / 0.8). */
+@media (min-width: 769px){
+  #root { zoom: 0.8; min-height: calc(100vh / 0.8); --shell-h: calc(100vh / 0.8); }
+}
 `;
 
 // ── Chart Color Palette ───────────────────────────────────────────────────────
