@@ -4,6 +4,14 @@
 // label. One Verification phase, not two (§19s allocates record verification under Verification);
 // collapses MOB-16's duplicate mobile tracker chips through the same shared fold. Keyed on the stage
 // key only -- no agent, no intent special-case. Nothing else in the fold changes.
+// PATCH-1 (post-QA, same session): first-completion-founds-the-stage was the wrong owner. The
+// record check runs INSIDE the gate's round so its completion streams FIRST, and live QA came back
+// inverted -- Eleanor Voss owning Verification with Owen Marsh nested under her. §19s allocates the
+// stage line to the PARENT work, so the filled-host case now reads span parentage (`buildParentBySpan`,
+// off the same prompt frames as buildDeclaredWorkBySpan) and lets a completion that is the parent of
+// the host's founding work CLAIM the headline, demoting the incumbent to a sub-entry that keeps its
+// own agent, account and took-time. One level only; an unrelated same-stage completion still nests.
+// Paired one-line carry in `useHarnessStream.js` (the ledger's prompt build dropped `parent_span_id`).
 // DeepBench v7.0.69 | AssemblyView.jsx | MOB-15 -- Assembly reaches mobile. Two additive exports and
 // nothing else: `AssemblyTrackerBand` (one chip per stage, off this file's own unchanged fold) and an
 // `export` keyword on the existing `StageSection`, so the mobile console can render one stage's text
@@ -259,6 +267,24 @@ function buildDeclaredWorkBySpan(list) {
   return bySpan;
 }
 
+// FEATURE: LAV-36 PATCH-1 (§19s) -- span -> PARENT span, off the same `prompt_assembled` frames
+// and with the same posture as buildDeclaredWorkBySpan above (pre-pass because the ledger is not in
+// frame-arrival order; first declaration per span wins; a span that never declared a parent is
+// simply absent). This is the only thing that can tell two same-stage completions apart WITHOUT
+// naming an agent or an intent: the work that ran INSIDE another piece of work points at it. §19s
+// allocates the stage line to the PARENT work, so the fold has to be able to see that link.
+function buildParentBySpan(list) {
+  const bySpan = new Map();
+  for (const evt of list) {
+    if (!evt || evt.type !== "prompt_assembled") continue;
+    const d = evt.data || {};
+    const span = d.span_id ?? null;
+    if (span == null || bySpan.has(span)) continue;
+    bySpan.set(span, d.parent_span_id ?? null);
+  }
+  return bySpan;
+}
+
 // FEATURE: LAV-28c -- the stage a `delegation_return` completes, read off the work its own span
 // declared. S-LAV-28b's live verdict (World 3c, both captured runs): every deep-leg completion
 // streams as `delegation_return` and ZERO `delegation_complete` frames stream at all, so a fold
@@ -314,6 +340,8 @@ export function buildAssemblyStages(events, eventTimes, {
   // FEATURE: LAV-28c -- span -> declared work, built before the main pass (see the helper's own
   // header for why the ledger's order makes a running lookup insufficient).
   const declaredWorkBySpan = buildDeclaredWorkBySpan(list);
+  // FEATURE: LAV-36 PATCH-1 -- same frames, same pre-pass reason (see buildParentBySpan).
+  const parentBySpan = buildParentBySpan(list);
 
   const sections = [];                                   // open order; reversed at the end
   const open = (props) => { const s = { subEntries: [], ...props }; sections.push(s); return s; };
@@ -426,6 +454,32 @@ export function buildAssemblyStages(events, eventTimes, {
       // (MOB-16 -- one chip per section, same fold).
       const filledHost = findLast(s => s.filled && s.stage === stage);
       if (filledHost) {
+        // FEATURE: LAV-36 PATCH-1 (§19s) -- WHICH of the two same-stage completions owns the stage
+        // line is not "whichever landed first". Live QA on the T1 build (2026-08-08) came back
+        // inverted for exactly that reason: the record check runs INSIDE the gate's round, so its
+        // completion always streams first, founded Verification, and the gate review -- the work
+        // §19s allocates the stage line to -- nested under it. Span parentage is the discriminator,
+        // and it is the only one available that names no agent and no intent (Rule #1): the parent
+        // work CLAIMS the headline, demoting the incumbent to a sub-entry that keeps its own agent,
+        // account and took-time. One level deliberately, never a walk up the chain -- §19s's nesting
+        // is one level deep. An unrelated same-stage completion (no parent link -- the Draft
+        // revision-round case) still nests exactly as T1 had it.
+        const incomingSpan = d.span_id ?? null;
+        const isParentOfHost = incomingSpan != null && filledHost.spanId != null
+          && parentBySpan.get(filledHost.spanId) === incomingSpan;
+        if (isParentOfHost) {
+          filledHost.subEntries.unshift({
+            key: `${filledHost.key}-demoted`,
+            // All FOUR identity fields whoOf builds, not three: `agentResolved` is what gates the
+            // sub-entry's avatar at render, so dropping it would silently strip the demoted agent's
+            // face off the line.
+            agentId: filledHost.agentId, agentName: filledHost.agentName,
+            agentRole: filledHost.agentRole, agentResolved: filledHost.agentResolved,
+            did: filledHost.did, timeSignature: filledHost.timeSignature,
+          });
+          Object.assign(filledHost, filledProps, { spanId: incomingSpan });
+          continue;
+        }
         filledHost.subEntries.push({ key, ...whoOf(evt.agentId, byId), did, timeSignature });
         continue;
       }
