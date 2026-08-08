@@ -1,3 +1,9 @@
+// DeepBench v7.0.74 | AssemblyView.jsx | LAV-36 -- one section per stage. The completion path gains
+// the start path's filled-host rule (LAV-25 T3's mirror): a stage-deriving completion whose stage is
+// already FILLED nests as a sub-entry under that section instead of opening a duplicate with the same
+// label. One Verification phase, not two (§19s allocates record verification under Verification);
+// collapses MOB-16's duplicate mobile tracker chips through the same shared fold. Keyed on the stage
+// key only -- no agent, no intent special-case. Nothing else in the fold changes.
 // DeepBench v7.0.69 | AssemblyView.jsx | MOB-15 -- Assembly reaches mobile. Two additive exports and
 // nothing else: `AssemblyTrackerBand` (one chip per stage, off this file's own unchanged fold) and an
 // `export` keyword on the existing `StageSection`, so the mobile console can render one stage's text
@@ -409,8 +415,21 @@ export function buildAssemblyStages(events, eventTimes, {
         key, stage, ghost: false, filled: true, ...whoOf(evt.agentId, byId),
         did, content: deriveContent(evt), timeSignature, asked: null,
       };
-      if (target) Object.assign(target, filledProps, { spanId: d.span_id ?? target.spanId ?? null });
-      else open({ ...filledProps, spanId: d.span_id ?? null });
+      if (target) { Object.assign(target, filledProps, { spanId: d.span_id ?? target.spanId ?? null }); continue; }
+      // FEATURE: LAV-36 (§19s) -- the completion-path mirror of LAV-25 T3's revision rule above:
+      // work whose stage is already FILLED is work INSIDE that stage, never a second section with
+      // the same label. The section keeps its own agent and ✓; the later completion nests as a
+      // sub-entry carrying the doer's own account and took-time. Keyed on the stage key only --
+      // no agent, no intent named (Rule #1). This is what makes the drawer show ONE Verification
+      // phase when the gate's review has filled it and the record check lands after (John's
+      // 2026-08-08 report), and it collapses the mobile tracker band's duplicate chips for free
+      // (MOB-16 -- one chip per section, same fold).
+      const filledHost = findLast(s => s.filled && s.stage === stage);
+      if (filledHost) {
+        filledHost.subEntries.push({ key, ...whoOf(evt.agentId, byId), did, timeSignature });
+        continue;
+      }
+      open({ ...filledProps, spanId: d.span_id ?? null });
       continue;
     }
 
