@@ -51,5 +51,17 @@ public key could simply rewrite or wipe. When auditing a table's exposure, alway
 and remember `role_column_grants` shows per-column rows for table-level grants too, so a column
 appearing there does not mean the grant was ever column-scoped. Gate-critical lockdown shipped for
 `ip_org_cache` (no public writes) and `ai_activity_log` (append-only + non-negative token check);
-the remaining tables are `DAT-18` (docs/FEATURES.md) — survey which tables the browser legitimately
-writes before revoking.
+`DAT-18` (v7.0.78, 2026-08-08) finished the platform: `anon`/`authenticated` hold **zero write
+privileges** on every table except `tasks` (INSERT+UPDATE — the browser's own write path, `DAT-19`
+tracks rerouting) and `ai_activity_log`'s INSERT.
+
+Two facts every later grants session needs:
+
+- **Default privileges are closed** (`alter default privileges for role postgres … revoke … on tables`):
+  a new table gets NO public write grants automatically. Right direction (fail closed), but a new
+  table the browser must write presents as silent 401/42501s — grant explicitly in the migration
+  that creates it, same pattern as the SELECT fail-closed note above.
+- **`information_schema.role_table_grants` does not report PG17 `MAINTAIN`** — `anon`/`authenticated`
+  still hold `m` on all 32 tables (`DAT-20`, latent, not DML, unreachable via PostgREST). Read
+  `pg_class.relacl` / `pg_default_acl` when the question is "the complete grant surface," not just
+  the information_schema views.

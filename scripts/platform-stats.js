@@ -1,4 +1,4 @@
-// DeepBench v6.3.177 | platform-stats.js | ABT-1f -- log a deepen only when it really deepened; record the Vercel shallow-clone finding
+// DeepBench v7.0.78 | platform-stats.js | S-DAT-18 -- writes with the service key (anon key lost its platform_stats write grant)
 // Runs automatically from package.json's `prebuild` on every Vercel build of dev/main, or
 // locally via `node --env-file=.env.local scripts/platform-stats.js`. Plain Node, no deps.
 // NEVER writes dev_toolchain_services -- that is a John-set value, preserved by omission.
@@ -37,11 +37,17 @@ async function main() {
     skip(`preview build for branch ${vercelRef}`);
   }
 
+  // DAT-18: this script's PATCH is the only non-browser write path to platform_stats, and the
+  // anon key no longer holds write grants on that table -- prefer the service key. The anon
+  // fallback is kept so a keyless/older environment still fails (or skips, under --soft) with a
+  // clear message rather than throwing.
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const SUPABASE_ANON_KEY =
-    process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    fail("missing SUPABASE_URL / SUPABASE_ANON_KEY (or VITE_ fallbacks)");
+  const SUPABASE_WRITE_KEY =
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !SUPABASE_WRITE_KEY) {
+    fail("missing SUPABASE_URL / SUPABASE_SERVICE_KEY (or key fallbacks)");
   }
 
   function walk(dir, matcher, out = []) {
@@ -159,8 +165,8 @@ async function main() {
   };
 
   const restHeaders = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    apikey: SUPABASE_WRITE_KEY,
+    Authorization: `Bearer ${SUPABASE_WRITE_KEY}`,
   };
 
   // Read the stored row first, so a computed count lower than what's already there (the other
