@@ -1,3 +1,14 @@
+// DeepBench v7.0.69 | LiveAgentViewScreen.jsx | MOB-15 -- the mobile bottom text cluster. The run's
+// text story consolidates into two fixed clusters on a phone: the status strip keeps §19o's
+// expectation row (badge · elapsed · Tokens · Est. Cost) and gives up its second row, and the
+// narration that row carried moves verbatim to the bottom region directly above the Agent Routing
+// feed -- narration and routing read together. Above them, the new Assembly tracker band gives mobile
+// its FIRST Assembly surface (chips off the same `buildAssemblyStages` fold the desktop drawer reads,
+// §19q); tapping a chip swaps the region's CONTENT to that stage's own text and tapping again swaps
+// back. One `openStageKey` state, one derived `openStage`, no effect: a new run changes the fold's
+// keys and the region returns to resting by itself. Fixed layout by construction -- flex, height,
+// padding and border are written on the container, outside the conditional, so neither state can
+// move a pixel of anything else on the screen. Mobile branch only; the desktop return is untouched.
 // DeepBench v7.0.55 | LiveAgentViewScreen.jsx | LAV-21b -- two additions, both of them one
 // expression each. (1) `assemblyStages`: the Assembly drawer's fold (§19r), built here for the same
 // reason the Run Assembly feed's is -- this file owns the run-scoped ledger and its index-aligned
@@ -155,7 +166,10 @@ import AgentNetwork from "../components/AgentNetwork.jsx";
 import { buildRunTaskEntries } from "../components/RunTasks.jsx";
 // FEATURE: LAV-21b -- the Assembly drawer's pure fold. Same input contract as buildRunTaskEntries
 // above; both stay built here so the feed can be re-mounted with no change to this file.
-import { buildAssemblyStages } from "../components/AssemblyView.jsx";
+// FEATURE: MOB-15 -- the band and the stage renderer come from the same module as the fold, so the
+// mobile bottom cluster shows the desktop drawer's own sections rendered by the desktop drawer's own
+// component. This screen authors no stage copy (§19j) and cannot drift from the drawer (§19q).
+import { buildAssemblyStages, AssemblyTrackerBand, StageSection } from "../components/AssemblyView.jsx";
 import { ROTATING_POOL, FIXED_DRAWER_TAIL } from "../data/chiQuestions.js";
 import { supabase } from "../lib/supabase.js";
 // FEATURE: LAV-1c -- the EST. COST meter's sumCost() delegates row-by-row to computeCallCost()
@@ -504,6 +518,12 @@ export default function LiveAgentViewScreen() {
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState("canvas");   // "canvas" | "answer"
   const [showTrace, setShowTrace] = useState(false);      // the Harness Trace overlay
+  // FEATURE: MOB-15 -- which Assembly stage the mobile bottom region is showing, or null for the
+  // resting view (narration + Agent Routing). A section KEY, never an index: the fold rebuilds a
+  // fresh array on every frame and an index would point at a different stage a moment later. The
+  // stage itself is DERIVED from this key below, never mirrored into state -- so a new run (fold
+  // resets, keys change) drops the region back to resting with no effect and no cleanup.
+  const [openStageKey, setOpenStageKey] = useState(null);
 
   const [picked, setPicked] = useState("");
   // FEATURE: LAV-11 -- captured at Run-click time, not read live off `picked` (the select is not
@@ -791,6 +811,11 @@ export default function LiveAgentViewScreen() {
   // both paths -- this branch is placed after the last one deliberately.
   if (isMobile) {
     const runDisabled = !picked || running || awaiting;
+    // FEATURE: MOB-15 -- the open stage, DERIVED from the tapped key against the current fold. A key
+    // the current fold no longer contains resolves to null and the bottom region returns to its
+    // resting view on its own: that is what makes a second run self-heal without an effect, a
+    // cleanup, or a reset written anywhere.
+    const openStage = (assemblyStages?.sections ?? []).find(s => s.key === openStageKey) ?? null;
     return (
       <AppShell>
         <div style={{position:"relative",flex:1,display:"flex",flexDirection:"column",minHeight:0,
@@ -798,6 +823,7 @@ export default function LiveAgentViewScreen() {
           <FeatureBadge id="LAV-1"/>
           <FeatureBadge id="LAV-5"/>
           <FeatureBadge id="MOB-4"/>
+          <FeatureBadge id="MOB-15"/>
 
           {/* ── Title row ── */}
           {/* CHI-88's locked mobile title chrome, mirrored: one 17px line with the focus area's own
@@ -853,8 +879,14 @@ export default function LiveAgentViewScreen() {
 
           {/* ── Status strip: permanent, tab-independent ── */}
           {/* §21's locked fix, inherited: the one progress indicator on the page must never be
-              inside a tab body, or switching tabs hides it. Both status branches keep desktop's
-              priority -- `awaiting` outranks the streamed message. */}
+              inside a tab body, or switching tabs hides it. §19o's expectation (the badge, the
+              elapsed clock and the two meters) is unchanged and still lives here.
+              FEATURE: MOB-15 -- the strip's SECOND row (the §19s working-status narration, and the
+              `awaiting` "Needs Your Decision" branch that outranks it) has moved verbatim down to the
+              bottom text cluster, directly above the Agent Routing feed, so the narration and the
+              routing it narrates are read together. Same content, same priority, same styles -- a
+              different slot on one screen, which re-cuts nothing about §19s's four-surface
+              allocation: status-line lane content is still rendered on exactly one surface here. */}
           <div style={{background:T.cardAlt,borderBottom:`1px solid ${T.line}`,padding:"7px 14px",
             flexShrink:0,display:"flex",flexDirection:"column",gap:4}}>
             <div style={{display:"flex",alignItems:"center",gap:9}}>
@@ -875,17 +907,6 @@ export default function LiveAgentViewScreen() {
                 </div>
               </div>
             </div>
-            {awaiting ? (
-              <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.brassDeep,
-                textTransform:"uppercase",letterSpacing:"0.02em"}}>
-                Needs Your Decision
-              </div>
-            ) : (
-              <div style={{fontFamily:mono,fontSize:10.5,color:T.muted,fontStyle:"italic",
-                whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                {status?.message || ""}
-              </div>
-            )}
           </div>
 
           {/* ── Tab bar ── */}
@@ -954,12 +975,48 @@ export default function LiveAgentViewScreen() {
             </div>
           )}
 
-          {/* ── Pinned Agent Routing feed ── */}
-          {/* Visible under both tabs and scrolling independently of the tab body, exactly as §21
-              pins CHI's. Same AgentRoutingRail, same events, unchanged. */}
-          <div style={{flex:1,minHeight:0,overflowY:"auto",background:T.paperDeep,
+          {/* ── MOB-15: the pinned bottom text cluster ── */}
+          {/* The run's whole text story, in one fixed-height region: the Assembly tracker band, then
+              EITHER (resting) the working-status narration above the pinned Agent Routing feed, OR
+              (a chip tapped) that one stage's own text. Visible under both tabs and scrolling
+              independently of the tab body, exactly as §21 pins CHI's -- the tab body's `flex:3` and
+              this region's `flex:1` are untouched, so the swap below is the ONLY thing that changes.
+
+              The swap is app-static by construction: it changes which children RENDER inside a box
+              whose flex, height, padding, border and background are written once, outside the
+              conditional. Nothing above it moves, and the canvas never reflows. */}
+          <AssemblyTrackerBand stages={assemblyStages} running={running} openKey={openStageKey}
+            onToggle={k => setOpenStageKey(prev => (prev === k ? null : k))}/>
+          <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column",background:T.paperDeep,
             borderTop:`1px solid ${T.line}`,padding:"8px 12px"}}>
-            <AgentRoutingRail events={railEvents} agents={agents}/>
+            {openStage ? (
+              /* One stage, rendered by the Assembly drawer's OWN component off the drawer's own
+                 section object -- no screen-authored copy, no second story about the stage (§19j,
+                 §19q). `first` so it carries no divider rule of its own in a box it is alone in. */
+              <div style={{flex:1,minHeight:0,overflowY:"auto"}}>
+                <StageSection section={openStage} first terminal={!!assemblyStages?.terminal}/>
+              </div>
+            ) : (
+              <>
+                {/* The narration moved down from the status strip, both branches verbatim --
+                    `awaiting` still outranks the streamed message, and neither line is restyled. */}
+                {awaiting ? (
+                  <div style={{fontFamily:mono,fontSize:11,fontWeight:700,color:T.brassDeep,
+                    textTransform:"uppercase",letterSpacing:"0.02em",flexShrink:0}}>
+                    Needs Your Decision
+                  </div>
+                ) : (
+                  <div style={{fontFamily:mono,fontSize:10.5,color:T.muted,fontStyle:"italic",
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>
+                    {status?.message || ""}
+                  </div>
+                )}
+                {/* Same AgentRoutingRail, same events, unchanged. */}
+                <div style={{flex:1,minHeight:0,overflowY:"auto"}}>
+                  <AgentRoutingRail events={railEvents} agents={agents}/>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── Harness Trace overlay ── */}

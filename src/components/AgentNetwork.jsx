@@ -1,3 +1,7 @@
+// DeepBench v7.0.69 | AgentNetwork.jsx | MOB-15 -- the mobile edge legend joins the Single|Bench
+// toggle as one right-aligned cluster (two declarations in NET_CSS's mobile section: .lav-mchrome
+// space-between -> flex-end, .lav-mseg loses its auto margin). Mobile-scoped selectors only -- no JSX
+// change, and the desktop rules and the desktop .lav-topright row are byte-identical.
 // DeepBench v7.0.68 | AgentNetwork.jsx | LAV-33 -- Deliverable drawer run-complete cue (brass
 // borderPulse until first open)
 // DeepBench v7.0.65 | AgentNetwork.jsx | LAV-32b (§19s four-surface standard) -- the canvas bubble is
@@ -912,16 +916,23 @@ export const NET_CSS = `
    the desktop canvas is byte-identical to what it renders today. The mobile canvas reuses
    .lav-stagewrap/.lav-stage as its box, but never .lav-inner: that box is locked to
    aspect-ratio:1200/640 for the desktop viewBox and would letterbox this layout away. */
-/* One chrome row: legend hard left, view toggle hard right, nothing in the middle -- which is what
-   lets the legend grow rightward as more edge meanings light up (MOB-5 accepts the wrap past 3). */
+/* FEATURE: MOB-15 -- one chrome row, ONE right-aligned cluster: the legend sits immediately left of
+   the Single|Bench toggle instead of hard left with the whole canvas width between them. This mirrors
+   desktop's .lav-topright arrangement (legend and controls together, top right) and amends §42's
+   locked "legend hard left" line -- John's own call, 2026-08-07. The legend still grows leftward from
+   the toggle as more edge meanings light up, so MOB-5's accepted wrap past 3 is unaffected; JSX order
+   (legend, then toggle) already reads left-to-right correctly and is untouched. */
 .lav-mchrome{position:absolute;left:8px;right:8px;top:7px;z-index:6;display:flex;align-items:center;
-  justify-content:space-between;gap:8px}
+  justify-content:flex-end;gap:8px}
 .lav-mlegend{min-height:19px;display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:0 7px;
   border-radius:8px;border:1px solid ${T.line};background:${rgba(T.paper, 0.94)};
   font-family:${mono};font-size:7px;color:${T.muted};line-height:1}
 .lav-mlegend span{display:inline-flex;align-items:center;gap:3px}
 .lav-mlegend .sw{width:11px;height:2px;border-radius:1px;flex:none}
-.lav-mseg{display:flex;align-items:stretch;height:19px;flex:none;margin-left:auto;padding:1px;
+/* FEATURE: MOB-15 -- the auto left margin is gone along with the space-between above: the row is
+   right-aligned as a whole now, so an auto margin here would push the toggle away from the legend
+   again and undo the cluster. */
+.lav-mseg{display:flex;align-items:stretch;height:19px;flex:none;padding:1px;
   background:${T.card};border:1px solid ${T.brass};border-radius:20px;
   box-shadow:0 2px 7px ${rgba(T.navy, 0.14)}}
 .lav-mseg button{position:relative;border:none;background:none;border-radius:20px;cursor:pointer;
@@ -1589,7 +1600,8 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
         <FeatureBadge id="LAV-16"/>
         <style>{NET_CSS}</style>
         <div className="lav-stage" ref={mStageRef}>
-          {/* Chrome: legend hard left, view toggle hard right, one row. The Choreographed/Static
+          {/* Chrome: legend and view toggle as ONE right-aligned cluster, one row (MOB-15 -- the CSS
+              is where that alignment lives; this order is unchanged). The Choreographed/Static
               control is deliberately absent -- it tunes a choreography this layout does not use. */}
           <div className="lav-mchrome">
             {mobileLegend.length > 0 && (

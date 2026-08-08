@@ -1,3 +1,8 @@
+// DeepBench v7.0.69 | AssemblyView.jsx | MOB-15 -- Assembly reaches mobile. Two additive exports and
+// nothing else: `AssemblyTrackerBand` (one chip per stage, off this file's own unchanged fold) and an
+// `export` keyword on the existing `StageSection`, so the mobile console can render one stage's text
+// in its bottom region. The fold, the drawer, every style constant above and every rendering decision
+// are byte-identical; nothing here mounts on desktop.
 // DeepBench v7.0.64 | AssemblyView.jsx | LAV-32a -- the §19s four-surface trim. This drawer is now
 // the BUILDING lane only, and a stage card renders exactly five things: ✓ (when filled) + stage
 // label + agent + `took m:ss` + the doer's receipt sentence. Removed, all render-only: the "arrived
@@ -561,7 +566,11 @@ function SubEntry({ entry }) {
 // FEATURE: LAV-25b (T1) -- `terminal` reaches here for exactly one reason: a ghost that survives
 // terminal because it holds real work must not keep shimmering. Shimmer means "still coming"; once
 // the run is over nothing else is coming, so the box renders what actually landed and nothing more.
-function StageSection({ section, first, terminal = false }) {
+// FEATURE: MOB-15 -- exported (and otherwise untouched) so the mobile console can render ONE stage's
+// own text in its bottom region. Mobile shows the same section object the desktop drawer shows, so
+// the two surfaces can never tell two different stories about a stage (§19q's one-story rule), and
+// the mobile screen authors no stage copy of its own (§19j).
+export function StageSection({ section, first, terminal = false }) {
   const label = section.stage ? STAGE_LABEL[section.stage] : IN_PROGRESS_LABEL;
   const isError = section.stage === "error";
   return (
@@ -603,6 +612,81 @@ function StageSection({ section, first, terminal = false }) {
           {section.subEntries.map(s => <SubEntry key={s.key} entry={s}/>)}
         </>
       )}
+    </div>
+  );
+}
+
+// ── FEATURE: MOB-15 -- the mobile Assembly tracker band ───────────────────────
+// Mobile had NO Assembly surface at all before this: the drawer below is desktop chrome, so on a
+// phone the build story simply did not exist. The band is that story's index -- one chip per stage
+// from the SAME `buildAssemblyStages` fold the desktop drawer reads, so the two surfaces can never
+// tell two different stories about one run (§19q). Tapping a chip is the screen's business; this
+// component owns no state and decides nothing about what the tap reveals.
+//
+// It renders the fold's REAL stages and nothing else: no placeholder chip, no "upcoming" stage, no
+// storyboard of a pipeline that has not run (§19r/§19j). Zero sections renders the label alone.
+// Every string is chrome register 1 -- ASSEMBLY_TITLE / STAGE_LABEL / IN_PROGRESS_LABEL, the
+// constants at the top of this file, John's canonical words, imported rather than re-typed.
+//
+// Motion is the existing global `aiBlink` keyframe (tokens.js), reused verbatim on a leading dot --
+// no new keyframe, so this inherits whatever reduced-motion posture the platform already has.
+const TRACKER_BAND = {
+  display: "flex", alignItems: "center", gap: 7, height: 26, flexShrink: 0,
+  padding: "0 12px", background: T.paper, borderTop: `1px solid ${T.line}`,
+  overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none",
+};
+// The Agent Routing header's own register, so the band reads as part of the bottom cluster's chrome.
+const TRACKER_LABEL = {
+  flex: "none", fontFamily: mono, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.11em",
+  textTransform: "uppercase", color: T.muted,
+};
+// The .lav-mseg toggle's chip idiom (AgentNetwork.jsx's mobile chrome), same size and weight.
+const TRACKER_CHIP = {
+  position: "relative", flex: "none", display: "inline-flex", alignItems: "center", gap: 4,
+  border: `1px solid ${T.line}`, borderRadius: 20, background: T.card, cursor: "pointer",
+  padding: "3px 8px", fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: "0.06em",
+  textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap",
+};
+// `.lav-mseg button::after`'s idiom, expressed inline: a transparent box that takes the TOUCH target
+// to ~37px without changing one pixel of layout, so the band's 26px visual height costs no
+// tappability. Inside the button, so it can only ever forward a tap to its own chip.
+const TRACKER_TOUCH = { position: "absolute", left: 0, right: 0, top: -10, bottom: -10 };
+const TRACKER_DOT = {
+  width: 5, height: 5, borderRadius: "50%", background: T.brass, flex: "none",
+  animation: "aiBlink 1.3s ease-in-out infinite",
+};
+const TRACKER_CHECK = { color: T.moss, letterSpacing: 0 };
+
+export function AssemblyTrackerBand({ stages, running = false, openKey = null, onToggle }) {
+  const sections = stages?.sections ?? [];
+  const terminal = !!stages?.terminal;
+  // The fold hands sections NEWEST FIRST (its own documented return order); a tracker reads
+  // chronologically left to right, so this reverses a COPY -- never the fold's own array.
+  const chips = [...sections].reverse();
+  return (
+    <div style={TRACKER_BAND}>
+      <span style={TRACKER_LABEL}>{ASSEMBLY_TITLE}</span>
+      {chips.map(s => {
+        const label = s.stage ? STAGE_LABEL[s.stage] : IN_PROGRESS_LABEL;
+        const isError = s.stage === "error";
+        // A ghost is a live prediction only while the run is actually live; once terminal, a
+        // surviving ghost is finished work with no completion, and it renders static (LAV-25b).
+        const live = !!s.ghost && !!running && !terminal;
+        const selected = openKey != null && openKey === s.key;
+        return (
+          <button key={s.key} type="button" title={label} onClick={() => onToggle?.(s.key)}
+            style={{ ...TRACKER_CHIP,
+              ...(s.filled && !isError ? { color: T.navy } : null),
+              ...(live ? { borderColor: T.brass } : null),
+              ...(isError ? { color: T.flag, borderColor: T.flag } : null),
+              ...(selected ? { borderColor: T.brassDeep } : null) }}>
+            <span style={TRACKER_TOUCH}/>
+            {live && <span style={TRACKER_DOT}/>}
+            {s.filled && !isError && <span style={TRACKER_CHECK}>✓</span>}
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
