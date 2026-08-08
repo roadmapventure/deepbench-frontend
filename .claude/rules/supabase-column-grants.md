@@ -40,3 +40,16 @@ column-REVOKE form above, reported success, and left the data fully exposed; it 
 because the QA step asserted the denial *and* the still-working read instead of one of them.
 
 Rationale: `docs/ARCHITECTURE.md` §12/§13, and `docs/harvests/LOG-121.md`.
+
+## Addendum (2026-08-08, `DAT-18`): check WRITE grants too, not just SELECT
+
+The rule above is about hiding a column from readers. `S-HAR-33-design` found the inverse hole:
+Supabase's defaults had granted `anon`/`authenticated` **table-level INSERT/UPDATE/DELETE/TRUNCATE
+on every public table**, RLS disabled — so any column-list SELECT lockdown was guarding a table the
+public key could simply rewrite or wipe. When auditing a table's exposure, always read
+`information_schema.role_table_grants` for ALL privilege types, not only the SELECT column list —
+and remember `role_column_grants` shows per-column rows for table-level grants too, so a column
+appearing there does not mean the grant was ever column-scoped. Gate-critical lockdown shipped for
+`ip_org_cache` (no public writes) and `ai_activity_log` (append-only + non-negative token check);
+the remaining tables are `DAT-18` (docs/FEATURES.md) — survey which tables the browser legitimately
+writes before revoking.

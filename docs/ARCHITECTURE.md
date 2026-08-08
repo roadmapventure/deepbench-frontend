@@ -2295,3 +2295,19 @@ by name with a reason — a silent omission is the defect that took four rounds 
 
 Build: `S-LAV-32a` (v7.0.64 — executor carries `capability_phrase`; drawer trim) +
 `S-LAV-32b` (v7.0.65 — status narration, panel strip, bubble ask; consumes the seeded phrases).
+
+---
+
+## 19t. IP Access Gate — Live-Site Cost Protection [design `design-ip-security`, John, 2026-08-08]
+
+**Every model-triggering `/api/*` request passes an edge gate before any function runs.** `middleware.js` (Vercel Edge Middleware — not one of the 12 serverless functions) enforces, and all gate state is data on `ip_org_cache`, one row per caller IP:
+
+- `permission`: `blocked` / `trial` (US default — capped by the row's own `spend_limit_usd`, default $5) / `unlimited` (the whitelist). John manages access by editing rows; `user_label` groups one person's several IPs.
+- Non-US country (Vercel's `x-vercel-ip-country`) blocks on first model call, written as `block_reason='geo'`. Crossing the spend cap writes `blocked`/`spend_cap`. Every refusal stamps `blocked_at` and increments `blocked_attempts` — the row IS the block log.
+- **Spend is computed, never stored:** `get_ip_stats(ip)` sums `ai_activity_log` tokens × the `model_pricing` table (per-1k rates + prompt-cache multipliers 1.25×/0.10×, mirroring `computeCallCost()`). `ai_activity_log.cost_usd` is legacy (43 rows) — never a spend source. John's report is the `ip_spend_report` view.
+- Refusals are structured 403s — `{deepbench_gate:true, reason:'spend_cap'|'geo'|'manual', ip, stats?}` — rendered by `AccessGateModal.jsx` via the `gate-intercept.js` fetch wrapper. `spend_cap` always carries `stats` (the popup's three tiles); the model is never called, a refused request costs $0. Browse-safe reads (`OPTIONS`, `GET agent-configs`, `GET load-entries`) pass ungated so a blocked visitor can still browse.
+- **Failure postures, deliberate and asymmetric:** an infra error before the block/allow question is answered fails OPEN (cost protection must never become an outage); once a row says `blocked`, an infra error fails CLOSED (worst case the popup loses its tiles).
+- **QA tooling exemption:** the `x-db-gate-bypass` header matching Vercel env `GATE_BYPASS_SECRET` (all environments; retrieve via `vercel env pull`). Any live test or regression driver either sends it or runs from an `unlimited` IP — otherwise it 403s.
+- The IP derivation is byte-identical to `lib/request-context.js`'s — the gate's key and the log's `caller_ip` MUST stay the same value or spend sums silently miss; change them only together.
+
+Related security posture (`DAT-18`, found this session): `ip_org_cache` accepts no writes from the anon key and `ai_activity_log` is append-only with non-negative token counts enforced — gate state and spend history cannot be edited from a browser. The platform-wide grant survey for the other 30 tables is `DAT-18`, open.
