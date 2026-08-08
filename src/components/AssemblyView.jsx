@@ -1,3 +1,5 @@
+// DeepBench v7.0.80 | AssemblyView.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability: narration
+// pill / solid-brass armed Answer tab / tappable tracker chips.
 // DeepBench v7.0.74 | AssemblyView.jsx | LAV-36 -- one section per stage. The completion path gains
 // the start path's filled-host rule (LAV-25 T3's mirror): a stage-deriving completion whose stage is
 // already FILLED nests as a sub-entry under that section instead of opening a duplicate with the same
@@ -703,7 +705,14 @@ export function StageSection({ section, first, terminal = false }) {
 //
 // Motion is the existing global `aiBlink` keyframe (tokens.js), reused verbatim on a leading dot --
 // no new keyframe, so this inherits whatever reduced-motion posture the platform already has.
-const TRACKER_BAND = {
+// FEATURE: MOB-20 -- rgba shades composed from imported tokens, never written as literals
+// (.claude/rules/design-tokens.md). Same helper LiveAgentViewScreen.jsx/HarnessTraceConsole.jsx use;
+// this file had none of its own until this chip needed one.
+const rgba = (hex, a) =>
+  `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
+
+// Exported so the regression test can assert on the real height/chip-style values (MOB-18 test plan).
+export const TRACKER_BAND = {
   display: "flex", alignItems: "center", gap: 7, height: 26, flexShrink: 0,
   padding: "0 12px", background: T.paper, borderTop: `1px solid ${T.line}`,
   overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none",
@@ -714,12 +723,17 @@ const TRACKER_LABEL = {
   textTransform: "uppercase", color: T.muted,
 };
 // The .lav-mseg toggle's chip idiom (AgentNetwork.jsx's mobile chrome), same size and weight.
-const TRACKER_CHIP = {
+// FEATURE: MOB-20 -- bumped from a flat 7.5px outline to a 9px chip with a soft drop shadow (reads
+// as a tappable control, not a status label); the per-state color rules below are unchanged.
+export const TRACKER_CHIP = {
   position: "relative", flex: "none", display: "inline-flex", alignItems: "center", gap: 4,
-  border: `1px solid ${T.line}`, borderRadius: 20, background: T.card, cursor: "pointer",
-  padding: "3px 8px", fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: "0.06em",
+  border: `1px solid ${rgba(T.mutedDeep, 0.5)}`, borderRadius: 20, background: T.card, cursor: "pointer",
+  padding: "4px 10px", fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
   textTransform: "uppercase", color: T.muted, whiteSpace: "nowrap",
+  boxShadow: `0 1px 3px ${rgba(T.navy, 0.22)}`,
 };
+// FEATURE: MOB-20 -- the caret that signals the chip is tappable, not a status label.
+const TRACKER_CARET = { color: T.brassDeep, fontSize: 7, letterSpacing: 0 };
 // `.lav-mseg button::after`'s idiom, expressed inline: a transparent box that takes the TOUCH target
 // to ~37px without changing one pixel of layout, so the band's 26px visual height costs no
 // tappability. Inside the button, so it can only ever forward a tap to its own chip.
@@ -757,6 +771,7 @@ export function AssemblyTrackerBand({ stages, running = false, openKey = null, o
             {live && <span style={TRACKER_DOT}/>}
             {s.filled && !isError && <span style={TRACKER_CHECK}>✓</span>}
             {label}
+            <span style={TRACKER_CARET}>{selected ? "▴" : "▾"}</span>
           </button>
         );
       })}
