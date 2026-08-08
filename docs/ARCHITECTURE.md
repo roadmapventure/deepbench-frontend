@@ -2271,6 +2271,21 @@ receipts, not asks); measured counts and pick reasoning leave the user-facing su
 untouched by any display change). **All durations everywhere render `m:ss` through one shared
 formatter** — no more per-surface unit dialects. The four render rules ride one frame stream;
 keep them in the fewest shared client seams possible so surfaces cannot drift apart again
+
+**Envelope resolution (John, 2026-08-08, `design-loo-33` → `S-LOO-33` v7.0.72).** A
+dispatch's `intent_slug` is envelope, and the platform carries it — never trusted from a
+model's echo of the candidate list (measured 2026-08-07: the optional echoed field dropped on
+~1 in 5 brokered picks, shipping real work with a blank envelope, `capability:none` feature
+strings, and unlabeled Assembly stages). The executor resolves it from its own roster data
+(`resolveDispatchIntent()`, applied at both dispatch seams — brokered and direct
+`delegate_to_agent`): a model-named intent is accepted only on membership in the capability's
+real intent list; a single-intent capability stamps deterministically; a multi-intent
+capability falls to its own `capabilities.default_intent_slug` declaration (nullable column,
+authored once per capability, John-approved — same authorship class as `display_phrase`;
+seeded only for `data-room-custody` → `library-evidence-intent`); else the envelope stays
+honestly blank, exactly the prior behavior. Never a model retry, never a platform guess past
+the declared default, no per-capability code (Rule #1/§19b intact — the model keeps the pick,
+the platform carries the envelope). Historical `:none` log rows are never relabeled.
 (SES-57 class).
 
 **Sibling-surface check (process rule born here):** any session changing run-content display
