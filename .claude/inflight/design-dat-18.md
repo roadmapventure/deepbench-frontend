@@ -1,1 +1,1 @@
-design-dat-18 — design session for DAT-18 (public write-grant lockdown on remaining Supabase tables).
+design-dat-18 — design session for DAT-18 (anon write-grant lockdown, remaining 28 tables). Kickoff v7.0.78 committed; coding session (S-DAT-18, Opus 5) spawned in this worktree on session/dat-18-coding. Survey result: only legit anon writes are tasks INSERT+UPDATE and ai_activity_log INSERT; platform_stats prebuild script moves to service key. Residual tasks exposure filed as DAT-19 (FEATURES-LATER, Post-beta).
