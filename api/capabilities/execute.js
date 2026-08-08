@@ -4,7 +4,7 @@
 // real work as `<capability>:none:depthN`). New resolveDispatchIntent(): validated echo -> single-
 // intent stamp -> the capability's own declared capabilities.default_intent_slug (data, §19b) ->
 // honest blank; any fetch failure degrades to the raw echo, never worse than before. Four brokered
-// reads and three direct-path reads now consume it; the originator-credit emit (the CURRENT agent's
+// sites and four direct-path sites now consume it; the originator-credit emit (the CURRENT agent's
 // own intent) and the fan/pre-dispatch hop-budget estimates are deliberately untouched. No new event
 // field, no span-identity change (§19p), no per-capability conditional
 // DeepBench v7.0.64 | api/capabilities/execute.js | LAV-32a (§19s four-surface standard) -- every one
@@ -1013,7 +1013,7 @@ async function dispatchDelegation({
     if (willResolveFinal) {
       // FEATURE: LOO-009 — unchanged: credits the target, claiming the 'delegation' placeholder above.
       onEvent({ type: 'delegation_complete', fromAgentId: agent_id, fromCapabilitySlug: capability_slug, toAgentId: targetAgentId, toCapabilitySlug: targetCapabilitySlug, toIntentSlug: resolvedTargetIntent, viaTool: 'delegate_to_agent', account: delegateResult?.content?.account ?? null, capability_phrase: await capabilityPhrase(targetCapabilitySlug), trace_id, from_span_id: span_id, to_span_id: delegateResult?.span_id ?? null }); // LOG-95 (§19p): credits the target's own resolved execution -- LAV-28 (§19s): and its own account
-      return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug, lastHelpSelection, job_id }) };
+      return { outcome: 'final', result: await finalizeDelegation({ delegateResult, targetAgentId, targetCapabilitySlug, targetIntentSlug: resolvedTargetIntent, lastHelpSelection, job_id }) };
     }
     returningFromAgentId = targetAgentId;
     returningFromCapabilitySlug = targetCapabilitySlug;
