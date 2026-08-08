@@ -1,0 +1,1 @@
+design-zoom-default-0807 — design session (S-LAV-36-design pending ID claim): desktop 80% render default (John-approved) + root-cause which controls clip at 100% zoom. Same conversation as S-LAV-34-design (v7.0.71, shipped).
