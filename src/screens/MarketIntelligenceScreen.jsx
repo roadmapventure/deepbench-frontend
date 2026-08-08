@@ -654,6 +654,28 @@ function formatElapsed(ms) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+// FEATURE: LAV-32a (ARCHITECTURE.md §19s, the four-surface standard) -- "All durations everywhere
+// render `m:ss` through one shared formatter -- no more per-surface unit dialects" (John, 2026-08-07).
+// This is that formatter. It lives here because this file is the module both other client surfaces
+// already import from (useHarnessStream.js and AgentNetwork.jsx each import from it today), so one
+// definition can reach every surface without closing an import cycle; S-LAV-32b converts the
+// remaining call sites to it.
+//
+// Two deliberate differences from RunTasks.jsx's formatArrival, which shares the m:ss shape:
+//   - the floor is ONE second, not zero. This formats a DURATION of real work, and "0:00" would
+//     read as "took no time," which is never true of a hop that actually ran -- a genuinely
+//     sub-second hop floors to "0:01" and stays honest. An arrival of 0:00 is honest by contrast
+//     (it arrived when the run started), which is why that helper floors at zero.
+//   - null/undefined returns null rather than a zero string, so an unmeasured hop renders NO
+//     duration line at all instead of a fabricated one (§19j / agent-section-rendering.md).
+// A function declaration, not a const: hoisted, so it stays safe to import from a module that this
+// file's own dependency graph can reach back into.
+export function formatHopDuration(ms) {
+  if (ms == null || !Number.isFinite(ms)) return null;
+  const totalSec = Math.max(1, Math.floor(ms / 1000));
+  return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, "0")}`;
+}
+
 // FEATURE: MI-35 — known intent chains per user-facing action that has one. Only chains this
 // session can ground in real, already-logged data get an entry — do not invent chains for
 // working-status triggers not listed here (patch resolution, memory consolidation, etc.); those

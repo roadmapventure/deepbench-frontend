@@ -1,3 +1,13 @@
+// DeepBench v7.0.64 | AssemblyView.jsx | LAV-32a -- the §19s four-surface trim. This drawer is now
+// the BUILDING lane only, and a stage card renders exactly five things: ✓ (when filled) + stage
+// label + agent + `took m:ss` + the doer's receipt sentence. Removed, all render-only: the "arrived
+// M:SS into the run" clause (and with it the fold's now-unread arrival plumbing), every ask line
+// (asks are live-only per §19s -- they belong to S-LAV-32b's bubble and status line, and nothing
+// appears on two surfaces), and the platform detail lines (fetch-chunk and token-count sub-entries,
+// marked `detail` in the fold and skipped at render -- still tracked, so LAV-25b's terminal-survival
+// rule is byte-identical). Durations now go through the one shared `formatHopDuration`. Ghost
+// behaviour, terminal caps, revision nesting and every stage-building decision in the fold are
+// untouched.
 // DeepBench v7.0.63 | AssemblyView.jsx | LAV-28c -- the deep-leg completion fold, plus the receipt
 // pair's display side. S-LAV-28b proved live (World 3c, both captured runs) that every deep-leg
 // completion streams as `delegation_return` and that ZERO `delegation_complete` frames stream at
@@ -85,7 +95,13 @@ import { T, body, mono } from "../tokens.js";
 import { Drawer, ScrollFadeHint, useScrollFadeHint, AgentAvatar } from "./SharedUI.jsx";
 // The feed's own derivations and time-signature idiom, reused verbatim (LAV-21a exported them for
 // exactly this). Nothing here re-composes a sentence RunTasks.jsx already knows how to write.
-import { deriveAsked, deriveDid, deriveContent, formatTimeSignature } from "./RunTasks.jsx";
+import { deriveAsked, deriveDid, deriveContent } from "./RunTasks.jsx";
+// FEATURE: LAV-32a (§19s) -- the ONE shared m:ss duration formatter, replacing this file's use of
+// RunTasks.jsx's formatTimeSignature (which composes "arrived M:SS into the run · took Ns" -- both
+// the arrival clause and the per-surface `Ns` dialect are what §19s removes). Imported from the
+// screen because that is where the shared display exports live and where the other two client
+// surfaces already import from; verified this session that the edge closes no cycle.
+import { formatHopDuration } from "../screens/MarketIntelligenceScreen.jsx";
 
 // ── chrome strings ────────────────────────────────────────────────────────────
 // John's canonical names, 2026-08-04. Verbatim; never re-worded without him.
@@ -278,9 +294,12 @@ export function buildAssemblyStages(events, eventTimes, {
   blocked = false, error = false,
 } = {}) {
   const list = Array.isArray(events) ? events : [];
-  const times = Array.isArray(eventTimes) ? eventTimes : [];
   const byId = new Map((Array.isArray(agents) ? agents : []).map(a => [a.id, a]));
-  const base = runStartedAt != null ? runStartedAt : (times.find(t => t != null) ?? null);
+  // FEATURE: LAV-32a (§19s) -- `eventTimes` / `runStartedAt` are still accepted (every caller passes
+  // them, and the signature is shared with buildRunTaskEntries) but no longer read: they existed
+  // solely to compute each hop's ARRIVAL offset, and §19s removes the "arrived M:SS into the run"
+  // clause from this surface. A hop's own `durationMs` is on the event itself, so the `took` figure
+  // needs neither. Nothing else in this fold consulted them.
   // FEATURE: LAV-28c -- span -> declared work, built before the main pass (see the helper's own
   // header for why the ledger's order makes a running lookup insufficient).
   const declaredWorkBySpan = buildDeclaredWorkBySpan(list);
@@ -296,10 +315,13 @@ export function buildAssemblyStages(events, eventTimes, {
     const evt = list[i];
     if (!evt) continue;
     const d = evt.data || {};
-    const at = times[i] ?? null;
     const key = `${evt.id ?? i}-${evt.type}`;
-    const arrivedAtMs = at != null && base != null ? Math.max(0, at - base) : null;
-    const timeSignature = formatTimeSignature({ arrivedAtMs, durationMs: evt.durationMs ?? null });
+    // FEATURE: LAV-32a (§19s) -- `took m:ss` and nothing else. "took" is chrome (register 1); the
+    // figure is the hop's own measured duration through the one shared formatter. A hop with no
+    // measured duration yields null here and renders no time line at all, rather than "took 0:00"
+    // (§19j -- the same honest-omission posture formatTimeSignature already took per-half).
+    const hopDuration = formatHopDuration(evt.durationMs ?? null);
+    const timeSignature = hopDuration ? `took ${hopDuration}` : null;
     // FEATURE: LAV-25 (T4) -- the agent's own account when the frame carried one, the feed's own
     // composed template sentence otherwise. One substitution point covers every place a content line
     // is written below (sections and sub-entries alike), because they all read this same `did`.
@@ -311,7 +333,13 @@ export function buildAssemblyStages(events, eventTimes, {
       // FEATURE: LAV-25 (T1) -- briefing fetches leave Assembly entirely: no section, no sub-entry,
       // no Evidence founding. Placed before every branch below so there is exactly one exit.
       if (BRIEFING_FETCH_SOURCES.has(d.source)) continue;
-      const sub = { key, ...whoOf(evt.agentId, byId), did, timeSignature };
+      // FEATURE: LAV-32a (§19s) -- `detail: true` marks a PLATFORM DETAIL line ("Fetched 74 chunks
+      // from the_library_catalog."): a measured count the four-surface standard moves off the
+      // user-facing surfaces entirely (it persists in the stored trace/log for audit, untouched).
+      // A render marker ONLY -- the fold still builds and tracks these exactly as before, which is
+      // what keeps LAV-25b's terminal-survival rule (`subEntries.length > 0`, so a ghost holding
+      // real work is not dropped at terminal) byte-identical. SubEntry skips them at render.
+      const sub = { key, ...whoOf(evt.agentId, byId), did, timeSignature, detail: true };
       const host = findLast(s => !s.filled && s.stage !== "draft" && sectionOwnsFetch(s, d));
       if (host) { host.subEntries.push(sub); continue; }
       const evidence = findLast(s => s.stage === "evidence");
@@ -326,7 +354,11 @@ export function buildAssemblyStages(events, eventTimes, {
 
     // ── other assembly work (reflect / synthesis / …): drafting effort, nested under Draft ────
     if (evt.type === "assembly_work_complete") {
-      const sub = { key, ...whoOf(evt.agentId, byId), did, timeSignature };
+      // FEATURE: LAV-32a (§19s) -- same platform-detail marker as the fetch branch above, same
+      // render-only effect. This line is "Completed the reflect step · 1832 tok." -- a template
+      // sentence carrying a measured token count, which is the same class §19s moves off the
+      // user-facing surfaces. The step is still tracked; only its line stops rendering.
+      const sub = { key, ...whoOf(evt.agentId, byId), did, timeSignature, detail: true };
       const host = findLast(s => s.stage === "draft")
         // No Draft section yet: open the container so the step is visible where it belongs. It is
         // NOT a ghost -- nothing is being predicted, a real hop just landed -- so it survives
@@ -506,18 +538,22 @@ function AgentRow({ who, small = false }) {
   );
 }
 
+// FEATURE: LAV-32a (§19s, the four-surface standard) -- two removals, both content-only:
+//   - the ASK line is gone. §19s's accepted trade is explicit: "asks are live-only (post-run, the
+//     drawer holds receipts, not asks)" -- the ask now belongs to the agent bubble and the elapsed
+//     status, which are S-LAV-32b's surfaces. Nothing appears on two surfaces.
+//   - a `detail` sub-entry renders nothing at all: those are the platform detail lines (fetch
+//     counts, token counts), which §19s bans from this drawer. The fold still tracks them.
+// With the ask gone, a sub-entry whose only content WAS the ask has nothing left to say, and
+// .claude/rules/agent-section-rendering.md is explicit that we render nothing where the agent
+// returned nothing -- so the whole row is skipped rather than left as a bare agent name (exactly
+// the "trailing bare-name entries" defect LAV-28c fixed at the fold seam).
 function SubEntry({ entry }) {
+  if (entry.detail || !entry.did) return null;
   return (
     <div style={SUB_ENTRY}>
       <AgentRow who={entry} small/>
-      {/* FEATURE: LAV-25 (T3) -- what this nested piece of work was ASKED to do, present only on the
-          revision sub-entries a delegation start opens (every other sub-entry carries no `asked` key
-          at all, so their markup is byte-identical to v7.0.57). Same muted treatment the ghost box
-          gives the same field, so one kind of line reads one way wherever it appears. */}
-      {entry.asked && (
-        <div style={{ ...CONTENT_LINE, fontSize: 10.5, color: T.muted }}>{entry.asked}</div>
-      )}
-      {entry.did && <div style={{ ...CONTENT_LINE, fontSize: 10.5 }}>{entry.did}</div>}
+      <div style={{ ...CONTENT_LINE, fontSize: 10.5 }}>{entry.did}</div>
     </div>
   );
 }
@@ -542,16 +578,15 @@ function StageSection({ section, first, terminal = false }) {
       {section.ghost ? (
         <div style={GHOST_BOX}>
           <AgentRow who={section}/>
-          {section.asked && (
-            <div style={{ ...CONTENT_LINE, fontSize: 10.5, color: T.muted, marginBottom: 4 }}>
-              <span style={{
-                display: "inline-block", width: 5, height: 5, borderRadius: "50%",
-                background: T.brass, marginRight: 5, verticalAlign: 1,
-                animation: "pdot 1.2s ease-in-out infinite",
-              }}/>
-              {section.asked}
-            </div>
-          )}
+          {/* FEATURE: LAV-32a (§19s) -- the ghost's ASK line (and the pulsing dot that led it) is
+              removed for the same reason as SubEntry's: asks are live-only and belong to the bubble
+              and the elapsed status, never to the drawer's ledger. Ghost BEHAVIOUR is untouched --
+              it still opens on the same declared work, still shimmers while the run is live, still
+              survives terminal when it holds real work and still drops when it does not. The fold
+              keeps computing `asked` (LAV-28c's revision-push rule depends on it and S-LAV-32b
+              reads it); only this drawer stops rendering it. Side effect worth naming: this also
+              retires the pulsing dot that persisted on a surviving unfilled stage after terminal
+              (the Tier-2/3 flag raised out of LAV-25b's live QA). */}
           {!terminal && (
             <>
               <ShimmerBar/>
