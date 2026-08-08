@@ -1,3 +1,13 @@
+// DeepBench v7.0.65 | useHarnessStream.js | LAV-32b (§19s four-surface standard) -- `capability_phrase`
+// joins both hand-rebuilt delegation-family ledger payloads, the third field to do so for the same
+// SES-57 reason: this payload names its fields by hand, so one the frame carries but the list omits
+// vanishes before it reaches the ledger. LAV-32a's executor puts the phrase on every
+// delegation-family frame and the live status line reads it off the RAW frame, so this is
+// forward-carry for the stored ledger -- verbatim `?? null`, nothing derived. Unlike LAV-25's note
+// below, the sibling constructor in MarketIntelligenceScreen.jsx gains the identical field in this
+// same commit: the two lists are back in lockstep rather than deliberately asymmetric.
+// Nothing renders differently from THIS file's change alone -- the status writer already flows
+// through describeDelegationEvent, which is where §19s's narration actually lands.
 // DeepBench v7.0.59 | useHarnessStream.js | LAV-25 -- two narration fields join this hand-rebuilt
 // ledger payload's named field list so the Assembly drawer can render them the MOMENT they stream
 // (§19s): `account` -- the agent's own one-sentence account of the work it just did -- on the
@@ -262,7 +272,13 @@ export function useHarnessStream() {
       // mirror reason and same shape-parity footing as `task`/`account`: the sibling list in
       // MarketIntelligenceScreen.jsx names the identical pair, and a fork between the two IS that
       // bug class. The five-word headline is what the Assembly ghost's Asked line renders.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-32b (§19s four-surface standard) -- `capability_phrase` joins the named list on
+      // both builds, for the third time and the same reason: this payload is hand-rebuilt, so a field
+      // the frame carries but the list does not name vanishes before it reaches the ledger (SES-57).
+      // LAV-32a's executor puts the phrase on every delegation-family frame; the live status line
+      // reads it off the raw frame, so carrying it here is forward-carry for the stored ledger, on
+      // the same verbatim `?? null` footing as `task`/`ask_line`/`account`.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, capability_phrase: evt.capability_phrase ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, candidates_considered: evt.candidates_considered ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
@@ -282,7 +298,9 @@ export function useHarnessStream() {
     // its degrade ladder, so carrying the field is the whole of that change -- the slug fallback
     // below it stays exactly where it is for the frames that still carry no task words (all of them
     // today: verified absent from every delegation start frame on the harvest run).
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    // FEATURE: LAV-32b (§19s) -- `capability_phrase` on the START build too, same SES-57 mirror rule:
+    // the two lists name the identical field set regardless of which end of a hop carries a value.
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, capability_phrase: evt.capability_phrase ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, toIntentSlug: evt.toIntentSlug ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 / §19o -- a recovered hop is never silent. The hook owns the user-visible half

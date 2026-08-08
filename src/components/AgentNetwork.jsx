@@ -1,3 +1,15 @@
+// DeepBench v7.0.65 | AgentNetwork.jsx | LAV-32b (§19s four-surface standard) -- the canvas bubble is
+// the BUBBLE lane and nothing else: while an agent holds an open assignment its bubble shows the ask
+// that engaged it, in the asker's own five words (`ask_line`), verbatim and quoted; with no open
+// assignment, no bubble. deriveNetwork's `bubbles` map is rewritten from "latest activity text" to
+// "the open assignment's quoted ask," written and deleted on exactly the frames that open and close
+// openByTarget. Deleted with it: the `reasoning ?? task ?? message` fallback chain and the
+// ASSEMBLY_FETCH_COPY / ASSEMBLY_STEP_COPY / assemblyBubbleText copy tables -- the canvas's only
+// source of fetch labels, chunk/token counts and model-step names, none of which §19s permits here.
+// The render gate collapses to `running` (§19s makes asks live-only by explicit trade); LAV-9b's
+// three-pulsing-state gate would now only hide a real ask from a target that has been asked but has
+// not yet produced its own hop. Assembly tint/ring, edges, pulses, node states and every style rule
+// are untouched -- this session changes what the bubble SAYS and when it is held, never how it looks.
 // DeepBench v7.0.55 | AgentNetwork.jsx | LAV-21b -- the left stack's second drawer becomes the
 // Assembly view (§19r): the deliverable itself, built live in stages, in the Run Assembly feed's
 // slot. The feed is HIDDEN, NOT DELETED -- RunTasks.jsx is untouched, the screen still folds and
@@ -304,41 +316,17 @@ export function isAssemblyHop(hop) {
 // showing assembly work. The tint below is therefore still very much alive.
 export const ASSEMBLY_COLOR = T.mutedDeep;
 
-// A missing count renders this, never 0-as-a-guess and never invented copy
-// (.claude/rules/agent-section-rendering.md).
-const ASSEMBLY_DASH = "—";
-// Bubble copy for a fetch, keyed on the frame's OWN `source` field. An unlisted or absent source
-// falls to the generic knowledge read -- it is still a real fetch that really happened, and the
-// count is still the frame's own.
-const ASSEMBLY_FETCH_COPY = {
-  the_library:         (n) => `Data Room read · ${n} chunks`,
-  the_library_catalog: (n) => `Data Room catalog · ${n}`,
-  roster:              (n) => `Roster fetch · ${n} candidates`,
-  the_reasoning:       (n) => `Reasoning Layer read · ${n}`,
-};
-// Dan Bingham's two model steps ripple WHILE running, so each has a start line and a complete line.
-// The token clause exists only when the frame really carried tokens.
-const ASSEMBLY_STEP_COPY = {
-  reflect:   { start: "REFLECT · drafting execution plan", done: (tok) => `REFLECT · plan drafted${tok}` },
-  synthesis: { start: "Synthesis · rewriting prompt",      done: (tok) => `Synthesis · prompt rewritten${tok}` },
-};
-
-// The bubble text for one assembly hop, composed from the frame's own fields ONLY. Returns null for
-// a work kind this canvas has no approved copy for -- no bubble is the honest render, never a
-// guessed label (§19l / .claude/rules/agent-section-rendering.md).
-export function assemblyBubbleText(hop) {
-  if (!isAssemblyHop(hop)) return null;
-  const d = hop.data || {};
-  if (d.work === "fetch") {
-    const count = d.matchCount != null ? d.matchCount : ASSEMBLY_DASH;
-    const copy = ASSEMBLY_FETCH_COPY[d.source];
-    return copy ? copy(count) : `Knowledge read · ${count} chunks`;
-  }
-  const step = ASSEMBLY_STEP_COPY[d.work];
-  if (!step) return null;
-  if (hop.type === ASSEMBLY_START) return step.start;
-  return step.done(d.tokens != null ? ` · ${d.tokens} tok` : "");
-}
+// FEATURE: LAV-32b (§19s, the four-surface standard) -- `ASSEMBLY_DASH`, `ASSEMBLY_FETCH_COPY`,
+// `ASSEMBLY_STEP_COPY` and `assemblyBubbleText()` are DELETED, along with the bubble's
+// `reasoning ?? task ?? message` fallback chain (see deriveNetwork below). §19s scopes the bubble
+// lane to one thing -- the asker's own five-word `ask_line` -- and those tables were the canvas's
+// only source of fetch labels, chunk/token counts and model-step names, none of which may appear on
+// this surface any more. They are removed rather than left dead: nothing else in src/ or tests/
+// imported `assemblyBubbleText` (verified this session), so a dead table here would only read as an
+// invitation to put counts back on the canvas.
+// What is NOT lost: the assembly TINT and ring (ASSEMBLY_COLOR / assemblyActive, AA-179b) are
+// untouched -- the canvas still shows that assembly work is happening, it just stops narrating its
+// internals. The counts themselves persist in the stored trace/log for audit (§19s's accepted trade).
 
 // ── pure derivations over the stored-event ledger ────────────────────────────
 // Stored events are exactly what buildHopEvent() produces (verified fresh in
@@ -358,7 +346,13 @@ export function deriveNetwork(runHops) {
   // freshly-addressed-but-silent agent (in `engaged`, not `activeId`, not an orchestrator) fell into
   // `done` and wore the finished-look moss border before it had done anything.
   const selfEngaged = new Set();
-  const bubbles = {};            // agentId -> its latest activity text this run
+  // FEATURE: LAV-32b (§19s) -- was "agentId -> its latest activity text this run". It is now
+  // "agentId -> the quoted five-word ask that engaged it, while that assignment is open": the bubble
+  // lane holds the asker's own `ask_line` and nothing else. The map is therefore keyed by the
+  // delegation TARGET (who was asked), written where openByTarget is written and deleted where
+  // openByTarget is deleted, so "has a bubble" and "has an open assignment" are the same fact by
+  // construction rather than by two call sites agreeing.
+  const bubbles = {};            // agentId -> its open assignment's quoted ask
   const openByTarget = new Map();// targetId -> dispatcherId, while that delegation is unreturned
   const finished = new Set();    // agents whose hop completed this run
   const edges = [];              // observed traffic only
@@ -377,12 +371,11 @@ export function deriveNetwork(runHops) {
     if (id) {
       if (!engaged.includes(id)) engaged.push(id);
       selfEngaged.add(id);
-      // An assembly frame carries the hook's own composed `message` in data, which is plumbing
-      // wording -- the canvas speaks the approved copy instead, built from the same real fields.
-      const text = assembly
-        ? assemblyBubbleText(h)
-        : (h.data?.reasoning ?? h.data?.task ?? h.data?.message ?? null);
-      if (text) bubbles[id] = text;
+      // FEATURE: LAV-32b (§19s) -- the `reasoning ?? task ?? message` chain that used to write a
+      // bubble here is gone. Every rung of it belonged to another lane: reasoning is audit-only,
+      // `task` is the untruncated instruction the display must never show, and `message` is the
+      // status line's own composed sentence (nothing appears on two surfaces). A hop no longer
+      // gives its own agent a bubble at all -- only being ASKED does, below.
       activeId = id;
       activeIsAssembly = assembly;
     }
@@ -396,6 +389,17 @@ export function deriveNetwork(runHops) {
       const k = edgeKey(id, h.secondaryAgentId);
       if (!edgeSeen.has(k)) { edgeSeen.add(k); edges.push({ key: k, from: id, to: h.secondaryAgentId }); }
       openByTarget.set(h.secondaryAgentId, id);
+      // FEATURE: LAV-32b (§19s bubble lane) -- the ask that engaged this target, in the ASKER's own
+      // five words, quoted because it is agent-authored. Written on the same frame and for the same
+      // target as openByTarget above, so the bubble opens exactly when the assignment does.
+      // A frame with no headline (a pre-LAV-28b frame, or a dispatch whose model omitted it) leaves
+      // the target with NO bubble -- honest silence, never a synthesized label and never the full
+      // `task` truncated into one (.claude/rules/agent-section-rendering.md, §19s). The explicit
+      // delete is what makes a re-dispatch carrying no headline clear the previous one's words
+      // rather than leave them standing over new work.
+      const askLine = typeof h.data?.ask_line === "string" && h.data.ask_line.trim() ? h.data.ask_line.trim() : null;
+      if (askLine) bubbles[h.secondaryAgentId] = `“${askLine}”`;
+      else delete bubbles[h.secondaryAgentId];
       // FEATURE: LAV-9b -- a delegation target is "on stage" the moment it's named, not only once it
       // produces its own credited hop. Deliberately a DIFFERENT definition of "engaged" than
       // LiveAgentViewScreen.jsx's AGENTS ENGAGED meter, which stays scoped to "actually produced a
@@ -406,7 +410,10 @@ export function deriveNetwork(runHops) {
       if (!engaged.includes(h.secondaryAgentId)) engaged.push(h.secondaryAgentId);
     }
     if (h.type === "delegation_complete" || h.type === "delegation_return") {
-      if (id) { openByTarget.delete(id); finished.add(id); }
+      // FEATURE: LAV-32b (§19s) -- the assignment closes, so the ask stops being this agent's
+      // CURRENT work and its bubble goes with it. Deleted alongside openByTarget, on the same
+      // credited id, for the same reason it was written alongside it.
+      if (id) { openByTarget.delete(id); finished.add(id); delete bubbles[id]; }
     }
   }
 
@@ -1502,9 +1509,16 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
     else if (running && net.assemblyActive.has(a.id)) cls.push("is-assembly");
     else if (running && net.activeId === a.id) cls.push("is-active");
     else if (net.done.has(a.id)) cls.push("is-done");
-    const pulsing = net.orchestrators.has(a.id)
-      || (running && (net.assemblyActive.has(a.id) || net.activeId === a.id));
-    const bubble = pulsing ? net.bubbles[a.id] : null;
+    // FEATURE: LAV-32b (§19s) -- LAV-9b's three-pulsing-state gate is replaced by the map itself:
+    // `net.bubbles` now contains an entry only while an agent genuinely holds an open assignment, so
+    // it already answers "is this agent working." The gate would now only SUBTRACT -- a delegation
+    // start is credited to the dispatcher, so a target that has been asked but has not yet produced
+    // its own hop is never `activeId`, and its ask would never reach the screen.
+    // `running` stays, and is the whole remaining gate: §19s makes asks LIVE-ONLY by explicit trade
+    // ("post-run, the drawer holds receipts, not asks"), which also settles a run that ends on an
+    // unreturned delegation -- the canvas goes quiet with everything else instead of leaving one
+    // bubble standing.
+    const bubble = running ? (net.bubbles[a.id] ?? null) : null;
     const patternLabel = latestClassifiedPattern(spansByAgent.get(a.id), spanPatterns);
     const modelTag = modelByAgent.get(a.id)?.model || null;
     return (
@@ -1785,9 +1799,13 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
             // for the rest of the run, even long after moving to is-done and someone else becoming
             // active. Mirrors the class-assignment conditions immediately above exactly, so the
             // black bubble and the node's own pulsing skin can never disagree.
-            const pulsing = net.orchestrators.has(a.id)
-              || (running && (net.assemblyActive.has(a.id) || net.activeId === a.id));
-            const bubble = pulsing ? net.bubbles[a.id] : null;
+            // FEATURE: LAV-32b (§19s) -- LAV-9b's gate is retired: `net.bubbles` now holds an entry
+            // only while an agent has a genuinely open assignment, which is the same question that
+            // gate was approximating -- and a better answer to it, since a target that has been
+            // asked but has not yet produced its own hop was never `activeId` and would have shown
+            // nothing. `running` remains, because §19s makes asks live-only by explicit trade.
+            // Identical rule to mobileFullCard's above; the two must stay one sentence apart.
+            const bubble = running ? (net.bubbles[a.id] ?? null) : null;
             const start = posRef.current[a.id] || home[a.id] || { x: VW / 2, y: VH / 2 };
             const down = start.y < VH * 0.34;
             // FEATURE: LAV-5b -- the LAST pattern this agent was really classified on, kept after

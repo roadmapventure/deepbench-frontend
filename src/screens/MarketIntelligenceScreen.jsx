@@ -1,3 +1,18 @@
+// DeepBench v7.0.65 | MarketIntelligenceScreen.jsx | LAV-32b (§19s four-surface standard) -- two of
+// the four lanes live in this file and both are narrowed to exactly what §19s allots them.
+// STATUS lane: describeDelegationEvent() becomes pure COMMUNICATION NARRATION -- three verbs
+// (asking / returning / reviewing), fixed chrome keyed on the frame's type+viaTool alone, with one
+// data slot: the receiving capability's John-approved `capability_phrase` (LAV-32a's carrier),
+// degrading to the asker's quoted five-word `ask_line`, then to the five existing templates, which
+// stay byte-identical as the final register. The doer's `account` LEAVES this line -- the receipt is
+// the Assembly drawer's lane, and nothing appears on two surfaces.
+// PANEL lane: the Agent Routing row keeps agent + BARE pattern names + hop time and drops everything
+// else (the "AI patterns used:" prefix, composed sentences, reasoning, capability-completion headers,
+// receipts, the 3-line clamp and its Read more toggle). Time now reads m:ss through the one shared
+// formatHopDuration, so the per-surface `1.4s` dialect -- and formatDuration, its last caller -- go.
+// Also: `capability_phrase` joins both hand-rebuilt onDelegationProgress payloads, in the same commit
+// it joins useHarnessStream.js's sibling pair, so the two lists cannot fork (SES-57).
+// No visual change: same fonts, colors, geometry and slots -- only which strings fill them.
 // DeepBench v7.0.61 | MarketIntelligenceScreen.jsx | LAV-28 (§19s routing-story extension) --
 // describeDelegationEvent() renders content-first: the doer's own `account` on a completion/return,
 // the requester's own `task` words on a start, and only then the five existing templates, which are
@@ -602,11 +617,11 @@ function sectionText(v) {
   return "";
 }
 
-// FEATURE: MI-19 — render a per-step Pipeline Log duration the same way everywhere.
-function formatDuration(ms) {
-  if (ms == null) return "";
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
-}
+// FEATURE: MI-19 / LAV-32b — `formatDuration` (the `1.4s`/`820ms` dialect) is DELETED. Its one
+// remaining caller was the Agent Routing panel row, which §19s moves to the shared m:ss formatter
+// (`formatHopDuration`, below) along with every other surface. Keeping a second, per-surface
+// duration helper alive with no caller is exactly how "no more per-surface unit dialects" would
+// re-drift the first time someone needed a duration in this file.
 
 // FEATURE: MI-42 -- mirrors CreateWorkOrderScreen.jsx's own proven reader (res.body.getReader() +
 // TextDecoder, data: <json> lines, data: [DONE] sentinel) -- same idiom, not a new one. Buffers a
@@ -1355,31 +1370,43 @@ export function describeDelegationEvent(evt, agents) { // FEATURE: LAV-1a -- exp
   const agentById = (id) => agents.find(a => a.id === id);
   const fromName = firstNameFor(evt.fromAgentId, agentById);
   const toName = firstNameFor(evt.toAgentId, agentById);
-  // FEATURE: LAV-28 -- register 3, content-first. The credited agent is the same one each type's
-  // template already names (MI-48's attribution: a return names the RETURNING delegate, fromName; a
-  // complete names who finished, toName) -- content changes the words, never who the line is about.
-  if (evt.type === 'delegation_complete' || evt.type === 'delegation_return') {
-    const account = agentWords(evt.account);
-    const credit = evt.type === 'delegation_complete' ? toName : fromName;
-    if (account) return `${credit} — “${account}”`;
+  // FEATURE: LAV-32b -- verb 3, REVIEWING. Keyed on viaTool alone and checked ahead of every type
+  // branch below, because §19s gives the review exchange one verb across BOTH ends of the hop: the
+  // critique dispatch and its completion are the same act of reviewing, and narrating the dispatch
+  // half as an ask would tell two stories about one exchange. No phrase slot by design -- what is
+  // being reviewed is the other agent's work, which the envelope already names.
+  if (evt.viaTool === 'critique') return `${toName} is reviewing ${fromName}'s work…`;
+  // FEATURE: LAV-32b -- the phrase slot, and the whole degrade chain, in one place.
+  //   1. `capability_phrase` -- the RECEIVING capability's John-approved display phrase, carried on
+  //      every delegation-family frame by the executor (LAV-32a). Data, authored once per
+  //      capability; the client never synthesizes it and never reads a slug to pick it.
+  //   2. the asker's own five-word headline (`ask_line`), QUOTED -- so a frame that predates
+  //      LAV-32a, or one whose capability row is still unseeded, still narrates the real exchange
+  //      instead of dropping straight to chrome. Quoted because it is agent-authored: the same
+  //      typography `account`/`ask_line` already wore here, which is what keeps the reader able to
+  //      tell platform words from an agent's own.
+  //   3. neither -- no phrase exists, and the five templates below carry the line unchanged.
+  // agentWords() is the CHI-65-class type guard both fields already rode: a phrase that arrived as
+  // an object, a number, or whitespace has no words to render and degrades one rung rather than
+  // stringifying into a template literal.
+  const capabilityPhrase = agentWords(evt.capability_phrase);
+  const askLine = agentWords(evt.ask_line);
+  const phrase = capabilityPhrase ?? (askLine ? `“${askLine}”` : null);
+  if (phrase) {
+    // Verb 1, ASKING -- both dispatch tools (request_help and delegate_to_agent) are the same act,
+    // so neither is named here: the only branch is the frame's own type.
+    if (evt.type === 'delegation') return `${fromName} is asking ${toName} for ${phrase}…`;
+    // Verb 2, RETURNING. MI-48's attribution is unchanged and is the reason these two lines differ:
+    // a `delegation_return` is subjected to the RETURNING delegate (fromAgentId, who was away and is
+    // now handing back), a `delegation_complete` to the agent who finished (toAgentId). The complete
+    // is the exchange's terminal beat, so it ends on a full stop rather than an ellipsis.
+    if (evt.type === 'delegation_return') return `${fromName} is returning ${phrase} to ${toName}…`;
+    if (evt.type === 'delegation_complete') return `${toName} has returned ${phrase}.`;
   }
-  // The START frame only. Deliberately not `else` -- an unrecognized future type carrying a `task`
-  // field must not be rendered as a hand-off sentence; it falls to the templates below like today.
-  // FEATURE: LAV-28c (§19s Receipt-format amendment) -- the requester authors TWO things in the one
-  // dispatch call: `ask_line`, the five-word headline meant for display, and `task`, the full
-  // untruncated instruction that actually drives the work. The headline wins here because that is
-  // what it is for; `task` stays as the rung below it so every older frame (and any dispatch whose
-  // model omitted the headline) reads exactly as it did in v7.0.61. The platform never truncates
-  // `task` into a headline -- an absent headline degrades one rung, it is never synthesized.
-  // Same agentWords() type guard as `account` above: an ask_line that arrived as an object, a
-  // number, or whitespace has no words to render and falls through rather than reaching a template
-  // literal (CHI-65's class, one layer earlier than JSX).
-  if (evt.type === 'delegation') {
-    const askLine = agentWords(evt.ask_line);
-    if (askLine) return `${fromName} → ${toName} — “${askLine}”`;
-    const task = agentWords(evt.task);
-    if (task) return `${fromName} → ${toName} — “${task}”`;
-  }
+  // FEATURE: LAV-28 / LAV-32b -- the five templates, byte-identical, and never deleted: they are the
+  // final degrade register (§19s: never blank, never invented). Reached whenever no phrase exists at
+  // all -- an unseeded capability, a pre-LAV-32a frame, or a dispatch whose model omitted its
+  // headline -- and by any unrecognized future frame type, which must never be narrated as a hand-off.
   if (evt.type === 'delegation_return') {
     return `${fromName} is back — wrapping up…`; // FEATURE: MI-48 -- was toName (named who control
     // returns TO, not who was actually away and is now done) -- confirmed against the real live SSE
@@ -1391,6 +1418,10 @@ export function describeDelegationEvent(evt, agents) { // FEATURE: LAV-1a -- exp
   switch (evt.viaTool) {
     case 'request_help':
       return `${fromName} is asking ${toName} who should help…`;
+    // FEATURE: LAV-32b -- currently UNREACHABLE (the reviewing verb above returns unconditionally on
+    // this same viaTool) and deliberately kept anyway: §19s's degrade register is the complete set of
+    // five, and deleting the one arm whose lane happens to have no null case today would leave the
+    // register incomplete the moment that lane grows one.
     case 'critique':
       return `${toName} is reviewing ${fromName}'s proposal…`;
     case 'delegate_to_agent':
@@ -2841,42 +2872,39 @@ function useTracePatterns(traceId, spanId) {
 // state, expressed structurally, no boundary/date copy -- John's §19l call).
 // FEATURE: CHI-88 — `terse` (mobile feed only) is forwarded straight to describePipelineEvent; the
 // "Read more" toggle also gains a real touch target on mobile (it measured 53×13px live at 375×667).
+// FEATURE: LAV-32b (§19s, the four-surface standard) -- this is the PANEL lane, and §19s scopes it to
+// exactly three things: the agent (RoutingHopCard's header, untouched), the hop's BARE pattern names,
+// and the hop's time. Everything else that used to render here belongs to another surface and, under
+// "nothing appears on two surfaces," may not also appear here: the composed activity sentences and
+// canned labels (status lane), reasoning and capability-completion headers (stored trace/log only),
+// the doer's receipt (Assembly drawer), and the fetch rows (never a routing event at all). With no
+// paragraph left to clamp, the 3-line clamp and its "Read more"/"Show less" toggle go with them --
+// there is nothing to expand.
+// The "AI patterns used:" prefix is deleted, not relabelled: the names ARE the line (§19s). A hop
+// that matched no gold pattern still renders no pattern line at all -- §19l's honest-unclassified
+// state is unchanged by this trim.
+// Time comes from the ONE shared m:ss formatter (LAV-32a's formatHopDuration), which is the whole
+// point of §19s's "no more per-surface unit dialects": this row used to speak `1.4s`/`820ms` while
+// the drawer spoke `0:01` about the same hop. An unmeasured hop renders no time (formatHopDuration
+// returns null), never a fabricated 0:00.
+// Style is untouched: the pattern names keep the mono/9/muted slot they already had and the time
+// takes the body/11.5/ink slot the sentence had, so the row's fonts, colors and geometry are the
+// same ones it renders today.
 function RoutingActivityLine({ evt, terse }) {
-  const isMobile = useIsMobile();
-  const { summary, color } = describePipelineEvent(evt, { terse });
+  // `terse` still reaches describePipelineEvent because the COLOR is still read from it (the dot's
+  // meaning is platform data, not copy, and §19s trims copy only). The flag is inert for color --
+  // it only ever elided a summary -- and is kept threaded so the call sites stay unchanged.
+  const { color } = describePipelineEvent(evt, { terse });
   const spanPatterns = useTracePatterns(evt.data?.trace_id, evt.data?.span_id);
   const names = evt.data?.span_id != null ? spanPatterns[evt.data.span_id] : null;
   const patternLabel = names && names.length > 0 ? names.join(', ') : null;
-  const [expanded, setExpanded] = useState(false);
-  const fullText = `${summary}${evt.durationMs != null ? ` · ${formatDuration(evt.durationMs)}` : ""}`;
-  const isLong = fullText.length > 160;
+  const hopDuration = formatHopDuration(evt.durationMs ?? null);
   return (
     <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
       <span style={{width:6,height:6,borderRadius:"50%",background:color,marginTop:5,flexShrink:0}}/>
       <div style={{flex:1,minWidth:0}}>
-        {patternLabel && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>AI patterns used: {patternLabel}</div>}
-        <div
-          onClick={() => isLong && setExpanded(e => !e)}
-          style={{
-            fontFamily:body,fontSize:11.5,color:T.ink,cursor:isLong?"pointer":"default",
-            display: expanded ? "block" : "-webkit-box",
-            WebkitLineClamp: expanded ? "unset" : 3,
-            WebkitBoxOrient:"vertical",
-            overflow: expanded ? "visible" : "hidden",
-          }}>
-          {fullText}
-        </div>
-        {isLong && (
-          /* FEATURE: CHI-88 — mobile only: 11px of vertical padding cancelled by an equal negative
-             margin, so the label sits exactly where it does today (marginTop 2 == -9 + 11) while the
-             hit box grows from the measured 53×13px to ~35px tall. Desktop style byte-identical. */
-          <button onClick={() => setExpanded(e => !e)}
-            style={isMobile
-              ? {background:"none",border:"none",padding:"11px 14px 11px 0",margin:"-9px 0 -9px",fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}
-              : {background:"none",border:"none",padding:0,marginTop:2,fontFamily:body,fontSize:10.5,fontStyle:"italic",color:T.brassDeep,textDecoration:"underline",cursor:"pointer"}}>
-            {expanded ? "Show less" : "Read more"}
-          </button>
-        )}
+        {patternLabel && <div style={{fontFamily:mono,fontSize:9,color:T.muted}}>{patternLabel}</div>}
+        {hopDuration && <div style={{fontFamily:body,fontSize:11.5,color:T.ink}}>{hopDuration}</div>}
       </div>
     </div>
   );
@@ -3841,7 +3869,11 @@ export default function MarketIntelligenceScreen() {
       // SES-57 mirror reason and on the same shape-parity footing `task`/`account` already ride:
       // the two lists must never fork again, so each names the whole receipt pair regardless of
       // which end of a hop actually carries a value for it.
-      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
+      // FEATURE: LAV-32b (§19s) -- `capability_phrase` joins the named list here in the same commit it
+      // joins useHarnessStream.js's sibling list. The LAV-28c note directly above is the reason: these
+      // two hand-rebuilt payloads must name the identical field set, and a fork between them IS the
+      // SES-57 bug class. Verbatim, never derived, on the same `?? null` footing as the pair above it.
+      logEvent(buildHopEvent(evt.type, attributedAgentId, { message, viaTool: evt.viaTool || null, reasoning: evt.reasoning ?? null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, capability_phrase: evt.capability_phrase ?? null, toCapabilitySlug: evt.toCapabilitySlug ?? null, ...pickCreditedSpan(evt) }, durationMs, {}));
       return;
     }
     const correlationKey = `${evt.fromAgentId}:${evt.toAgentId}:${evt.viaTool || ''}`;
@@ -3849,7 +3881,8 @@ export default function MarketIntelligenceScreen() {
     // pair useHarnessStream.js's START build already names: `task` is the requester's own words (now
     // emitted on every delegation start, LAV-17's carrier half) and `account` rides for shape parity
     // so neither list can drift from the other again.
-    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
+    // FEATURE: LAV-32b (§19s) -- and on the START build, same mirror rule.
+    logEvent(buildHopEvent(evt.type, evt.fromAgentId, { message, viaTool: evt.viaTool || null, task: evt.task ?? null, ask_line: evt.ask_line ?? null, account: evt.account ?? null, capability_phrase: evt.capability_phrase ?? null, ...pickCreditedSpan(evt) }, durationMs, { secondaryAgentId: evt.type === 'delegation' ? evt.toAgentId : null }), { replaces: { key: correlationKey, awaitingAgentId: evt.toAgentId } });
   };
 
   // FEATURE: HAR-17 -- recovery visibility, John's exact design 2026-07-28: tell the user we hit a
