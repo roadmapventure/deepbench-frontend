@@ -1,1 +1,0 @@
-Worktree `design-lav-36` — design+coding session on LAV-36 (Assembly drawer: collapse duplicate same-stage sections; second Verification section becomes a sub-entry per §19s). Started 2026-08-08. Also closes MOB-16's chip-merge question (same shared fold).
