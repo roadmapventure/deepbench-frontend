@@ -1,3 +1,4 @@
+// DeepBench v7.0.73 | AppShell.jsx | CHI-100 -- shell height consumes the desktop-only vh compensation variable (see tokens.js), mobile falls back to 100vh
 // DeepBench v7.0.4 | AppShell.jsx | LAV-1e -- nav flip: "Live Agent View" added as the first Work item (desktop dropdown + mobile NAV_GROUPS), Channel Sales Intelligence repointed to /channel-intelligence, isMI/isLAV active-state derivations updated
 // DeepBench v6.3.139 | AppShell.jsx | S-SH-23b -- widen Work dropdown so focus-area names fit one line + right-justify the (Beta)/(Alpha) status
 // DeepBench v6.3.138 | AppShell.jsx | S-SH-23 -- focus-area release-status labels
@@ -364,7 +365,7 @@ export function AppShell({ children, headerProps = {}, toast }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   return (
-    <div style={{height:"100vh",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
+    <div style={{height:"var(--shell-h, 100vh)",background:T.paperDeep,fontFamily:body,color:T.ink,display:"flex",flexDirection:"column"}}>
       <AppHeader {...headerProps} onHelp={()=>setAboutOpen(true)} onAIPanel={()=>setAiPanelOpen(o=>!o)}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
         {children}
