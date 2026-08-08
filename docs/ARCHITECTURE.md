@@ -2249,3 +2249,33 @@ hop degraded to a template). The requirement now lives once, in the harness:
   created, not simply output" (John, same exchange).
 
 Build: `S-LAV-28b` (v7.0.62, harness) + `S-LAV-28c` (v7.0.63, display + gates).
+
+**The four-surface standard (John, 2026-08-07, `design-display-contract` — supersedes every
+earlier per-surface content rule in this section; decided against a live four-way capture of one
+run).** The console proves two stories at once — real routing and real building — and the four
+run displays split them into non-overlapping lanes. **Nothing appears on two surfaces**; every
+lane is universal (every agent, every hop, by construction — the harness contract, never
+per-agent anything):
+
+| Surface | Lane | Shows — and nothing else |
+|---|---|---|
+| **Elapsed status** | routing, live | Communication narration, platform-authored from the frame: `<asker> is asking <receiver> for <phrase>…` / `<receiver> is returning <phrase> to <asker>…` / `<reviewer> is reviewing <author>'s work…`. Three verbs (asking/returning/reviewing) keyed on frame type — fixed chrome. `<phrase>` comes from `capabilities.display_phrase` (data, authored once per capability, John-approved copy), carried on the frame by the executor; absent phrase → the capability's `name`. |
+| **Agent bubble** | routing, live, per-agent | The agent's current assignment in the **asker's own 5 words** (`ask_line`), held while it works. Nothing else — no raw task text, no reasoning, no fetch labels, no model names. |
+| **Routing panel** | routing, persistent (the proof ledger) | Per hop: agent, **bare pattern names** (no "AI patterns used:" prefix), hop time. Nothing else — no fetch rows, no reasoning, no receipts, no capability headers, no canned lines. |
+| **Assembly drawer** | building, persistent (the document's ledger) | Per stage: ✓ + stage label + agent + `took m:ss` + the doer's **receipt sentence** (`account`), verbatim. No "arrived," no "Asked/Did" prefixes, no platform detail lines. Document-building turns only — a pure routing turn creates no stage (John, explicit). |
+
+Accepted trades (chosen, not accidental): asks are live-only (post-run, the drawer holds
+receipts, not asks); measured counts and pick reasoning leave the user-facing surfaces entirely
+(both persist in the stored trace/log for audit — the §19k signature reads the stored log and is
+untouched by any display change). **All durations everywhere render `m:ss` through one shared
+formatter** — no more per-surface unit dialects. The four render rules ride one frame stream;
+keep them in the fewest shared client seams possible so surfaces cannot drift apart again
+(SES-57 class).
+
+**Sibling-surface check (process rule born here):** any session changing run-content display
+must enumerate every surface rendering that content class and mark each in-scope or excluded
+by name with a reason — a silent omission is the defect that took four rounds to surface
+(`CLAUDE-DESIGN.md` Architect Review carries the enforcement copy).
+
+Build: `S-LAV-32a` (v7.0.64 — executor carries `capability_phrase`; drawer trim) +
+`S-LAV-32b` (v7.0.65 — status narration, panel strip, bubble ask; consumes the seeded phrases).
