@@ -1,3 +1,7 @@
+// DeepBench v7.0.76 | middleware.js | HAR-33 PATCH-1 -- every reason='spend_cap' refusal carries
+// the stats object, repeat refusals included, because HAR-33b's John-approved superuser popup
+// always renders three stat tiles; a stats-less spend_cap refusal would be a different popup
+// than the one signed off. See refuse() and the stored-blocked branch.
 // DeepBench v7.0.76 | middleware.js | HAR-33 -- per-IP access gate at the edge: US callers get a
 // $5 trial spend cap, non-US callers are blocked on their first model-triggering call, and every
 // refusal is a structured 403 that HAR-33b turns into a friendly popup.
@@ -72,11 +76,12 @@ function passThrough() {
 }
 
 /**
- * The exact part-b contract. `stats` is present only when this request actually computed them --
- * i.e. the spend cap was crossed on this call. A caller that is already stored as blocked is
- * refused without an extra get_ip_stats round trip: re-querying spend for an IP that is hammering
- * a closed door is precisely the cost this gate exists to avoid, and HAR-33b must tolerate an
- * absent `stats` anyway (geo and manual refusals never carry one).
+ * The exact part-b contract. `stats` accompanies EVERY reason='spend_cap' refusal -- the first one
+ * and every repeat alike -- because HAR-33b's superuser popup always renders three stat tiles
+ * (LLM calls / tokens / usage) and John signed off on that shape; a stats-less spend_cap refusal
+ * would be a different popup than the approved one (PATCH-1). geo and manual refusals never carry
+ * stats and cost no RPC. The one permitted omission is an RPC failure on a repeat refusal: the
+ * refusal must never depend on the RPC, so it degrades to no tiles rather than opening the gate.
  */
 function refuse(reason, ip, stats) {
   const body = { deepbench_gate: true, reason, ip };
@@ -128,6 +133,35 @@ function background(context, promise) {
   } catch {
     // waitUntil unavailable (local dev): the fetch is already in flight either way.
   }
+}
+
+/**
+ * Spend for one IP, computed at check time from ai_activity_log x model_pricing. Throws on any
+ * failure -- the two callers want opposite behaviour on error (the trial path fails OPEN because
+ * it has not yet established that this caller is over budget; the stored-blocked path stays
+ * CLOSED because the row already settled that question), so neither may inherit a default.
+ */
+async function fetchStats(url, key, ip) {
+  const res = await fetch(`${url}/rest/v1/rpc/get_ip_stats`, {
+    method: 'POST',
+    headers: { ...supabaseAuth(key), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_ip: ip }),
+    signal: timeoutSignal(SUPABASE_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`status ${res.status}`);
+  const body = await res.json();
+  const stats = Array.isArray(body) ? body[0] : body;
+  if (!stats || typeof stats !== 'object') throw new Error('empty stats');
+  return stats;
+}
+
+/** The three numbers HAR-33b's popup tiles render. cost_usd is rounded to cents for display. */
+function shapeStats(stats) {
+  return {
+    llm_calls: Number(stats.llm_calls) || 0,
+    total_tokens: Number(stats.total_tokens) || 0,
+    cost_usd: Math.round((Number(stats.cost_usd) || 0) * 100) / 100,
+  };
 }
 
 function writeRow(url, key, ip, payload, resolution) {
@@ -206,7 +240,25 @@ export default async function middleware(request, context) {
           }),
         }),
       );
-      return refuse(row.block_reason || 'manual', ip, null);
+      // PATCH-1: a repeat spend_cap refusal carries the same three stat tiles as the first one,
+      // so HAR-33b's approved popup renders identically whether this is the call that crossed the
+      // cap or the hundredth call after it. Deliberately scoped to spend_cap: geo and manual
+      // blocks render no tiles, so they still cost zero RPC.
+      const reason = row.block_reason || 'manual';
+      let stats = null;
+      if (reason === 'spend_cap') {
+        try {
+          stats = shapeStats(await fetchStats(supabaseUrl, supabaseKey, ip));
+        } catch (err) {
+          // NOT a fail-open: the row already established this caller is blocked, so an unavailable
+          // RPC costs the popup its tiles, never the gate its refusal. Distinct log prefix so the
+          // "did the fail-open path fire?" QA grep stays honest.
+          console.error(
+            `[HAR-33 gate] stats-unavailable on stored spend_cap refusal for ip=${ip}: ${err && err.message ? err.message : String(err)}`,
+          );
+        }
+      }
+      return refuse(reason, ip, stats);
     }
 
     // 5. Trial (or first sighting).
@@ -232,17 +284,10 @@ export default async function middleware(request, context) {
 
     let stats = null;
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_ip_stats`, {
-        method: 'POST',
-        headers: { ...supabaseAuth(supabaseKey), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_ip: ip }),
-        signal: timeoutSignal(SUPABASE_TIMEOUT_MS),
-      });
-      if (!res.ok) return failOpen('spend-rpc', ip, new Error(`status ${res.status}`));
-      const body = await res.json();
-      stats = Array.isArray(body) ? body[0] : body;
-      if (!stats || typeof stats !== 'object') return failOpen('spend-rpc', ip, new Error('empty stats'));
+      stats = await fetchStats(supabaseUrl, supabaseKey, ip);
     } catch (err) {
+      // Fails OPEN, unlike the stored-blocked path above: nothing has yet established that this
+      // caller is over budget, so refusing on a broken RPC would block good users.
       return failOpen('spend-rpc', ip, err);
     }
 
@@ -266,11 +311,7 @@ export default async function middleware(request, context) {
           'merge-duplicates',
         ),
       );
-      return refuse('spend_cap', ip, {
-        llm_calls: Number(stats.llm_calls) || 0,
-        total_tokens: Number(stats.total_tokens) || 0,
-        cost_usd: Math.round(spent * 100) / 100,
-      });
+      return refuse('spend_cap', ip, shapeStats(stats));
     }
 
     // Under the cap. First sighting gets a minimal trial row so John sees every IP that has ever
