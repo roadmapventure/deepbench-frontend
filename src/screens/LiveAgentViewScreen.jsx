@@ -1,3 +1,5 @@
+// DeepBench v7.0.82 | LiveAgentViewScreen.jsx | MOB-21 -- mobile armed Answer tab word pulses
+// ink->tan in sync with the border (LAV-38 parity, inkTanPulse from tokens.js).
 // DeepBench v7.0.80 | LiveAgentViewScreen.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability:
 // narration pill / solid-brass armed Answer tab / tappable tracker chips.
 // DeepBench v7.0.71 | LiveAgentViewScreen.jsx | LAV-34 -- desktop status strip: the live-status
@@ -520,8 +522,11 @@ const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
 // button's own inline style already carries `border:"none"` plus a 2px `borderBottom`, so this
 // pulses the underline color and its soft glow with no layout shift -- deliberately not a full
 // border. Exported as a named const so the regression test can import and assert on the real string.
+// MOB-21 (v7.0.82) adds a second animation on the same rule: the armed label pulses ink->tan
+// (inkTanPulse, tokens.js GLOBAL_CSS, landed with LAV-38) in sync with the border, giving mobile
+// the same "answer ready" language as the desktop drawer title.
 export const MOB_TAB_CUE_CSS = `
-.lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite}
+.lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite,inkTanPulse 2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.lav-mtab-alert{animation:none;border-bottom-color:${T.brass}}}
 `;
 
