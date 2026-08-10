@@ -1,3 +1,6 @@
+// DeepBench v7.0.84 | LiveAgentViewScreen.jsx | LAV-39 -- rail header label becomes "Agent Patterns"
+// (render string only; hop grouping, row components, event copy, §19s content contract untouched --
+// John's call, 2026-08-10, verified against published agentic-patterns vocabulary).
 // DeepBench v7.0.82 | LiveAgentViewScreen.jsx | MOB-21 -- mobile armed Answer tab word pulses
 // ink->tan in sync with the border (LAV-38 parity, inkTanPulse from tokens.js).
 // DeepBench v7.0.80 | LiveAgentViewScreen.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability:
@@ -495,7 +498,7 @@ function AgentRoutingRail({ events, agents }) {
       {/* The drawer-title look without the Drawer: not collapsible, nothing to collapse into. */}
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",
         textTransform:"uppercase",color:T.muted}}>
-        Agent Routing · {realHopCount} hop{realHopCount === 1 ? "" : "s"}
+        Agent Patterns · {realHopCount} hop{realHopCount === 1 ? "" : "s"}
       </div>
       {ordered.length === 0 ? (
         <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
