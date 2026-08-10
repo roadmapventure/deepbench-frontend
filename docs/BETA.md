@@ -95,7 +95,7 @@ session. Verbatim:
 | 2 | **UX/UI: chat + column 2** | Chat (column 1) and the numbered journey-step drawers (column 2, §19n) are clean, and a user can operate them with minimal difficulty. |
 | 3 | **Mobile works well** | The beta surfaces behave well on mobile. |
 | 4 | **AI Audit Log screen is accurate** | What the audit screen renders is true — counts reconcile, labels aren't invented or hardcoded. |
-| 5 | **Agent Routing drawer** | Works well, accurate, and every agent displays ≥1 pattern in its hop — where appropriate. |
+| 5 | **Agent Routing drawer** *(renamed "Agent Patterns" on all surfaces, `LAV-39` 2026-08-10 — bucket name kept as John's verbatim)* | Works well, accurate, and every agent displays ≥1 pattern in its hop — where appropriate. *(2026-08-10, `LOG-133`: a live 9-hop run showed ≥1 pattern on all 9 hops after Susan's "Brokered Delegation" promotion closed the broker-path gap.)* |
 
 **Ship rule:** all five buckets green → ship beta.
 **Bonus (only if time remains after the five):** get the AI Audit "re-classify patterns"
