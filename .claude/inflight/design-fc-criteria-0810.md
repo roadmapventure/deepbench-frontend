@@ -1,1 +1,0 @@
-design-fc-criteria-0810 — data session (ID/version pending claim): the answer-emission hop's Function Calling gap — one governed candidate presenting Susan her stale 07-28 discard reasoning + the now-present schema-conformance signals; her re-decision. Live slice of LOG-134, promoted to bucket 5. Same conversation as S-LAV-39-design/S-LOG-133.
