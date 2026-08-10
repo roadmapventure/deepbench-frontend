@@ -5,6 +5,16 @@
 
 ---
 
+## design-log-136-matcher / S-LOG-136 (v7.0.87, `49bc533`, 2026-08-10, worktree `design-log-136-matcher`) — Criteria matcher learns dotted paths; Susan's stored judgment activates; every CHI hop shape classifies
+
+**`LOG-136` (Observability, Beta-gate bucket 5) ✅ done + archived; `LOG-135` (Observability, Beta-gate bucket 5) ✅ discharged on its named gate + archived (secondary-ID discipline: the gate was the 5 emission rows, and it passed).** The fix S-LOG-135 diagnosed: `pattern_criteria_matches()` gained path-aware key resolution (`sig #> string_to_array(k,'.')` for dotted keys) and its containment branch now reads the resolved value — two edits, replaced in place with the identical signature (single-function count asserted, per the `supabase-function-signature` rule), `IMMUTABLE` kept, applied as migration `log136_criteria_dotted_path`.
+
+**Proofs (coding session, then independently re-run by the design session):** equality sweep — all eight pre-existing patterns' match counts byte-identical (brokered-delegation 1483, evaluator-optimizer 128, handoff 903, orchestrator-workers 499, output-guardrails 1933, prompt-chaining 1044, request-routing 3523, RAG 2819); sole diff `function-calling` at **585 rows**, all `ci-answer-intent` answer-emission hops (blast radius uncapped, sums exactly); the 5 gate rows each return "Function Calling" against Susan's actually-stored criteria; both defect directions retested (dotted now matches, plain keys unchanged); `LOG-131` plan shape held (`Index Cond` on pkey, 3.6 ms vs 3.9 ms baseline). Live proof: a fresh console run showed the emission hop patterned mid-run — "Function Calling", Marcus Webb — GEO CSO Expert, hop 6, on the Agent Patterns panel.
+
+**What the four-leg arc (S-LAV-39 → S-LOG-133 → S-LOG-135 → S-LOG-136) leaves behind:** the panel named for what it shows, two new/repaired gold patterns governed by Susan Smith — Trainer's real logged judgments, zero blank hop shapes in the CHI journey, a matcher that can express every legal criteria field, and honest audit trails for the two rounds that failed before the one that landed. Note for `LOG-132` (Observability, bucket 4): the rollup re-measure should account for this fn change.
+
+---
+
 ## design-fc-criteria-0810 / S-LOG-135 (v7.0.86, `9d12f27`+`d694cc6`, 2026-08-10, worktree `design-fc-criteria-0810`) — The answer-emission Function Calling gap: Susan's judgment lands, the criteria grammar doesn't
 
 **`LOG-135` (Observability, Beta-gate bucket 5) ⚠️ deliberately left OPEN — the honest close.** John's find: every run's answer-emission hop (Marcus Webb — GEO CSO Expert writing the final answer through his intent's schema tool, citing real Library records — verified rows 37603/37640/37644/37670/37682, one per question, always blank). The matching gold row (`function-calling`) was dormant on Susan Smith — Trainer's 07-28 discard, whose stated reason — the signature can't observe schema-conformance — went stale when `traits.schema` + the schema-tool name in `tool_calls` (recorded only on parsed structured emission) joined the signature.

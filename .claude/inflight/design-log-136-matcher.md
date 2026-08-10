@@ -1,1 +1,0 @@
-design-log-136-matcher — S-LOG-136 (version pending claim): pattern_criteria_matches() gains dotted-path traversal (LOG-136, Beta-gate bucket 5) so Susan's stored function-calling criteria activates and the answer-emission hop classifies (closes LOG-135). John-approved. Same conversation as S-LOG-133/S-LOG-135.
