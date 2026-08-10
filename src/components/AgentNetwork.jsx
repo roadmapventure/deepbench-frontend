@@ -1,3 +1,5 @@
+// DeepBench v7.0.81 | AgentNetwork.jsx | LAV-38 -- Answer drawer armed state gains a solid-brass
+// header fill and an ink->tan pulsing title, on the same 2s rhythm as LAV-33's existing borderPulse.
 // DeepBench v7.0.75 | AgentNetwork.jsx | LAV-37 -- console first-draw cleanup (grid clears chrome
 // overlays / role wrap / waterfall pane tint)
 // DeepBench v7.0.69 | AgentNetwork.jsx | MOB-15 -- the mobile edge legend joins the Single|Bench
@@ -1041,13 +1043,22 @@ export const NET_CSS = `
 .lav-mgate-actions button:disabled{cursor:default;opacity:.5}
 .lav-mgate-reject{background:${T.card};border:1.5px solid ${T.flag};color:${T.flag}}
 .lav-mgate-accept{background:${T.navy};color:${T.card}}
-/* FEATURE: LAV-33 -- the Deliverable drawer's run-complete cue. Closed by design (LAV-7b), so
+/* FEATURE: LAV-33 -- the Answer drawer's run-complete cue. Closed by design (LAV-7b), so
    nothing signals an answer arrived until the user opens it; this reuses the existing brass
    borderPulse attention idiom (Console Boot Dial frame, .upload-blink) rather than inventing a
    second one. Targets the Drawer's own outermost bordered div (its direct DOM child), never the
-   drawer content, which is untouched. */
+   drawer content, which is untouched.
+   FEATURE: LAV-38 -- flashier armed state (John, beta feedback, 2026-08-10): while armed, the
+   header row also fills solid T.brass (the MOB-19 armed-tab idiom) and the title word pulses
+   T.ink -> T.line via the new inkTanPulse keyframe, on the same 2s rhythm as borderPulse. Selectors
+   follow the Drawer's DOM shape verified in SharedUI.jsx: outer bordered div -> header row ->
+   title div -- same structural-selector approach, never the drawer content. Reduced-motion: solid
+   brass header + static T.ink title, no animation. */
 .lav-answer-alert > div{animation:borderPulse 2s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.lav-answer-alert > div{animation:none;border-color:${T.brass}}}
+.lav-answer-alert > div > div:first-child{background:${T.brass}}
+.lav-answer-alert > div > div:first-child > div:first-child{animation:inkTanPulse 2s ease-in-out infinite;color:${T.ink}}
+@media (prefers-reduced-motion:reduce){.lav-answer-alert > div{animation:none;border-color:${T.brass}}
+.lav-answer-alert > div > div:first-child > div:first-child{animation:none;color:${T.ink}}}
 `;
 
 // FEATURE: LAV-33 -- pure predicate for the Deliverable drawer's run-complete cue. Arms the moment
@@ -1744,7 +1755,10 @@ export default function AgentNetwork({ roster, hops, runHops, running, traceRows
               then read as a guardrail catch that didn't happen -- that mislabel edge is CHI-98's to
               resolve, not this ticket's. */}
           {/* FEATURE: LAV-21b -- "Answer" becomes "Deliverable" (John, 2026-08-04). Title strings
-              only; every other behaviour of this drawer is byte-unchanged. */}
+              only; every other behaviour of this drawer is byte-unchanged.
+              FEATURE: LAV-38 -- reversed (John, beta feedback, 2026-08-10): "Deliverable" becomes
+              "Answer" again, re-unifying desktop with mobile's tab label (MOB-17). Conscious
+              reversal, not drift -- recorded here per the kickoff. */}
           {/* FEATURE: LAV-33 -- controlled open state (was `defaultOpen` only) so the run-complete
               cue can see and clear on open; `onToggle` receives the Drawer's own next-open boolean
               (SharedUI.jsx's `willOpen`, MI-72b's controlled-mode contract), so this is a direct
