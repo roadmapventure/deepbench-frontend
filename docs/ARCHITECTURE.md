@@ -1543,6 +1543,15 @@ to a `§19i` layer, and each has a *different* caller:
   (capture bug), the pattern inventory (a new pattern → Pattern Definer), or the criteria (too narrow).
 - **Scale:** aggregate by **distinct signature** (~dozens, bounded by ~29 intents), never per-row; compute
   in the DB (`GROUP BY`). No stored summary — the summary *is* the live aggregate.
+- **Read-shape split (`LOG-131`, v7.0.83, 2026-08-10):** signature assembly is single-sourced in the
+  `log_row_signature(ai_activity_log)` SQL function — edit it there only, never fork the expression into
+  a view body. `ai_call_patterns` itself is a per-row LATERAL over that function, so an
+  `ai_activity_log_id` filter pushes to the pkey index (point lookups cost the rows requested, not the
+  whole log — the pre-split shape blew anon's 3 s cap from the Agent Routing drawer). The two rollup
+  views carry the distinct-signature dedup **internally** (the Scale bullet above governs them, not the
+  point-lookup view). Everything stays plain views — this split changes where the work happens, not the
+  never-materialize / self-cleanse posture. Known cost: the function's EXISTS sublinks are not
+  planner-inlinable, so the full-log rollup paths run ~2.1× slower (`LOG-132` tracks the headroom).
 - **Returns** a *set* of pattern objects per row — `slug`, `name` + `definition`/`citation` (gold), `role`
   (`primary` = the `intent` pattern / `supporting`), `evidence` (which element fired the match). Three
   honest states: governed match / matched-but-uncatalogued (`humanizeSlug`) / not-yet-classified.
