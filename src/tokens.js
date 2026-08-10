@@ -1,3 +1,4 @@
+// DeepBench v7.0.81 | tokens.js | LAV-38 -- inkTanPulse keyframe for the Answer drawer's armed-header title pulse
 // DeepBench v7.0.73 | tokens.js | CHI-100 -- desktop 80% render default: GLOBAL_CSS media block + vh compensation variable (see below)
 // DeepBench v7.0.4 | tokens.js | LAV-1e -- focus-area status flip: channelSales Beta->Alpha, projectMgmt/spendAnalysis Alpha->Pre-Alpha, new liveAgentView key (Beta)
 // DeepBench v6.3.171 | tokens.js | ABT-1a -- About screen: single Architecture tab, live-wired rebuild
@@ -57,6 +58,7 @@ export const FONT_URL = "https://fonts.googleapis.com/css2?family=Fraunces:ital,
 export const GLOBAL_CSS = `
 @import url('${FONT_URL}');
 @keyframes borderPulse { 0%,100%{border-color:#b6873a55;box-shadow:0 0 0 0 rgba(182,135,58,0)} 50%{border-color:#b6873a;box-shadow:0 0 18px 4px rgba(182,135,58,0.2)} }
+@keyframes inkTanPulse { 0%,100%{color:#28221a} 50%{color:#c8bb9a} }
 @keyframes hModalFadeIn { from{opacity:0} to{opacity:1} }
 @keyframes hModalPopIn  { from{opacity:0;transform:translate(-50%,-50%) scale(0.93)} to{opacity:1;transform:translate(-50%,-50%) scale(1)} }
 @keyframes pdot    { 0%,100%{opacity:1} 50%{opacity:0.2} }

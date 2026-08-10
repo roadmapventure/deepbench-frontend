@@ -1,3 +1,7 @@
+// DeepBench v7.0.84 | MarketIntelligenceScreen.jsx | LAV-39 -- CHI drawer title, mobile pinned-feed
+// header, and hop-summary leads relabeled "Agent Patterns" (render strings only; hop grouping, row
+// components, event copy, §19s content contract untouched -- John's call, 2026-08-10, verified
+// against published agentic-patterns vocabulary). Both surfaces.
 // DeepBench v7.0.66 | MarketIntelligenceScreen.jsx | LAV-32c (§19s panel lane) -- QA patch on 32b.
 // 32b stripped the panel row's CONTENT but left the per-event row STRUCTURE, so a hop that logged
 // three frames still rendered three rows -- live hop 12 (Michelle, agent-selection + two briefing
@@ -1312,7 +1316,7 @@ function formatHopSummary(hopEnd, totalElapsedMs, isAnswer = true) {
   if (hopEnd == null || totalElapsedMs == null) return null;
   const hopWord = hopEnd === 1 ? "hop" : "hops";
   // FEATURE: CHI-74 -- non-answer grounded-work bubbles (forecast ack, theory candidates) drop "& Answer"
-  const lead = isAnswer ? "Full Agent Routing & Answer" : "Full Agent Routing";
+  const lead = isAnswer ? "Full Agent Patterns & Answer" : "Full Agent Patterns";
   return `${lead} in ${hopEnd} ${hopWord} total, ${formatElapsed(totalElapsedMs)}`;
 }
 
@@ -3227,7 +3231,7 @@ export function AuditColumn({ events, agentActivity, onAgentsDrawerOpen }) { // 
       {/* FEATURE: CHI-01 — Drawer count switches from "N events" to "N hops" (John's explicit
           call: a new line should mean a hand-off, not an activity). FEATURE: CHI-03c — was "turns".
           FEATURE: CHI-04 — count excludes question_boundary marker rows (realHopCount). */}
-      <Drawer title="Agent Routing" count={`${realHopCount} hop${realHopCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
+      <Drawer title="Agent Patterns" count={`${realHopCount} hop${realHopCount === 1 ? "" : "s"}`} defaultOpen={true} maxHeight={280} resizable>
         {ordered.length === 0 ? (
           <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
         ) : hops.map(hop =>
@@ -3683,7 +3687,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
       <div style={{flexShrink:0,height:176,background:T.cardAlt,border:`1px solid ${T.lineSoft}`,display:"flex",flexDirection:"column",position:"relative"}}>
         <div style={{flexShrink:0,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,borderBottom:`1px solid ${T.lineSoft}`}}>
           <span style={{width:5,height:5,borderRadius:"50%",background:T.brass,animation:"aiBlink 1.3s ease-in-out infinite"}}/>
-          <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Routing · Live</span>
+          <span style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:T.muted}}>Agent Patterns · Live</span>
         </div>
         <div ref={routingFeedRef} onScroll={checkRoutingScroll} style={{flex:1,minHeight:0,overflowY:"auto",padding:"7px 10px",display:"flex",flexDirection:"column",gap:6}}>
           {/* FEATURE: CHI-01 — hop-grouped cards, same shared render path as desktop's AuditColumn. FEATURE: CHI-03c — was "turn-grouped".

@@ -1,3 +1,4 @@
+// DeepBench v7.0.81 | AssemblyView.jsx | LAV-38 -- Answer drawer rename (reversal of LAV-21b)
 // DeepBench v7.0.80 | AssemblyView.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability: narration
 // pill / solid-brass armed Answer tab / tappable tracker chips.
 // DeepBench v7.0.74 | AssemblyView.jsx | LAV-36 -- one section per stage. The completion path gains
@@ -127,7 +128,7 @@ import { formatHopDuration } from "../screens/MarketIntelligenceScreen.jsx";
 // ── chrome strings ────────────────────────────────────────────────────────────
 // John's canonical names, 2026-08-04. Verbatim; never re-worded without him.
 export const ASSEMBLY_TITLE = "Assembly";
-export const DELIVERABLE_TITLE = "Deliverable";              // the Answer drawer's new name
+export const DELIVERABLE_TITLE = "Answer";  // LAV-38 (John, 2026-08-10, beta feedback): conscious reversal of LAV-21b's rename -- matches mobile's tab label (MOB-17)
 export const ASSEMBLY_LIVE_TEXT = "Assembly under way…";     // live run, no sections yet
 export const ASSEMBLY_EMPTY_TEXT =
   "No build yet — run a question and watch the answer assemble here.";

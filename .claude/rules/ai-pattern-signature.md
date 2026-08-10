@@ -23,6 +23,11 @@ write-time stamping. Pattern detection is **data** (`criteria` on the gold
 query path — semantics happen once, when the Pattern Definer (Susan) defines the pattern.
 The Displayer view stays a **plain view, never materialized**. Surface unclassifiable rows
 (`LEFT JOIN`), never silently drop them.
+Signature assembly lives ONLY in the `log_row_signature(ai_activity_log)` SQL function
+(`LOG-131`, v7.0.83) — never fork that expression into a view body, a query, or JS.
+`ai_call_patterns` is a per-row LATERAL over it (point lookups must stay pkey-pushdown fast);
+the two rollup views dedup by distinct signature internally. A change that makes the point
+lookup recompute the whole log again is the `LOG-131` regression, not a refactor.
 The Displayer matches against the **full assembled §19k signature** (`call_facts` + derived
 `model_modality` + `intent` parsed from `feature` + span-derived `sub_calls_chained` +
 span-derived `integration_followed`, explicit true/false when `span_id` is present, omitted

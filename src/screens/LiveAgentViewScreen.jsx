@@ -1,3 +1,9 @@
+// DeepBench v7.0.88 | LiveAgentViewScreen.jsx | LAV-40 -- guardrail question frontload: "FOR DEMO ONLY - agent guardrail display:" (John's copy; caps because native option text can't style partially)
+// DeepBench v7.0.84 | LiveAgentViewScreen.jsx | LAV-39 -- rail header label becomes "Agent Patterns"
+// (render string only; hop grouping, row components, event copy, §19s content contract untouched --
+// John's call, 2026-08-10, verified against published agentic-patterns vocabulary).
+// DeepBench v7.0.82 | LiveAgentViewScreen.jsx | MOB-21 -- mobile armed Answer tab word pulses
+// ink->tan in sync with the border (LAV-38 parity, inkTanPulse from tokens.js).
 // DeepBench v7.0.80 | LiveAgentViewScreen.jsx | MOB-18+MOB-19+MOB-20 -- mobile noticeability:
 // narration pill / solid-brass armed Answer tab / tappable tracker chips.
 // DeepBench v7.0.71 | LiveAgentViewScreen.jsx | LAV-34 -- desktop status strip: the live-status
@@ -100,7 +106,7 @@
 // pre-display gate 56% of the time, so John replaced it with training-turnover-benchmark (75%
 // answer rate). south-korea-coop stays -- John's explicit call -- as a deliberate guardrail-catch
 // showcase (0/5, never clears the gate; CHI-98 tracks that gap). Its picker option is decorated
-// "Guardrail catch demo: <label>" at this file's option-build point only (chiQuestions.js's
+// "FOR DEMO ONLY - agent guardrail display: <label>" at this file's option-build point only (chiQuestions.js's
 // exported label is never touched, and the undecorated label is still what gets sent to
 // runQuestion -- decorating the string actually sent would change the real question asked). The
 // run's question id is captured into ranQuestionId at Run-click time (not read live off `picked`,
@@ -493,7 +499,7 @@ function AgentRoutingRail({ events, agents }) {
       {/* The drawer-title look without the Drawer: not collapsible, nothing to collapse into. */}
       <div style={{fontFamily:mono,fontSize:9.5,fontWeight:700,letterSpacing:"0.1em",
         textTransform:"uppercase",color:T.muted}}>
-        Agent Routing · {realHopCount} hop{realHopCount === 1 ? "" : "s"}
+        Agent Patterns · {realHopCount} hop{realHopCount === 1 ? "" : "s"}
       </div>
       {ordered.length === 0 ? (
         <div style={{fontFamily:body,fontSize:12,color:T.muted}}>{AGENT_ROUTING_EMPTY_TEXT}</div>
@@ -520,8 +526,11 @@ const MOB_TABS = [["canvas", "Canvas"], ["answer", "Answer"]];
 // button's own inline style already carries `border:"none"` plus a 2px `borderBottom`, so this
 // pulses the underline color and its soft glow with no layout shift -- deliberately not a full
 // border. Exported as a named const so the regression test can import and assert on the real string.
+// MOB-21 (v7.0.82) adds a second animation on the same rule: the armed label pulses ink->tan
+// (inkTanPulse, tokens.js GLOBAL_CSS, landed with LAV-38) in sync with the border, giving mobile
+// the same "answer ready" language as the desktop drawer title.
 export const MOB_TAB_CUE_CSS = `
-.lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite}
+.lav-mtab-alert{animation:borderPulse 2s ease-in-out infinite,inkTanPulse 2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.lav-mtab-alert{animation:none;border-bottom-color:${T.brass}}}
 `;
 
@@ -922,7 +931,7 @@ export default function LiveAgentViewScreen() {
                     numbers stay correct and in order if the list ever changes. */}
                 {ALL_QUESTIONS.map((q, i) => (
                   <option key={q.id} value={q.id}>
-                    {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
+                    {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `FOR DEMO ONLY - agent guardrail display: ${q.label}` : q.label}`}
                   </option>
                 ))}
               </select>
@@ -1174,7 +1183,7 @@ export default function LiveAgentViewScreen() {
                 border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
                 cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
               <option value="">{PICKER_PLACEHOLDER}</option>
-              {/* FEATURE: LAV-11 -- south-korea-coop's option reads with a "Guardrail catch demo: "
+              {/* FEATURE: LAV-11 -- south-korea-coop's option reads with a "FOR DEMO ONLY - agent guardrail display: "
                   prefix, decorated here only. chiQuestions.js's exported label stays undecorated
                   (CHI's own picker must keep reading it plain), and onRun still sends q.label --
                   the undecorated string -- to runQuestion, so this prefix never reaches the harness
@@ -1183,7 +1192,7 @@ export default function LiveAgentViewScreen() {
                   picker above uses; the decorated label itself is unchanged. */}
               {ALL_QUESTIONS.map((q, i) => (
                 <option key={q.id} value={q.id}>
-                  {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
+                  {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `FOR DEMO ONLY - agent guardrail display: ${q.label}` : q.label}`}
                 </option>
               ))}
             </select>
