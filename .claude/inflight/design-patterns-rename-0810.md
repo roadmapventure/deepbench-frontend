@@ -1,0 +1,1 @@
+design-patterns-rename-0810 — design session: (1) "Agent Routing" → "Agent Patterns" rename, both surfaces (John-locked); (2) rail seam fix — hop rows dropping patterns_used their log rows hold (Marcus ci-answer-display case, John's 9-hop run). IDs/version pending claim. Also to file: hygiene PostToolUse hook ETIMEDOUT ×4 this conversation.
