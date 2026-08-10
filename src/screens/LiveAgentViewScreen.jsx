@@ -1,3 +1,4 @@
+// DeepBench v7.0.88 | LiveAgentViewScreen.jsx | LAV-40 -- guardrail question frontload: "FOR DEMO ONLY - agent guardrail display:" (John's copy; caps because native option text can't style partially)
 // DeepBench v7.0.84 | LiveAgentViewScreen.jsx | LAV-39 -- rail header label becomes "Agent Patterns"
 // (render string only; hop grouping, row components, event copy, §19s content contract untouched --
 // John's call, 2026-08-10, verified against published agentic-patterns vocabulary).
@@ -105,7 +106,7 @@
 // pre-display gate 56% of the time, so John replaced it with training-turnover-benchmark (75%
 // answer rate). south-korea-coop stays -- John's explicit call -- as a deliberate guardrail-catch
 // showcase (0/5, never clears the gate; CHI-98 tracks that gap). Its picker option is decorated
-// "Guardrail catch demo: <label>" at this file's option-build point only (chiQuestions.js's
+// "FOR DEMO ONLY - agent guardrail display: <label>" at this file's option-build point only (chiQuestions.js's
 // exported label is never touched, and the undecorated label is still what gets sent to
 // runQuestion -- decorating the string actually sent would change the real question asked). The
 // run's question id is captured into ranQuestionId at Run-click time (not read live off `picked`,
@@ -930,7 +931,7 @@ export default function LiveAgentViewScreen() {
                     numbers stay correct and in order if the list ever changes. */}
                 {ALL_QUESTIONS.map((q, i) => (
                   <option key={q.id} value={q.id}>
-                    {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
+                    {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `FOR DEMO ONLY - agent guardrail display: ${q.label}` : q.label}`}
                   </option>
                 ))}
               </select>
@@ -1182,7 +1183,7 @@ export default function LiveAgentViewScreen() {
                 border:`1px solid ${T.line}`,borderRadius:6,padding:"8px 30px 8px 11px",outline:"none",
                 cursor:"pointer",textOverflow:"ellipsis",whiteSpace:"nowrap",overflow:"hidden"}}>
               <option value="">{PICKER_PLACEHOLDER}</option>
-              {/* FEATURE: LAV-11 -- south-korea-coop's option reads with a "Guardrail catch demo: "
+              {/* FEATURE: LAV-11 -- south-korea-coop's option reads with a "FOR DEMO ONLY - agent guardrail display: "
                   prefix, decorated here only. chiQuestions.js's exported label stays undecorated
                   (CHI's own picker must keep reading it plain), and onRun still sends q.label --
                   the undecorated string -- to runQuestion, so this prefix never reaches the harness
@@ -1191,7 +1192,7 @@ export default function LiveAgentViewScreen() {
                   picker above uses; the decorated label itself is unchanged. */}
               {ALL_QUESTIONS.map((q, i) => (
                 <option key={q.id} value={q.id}>
-                  {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `Guardrail catch demo: ${q.label}` : q.label}`}
+                  {`${i + 1}. ${q.id === GUARDRAIL_DEMO_QUESTION_ID ? `FOR DEMO ONLY - agent guardrail display: ${q.label}` : q.label}`}
                 </option>
               ))}
             </select>
