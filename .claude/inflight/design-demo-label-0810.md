@@ -1,0 +1,1 @@
+Worktree `design-demo-label-0810` — design session S-LAV-40-design (v7.0.88): `LAV-40` (UI, Beta-gate bucket 5) — guardrail question frontload becomes "FOR DEMO ONLY - agent guardrail display:" (John's copy; caps in lieu of un-renderable native-option italics). Kickoff `docs/kickoffs/v7.0.88-LAV-40-demo-question-label.md`; automated loop (Sonnet 5), then self-QA.
