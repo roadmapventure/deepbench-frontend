@@ -19,25 +19,31 @@ Not a flat list — every top-level nav destination is a **Product Focus Area**,
 |---|---|---|---|
 | Home Screen | `/` *(not yet — see note)* | not built yet | ❌ Missing, tracked as `LA-01` (`docs/FEATURES-LATER.md`) |
 
-Splash, announcements, and overall dashboard metrics. `Channel Intelligence` (below) currently occupies `/` temporarily — it needs its own route once Home Screen is built. Not scoped yet. **Interim update 2026-07-31 (`LAV-1`):** when the Live Agent View build's flip session (`S-LAV-1e`) lands, `/` serves the **Live Agent View** (below) transitionally and Channel Intelligence moves to `/channel-intelligence`. When `LA-01` Home ships, `/` repoints again to Home; neither screen is the permanent homepage.
+Splash, announcements, and overall dashboard metrics. Not scoped yet. **Status as of `S-LAV-1e` (v7.0.4):** `/` serves the **Live Agent Console** (below) transitionally and Channel Sales Intelligence has moved to `/channel-intelligence`. When `LA-01` Home ships, `/` repoints again to Home; neither screen is the permanent homepage.
 
-### Live Agent View — transitional homepage (new, 2026-07-31)
+> **Precondition for `LA-01` (added 2026-08-10, `LOG-138`).** `ai_activity_log.screen_origin` is derived server-side from the request's page address via a route→screen map in `lib/request-context.js`, where **`/` is mapped to `live-agent-console`** because that is what it genuinely serves today. The session that repoints `/` to Home must update that map in the same commit — otherwise every run launched from the new Home screen is recorded as Live Agent Console, silently and with no backfill available to repair it. An unmapped route records nothing (never a guess), so *adding* Home's own route is safe on its own; it is the `/` re-point specifically that needs the paired edit.
+
+### Live Agent Console — transitional homepage (new, 2026-07-31)
 | Screen | Route | Component | Status |
 |---|---|---|---|
-| Live Agent View | `/live-agent-view` (also served at `/` transitionally since `S-LAV-1e` v7.0.4, until `LA-01` Home ships) | `LiveAgentViewScreen.jsx` (+ `AgentNetwork.jsx`, `HarnessTraceConsole.jsx`) | ✅ Live — `LAV-1-done` (v7.0.0–v7.0.6, `docs/FEATURES-ARCHIVE.md`) |
+| Live Agent Console | `/live-agent-view` (also served at `/` transitionally since `S-LAV-1e` v7.0.4, until `LA-01` Home ships) | `LiveAgentViewScreen.jsx` (+ `AgentNetwork.jsx`, `HarnessTraceConsole.jsx`) | ✅ Live — `LAV-1-done` (v7.0.0–v7.0.6, `docs/FEATURES-ARCHIVE.md`) |
 
-Screen code: **`LAV`** — claimed 2026-07-31 (`design-live-agent-dash-0731`, row `LAV-1`). **Dual naming is deliberate (John, 2026-07-31):** the open page's own title reads "Live Multi-Agent Routing (Beta)"; the Work-dropdown label reads "Live Agent View (Beta)". Both are correct; do not "fix" one to match the other.
+Screen code: **`LAV`** — claimed 2026-07-31 (`design-live-agent-dash-0731`, row `LAV-1`). **Dual naming is deliberate (John, 2026-07-31):** the open page's own title reads "Live Multi-Agent Console" (`LiveAgentViewScreen.jsx`'s `PAGE_TITLE`); the Work-dropdown label reads "Live Agent Console" (`AppShell.jsx`, desktop + mobile `NAV_GROUPS`, with the `(Beta)` suffix appended separately from `FOCUS_AREA_STATUS`). Both are correct; do not "fix" one to match the other.
+
+**Name corrected 2026-08-10 (`design-log-138-0810`, John's live correction, then verified against the shipped literals).** This entry previously recorded the screen as "Live Agent View" and its two names as "Live Multi-Agent Routing (Beta)" / "Live Agent View (Beta)" — neither string is in the code. The screen's name is **Live Agent Console**. The route (`/live-agent-view`) and the component filename keep their older wording, which is normal and expected to lag per this file's own convention; the `LAV` ID prefix is unchanged, IDs are never renamed.
 
 ### Work — a family of dashboards, one per work-type
 | Screen | Route | Component | Children | Notes |
 |---|---|---|---|---|
-| Channel Intelligence | `/` *(temporary — moving to `/channel-intelligence` at `S-LAV-1e`, see Home above)* | `MarketIntelligenceScreen.jsx` | — | Renamed from "Market Intelligence," then from the interim "Channel Sales Intelligence" (`MI-46`). Filename never updated to match — that's normal, expected to lag. |
+| Channel Sales Intelligence | `/channel-intelligence` (moved off `/` at `S-LAV-1e` v7.0.4) | `MarketIntelligenceScreen.jsx` | — | Renamed from "Market Intelligence" → **"Channel Sales Intelligence"** (`MI-46`). Filename and route both keep older wording — normal, expected to lag. |
 | Project Management | `/work` | `DashboardScreen.jsx` | Create Work Order, Task Instructions | Filename says "Dashboard" — nav label is the canonical name. |
 | Spend Analysis | `/work/:taskId/analyze` | `AnalyzerScreen.jsx` | Fetch *(uncertain, see below)* | Filename/legacy prefix (`AZ`) reflect NIGP-analyzer heritage — nav label is canonical. |
 | Create Work Order | `/work/new` | `CreateWorkOrderScreen.jsx` | — | Always a child of Project Management. |
 | Task Instructions | `/work/:taskId` | `TaskInstructionsScreen.jsx` | — | Always a child of Project Management. |
 
 More dashboards expected here over time as new work-types are built — this list isn't meant to be closed.
+
+**Name corrected 2026-08-10 (`design-log-138-0810`, John's live correction, then verified against the shipped literals).** This table previously called the screen "Channel Intelligence" and described "Channel Sales Intelligence" as an *interim* name that had been renamed away from — the rename runs the other way. `MI-46` renamed Market Intelligence **to** Channel Sales Intelligence, and that is what ships today in both places a user sees it: the nav label (`AppShell.jsx`, desktop + mobile) and the screen's own headline (`MarketIntelligenceScreen.jsx`). The route `/channel-intelligence` keeps the shorter wording.
 
 ### Bench
 | Screen | Route | Component | Children | Notes |
