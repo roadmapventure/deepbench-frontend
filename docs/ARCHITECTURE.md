@@ -2388,6 +2388,18 @@ upload rides the same downstream flow); the Recruiter build itself (`AGT-56`). D
 `AA-165` — Michelle's broker doesn't surface Skill-level content yet, which caps the quality of
 the Recruiter's bench-overlap reasoning at hire time.
 
+**Prerequisite audit — Skill-type fidelity through Scaffold and Harness (`AGT-59`, John's
+addition, 2026-08-11).** Before any agent autonomously authors Skills, walk each of §2's six
+Skill types (Identity, Behavior, Knowledge, Intent, Format, Guardrails) end-to-end and prove the
+Scaffold (`db-assembly.js` `assemblePrompt()`, `ai-enrichment.js` `enrichPrompt()`) and Harness
+(`request-receivable.js` `sendRequest()`, including guardrail evaluation) each consume that type
+the way §2/§19b say they do — a type the pipeline drops or mis-orders means the Recruiter would
+author Skills that silently do nothing. Known starting points: `SKILL_ORDER`
+(`db-assembly.js:58`) covers all six but falls back to a silent `?? 99` for unrecognized type
+slugs, and §2's known drift (the `skill_types` catalog is missing its `guardrails` row while the
+code dispatches on it). The audit must assert on the path taken, not the output — a prompt that
+"looks right" doesn't prove the type was consumed by the intended branch.
+
 ### Ruled out / deferred
 
 - **A Recruiter route or screen as the maker experience** — the agent *is* the maker experience;
