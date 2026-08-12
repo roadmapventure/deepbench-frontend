@@ -101,6 +101,11 @@ under their governing section. Nothing below this index was edited when it was a
   - 18b — Capability Spectrum Model (superseded 2026-06-15)
 - **§19o.** End-to-End Reliability — Failure Compounding & the Transient-Recovery Constraint [discovery `chi-e2e-design`, 2026-07-28]
 - **§19p.** Hop-Event Span Identity — Identity Travels With the Event [discovery `michelle-patterns`, 2026-07-28]
+- **§19q.** Run Assembly Feed — Content Travels With the Event [discovery `design-list-arch-0802`, 2026-08-02]
+- **§19r.** Deliverable Build View — Watching the Answer Get Built [discovery `design-build-view-0803`, 2026-08-03]
+- **§19s.** Assembly Content Contract — Agent-Narrated Build [design `design-lav-25`, John, 2026-08-04]
+- **§19t.** IP Access Gate — Live-Site Cost Protection [design `design-ip-security`, John, 2026-08-08]
+- **§19u.** The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
 
 ---
 
@@ -2320,3 +2325,85 @@ Build: `S-LAV-32a` (v7.0.64 — executor carries `capability_phrase`; drawer tri
 - The IP derivation is byte-identical to `lib/request-context.js`'s — the gate's key and the log's `caller_ip` MUST stay the same value or spend sums silently miss; change them only together.
 
 Related security posture (`DAT-18`, found this session; **shipped v7.0.78, `S-DAT-18`, 2026-08-08**): `ip_org_cache` accepts no writes from the anon key and `ai_activity_log` is append-only with non-negative token counts enforced — gate state and spend history cannot be edited from a browser. The platform-wide lockdown is done: `anon`/`authenticated` hold zero write privileges on all other tables except `tasks` INSERT+UPDATE (the browser's own work-order path — `DAT-19` tracks rerouting it through a service-key route), and default privileges no longer auto-grant writes on future tables (fail closed — a new browser-written table needs its grant in its own migration). The Vercel `prebuild` stats refresh (`scripts/platform-stats.js`) writes `platform_stats` via the service key. Grant-surface residue: `DAT-20`; read-side policy design: `DAT-9`.
+
+---
+
+## 19u. The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
+
+**The vision (John's, this session):** one Recruiter agent that builds other agents. Three intake
+modes — **interview** (it asks questions, continuously), **documents** (job descriptions, job
+postings, files from John's drives), and **web research** (best practices for the role being
+designed). Two jobs, one capability at two depths: (1) hire a new agent from a job description;
+(2) the deep case — **replicate John himself**: a standing agent the Recruiter keeps interviewing,
+whose corpus grows from John's knowledge, documents, and reasoning patterns, walking §3's ladder
+L1 → L4. The Recruiter also **works autonomously in study cycles around the clock**, under a spend
+budget, so the replica is measurably smarter each morning.
+
+**This is §3 getting its intake front end, not a new model.** §3 already defines the two persona
+layers (Behavioral → `agent_configs`; Knowledge → `knowledge_entries`), the L1–L4 depth ladder, and
+the three training material types — with Reasoning Pattern material (how John decides, not what he
+concluded) as the highest-value type. The Recruiter is the agent whose job is filling those
+structures. Its own brain is Skills through the generic executor (§19b) — a route or harness
+conditional naming the Recruiter is the failure mode, not the build.
+
+### Decisions locked this session
+
+1. **The Recruiter subsumes "agent builder."** Hiring from a job description and replicating a
+   human are the same capability at two depths — one agent, not two.
+2. **Two-lane learning, keyed off the existing `Trainability` Skill property (§2):**
+   - **Trainable lane** — auto-ingests without John: web research on approved domains,
+     consolidation of its own corpus, self-testing the replica. Every item logged with why.
+   - **Supervised lane** — everything that *is John* (identity, reasoning patterns, anything
+     pulled from his drives): overnight work produces a **proposal queue only**. The locked
+     John-approves-before-ingestion rule (§19c/§19e — Susan Smith, TR-08, performs the write)
+     does not bend at night. Silent ingestion of personal/identity material is banned.
+3. **Study cycles, not a continuous loop.** A worker wakes every few hours, runs a cycle, stops.
+   **No cycle starts without checking a spend budget stored as data — no budget row, no run
+   (fail closed).** Precedent: `HAR-38` tripped a $10 IP cap during ordinary QA; an unbudgeted
+   overnight learner is a bill, not a feature.
+4. **"Smarter" must be measured, not asserted.** Daily eval against **held-out questions only**
+   (never items the replica was just trained on), graded blind (LLM-as-judge). The delta is
+   reported in a morning-briefing Deliverable: what was studied, what was ingested per lane,
+   spend vs. budget, score movement, questions queued for John. §3's L3 ("self-improving") gets
+   a number.
+5. **Every hire is signed.** Creating platform records (a new agent, its Skills, Capabilities,
+   assignments) always carries `requires_human_confirmation` — John signs every hire card.
+6. **Taxonomy writes get an owner (§19e, Exclusive Access-Control flavor).** One new brokered
+   service module owns writes to `skill_profiles`/`capabilities`/`capability_skill_profiles`/
+   `agent_capability_assignments`/`agents`. Generic by construction — nothing in it names the
+   Recruiter; the Recruiter is merely its first authorized caller. Registry row to be added to
+   §19e's table when the broker ships (`HAR-39`).
+
+### Current vs. future state
+
+**Already live (verified this session):** the generic executor (§19b); the upload → extract →
+chunk → embed pipeline into `knowledge_entries` (Teach path, §3); Susan Smith's structural
+ownership of training writes (§19c); the web search harness tool; the `agents` table already
+holding the full personnel record (28 columns). **The gaps, each filed Post-beta in
+`docs/FEATURES-LATER.md`:** the frontend roster still reads code (`src/data/agents.js`
+`AGENTS`/`AVATAR_CFG`/`AGENT_PRONOUNS`) instead of the `agents` table (`AGT-57`); no write tool
+exists for platform records (`HAR-39`); no autonomous worker or budget governor exists — nothing
+in the platform runs unprompted (`HAR-40`); no drive/cloud connectors (`AGT-58`, deferrable — hand
+upload rides the same downstream flow); the Recruiter build itself (`AGT-56`). Dependency:
+`AA-165` — Michelle's broker doesn't surface Skill-level content yet, which caps the quality of
+the Recruiter's bench-overlap reasoning at hire time.
+
+### Ruled out / deferred
+
+- **A Recruiter route or screen as the maker experience** — the agent *is* the maker experience;
+  v1 interviews run on existing surfaces. (A dedicated screen is later polish, not architecture.)
+- **A continuous 24/7 loop** — cycles under budget deliver the same outcome without the bill.
+- **Auto-ingesting Supervised-lane material** — banned above, restating for emphasis.
+- **The PM-team build** (outbound email service, human-accountability workflows) — considered
+  this session, **removed from scope by John ("remove the pm team for now")**. Deferred, not
+  rejected; outbound email is explicitly out of the Recruiter's v1.
+
+### Invariants for future build sessions (no files exist yet, so they live here per discovery rules)
+
+- No route, and no conditional in `execute.js`/`request-receivable.js`, may name the Recruiter or
+  any capability slug of its build (`SE-02` discipline extends to it).
+- Supervised-lane content never reaches `knowledge_entries`/`agent_configs` without a recorded
+  human approval; the write itself goes through Susan Smith's path, never a new direct one.
+- An autonomous cycle checks its budget row before spending; absence of the row fails closed.
+- Replica eval scores come from held-out items only — a score computed over trained items is not
+  an eval and must not be reported as one.

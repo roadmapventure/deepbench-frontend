@@ -1,1 +1,1 @@
-Worktree `design-agent-readiness` — discovery: is the platform ready for end-user agent building (Copilot Studio parity question)?
+Worktree `design-agent-readiness` — discovery on agent-building readiness → converged on the Recruiter vision (§19u committed 2026-08-11): agent-built agents + John-replication + autonomous study cycles. Filed AGT-56/57/58, HAR-39/40 (all Post-beta, FEATURES-LATER.md). Session still open with John.
