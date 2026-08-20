@@ -147,8 +147,12 @@ latest reading + calibration; the reading-entry card (three percentages + save) 
 every rebuild, and so must the **"Next up" section — the queue's top five** (queue #, ticket
 ID, named class, short title, gated flag; computed from the selection rules until `SES-86`'s
 queue numbers are real) so John can see what upcoming cycles will do and run the schedule
-early with foreknowledge (register B25), and the **`now`-tier census** — count of open backlog
-tickets remaining in tier `now` per named class, plus the unclassed remainder (register B26). Mark the directive `done`. Rebuild the briefing page
+early with foreknowledge (register B25), the **`now`-tier census** — count of open backlog
+tickets remaining in tier `now` per named class, plus the unclassed remainder, with a compact
+**"Next 3" (`ID — title`)** at the page top (register B26), the **exposure-rate line** — cards
+that needed John this week vs. last (register B28) — and the **daily "help me" ticket**: the
+top pending-on-John ticket by the standard ordering, its specific questions on the card,
+inviting a manual session or a Rework line; resolution re-enters it at queue #1 (register B29). Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
 manually.)* End the session cleanly.

@@ -156,6 +156,19 @@
   session is the fallback, never the default. **Continuation clause (John, same exchange):
   outcomes 3/4 never end the cycle — the ticket goes pending, the cycle drops to the next
   queued ticket per B24 and still delivers its one build.**
+- **B28. Exposure rate on the briefing (John, 2026-08-20):** a line tracking cards that needed
+  John's judgment this week vs. last — the learning loop's visible metric. Every decided card
+  (decision + reason, structured) feeds `SES-79` mining → criteria in the decision-patterns
+  file / vision corpus → B27 axis 2 consults them, so repeated question-shapes stop reaching
+  John. Generalizations are never silent: three similar taps → a proposed-rule card (B14),
+  John's tap ratifies. The floor is novel judgment only — nothing should need him twice.
+- **B29. The daily "help me" ticket (John, 2026-08-20):** the briefing nominates **one ticket
+  per day where the runner needs John** — selected from the pending-on-John set by the SAME
+  ordering as automation (tier → class → beta → newest), so it changes daily with what's
+  pending. The card carries the specific questions (B27's card content) and invites a manual
+  session to complete it; a Rework line suffices when the questions are small. On resolution
+  the ticket re-enters at **queue #1** (B23 machinery, timestamped) so the next cycle builds
+  it first.
 - **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
   titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
   it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import
