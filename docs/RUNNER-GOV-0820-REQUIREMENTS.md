@@ -92,19 +92,18 @@
 ## C. Open questions (iteration continues until empty)
 
 - C1. John's remaining follow-up questions (his item 6) — not yet stated.
-- C2. Full-automation requirements review (his original topic 5) — pending.
-- C3. Egress check for invention-cycle web research (B12) — unverified.
-- C4. Queue/lifecycle build sequencing vs SES-83 phases d/e — which ships first.
+- C2. Full-automation requirements review (his original topic 5) — in discussion.
+- C3. Egress check for invention-cycle web research (B12) — unverified; precondition on SES-88.
+- ~~C4. Build sequencing~~ — **APPROVED by John 2026-08-20:** SES-83 (b)/(c) → SES-85 sweep →
+  SES-86 queue engine → SES-83 (d) runner-selects-by-SQL → SES-83 (e) session ceremony →
+  SES-87 revalidation → SES-88 invention. (d)/(e) end with John's switchover sign-off.
 
 ## D. Ticket ledger
 
-**Filed this session (4):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter
-read when upstream ships) · SES-83 (backlog→DB; a ✅, b/c queued by directive, d/e gated) ·
-SES-84 (vision corpus, drip model).
-
-**To create when iteration closes (est. 4):** classification sweep (B8) · queue engine — queue
-+ lifecycle + pins + filed_at mining (B4/B5/B6/B10) · revalidation flow (B7) · invention
-wiring (B12). B14 extends existing SES-79; B1–B3 ride SES-83's remaining phases; B9/B11 are
-rulebook edits, not tickets.
+**Filed this session (8):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter
+read when upstream ships) · SES-83 (backlog→DB; a ✅ v7.0.100, b/c queued, d/e gated) ·
+SES-84 (vision corpus, drip model) · **SES-85 (classification sweep) · SES-86 (queue engine) ·
+SES-87 (revalidation flow) · SES-88 (invention wiring)** — the four cut on C4's approval,
+dependencies in each row. B14 extends existing SES-79; B9/B11 are rulebook edits, not tickets.
 
 **Directives queued:** SES-83 phases b+c (id `5e4bc577`, with John's amendments).
