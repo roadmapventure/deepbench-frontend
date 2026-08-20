@@ -94,9 +94,32 @@
 - C1. John's remaining follow-up questions (his item 6) — not yet stated.
 - C2. Full-automation requirements review (his original topic 5) — in discussion.
 - C3. Egress check for invention-cycle web research (B12) — unverified; precondition on SES-88.
-- ~~C4. Build sequencing~~ — **APPROVED by John 2026-08-20:** SES-83 (b)/(c) → SES-85 sweep →
-  SES-86 queue engine → SES-83 (d) runner-selects-by-SQL → SES-83 (e) session ceremony →
-  SES-87 revalidation → SES-88 invention. (d)/(e) end with John's switchover sign-off.
+- ~~C4. Build sequencing~~ — **SUPERSEDED same day by JOHN'S AUTOMATION QUEUE (his words,
+  2026-08-20), which is now THE order:**
+  **(1)** Briefing page easily accessible — DeepBench Admin screen via the Vercel link
+  (`ADM-1` v1, promoted, directive-queued; B19).
+  **(2)** The backlog-ticket DB completed and USED — updating, exposure, usability, manual
+  and automated (`SES-83` b/c/d/e + `SES-86` queue engine).
+  **(3)** The C2 automation-gap tickets (`SES-89` Heal engine, `HAR-41` flags design session,
+  B17/B18 rules, agent lanes when they surface).
+  **(4)** Claude reads ALL sessions and becomes the behavior expert on John's decisions —
+  "think like me" (`SES-79` expanded over the full local session archive + structured taps).
+  **(5)** THEN the priority-classification sweep (`SES-85`) — deliberately after (4) so
+  classification is grounded in John's thinking, not inference. `SES-87` revalidation follows.
+  **(6)** The inventor tickets (`SES-84` corpus drip + `SES-88` wiring) run IN PARALLEL at
+  any time.
+- **B17. Accept follow-through (found live 2026-08-20):** an Accept on a gated-before-build
+  card automatically becomes a queued backlog ticket (classed at filing) — an Accept must
+  never evaporate. Backfill: the accepted stale-prompt step-0 guards proposal
+  (`runner_items.d1c1ca1b`) → directive queued.
+- **B18. Briefing completeness:** cards are always rebuilt from the database's undecided set,
+  never from a cycle's memory of what it filed. (Runbook step 9 rule.)
+- **B19. Briefing accessibility (John's automation queue #1):** the briefing page reachable
+  from the DeepBench dev site — Admin route, hamburger nav, prominent link to the permanent
+  Artifact URL; read-only runner evidence cards as v1.5. Decision buttons stay on the
+  owner-authenticated Artifact until Clerk (unchanged).
+- **B20. dev→main stays John's forever** — full automation ends at dev, stated as a boundary,
+  not a gap.
 
 ## D. Ticket ledger
 
