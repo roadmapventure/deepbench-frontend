@@ -89,7 +89,8 @@ tier or files a proposal; never grind.
 immediately, restore your before-images, set the cycle `outcome='reverted'` — it counts as a
 Reverse on the ladder.
 
-**9. Write the record, then die.** `runner_items` row (kind, backlog ID + Type + P-class,
+**9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
+(America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + P-class,
 title, value case, before → after, QA evidence with proof-type label, dev link, flag slug if
 any, cost, model). Close `runner_cycles` (outcome, `cost_usd` — **estimated is fine, labeled
 estimated; never invented**, push SHA). Mark the directive `done`. Rebuild the briefing page

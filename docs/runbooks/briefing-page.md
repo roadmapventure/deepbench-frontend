@@ -9,6 +9,10 @@ Governing design: `docs/SES-78-RUNNER-DESIGN.md` §3; architecture `ARCHITECTURE
 
 ## Regeneration contract (every cycle, step 9)
 
+**Times rule (John, Rework 2026-08-20): every date/time DISPLAYED to John — page header, verdict
+lines, cycle timestamps, "at" stamps — is converted to CST (America/Chicago) and labeled CST.**
+Store UTC internally as before; the conversion is display-only.
+
 1. Build the day's HTML from `runner_items` / `runner_cycles` / `runner_budget` /
    `runner_ladder` — same structure as the live page: masthead, stat strip (shipped /
    proposals / reverted / day spend / month left), Shipped cards, Proposals, Needs-your-call
