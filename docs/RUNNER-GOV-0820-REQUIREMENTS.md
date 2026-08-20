@@ -77,6 +77,17 @@
 - **B14. Business-rule generation loop:** declared (John states) + mined (SES-79 over his
   structured taps) + learned (incidents) → proposed-rule briefing cards → only John's tap
   ratifies. Rule-making stays gated forever.
+- **B15. Lane ≠ class (John's catch, 2026-08-20): the `P-GATED` class marker is RETIRED**
+  (never applied to any ticket — legend-only). Every open ticket gets a real class AND a queue
+  number, gated ones included; gated-ness becomes a separate **lane flag with a reason note**
+  ("edits an active agent's Skills", "touches LOCKED §19e", "modifies a harness file"). A
+  gated ticket reaching the top of the queue produces a **gated-before-build briefing card**
+  instead of an unattended build — John's tap decides its path. The briefing (later Super
+  Admin) shows the gated-flagged tickets with their queue positions ("Your lane" view).
+- **B16. "Unclassifiable" (John's term) replaces "unreadable":** reserved for tickets whose
+  text is genuinely too degraded to judge; carries a **reason/note field** saying why; every
+  one surfaces as a briefing card for John's Rework or removal. Expected population: a
+  handful of ~420.
 
 ## C. Open questions (iteration continues until empty)
 
