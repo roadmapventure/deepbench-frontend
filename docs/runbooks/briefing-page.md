@@ -20,7 +20,12 @@ Store UTC internally as before; the conversion is display-only.
    2026-08-20):** outcomes display as "did not run" / "gated before build" (data values
    `did_not_run` / `gated_before_build`; `noop`/`proposal` retired), and every P-class is
    written named (`P9 - Tooling`, never bare `P9`) — see the Language block in
-   `runner-cycle.md`. Every card carries: `id="item-<ID>"`,
+   `runner-cycle.md`. **Budget & usage cards (John, 2026-08-20):** an API-dollars card with the
+   dev/QA split bar against the $5 day / $100 month walls; a subscription-tokens card with the
+   same dev/QA split bar, the runner's token use by model, John's latest reading + the
+   calibration sentence; and the reading-entry card (Fable % / All models % / 5-hour % + Save,
+   persisted through the `briefing-state` block like the directive box) — on every rebuild.
+   Mock John approved: artifact `ca23ace7-c2e3-465d-bac4-089daff812d2`. Every card carries: `id="item-<ID>"`,
    kind chip, `ID (Type · named P-class)`, title, Value case, Before → After, QA evidence, meta
    (cost / model / push SHA), links (dev URL; flagged items also the flag-ON link), the three
    buttons, hidden reason input, verdict line.

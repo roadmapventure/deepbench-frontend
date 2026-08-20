@@ -2519,8 +2519,25 @@ tickets are legitimate only for pre-existing bugs found in code the feature didn
 
 ### Budget governor & model self-control
 
-One ledger row (HAR-40's fail-closed pattern): **$100/month, ~$3.30/day default**, both checked
-before every cycle — no row, no run. Unspent days roll forward; the month cap is the hard wall.
+**Two tracks (John, 2026-08-20, `design-runner-gov-0820` — supersedes the single dollar
+bucket, and with it the earlier "unspent days roll forward" line):**
+
+- **API dollars — real money, hard walls.** One ledger row (HAR-40's fail-closed pattern):
+  **$100/month, $5/day**, both checked before every cycle — no row, no run. Counts **only true
+  billable API calls**, split `dev` vs `QA` so John sees where the money goes. A cycle's own
+  thinking is never charged here — the retired practice of estimating session tokens at API
+  prices produced phantom dollars that blocked development over money never spent (2026-08-20:
+  $5.50 "spent", true API spend ≈ $0, three cycles rested for nothing).
+- **Subscription tokens — John's allowance, governed by calibration.** No API exposes the
+  subscription meters, so John is the sensor: a daily reading (Fable % / all-models % /
+  5-hour %) typed into the briefing converts percentages to tokens (`tokens_per_pct`,
+  calibrated from runner-only overnight windows). Guardrails, derived from a measured month of
+  John's real usage (median working day ~11.6M tokens, p90 ~34M, peak 88M): runner rests at a
+  **weekly all-models reading ≥ 85%**; plans against a **50% share** of today's calculated
+  availability; initial/uncalibrated allowance **10M tokens/day**; a reading staler than 48h
+  drops it to a **3M/day fallback** — ignoring the page makes the runner more cautious, never
+  less. All token figures are estimates, always labeled estimated; the runner governs only
+  itself and can never cap John's own sessions.
 Model choice is per session, by task shape, on **cost per outcome, not cost per hour**:
 mechanical work on the cheapest capable tier; design/root-cause/invention scoring on the deep
 tier (4 hours of a mid tier grinding costs more than 30 minutes of the deep tier and produces

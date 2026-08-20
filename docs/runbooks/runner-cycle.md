@@ -40,16 +40,35 @@ item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accep
 streak +1 (5 consecutive → rung +1); **Reverse** → revert-forward the item's commits and/or
 restore its before-images, reopen its backlog row carrying John's line, ladder streak → 0 and
 rung −1; **Rework** → John's line becomes a new `runner_directives` row, queued first.
-Non-empty directive text in the page becomes a `runner_directives` row (verbatim). Update the
+Non-empty directive text in the page becomes a `runner_directives` row (verbatim). A saved
+usage reading (the three meter percentages John types in) becomes a `runner_usage_readings`
+row: store the percentages verbatim, compute `est_tokens_since_prev` (sum of cycle token
+estimates since the prior reading) and `tokens_per_pct` (that sum ÷ the all-models delta,
+only when the delta is positive and the window is runner-only — overnight windows qualify;
+otherwise leave it NULL rather than storing a confounded number). Update the
 ladder with a before-image first, always. *(Supervised run: if the page is unreachable from
 the cloud session, log that in the cycle row and continue — this run's decisions were already
 harvested manually; whether cloud can reach it is one of the things this run measures.)*
 
-**3. Check the walls.**
-- **Budget:** SELECT `runner_budget` for the current month — no row → `did_not_run`, END. Sum
-  this month's and today's `cost_usd` from `runner_cycles`; over the month cap → `did_not_run`,
-  END; over the day default → `did_not_run` END unless an unexpired `budget_override` directive
-  covers it (then its `max_usd` is your ceiling this cycle).
+**3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).**
+- **API dollars (real money, hard wall):** SELECT `runner_budget` for the current month — no
+  row → `did_not_run`, END. Sum this month's and today's `api_cost_dev_usd + api_cost_qa_usd`
+  from `runner_cycles`; over the month cap → `did_not_run`, END; over the day default →
+  `did_not_run` END unless an unexpired `budget_override` directive covers it (then its
+  `max_usd` is your ceiling this cycle). **Only true billable API calls count here** — your own
+  session's thinking is subscription usage, tracked in tokens below, never in dollars.
+- **Subscription tokens (the governor that replaced the phantom-dollar wall):**
+  read the latest `runner_usage_readings` row (John's typed-in meter percentages).
+  (a) `all_models_pct ≥ weekly_rest_pct` (85) → rest: `did_not_run`, reason "weekly meter at
+  N% — resting", END. (b) No reading, or latest older than 48h → today's allowance =
+  `stale_fallback_tokens` (3M). (c) Otherwise: calibrate `tokens_per_pct` from the estimated
+  tokens logged between the two most recent readings vs. the meter delta (store it on the
+  reading row); remaining weekly pool = `(100 − all_models_pct) × tokens_per_pct`; today's
+  availability = pool ÷ days left in the meter week; runner allowance = availability ×
+  `runner_share_pct` (50%), capped at `runner_day_token_allowance` (10M) until two readings
+  exist to calibrate from. Sum today's `est_tokens_dev + est_tokens_qa`; at or over the
+  allowance → `did_not_run`, reason "runner token share for the day spent (~N est)", END.
+  All token figures are estimates and are always labeled estimated.
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
   gated-before-build item over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
 
@@ -102,8 +121,14 @@ Reverse on the ladder.
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + named P-class per the Language block above,
 title, value case, before → after, QA evidence with proof-type label, dev link, flag slug if
-any, cost, model). Close `runner_cycles` (outcome, `cost_usd` — **estimated is fine, labeled
-estimated; never invented**, push SHA). Mark the directive `done`. Rebuild the briefing page
+any, cost split, model). Close `runner_cycles` with the two cost tracks (John, 2026-08-20):
+`api_cost_dev_usd` / `api_cost_qa_usd` (true billable API calls only — trace to
+`ai_activity_log` where possible; $0 is the normal value) and `est_tokens_dev` /
+`est_tokens_qa` (your own session's thinking, split build-vs-QA steps — **estimated is fine,
+labeled estimated; never invented**), plus outcome and push SHA. The briefing's budget cards
+show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
+latest reading + calibration; the reading-entry card (three percentages + save) must be on
+every rebuild. Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
 manually.)* End the session cleanly.
