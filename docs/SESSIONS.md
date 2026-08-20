@@ -5,6 +5,30 @@
 
 ---
 
+## cycle-20260820-2050 / S-B32-token-override (v7.0.105, 2026-08-20, manual — John live in chat, model Opus 5) — the subscription-token wall gains the day-override the dollar wall already had
+
+**Origin.** Automated cycle `4f39e727` (stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`) passed both step-0 assertions, harvested John's briefing Accept on the ADM-1 v1 ship card, then closed `did_not_run` at step 3: today's estimated subscription-token spend (3,230,000) met the 3,000,000 allowance. John, live in chat immediately after: *"go ahead and allow overance for the day and keep sessions going."*
+
+**The actual defect his instruction exposed.** The runbook's step-3 dollar track already ends "unless an unexpired `budget_override` directive covers it (then its `max_usd` is your ceiling this cycle)". The token track had **no such clause** — so a directive alone would have been ignored by any compliant cycle and the runner would have stopped again at 23:00Z. Worse, two things the runbook names had no typed home at all:
+
+- **`max_tokens`** — a token ceiling. `max_usd` could not carry it without violating John's standing two-track rule ("never charge session-token estimates as dollars"), which is the whole point of the token track existing.
+- **`expires_at`** — "unexpired" appeared in the runbook but `runner_directives` had only a manually-flipped `status='expired'`. A "for the day" override had no way to actually end.
+
+**Changes (3 files + 1 additive migration):**
+1. Migration `runner_directives_token_ceiling_and_expiry` — `add column if not exists max_tokens bigint`, `expires_at timestamptz`, both nullable with COMMENTs. Fail closed by construction: NULL `max_tokens`, or a NULL/past `expires_at`, means no override and the wall stands. Grants checked first, not assumed: `role_table_grants` for `anon`/`authenticated` on `runner_directives` = **0 rows** before and after, so per `.claude/rules/supabase-column-grants.md` the new columns need no grant and leak nothing.
+2. `docs/runbooks/runner-cycle.md` step 3 — token bullet gains the escape, mirroring the dollar track's wording. Covering = `type='budget_override' AND status='queued' AND max_tokens IS NOT NULL AND expires_at > now()`; the honouring cycle logs the directive id in its cycle `notes`. Two explicit non-overrides written in: the **weekly rest wall** (`all_models_pct ≥ weekly_rest_pct`) stays absolute — an override buys the day's allowance, never John's weekly meter — and the override **never widens the API-dollar wall**, which needs its own `max_usd`.
+3. `CLAUDE-STATE.md` — version line + bullet, list trimmed back to 3.
+
+**Override row filed:** `c1d81dd3-b625-4b1f-be33-a7bc62fcddb9`, `max_tokens` 10,000,000 est, `max_usd` NULL, `expires_at` 2026-08-21T00:00:00Z. The ceiling is `runner_budget.runner_day_token_allowance` — John's own pre-set uncalibrated cap, deliberately not a number invented for this override. The expiry is exactly the instant the UTC day counter resets, so the row cannot outlive the day it was authorised for.
+
+**QA — discriminating in both directions.** Ran the real step-3 evaluation as SQL, not a proxy: `wall_blocks_without_override = true`, `wall_blocks_with_override = false` (would the test pass if the change did nothing? No — the first value proves the wall genuinely blocked). Three fail-closed counterfactuals each returned **0**: the same query evaluated one second past `expires_at`; the same query with `status='expired'`; and a search for a covering *dollar* override, confirming this row grants no dollar headroom.
+
+**Two facts for the record.** (1) This override unblocks exactly one cycle — the 23:00Z / 6:00 PM CDT fire. The 02:00Z / 9:00 PM CDT fire is already UTC day 2026-08-21 and would have run regardless; the runner's "day" boundary is UTC, i.e. 7:00 PM CDT, not local midnight. (2) The wall was reached at 3M rather than a calibrated number because **`runner_usage_readings` has never received a single row** — the runner has been on the stale fallback since go-live. A saved reading on the briefing page is the durable fix; this override is not.
+
+**Also harvested this session:** John's Accept on the ADM-1 v1 ship card (`runner_items 27dd3794`, decided 20:49Z) → ladder `invention` streak 1 → 2 (rung 1; 5 promotes). Before-images captured for both mutated rows under cycle `4f39e727`. Undecided `runner_items` now 0.
+
+---
+
 ## cycle-20260820-2006 / S-ADM-1-v1 (v7.0.104, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — ADM-1 minimal v1: dev-only Admin nav → briefing artifact link
 
 **Item shipped:** `ADM-1` (Feature · P2 - Inventive · automation-queue #1), the exact V1 scope John's briefing Accept resolved to: dev-site hamburger + desktop nav gains an "Admin" entry that opens a minimal `/admin` route whose sole content is a prominent link to the Morning Briefing artifact. This closes the "brief page available through deepbench admin screen via vercel link" ask directly, without waiting on HAR-41's data-row flag mechanism — John's Accept 2026-08-20T20:03Z on the ADM-1 gated card is the waiver on record for `.claude/rules/autonomous-surface-changes.md`, permitting a hostname code-constant gate for this v1 only.

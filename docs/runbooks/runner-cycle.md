@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.105 | runbooks/runner-cycle.md | B32 — the subscription-token wall gains the same unexpired-budget_override escape the dollar wall already had (new runner_directives.max_tokens + .expires_at, both nullable/fail-closed). John live 2026-08-20: "allow overance for the day and keep sessions going." The weekly rest wall stays non-overridable; the API-dollar wall still needs its own max_usd override. -->
 <!-- DeepBench v7.0.102 | runbooks/runner-cycle.md | B17 BACKFILL — codify the two step-0 assertions (stamp match, no foreign open cycle) John accepted 2026-08-20 12:51Z and the step-9 register B18 briefing-rebuild rule (build cards FROM the DB's undecided runner_items, not from in-cycle memory). -->
 <!-- DeepBench v7.0.99 | runbooks/runner-cycle.md | S-SES-78c — the Automated-mode cycle: the nine steps as an executable standing prompt. Governing: ARCHITECTURE.md §19v; design: docs/SES-78-RUNNER-DESIGN.md. -->
 # Runner Cycle — Standing Prompt (§19v)
@@ -80,7 +81,17 @@ harvested manually; whether cloud can reach it is one of the things this run mea
   availability = pool ÷ days left in the meter week; runner allowance = availability ×
   `runner_share_pct` (50%), capped at `runner_day_token_allowance` (10M) until two readings
   exist to calibrate from. Sum today's `est_tokens_dev + est_tokens_qa`; at or over the
-  allowance → `did_not_run`, reason "runner token share for the day spent (~N est)", END.
+  allowance → `did_not_run`, reason "runner token share for the day spent (~N est)", END —
+  **unless an unexpired `budget_override` directive covers today's token track, exactly as the
+  dollar track above works** (register B32, John live 2026-08-20 21:0xZ: "allow overance for the
+  day and keep sessions going"). Covering means: `type='budget_override'`, `status='queued'`,
+  `max_tokens IS NOT NULL`, and `expires_at > now()`. Then `max_tokens` — never `max_usd`, which
+  is dollars only — is your allowance for this cycle, and you log the override's directive id in
+  the cycle row's `notes`. The rest wall (a) is NOT overridable: an override buys the day's
+  allowance, never John's weekly meter, so `all_models_pct ≥ weekly_rest_pct` still rests.
+  **The override never widens the API-dollar wall** — that is real money and needs its own
+  `max_usd` override. Both new columns are nullable and fail closed: NULL `max_tokens` or a NULL
+  / past `expires_at` means no override, and the wall stands.
   All token figures are estimates and are always labeled estimated.
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
   gated-before-build item over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
