@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.106 | runbooks/runner-cycle.md | B31 — step-0 assertion (2) becomes an atomic lease claim on the new public.runner_lease singleton, and every exit path releases it. The read it replaces ("no foreign open cycle") missed a cycle opened 17 seconds earlier and let two cycles build ADM-1 v1 in parallel (e36d4379 vs 4da5a7bd, 2026-08-20). -->
 <!-- DeepBench v7.0.105 | runbooks/runner-cycle.md | B32 — the subscription-token wall gains the same unexpired-budget_override escape the dollar wall already had (new runner_directives.max_tokens + .expires_at, both nullable/fail-closed). John live 2026-08-20: "allow overance for the day and keep sessions going." The weekly rest wall stays non-overridable; the API-dollar wall still needs its own max_usd override. -->
 <!-- DeepBench v7.0.102 | runbooks/runner-cycle.md | B17 BACKFILL — codify the two step-0 assertions (stamp match, no foreign open cycle) John accepted 2026-08-20 12:51Z and the step-9 register B18 briefing-rebuild rule (build cards FROM the DB's undecided runner_items, not from in-cycle memory). -->
 <!-- DeepBench v7.0.99 | runbooks/runner-cycle.md | S-SES-78c — the Automated-mode cycle: the nine steps as an executable standing prompt. Governing: ARCHITECTURE.md §19v; design: docs/SES-78-RUNNER-DESIGN.md. -->
@@ -39,14 +40,73 @@ prompt carries a `stamp:` clause; call `list_triggers` and match that stamp agai
 current routine's stored prompt verbatim. A mismatch means the routine was updated and this
 prompt is superseded — CLOSE `did_not_run` immediately with the mismatched pair in `notes`,
 never run superseded instructions (found live, `SES-78`: a retired prompt fired a second
-runner cycle five minutes after the real one). **(2) No foreign open cycle.** `SELECT id FROM
-runner_cycles WHERE ended_at IS NULL` — a returned row means another cycle is mid-flight;
-CLOSE `did_not_run` with that row's id in `notes` rather than racing its counters, pushes,
-and briefing republish (only one runner can hold the ledger's mutable state at a time). Only
-after both pass, INSERT this cycle's row (step 1).
+runner cycle five minutes after the real one). **(2) Claim the lease** — see below. Only after
+both pass do you own the cycle; the claim itself mints its id (step 1).
 
-**1. Open the cycle.** INSERT `runner_cycles` (stamp, trigger, model) via the connector — leave `outcome` NULL until close (the check constraint has no in-progress value; found live, SES-78c). Every
-later step's evidence hangs off this row's id.
+**The lease — one runner at a time, proven by a write, never by a read (B31, `v7.0.106`).**
+Assertion (2) used to be `SELECT id FROM runner_cycles WHERE ended_at IS NULL`. That read
+**cannot** do this job and was found live doing exactly that: cycle `e36d4379` selected zero
+open cycles ~17 seconds after cycle `4da5a7bd` had already inserted its own row, so both
+picked the same top-of-queue item and both built `ADM-1 v1` (theirs pushed first as
+`a7c66ad`; the loser's work was discarded and version `7.0.103` is a permanent counter gap).
+A read cannot serialise against a concurrent write — only a write on the same row can. So the
+gate is a **single-row `UPDATE` on the `public.runner_lease` singleton**, which Postgres
+serialises for us: the second claimer blocks on the row lock, re-evaluates the `WHERE` clause
+after the first commits, and matches nothing.
+
+```sql
+-- Claim. One statement, one row touched. Returns 1 row = you hold the lease; the returned
+-- holder IS your cycle id. Returns 0 rows = another cycle is live.
+UPDATE public.runner_lease
+   SET holder      = gen_random_uuid(),
+       stamp       = '<your stamp>',
+       held_since  = now(),
+       released_at = NULL,
+       steals      = steals + (CASE WHEN holder IS NOT NULL THEN 1 ELSE 0 END),
+       updated_at  = now()
+ WHERE id = 1
+   AND (holder IS NULL OR held_since < now() - INTERVAL '45 minutes')
+RETURNING holder AS cycle_id, steals;
+```
+
+**0 rows → CLOSE `did_not_run` and END** — insert a runner_cycles row that is already closed
+(`ended_at = now()`, `outcome = 'did_not_run'`) naming the blocking holder in `notes`, and do
+**not** claim the lease for it. Never race a live cycle's counters, pushes, or briefing
+republish.
+
+Three properties worth knowing before you edit any of this:
+
+- **`holder` is deliberately not a foreign key.** The claim mints the cycle id with
+  `gen_random_uuid()` *inside* the claiming UPDATE, and the `runner_cycles` row is inserted
+  with that id in the next statement (step 1). Splitting it into claim-then-bind inside one
+  statement does not work: Postgres silently drops a second UPDATE of the same row in the same
+  statement, which would leave `holder` NULL and the lease effectively open.
+- **The 45-minute TTL is the anti-deadlock.** A cloud session that dies mid-cycle never
+  releases; without a TTL the routine would be wedged until a human noticed. Longest real
+  cycle to date is ~18 minutes against a 3-hour cadence, so a stolen lease means the holder is
+  dead, not slow. A steal increments `steals` — a non-zero value is the signal that cycles are
+  dying, and belongs in the briefing when it moves.
+- **The lease is ledger state, not content.** Its own columns (`holder`, `held_since`,
+  `steals`, `released_at`) are the audit trail, so the claim and the release do not each need a
+  `runner_before_images` row; anything else you write to it (a QA fixture, a manual repair)
+  does, exactly like every other Supabase write.
+
+**1. Open the cycle.** INSERT `runner_cycles` **with the id the claim returned** —
+`INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
+the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
+value; found live, SES-78c). Every later step's evidence hangs off this row's id, which is now
+also the lease's `holder`, so "who is running right now" is one `SELECT` away.
+
+**Release the lease at EVERY exit path** — the ship at step 9, every wall-stop at step 3, a
+blocker abort, a `failed` close. The statement is holder-guarded so a cycle that was stolen
+from can never clobber its successor:
+
+```sql
+UPDATE public.runner_lease
+   SET holder = NULL, released_at = now(), updated_at = now()
+ WHERE id = 1 AND holder = '<your cycle id>'
+RETURNING released_at;   -- 0 rows = you were stolen from; leave the new holder alone
+```
 
 **2. Harvest John's judgment.** Read the briefing page (URL in
 `docs/runbooks/briefing-page.md`) and parse its `briefing-state` JSON block. For each decided
@@ -64,7 +124,10 @@ ladder with a before-image first, always. *(Supervised run: if the page is unrea
 the cloud session, log that in the cycle row and continue — this run's decisions were already
 harvested manually; whether cloud can reach it is one of the things this run measures.)*
 
-**3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).**
+**3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** Every
+`did_not_run` exit from this step **releases the lease** (statement in step 0) before it ends —
+a wall-stop that keeps the lease holds the next three hours' cycle hostage until the TTL
+expires.
 - **API dollars (real money, hard wall):** SELECT `runner_budget` for the current month — no
   row → `did_not_run`, END. Sum this month's and today's `api_cost_dev_usd + api_cost_qa_usd`
   from `runner_cycles`; over the month cap → `did_not_run`, END; over the day default →
@@ -189,11 +252,14 @@ cycle's card was Reversed after you already forgot it, so the DB is the only tru
 source. Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
-manually.)* End the session cleanly.
+manually.)* **Release the lease last** (holder-guarded statement in step 0), after the cycle row
+is closed and the briefing is republished — the lease is what stops the next fire from starting
+while you are still writing the record. Then end the session cleanly.
 
 ## Standing prohibitions (§19v — no step overrides these)
 
 Never: touch the gated lane (terminology, LOCKED sections, schema-destructive migrations,
 §19e-owned writes, active-agent Skill/Capability edits, the four harness files, dev→main);
 write Supabase without a before-image; report a number that doesn't trace to a row or log;
-retry the same tier twice; push more than once per ship point; proceed past a failed wall.
+retry the same tier twice; push more than once per ship point; proceed past a failed wall;
+build without holding the lease, or end a cycle without releasing it (B31).

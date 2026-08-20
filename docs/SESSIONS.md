@@ -5,6 +5,32 @@
 
 ---
 
+## cycle-20260820-2106 / S-B31-runner-lease (v7.0.106, 2026-08-20, Automated runner cycle, model Opus 5) — one cycle at a time, enforced by a write instead of a read
+
+**Origin.** `runner_directives.e5fb5b2a` (register `B31`), filed 2026-08-20 20:25Z by the *losing* cycle of the collision it describes. Directive queue outranks the backlog, so this was the pick; session renamed at pick per register B22.
+
+**The defect.** Step-0 assertion (2) was `SELECT id FROM runner_cycles WHERE ended_at IS NULL`. At 20:07:43Z cycle `4da5a7bd` inserted its open row; at ~20:08:00Z cycle `e36d4379` ran that SELECT and got **zero rows**. Both picked the same top-of-queue item, both built `ADM-1 v1`, both QA'd green. `4da5a7bd` pushed first (`a7c66ad`, v7.0.104); `e36d4379`'s commit `5c425d5` never reached the remote and was reset away. `v7.0.103` is a permanent gap in `dev_version_counter` — correct behaviour, atomic counters are never rolled back. **Root cause: a read cannot serialise against a concurrent write.** Replica lag or query routing widens the window; it does not create the bug. The collision was benign only because both cycles happened to design the same thing.
+
+**Fix — option (b) of the three the directive offered.** New `public.runner_lease` singleton, claimed by one statement:
+
+```sql
+UPDATE public.runner_lease
+   SET holder = gen_random_uuid(), stamp = '<stamp>', held_since = now(), released_at = NULL,
+       steals = steals + (CASE WHEN holder IS NOT NULL THEN 1 ELSE 0 END), updated_at = now()
+ WHERE id = 1 AND (holder IS NULL OR held_since < now() - INTERVAL '45 minutes')
+RETURNING holder AS cycle_id, steals;
+```
+
+Postgres serialises concurrent UPDATEs of one row: the second claimer blocks on the row lock, re-evaluates its `WHERE` after the first commits, matches nothing. 1 row = you hold the lease and the returned uuid **is** your cycle id (step 1 inserts `runner_cycles` with it); 0 rows = close `did_not_run` naming the holder, and end. Rejected: (a) `pg_try_advisory_lock` — invisible, no row to inspect, a dead session drops it with no record; (c) a post-pick uniqueness recheck — fires after both cycles have already spent their build tokens.
+
+**Three design points worth keeping.** (1) `holder` is deliberately **not** a foreign key: the claim mints the cycle id inside the claiming UPDATE, and claim-then-bind inside one statement is impossible — Postgres silently drops a second UPDATE of the same row in one statement, which would leave `holder` NULL and the lease looking free. Found while writing this cycle's QA, before the runbook text existed. (2) The **45-minute TTL** is the anti-deadlock: fail-closed must not mean fail-forever, and a cloud session killed mid-cycle never releases. Longest real cycle to date ~18 min against a 3-hour cadence, so a stolen lease means the holder is dead, not slow; `steals` counts them and a non-zero value is a briefing-worthy signal. (3) Release is **holder-guarded** (`AND holder = '<own id>'`) and required at every exit path — ship, wall-stop, abort — so a stolen-from cycle can never clobber its successor.
+
+**Changes (2 docs + 2 additive migrations).** `docs/runbooks/runner-cycle.md`: assertion (2) becomes the claim (with SQL), step 1 inserts the cycle row *with the claimed id*, step 3's wall-stops and step 9's close both release, standing prohibitions gain "build without holding the lease / end without releasing it". `docs/SES-78a-migration-log.md`: addendum with both migrations and the QA table. Migrations `b31_runner_lease_singleton` (table + seed + `REVOKE ALL FROM anon, authenticated` in the same migration + rationale comment) and `b31_runner_lease_drop_fk_holder`.
+
+**QA — discriminating, all live against the real table, no fixture table and no mock.** Second claimer runs the canonical claim while this cycle holds it → **0 rows**. **Red control:** the *identical* statement after aging `held_since` 60 minutes past the TTL → 1 row, new holder, `steals 1` — without it, the 0-row result would be indistinguishable from a statement that can never claim. Release by the stolen-from cycle → 0 rows, successor untouched. Zero probe pollution (`0` rows `stamp LIKE 'B31-QA%'`). Grants: `role_table_grants` 0 rows, and proven live both directions — publishable key SELECT **401** `42501 permission denied for table runner_lease`, PATCH **401** the same, while the same key on `tasks` returns **200**. Fixture restored (lease back to this cycle, `steals` back to 0; before-image `25ea7e86`). `npm run build` 929 modules clean; regression **29/29** (run with the project's *publishable read-only* key — the Supabase-dependent halves only read granted tables, so no service key was written to disk or to a shell this cycle).
+
+**Kickoff:** `docs/kickoffs/v7.0.106-B31-runner-lease.md`. **Bootstrap note:** this cycle opened before its own lease existed, so it claimed the lease onto its already-open cycle id rather than minting one — the only cycle that will ever do so.
+
 ## cycle-20260820-2050 / S-B32-token-override (v7.0.105, 2026-08-20, manual — John live in chat, model Opus 5) — the subscription-token wall gains the day-override the dollar wall already had
 
 **Origin.** Automated cycle `4f39e727` (stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`) passed both step-0 assertions, harvested John's briefing Accept on the ADM-1 v1 ship card, then closed `did_not_run` at step 3: today's estimated subscription-token spend (3,230,000) met the 3,000,000 allowance. John, live in chat immediately after: *"go ahead and allow overance for the day and keep sessions going."*
