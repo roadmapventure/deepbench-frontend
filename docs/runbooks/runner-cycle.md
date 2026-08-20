@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.102 | runbooks/runner-cycle.md | B17 BACKFILL — codify the two step-0 assertions (stamp match, no foreign open cycle) John accepted 2026-08-20 12:51Z and the step-9 register B18 briefing-rebuild rule (build cards FROM the DB's undecided runner_items, not from in-cycle memory). -->
 <!-- DeepBench v7.0.99 | runbooks/runner-cycle.md | S-SES-78c — the Automated-mode cycle: the nine steps as an executable standing prompt. Governing: ARCHITECTURE.md §19v; design: docs/SES-78-RUNNER-DESIGN.md. -->
 # Runner Cycle — Standing Prompt (§19v)
 
@@ -30,6 +31,18 @@ All other CLAUDE.md hard rules apply verbatim — atomic counters, `push origin 
 kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention; this exception is cloud-cycle-specific.) Read `runner_secrets` via the Supabase
 connector and export what a step needs as env vars — secrets never go into files, commits, or
 logs.
+
+**Step-0 assertions — prove both cheaply before opening the cycle, fail closed if either fails
+(B17, John-accepted 2026-08-20 12:51Z, `runner_items d1c1ca1b`).** **(1) Stamp match.** Your
+prompt carries a `stamp:` clause; call `list_triggers` and match that stamp against the
+current routine's stored prompt verbatim. A mismatch means the routine was updated and this
+prompt is superseded — CLOSE `did_not_run` immediately with the mismatched pair in `notes`,
+never run superseded instructions (found live, `SES-78`: a retired prompt fired a second
+runner cycle five minutes after the real one). **(2) No foreign open cycle.** `SELECT id FROM
+runner_cycles WHERE ended_at IS NULL` — a returned row means another cycle is mid-flight;
+CLOSE `did_not_run` with that row's id in `notes` rather than racing its counters, pushes,
+and briefing republish (only one runner can hold the ledger's mutable state at a time). Only
+after both pass, INSERT this cycle's row (step 1).
 
 **1. Open the cycle.** INSERT `runner_cycles` (stamp, trigger, model) via the connector — leave `outcome` NULL until close (the check constraint has no in-progress value; found live, SES-78c). Every
 later step's evidence hangs off this row's id.
@@ -158,7 +171,11 @@ tickets remaining in tier `now` per named class, plus the unclassed remainder, w
 **"Next 3" (`ID — title`)** at the page top (register B26), the **exposure-rate line** — cards
 that needed John this week vs. last (register B28) — and the **daily "help me" ticket**: the
 top pending-on-John ticket by the standard ordering, its specific questions on the card,
-inviting a manual session or a Rework line; resolution re-enters it at queue #1 (register B29). Mark the directive `done`. Rebuild the briefing page
+inviting a manual session or a Rework line; resolution re-enters it at queue #1 (register B29). **Register B18 (SES-B17, 2026-08-20): build the briefing cards FROM the database's undecided
+`runner_items` set (`WHERE decision IS NULL`), never from this cycle's memory of what it
+filed** — in-memory reconstruction drifts silently the moment two sessions overlap or a prior
+cycle's card was Reversed after you already forgot it, so the DB is the only trustworthy
+source. Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
 manually.)* End the session cleanly.

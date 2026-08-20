@@ -5,6 +5,32 @@
 
 ---
 
+## cycle-20260820-1935 / S-B17-BACKFILL (v7.0.102, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — Runbook gains its step-0 safety assertions + step-9 register B18; ADM-1 filed gated_before_build
+
+**`B17 BACKFILL` (Tooling, P10 - Tooling, doc-only) 🔶 done.** John's queued directive `004dabe4-95f7-4c99-89bc-4ccb4dbc6476` (queued 18:34 UTC), asking that the two step-0 assertions from his accepted `runner_items d1c1ca1b` (SES-78 stale-prompt proposal, accepted 12:51Z) plus register B18 (build briefing cards from the DB's undecided `runner_items`, not in-cycle memory) be codified into `docs/runbooks/runner-cycle.md`. The Accept had spawned no work — B17 is the discovery, this cycle is the fix. Cycle id `f0d7a587-d451-4e80-803d-88596b43e09d`.
+
+**`ADM-1` (Feature, P2 - Inventive) 🔴 gated_before_build.** Two directives were queued at the identical second `2026-08-20 18:34:53.111253+00`. The first one processed — ADM-1 for a hamburger nav entry linking to the briefing artifact — is *directly* forbidden to Automated mode by `.claude/rules/autonomous-surface-changes.md`: "New screens ship route AND nav entry inert behind a default-off flag (**a data row, `HAR-41` — never a code constant**)." The ADM-1 directive prescribes a hostname gate (a code constant); HAR-41 (the flag mechanism) does not exist yet — it is queue #1 on the Next up list still pending as `P10 - Tooling`. Filed as `runner_items 39204690` with three possible resolutions written into the QA evidence for John to pick (Accept = waive the standing rule for ADM-1 minimal v1; Rework = build HAR-41 first; Reverse = drop). Dropped to the next queued directive per runbook step 5.
+
+**What shipped.** Three insertions into `docs/runbooks/runner-cycle.md`:
+
+1. **Step 0 gains two assertions** (fail-closed before the cycle opens):
+   - **Stamp match** — the prompt's `stamp:` clause must equal the routine's current stored prompt per `list_triggers`; mismatch → CLOSE `did_not_run` immediately (a superseded prompt has fired at least once before, `SES-78`, five minutes after the real one).
+   - **No foreign open cycle** — `SELECT id FROM runner_cycles WHERE ended_at IS NULL` must return zero rows; a returned row → CLOSE `did_not_run` with that id, never race the other cycle's counters, pushes, or briefing republish.
+2. **Step 9 gains register B18** — briefing cards render FROM the DB's undecided `runner_items` set (`WHERE decision IS NULL`), never from this cycle's memory of what it filed. In-memory reconstruction drifts silently the moment two cycles overlap or a prior card was Reversed after you already forgot it.
+3. Version-header comment on the runbook bumped to v7.0.102 (existing v7.0.99 line kept as the second history line).
+
+**Self-applied preconditions.** The B17 backfill couldn't rely on the runbook it was about to update — the two assertions were run manually at cycle start (before opening `runner_cycles`): stamp matched `list_triggers` byte-for-byte for `trig_017TZ3JZcLBK6AYH6DKURqMH`; `SELECT id FROM runner_cycles WHERE ended_at IS NULL` returned 0 rows.
+
+**QA — discriminating, would fail if the change did nothing.** Four greps against the edited file all hit exactly once (`Step-0 assertions`, `Register B18`, `Stamp match`, `No foreign open cycle`) — and the same four greps against the pre-edit `origin/dev` blob return **0 hits each**. Additionally, section-scoped `awk` blocks confirm `Stamp match` lives inside step 0 (between `**0. Bootstrap.**` and `**1. Open the cycle.**`) and `Register B18` lives inside step 9 (between `**9. Write the record` and `## Standing prohibitions`). The section-scoping distinguishes "added but landed in the wrong step" from "actually landed correctly" — the change could have satisfied the crude presence check while dropping the text into step 3.
+
+**Model discipline (register B21) — Opus solo, deliberately.** The mechanical-step rule (delegate to Sonnet 5) is written for substantial mechanical work — imports, sweeps, mass-rewrites. This edit was three insertions totalling under 30 lines with the exact source text prescribed in the directive; delegation overhead exceeded the work. Noted in the cycle row. No sub-agent was spawned this cycle.
+
+**No src/, api/, lib/, or Supabase writes.** `npm run build` and regression not applicable — the change is doc-only and no code path or schema was touched. Grants gate unchanged. No before-image needed for the runbook edit (docs are gitted, not Supabase-mutated); before-images taken for the two `runner_directives` UPDATEs (ADM-1 in_progress→done, B17 BACKFILL queued→in_progress→done).
+
+**Two-track budget close-out.** API dollars: dev $0.00 / QA $0.00 — no billable API calls (schema/updates via Supabase MCP + PostgREST with the service key; edits via local file tools). Tokens (estimated): dev ~340k / QA ~50k, all Opus 5. Well under the 3M/day stale-fallback allowance (no reading on file). Runner day tally to date: ~980k of 3M.
+
+**Ship.** One batched push to `dev` at the ship point (§19v: doc changes ship live). Rebuilt the briefing page per `docs/runbooks/briefing-page.md`: harvested first (two prior Accepts already ledgered, no new taps, no directive text, no reading), then republished to the permanent URL. New cards on the rebuild: ADM-1 gated_before_build (needs John's call) + B17 BACKFILL ship + SES-83a and SES-83b carried forward silence-not-accept. Directive `004dabe4-95f7-4c99-89bc-4ccb4dbc6476` marked `done`. Directive `0c44329f-aae5-4c60-8867-7156fca40dc4` (ADM-1) marked `done` because a runner-side action (gated_before_build filing) is what a directive that hits the gate does; John's future Accept will queue a fresh directive at position #1 per register B23.
+
 ## cycle-20260820-1910 / S-SES-83b (v7.0.101, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — Backlog mirror covers all three OPEN files: 553 tickets byte-for-byte, post-renumber
 
 **`SES-83` (Tooling, P10 - Tooling) phase (b) 🔶 done — phase c queued, d/e gated.** John's queued directive `5e4bc577-0437-4707-8c5d-a093b56798a6` (`design-runner-gov-0820`, 18:02 UTC, carrying amendments [1]/[2]/[3]) sat top of the queue at cycle open; the runner picked it. Cycle id `164a1231-68dc-4f01-9cac-8469f5a8e96c`.
