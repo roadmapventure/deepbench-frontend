@@ -48,7 +48,9 @@ and the page degrades to read-only). Canonical implementation:
 Read-back is therefore trivial: **WebFetch the URL and parse the `briefing-state` JSON block**
 from the served document —
 `{"items": {"item-<ID>": {"decision": "accept|reverse|rework", "reason": "...", "at": "<iso>Z"}},
-"directive": "..."}`. Proven live: John's mobile taps (`rework` + typed reason on the test card,
+"directive": "...", "reading": {"fable": "41", "all": "38", "h5": "12", "at": "<iso>Z"} | null}`
+— a non-null `reading` newer than the last `runner_usage_readings` row becomes a new row there
+(step 2), and the rebuild re-seeds the inputs from it. Proven live: John's mobile taps (`rework` + typed reason on the test card,
 `accept` on SES-78a) read back verbatim. Non-empty `directive` text becomes a
 `runner_directives` row (verbatim) and is cleared in the rebuild. Override approvals ride the
 same state block when Needs-your-call cards exist.

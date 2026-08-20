@@ -74,6 +74,30 @@
      color:var(--muted);background:var(--card-alt)}
   td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   tr:last-child td{border-bottom:none}
+  .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
+          padding:13px 14px;margin-bottom:14px}
+  .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
+             color:var(--brass-deep);margin:0 0 8px}
+  .bar{height:8px;border-radius:4px;background:var(--card-alt);border:1px solid var(--line-soft);
+       overflow:hidden;display:flex;margin:6px 0 4px}
+  .bar .dev{background:var(--navy);height:100%}
+  .bar .qa{background:var(--brass);height:100%}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10.5px;
+          color:var(--muted-deep);font-variant-numeric:tabular-nums}
+  .legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:baseline}
+  .calib{font-size:12.5px;color:var(--muted-deep);margin:8px 0 0;line-height:1.5}
+  .est{font-family:var(--mono);font-size:9px;letter-spacing:.7px;text-transform:uppercase;
+       color:var(--muted);border:1px solid var(--line-soft);border-radius:3px;padding:1px 5px;margin-left:6px}
+  .readgrid{display:flex;gap:8px;margin-top:9px}
+  .readgrid label{flex:1;font-family:var(--mono);font-size:9px;letter-spacing:.6px;
+       text-transform:uppercase;color:var(--muted-deep)}
+  .readgrid input{width:100%;font-family:var(--mono);font-size:15px;padding:8px 9px;margin-top:3px;
+       border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .readgrid input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .savebtn{margin-top:10px;width:100%;font-family:var(--body);font-weight:600;font-size:13.5px;
+       padding:10px;border-radius:6px;border:1.5px solid var(--moss);background:var(--moss);
+       color:var(--white);cursor:pointer;min-height:44px}
+  .savebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
   .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
         padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
         color:var(--ink);resize:vertical}
@@ -85,14 +109,14 @@
 
 <div id="page"></div>
 
-<script type="application/json" id="briefing-state">{"items":{},"directive":""}</script>
+<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null}</script>
 
 <script id="code">
 // SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
 // version via claude.use('artifact').publish(fullDoc). Never serializes the live DOM.
 (function(){
   var stEl = document.getElementById('briefing-state');
-  var state = {items:{}, directive:''};
+  var state = {items:{}, directive:'', reading:null};
   try { state = JSON.parse(stEl.textContent); } catch(e) {}
   // Recover state stashed before a publish that may not have landed (docs: stash first).
   try {
@@ -134,10 +158,37 @@
     +'<div class="stats">'
     +'<div class="stat"><b>1</b><span>Shipped</span></div>'
     +'<div class="stat"><b>0</b><span>Gated before build</span></div>'
-    +'<div class="stat"><b>0</b><span>Reverted</span></div>'
-    +'<div class="stat"><b>$0.00</b><span>of $3.30 day</span></div>'
-    +'<div class="stat"><b>$100</b><span>month left</span></div>'
+    +'<div class="stat"><b>0</b><span>Did not run</span></div>'
+    +'<div class="stat"><b>$0.00</b><span>API of $5 day</span></div>'
+    +'<div class="stat"><b>0M</b><span>tokens of 10M</span></div>'
     +'</div>'
+    +'<h2>Budget &amp; usage</h2>'
+    // Regenerate these three cards from runner_cycles / runner_budget / runner_usage_readings —
+    // spec: docs/runbooks/briefing-page.md (John, 2026-08-20). Figures below are sample values.
+    +'<div class="budget"><h4>API dollars — real money, hard wall</h4>'
+    +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>dev $0.00</span>'
+    +'<span><span class="sw" style="background:var(--brass)"></span>QA $0.00</span>'
+    +'<span>= $0.00 of $5.00 day</span><span>$0.00 of $100 month</span></div></div>'
+    +'<div class="budget"><h4>Subscription tokens — your allowance, runner\'s share<span class="est">all estimated</span></h4>'
+    +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>dev ~0M</span>'
+    +'<span><span class="sw" style="background:var(--brass)"></span>QA ~0M</span>'
+    +'<span>= ~0M of 10M allowance</span></div>'
+    +'<table style="margin-top:10px"><tr><th>Model</th><th>Runner today (est)</th><th>Your weekly meter</th></tr>'
+    +'<tr><td>Fable 5</td><td class="num">0</td><td class="num">—</td></tr>'
+    +'<tr><td>Opus 5</td><td class="num">0</td><td class="num">all models —</td></tr>'
+    +'<tr><td>Sonnet 5</td><td class="num">0</td><td class="num"></td></tr></table>'
+    +'<p class="calib">'+(state.reading
+        ? 'Your last reading — <b>'+esc(state.reading.at)+'</b>: Fable <b>'+esc(state.reading.fable)+'%</b> · All models <b>'+esc(state.reading.all)+'%</b> · 5-hour <b>'+esc(state.reading.h5)+'%</b>.'
+        : 'No reading yet — the runner is on its conservative allowance until your first one.')
+    +' Guardrails: rest at 85% weekly · 50% share · 10M/day uncalibrated · 3M/day if the reading is over 48h old.</p></div>'
+    +'<div class="budget"><h4>Today\'s reading — 10 seconds, recalibrates the budget</h4>'
+    +'<div class="readgrid">'
+    +'<label>Fable %<input type="number" inputmode="numeric" id="r-fable" value="'+esc(state.reading?state.reading.fable:'')+'"></label>'
+    +'<label>All models %<input type="number" inputmode="numeric" id="r-all" value="'+esc(state.reading?state.reading.all:'')+'"></label>'
+    +'<label>5-hour %<input type="number" inputmode="numeric" id="r-h5" value="'+esc(state.reading?state.reading.h5:'')+'"></label>'
+    +'</div><button class="savebtn" id="r-save">Save reading</button></div>'
     +'<h2>Shipped</h2>'
     +card('item-ses78a','ship','Ship','SES-78a (Tooling · P9 - Tooling)',
       'Runner foundation — six tables and your budget, live',
@@ -240,6 +291,16 @@
     var ta = document.querySelector('.directive textarea');
     if (ta) ta.addEventListener('blur', function(){
       if (state.directive !== ta.value) { state.directive = ta.value; save(); }
+    });
+    var rs = document.getElementById('r-save');
+    if (rs) rs.addEventListener('click', function(){
+      var f = document.getElementById('r-fable').value,
+          a = document.getElementById('r-all').value,
+          h = document.getElementById('r-h5').value;
+      if (!f && !a && !h) return;
+      state.reading = { fable:f, all:a, h5:h,
+                        at:new Date().toISOString().slice(0,16)+'Z' };
+      save(); render();
     });
   }
 
