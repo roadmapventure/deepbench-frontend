@@ -143,6 +143,19 @@
   data every cycle. **Amendment (John, same day): the page top also carries a compact
   "Next 3" — `ID — title` for the queue's next three — glanceable without scrolling; B25's
   fuller top-five section sits below.**
+- **B27. Build-vs-ask decision (John's question, 2026-08-20) — two axes at pick time, four
+  outcomes:** Axis 1 authority (the gated list — fails to John regardless of clarity); axis 2
+  specification (every open question answerable from: the ticket text, governing architecture,
+  vision corpus + decision patterns, or an existing code pattern — else it's John's judgment
+  being invented). Outcomes, escalating: (1) build automatically; (2) design via the Fable
+  subagent, then build, same cycle, reasoning logged; (3) design, then gated-before-build card
+  — "here's exactly what I'd build," John's Rework line is a requirements session in
+  miniature; (4) "needs your requirements session" card naming the specific questions —
+  reserved for genuine forks (ticket says "John's call", new canonical naming, UI with no
+  approved mock, contradicting prior decisions). Bias: 1–3 absorb almost everything; the
+  session is the fallback, never the default. **Continuation clause (John, same exchange):
+  outcomes 3/4 never end the cycle — the ticket goes pending, the cycle drops to the next
+  queued ticket per B24 and still delivers its one build.**
 - **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
   titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
   it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import
