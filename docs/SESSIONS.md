@@ -5,6 +5,22 @@
 
 ---
 
+## design-runner-gov-0820 / S-RUNNER-GOV (v7.0.99, 2026-08-20, design session, John + Fable 5, worktree `design-runner-gov-0820`)
+
+**John's full recalibration of the Automated-runner governance — five topics, 29 registered requirements, 9 tickets filed, and everything decidable shipped live the same day.** Canonical record: **`docs/RUNNER-GOV-0820-REQUIREMENTS.md`** (A shipped / B locked / C closed / D ticket ledger) — read that file, not this summary, for the full detail.
+
+**Shipped live this session (across pushes `873587b`→`5d38519` + Supabase migrations + routine updates):**
+- **Language:** outcomes `did_not_run` / `gated_before_build` (data + constraints + docs + routine; `noop`/`proposal` retired, red-control verified); classes always written named; "backlog ticket," never "row."
+- **Schedule:** 12/3/6/9 AM/PM CST (UTC cron `0 2,5,8,11,14,17,20,23 * * *`; DST re-align noted).
+- **Two-track budget:** phantom subscription dollars retired (root cause of 3 wall-stopped cycles over ~$0 real spend); API dollars dev/QA split against $5/$100 hard walls; token governor calibrated from John's typed meter readings, guardrails derived from a measured month of transcripts (median day ~11.6M working tokens). `runner_usage_readings` table + budget knobs live; briefing template carries budget cards + saving reading card.
+- **Priority classes renumbered P1–P10:** new top class **P1 - Improves John's Skills**; business-side judgment (P1–P4 classification, value ranking, competitive/whitespace review) **delegated to Claude**, John governs after the fact via briefing taps (§19v amended).
+- **Runner ops:** Agent tool + model discipline (Opus orchestrates, Fable designs, Sonnet mechanical — makes §19v escalation executable); run titles name the work; two directives queued (ADM-1 v1 admin briefing link — John's automation queue #1; B17 backfill of the accepted stale-prompt guards).
+- **John's automation queue** (supersedes the session's own approved build order): briefing access → backlog DB complete/used → automation-gap tickets → behavior-expert pass → classification sweep → invention in parallel.
+
+**Filed: `SES-81`…`SES-89` (all Tooling, P10 - Tooling)** — backup-tool table discovery; programmatic meter read (blocked upstream); backlog→DB migration (phase a shipped by the runner mid-session, v7.0.100 — its FEATURES.md push and this session's renumber rebase-collided and merged cleanly); vision corpus (drip model — no long interviews, claim cards on the briefing); classification sweep; queue engine; revalidation flow; invention wiring; Heal engine. `ADM-1` (Feature) reclassed **P2 - Inventive** under delegated authority and promoted to queue #1.
+
+**Found live:** the backup tool's hardcoded table list gave the six `runner_` tables zero coverage while reporting success (`SES-81`); an Accepted proposal spawned no work (fixed as register B17); every routine run titled identically (fixed as B22); a gated pick wasted its whole cycle (fixed as B24). Lane ≠ class — `P-GATED` retired as a class marker (John's catch, B15/B16: "unclassifiable" + reason field).
+
 ## cycle-20260820-1707 / S-SES-83a (v7.0.100, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — The backlog gets a Supabase mirror: 277 FEATURES.md rows imported byte-for-byte
 
 **`SES-83` (Tooling, P9 - Tooling) phase (a) 🔶 done — phases b/c queued, d/e gated.** John's queued directive `62b9cb4f-2291-466e-be66-a80505d9df40` (`design-runner-gov-0820`, 16:50 UTC) sat top of the queue at cycle open; the runner picked it before the P-list. Cycle id `d5df6bd0-bbda-4eaa-9edc-4cdacaf5f92a`.

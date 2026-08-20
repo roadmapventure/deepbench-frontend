@@ -4,9 +4,10 @@
 > Session `design-runner-gov-0820` (John + Fable 5, 2026-08-20). John's five session topics:
 > (1) language ✅ shipped, (2) schedule ✅ shipped, (3) cost vs usage ✅ shipped,
 > (4) prioritization — iterating in this file, (5) full automation — pending.
-> **Status: STILL ITERATING — John is generating requirements until all open questions are
-> answered.** Everything marked SHIPPED is live on dev/Supabase; everything marked LOCKED is
-> decided but not yet built; OPEN means undecided.
+> **Status: REQUIREMENTS COMPLETE — John called it done 2026-08-20.** Everything in A is live
+> on dev/Supabase; B1–B29 are the locked build requirements the automation-queue tickets
+> execute against; C1/C2/C4 closed (C3 — the invention-cycle egress check — rides `SES-88`).
+> This file is the design record the kickoffs cite.
 
 ## A. Shipped this session (live)
 
