@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.92 | GOVERNANCE-MODES.md | SES-78 series -- governance-mode registry, created by discovery design-selfbuilding-0819 (2026-08-19). Extensible by rows, never rewrites. -->
+<!-- DeepBench v7.0.99 | GOVERNANCE-MODES.md | SES-78 series -- governance-mode registry, created by discovery design-selfbuilding-0819 (2026-08-19). Extensible by rows, never rewrites. -->
 # Governance-Mode Registry
 
 > Created by discovery `design-selfbuilding-0819` (John, 2026-08-19). Governing architecture:
@@ -15,7 +15,7 @@ John's judgment is exercised** — during the work, the morning after on evidenc
 | Mode | Judgment point | Selection | Status |
 |---|---|---|---|
 | **Manual Design & Build** | During the work — design conversation, walkthrough gates, kickoff docs, John's approvals live | **Default.** A human in the chat *is* the selection; no session is ever asked "which mode?" | Active (today's process) |
-| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live, after two supervised cycles: one correct fail-closed, one full-path ship). Cadence: every 3h; pause = disable the routine at claude.ai/code/routines |
+| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live, after two supervised cycles: one correct fail-closed, one full-path ship). Cadence: every 3h **on John's clock hours — 12, 3, 6, 9 AM/PM CST** (John, 2026-08-20; UTC cron `0 2,5,8,11,14,17,20,23 * * *` — the scheduler adds a few minutes' dispatch delay, and the UTC cron needs a one-hour re-align when DST ends in November); pause = disable the routine at claude.ai/code/routines |
 | **"Open Workspace"** *(placeholder name — John's to set, Tier 3)* | None — non-DeepBench work (research, documents, anything John runs as Claude Desktop projects today) | John says so at session start | Defined, available |
 
 ## Shared invariants — identical in every DeepBench mode
