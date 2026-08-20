@@ -17,12 +17,11 @@ dev`, then `git checkout -B session/cycle-<UTC yyyymmdd-hhmm> origin/dev`. This 
 clone + session branch satisfies CLAUDE.md's worktree-isolation rule by construction (the rule
 exists to isolate concurrent sessions sharing one machine checkout; you have the whole clone).
 All other CLAUDE.md hard rules apply verbatim — atomic counters, `push origin HEAD:dev`,
-kickoff-gated coding, verify-never-assert. Create `.claude/inflight/cycle-<stamp-suffix>.md`
-(one line) and stage it with your first commit. Read `runner_secrets` via the Supabase
+kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention; this exception is cloud-cycle-specific.) Read `runner_secrets` via the Supabase
 connector and export what a step needs as env vars — secrets never go into files, commits, or
 logs.
 
-**1. Open the cycle.** INSERT `runner_cycles` (stamp, trigger, model) via the connector. Every
+**1. Open the cycle.** INSERT `runner_cycles` (stamp, trigger, model) via the connector — leave `outcome` NULL until close (the check constraint has no in-progress value; found live, SES-78c). Every
 later step's evidence hangs off this row's id.
 
 **2. Harvest John's judgment.** Read the briefing page (URL in
@@ -42,8 +41,7 @@ harvested manually; whether cloud can reach it is one of the things this run mea
   the day default → `noop` END unless an unexpired `budget_override` directive covers it (then
   its `max_usd` is your ceiling this cycle).
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
-  proposal over a push. *(Supervised run: no `VERCEL_TOKEN` is provisioned yet — note the skip
-  in the cycle row; full check is a 78d item.)*
+  proposal over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
 
 ## Phase 2 — the work
 
@@ -81,7 +79,7 @@ tier or files a proposal; never grind.
 - Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
 - Close-out edits in the same commit set: `FEATURES*.md` row (status + P-class),
   `CLAUDE-STATE.md` (version line + your one-line bullet, keep 3), `docs/SESSIONS.md` entry,
-  version-header comments on touched files, delete your inflight file.
+  version-header comments on touched files.
 - **One batched push:** `git fetch origin dev && git rebase origin/dev && git push origin
   HEAD:dev`. Never per-artifact pushes.
 
