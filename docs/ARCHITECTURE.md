@@ -2447,15 +2447,22 @@ Orders **elective** work; a user blocker preempts the entire list (see The block
 John's **directive queue** outranks everything: a directive row (his idea, his words) is the
 cycle's mission before any list item.
 
-1. New inventive features — white space, competitive differentiation
-2. New features that add investor / buyout value
-3. New features that win new customers
-4. Enhancements to existing features (prioritized by 1–3)
-5. Agent enhancement — extend existing agents to perform across the platform
-6. Agent creation — a new agent when functionality requires a competency the bench lacks
-7. Removing determinism — harness and platform services become model decisions
-8. Bug fixes, non-blocking (prioritized by 1–7)
-9. Session / governance / tooling enhancements and cleanups
+1. **P1 - Inventive** — new inventive features: white space, competitive differentiation
+2. **P2 - Investor Value** — new features that add investor / buyout value
+3. **P3 - New Customers** — new features that win new customers
+4. **P4 - Enhancements** — enhancements to existing features (prioritized by 1–3)
+5. **P5 - Agent Enhancement** — extend existing agents to perform across the platform
+6. **P6 - Agent Creation** — a new agent when functionality requires a competency the bench lacks
+7. **P7 - Determinism Removal** — harness and platform services become model decisions
+8. **P8 - Bug Fixes** — bug fixes, non-blocking (prioritized by 1–7)
+9. **P9 - Tooling** — session / governance / tooling enhancements and cleanups
+
+**Named form is canonical (John, 2026-08-20, `design-runner-gov-0820`):** a priority class is
+always written with its name — `P9 - Tooling`, never a bare `P9` — in backlog rows, briefing
+cards, notifications, and chat. John should never have to memorize the digits. Cycle-outcome
+language, same decision: `noop` → `did_not_run` (displayed "did not run") and `proposal` →
+`gated_before_build` (displayed "gated before build"), renamed in the `runner_cycles` /
+`runner_items` check constraints and data, not just display.
 
 **Backlog integration (beta retired 2026-08-19, John):** Beta-gate/Post-beta declarations are
 discontinued — `docs/BETA.md` is historical. `FEATURES.md` (now) / `FEATURES-NEXT.md` /
@@ -2484,7 +2491,7 @@ signing the hire card**. **P7** (determinism removal) — ships live in data and
 modules; **gated in the four harness files** (`api/capabilities/execute.js`,
 `api/prompt/db-assembly.js` / `ai-enrichment.js` / `request-receivable.js`) — there the engine
 may diagnose, write the diff, and prove it with a full regression run, but it lands as a
-proposal. **P8** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
+gated-before-build item. **P8** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
 surface is an appearance decision wearing a bug's clothes: flagged or gated. **P9** (tooling) —
 ships live.
 
@@ -2562,21 +2569,22 @@ per data row — and is charged to the budget, so QA cost is visible per item.
 
 ### The daily briefing (John's governance surface)
 
-One Artifact page per day, phone-friendly, shareable. Top line: shipped / proposals / reverted /
-spend vs. budget. Per shipped item: ID + Type, the value case (who it serves, white space
+One Artifact page per day, phone-friendly, shareable. Top line: shipped / gated before build /
+reverted / spend vs. budget. Per shipped item: ID + Type, the value case (who it serves, white space
 covered, how it strengthens §0's pitch), before → after, QA evidence with regression count,
 live dev link (**flagged items link both states — the on-link carries the flag switch as a URL
 parameter**, one tap shows the feature on while other visitors see it off; links included only
 after deploy-currency passes), cost + model, and the three response actions: **Accept /
 Reverse / Rework** (Reverse = auto-revert + row reopened with John's one-line reason; Rework =
-keep the idea, change direction, back into that night's queue). Proposals section: gated items
+keep the idea, change direction, back into that night's queue). Gated-before-build section: gated items
 with POC findings, promote or kill. Bottom: ladder movements + anything auto-reverted, one line
 each. Answers from the page land in the queue the next cycle reads.
 
 ### Operations
 
 24×7 as **chained short sessions**: a scheduled cloud task fires; each firing runs one cycle —
-pick (directive queue first, else the P-list), design, build, QA, ship or file a proposal —
+pick (directive queue first, else the P-list), design, build, QA, ship or file a
+gated-before-build item —
 under the full existing ceremony, ending at close-out, never at context exhaustion (the
 one-feature/3-file scope rule guarantees the margin). **Pushes batch to ship points** — a
 session pushes when there is something to deploy or hand off, never per artifact (the inflight

@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.94 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
+<!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
 # Runbook — The Morning Briefing Page (`SES-78b`)
 
 **Live URL (permanent — every redeploy keeps it):** `https://claude.ai/code/artifact/4c22b9b1-6b14-4092-b728-1756a59b3173`
@@ -15,9 +15,13 @@ Store UTC internally as before; the conversion is display-only.
 
 1. Build the day's HTML from `runner_items` / `runner_cycles` / `runner_budget` /
    `runner_ladder` — same structure as the live page: masthead, stat strip (shipped /
-   proposals / reverted / day spend / month left), Shipped cards, Proposals, Needs-your-call
-   (budget overrides), Trust ladder, Directive textarea. Every card carries: `id="item-<ID>"`,
-   kind chip, `ID (Type · P-class)`, title, Value case, Before → After, QA evidence, meta
+   gated before build / reverted / day spend / month left), Shipped cards, Gated before build,
+   Needs-your-call (budget overrides), Trust ladder, Directive textarea. **Language (John,
+   2026-08-20):** outcomes display as "did not run" / "gated before build" (data values
+   `did_not_run` / `gated_before_build`; `noop`/`proposal` retired), and every P-class is
+   written named (`P9 - Tooling`, never bare `P9`) — see the Language block in
+   `runner-cycle.md`. Every card carries: `id="item-<ID>"`,
+   kind chip, `ID (Type · named P-class)`, title, Value case, Before → After, QA evidence, meta
    (cost / model / push SHA), links (dev URL; flagged items also the flag-ON link), the three
    buttons, hidden reason input, verdict line.
 2. **Republish to the SAME URL** — pass the URL above as `url` to the Artifact tool (a publish

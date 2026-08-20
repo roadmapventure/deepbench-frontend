@@ -1,11 +1,21 @@
-<!-- DeepBench v7.0.94+ | runbooks/runner-cycle.md | S-SES-78c — the Automated-mode cycle: the nine steps as an executable standing prompt. Governing: ARCHITECTURE.md §19v; design: docs/SES-78-RUNNER-DESIGN.md. -->
+<!-- DeepBench v7.0.99 | runbooks/runner-cycle.md | S-SES-78c — the Automated-mode cycle: the nine steps as an executable standing prompt. Governing: ARCHITECTURE.md §19v; design: docs/SES-78-RUNNER-DESIGN.md. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
 session. Your routine prompt carries your **stamp** and **trigger** — echo both into your
-cycle row. Run the steps in order; **fail closed at every wall** (log a `noop` cycle and end —
-never proceed on hope). Everything you ship must satisfy `ARCHITECTURE.md` §19v; when this
+cycle row. Run the steps in order; **fail closed at every wall** (log a `did_not_run` cycle and
+end — never proceed on hope). Everything you ship must satisfy `ARCHITECTURE.md` §19v; when this
 runbook and §19v disagree, §19v wins and the disagreement is itself a briefing item.
+
+**Language (John, 2026-08-20, `design-runner-gov-0820`).** Cycle outcomes are `shipped` /
+`gated_before_build` / `reverted` / `did_not_run` / `failed` (the `runner_cycles` check
+constraint; the former values `noop` and `proposal` are retired — the constraint rejects them).
+In anything John reads — briefing cards, notifications, chat — write them as plain words:
+"did not run", "gated before build". A priority class is **always written named, never a bare
+digit**: `P1 - Inventive`, `P2 - Investor Value`, `P3 - New Customers`, `P4 - Enhancements`,
+`P5 - Agent Enhancement`, `P6 - Agent Creation`, `P7 - Determinism Removal`, `P8 - Bug Fixes`,
+`P9 - Tooling` (canonical list: `FEATURES.md`'s Priority Class legend). John should never have
+to memorize the digits.
 
 **Supervised-run notes** are inline where the first supervised cycle (SES-78c QA) runs a
 reduced version of a step; 78d replaces them with the full mechanism.
@@ -36,12 +46,12 @@ the cloud session, log that in the cycle row and continue — this run's decisio
 harvested manually; whether cloud can reach it is one of the things this run measures.)*
 
 **3. Check the walls.**
-- **Budget:** SELECT `runner_budget` for the current month — no row → `noop`, END. Sum this
-  month's and today's `cost_usd` from `runner_cycles`; over the month cap → `noop`, END; over
-  the day default → `noop` END unless an unexpired `budget_override` directive covers it (then
-  its `max_usd` is your ceiling this cycle).
+- **Budget:** SELECT `runner_budget` for the current month — no row → `did_not_run`, END. Sum
+  this month's and today's `cost_usd` from `runner_cycles`; over the month cap → `did_not_run`,
+  END; over the day default → `did_not_run` END unless an unexpired `budget_override` directive
+  covers it (then its `max_usd` is your ceiling this cycle).
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
-  proposal over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
+  gated-before-build item over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
 
 ## Phase 2 — the work
 
@@ -53,9 +63,9 @@ item.)*
 
 **5. Pick ONE item.** `runner_directives` `status='queued'` oldest first — a directive is the
 mission, mark it `in_progress`. Else the backlog: `FEATURES.md` (now) → `FEATURES-NEXT.md` →
-`FEATURES-LATER.md`, P1 → P9 within each. **Classify its lane against §19v: anything gated —
-or uncertain — becomes a `proposal` `runner_items` row with your reasoning, and the cycle ends
-there.** One item per cycle, never more.
+`FEATURES-LATER.md`, `P1 - Inventive` → `P9 - Tooling` within each. **Classify its lane against
+§19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
+your reasoning, and the cycle ends there.** One item per cycle, never more.
 
 **6. Full ceremony — no shortcuts, you earn no exemption.** Read the item's backlog row, the
 governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will
@@ -65,7 +75,7 @@ a feature mill). Claim your version atomically (`dev_version_counter`, SQL in
 `.claude/skills/session-setup/SKILL.md`). Write the kickoff doc
 (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3
 files, ≤4 tasks). Model discipline: attempts-per-tier ≤ 1 — a failed attempt escalates one
-tier or files a proposal; never grind.
+tier or files a gated-before-build item; never grind.
 
 **7. QA bar, then ship at ONE ship point.**
 - `npm install && npm run build` green (a `src/`/`api/`/`lib/` change that fails build never
@@ -90,7 +100,7 @@ immediately, restore your before-images, set the cycle `outcome='reverted'` — 
 Reverse on the ladder.
 
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
-(America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + P-class,
+(America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + named P-class per the Language block above,
 title, value case, before → after, QA evidence with proof-type label, dev link, flag slug if
 any, cost, model). Close `runner_cycles` (outcome, `cost_usd` — **estimated is fine, labeled
 estimated; never invented**, push SHA). Mark the directive `done`. Rebuild the briefing page
