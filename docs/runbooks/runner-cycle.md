@@ -12,10 +12,10 @@ runbook and §19v disagree, §19v wins and the disagreement is itself a briefing
 constraint; the former values `noop` and `proposal` are retired — the constraint rejects them).
 In anything John reads — briefing cards, notifications, chat — write them as plain words:
 "did not run", "gated before build". A priority class is **always written named, never a bare
-digit**: `P1 - Inventive`, `P2 - Investor Value`, `P3 - New Customers`, `P4 - Enhancements`,
-`P5 - Agent Enhancement`, `P6 - Agent Creation`, `P7 - Determinism Removal`, `P8 - Bug Fixes`,
-`P9 - Tooling` (canonical list: `FEATURES.md`'s Priority Class legend). John should never have
-to memorize the digits.
+digit**: `P1 - Improves John's Skills`, `P2 - Inventive`, `P3 - Investor Value`,
+`P4 - New Customers`, `P5 - Enhancements`, `P6 - Agent Enhancement`, `P7 - Agent Creation`,
+`P8 - Determinism Removal`, `P9 - Bug Fixes`, `P10 - Tooling` (canonical list: `FEATURES.md`'s
+Priority Class legend). John should never have to memorize the digits.
 
 **Supervised-run notes** are inline where the first supervised cycle (SES-78c QA) runs a
 reduced version of a step; 78d replaces them with the full mechanism.
@@ -82,7 +82,8 @@ item.)*
 
 **5. Pick ONE item.** `runner_directives` `status='queued'` oldest first — a directive is the
 mission, mark it `in_progress`. Else the backlog: `FEATURES.md` (now) → `FEATURES-NEXT.md` →
-`FEATURES-LATER.md`, `P1 - Inventive` → `P9 - Tooling` within each. **Classify its lane against
+`FEATURES-LATER.md`, `P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
+class: beta-marked first, then newest filed, then oldest (John, 2026-08-20). **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
 your reasoning, and the cycle ends there.** One item per cycle, never more.
 

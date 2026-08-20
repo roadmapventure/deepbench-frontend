@@ -2447,18 +2447,30 @@ Orders **elective** work; a user blocker preempts the entire list (see The block
 John's **directive queue** outranks everything: a directive row (his idea, his words) is the
 cycle's mission before any list item.
 
-1. **P1 - Inventive** — new inventive features: white space, competitive differentiation
-2. **P2 - Investor Value** — new features that add investor / buyout value
-3. **P3 - New Customers** — new features that win new customers
-4. **P4 - Enhancements** — enhancements to existing features (prioritized by 1–3)
-5. **P5 - Agent Enhancement** — extend existing agents to perform across the platform
-6. **P6 - Agent Creation** — a new agent when functionality requires a competency the bench lacks
-7. **P7 - Determinism Removal** — harness and platform services become model decisions
-8. **P8 - Bug Fixes** — bug fixes, non-blocking (prioritized by 1–7)
-9. **P9 - Tooling** — session / governance / tooling enhancements and cleanups
+1. **P1 - Improves John's Skills** — features that showcase and grow John's frontier AI /
+   agentic-engineering skill and make him more hireable, especially for FAANG-level AI roles;
+   the platform is his living portfolio (added 2026-08-20, John, `design-runner-gov-0820` —
+   inserted above the original list, every other class pushed down one)
+2. **P2 - Inventive** — new inventive features: white space, competitive differentiation
+3. **P3 - Investor Value** — new features that add investor / buyout value
+4. **P4 - New Customers** — new features that win new customers
+5. **P5 - Enhancements** — enhancements to existing features (prioritized by 1–4)
+6. **P6 - Agent Enhancement** — extend existing agents to perform across the platform
+7. **P7 - Agent Creation** — a new agent when functionality requires a competency the bench lacks
+8. **P8 - Determinism Removal** — harness and platform services become model decisions
+9. **P9 - Bug Fixes** — bug fixes, non-blocking (prioritized by 1–8)
+10. **P10 - Tooling** — session / governance / tooling enhancements and cleanups
+
+**Classification authority (John, 2026-08-20, `design-runner-gov-0820` — supersedes the
+"never assigned unattended" carve-out for P1–P4):** John has delegated the business-side read —
+P1–P4 classification, value/usage ranking, competitive and whitespace review — to Claude, who
+assigns and recommends; John governs **after the fact** through the briefing's Accept /
+Reverse / Rework, the same way he governs shipped code. The criteria sources are the vision
+corpus (`SES-84`) and `docs/JOHN-DECISION-PATTERNS.md`; every Reverse/Rework on a strategy
+call feeds back into them (`SES-79`).
 
 **Named form is canonical (John, 2026-08-20, `design-runner-gov-0820`):** a priority class is
-always written with its name — `P9 - Tooling`, never a bare `P9` — in backlog rows, briefing
+always written with its name — `P10 - Tooling`, never a bare `P9` — in backlog rows, briefing
 cards, notifications, and chat. John should never have to memorize the digits. Cycle-outcome
 language, same decision: `noop` → `did_not_run` (displayed "did not run") and `proposal` →
 `gated_before_build` (displayed "gated before build"), renamed in the `runner_cycles` /
@@ -2466,9 +2478,11 @@ language, same decision: `noop` → `did_not_run` (displayed "did not run") and 
 
 **Backlog integration (beta retired 2026-08-19, John):** Beta-gate/Post-beta declarations are
 discontinued — `docs/BETA.md` is historical. `FEATURES.md` (now) / `FEATURES-NEXT.md` /
-`FEATURES-LATER.md` stay as the urgency axis; every row gains a priority class `P1`–`P9` from
-the list above. The engine picks now → next → later, and P1 → P9 within each. Former Beta-gate
-rows fold in as P4/P8 sorted first within their class (`SES-80` is the reclassification pass).
+`FEATURES-LATER.md` stay as the urgency axis; every row gains a priority class `P1`–`P10` from
+the list above. The engine picks now → next → later, and `P1 - Improves John's Skills` →
+`P10 - Tooling` within each; within a class the tie order is **beta-marked first, then newest
+filed, then oldest** (John, 2026-08-20). Former Beta-gate rows belong in tier `now` unless
+deliberately parked in next/later (`SES-80` is the reclassification pass).
 
 ### Lane routing — what ships unattended vs. what waits for John
 
@@ -2478,21 +2492,22 @@ surface do what it was already supposed to do → ships live.* A flag governs **
 correctness** — a bug fix behind an off flag is a fix that did nothing, and it makes the
 regression test vacuous (the `LOO-013` failure shape).
 
-Per priority class: **P1–P3** (new features) — flagged; a new screen ships its route *and* nav
-entry inert behind the flag. **P4** (enhancements) — flagged; the enhancement lives in a new
+Per priority class (renumbered 2026-08-20 with the P1 insertion): **P1–P4** (new features,
+including P1 - Improves John's Skills) — flagged; a new screen ships its route *and* nav
+entry inert behind the flag. **P5** (enhancements) — flagged; the enhancement lives in a new
 component file, the approved screen gains only an import + one guarded mount; the checkable
 assertion is **zero deleted lines** in existing `src/screens/*` / `src/AppShell.jsx`.
-**P5** (agent enhancement) — no unattended edits to any **active** agent's Skills/Capabilities
+**P6** (agent enhancement) — no unattended edits to any **active** agent's Skills/Capabilities
 (the moment a row changes, every live run uses it — maximum blast radius, no inert state);
-auto-lane only against agents still `is_active = false`. **P6** (agent creation) — `is_active =
+auto-lane only against agents still `is_active = false`. **P7** (agent creation) — `is_active =
 false` *is* the flag: new agents are born invisible (excluded from the delegation roster,
 `LOO-37`) and unreachable (the `execute.js` gate, `LOO-004`); **John flipping `is_active` is
-signing the hire card**. **P7** (determinism removal) — ships live in data and platform-service
+signing the hire card**. **P8** (determinism removal) — ships live in data and platform-service
 modules; **gated in the four harness files** (`api/capabilities/execute.js`,
 `api/prompt/db-assembly.js` / `ai-enrichment.js` / `request-receivable.js`) — there the engine
 may diagnose, write the diff, and prove it with a full regression run, but it lands as a
-gated-before-build item. **P8** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
-surface is an appearance decision wearing a bug's clothes: flagged or gated. **P9** (tooling) —
+gated-before-build item. **P9** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
+surface is an appearance decision wearing a bug's clothes: flagged or gated. **P10** (tooling) —
 ships live.
 
 **The gated lane (never unattended, no trust rung ever unlocks it):** terminology and canonical

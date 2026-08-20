@@ -34,7 +34,7 @@ John is present and directing; it is the default absent any explicit selection, 
 ## Automated
 
 The three-engine 24×7 pipeline (Execute / Heal / Invent) governed by §19v: lane routing
-(auto vs. gated), the P1–P9 priority order, feature-flag exposure rules, the budget governor,
+(auto vs. gated), the P1–P10 priority order, feature-flag exposure rules, the budget governor,
 the trust ladder, and the daily briefing. Appropriate for unattended work only. **Nothing runs
 under this mode until a follow-up design session builds the runner against §19v's constraints
 and John approves it** — structurally enforced: the stamp that proves the mode cannot exist

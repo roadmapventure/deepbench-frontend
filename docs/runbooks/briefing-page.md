@@ -19,7 +19,7 @@ Store UTC internally as before; the conversion is display-only.
    Needs-your-call (budget overrides), Trust ladder, Directive textarea. **Language (John,
    2026-08-20):** outcomes display as "did not run" / "gated before build" (data values
    `did_not_run` / `gated_before_build`; `noop`/`proposal` retired), and every P-class is
-   written named (`P9 - Tooling`, never bare `P9`) — see the Language block in
+   written named (`P10 - Tooling`, never bare `P9`) — see the Language block in
    `runner-cycle.md`. **Budget & usage cards (John, 2026-08-20):** an API-dollars card with the
    dev/QA split bar against the $5 day / $100 month walls; a subscription-tokens card with the
    same dev/QA split bar, the runner's token use by model, John's latest reading + the
