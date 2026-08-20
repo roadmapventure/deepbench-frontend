@@ -57,8 +57,22 @@
 
 Models: design done here (Fable 5); 78b/78c coding on Opus 5; 78c's proof runs the real cycle.
 
+## Super Admin split (John, 2026-08-19, this session)
+
+John's model adopted: the in-app home for runner evidence is a new **Super Admin** Product Focus
+Area (`ADM-1`, screen code `ADM`, hamburger → Admin, dev-instance only) — read-only briefing
+cards, cycle history, spend, ladder; future user-admin nests there. **The decision surface
+stays on the owner-authenticated briefing Artifact until real auth ships** — §10 is a hardcoded
+`CURRENT_USER`, so an in-app Accept button would be pressable by anyone with the dev URL against
+a queue that ships code. Buttons migrate into Super Admin when Clerk lands; same `runner_`
+tables under both, nothing built twice. Data-side posture stays primary: `runner_` tables keep
+zero public grants; `ADM-1` reads a narrow view (no directive bodies; spend exposure John's call).
+
 ## Open questions (questions, not IDs)
 
 - Briefing page layout/appearance — UI appearance is John's (Tier 3); 78b describes the mock
-  for approval before its kickoff is written.
+  for approval before its kickoff is written. *(Mock walked through 2026-08-19, John pivoted to
+  the Super Admin question — re-confirm the mock before the 78b kickoff.)*
 - Which trivial P9 item seeds 78c's supervised cycle — picked at 78c time from the live board.
+- `ADM-1`'s exact public data cut (spend as % vs dollars; what a dev-URL visitor may see) —
+  John's call at its design session.
