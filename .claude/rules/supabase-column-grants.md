@@ -57,10 +57,15 @@ tracks rerouting) and `ai_activity_log`'s INSERT.
 
 Two facts every later grants session needs:
 
-- **Default privileges are closed** (`alter default privileges for role postgres … revoke … on tables`):
+- **Default privileges are closed for WRITES only** (`alter default privileges for role postgres … revoke … on tables`):
   a new table gets NO public write grants automatically. Right direction (fail closed), but a new
   table the browser must write presents as silent 401/42501s — grant explicitly in the migration
   that creates it, same pattern as the SELECT fail-closed note above.
+  **Corrected 2026-08-19 (`SES-78a`, found live): SELECT is NOT closed** — the six `runner_`
+  tables came up with auto-granted public SELECT (12 rows, 6 tables × 2 roles), caught by the
+  migration's own QA. A new table whose content shouldn't be publicly readable needs an explicit
+  `REVOKE SELECT … FROM anon, authenticated` in its creating migration, and its QA must assert
+  zero grant rows. Detail: `docs/SES-78a-migration-log.md`.
 - **`information_schema.role_table_grants` does not report PG17 `MAINTAIN`** — `anon`/`authenticated`
   still hold `m` on all 32 tables (`DAT-20`, latent, not DML, unreachable via PostgREST). Read
   `pg_class.relacl` / `pg_default_acl` when the question is "the complete grant surface," not just
