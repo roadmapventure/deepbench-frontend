@@ -80,9 +80,15 @@ harvested manually; whether cloud can reach it is one of the things this run mea
 fixes. *(Supervised run: the cheap reachability probe only; the full sweep spec is a 78d
 item.)*
 
-**5. Pick ONE item.** `runner_directives` `status='queued'` oldest first — a directive is the
-mission, mark it `in_progress`. Else the backlog: `FEATURES.md` (now) → `FEATURES-NEXT.md` →
-`FEATURES-LATER.md`, `P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
+**5. Pick ONE item.** Selection layers, in order (register B30):
+(1) `runner_directives` `status='queued'` oldest first — a directive is the mission, mark it
+`in_progress`. (2) **John's automation queue** — `docs/RUNNER-GOV-0820-REQUIREMENTS.md`'s C4
+section, his standing order (briefing access → backlog DB → automation-gap tickets →
+behavior-expert pass → classification sweep; invention parallel): pick the next incomplete
+step's ticket. Without this layer the 63 open `P9 - Bug Fixes` tickets would outrank every
+`P10 - Tooling` automation ticket and bury the queue he set. (3) Only when both are empty,
+the backlog by class: `FEATURES.md` (now) → `FEATURES-NEXT.md` → `FEATURES-LATER.md`,
+`P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
 class: beta-marked first, then newest filed, then oldest (John, 2026-08-20). **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
 your reasoning — then the ticket goes pending and you DROP TO THE NEXT available queued

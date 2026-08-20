@@ -187,6 +187,13 @@
   cloud environment supporting Agent + per-agent model — first cycle after rollout reports;
   if unavailable, it notes it in the cycle row and continues on Opus 5.
 
+- **B30. John's automation queue is a SELECTION LAYER, not just a plan (found at close-out,
+  2026-08-20):** runbook step 5 picks in three layers — directives → the next incomplete step
+  of this file's C4 automation queue → the class-sorted backlog. Without the middle layer, the
+  63 open `P9 - Bug Fixes` tickets would outrank every `P10 - Tooling` automation ticket and
+  bury the queue John set. The layer retires itself when the automation queue's steps are all
+  complete (post-`SES-83` d/e the queue engine's pins express the same thing in data).
+
 ## D. Ticket ledger
 
 **Filed this session (8):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter
