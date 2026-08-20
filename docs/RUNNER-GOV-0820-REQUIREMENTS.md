@@ -120,6 +120,15 @@
   owner-authenticated Artifact until Clerk (unchanged).
 - **B20. dev→main stays John's forever** — full automation ends at dev, stated as a boundary,
   not a gap.
+- **B21. Model choice inside automated cycles (John, 2026-08-20):** the Opus 5 parent cycle
+  orchestrates, codes, QAs, ships — and delegates by task shape via the Agent tool:
+  judgment-dense steps (kickoff design for P1–P5, root-cause diagnosis, invention scoring,
+  P1–P4 classification) → **Fable 5 subagent**; mechanical steps (doc sweeps, imports,
+  formatting) → **Sonnet 5 subagent**. Makes §19v's escalation rule executable: a failed
+  attempt re-runs that piece one tier up, never grinds. Fable spend is metered by the token
+  governor and visible in the briefing's by-model breakdown. **Unverified precondition:** the
+  cloud environment supporting Agent + per-agent model — first cycle after rollout reports;
+  if unavailable, it notes it in the cycle row and continues on Opus 5.
 
 ## D. Ticket ledger
 

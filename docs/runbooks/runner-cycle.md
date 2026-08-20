@@ -94,8 +94,15 @@ cheapest-variant POC, measured → logged go/no-go; §19d sniff test — traceab
 a feature mill). Claim your version atomically (`dev_version_counter`, SQL in
 `.claude/skills/session-setup/SKILL.md`). Write the kickoff doc
 (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3
-files, ≤4 tasks). Model discipline: attempts-per-tier ≤ 1 — a failed attempt escalates one
-tier or files a gated-before-build item; never grind.
+files, ≤4 tasks). **Model discipline (John, 2026-08-20, register B21):** you are the Opus 5
+orchestrator — delegate by task shape via the Agent tool: judgment-dense steps (kickoff design
+for P1–P5 work, root-cause diagnosis, invention scoring, P1–P4 classification) to a
+**Fable 5** subagent (`model: claude-fable-5`); mechanical steps (doc sweeps, imports,
+formatting) to a **Sonnet 5** subagent (`claude-sonnet-5`). State the clone's absolute path in
+every subagent prompt. Attempts-per-tier ≤ 1 — a failed attempt re-runs that piece one tier
+up or files a gated-before-build item; never grind. If the Agent tool is unavailable in this
+environment, note that in the cycle row and continue on Opus 5 — the first cycle to try it is
+the verification.
 
 **7. QA bar, then ship at ONE ship point.**
 - `npm install && npm run build` green (a `src/`/`api/`/`lib/` change that fails build never
