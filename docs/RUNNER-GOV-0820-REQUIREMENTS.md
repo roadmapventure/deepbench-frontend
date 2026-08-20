@@ -140,7 +140,9 @@
 - **B26. Briefing shows the `now`-tier ticket census (John, 2026-08-20):** a count of all open
   backlog tickets remaining in tier `now`, broken down by named priority class (one line per
   class, named form), plus the unclassed remainder until `SES-85` retires it. Rebuilt from the
-  data every cycle.
+  data every cycle. **Amendment (John, same day): the page top also carries a compact
+  "Next 3" — `ID — title` for the queue's next three — glanceable without scrolling; B25's
+  fuller top-five section sits below.**
 - **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
   titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
   it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import
