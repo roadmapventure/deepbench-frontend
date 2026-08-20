@@ -5,6 +5,33 @@
 
 ---
 
+## cycle-20260820-1707 / S-SES-83a (v7.0.100, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — The backlog gets a Supabase mirror: 277 FEATURES.md rows imported byte-for-byte
+
+**`SES-83` (Tooling, P9 - Tooling) phase (a) 🔶 done — phases b/c queued, d/e gated.** John's queued directive `62b9cb4f-2291-466e-be66-a80505d9df40` (`design-runner-gov-0820`, 16:50 UTC) sat top of the queue at cycle open; the runner picked it before the P-list. Cycle id `d5df6bd0-bbda-4eaa-9edc-4cdacaf5f92a`.
+
+**What shipped.** New table `public.backlog_items` in Supabase, columns per the directive spec:
+`id uuid PK · backlog_id text · tier text CHECK ('now'|'next'|'later') · type · priority_class · title · description · status text CHECK ('done'|'partial'|'missing') · source_file · session_ref · harvest_link · row_ordinal int · created_at · updated_at`, plus `UNIQUE (source_file, row_ordinal)` and RLS explicitly off. **Same migration** (per `.claude/rules/supabase-column-grants.md`'s default-grant trap): `REVOKE ALL PRIVILEGES ON TABLE public.backlog_items FROM anon, authenticated`. 277 rows imported from `docs/FEATURES.md` via PostgREST + service key (401KB of INSERTs pipelined efficiently — 12 execute_sql chunks would have burned ~120K tokens; PostgREST direct POST is one call).
+
+**QA (discriminating, would fail if the change did nothing).**
+- **Count.** `grep -c '^| [A-Z][A-Z0-9]*-[0-9]' docs/FEATURES.md` = 277 = `select count(*) from backlog_items`. ✓
+- **IDs.** 276 distinct backlog_ids across 277 rows — `CHI-48` count 2 (SES-30's documented file-level duplicate — Data-type L139 vs UI-type L244), preserved via `row_ordinal`, no other duplicates. ✓
+- **Byte-for-byte reconciliation.** Re-parsed the file fresh in `scratchpad/reconcile.mjs`, fetched all 277 DB rows via service key, joined on `(source_file, row_ordinal)`, compared 9 fields per row (2,493 comparisons) — **zero mismatches**. Status distribution matches: missing 254 / partial 20 / done 3. Priority-class rows: 86 file = 86 db (86 out of 277 rows carry a `**P[1-9] - Name.**` marker at the head of their description, extracted by regex).
+- **Grants — both directions live** (per the column-grants rule: "the denied query must fail *and* a legitimate projection must still return rows"). Anon key SELECT → HTTP 401 `permission denied for table backlog_items`. Publishable key SELECT → HTTP 401. Anon INSERT attempt → HTTP 401. Service key SELECT → HTTP 200 with `content-range: 0-276/277`. `role_table_grants` for anon/authenticated/public on this table = 0 rows.
+- **Discriminating framing.** If the migration had shipped without the REVOKE, the anon SELECT would have returned rows (a shipped platform running rows via the browser-visible key). If the status mapping had misfired (e.g. `➡️ Superseded → partial` instead of `done`), the byte-for-byte reconcile would have flagged every affected row. Both would have shown live; neither did.
+
+**Status mapping** (7 raw values → 3 canonical, documented in the kickoff):
+`✅ Done → done` · `✅ Shipped (SQL-only, via MCP) → done` · `➡️ Superseded (...) → done` (3 total) · `🔶 Partial → partial` · `🔶 Duplicate (merge proposed) → partial` (20 total) · `❌ Missing → missing` · `— N/A → missing` (254 total).
+
+**Reversibility.** No before-images — the table was empty. Reverse-forward is a single `DROP TABLE public.backlog_items`; nothing reads this table yet (phases d/e are gated), so dropping cannot break a live surface.
+
+**Not in this cycle.** Phases (b) NEXT/LATER/ARCHIVE import and (c) snapshot-export script + runbook step — queued as directive follow-ups, one per future cycle to hold the one-item scope cap. Phases (d) switch runner step-5 selection to SQL and (e) switch human-session ceremony off the files — both gated on John.
+
+**Files touched (3, within scope cap):** `docs/kickoffs/v7.0.100-SES-83a-backlog-items-schema.md` (new), `CLAUDE-STATE.md` (version + bullet + trim), `docs/FEATURES.md` (SES-83 row status → 🔶 Partial with phase (a) inline update). Migration + inserts live in Supabase (not repo files) — matches the SES-77/SES-78a pattern.
+
+Kickoff: `docs/kickoffs/v7.0.100-SES-83a-backlog-items-schema.md`. Scratchpad artifacts (parser, reconciliation script): session directory (ephemeral).
+
+---
+
 ## cycle-20260820-0518 / S-SES-80 Pass A1 (v7.0.98, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — The backlog gets its first ordering: 4 classed rows become 85
 
 **`SES-80` (Tooling, P9) 🔶 Pass A1 done.** The third true Automated-mode cycle, and the first to ship a backlog change. §19v selects work by "`FEATURES.md` → `NEXT` → `LATER`, P1→P9 within each"; before this cycle that rule chose from **4 classed rows out of 269 open** in `FEATURES.md`. John accepted the `SES-80` scoping proposal from his phone at 05:12Z — decision 1 (the Type→P-class mapping) and decision 2 (`**P-GATED**`, never a digit) *as written* — so the mapping was his, applied verbatim, not the engine's opinion.
