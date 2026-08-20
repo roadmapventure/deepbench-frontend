@@ -1,0 +1,248 @@
+<title>DeepBench Morning Briefing</title>
+<link id="f" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style id="s">
+  :root{
+    --paper:#ebe5d5; --card:#f8f2e2; --card-alt:#f2ead4;
+    --navy:#12243c; --ink:#28221a;
+    --muted:#786d52; --muted-deep:#58503a; --line:#c8bb9a; --line-soft:#d8cbac;
+    --brass:#b6873a; --brass-deep:#886224; --brass-light:#e4c786;
+    --navy-text-hi:#b8c5d8; --moss:#5a7538; --moss-light:#a6bc82; --flag:#a83319; --white:#ffffff;
+    --display:"Fraunces",Georgia,serif; --body:"Inter",-apple-system,system-ui,sans-serif;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+       font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:0 14px 48px}
+  header{background:var(--navy);color:var(--card);border-bottom:3px solid var(--brass);
+         padding:14px;display:flex;align-items:center;gap:11px}
+  .db{width:34px;height:34px;border-radius:50%;background:var(--brass);color:var(--navy);
+      display:flex;align-items:center;justify-content:center;font-family:var(--display);
+      font-weight:700;font-size:14px;border:2px solid var(--card);flex-shrink:0}
+  header h1{font-family:var(--display);font-size:17px;font-weight:600;margin:0;line-height:1.1}
+  header .sub{font-family:var(--mono);font-size:9px;color:var(--navy-text-hi);
+              letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  header .date{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--brass-light);
+               text-align:right;line-height:1.3}
+  .stats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);
+         border-radius:6px;overflow:hidden;margin:16px 0 22px}
+  .stat{flex:1;background:var(--card);padding:9px 6px;text-align:center}
+  .stat b{display:block;font-family:var(--mono);font-size:15px;font-weight:700;
+          font-variant-numeric:tabular-nums;color:var(--navy)}
+  .stat span{font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  h2{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.4px;
+     text-transform:uppercase;color:var(--muted-deep);margin:26px 0 10px;
+     border-bottom:1px solid var(--line);padding-bottom:5px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:7px;
+        padding:14px 14px 12px;margin-bottom:14px}
+  .item[data-decision]{border-color:var(--brass)}
+  .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+        padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
+        background:var(--card-alt)}
+  .kind.ship{color:var(--moss);border-color:var(--moss-light)}
+  .kind.test{color:var(--brass-deep);border-color:var(--brass-light)}
+  .item .top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .item .id{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+  .item h3{font-family:var(--display);font-size:17px;font-weight:600;margin:0 0 8px;text-wrap:balance}
+  .item p{margin:0 0 8px;font-size:14px}
+  .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+       color:var(--brass-deep);display:block;margin-bottom:1px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:11px;
+        color:var(--muted-deep);margin:10px 0;font-variant-numeric:tabular-nums}
+  .links a{color:var(--brass-deep);font-weight:600;font-size:13px;text-decoration:underline;
+           text-underline-offset:2px;margin-right:14px}
+  .decide{display:flex;gap:8px;margin-top:12px}
+  .decide button{flex:1;font-family:var(--body);font-weight:600;font-size:13.5px;
+                 padding:10px 4px;border-radius:6px;border:1.5px solid var(--line);
+                 background:var(--card-alt);color:var(--ink);cursor:pointer;min-height:44px}
+  .decide button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button.accept.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  button.reverse.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  button.rework.on{background:var(--brass);border-color:var(--brass-deep);color:var(--white)}
+  .verdict{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:8px;min-height:15px}
+  .reason{display:none;margin-top:9px}
+  .reason.show{display:block}
+  .reason input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;
+                border:1.5px solid var(--brass);border-radius:6px;background:var(--white);color:var(--ink)}
+  .reason input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .reason .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .empty{font-size:13.5px;color:var(--muted);font-style:italic;padding:4px 2px}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+        border-radius:7px;overflow:hidden;font-size:12.5px}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line-soft)}
+  th{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+     color:var(--muted);background:var(--card-alt)}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
+        padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
+        color:var(--ink);resize:vertical}
+  .directive textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
+  .savebar{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:6px;min-height:14px}
+  .note{font-size:11.5px;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="page"></div>
+
+<script type="application/json" id="briefing-state">{"items":{},"directive":""}</script>
+
+<script id="code">
+// SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
+// version via claude.use('artifact').publish(fullDoc). Never serializes the live DOM.
+(function(){
+  var stEl = document.getElementById('briefing-state');
+  var state = {items:{}, directive:''};
+  try { state = JSON.parse(stEl.textContent); } catch(e) {}
+  // Recover state stashed before a publish that may not have landed (docs: stash first).
+  try {
+    var stash = sessionStorage.getItem('briefing-pending');
+    if (stash) { state = JSON.parse(stash); }
+  } catch(e) {}
+
+  var readOnly = false;
+
+  function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function card(id, kindCls, kindTxt, idTxt, title, bodyHtml){
+    var d = state.items[id] || {};
+    var dec = d.decision || '';
+    var showReason = dec==='reverse' || dec==='rework';
+    return '<div class="item" id="'+id+'"'+(dec?' data-decision="'+dec+'"':'')+'>'
+      +'<div class="top"><span class="kind '+kindCls+'">'+kindTxt+'</span>'
+      +'<span class="id">'+idTxt+'</span></div>'
+      +'<h3>'+title+'</h3>'+bodyHtml
+      +'<div class="decide">'
+      +'<button class="accept'+(dec==='accept'?' on':'')+'" data-c="accept">Accept</button>'
+      +'<button class="reverse'+(dec==='reverse'?' on':'')+'" data-c="reverse">Reverse</button>'
+      +'<button class="rework'+(dec==='rework'?' on':'')+'" data-c="rework">Rework</button>'
+      +'</div>'
+      +'<div class="reason'+(showReason?' show':'')+'">'
+      +'<input type="text" value="'+esc(d.reason)+'" placeholder="One line — then press Save">'
+      +'<div class="hint">Press Enter or tap Save to record the line.</div></div>'
+      +'<div class="verdict">'+(dec?('recorded: '+dec.toUpperCase()+' · '+esc(d.at||'')):'')+'</div>'
+      +'</div>';
+  }
+
+  function render(){
+    document.getElementById('page').innerHTML =
+    '<header><div class="db">DB</div><div><h1>Morning Briefing</h1>'
+    +'<div class="sub">DeepBench · Automated Development</div></div>'
+    +'<div class="date">2026-08-19<br>v7.0.94</div></header>'
+    +'<div class="wrap">'
+    +'<div class="stats">'
+    +'<div class="stat"><b>1</b><span>Shipped</span></div>'
+    +'<div class="stat"><b>0</b><span>Proposals</span></div>'
+    +'<div class="stat"><b>0</b><span>Reverted</span></div>'
+    +'<div class="stat"><b>$0.00</b><span>of $3.30 day</span></div>'
+    +'<div class="stat"><b>$100</b><span>month left</span></div>'
+    +'</div>'
+    +'<h2>Shipped</h2>'
+    +card('item-ses78a','ship','Ship','SES-78a (Tooling · P9)',
+      'Runner foundation — six tables and your budget, live',
+      '<p><span class="lbl">Value case</span>The ground the Automated mode stands on: your directives, the $100/month budget, the cycle ledger, the trust ladder, and the before-images that make every overnight change reversible by one tap.</p>'
+      +'<p><span class="lbl">Before → after</span>Before: the runner design existed only on paper. After: all six runner_ tables live in Supabase, budget seeded ($100 month / $3.30 day, fail closed), trust ladder at rung 1, zero public access.</p>'
+      +'<p><span class="lbl">QA evidence</span>5/5 green, including a before-image → restore round-trip (row corrupted on purpose, restored byte-equal) and a live catch: new tables came up publicly readable by default — revoked, verified zero.</p>'
+      +'<div class="meta"><span>cost $0.00 API</span><span>model Fable 5 (manual session)</span><span>push 5de2398</span></div>'
+      +'<p class="links"><span class="lbl">Where</span><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a> (data-layer only — log: docs/SES-78a-migration-log.md)</p>')
+    +card('item-tap-test','test','Test','SES-78b tap QA',
+      'Tap test — prove the round trip from your phone',
+      '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>')
+    +'<h2>Proposals — your promote / kill</h2><p class="empty">None tonight.</p>'
+    +'<h2>Needs your call</h2><p class="empty">No budget overrides pending. Day and month envelopes untouched.</p>'
+    +'<h2>Trust ladder</h2><table>'
+    +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
+    +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><td>Enhancement</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><td>Agent creation</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><td>Determinism removal</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><td>Bug fix</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><td>Tooling</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'</table>'
+    +'<h2>Directive queue — your seed, any time</h2>'
+    +'<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first.">'+esc(state.directive)+'</textarea>'
+    +'<div class="savebar" id="savebar">'+(readOnly?'read-only view — decisions record for the owner only':'')+'</div></div>'
+    +'<p class="note">Decisions and directives record for the page owner only — anyone else with this link sees a read-only briefing. Recorded taps are read by the next runner cycle. DeepBench · ARCHITECTURE.md §19v · SES-78b.</p>'
+    +'</div>';
+    wire();
+  }
+
+  // Full replacement document, rendered from state — the page's own source as a function.
+  function doc(){
+    return '<!doctype html>\n<html><head><meta charset="utf-8">'
+      +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+      +'<title>DeepBench Morning Briefing</title>'
+      +document.getElementById('f').outerHTML
+      +document.getElementById('s').outerHTML
+      +'</head><body><div id="page"></div>'
+      +'<script type="application/json" id="briefing-state">'
+      +JSON.stringify(state).replace(/</g,'\\u003c')
+      +'<\/script>'
+      +'<script id="code">'+document.getElementById('code').textContent+'<\/script>'
+      +'</body></html>';
+  }
+
+  var saving = false;
+  function save(){
+    if (readOnly || saving) return;
+    saving = true;
+    bar('saving…');
+    try { sessionStorage.setItem('briefing-pending', JSON.stringify(state)); } catch(e) {}
+    window.claude.use('artifact').then(function(a){
+      if (!a) { readOnly = true; saving=false; bar('read-only view'); return; }
+      a.publish(doc()).then(function(){
+        try { sessionStorage.removeItem('briefing-pending'); } catch(e) {}
+        // View reloads to the new version; nothing else to do.
+      }, function(err){
+        saving = false;
+        var c = err && err.code;
+        if (c==='not_writer' || c==='not_granted' || c==='consent_required' ||
+            c==='capability_disabled' || c==='capability_removed') {
+          readOnly = true; bar('read-only view — decisions record for the owner only');
+        } else if (c==='conflict') {
+          bar(''); // shell reloads to the winning version
+        } else if (c==='rate_limited') {
+          bar('too fast — tap again in a moment');
+        } else {
+          bar('save failed ('+(c||'unknown')+') — tap again to retry');
+        }
+      });
+    });
+  }
+
+  function bar(t){ var b=document.getElementById('savebar'); if(b) b.textContent=t; }
+
+  function wire(){
+    document.querySelectorAll('.item').forEach(function(cardEl){
+      var id = cardEl.id;
+      cardEl.querySelectorAll('.decide button').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var c = btn.getAttribute('data-c');
+          var cur = state.items[id] || {};
+          state.items[id] = { decision:c, reason:(c==='accept'?'':(cur.reason||'')),
+                              at:new Date().toISOString().slice(0,16)+'Z' };
+          if (c==='accept') { save(); render(); }
+          else { render(); var inp=document.querySelector('#'+id+' .reason input'); if(inp) inp.focus(); }
+        });
+      });
+      var inp = cardEl.querySelector('.reason input');
+      if (inp) {
+        function commit(){
+          var cur = state.items[id];
+          if (!cur || cur.reason === inp.value) return;
+          cur.reason = inp.value; save();
+        }
+        inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commit(); } });
+        inp.addEventListener('blur', commit);
+      }
+    });
+    var ta = document.querySelector('.directive textarea');
+    if (ta) ta.addEventListener('blur', function(){
+      if (state.directive !== ta.value) { state.directive = ta.value; save(); }
+    });
+  }
+
+  render();
+})();
+</script>
