@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.99 | RUNNER-GOV-0820-REQUIREMENTS.md | design-runner-gov-0820 — the running requirements register for John's governance recalibration session (2026-08-20). Updated same-turn as decisions land; the automation tickets are cut from this file. -->
+<!-- DeepBench v7.0.108 | RUNNER-GOV-0820-REQUIREMENTS.md | design-runner-gov-0820 — the running requirements register for John's governance recalibration session (2026-08-20). Updated same-turn as decisions land; the automation tickets are cut from this file. -->
 # Runner Governance Recalibration — Requirements Register
 
 > Session `design-runner-gov-0820` (John + Fable 5, 2026-08-20). John's five session topics:
@@ -193,6 +193,19 @@
   63 open `P9 - Bug Fixes` tickets would outrank every `P10 - Tooling` automation ticket and
   bury the queue John set. The layer retires itself when the automation queue's steps are all
   complete (post-`SES-83` d/e the queue engine's pins express the same thing in data).
+- **B33. Heal engine v1 shipped, as built (SES-89, v7.0.108, 2026-08-20):** groups failed
+  `public.durable_hops` rows into `(capability_slug, error_class)` signatures, fires at ≥3
+  occurrences in a 14-day window, dedups forever on a 12-hex `sig_hash` written into the filed
+  ticket's description, and files `P9 - Bug Fixes` tickets into `backlog_items` with
+  `source_file='heal-engine'`; dry-run by default, `--apply` needs a real cycle id plus an
+  atomically-claimed id block; detection never auto-fixes. **`ai_activity_log` carries no
+  error/status column at all** (34,449 rows, verified live) — `public.durable_hops` (260
+  `failed` rows) is the only queryable failure signal on the platform; regression trends and
+  Vercel logs have no persisted store to query either. Heal tickets are **DB-only** — they land
+  in `backlog_items` with no counterpart in any of the three FEATURES `.md` files — until
+  `SES-83` phases (d)/(e) flip the database to authoritative. **Consequence for any future
+  markdown↔DB reconciliation:** `source_file='heal-engine'` must be added to that script's
+  ignore-list, or a naive orphan sweep will delete every heal-filed ticket as unmatched.
 
 ## D. Ticket ledger
 

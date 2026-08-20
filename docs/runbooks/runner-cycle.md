@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.108 | runbooks/runner-cycle.md | SES-89 — new step 8b, the Heal sweep: `scripts/heal-engine.js` groups `durable_hops` failures into signatures and files evidenced `P9 - Bug Fixes` tickets (dry-run by default; the cycle claims the id block and passes it in). Reads `durable_hops`, NOT `ai_activity_log` — the latter has no error column, verified live. -->
 <!-- DeepBench v7.0.107 | runbooks/runner-cycle.md | SES-83c — step 7 gains the backlog snapshot export: `scripts/export-backlog-snapshot.js` regenerates `docs/backlog/BACKLOG-SNAPSHOT.md` into the ship commit set, so the Supabase board has a git-history + offline restore copy (SES-81's backup gap). Deterministic by construction — an unchanged table writes nothing. -->
 <!-- DeepBench v7.0.106 | runbooks/runner-cycle.md | B31 — step-0 assertion (2) becomes an atomic lease claim on the new public.runner_lease singleton, and every exit path releases it. The read it replaces ("no foreign open cycle") missed a cycle opened 17 seconds earlier and let two cycles build ADM-1 v1 in parallel (e36d4379 vs 4da5a7bd, 2026-08-20). -->
 <!-- DeepBench v7.0.105 | runbooks/runner-cycle.md | B32 — the subscription-token wall gains the same unexpired-budget_override escape the dollar wall already had (new runner_directives.max_tokens + .expires_at, both nullable/fail-closed). John live 2026-08-20: "allow overance for the day and keep sessions going." The weekly rest wall stays non-overridable; the API-dollar wall still needs its own max_usd override. -->
@@ -239,6 +240,49 @@ the verification.
 **8. Blocker sweep #2.** Re-run step 4's probe. If your own ship broke dev: revert-forward
 immediately, restore your before-images, set the cycle `outcome='reverted'` — it counts as a
 Reverse on the ladder.
+
+**8b. Heal sweep (`SES-89`, `v7.0.108`) — detect, file, never fix.** Run the Heal engine over the
+platform's own failure ledger and let anything recurring become a normal queued ticket:
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/heal-engine.js --json
+```
+
+Exit **1** means it found recurring failure signatures that are over threshold and not yet filed.
+Only then, claim an id block of that size in **one** `feature_id_counter` call (SQL:
+`.claude/skills/session-setup/SKILL.md` §3b) and re-run with
+`--apply --cycle-id=<your cycle id> --backlog-ids=LOO-<n>,…`. Exit **0** is "nothing new" — the
+normal, quiet case. Exit **2** is "could not run" (missing env, REST failure, `--apply` without a
+cycle id or ids): note it in the cycle row and never treat it as a pass. List any filed `LOO-` ids
+in the cycle row's notes and on the briefing.
+
+Four things this step deliberately does:
+
+- **It reads `durable_hops`, not `ai_activity_log`.** The `SES-89` ticket said the latter; verified
+  live 2026-08-20, `ai_activity_log` has 34,449 rows and **no status or error column at all**, so
+  there is no error rate in it to read. `durable_hops` is the real ledger: 260 `failed` rows, all
+  260 carrying classifiable error text. Regression trends and Vercel logs were dropped for the same
+  reason — nothing persists them to query.
+- **It never mints its own ticket id.** The atomic block claim is an `UPDATE … RETURNING` with
+  arithmetic, which PostgREST cannot express and this project has no RPC for. The cycle claims the
+  block through the connector and passes it in — that is what keeps CLAUDE.md's atomic-counter rule
+  intact instead of quietly hand-counting.
+- **The INSERT before-image convention starts here.** Every prior `runner_before_images` row records
+  an UPDATE and carries the old row in `row_data`. A heal filing is an INSERT, so there is no prior
+  state: it writes `row_data = NULL`, meaning **"this row did not exist — Reverse is a DELETE of
+  this pk."** The before-image is written first and its success is what authorises the ticket
+  insert (§19v: no before-image, no write).
+- **Feature-owns-its-bugs still binds (§19v).** A failure caused by *this* cycle's own ship is
+  sweep-#2 and revert territory, never a ticket — filing a bug in the thing you just built is a QA
+  failure wearing a ticket's clothes. Only pre-existing signatures are legitimate here.
+
+Heal tickets are `P9 - Bug Fixes` in tier `now`, live in `backlog_items` only (`source_file =
+'heal-engine'`), and ride the normal queue — **the fix runs the full ceremony in a later cycle.**
+Because the markdown backlog files are still authoritative for selection, they will not appear in
+`FEATURES.md` until `SES-83` (d)/(e) flips authority to the table; the snapshot export (step 7)
+gives each one a git-committed copy in the meantime. **`source_file='heal-engine'` must go on the
+ignore-list of any future markdown→DB reconciliation**, or it will delete every heal ticket as an
+orphan.
 
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + named P-class per the Language block above,
