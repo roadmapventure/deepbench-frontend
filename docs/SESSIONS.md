@@ -5,6 +5,38 @@
 
 ---
 
+## cycle-20260820-2006 / S-ADM-1-v1 (v7.0.104, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — ADM-1 minimal v1: dev-only Admin nav → briefing artifact link
+
+**Item shipped:** `ADM-1` (Feature · P2 - Inventive · automation-queue #1), the exact V1 scope John's briefing Accept resolved to: dev-site hamburger + desktop nav gains an "Admin" entry that opens a minimal `/admin` route whose sole content is a prominent link to the Morning Briefing artifact. This closes the "brief page available through deepbench admin screen via vercel link" ask directly, without waiting on HAR-41's data-row flag mechanism — John's Accept 2026-08-20T20:03Z on the ADM-1 gated card is the waiver on record for `.claude/rules/autonomous-surface-changes.md`, permitting a hostname code-constant gate for this v1 only.
+
+**Files (3, additions-only where existing):**
+1. `src/screens/AdminScreen.jsx` — new screen. Wraps in `AppShell`. Body: heading ("Runner & briefing home") + brass-bordered CTA card linking to the briefing URL (opens in new tab; `noopener,noreferrer`) + a small "coming next" note labeling the v1.5 read-only evidence cards as deferred + a hostname-gate footer. Reads the same `IS_ADMIN_HOST` constant exported from `AppShell.jsx`; on mount, when the gate is false, `useEffect` redirects to `/` (defense in depth over the nav-side gate).
+2. `src/AppShell.jsx` — exports new `IS_ADMIN_HOST` constant (localhost + `127.0.0.1` + `-git-dev-*.vercel.app` only; production custom domain `deepbench.roadmapventure.com` and PR previews without `-git-dev-` excluded by construction). Mobile drawer's Platform section gains one Admin button (⚙ icon, `navigate("/admin")`) rendered only when the gate is true, with the active-item styling copied from the drawer's other entries. Desktop header gains one `NavTab` (⚙ Admin) after the Bench tab, same conditional. **Zero deletions** — `git diff --numstat origin/dev` shows +47 / −0.
+3. `src/main.jsx` — one `AdminScreen` import + one `<Route path="/admin" element={<AdminScreen/>} />` line. +6 / −0.
+
+**Discriminating QA (would still pass if the change did nothing? No.):**
+- **Anchor grep pairs, post-edit vs `origin/dev`:**
+  - `Route path=./admin` in `main.jsx`: post=1, baseline=0.
+  - `navigate("/admin")` in `AppShell.jsx`: post=2 (mobile + desktop), baseline=0.
+  - `IS_ADMIN_HOST` in `AppShell.jsx`: post=6, baseline=0. In `AdminScreen.jsx`: post=3.
+  - `AdminScreen` in `main.jsx`: post=3 (comment + import + route), baseline=0.
+- **Zero deletions from existing source files:** `git diff --numstat origin/dev -- src/AppShell.jsx src/main.jsx` → `47 0` / `6 0`. Any accidental refactor would show non-zero deletions.
+- **Build:** `npm install && npm run build` → 929 modules transformed, 0-exit, `dist/index.html` + one bundle. Baseline (LOO-37 kickoff) was 928 — this cycle adds exactly one module (`AdminScreen.jsx`), matching prediction.
+- **Regression suite:** `node --env-file=$SCRATCH/env.local tests/regression/run-all.js` → **29/29 passed**. `$SCRATCH/env.local` was written from `runner_secrets` (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`) under `/tmp/claude-0/…/scratchpad`, `chmod 600`, run, then `rm -f` — never committed, never printed, never left on disk after the run.
+- **Post-ship live probe (step 8):** curl `https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/admin` with the vercel bypass secret + cookie jar — expect 200 and body containing "Runner & briefing home" and the briefing URL. See §Blocker sweep #2 below.
+
+**Proof-type labels:** discriminating anchor-grep pairs = **SEAM** (source-file grep against the pre-edit `origin/dev` blob and the post-edit working copy on the same anchor strings). Regression suite = **SEAM** (repo tests, mostly assembler contracts). Post-ship curl = **LIVE**. Build = **LIVE** (real vite production build; module count crosschecked against LOO-37 baseline).
+
+**Waiver on record + defense in depth.** `.claude/rules/autonomous-surface-changes.md` normally requires new-surface features to ship "inert behind a default-off flag (a data row, `HAR-41` — never a code constant)." HAR-41 doesn't exist yet (it's queue #2 on Next-up). John's Accept 2026-08-20T20:03Z on the ADM-1 gated briefing card explicitly waives this rule for the ADM-1 minimal v1 — hostname code constant is fine here because "easy accessible" is the point. The gate excludes production by construction; if HAR-41 lands later, this cycle's code-constant can be retired without moving the surface. Defense in depth: even when nav is hidden, a shared link to `/admin` from a production URL would render nothing — `AdminScreen`'s own `useEffect` redirects to `/` when `IS_ADMIN_HOST` is false, and the component returns `null` before rendering any DOM.
+
+**Deferred (intentional):** the ADM-1 v1.5 read-only in-app runner-evidence cards (spend vs. budget, cycle history, trust-ladder state) — reading a narrow SELECT-granted view over the `runner_` tables. Decision buttons (Accept/Reverse/Rework, overrides, directives) remain **explicitly excluded** from any in-app surface until real auth ships, per the ADM-1 backlog row's security posture — the hardcoded `CURRENT_USER` in §10 means an in-app button is pressable by anyone with the URL.
+
+**Ledger:** cycle row `4da5a7bd-2276-423a-bec1-01d3aae6916f`; the four undecided items from the prior briefing were harvested (all Accept) with before-images written to `runner_before_images` (2 ladder rows + 4 runner_items rows = 6). Ladder streaks: tooling 1 → 4 (three tooling ships accepted: B17 + SES-83a + SES-83b), invention 0 → 1 (ADM-1 gated card Accept). No promotion this cycle — tooling needs streak 5. Model discipline: this cycle stayed on Opus 5 (the harness re-served `claude-opus-4-7` mid-cycle as fallback) — the work was mechanical enough (one screen, one gate, one route) that no Fable/Sonnet delegation was warranted; ADM-1's classification was already settled by John's Accept.
+
+**Push SHA:** (recorded in the runner_items row after push; see below).
+
+---
+
 ## cycle-20260820-1935 / S-B17-BACKFILL (v7.0.102, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — Runbook gains its step-0 safety assertions + step-9 register B18; ADM-1 filed gated_before_build
 
 **`B17 BACKFILL` (Tooling, P10 - Tooling, doc-only) 🔶 done.** John's queued directive `004dabe4-95f7-4c99-89bc-4ccb4dbc6476` (queued 18:34 UTC), asking that the two step-0 assertions from his accepted `runner_items d1c1ca1b` (SES-78 stale-prompt proposal, accepted 12:51Z) plus register B18 (build briefing cards from the DB's undecided `runner_items`, not in-cycle memory) be codified into `docs/runbooks/runner-cycle.md`. The Accept had spawned no work — B17 is the discovery, this cycle is the fix. Cycle id `f0d7a587-d451-4e80-803d-88596b43e09d`.

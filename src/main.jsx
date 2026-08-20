@@ -1,3 +1,4 @@
+// DeepBench v7.0.104 | main.jsx | ADM-1 minimal v1 — /admin route added, mounts AdminScreen (hostname-gated dev-only via IS_ADMIN_HOST; a non-dev host visit redirects to /). Nav entry added in AppShell.
 // DeepBench v7.0.4 | main.jsx | LAV-1e — homepage flip: / serves LiveAgentViewScreen (transitional), Channel Intelligence moves to /channel-intelligence, /live-agent-view kept. WelcomeSplash untouched.
 // DeepBench v7.0.1 | main.jsx | LAV-1b — one route added: /live-agent-view (Live Agent View). No other change.
 // DeepBench v6.3.137 | main.jsx | CHI-66 — root React error boundary wrapping BrowserRouter
@@ -25,6 +26,7 @@ import TestTeamScreen         from "./screens/TestTeamScreen.jsx";
 import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
 import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
 import LiveAgentViewScreen      from "./screens/LiveAgentViewScreen.jsx"; // FEATURE: LAV-1b
+import AdminScreen              from "./screens/AdminScreen.jsx";           // FEATURE: ADM-1 v1
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -51,6 +53,10 @@ createRoot(document.getElementById("root")).render(
               <Route path="/bench/test"                element={<TestTeamScreen />} />
               <Route path="/bench/:agentId"            element={<PersonnelScreen />} />
               <Route path="/bench/:agentId/teach"      element={<TeachScreen />} />
+              {/* FEATURE: ADM-1 v1 — hostname-gated Admin surface. The screen itself redirects to
+                  / when IS_ADMIN_HOST is false, so a link shared to a production URL cannot render
+                  the Admin body (defense in depth over the nav-side gate in AppShell). */}
+              <Route path="/admin"                     element={<AdminScreen />} />
             </Routes>
           </AnalyzerProvider>
         </FetchProvider>

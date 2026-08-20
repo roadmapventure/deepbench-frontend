@@ -1,3 +1,10 @@
+// DeepBench v7.0.104 | AppShell.jsx | ADM-1 minimal v1 -- adds IS_ADMIN_HOST (hostname code-constant
+// gate; waiver on record 2026-08-20T20:03Z on the ADM-1 gated briefing card, replacing HAR-41 which
+// does not exist yet), one Admin entry in the mobile drawer's Platform section, and one Admin
+// NavTab next to Bench in the desktop nav bar. Both are rendered only when IS_ADMIN_HOST === true
+// (localhost + -git-dev-*.vercel.app; production custom domain excluded by construction). Zero
+// deletions from this file -- additions only, per the standing autonomous-surface-changes rule
+// (which is waived for this v1 but honored otherwise).
 // DeepBench v7.0.77 | AppShell.jsx | HAR-33 -- access-gate popup mounted once at shell level: the
 // gate-intercept side-effect import wraps window.fetch, AccessGateModal renders the refusal. No
 // per-screen change; every screen renders inside this shell.
@@ -27,6 +34,18 @@ import AboutPanel from "./components/AboutPanel.jsx";
 // app reaches the modal below. Observation-only; screens keep their own error handling.
 import "./lib/gate-intercept.js";
 import AccessGateModal from "./components/AccessGateModal.jsx";
+
+// FEATURE: ADM-1 v1 -- hostname code-constant gate for the Admin surface. True on localhost and on
+// the dev-branch Vercel preview only; production custom domain (deepbench.roadmapventure.com) and
+// PR previews (*.vercel.app without -git-dev-) are excluded by construction. This is the code
+// constant .claude/rules/autonomous-surface-changes.md normally forbids -- John's Accept 2026-08-20
+// waives that rule for the ADM-1 minimal v1 specifically; a later cycle can retire this constant
+// in favor of HAR-41's data-row flag mechanism without moving the surface.
+export const IS_ADMIN_HOST =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    /-git-dev-.*\.vercel\.app$/.test(window.location.hostname));
 
 // ── Global style injection ────────────────────────────────────────────────────
 let _styleInjected = false;
@@ -186,6 +205,23 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
                   </div>
                 ))}
                 <div style={{fontFamily:mono,fontSize:8.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"12px 16px 4px"}}>Platform</div>
+                {/* FEATURE: ADM-1 v1 -- Admin nav entry in the mobile drawer's Platform section.
+                    Rendered only when IS_ADMIN_HOST is true (localhost + dev preview). John's
+                    explicit ask 2026-08-20: "brief page available through deepbench admin screen
+                    via vercel link -- easy accessible." */}
+                {IS_ADMIN_HOST && (
+                  <button onClick={()=>{ setMobileMenuOpen(false); navigate("/admin"); }}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",
+                      padding: location.pathname === "/admin" ? "11px 16px 11px 13px" : "11px 16px",
+                      fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",
+                      borderBottom:`1px solid ${T.lineSoft}`,
+                      borderLeft: location.pathname === "/admin" ? `3px solid ${T.brass}` : "3px solid transparent",
+                      background: location.pathname === "/admin" ? "rgba(182,135,58,.09)" : "transparent",
+                      color: location.pathname === "/admin" ? T.navy : T.ink,
+                      fontWeight: location.pathname === "/admin" ? 600 : 400}}>
+                    <span style={{width:18,textAlign:"center",flexShrink:0}}>⚙</span>Admin
+                  </button>
+                )}
                 {showAIPanel && (
                   <button onClick={()=>{ setMobileMenuOpen(false); onAIPanel(); }}
                     style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 16px",fontFamily:body,fontSize:13.5,textAlign:"left",cursor:"pointer",border:"none",borderBottom:`1px solid ${T.lineSoft}`,background:"transparent",color:T.ink}}>
@@ -262,6 +298,17 @@ export function AppHeader({ onHelp, showHelp = true, backLabel, onBack, rightCon
           label="Bench"
           hasBorderLeft={false}
         />
+        {/* FEATURE: ADM-1 v1 -- desktop Admin nav tab, hostname-gated to localhost + dev preview.
+            Sits rightmost so it doesn't disturb the Work-then-Bench muscle memory. */}
+        {IS_ADMIN_HOST && (
+          <NavTab
+            isActive={location.pathname === "/admin"}
+            onClick={()=>navigate("/admin")}
+            icon="⚙"
+            label="Admin"
+            hasBorderLeft={false}
+          />
+        )}
       </div>
       {/* click-outside-to-close backdrop — rendered as a sibling of the transformed nav wrapper above,
           not nested inside it: `transform` on an ancestor creates a new containing block for
