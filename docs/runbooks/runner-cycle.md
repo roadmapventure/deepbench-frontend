@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.107 | runbooks/runner-cycle.md | SES-83c — step 7 gains the backlog snapshot export: `scripts/export-backlog-snapshot.js` regenerates `docs/backlog/BACKLOG-SNAPSHOT.md` into the ship commit set, so the Supabase board has a git-history + offline restore copy (SES-81's backup gap). Deterministic by construction — an unchanged table writes nothing. -->
 <!-- DeepBench v7.0.106 | runbooks/runner-cycle.md | B31 — step-0 assertion (2) becomes an atomic lease claim on the new public.runner_lease singleton, and every exit path releases it. The read it replaces ("no foreign open cycle") missed a cycle opened 17 seconds earlier and let two cycles build ADM-1 v1 in parallel (e36d4379 vs 4da5a7bd, 2026-08-20). -->
 <!-- DeepBench v7.0.105 | runbooks/runner-cycle.md | B32 — the subscription-token wall gains the same unexpired-budget_override escape the dollar wall already had (new runner_directives.max_tokens + .expires_at, both nullable/fail-closed). John live 2026-08-20: "allow overance for the day and keep sessions going." The weekly rest wall stays non-overridable; the API-dollar wall still needs its own max_usd override. -->
 <!-- DeepBench v7.0.102 | runbooks/runner-cycle.md | B17 BACKFILL — codify the two step-0 assertions (stamp match, no foreign open cycle) John accepted 2026-08-20 12:51Z and the step-9 register B18 briefing-rebuild rule (build cards FROM the DB's undecided runner_items, not from in-cycle memory). -->
@@ -218,6 +219,18 @@ the verification.
 - Close-out edits in the same commit set: `FEATURES*.md` row (status + P-class),
   `CLAUDE-STATE.md` (version line + your one-line bullet, keep 3), `docs/SESSIONS.md` entry,
   version-header comments on touched files.
+- **Backlog snapshot (SES-83c, `v7.0.107`) — in the same commit set, every ship:**
+  `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/export-backlog-snapshot.js` (both values
+  from `runner_secrets`, exported as env, never written to a file). It regenerates
+  `docs/backlog/BACKLOG-SNAPSHOT.md` from `public.backlog_items` — the table's only repo-side
+  copy, which is what makes the board restorable and gives its history a git log. The output is
+  deterministic (no timestamp in the body; provenance is the ticket count + a payload `sha256`),
+  so a cycle that changed no ticket prints `unchanged`, writes nothing, and commits nothing —
+  a diff here always means the board actually moved. Exit **2** is "could not run" (missing env,
+  PostgREST error), never a pass: treat it like any other failed check — investigate, and if the
+  export cannot run, say so in the cycle row rather than shipping a silently stale snapshot.
+  `--check` (exit 1 = drift) is the read-only form for a cycle that wants to know whether the
+  snapshot is current without writing it.
 - **One batched push:** `git fetch origin dev && git rebase origin/dev && git push origin
   HEAD:dev`. Never per-artifact pushes.
 

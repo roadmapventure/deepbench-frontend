@@ -1,0 +1,556 @@
+#!/usr/bin/env node
+// DeepBench v7.0.107 | scripts/export-backlog-snapshot.js | SES-83c
+// FEATURE: SES-83c -- exports public.backlog_items to a deterministic, git-committed markdown
+// snapshot so the table has a point-in-time, offline-restorable backup independent of Supabase's
+// own backups.
+//
+// SES-81 found the backup gap this closes: `public.backlog_items` mirrors the markdown backlog
+// files (docs/FEATURES.md and friends -- 553 open tickets as of SES-83c), but the table itself
+// had no history outside Supabase. If a bad migration or a bad UPDATE clobbered rows, the only
+// recovery path was Supabase's own point-in-time restore, which nobody had verified worked and
+// which is invisible to `git log`. This script writes the table's content to a markdown file
+// under version control, so every runner ship point that changes the table leaves a diffable,
+// restorable commit -- the same durability guarantee the markdown backlog files already had,
+// applied to their database mirror.
+//
+// The markdown backlog files remain AUTHORITATIVE. This snapshot is generated FROM the table,
+// not the other way around, and stays a read-only mirror-of-a-mirror until SES-83 phases (d) and
+// (e) land and flip authority to the table itself. Until then: never hand-edit the generated
+// file, never treat it as a second source of truth, and never let its content diverge from what
+// `--check` would report.
+//
+// Losslessness is the actual point of this file existing: a snapshot that cannot be parsed back
+// into exactly the table's contents is not a backup, it's a lossy summary. See the cell-escaping
+// comment on esc()/unesc() below for the exact, documented, round-trippable encoding, and the
+// header block this script writes into the generated file for the human-readable version of the
+// same rules.
+//
+// Usage:
+//   node scripts/export-backlog-snapshot.js [--worktree=<path>] [--out=<path>] [--check] [--json]
+//
+//   --worktree=<path>  Root to resolve --out against and to write into. Default process.cwd(),
+//                       matching the other scripts/check-*.js tools in this repo.
+//   --out=<path>        Output file. Default docs/backlog/BACKLOG-SNAPSHOT.md relative to
+//                       --worktree (or used verbatim if absolute).
+//   --check              Do not write. Fetch the table, build the document it would produce, and
+//                       compare against what's already on disk. Reports drift; touches nothing.
+//   --json                Print a single-line machine-readable JSON summary instead of prose.
+//
+// Exit codes:
+//   0  wrote the snapshot, or its content was already unchanged, or --check found no drift
+//   1  --check found drift -- the file on disk is stale or missing
+//   2  cannot run -- a required env var is missing, the Supabase REST call failed, or its
+//      response could not be parsed. Exit 2 is deliberately distinct from exit 1: an unrunnable
+//      check must never be reported as a pass, and must not be confused with a real "the
+//      snapshot is stale" failure either.
+//
+// Env (read from process.env only -- never hardcoded, never printed):
+//   SUPABASE_URL           Project REST base, e.g. https://xxxx.supabase.co
+//   SUPABASE_SERVICE_KEY   Service-role key. Required because backlog_items' RLS/grants are not
+//                          guaranteed to expose every tracked field to the anon key, and this
+//                          script's whole purpose is a complete, lossless backup.
+//
+// Pure helpers (esc, unesc, buildDocument, canonicalPayload) are exported so a QA harness can
+// import this module and round-trip a generated file WITHOUT network access. The network/CLI
+// path only runs when this file is executed directly (see the pathToFileURL guard at the
+// bottom) -- importing the module for its exports must never hit Supabase or touch disk.
+
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { pathToFileURL } from "url";
+
+// ---------------------------------------------------------------------------
+// CLI arg parsing -- same `arg(name, fallback)` shape as the repo's other
+// scripts/check-*.js tools, for `--flag=value` style options.
+// ---------------------------------------------------------------------------
+
+function arg(name, fallback) {
+  const prefix = `--${name}=`;
+  const hit = process.argv.find(a => a.startsWith(prefix));
+  return hit ? hit.slice(prefix.length) : fallback;
+}
+
+const WORKTREE = arg("worktree", process.cwd());
+const JSON_OUT = process.argv.includes("--json");
+
+// The 11 tracked fields, in the fixed order used both for the exported markdown
+// table's columns and for canonicalPayload()'s hash input. `id`, `created_at`,
+// and `updated_at` are deliberately excluded -- they are row churn (surrogate
+// key, timestamps), not backlog content, and including them would make the
+// snapshot change on every fetch even when nothing about the ticket itself
+// changed, defeating the "byte-identical across unchanged-table runs" goal.
+const COLUMNS = [
+  "backlog_id",
+  "tier",
+  "type",
+  "priority_class",
+  "title",
+  "description",
+  "status",
+  "source_file",
+  "session_ref",
+  "harvest_link",
+  "row_ordinal",
+];
+
+const TIER_ORDER = ["now", "next", "later"];
+const PAGE_SIZE = 500;
+const MAX_PAGES = 200; // hard ceiling -- see fetchAllTickets() below
+
+// ---------------------------------------------------------------------------
+// Cell escaping -- the load-bearing part of this file. esc()/unesc() together
+// form a lossless, invertible encoding for pipe-table cells. Order matters:
+// backslash is escaped FIRST, then pipe, then newline. Escaping backslash
+// first guarantees that every backslash unesc() ever encounters is the FIRST
+// character of exactly one of three two-character sequences -- \\, \|, \n --
+// never a bare backslash and never the second character of some other
+// sequence. That is what makes a single left-to-right regex pass sufficient
+// to unescape correctly, with no lookahead and no ambiguity, regardless of
+// what backslashes, pipes, or newlines were actually in the source text.
+//
+// NULL vs empty string: PostgREST returns SQL NULL as JS `null`, and this
+// table can (and does) have both NULL and empty-string values in nullable
+// text columns, so the encoding must distinguish them:
+//   - An EMPTY cell (zero characters between the pipes) means the stored
+//     value is SQL NULL.
+//   - A stored value that is ITSELF the empty string is written as the
+//     literal two-character marker `\e` (backslash, e).
+// `\e` can never be produced by esc() for any other input: every backslash
+// esc() emits is immediately followed by another `\`, a `|`, or an `n` --
+// never a bare `e` -- so `\e` is unambiguous as the sole empty-string marker
+// and unesc() can special-case it before running the general unescape pass.
+//
+// PADDING, and why it is a rule rather than cosmetics (found while reviewing
+// this file against the live table): 4 of the 553 tickets store a value with
+// its OWN leading or trailing whitespace. A reader that recovered cells with
+// `.trim()` would silently eat exactly those 4 values' edges, so the snapshot
+// would be lossy in precisely the cases nobody would notice. The rule is
+// therefore exact: the writer adds EXACTLY ONE space of padding on each side
+// of every escaped cell, and the reader removes EXACTLY ONE character from
+// each side -- never a trim. A value that itself starts with a space is
+// written with two leading spaces and comes back with one. Readability and
+// losslessness both hold, and neither depends on the data being well-behaved.
+// ---------------------------------------------------------------------------
+
+export function esc(value) {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (s === "") return "\\e";
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, "\\n");
+}
+
+export function unesc(cell) {
+  if (cell === "") return null;
+  if (cell === "\\e") return "";
+  return cell.replace(/\\\\|\\\||\\n/g, m => {
+    if (m === "\\\\") return "\\";
+    if (m === "\\|") return "|";
+    return "\n"; // m === "\\n"
+  });
+}
+
+// ---------------------------------------------------------------------------
+// parseDocument() -- the inverse of buildDocument(). A backup format nobody can
+// read back is a summary, not a backup, so the restore path lives here in the
+// same file as the writer and is exercised by QA: parse the generated file,
+// compare every field against a fresh fetch, and any drift between writer and
+// reader shows up immediately instead of on the day the table is gone.
+//
+// Section headings carry tier + source_file; the row itself carries the other
+// nine fields. Cells are separated by UNESCAPED pipes -- an in-value pipe is
+// always `\|` -- and every delimiter is surrounded by the one-space padding the
+// writer adds, so a delimiter can never be confused with escaped content.
+// Exactly one padding character is removed from each side (never a trim: see
+// the padding note above -- 4 live tickets carry their own edge whitespace).
+// ---------------------------------------------------------------------------
+
+const HEADING_RE = /^## tier `([^`]*)` — `([^`]*)`/;
+const ROW_FIELDS = [
+  "row_ordinal",
+  "backlog_id",
+  "type",
+  "priority_class",
+  "title",
+  "status",
+  "session_ref",
+  "harvest_link",
+  "description",
+];
+
+export function parseDocument(text) {
+  const tickets = [];
+  let tier = null;
+  let source_file = null;
+
+  for (const line of text.split("\n")) {
+    const heading = HEADING_RE.exec(line);
+    if (heading) {
+      tier = heading[1];
+      source_file = heading[2];
+      continue;
+    }
+    if (tier === null) continue;                       // prose above the first section
+    if (!line.startsWith("|")) continue;
+    if (line.startsWith("|---")) continue;             // separator
+    if (line.startsWith("| # | ID |")) continue;       // column header
+
+    const inner = line.slice(1, -1);                   // drop the outer pipes
+    const cells = inner.split(/(?<!\\)\|/).map(c => c.slice(1, -1));
+    if (cells.length !== ROW_FIELDS.length) {
+      throw new Error(
+        `parseDocument: expected ${ROW_FIELDS.length} cells, got ${cells.length} in: ${line.slice(0, 120)}`
+      );
+    }
+
+    const ticket = { tier, source_file };
+    ROW_FIELDS.forEach((field, i) => { ticket[field] = unesc(cells[i]); });
+    // row_ordinal is the join key and is numeric in the table; everything else
+    // stays text exactly as stored.
+    ticket.row_ordinal = ticket.row_ordinal === null ? null : Number(ticket.row_ordinal);
+    tickets.push(ticket);
+  }
+
+  return tickets;
+}
+
+// ---------------------------------------------------------------------------
+// Grouping/ordering -- one `##` section per (tier, source_file), tiers in the
+// fixed order now/next/later (any unknown tier sorts last, alphabetically
+// among unknown tiers), then by source_file, then rows within a group by
+// row_ordinal ascending (numeric). This function is the single source of
+// truth for "emit order" -- both buildDocument() and canonicalPayload() call
+// it, so the markdown table order and the hashed payload order always agree.
+// ---------------------------------------------------------------------------
+
+function tierRank(tier) {
+  const idx = TIER_ORDER.indexOf(tier);
+  return idx === -1 ? TIER_ORDER.length : idx;
+}
+
+function groupTickets(tickets) {
+  const groups = new Map(); // key: `${tier} ${source_file}` -> rows[]
+  for (const t of tickets) {
+    const key = `${t.tier} ${t.source_file}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+
+  const groupList = [...groups.entries()].map(([key, rows]) => {
+    const [tier, source_file] = key.split(" ");
+    const sorted = [...rows].sort((a, b) => Number(a.row_ordinal) - Number(b.row_ordinal));
+    return { tier, source_file, rows: sorted };
+  });
+
+  groupList.sort((a, b) => {
+    const ra = tierRank(a.tier);
+    const rb = tierRank(b.tier);
+    if (ra !== rb) return ra - rb;
+    // Both known (same tier, ra===rb<TIER_ORDER.length) or both unknown.
+    if (a.tier !== b.tier) return a.tier < b.tier ? -1 : 1; // unknown tiers: alphabetical
+    return a.source_file < b.source_file ? -1 : a.source_file > b.source_file ? 1 : 0;
+  });
+
+  return groupList;
+}
+
+function flattenOrdered(tickets) {
+  const groups = groupTickets(tickets);
+  return groups.flatMap(g => g.rows);
+}
+
+// ---------------------------------------------------------------------------
+// canonicalPayload() -- the hash input. A canonical JSON serialization of the
+// exported tickets as an array of arrays in COLUMNS order, in emitted row
+// order (grouped/sorted per groupTickets() above). Hashing this instead of
+// the rendered markdown means the hash (and therefore whether the snapshot
+// counts as "changed") survives purely cosmetic markdown formatting changes,
+// and can be computed and compared directly against a fresh DB fetch without
+// ever building the document.
+// ---------------------------------------------------------------------------
+
+export function canonicalPayload(tickets) {
+  const ordered = flattenOrdered(tickets);
+  const rows = ordered.map(t => COLUMNS.map(c => (t[c] === undefined ? null : t[c])));
+  return JSON.stringify(rows);
+}
+
+function sha256Hex(s) {
+  return crypto.createHash("sha256").update(s, "utf8").digest("hex");
+}
+
+// ---------------------------------------------------------------------------
+// buildDocument() -- the pure renderer. No network, no fs. Deterministic:
+// given the same tickets array (in any fetch order), always produces the
+// same bytes -- no wall-clock timestamp anywhere in the output. That
+// determinism is the entire point: two runs against an unchanged table must
+// be byte-identical, so the ship-point commits that touch this file actually
+// carry meaning (a real content change), not fetch-order or timestamp noise.
+// ---------------------------------------------------------------------------
+
+export function buildDocument(tickets) {
+  const groups = groupTickets(tickets);
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const hash = sha256Hex(canonicalPayload(tickets));
+
+  const lines = [];
+  lines.push(
+    "<!-- DeepBench | docs/backlog/BACKLOG-SNAPSHOT.md | GENERATED FILE -- do not edit by hand. Regenerate: node scripts/export-backlog-snapshot.js -->"
+  );
+  lines.push("");
+  lines.push("# Backlog snapshot — `public.backlog_items`");
+  lines.push("");
+  lines.push(
+    "This file is generated by `scripts/export-backlog-snapshot.js` from the Supabase table"
+  );
+  lines.push(
+    "`public.backlog_items` -- it is NOT hand-maintained and must not be edited directly. The"
+  );
+  lines.push(
+    "markdown backlog files under `docs/` (`FEATURES.md` and its siblings) remain the"
+  );
+  lines.push(
+    "authoritative source of truth for backlog content until SES-83 phases (d) and (e) land and"
+  );
+  lines.push(
+    "flip that authority to the table itself. Until then, this snapshot exists purely as the"
+  );
+  lines.push(
+    "git-history and offline-restore copy of the table's contents -- the backup gap SES-81"
+  );
+  lines.push(
+    "identified, where the table had no point-in-time recovery path independent of Supabase's own"
+  );
+  lines.push(
+    "backups. Every runner ship point regenerates this file and commits it if changed, so"
+  );
+  lines.push("`git log` on this path is a durable history of the table's state across sessions.");
+  lines.push("");
+  lines.push(`**Tickets:** ${total} · **Payload sha256:** \`${hash}\``);
+  lines.push("");
+  lines.push(
+    "Cell escaping (applied in this order so it is mechanically invertible): a literal backslash"
+  );
+  lines.push(
+    "`\\` becomes `\\\\`, a literal pipe `|` becomes `\\|`, and a literal newline becomes the"
+  );
+  lines.push(
+    "two-character sequence `\\n`. Unescaping reverses this in a single left-to-right pass over"
+  );
+  lines.push(
+    "those same three sequences -- escaping backslash first guarantees no bare `\\` can appear in"
+  );
+  lines.push(
+    "an escaped cell except as the first character of `\\\\`, `\\|`, or `\\n`, so the pass is"
+  );
+  lines.push(
+    "unambiguous. An EMPTY cell (zero characters) means the stored value is SQL `NULL`. A stored"
+  );
+  lines.push(
+    "value that is itself the empty string is written as the literal two-character marker `\\e`"
+  );
+  lines.push(
+    "-- escaping can never produce `\\e` on its own (every backslash it emits is followed only by"
+  );
+  lines.push("`\\`, `|`, or `n`), so `\\e` is unambiguous as the empty-string marker.");
+  lines.push("");
+  lines.push(
+    "Every cell is padded with EXACTLY ONE space on each side, and a reader removes exactly one"
+  );
+  lines.push(
+    "character from each side rather than trimming -- four tickets store values with their own"
+  );
+  lines.push(
+    "leading or trailing whitespace, and a `.trim()` reader would silently eat precisely those."
+  );
+  lines.push(
+    "`tier` and `source_file` come from each section heading; the other nine fields come from the"
+  );
+  lines.push(
+    "row. `parseDocument()` in the generating script is the reference reader and restores this"
+  );
+  lines.push("file to the exact table contents.");
+  lines.push("");
+
+  for (const g of groups) {
+    const count = g.rows.length;
+    lines.push(`## tier \`${g.tier}\` — \`${g.source_file}\` (${count} ticket${count === 1 ? "" : "s"})`);
+    lines.push("");
+    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description |");
+    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|");
+    for (const t of g.rows) {
+      lines.push(
+        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} |`
+      );
+    }
+    lines.push("");
+  }
+
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  return lines.join("\n") + "\n";
+}
+
+// ---------------------------------------------------------------------------
+// I/O -- PostgREST fetch with pagination.
+// ---------------------------------------------------------------------------
+
+// PostgREST silently caps the rows a single request returns at its configured
+// max-rows setting -- a table that grows past that cap does not error, it just
+// truncates the response, which for a backup script means silently dropping
+// tickets from the backup with no signal anything went wrong. So this always
+// pages in blocks of PAGE_SIZE and only stops on a SHORT page (fewer rows
+// returned than requested), never on a fixed row-count assumption. MAX_PAGES
+// is a hard ceiling against an infinite loop (e.g. a broken `offset` that
+// never converges) -- hitting it is treated as a failure, not a truncated
+// success, because a backup script that can silently truncate is worse than
+// one that refuses to run.
+async function fetchAllTickets(supabaseUrl, supabaseKey) {
+  const cols = COLUMNS.join(",");
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  const base = supabaseUrl.replace(/\/+$/, "");
+
+  let all = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const offset = page * PAGE_SIZE;
+    const url = `${base}/rest/v1/backlog_items?select=${cols}&order=source_file.asc,row_ordinal.asc&limit=${PAGE_SIZE}&offset=${offset}`;
+
+    let res;
+    try {
+      res = await fetch(url, { headers });
+    } catch (e) {
+      return { error: `could not reach the Supabase REST endpoint: ${e.message}` };
+    }
+
+    if (!res.ok) {
+      let body = "";
+      try {
+        body = await res.text();
+      } catch {
+        // best effort -- body may be unreadable, that's fine
+      }
+      return { error: `Supabase REST returned HTTP ${res.status} ${res.statusText}: ${body}` };
+    }
+
+    let body;
+    try {
+      body = await res.json();
+    } catch (e) {
+      return { error: `Supabase REST returned unparseable JSON: ${e.message}` };
+    }
+
+    if (!Array.isArray(body)) {
+      return { error: "Supabase REST returned a non-array response for a select query (unexpected shape)" };
+    }
+
+    all = all.concat(body);
+    if (body.length < PAGE_SIZE) {
+      return { tickets: all };
+    }
+  }
+
+  return {
+    error: `hit the hard page ceiling (${MAX_PAGES} pages / ${MAX_PAGES * PAGE_SIZE} rows) without a short page -- refusing to assume the table is fully paginated, since that would silently truncate the backup`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+function fail(code, message) {
+  if (JSON_OUT) {
+    console.log(JSON.stringify({ ok: false, exitCode: code, error: message }));
+  } else {
+    console.error(message);
+  }
+  process.exit(code);
+}
+
+function done(code, summary, prose) {
+  if (JSON_OUT) {
+    console.log(JSON.stringify({ ok: true, exitCode: code, ...summary }));
+  } else {
+    console.log(prose);
+  }
+  process.exit(code);
+}
+
+async function main() {
+  const outArg = arg("out", "docs/backlog/BACKLOG-SNAPSHOT.md");
+  const outPath = path.isAbsolute(outArg) ? outArg : path.join(WORKTREE, outArg);
+  const CHECK = process.argv.includes("--check");
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    const missing = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY"].filter(Boolean).join(", ");
+    return fail(
+      2,
+      `export-backlog-snapshot: missing required env var(s): ${missing}. Exiting 2 (cannot run) -- this is NOT a pass, the table was never fetched.`
+    );
+  }
+
+  const { tickets, error } = await fetchAllTickets(supabaseUrl, supabaseKey);
+  if (error) {
+    return fail(2, `export-backlog-snapshot: ${error}\nExiting 2 (cannot run) -- this is NOT a pass, the table was never fully fetched.`);
+  }
+
+  const doc = buildDocument(tickets);
+  const groups = groupTickets(tickets).length;
+  const hash = sha256Hex(canonicalPayload(tickets));
+
+  let existing = null;
+  let existed = true;
+  try {
+    existing = fs.readFileSync(outPath, "utf8");
+  } catch {
+    existed = false;
+  }
+
+  const changed = existing !== doc;
+
+  if (CHECK) {
+    if (!changed) {
+      return done(
+        0,
+        { mode: "check", tickets: tickets.length, groups, sha256: hash, changed: false, outPath },
+        `export-backlog-snapshot --check: no drift -- ${outPath} matches the DB (${tickets.length} tickets, sha256 ${hash}).`
+      );
+    }
+    return done(
+      1,
+      { mode: "check", tickets: tickets.length, groups, sha256: hash, changed: true, outPath },
+      `export-backlog-snapshot --check: DRIFT -- ${outPath} ${existed ? "does not match" : "is missing; DB currently has"} ${tickets.length} tickets (sha256 ${hash}). Regenerate with: node scripts/export-backlog-snapshot.js`
+    );
+  }
+
+  if (!changed) {
+    return done(
+      0,
+      { mode: "write", tickets: tickets.length, groups, sha256: hash, changed: false, outPath },
+      `export-backlog-snapshot: unchanged -- ${outPath} already matches the DB (${tickets.length} tickets, sha256 ${hash}). Not touching the file.`
+    );
+  }
+
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, doc);
+  return done(
+    0,
+    { mode: "write", tickets: tickets.length, groups, sha256: hash, changed: true, created: !existed, outPath },
+    `export-backlog-snapshot: ${existed ? "updated" : "created"} ${outPath} -- ${tickets.length} tickets across ${groups} group(s), sha256 ${hash}.`
+  );
+}
+
+// Only run the network/CLI path when invoked directly -- a QA harness imports
+// this module for esc/unesc/buildDocument/canonicalPayload and must be able
+// to do so without triggering a Supabase fetch or a disk write. pathToFileURL,
+// not a hand-built `file://${path}` string, for the same reason
+// check-deploy-current.js uses it: a Windows path parses wrong as a bare
+// `file://` string, which would silently break this guard on John's machine.
+const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  main();
+}
