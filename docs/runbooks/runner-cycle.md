@@ -147,7 +147,8 @@ latest reading + calibration; the reading-entry card (three percentages + save) 
 every rebuild, and so must the **"Next up" section — the queue's top five** (queue #, ticket
 ID, named class, short title, gated flag; computed from the selection rules until `SES-86`'s
 queue numbers are real) so John can see what upcoming cycles will do and run the schedule
-early with foreknowledge (register B25). Mark the directive `done`. Rebuild the briefing page
+early with foreknowledge (register B25), and the **`now`-tier census** — count of open backlog
+tickets remaining in tier `now` per named class, plus the unclassed remainder (register B26). Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
 manually.)* End the session cleanly.

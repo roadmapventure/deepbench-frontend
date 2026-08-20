@@ -137,6 +137,10 @@
   claude.ai/code/routines) consumes queue #1 **without shifting the fixed clock schedule**;
   the next scheduled fire takes whatever is then next. Overlap guard (B17 backfill) protects
   the race. Until `SES-86`, the preview is computed at rebuild; after, it is rows 1–5.
+- **B26. Briefing shows the `now`-tier ticket census (John, 2026-08-20):** a count of all open
+  backlog tickets remaining in tier `now`, broken down by named priority class (one line per
+  class, named form), plus the unclassed remainder until `SES-85` retires it. Rebuilt from the
+  data every cycle.
 - **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
   titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
   it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import
