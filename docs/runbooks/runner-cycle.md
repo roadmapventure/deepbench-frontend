@@ -85,7 +85,11 @@ mission, mark it `in_progress`. Else the backlog: `FEATURES.md` (now) → `FEATU
 `FEATURES-LATER.md`, `P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
 class: beta-marked first, then newest filed, then oldest (John, 2026-08-20). **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
-your reasoning, and the cycle ends there.** One item per cycle, never more.
+your reasoning, and the cycle ends there.** One item per cycle, never more. **The moment the
+pick is made, rename this session** to `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) —
+import NEXT+LATER") so John's runs list shows the work at a glance; on a wall-stop, rename to
+`"did not run — <wall>"` back at step 3. No title mechanism available → note it in the cycle
+row (register B22).
 
 **6. Full ceremony — no shortcuts, you earn no exemption.** Read the item's backlog row, the
 governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will

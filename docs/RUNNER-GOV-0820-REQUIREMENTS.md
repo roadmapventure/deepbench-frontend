@@ -120,6 +120,13 @@
   owner-authenticated Artifact until Clerk (unchanged).
 - **B20. dev→main stays John's forever** — full automation ends at dev, stated as a boundary,
   not a gap.
+- **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
+  titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
+  it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import
+  NEXT+LATER"), or `"did not run — <wall>"` on a wall-stop — so the routine's runs list at
+  claude.ai/code/routines shows what each run is doing at a glance. If no title mechanism is
+  available in the cloud environment, the cycle notes that in its ledger row (first cycle
+  verifies, same pattern as B21).
 - **B21. Model choice inside automated cycles (John, 2026-08-20):** the Opus 5 parent cycle
   orchestrates, codes, QAs, ships — and delegates by task shape via the Agent tool:
   judgment-dense steps (kickoff design for P1–P5, root-cause diagnosis, invention scoring,
