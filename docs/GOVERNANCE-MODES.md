@@ -15,7 +15,7 @@ John's judgment is exercised** — during the work, the morning after on evidenc
 | Mode | Judgment point | Selection | Status |
 |---|---|---|---|
 | **Manual Design & Build** | During the work — design conversation, walkthrough gates, kickoff docs, John's approvals live | **Default.** A human in the chat *is* the selection; no session is ever asked "which mode?" | Active (today's process) |
-| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner, which stamps its identity into the session's inflight file. No stamp → Manual Design & Build, and the session stops at its first gate. | **Unselectable** until the runner ships (`SES-78`) and John approves it |
+| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live, after two supervised cycles: one correct fail-closed, one full-path ship). Cadence: every 3h; pause = disable the routine at claude.ai/code/routines |
 | **"Open Workspace"** *(placeholder name — John's to set, Tier 3)* | None — non-DeepBench work (research, documents, anything John runs as Claude Desktop projects today) | John says so at session start | Defined, available |
 
 ## Shared invariants — identical in every DeepBench mode

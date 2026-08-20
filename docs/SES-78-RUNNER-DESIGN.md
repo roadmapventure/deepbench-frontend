@@ -1,6 +1,8 @@
 <!-- DeepBench v7.0.93 | SES-78-RUNNER-DESIGN.md | S-SES-78-design — the Automated-mode runner design record; 78b/78c/78d kickoffs execute against this. -->
 # SES-78 — The Automated-Mode Runner: Design Record
 
+> **✅ SHIPPED AND LIVE (v7.0.97, 2026-08-20, John approved go-live).** All four phases done; the routine `deepbench-runner` runs every 3h under the Automated stamp. This record is now history + reference; the operative docs are `docs/GOVERNANCE-MODES.md`, `docs/runbooks/runner-cycle.md`, and `docs/runbooks/briefing-page.md`.
+
 > Design session `design-ses-78-0819` (John, 2026-08-19, model Fable 5 — same conversation as
 > the §19v discovery). Governing constraints: `docs/ARCHITECTURE.md` §19v "Invariants for the
 > runner build" + `docs/GOVERNANCE-MODES.md`. This file is the settled design; each phase's

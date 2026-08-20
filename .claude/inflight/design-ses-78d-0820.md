@@ -1,1 +1,0 @@
-# design-ses-78d-0820 — DESIGN session on SES-78d (egress/QA decision, permission allowlist, VERCEL_TOKEN, full-path supervised re-run, go-live gate). Same conversation. Model: Fable 5. Started 2026-08-20.

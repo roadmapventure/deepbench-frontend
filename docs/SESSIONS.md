@@ -5,6 +5,14 @@
 
 ---
 
+## design-ses-78d-0820 / S-SES-78d (v7.0.97, 2026-08-20, worktree `design-ses-78d-0820`, model Fable 5) — GO-LIVE: John approved the runner; the Automated governance mode is live
+
+**`SES-78` (Tooling, P9) ✅ done, all four phases, row archived.** 78d closed the supervised-run findings register with verification at every step: (1) **egress** — verified via claude-code-guide against current docs that cloud environments support custom network allowlists; John created the `deepbench-runner` environment (dev host + supabase.co + api.vercel.com + defaults); run 2 proved it (dev root 200, seam tests against real Supabase, deploy gate). (2) **permission stalls** — `.claude/` paths are hard-coded protected (not configurable), so the runbook drops the inflight file for cloud cycles (redundant there: exclusive clone + `runner_cycles` row is the liveness signal); run 2 had zero stalls vs run 1's two. (3) **`VERCEL_TOKEN`** — John created it, handed over via `.env.local` (never in chat), vaulted to `runner_secrets`, verified live: `check-deploy-current.js` exit 0, dev serving `f72faf7`. (4) outcome convention held.
+
+**The full-path supervised cycle (run 2, Opus 5, John watching) shipped `LOO-37` itself** — v7.0.96, `f72faf7`: kickoff doc, one-file fix, build green, regression suite, a seam proof with a **red control** (stashed its own fix to prove the test fails without it), before-imaged + cleaned QA fixtures, batched single push, ledger rows, briefing republished from the cloud (after John allowed the Artifact tool — now pre-approved in the routine). Only deploy-quota was skipped (token vaulted after).
+
+**Go-live (John's explicit approval, 2026-08-20):** routine renamed `deepbench-runner`, cron every 3h (server-assigned minute :23), enabled, Opus 5, Artifact in allowed tools, standing Automated prompt with the stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`. `GOVERNANCE-MODES.md` flipped: Automated = LIVE, selection by stamp, pause = disable the routine. First scheduled fire 06:23Z 2026-08-20. Dev→main remains John's alone; the briefing page is his judgment surface (Accept / Reverse / Rework).
+
 ## cycle-supervised-20260820 / S-LOO-37 (v7.0.96, 2026-08-20, cloud runner cycle `SES-78D-SUPERVISED-20260820`, model Opus 5, John watching live) — The runner's first end-to-end item: full path, real ship, discriminating QA
 
 **Run 2 of the supervised proof — NOT Automated mode** (`docs/GOVERNANCE-MODES.md` keeps Automated structurally unselectable until `SES-78d` closes and John signs off). Cycle row `runner_cycles.42dfe8a9-8cb0-4c95-9a5b-5b63a8995f37`; exclusive cloud clone, branch `session/cycle-supervised-20260820` off `origin/dev@9c54288`; no inflight file (runbook step 0's cloud-cycle exception, added after run 1's two permission stalls — **it worked: zero stalls this run**).
