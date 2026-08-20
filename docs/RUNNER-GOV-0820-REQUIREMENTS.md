@@ -120,6 +120,23 @@
   owner-authenticated Artifact until Clerk (unchanged).
 - **B20. dev→main stays John's forever** — full automation ends at dev, stated as a boundary,
   not a gap.
+- **B23. Gated re-entry is through the queue (John, 2026-08-20):** a gated/proposal card's
+  **Accept re-enters the ticket at queue #1** — a system pin, timestamped by the tap, same
+  machinery as "move to 1"; the recompute renumbers everything beneath sequentially. Multiple
+  Accepts in one sitting stack at the top in tap order; an explicit "move to 1" still outranks
+  (latest word wins). Silence parks the card forever — no timer, no retry. Accept authorizes
+  that one item once; the gate never learns itself open.
+- **B24. A gated card never wastes the cycle (John, 2026-08-20):** filing a gated-before-build
+  or removal-proposed card is bookkeeping, not a build — the cycle then drops to the next
+  available queued ticket and runs it on the same schedule. Still exactly ONE build per cycle;
+  carded tickets go pending immediately so no cycle re-trips on them. Only walls and blockers
+  legitimately end a cycle build-less.
+- **B25. "Next up" visibility + run-early (John, 2026-08-20):** the briefing shows the queue's
+  **top five** (queue #, ticket ID, named class, short title, gated flag) so John can see what
+  upcoming cycles will do and choose to run the schedule early. Run-now (mobile app /
+  claude.ai/code/routines) consumes queue #1 **without shifting the fixed clock schedule**;
+  the next scheduled fire takes whatever is then next. Overlap guard (B17 backfill) protects
+  the race. Until `SES-86`, the preview is computed at rebuild; after, it is rows 1–5.
 - **B22. Run titles name the work (John, 2026-08-20 — verified live: all runs today are
   titled "⚡ deepbench-runner" with no ticket visible):** the moment a cycle picks its work,
   it renames its own session — `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) — import

@@ -85,7 +85,11 @@ mission, mark it `in_progress`. Else the backlog: `FEATURES.md` (now) → `FEATU
 `FEATURES-LATER.md`, `P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
 class: beta-marked first, then newest filed, then oldest (John, 2026-08-20). **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
-your reasoning, and the cycle ends there.** One item per cycle, never more. **The moment the
+your reasoning — then the ticket goes pending and you DROP TO THE NEXT available queued
+ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
+over one; only walls and blockers end a cycle build-less).** Exactly ONE build per cycle,
+never more. A gated card's later Accept re-enters that ticket at queue #1 (register B23 —
+tap-order stacking, recompute renumbers beneath). **The moment the
 pick is made, rename this session** to `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) —
 import NEXT+LATER") so John's runs list shows the work at a glance; on a wall-stop, rename to
 `"did not run — <wall>"` back at step 3. No title mechanism available → note it in the cycle
@@ -140,7 +144,10 @@ any, cost split, model). Close `runner_cycles` with the two cost tracks (John, 2
 labeled estimated; never invented**), plus outcome and push SHA. The briefing's budget cards
 show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
 latest reading + calibration; the reading-entry card (three percentages + save) must be on
-every rebuild. Mark the directive `done`. Rebuild the briefing page
+every rebuild, and so must the **"Next up" section — the queue's top five** (queue #, ticket
+ID, named class, short title, gated flag; computed from the selection rules until `SES-86`'s
+queue numbers are real) so John can see what upcoming cycles will do and run the schedule
+early with foreknowledge (register B25). Mark the directive `done`. Rebuild the briefing page
 per `docs/runbooks/briefing-page.md` (harvest before rebuild; republish to the same URL).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
 manually.)* End the session cleanly.
