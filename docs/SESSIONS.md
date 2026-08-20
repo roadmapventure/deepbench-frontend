@@ -5,6 +5,41 @@
 
 ---
 
+## cycle-20260820-1910 / S-SES-83b (v7.0.101, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — Backlog mirror covers all three OPEN files: 553 tickets byte-for-byte, post-renumber
+
+**`SES-83` (Tooling, P10 - Tooling) phase (b) 🔶 done — phase c queued, d/e gated.** John's queued directive `5e4bc577-0437-4707-8c5d-a093b56798a6` (`design-runner-gov-0820`, 18:02 UTC, carrying amendments [1]/[2]/[3]) sat top of the queue at cycle open; the runner picked it. Cycle id `164a1231-68dc-4f01-9cac-8469f5a8e96c`.
+
+**What shipped.** `public.backlog_items` now mirrors all three OPEN backlog files:
+- **`docs/FEATURES.md`** — 283 tickets (`tier='now'`); 277 already imported by phase (a) were UPSERTED to bring them byte-for-byte against the current file after commit `573bb84`'s P1–P10 renumber (priority_class strings rewritten across P9/P10, previously P8/P9); 6 new tickets filed between `e553adb` and HEAD inserted at the tail.
+- **`docs/FEATURES-NEXT.md`** — 23 tickets, all open (`tier='next'`).
+- **`docs/FEATURES-LATER.md`** — 247 tickets, all open (`tier='later'`).
+- **`docs/FEATURES-ARCHIVE.md`** — deliberately NOT imported (amendment [2] — history, never maintained).
+
+Total: **553 tickets**. Amendment [3] applied — the ledger, the kickoff, this entry, and the state file say "backlog tickets" now, not "rows".
+
+**Parser widened for phase (b) specifics.**
+- **Header-aware column detection.** FEATURES-LATER.md uses a 4-column layout `| ID | Feature | Status | Session |` for most sections; a single section at file end (DATA MODEL — DAT) uses the 5-column layout with Type. The parser tracks the current header row and adjusts `type` extraction accordingly.
+- **Broadened P-class detector.** Phase (a) matched `**P<n> - <name>.**` as the pure marker at the head of the leading bold. Post-renumber, one ticket (`ADM-1`) packs extra text into its leading bold — `**P2 - Inventive → promoted to AUTOMATION QUEUE #1 (John, 2026-08-20): "…"**` — closed by `**` at the far end, no `.**` after "Inventive." Detector now walks every bold in the feature cell, tests whether its content starts with any of the 11 canonical labels (P1–P10 plus the `P9 - Bug Fixes · FLAGGED` variant), takes the first hit. Handles pure and packed markers identically.
+- **Bare `—` status** (2 tickets: `MI-05` folded into `AG-22`; `SH-09`) mapped to `missing` — mirrors what the row surfaces on the page as open backlog. The 3-value canonical status distribution: `missing 507 · partial 43 · done 3`.
+
+**Write path.** PostgREST direct POST with the service key, `Prefer: resolution=merge-duplicates` for the FEATURES.md re-reconcile, plain INSERT for NEXT + LATER. Batches of 50 tickets, 12 requests total. Zero HTTP errors.
+
+**QA (discriminating, would fail if the change did nothing).**
+- **Count.** `select source_file, tier, count(*) group by 1,2` = `FEATURES.md now 283`, `FEATURES-NEXT.md next 23`, `FEATURES-LATER.md later 247`. ✓
+- **Byte-for-byte, all 3 files, all 9 tracked columns.** Node reconciler (`scratchpad/qa-reconcile.mjs`) re-parses every file fresh, fetches all 553 DB tickets via service key (paginated, PostgREST 1000-row cap not hit), joins on `(source_file, row_ordinal)`, compares `backlog_id/tier/type/priority_class/title/description/status/session_ref/harvest_link`: **553 × 9 = 4,977 comparisons, 0 mismatches**. ✓
+- **Grants — both directions live.** `role_table_grants` for anon/authenticated/public on `backlog_items` = 0 rows (unchanged; no new grant landed). Publishable-key SELECT → HTTP 401 `permission denied for table backlog_items`. Publishable-key INSERT attempt → 401. Service-key SELECT → 200 with real ticket rows. ✓
+- **Discriminating framing.** Three converging kills for "nothing happened": (1) if the FEATURES.md upsert had done nothing, ~94 tickets would still carry pre-renumber priority_class (P8 - Bug Fixes / P9 - Tooling vs the file's P9/P10) and the reconciler would have flagged every one — 0 flagged; (2) if NEXT + LATER inserts had failed, the count query would show 0 for those source_files — showed 23 and 247; (3) if the REVOKE had ever been dropped, publishable-key SELECT would return rows — returned 401. All three fired the right way.
+
+**Reversibility.** Before-image of the 277 pre-phase-b tickets snapshotted to `runner_before_images` at cycle open (cycle_id `164a1231-…`, `snapshotted 277`). Reverse-forward = `DELETE FROM backlog_items` then restore from `row_data` jsonb. No app reads this table yet — phases d/e stay gated on John.
+
+**Wall check.** API dollars $0 today, $0 this month (of $5/$100). Subscription tokens: no reading recorded → 3M/day stale fallback active; this cycle est ~200k tokens (well under). Deploy quota: not evaluated — VERCEL_TOKEN present in `runner_secrets` but not exercised (no build+deploy this cycle; docs + Supabase-only). Blocker sweep #1 (dev root with bypass header): 200. Blocker sweep #2: skipped in this run because the change writes nothing to dev's live surface — files + Supabase only.
+
+**Model discipline.** No sub-agents. The parser is mechanical (Sonnet-tier by shape) but small enough that delegation overhead exceeded the work; kept in-context on Opus. Attempts-per-tier ≤ 1. Nothing failed.
+
+**Registered follow-ups**: phase (c) — snapshot-export script (Supabase → generated markdown committed at ship points) + runbook step — queued for a later cycle. Phases (d)/(e) stay gated. The new columns the `design-runner-gov-0820` rulebook added (`queue`, lifecycle `status`, `filed_at` from git, pins) are a distinct later phase; not built here per the directive's explicit "do not build them yet."
+
+Details: `docs/kickoffs/v7.0.101-SES-83b-backlog-items-next-later-import.md`.
+
 ## design-runner-gov-0820 / S-RUNNER-GOV (v7.0.99, 2026-08-20, design session, John + Fable 5, worktree `design-runner-gov-0820`)
 
 **John's full recalibration of the Automated-runner governance — five topics, 29 registered requirements, 9 tickets filed, and everything decidable shipped live the same day.** Canonical record: **`docs/RUNNER-GOV-0820-REQUIREMENTS.md`** (A shipped / B locked / C closed / D ticket ledger) — read that file, not this summary, for the full detail.
