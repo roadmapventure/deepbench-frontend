@@ -17,6 +17,15 @@
    (Neither — an audit/sweep/investigation? Proceed with the worktree from step 1; there's no
    separate router branch, but the isolation and freshness requirements are identical.)
 
+> **Governance mode (added 2026-08-19, `design-selfbuilding-0819` — registry:
+> `docs/GOVERNANCE-MODES.md`, architecture: `docs/ARCHITECTURE.md` §19v):** a human in the
+> chat means **Manual Design & Build** — today's process, exactly as this file describes; no
+> session asks "which mode?". **Automated** mode cannot be chosen by anyone typing it: it
+> exists only in a session launched by the approved runner (`SES-78`, not yet built), which
+> stamps its identity into the session's inflight file — no stamp, no Automated, and the
+> session proceeds as Manual and stops at its first gate. Non-DeepBench work runs under the
+> registry's open mode and never touches this repo or its Supabase.
+
 ---
 
 ## If DESIGN session:

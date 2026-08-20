@@ -1,5 +1,15 @@
 # DeepBench Beta — Definition, Buckets, Execution Queue
 
+> ## ⛔ RETIRED 2026-08-19 (John, `design-selfbuilding-0819`) — historical record only
+>
+> John: beta has been pushed; he is no longer categorizing tickets as beta vs. non-beta.
+> Effective immediately: **no new row declares `Beta-gate (<bucket>)` or `Post-beta`**, and
+> close-outs no longer split into BETA / NON-BETA sections. The prioritization axis is now the
+> `P1`–`P9` priority classes of `docs/ARCHITECTURE.md` §19v, applied across
+> `FEATURES.md` (now) / `FEATURES-NEXT.md` / `FEATURES-LATER.md`; former Beta-gate rows fold in
+> as P4/P8 sorted first within their class (`SES-80` is the reclassification pass). Everything
+> below is kept as history — it governs nothing.
+
 > **Why this file exists (2026-07-28):** John's beta definition and bucket prioritization were
 > stated live in the 2026-07-23/24 "beta prioritization" session, but that session never
 > committed its output — the content lived only in the conversation transcript until it was

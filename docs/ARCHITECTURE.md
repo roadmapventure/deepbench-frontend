@@ -106,6 +106,7 @@ under their governing section. Nothing below this index was edited when it was a
 - **§19s.** Assembly Content Contract — Agent-Narrated Build [design `design-lav-25`, John, 2026-08-04]
 - **§19t.** IP Access Gate — Live-Site Cost Protection [design `design-ip-security`, John, 2026-08-08]
 - **§19u.** The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
+- **§19v.** The Self-Building Platform — Autonomous Development Governance [discovery `design-selfbuilding-0819`, John, 2026-08-19]
 
 ---
 
@@ -2419,3 +2420,191 @@ code dispatches on it). The audit must assert on the path taken, not the output 
 - An autonomous cycle checks its budget row before spending; absence of the row fails closed.
 - Replica eval scores come from held-out items only — a score computed over trained items is not
   an eval and must not be reported as one.
+
+---
+
+## 19v. The Self-Building Platform — Autonomous Development Governance [discovery `design-selfbuilding-0819`, John, 2026-08-19]
+
+**The vision (John's, this session):** DeepBench builds itself, 24×7 — three engines: **Execute**
+(works the backlog), **Heal** (detects, root-causes, and fixes its own defects), **Invent**
+(generates new features with limited or no direction — studying the market, the platform's own
+white space, usage/audit data, and §0's investor lens — each with a value case). John judges once
+a day from a briefing, ~10 minutes, from any device: he is the editor and executive, not the
+author. Nothing reaches production without him — dev→main stays his, always. This extends §19u's
+patterns (study cycles, budget-governed autonomy, morning evidence) one level up, to the
+platform's own development.
+
+**Governance modes:** see `docs/GOVERNANCE-MODES.md` (the registry — Manual Design & Build /
+Automated / "Open Workspace", extensible by rows). Automated is **structurally unselectable**
+until the runner (`SES-78`) ships and John approves it: the mode requires a runner stamp in the
+session's inflight file, and until the runner exists the stamp cannot. Every mode shares every
+existing invariant — worktree isolation, branch discipline, atomic counters, full session
+ceremony; the modes differ only in when John's judgment is exercised.
+
+### The priority order (John's, locked this session)
+
+Orders **elective** work; a user blocker preempts the entire list (see The blocker sweep).
+John's **directive queue** outranks everything: a directive row (his idea, his words) is the
+cycle's mission before any list item.
+
+1. New inventive features — white space, competitive differentiation
+2. New features that add investor / buyout value
+3. New features that win new customers
+4. Enhancements to existing features (prioritized by 1–3)
+5. Agent enhancement — extend existing agents to perform across the platform
+6. Agent creation — a new agent when functionality requires a competency the bench lacks
+7. Removing determinism — harness and platform services become model decisions
+8. Bug fixes, non-blocking (prioritized by 1–7)
+9. Session / governance / tooling enhancements and cleanups
+
+**Backlog integration (beta retired 2026-08-19, John):** Beta-gate/Post-beta declarations are
+discontinued — `docs/BETA.md` is historical. `FEATURES.md` (now) / `FEATURES-NEXT.md` /
+`FEATURES-LATER.md` stay as the urgency axis; every row gains a priority class `P1`–`P9` from
+the list above. The engine picks now → next → later, and P1 → P9 within each. Former Beta-gate
+rows fold in as P4/P8 sorted first within their class (`SES-80` is the reclassification pass).
+
+### Lane routing — what ships unattended vs. what waits for John
+
+**The exposure rule:** *changes what an approved surface looks like, or adds a surface →
+default-off feature flag (a data row, `HAR-41` — never a code constant). Only makes an approved
+surface do what it was already supposed to do → ships live.* A flag governs **exposure, never
+correctness** — a bug fix behind an off flag is a fix that did nothing, and it makes the
+regression test vacuous (the `LOO-013` failure shape).
+
+Per priority class: **P1–P3** (new features) — flagged; a new screen ships its route *and* nav
+entry inert behind the flag. **P4** (enhancements) — flagged; the enhancement lives in a new
+component file, the approved screen gains only an import + one guarded mount; the checkable
+assertion is **zero deleted lines** in existing `src/screens/*` / `src/AppShell.jsx`.
+**P5** (agent enhancement) — no unattended edits to any **active** agent's Skills/Capabilities
+(the moment a row changes, every live run uses it — maximum blast radius, no inert state);
+auto-lane only against agents still `is_active = false`. **P6** (agent creation) — `is_active =
+false` *is* the flag: new agents are born invisible (excluded from the delegation roster,
+`LOO-37`) and unreachable (the `execute.js` gate, `LOO-004`); **John flipping `is_active` is
+signing the hire card**. **P7** (determinism removal) — ships live in data and platform-service
+modules; **gated in the four harness files** (`api/capabilities/execute.js`,
+`api/prompt/db-assembly.js` / `ai-enrichment.js` / `request-receivable.js`) — there the engine
+may diagnose, write the diff, and prove it with a full regression run, but it lands as a
+proposal. **P8** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
+surface is an appearance decision wearing a bug's clothes: flagged or gated. **P9** (tooling) —
+ships live.
+
+**The gated lane (never unattended, no trust rung ever unlocks it):** terminology and canonical
+naming; architecture supersessions and LOCKED-section changes; schema-destructive migrations;
+anything §19e-owned; edits to active agents; the four harness files; dev→main. **Uncertain
+classification → gated, always.**
+
+### Reversibility — every change undone by one action of John's
+
+- **Code → revert-forward:** a new commit undoing the old one; history is never rewritten, so
+  reversal works after later commits stack on top.
+- **Supabase data → before-image:** every Automated-mode write records the prior row state
+  first; Reverse restores it exactly. **No before-image logged → the write does not happen.**
+- **Flagged work →** the flag simply stays off while the revert lands.
+
+### The blocker sweep & feature-owns-its-bugs
+
+Every cycle sweeps for user blockers (crash, dead control, broken run) **first** — nothing
+elective starts until dev is clean — and **again at the end**: a feature that leaves a blocker
+behind is auto-reverted by its own cycle's sweep before John ever sees it, and that reversal
+counts as a Reverse on the trust ladder. **A feature is not shipped until its own bugs are
+fixed** — filing a ticket for a bug in the thing just built is a QA failure, not a deliverable;
+tickets are legitimate only for pre-existing bugs found in code the feature didn't touch.
+
+### Budget governor & model self-control
+
+One ledger row (HAR-40's fail-closed pattern): **$100/month, ~$3.30/day default**, both checked
+before every cycle — no row, no run. Unspent days roll forward; the month cap is the hard wall.
+Model choice is per session, by task shape, on **cost per outcome, not cost per hour**:
+mechanical work on the cheapest capable tier; design/root-cause/invention scoring on the deep
+tier (4 hours of a mid tier grinding costs more than 30 minutes of the deep tier and produces
+the revert that costs a second night). **Escalation trigger, checkable: one failed attempt at a
+tier (QA red, or root cause not found) → escalate one tier or queue for morning. Never a second
+attempt at the same tier** — "attempts per tier ≤ 1" is auditable in the session log. Every
+kickoff names its model; every briefing item shows cost + model. Two measured walls stand:
+Vercel's 100-deploys/day cap (`SES-33`) and account API caps (`SES-66`); the runner checks
+remaining deploy quota before every push and **yields headroom to John's manual sessions**.
+
+### The trust ladder — autonomy widens earned, measured
+
+Data: one row per work class (invention, enhancement, agent creation, determinism removal, bug
+fix), holding rung + streak. John's briefing answers feed it: **Accept** → streak +1, five
+consecutive accepts promote one rung. **Reverse** → streak 0 and demote one rung immediately
+(one reversal outweighs five accepts by design). **Rework** → neutral (steering, not failure).
+**A sweep auto-revert counts as a Reverse.** A rung buys throughput inside the auto lane — rung
+1 = one item/night in that class at minimum blast radius; rung 2 = two, or the next-larger
+blast radius. **No rung ever unlocks the gated lane** — that boundary moves only in a session
+like this one. Inventions start at the most conservative rung. Silence is never an Accept: an
+unjudged item stays live on dev but its streak does not advance.
+
+### The Invention engine
+
+**What it studies:** market/competitor scan (web research); white space against
+`docs/SCREEN-INVENTORY.md`, the §19-series, and the backlog; usage/audit signals
+(`ai_activity_log`); §0's investor framing. **Scoring:** platform value, pitch strength,
+white-space coverage, build cost. **Volume: one invention per cycle-day at rung 1** — widened
+only by the ladder, never by config. **The R&D gate — mandatory before build spend, for John's
+seeds and self-invented candidates alike:** (a) research, logged; (b) a **POC of the cheapest
+variant, measured** (John's standing rule: never call a feature blocked without measuring the
+cheapest variant); (c) a go/no-go traceable to why — §19d's sniff test applies: the reasoning
+for WHY this feature is logged model reasoning, never a feature mill. POC fails → the briefing
+gets findings, not a broken feature; the seed stays queued with what was learned. John's
+5-minute seed rides the directive queue and gets the same expansion — he describes, the engine
+researches, designs, POCs, builds.
+
+### QA bar (per shipped item)
+
+(a) The deterministic regression suite green (node tests, no AI calls — runs on every ship);
+(b) a **discriminating** self-QA on the new path — *would this test still pass if the change
+did nothing?* If yes, it is not QA; (c) deploy-currency verified before any live evidence
+(`scripts/check-deploy-current.js` — exit 2 is not a pass); (d) the blocker sweep clean.
+**Live AI-call QA is scoped to novel risk** — prove a genuinely new path live once, never once
+per data row — and is charged to the budget, so QA cost is visible per item.
+
+### The daily briefing (John's governance surface)
+
+One Artifact page per day, phone-friendly, shareable. Top line: shipped / proposals / reverted /
+spend vs. budget. Per shipped item: ID + Type, the value case (who it serves, white space
+covered, how it strengthens §0's pitch), before → after, QA evidence with regression count,
+live dev link (**flagged items link both states — the on-link carries the flag switch as a URL
+parameter**, one tap shows the feature on while other visitors see it off; links included only
+after deploy-currency passes), cost + model, and the three response actions: **Accept /
+Reverse / Rework** (Reverse = auto-revert + row reopened with John's one-line reason; Rework =
+keep the idea, change direction, back into that night's queue). Proposals section: gated items
+with POC findings, promote or kill. Bottom: ladder movements + anything auto-reverted, one line
+each. Answers from the page land in the queue the next cycle reads.
+
+### Operations
+
+24×7 as **chained short sessions**: a scheduled cloud task fires; each firing runs one cycle —
+pick (directive queue first, else the P-list), design, build, QA, ship or file a proposal —
+under the full existing ceremony, ending at close-out, never at context exhaustion (the
+one-feature/3-file scope rule guarantees the margin). **Pushes batch to ship points** — a
+session pushes when there is something to deploy or hand off, never per artifact (the inflight
+marker rides the first push, no solo push). The runner is **cloud-hosted**: John's laptop can
+sleep; today's hooks (`C:/Projects/.claude/`), `.env.local`, and Supabase MCP auth exist only
+on his machine — porting that environment is deliverable #1 of `SES-78`, and until it is done
+nothing runs 24×7.
+
+### Vision-drift protection
+
+`docs/JOHN-DECISION-PATTERNS.md` is the criteria source for **every** autonomous choice,
+including what to invent (`SES-79` is the mining pass that grows it from a month of
+proposed→responded pairs). **Anything it doesn't cover fails closed to the gated lane.** The
+risk designed against is not bugs — it is a hundred individually-fine decisions summing to a
+platform that is no longer John's. For inventions specifically: covering white space must never
+mean drifting off §0's pitch — pitch strength is a scoring axis, not a tiebreaker. The
+decision model operates **inside the auto lane only**; it never impersonates John on gated
+calls.
+
+### Invariants for the runner build (`SES-78` is judged against these)
+
+- No Automated session exists without the runner stamp; the stamp cannot exist before John
+  approves the runner.
+- No cycle spends without checking the budget ledger (month + day); absence fails closed.
+- No Supabase write without a before-image; no ship without the QA bar; no cycle end without
+  the blocker sweep.
+- Every briefing claim (shipped / QA / cost) traceable to logged evidence — §19d's sniff test
+  applied to the platform's own development.
+- Enforceable file-scoped subset lives in `.claude/rules/autonomous-surface-changes.md`,
+  `.claude/rules/agent-roster-inert.md`, and the gated-mirror line in
+  `.claude/rules/capabilities-are-data.md`.
