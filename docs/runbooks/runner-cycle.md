@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.117 | runbooks/runner-cycle.md | directive 73e41d2c — two corrections a cycle paid for in blood. Step 0's `.claude/` clause is widened from "no inflight file" to "a cloud cycle writes NOTHING under `.claude/`, it cards the edit for a laptop session", with the three measurements behind it (a ~35-minute probe return, two cycles dead mid-run on that one mission, and a fresh probe that produced no tool result at all). Step 6 gains the rule those cycles broke: a subagent that has not returned is NOT a result — wait for it or report the question open, and leave a breadcrumb outside the paths under test so a hang still says where it hung. -->
 <!-- DeepBench v7.0.114 | runbooks/runner-cycle.md | SES-83 (d) cycle 3 — step 7's close-out line stops telling every cycle to edit a `FEATURES*.md` row (status + P-class) and names the Supabase write instead. Cycle 1 flipped SELECTION to the table but left this WRITE line pointing at the files, so from v7.0.113 (the trim) until now the runbook contradicted itself: step 5 read the table, step 7 told the same cycle to update a stub. Found by the cycle-3 ceremony sweep. NOTE FOR JOHN: the stored routine prompt's step 4 still names the three markdown files for work selection — superseded by step 5 here, but only he can edit that prompt. -->
 <!-- DeepBench v7.0.112 | runbooks/runner-cycle.md | SES-83 (d) — step 5's selection layer (3) stops parsing FEATURES.md / FEATURES-NEXT.md / FEATURES-LATER.md and reads public.backlog_items via one canonical SQL query, quoted verbatim. John's "table is authority" call, Accepted 2026-08-21T00:19Z. Four live traps encoded in the query itself: numeric P-class ordering (lexical puts P10 before P2), the `· FLAGGED` suffix, the Beta-gate/Post-beta declaration regex (ILIKE '%beta%' over-matches by 20), and `title` holding the class string for imported tickets. Layers (1) directives and (2) John's automation queue are unchanged and still outrank the table. -->
 <!-- DeepBench v7.0.108 | runbooks/runner-cycle.md | SES-89 — new step 8b, the Heal sweep: `scripts/heal-engine.js` groups `durable_hops` failures into signatures and files evidenced `P9 - Bug Fixes` tickets (dry-run by default; the cycle claims the id block and passes it in). Reads `durable_hops`, NOT `ai_activity_log` — the latter has no error column, verified live. -->
@@ -34,7 +35,9 @@ dev`, then `git checkout -B session/cycle-<UTC yyyymmdd-hhmm> origin/dev`. This 
 clone + session branch satisfies CLAUDE.md's worktree-isolation rule by construction (the rule
 exists to isolate concurrent sessions sharing one machine checkout; you have the whole clone).
 All other CLAUDE.md hard rules apply verbatim — atomic counters, `push origin HEAD:dev`,
-kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention; this exception is cloud-cycle-specific.) Read `runner_secrets` via the Supabase
+kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention; this exception is cloud-cycle-specific.)
+
+**Widened 2026-08-21 (`v7.0.117`), and it is not just the inflight file: a cloud cycle writes NOTHING under `.claude/`.** Re-measured this cycle after `v7.0.115` read a hung probe as a finding and `v7.0.116` corrected it in the wrong direction. What is actually established: (1) `v7.0.115`'s delegated probe **did** return success — but only after **2,090,008 ms (~35 minutes)**, which is a stall that eventually clears, not evidence of an unblocked path; (2) two consecutive cycles, `ba8f2ce3` and `633fe486`, then **died mid-run without ever closing** — no `ended_at`, no `outcome`, no push — on the one mission that required editing `.claude/skills/session-hygiene/SKILL.md`, and the next cycle had to take the lease by TTL steal, not release; (3) `v7.0.117` re-probed with a throwaway background subagent and a plain `printf > .claude/inflight/…` **produced no tool result at all**, its transcript not advancing a single byte, while dozens of other Bash calls in the same session ran normally. **There is no deny rule to fix** — re-verified this cycle: `~/.claude/launcher-settings.json` configures only hooks, `~/.claude/policy-limits.json` carries no path restrictions, `~/.claude/settings.json` does not exist, and the repo's `.claude/settings.json` is an allow-list with no denies. The block is harness-level, so no settings change of John's unblocks it. **The operational rule is identical under either mechanism** (hard block, or a permission round trip nothing can answer): a cloud cycle that needs a `.claude/` edit **files a card carrying the exact replacement text for a laptop session** and moves on. It never spends the cycle on the attempt, and — `CLAUDE.md`, `SES-019` — never retries the same write through a different tool to get around it. Read `runner_secrets` via the Supabase
 connector and export what a step needs as env vars — secrets never go into files, commits, or
 logs.
 
@@ -253,6 +256,19 @@ every subagent prompt. Attempts-per-tier ≤ 1 — a failed attempt re-runs that
 up or files a gated-before-build item; never grind. If the Agent tool is unavailable in this
 environment, note that in the cycle row and continue on Opus 5 — the first cycle to try it is
 the verification.
+
+**A subagent that has not returned is not a result (`SES-83` (d) cycle 4, corrected `v7.0.117`).**
+A delegated probe that is still `running` at close-out has told you **nothing** — not "blocked",
+not "slow", not "failed". Cycle 4 read ~21 minutes of silence from a background probe as evidence
+of a block, wrote that reading into the ledger, `CLAUDE-STATE.md`, `docs/SESSIONS.md`, the briefing
+and a push notification, and closed. The agent then returned **success**: three tool calls, no
+denial, no prompt — 2,090,008 ms of latency, not a block. Delegating the probe was right and is
+what made the error recoverable; converting its silence into a finding was not. So: **either wait
+for the agent, or report the question as still open** — never a third thing. Two mechanics make
+waiting cheap, and a cycle that delegates anything load-bearing should use both: (1) have the
+subagent append a one-line `STARTING …` / `RESULT …` breadcrumb to a scratchpad file **outside**
+the paths under test after every step, so a hang still leaves evidence of exactly which step hung;
+(2) block on the breadcrumb with a bounded background wait rather than guessing from elapsed time.
 
 **7. QA bar, then ship at ONE ship point.**
 - `npm install && npm run build` green (a `src/`/`api/`/`lib/` change that fails build never
