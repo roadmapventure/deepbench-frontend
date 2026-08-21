@@ -59,6 +59,19 @@ Store UTC internally as before; the conversion is display-only.
    page's HTML out of harness storage. The same rule generalizes: a cloud cycle runs **no Bash
    command against any `~/.claude/` path**, mirror of `runner-cycle.md` step 0's `.claude/` rule.
 
+## Vision-corpus drip cards (every rebuild — `SES-84` phase 2, register B13, `v7.0.134`)
+
+Each rebuild includes **1–3 vision claim cards** (~15 min/day of John's time max, his rule) drawn
+from `docs/vision/*.md`: pick the highest-value unratified claims — `LOW` confidence first, then
+`MED`, then each doc's "Open questions for John" — never more than 3, never zero while unratified
+claims remain. Card face: the claim sentence phrased as "X because Y — true?", its doc + claim id
+(`C-thesis-4`), and the three buttons. **Accept** ratifies: the cycle edits that claim line to
+`HIGH` with `(ratified <date>)`. **Rework** replaces the claim text with John's line verbatim,
+marked `HIGH (John's words, <date>)`. **Reverse** deletes the claim and records it in
+`vision/rejected-paths.md` if it asserts a path. Decisions ride the same `briefing-state`
+harvest as every other card; the corpus edit lands in the cycle's normal ship commit. On-demand
+bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.
+
 ## Decision read-back contract (every cycle, step 2) — CORRECTED after live QA 2026-08-19
 
 **Found live during SES-78b's own tap QA:** this artifact is a *classic* artifact, not a live
