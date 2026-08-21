@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.149 | runbooks/runner-cycle.md | SES-109 — the committed backlog snapshot stops being one harvest stale. Step 7 exports and pushes `docs/backlog/BACKLOG-SNAPSHOT.md` BEFORE the step-9 serial tail, but register B42 (2026-08-21) moved the harvest WRITES — John's Accept/Reverse/Rework, answers that file tickets, a released pin — into that tail, so every board change a tap causes lands AFTER the export meant to capture it, leaving the board's only repo-side copy (the SES-81 restore path) systematically one cycle behind. Found live by cycle ff23297c (v7.0.148): its snapshot in 61fd3e4 recorded 571 tickets and missed SES-98 going done, SES-105 losing its pin, and SES-108 existing — all three written minutes later in its own tail. Of the ticket's two candidate fixes the tail RE-EXPORT is taken over moving the export wholesale, and the reason is structural: the export must ride the step-7 code push, and that push is deliberately kept OUT of the serial section so parallel cycles rebase-retry instead of serialising (B42) — so re-exporting once in the tail, AFTER the harvest writes, is the minimal change. It fires only when the harvest actually moved the board (the script is deterministic and prints `unchanged` otherwise), which makes it the one sanctioned second push: snapshot-only, guarded by the publish lease already held (the ticket claim is released at step-7 close-out, so it is NOT the token here), and a rebase conflict that outlives the retries degrades to exactly today's one-harvest lag, never a wall. The standing prohibition's "one push per ship point" gains that single carve-out. Doc-only; no code, no site change. -->
 <!-- DeepBench v7.0.148 | runbooks/runner-cycle.md | SES-107 — step 2's ladder rule stops leaving a blank a cycle has to fill. It read "Accept → streak +1 (5 consecutive → rung +1)" and never said what happens to the streak AFTER a promotion; cycle 7392e345 hit that live at 20:27Z (tooling 4 → 5, rung 6 → 7), set the streak to 0, and correctly filed `q-ladder-streak-reset` instead of inventing the rule. John answered NO at 22:04Z — "which one just keeps the count going? no need to reset - why would i do that?" — so the streak now keeps running and the promotion test is stated as arithmetic, `streak % 5 = 0`, never "at least 5". Both halves are load-bearing: removing the reset ALONE, under a "5 or more" reading, promotes on every tap forever, which is the opposite failure and would compound the runner's autonomy on a rule nobody wrote. A Reverse still zeroes the streak (John, `1d01ea85`, "leave it") — only promotion stops resetting. MEASURED rather than assumed, and it is the honest half of this ship: John was told on the card "No = I will correct tonight's row", and replaying tonight's before-images under the new rule reproduces the STORED row exactly — the Reverses at 21:21Z and 22:22Z each zero the streak regardless, so the promised correction is a no-op. Said plainly on the briefing rather than quietly skipped. The B34 boundary paragraph's justification is corrected with it ("does not define" expired), while its conclusion stands on John's own `q-ladder-rewind` NO rather than on a missing value. NOT DONE, and carded rather than attempted: no code implements the ladder (grep -rl runner_ladder --include=*.js → nothing), so this rule is applied by hand in SQL every cycle; making it executable is his call, filed as a question. -->
 <!-- DeepBench v7.0.147 | runbooks/runner-cycle.md | SES-101 — step 5's automation-lane block gains the filing rule the lane never had: a new automation ticket claims the TOP of the lane with one call, `SELECT public.claim_automation_lane_top('<TICKET-ID>')` (migration ses101_automation_lane_top). `automation_rank` has been recompute_backlog_queue()'s leading key since v7.0.133, but NOTHING assigned it at filing time, so a new automation ticket landed in the class-sorted backlog — the very failure the lane was built to end. John's ruling settles the direction: question q-lane-top, answered YES 2026-08-21T20:47Z (from directive 48ae1939 line 4, "if you create more automation tickets keep making them top of queue"), so the slot is min(open lane) − 1, never max + 1. Measured before shipping: the last three automation tickets filed were hand-assigned to the BOTTOM (SES-99=7, SES-100=8, SES-101=9) — the opposite of his answer, drifting silently for exactly the reason SES-86 phase 3 and v7.0.146 both diagnosed, that a rule each cycle must remember is a rule that gets forgotten. Function is idempotent, runs the recompute itself, and reads the OPEN lane only. A SECOND rule rides along, found live in this migration's own QA and general to every future function: REVOKE EXECUTE FROM anon, authenticated reports success and changes NOTHING while PUBLIC holds the default grant — the function-level twin of .claude/rules/supabase-column-grants.md. Asserted both directions after the corrected revoke. NOT DONE, and carded rather than attempted: the canonical INSERT at session-setup step 3c is under `.claude/`, which an unattended cycle may not write (step 0, register B39) — the exact replacement text is on the card for a session John attends. -->
 <!-- DeepBench v7.0.146 | runbooks/runner-cycle.md | directive dda69acb (+ twin 6b6cdd71) — step 9's card-filing line gains the three plain-language columns (migration ses106_card_plain_language). v7.0.145 made the More-info panel's three fields required at RENDER only, as a per-card JS object literal, so the words had nowhere to live between rebuilds and register B18 ("build cards FROM the DB, never from memory") was unfollowable for them — the next cycle had to re-invent a card's wording from scratch. John Reworked two cards three minutes apart for that confusion (20:44Z, 20:46Z) and Accepted the v7.0.145 render half at 21:32Z; this is its data half. NULL stays NULL: it is what draws the red defect line, and coercing it to '' would make a missing summary look fine. Same prose→column shape as SES-86 phase 3. -->
@@ -829,7 +830,13 @@ the paths under test after every step, so a hang still leaves evidence of exactl
   PostgREST error), never a pass: treat it like any other failed check — investigate, and if the
   export cannot run, say so in the cycle row rather than shipping a silently stale snapshot.
   `--check` (exit 1 = drift) is the read-only form for a cycle that wants to know whether the
-  snapshot is current without writing it.
+  snapshot is current without writing it. **This step-7 export captures the board through your
+  own close-out (the ticket you just set `done`, its recompute) but NOT John's harvest — those
+  writes land in the step-9 serial tail, AFTER this push — so a step-7-only snapshot is
+  systematically one harvest stale (`SES-109`, `v7.0.149`, found live by cycle `ff23297c`). The
+  tail re-exports it once the harvest has landed; see the tail's snapshot sub-step below. Do NOT
+  try to close the gap by moving the harvest earlier: B42 put those writes in the serial tail on
+  purpose, because they race under parallel cycles.**
 - **Re-assert the lease, then one batched push.** The re-assertion `SELECT` (step 0) is a **hard
   gate on the push**: run it, and only on 1 row proceed with
   `git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev`. Never
@@ -973,9 +980,21 @@ pre-lease harvest is exactly the "about to overwrite another session" moment Joh
 requires you to notice and absorb; **(3)** write the harvested decisions idempotently
 (`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
 only), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
-`uniq_card_ask`); **(4)** rebuild cards from the DB's undecided set — **each with its More-info
+`uniq_card_ask`); **(4)** re-export the backlog snapshot now that the harvest writes have
+landed — the fix for the one-harvest staleness `SES-109` found (`v7.0.149`). Re-run step 7's
+`scripts/export-backlog-snapshot.js`; the script is deterministic and prints `unchanged`,
+writing nothing, when John's taps moved no board row — the common case, and then there is
+nothing to push, so skip to (5). Only when it produced a diff do you commit
+`docs/backlog/BACKLOG-SNAPSHOT.md` and push it (`git fetch origin dev && git rebase origin/dev &&
+git push origin HEAD:dev`, the rebase-retry×3 of step 7). **This is the one sanctioned second
+push of a cycle** — snapshot-only, inside the serial tail, guarded by the publish lease you
+already hold (NOT the ticket claim, which your step-7 close-out already released), and it fires
+only on cycles that actually changed the board, so the "one push per ship point" spirit holds. A
+rebase conflict that survives the retries is not a wall: leave the snapshot one harvest stale
+exactly as before this fix — the next cycle's step-7 export captures the same writes — and note
+it in the cycle row; **(5)** rebuild cards from the DB's undecided set — **each with its More-info
 panel, and each open `runner_card_asks` row answered on its own card** (`v7.0.145`; a card
-rendered without those fields carries a visible defect line, by design) — and republish; **(5)** close your `runner_cycles` row; **(6)** release the publish lease
+rendered without those fields carries a visible defect line, by design) — and republish; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
 (holder-guarded statement in step 1). Then end the session cleanly. The tail should take
 seconds to low minutes — everything long-running happened before it, in parallel.
 
@@ -984,7 +1003,9 @@ seconds to low minutes — everything long-running happened before it, in parall
 Never: touch the gated lane (terminology, LOCKED sections, schema-destructive migrations,
 §19e-owned writes, active-agent Skill/Capability edits, the four harness files, dev→main);
 write Supabase without a before-image; report a number that doesn't trace to a row or log;
-retry the same tier twice; push more than once per ship point; proceed past a failed wall;
+retry the same tier twice; push more than once per ship point (the step-9 tail's snapshot-only
+re-export push, `SES-109`/`v7.0.149`, is the single sanctioned exception — conditional on the
+harvest having moved the board, guarded by the publish lease); proceed past a failed wall;
 build a ticket without holding its claim (register B42 — the per-resource successor to B31's
 retired cycle lease); enter the serial tail without the publish lease, republish from a
 pre-lease harvest, or end a cycle without running the tail — and **never push or claim a
