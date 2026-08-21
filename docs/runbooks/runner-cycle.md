@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.146 | runbooks/runner-cycle.md | directive dda69acb (+ twin 6b6cdd71) — step 9's card-filing line gains the three plain-language columns (migration ses106_card_plain_language). v7.0.145 made the More-info panel's three fields required at RENDER only, as a per-card JS object literal, so the words had nowhere to live between rebuilds and register B18 ("build cards FROM the DB, never from memory") was unfollowable for them — the next cycle had to re-invent a card's wording from scratch. John Reworked two cards three minutes apart for that confusion (20:44Z, 20:46Z) and Accepted the v7.0.145 render half at 21:32Z; this is its data half. NULL stays NULL: it is what draws the red defect line, and coercing it to '' would make a missing summary look fine. Same prose→column shape as SES-86 phase 3. -->
 <!-- DeepBench v7.0.145 | runbooks/runner-cycle.md | directive edab5908 — step 2 gains the `asks` harvest and step 9's tail gains the duty it creates. John typed a question box into existence ("I need to be able to ask questions about the issue"), and the rule that comes with it is that an ask he can see recorded but never answered is worse than no box: every open runner_card_asks row is answered on its own card in the rebuild. The idempotence note is not decoration — the page keeps every ask in briefing-state forever, so every cycle re-reads asks it already stored, and uniq_card_ask is the only thing stopping the log duplicating on each republish. -->
 <!-- DeepBench v7.0.135 | runbooks/runner-cycle.md | SES-99, directive 48ae1939 — step 2's harvest gains `answers` (the briefing's new yes/no question list, table public.runner_questions) and step 9's "help me" line stops describing a paragraph. John: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." -->
 <!-- DeepBench v7.0.133 | runbooks/runner-cycle.md | SES-86 phase 3, directive f47e5a95 — John's automation queue stops being prose a cycle has to remember and becomes the board's leading sort key. His line: "keep closing automation tooling tickets first before getting to the classified backlog." Step 5's layer (2) was a doc section every cycle had to go read and correctly interpret; the forgetting was silent, and it had already happened — measured 16:29Z, his automation tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told him the next cycle would be "building product, not tooling". New nullable backlog_items.automation_rank (C4 step number, NULL = not in lane) is now recompute_backlog_queue()'s LEADING ORDER BY key, NULLS LAST, with all six prior clauses preserved beneath it; migration ses86c_automation_lane. Self-retiring by construction — a done ticket leaves the ranked set, so the lane evaporates when his automation queue completes, which is his "until automation is complete". Two boundaries written into the migration header so they travel with the code: a future pin (B23) goes ABOVE automation_rank, and the five load-bearing clauses from ses86b are unchanged. QA proved the lane discriminating (before: 5 of 7 past position 240; after: queue 1-5) and idempotence the honest way this time — 551 -> 0, then a REAL change (the SES-89 status correction) -> 548 -> 0, never one clean re-run on an unchanged board. -->
@@ -839,7 +840,27 @@ ticket re-queues.
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + named P-class per the Language block above,
 title, value case, before → after, QA evidence with proof-type label, dev link, flag slug if
-any, cost split, model). Close `runner_cycles` with the two cost tracks (John, 2026-08-20):
+any, cost split, model, **plus the three plain-language columns `plain_cant` / `plain_after` /
+`plain_worth`**).
+
+**THE PLAIN-LANGUAGE SUMMARY IS A COLUMN NOW, NOT PROSE YOU WRITE AT RENDER TIME (`v7.0.146`,
+directive `dda69acb` and its twin `6b6cdd71`, John 2026-08-21T20:44Z and 20:46Z).** `v7.0.145`
+made the More-info panel's three fields required — *what you can't do today* / *what you could do
+after* / *why that's worth something* — but required them only **in the HTML**, passed as a
+per-card JavaScript object literal written by whichever cycle happened to be rebuilding. The text
+therefore had nowhere to live between rebuilds, and **register B18 could not be honoured for it**:
+"build the cards FROM the DB's undecided set, never from memory" is unfollowable when the DB has
+no place to put the words, so the next cycle to rebuild had to re-invent a card's wording from
+scratch — for a card it did not write. Store them on the row when you FILE the card, in John's
+register rather than the system's ("you can't X today", never "the affordance is absent"), and the
+rebuild reads them back instead of guessing. **`NULL` is not an empty string and must not become
+one:** it is what makes the page draw the red defect line, which is the deliberate `v7.0.145`
+choice that a missing summary should look missing rather than look fine. Filing a card without
+them is now a visible omission in the ledger, catchable before John ever sees the page —
+`SELECT id FROM runner_items WHERE decision IS NULL AND plain_cant IS NULL;` should return
+nothing. Same shape as `SES-86` phase 3 (John's automation queue: prose → `automation_rank`) and
+for the same measured reason — a rule each cycle must remember to apply is a rule that gets
+silently forgotten. Close `runner_cycles` with the two cost tracks (John, 2026-08-20):
 `api_cost_dev_usd` / `api_cost_qa_usd` (true billable API calls only — trace to
 `ai_activity_log` where possible; $0 is the normal value) and `est_tokens_dev` /
 `est_tokens_qa` (your own session's thinking, split build-vs-QA steps — **estimated is fine,

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.146 | runbooks/briefing-page.md | directive dda69acb (+ twin 6b6cdd71) — the More-info panel's fields 1-3 are READ FROM runner_items.plain_cant/.plain_after/.plain_worth instead of being composed fresh at render time. Read them, do not re-author them; NULL renders the red defect line and is never coerced to ''. -->
 <!-- DeepBench v7.0.145 | runbooks/briefing-page.md | directive edab5908 — John: "often your wording is very confusing and does not make sense to which button to push, or i don't understand the issue." New section "More info, and asking me a question from the page": every card and question row gains a More info panel (what you can't do today / what you could do after / why that's worth something / what each button does here), Yes/No rows carry their consequences under the buttons, and John can type a question on any card — recorded to public.runner_card_asks (migration ses105_card_asks) and answered on that card by the next cycle, thread kept. The live in-page answer (his conditional "if possible") is carded, not built. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-page.md | SES-99, directive 48ae1939 — John's line: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." The "Help me — the questions" paragraph becomes a tappable yes/no list backed by the new public.runner_questions table; answers ride the briefing-state block under a new `answers` key and are harvested exactly like card decisions. Silence is never an answer. -->
 <!-- DeepBench v7.0.129 | runbooks/briefing-page.md | SES-96 — regeneration step 4 added: never shell-process the WebFetch result's saved file. John's captured permission prompt (2026-08-21) showed the rebuild sed-slicing the prior page's HTML out of ~/.claude/projects/…/tool-results/ — a permission-gated path that parks an unattended cycle exactly like a .claude/ write. Parse briefing-state in context; rebuild structurally from briefing-template.html + the runner_ tables. -->
@@ -133,6 +134,18 @@ comes before the choice, opening a panel with, in order:
 1. **What you can't do today** — the gap, in a sentence a person outside this repo would follow.
 2. **What you could do after** — the same sentence from the other side.
 3. **Why that's worth something** — the platform-value claim, plainly.
+
+   **Fields 1–3 are READ FROM THE ROW, not composed at render time (`v7.0.146`, directive
+   `dda69acb`).** They live in `runner_items.plain_cant` / `.plain_after` / `.plain_worth`, written
+   by the cycle that FILES the card (`runner-cycle.md` step 9). `v7.0.145` shipped them as a
+   per-card JavaScript object literal, which meant the words existed only inside one rebuild's
+   HTML — so **register B18 was unfollowable for this part of a card**: "build cards FROM the DB's
+   undecided set, never from memory" cannot be obeyed when the DB has no column to read, and the
+   next cycle to rebuild had to re-invent the wording for a card it never wrote. Read them; do not
+   re-author them. **A `NULL` renders the red defect line and must never be coerced to `''`** —
+   that line is the point (see "No summary, no silence" below), and an empty string would turn a
+   missing summary into a convincing blank, which is the exact failure the defect line exists to
+   make visible.
 4. **What each button does *here*** — Accept / Reverse / Rework, spelled out **in this card's own
    terms**. Defaults differ by card kind and the difference is real, not cosmetic: a gated Accept
    is permission and never touches the ladder (John's B34 ruling), a shipped Accept is a rating.

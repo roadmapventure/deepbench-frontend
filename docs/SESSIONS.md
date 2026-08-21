@@ -8884,3 +8884,83 @@ Kickoff: `docs/kickoffs/v7.0.109-HAR-41-feature-flag-mechanism.md`.
 **Also this cycle:** the step-4 blocker probe returned **502 three times running** against dev — and `example.com` returned 502 on the same command, `curl "$HTTPS_PROXY/__agentproxy/status"` reported `connect_rejected · gateway answered 503 to CONNECT`, and `git ls-remote` failed with *"session scope unavailable"*. A transient failure of **this session's own egress**, not of DeepBench; both recovered within ~90 seconds and dev root then returned **200**. Recorded because the `v7.0.115` failure — reading an instrument's silence as a finding about the system — was one step away here, and the thing that prevented it was probing a second, unrelated host.
 
 Kickoff: `docs/kickoffs/v7.0.145-directive-edab5908-more-info.md`.
+
+---
+
+## 2026-08-21 — cycle-20260821-2137 (v7.0.146) — directives `dda69acb` + `6b6cdd71`: the card's plain-language summary becomes data
+
+**Mission.** Selection layer 1, a directive. Two work directives sat queued, filed at the *same*
+instant (`21:21:57.836898`) and therefore tied on oldest-first: `dda69acb`, John's Rework on the
+`SES-84` gated card at 20:44Z — *"i don't understand what you are trying to get at here - please
+simply your ask"* — and `6b6cdd71`, his Rework on the A2A invention card two minutes later —
+*"You need to summarize better what is happening. i don't understand, you are giving too much
+technical jargon. I need a business value statement - what can't the user do today? What would
+they be able to do after? How does this make the platform more valuable?"* They are one complaint
+wearing two cards, and one ship serves both. `dda69acb` was claimed at pick — which is now his
+explicit instruction: he answered **yes** to `q-directive-claim-at-pick` at 21:34Z, two minutes
+before this cycle opened.
+
+**The gap, and why it is not the one `v7.0.145` already closed.** `v7.0.145` shipped fourteen
+minutes before this cycle opened and John **Accepted** it at 21:32Z. It gave every card a More-info
+panel and made three fields required — *what you can't do today* / *what you could do after* /
+*why that's worth something* — which is close to verbatim the specification inside `6b6cdd71`. But
+it made them required **at render, and only at render**: the rebuild passed them as a per-card
+JavaScript object literal, hand-written by whichever cycle happened to be rebuilding. So the words
+had nowhere to live between rebuilds, and **register B18 was unfollowable for this part of a card**
+— *"build the cards FROM the DB's undecided set, never from this cycle's memory"* cannot be obeyed
+when the database has no column to read, so the next cycle to rebuild had to re-invent the wording
+from scratch, for a card it never wrote. That is precisely the silent drift B18 exists to prevent,
+and it is the mechanism most likely to reproduce the confusion John Reworked twice tonight.
+Premise revalidated live before any work (register B7): `runner_items`' column list was read from
+`information_schema` and carried no field for any of the three.
+
+**What shipped.** Migration `ses106_card_plain_language` — `plain_cant`, `plain_after`,
+`plain_worth` on `public.runner_items`, `text`, nullable, no default, each carrying a `COMMENT`
+with its contract. Two runbooks follow it: `runner-cycle.md` step 9 names the three columns as
+part of what filing a card writes (and gives the omission check,
+`SELECT id FROM runner_items WHERE decision IS NULL AND plain_cant IS NULL`), and
+`briefing-page.md` says fields 1–3 are **read from the row, not composed at render time**. Same
+prose→column shape as `SES-86` phase 3, and for the same measured reason: a rule each cycle must
+remember to apply is a rule that gets silently forgotten.
+
+**`NULL` is load-bearing and must stay that way.** It is what draws `v7.0.145`'s red defect line.
+Coercing it to `''` would turn a missing summary into a convincing blank — the exact failure that
+line exists to make visible — so both runbooks now say so explicitly, and the QA has a negative
+control for it rather than trusting the sentence.
+
+**QA — stated as the runbook demands, "would it still pass if the change did nothing?".**
+(1) Columns read back from `information_schema.columns` + `col_description`: three `text`, all
+nullable, all commented. Does nothing → zero rows. (2) **The discriminating one:** a real
+round-trip, writing plain-language text to two live cards and reading it back by value. Does
+nothing → the write fails outright with `column "plain_cant" does not exist`. (3) **Negative
+control:** the two cards John Reworked must still read `NULL` on all three — a migration that had
+quietly added `DEFAULT ''` would pass (1) and (2) and fail only this. All three green. Build green
+(6.11s). Before-images written ahead of every row write.
+
+**Recorded rather than buried — the regression suite lies by omission in this environment.** The
+first run reported **30/31**, one `[FAIL]` on `CHI-31-source-simulation-consistency.js`. It is not
+a regression and not a code failure: the cloud clone has no `.env.local`, and that test needs
+`SUPABASE_URL` / `SUPABASE_SERVICE_KEY` to verify Skill Profile text. Re-run with both supplied
+from `runner_secrets`: **31/31**. Worth writing down because the summary line on its own —
+"30/31 passed" — reads as a real failure, and the opposite mistake (waving a red suite through as
+"probably environmental") is the one the standards forbid. Neither the build nor the suite can
+observe a `runner_items` column, so neither was ever the test of this change; they are the
+no-regression floor and were treated as such.
+
+**Model discipline (register B21), stated rather than silently skipped.** Kept on Opus 5
+throughout, deliberately. B21 routes judgment-dense *kickoff design for P1–P5 work* to Fable 5 —
+this is `P10 - Tooling`, so that route does not apply by its own terms — and mechanical steps to
+Sonnet 5, of which there were none worth a round-trip across three files. The one genuinely
+judgment-dense part was writing plain English to John about his own complaint that the writing is
+unclear, which is the last thing to hand to a fresh context with no sight of tonight's four taps.
+
+**Also this cycle.** Both cards John Reworked were re-asked on the briefing in plain language,
+carrying the new fields — the fix demonstrated on the exact cards that caused it rather than
+asserted in the abstract. His ask on `q-ladder-streak-reset` (*"which one just keeps the count
+going? no need to reset - why would i do that?"*) is answered on its own card. Step 0b's silence
+sweep found one open peer, `db8b9eee`, heartbeat stale since 18:19Z — already carrying
+`stall_notified_at` from 20:11Z, so a peer had pushed it and this cycle correctly stood down
+rather than double-pushing. Step 4b's invention pass was skipped by its own rule: two cycles
+already carry `INVENTION PASS` in this America/Chicago day.
+
+Kickoff: `docs/kickoffs/v7.0.146-dda69acb-card-plain-language-fields.md`.
