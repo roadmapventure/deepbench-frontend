@@ -5,6 +5,30 @@
 
 ---
 
+## cycle-20260821-0134 / S-SES-83d-ceremony-docs (v7.0.114, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + 1× Sonnet 5)
+
+**`SES-83` (Tooling · `P10 - Tooling`) phase (d), cycle 3 of the five John Accepted 2026-08-21T00:19Z — the ceremony docs.** Cycle 2 emptied the three markdown backlog files; cycle 1 had already flipped *selection* to SQL. Neither touched the docs that tell a session what to **do**, so until this cycle every ceremony doc still instructed filing into, and reading out of, files with no rows in them.
+
+**Shipped (3 files, the scope cap):** `CLAUDE-DESIGN.md` — the Backlog Capture standing rule gains a dated supersession banner and 19 hits are retargeted onto `public.backlog_items`; Step 1's reading list, Step 3's ticket read, close-out steps 8c/9/12, the 5b gate and 5c's archive move all name the table. `docs/runbooks/runner-cycle.md` — step 7's close-out line becomes a Supabase write with a before-image. `docs/WORKING-WITH-JOHN.md` — the Tier-1 autonomy item, the measured-detail rule and the log-session-findings rule.
+
+**The editing principle, carried over from cycle 2:** John's approved wording is preserved verbatim and superseded by a dated banner, never silently rewritten. His now/next/later criterion is quoted in full and stays byte-identical; only the **destination** changed — it now sets the `tier` **column** instead of choosing a **file**. The classification rules themselves are untouched, and `docs/FEATURES.md` remains the canonical home of the Feature ID Format, Type Taxonomy and Priority Class legend, so every reference to those three sections was left pointing exactly where it pointed before.
+
+**The sweep, and why it was re-run.** The cycle-2 briefing card cited a 30-item sweep, but that list was **never committed to the repo** — so it was not evidence, and `CLAUDE.md`'s verify-never-assert rule required re-deriving it. Delegated to a **Sonnet 5** subagent per register B21: **25 filing hits, 23 reading hits, 2 size/hygiene, ~557 benign** (the benign mass is `docs/SESSIONS.md`'s own past-tense log, correctly left as history).
+
+**Two catches the orchestrator's own greps missed, both material.** (1) **`docs/runbooks/runner-cycle.md:266` — the runner's own runbook contradicted itself.** Step 5 selected from the table while step 7 told the same cycle to edit a `FEATURES*.md` row — i.e. to write to a stub — at ~8 cycles/day, and *this* cycle was about to follow it. (2) **`docs/ARCHITECTURE.md:2497` still asserts the files "are still where new tickets are filed"** — flatly false since `v7.0.113`, and sitting one paragraph below §19v's own correct past-tense migration note. **§19v is the gated lane, so it was carded, not edited** (`gated_before_build`, with the exact proposed replacement sentence).
+
+**QA — 30/30, with the red control run rather than argued.** 23 **paired** assertions: each stale instruction must be absent from the new file *and* present in `HEAD`. The second half is the arming check — a fragment that was never in `HEAD` reports `CONTROL NOT ARMED` and **fails**, so the suite cannot pass vacuously on a string that never existed; 23/23 armed. Plus 7 pointer checks confirming every surviving path and section anchor still resolves. **"Would it still pass if the change did nothing?"** — the same assertions were run against a pristine `HEAD` copy of the three files: **23 `STILL PRESENT` failures, exit 1.** Build green, regression 31/31 (credentials exported).
+
+**Deliberately not done, and it is cycle 4's problem.** Every `.claude/` path was avoided because `runner-cycle.md` step 0 records **two live stalls** (`SES-78c`) from `.claude/` writes prompting for permission in a routine session — an unattended cycle that stalls is worse than one that defers. That leaves `.claude/skills/triage/SKILL.md` unfixed, which the sweep names as *the single most direct filing instruction in the repo*, plus `session-setup/SKILL.md:202`'s now-impossible lightweight-append path. **Cycle 4's named target, `.claude/skills/session-hygiene/SKILL.md`, is itself under `.claude/`** — that cycle must establish whether it can write there before planning around it. Also deferred: `docs/STANDARDS.md` (`:359`, `:361`) and the two QA runbooks (3 reading hits gating live QA on rows that no longer exist).
+
+**Observed live:** `node scripts/check-session-docs.js` reported "0 flagged" while scanning the empty stubs — the false "all clear" cycle 4 exists to fix, now confirmed rather than predicted.
+
+**Process note, recorded rather than hidden:** the version was claimed and the edits were made **before** the kickoff doc was written, inverting `runner-cycle.md` step 6's stated order. The substance is unaffected (the plan was fixed by the sweep's evidence), but the order was wrong and is logged here rather than presented as if it had been followed.
+
+Detail: `docs/kickoffs/v7.0.114-SES-83d-ceremony-docs.md`.
+
+---
+
 ## cycle-20260821-0049 / S-SES-83d-the-trim (v7.0.113, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Sonnet 5, unattended) — the trim: 555 ticket rows leave the markdown files for good
 
 **Origin — an Accept given after being warned, not silence.** Step 2's harvest read one tap and,

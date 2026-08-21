@@ -169,3 +169,48 @@ not its contents:**
 against the ordered list derived from the three markdown files under the old rule; the flip is
 behaviour-preserving. Red control: the naive orderings rejected above produce a *different* list,
 so the comparison discriminates. Detail: `docs/kickoffs/v7.0.112-SES-83d-selection-flips-to-sql.md`.
+
+## Phase (d) cycle 3 — the ceremony docs — ✅ done v7.0.114, 2026-08-21, cycle `ff76eeb7-757e-45e2-a88d-6290236da141`
+
+Doc-only, 3 files: `CLAUDE-DESIGN.md` (Backlog Capture standing rule + Step 1 reading list +
+Step 3 ticket read + close-out steps 8c/9/12 + the 5b gate + 5c's archive move),
+`docs/runbooks/runner-cycle.md` (step 7's close-out line) and `docs/WORKING-WITH-JOHN.md`
+(Tier-1 autonomy item, measured-detail rule, log-session-findings rule).
+
+**The cycle-2 sweep list was never committed**, so it could not be used as evidence and was
+re-derived from scratch by a delegated Sonnet 5 subagent (register B21): **25 filing hits, 23
+reading hits, 2 size/hygiene, ~557 benign** — the benign mass being `docs/SESSIONS.md`'s
+past-tense session log, correctly left as history. Lesson for later cycles: **a sweep's findings
+are evidence only if they land in the repo.** A count quoted on a briefing card is a claim, not a
+record.
+
+**Two findings that came from the delegation and not from the orchestrator's own greps:**
+
+1. **The runner's runbook contradicted itself.** `runner-cycle.md` step 7 still read "Close-out
+   edits in the same commit set: `FEATURES*.md` row (status + P-class)" while step 5 of the same
+   file selected from `backlog_items`. Cycle 1 flipped the READ and left the WRITE pointing at
+   the files; the trim then emptied them. Every cycle since `v7.0.113` was instructed to update a
+   stub, ~8 times a day. Now a Supabase write with a before-image.
+2. **`ARCHITECTURE.md:2497` is still false** — "until then they remain on disk, unchanged, and
+   are still where new tickets are filed", one paragraph below §19v's own correct past-tense
+   note. §19v is the **gated lane**, so this is a `gated_before_build` card carrying the exact
+   proposed replacement, not an unattended edit.
+
+**A constraint worth knowing before cycle 4 plans itself:** this cycle deliberately touched no
+`.claude/` path, because step 0 of the runbook records two live stalls (`SES-78c`) from `.claude/`
+writes prompting for permission mid-cycle. **Cycle 4's named scope — the hygiene skill — lives
+at `.claude/skills/session-hygiene/SKILL.md`.** Establish whether an unattended cycle can write
+there *first*; if it cannot, cycle 4 is a gated card or a laptop session, not a build. Left
+unfixed for the same reason: `.claude/skills/triage/SKILL.md`'s Classification section, which the
+sweep rates the most direct filing instruction in the repo.
+
+**Still open after this cycle:** `docs/STANDARDS.md` (`:359` filing, `:361` row-status vocabulary),
+`docs/runbooks/CHI-TRUE-REGRESSION.md` (`:29`, `:93`) and `HAR-17-23q-regression.md` (`:49`) —
+three reading hits that gate live QA on `FEATURES.md` rows that no longer exist. And the stored
+**routine prompt's step 4** still names the three markdown files for work selection; it is
+superseded by runbook step 5, but only John can edit that prompt.
+
+**QA:** 23 paired assertions (absent-from-new **and** present-in-`HEAD`, the latter arming each
+control so the suite cannot pass vacuously) + 7 pointer-resolution checks = 30/30, exit 0. Red
+control run against a pristine `HEAD` copy: 23/23 fail, exit 1. Detail:
+`docs/kickoffs/v7.0.114-SES-83d-ceremony-docs.md`.

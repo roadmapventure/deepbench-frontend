@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.114 | runbooks/runner-cycle.md | SES-83 (d) cycle 3 — step 7's close-out line stops telling every cycle to edit a `FEATURES*.md` row (status + P-class) and names the Supabase write instead. Cycle 1 flipped SELECTION to the table but left this WRITE line pointing at the files, so from v7.0.113 (the trim) until now the runbook contradicted itself: step 5 read the table, step 7 told the same cycle to update a stub. Found by the cycle-3 ceremony sweep. NOTE FOR JOHN: the stored routine prompt's step 4 still names the three markdown files for work selection — superseded by step 5 here, but only he can edit that prompt. -->
 <!-- DeepBench v7.0.112 | runbooks/runner-cycle.md | SES-83 (d) — step 5's selection layer (3) stops parsing FEATURES.md / FEATURES-NEXT.md / FEATURES-LATER.md and reads public.backlog_items via one canonical SQL query, quoted verbatim. John's "table is authority" call, Accepted 2026-08-21T00:19Z. Four live traps encoded in the query itself: numeric P-class ordering (lexical puts P10 before P2), the `· FLAGGED` suffix, the Beta-gate/Post-beta declaration regex (ILIKE '%beta%' over-matches by 20), and `title` holding the class string for imported tickets. Layers (1) directives and (2) John's automation queue are unchanged and still outrank the table. -->
 <!-- DeepBench v7.0.108 | runbooks/runner-cycle.md | SES-89 — new step 8b, the Heal sweep: `scripts/heal-engine.js` groups `durable_hops` failures into signatures and files evidenced `P9 - Bug Fixes` tickets (dry-run by default; the cycle claims the id block and passes it in). Reads `durable_hops`, NOT `ai_activity_log` — the latter has no error column, verified live. -->
 <!-- DeepBench v7.0.107 | runbooks/runner-cycle.md | SES-83c — step 7 gains the backlog snapshot export: `scripts/export-backlog-snapshot.js` regenerates `docs/backlog/BACKLOG-SNAPSHOT.md` into the ship commit set, so the Supabase board has a git-history + offline restore copy (SES-81's backup gap). Deterministic by construction — an unchanged table writes nothing. -->
@@ -263,9 +264,14 @@ the verification.
   seam proof** in the evidence. Every Supabase write your QA makes gets a before-image row
   first and is cleaned up after.
 - Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
-- Close-out edits in the same commit set: `FEATURES*.md` row (status + P-class),
-  `CLAUDE-STATE.md` (version line + your one-line bullet, keep 3), `docs/SESSIONS.md` entry,
-  version-header comments on touched files.
+- Close-out ticket update — **a Supabase write, not a file edit** (`SES-83` (d) cycle 3,
+  `v7.0.114`): set the ticket's `backlog_items.status` (and `priority_class` if it changed) with a
+  `runner_before_images` row first. This line used to read "`FEATURES*.md` row (status + P-class)"
+  and was left behind by cycle 2's trim — those files hold no ticket rows to edit, so it
+  contradicted this same runbook's step-5 selection query. A cycle that still edits a
+  `FEATURES*.md` row is writing to a stub.
+- Close-out edits in the same commit set: `CLAUDE-STATE.md` (version line + your one-line bullet,
+  keep 3), `docs/SESSIONS.md` entry, version-header comments on touched files.
 - **Backlog snapshot (SES-83c, `v7.0.107`) — in the same commit set, every ship:**
   `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/export-backlog-snapshot.js` (both values
   from `runner_secrets`, exported as env, never written to a file). It regenerates
