@@ -18,7 +18,10 @@ lines, cycle timestamps, "at" stamps — is converted to CST (America/Chicago) a
 Store UTC internally as before; the conversion is display-only.
 
 1. Build the day's HTML from `runner_items` / `runner_cycles` / `runner_budget` /
-   `runner_ladder` — same structure as the live page: masthead, stat strip (shipped /
+   `runner_ladder` — same structure as the live page: masthead **(which carries a one-tap
+   "▶ Run a cycle now" link to `https://claude.ai/code/routines` — `SES-102`, John's ask
+   2026-08-21: the routines page works in his phone's browser and has the Run button, and this
+   page is already on his phone every morning)**, stat strip (shipped /
    gated before build / reverted / day spend / month left), Shipped cards, Gated before build,
    Needs-your-call (budget overrides), Trust ladder, Directive textarea. **Language (John,
    2026-08-20):** outcomes display as "did not run" / "gated before build" (data values

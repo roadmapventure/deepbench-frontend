@@ -140,6 +140,48 @@ export default function AdminScreen() {
             </p>
           </a>
 
+          {/* FEATURE: SES-102 — one-tap Run-now. The native phone app doesn't list routines;
+              the claude.ai routines page DOES work in a phone browser and carries the Run
+              button, and this screen is reachable from his phone. A DeepBench-native start
+              button is not buildable (only Anthropic's scheduler can spawn a cycle) — the
+              link is the ceiling until the app ships routine support. */}
+          <a
+            href="https://claude.ai/code/routines"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              background: T.cardAlt,
+              border: `1px solid ${T.line}`,
+              borderRadius: 7,
+              padding: "12px 16px",
+              textDecoration: "none",
+              color: T.ink,
+              marginBottom: 22,
+              fontSize: 13.5,
+            }}
+          >
+            <span style={{ fontFamily: display, fontWeight: 600, color: T.navy }}>
+              ▶ Run a cycle now
+            </span>
+            <span style={{ color: T.mutedDeep, marginLeft: 10 }}>
+              Opens the deepbench-runner routine — tap Run there; the cycle pushes a phone
+              notification when it starts and reports on the briefing.
+            </span>
+            <span
+              style={{
+                marginLeft: 10,
+                fontFamily: mono,
+                fontSize: 10,
+                color: T.brassDeep,
+                letterSpacing: 0.8,
+                textTransform: "uppercase",
+              }}
+            >
+              External ↗
+            </span>
+          </a>
+
           {/* FEATURE: ADM-1 v1.5 — the evidence cards, flag-guarded mount. */}
           {showEvidence && <AdminEvidenceCards />}
 

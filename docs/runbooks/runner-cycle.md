@@ -292,7 +292,14 @@ what `ba8f2ce3` and `633fe486` were, and nothing told him at the time. Both, not
 back and pushed their work to their own session branches; the correct action for that pair was
 "cherry-pick `69bc903`", never "the work is gone".
 
-**1. Open the cycle.** INSERT `runner_cycles` **with the id the claim returned** —
+**1. Open the cycle — and tell John's phone it started (`SES-102` — runner transparency on the
+phone, John's ask 2026-08-21, `v7.0.142`).** Immediately after inserting your cycle row, send
+**exactly one push notification**: fire kind + time + where the result lands — e.g.
+`"Runner cycle started (scheduled 3:00 PM CST fire). Pick and outcome will be on the briefing."`
+(or `"(manual fire)"` when the start time sits off the 3-hour grid). One push per cycle open,
+never more — the step-0b silence pushes and the close-out remain the only other notification
+senders. If no push mechanism is available in the environment, note that in the cycle row and
+continue. INSERT `runner_cycles` **with the id the claim returned** —
 `INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
 the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
 value; found live, SES-78c). Every later step's evidence hangs off this row's id; "who is

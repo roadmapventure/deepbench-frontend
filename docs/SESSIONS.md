@@ -61,6 +61,16 @@
 
 **Not done, deliberately.** B5 pins, B6 lifecycle status, B10 `filed_at` from git; adding `queue` to `BACKLOG-SNAPSHOT.md`'s explicit column list (its whitelist means the snapshot is unaffected today); and `session-setup`'s manual-session recompute call site — a `.claude/` edit, which an unattended cycle does not enter (step 0). **Also of note for cloud cycles:** the regression suite reports 30/31 in a fresh clone because `CHI-31` needs `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; exported from `runner_secrets` it is 31/31. That is an environment gap, not a code failure, and reading it as one would be the `v7.0.115` mistake in a new costume.
 
+## automation-review / SES-102-phone-transparency (v7.0.142, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the runner tells John's phone when it starts, and Run-now is one tap away
+
+**Mission.** `SES-102` — runner transparency on the phone (Tooling · `P10 - Tooling`), John's live ask: routines don't show in the iPhone app; he wants a manual push path and a kickoff notification.
+
+**What shipped.** `runner-cycle.md` step 1: **exactly one push notification at cycle open** — fire kind (scheduled/manual), CST time, where the result lands; the 0b silence pushes and close-out stay the only other senders, so notification volume is bounded at one-per-cycle-start. `/admin` gains a "▶ Run a cycle now" link to `claude.ai/code/routines` (that page works in a phone browser and carries the real Run button); `briefing-page.md`'s masthead spec carries the same link, since the briefing is already on his phone every morning. Build green, regression **31/31**.
+
+**Honest boundary, recorded in the ticket so it is never re-litigated:** the native Claude iPhone app not listing routines is Anthropic's surface, and nothing in this repo can spawn a cloud cycle — only Anthropic's scheduler/Run-now can — so a DeepBench-native "start a cycle" button is not buildable. The one-tap link is the ceiling until the app ships routine support.
+
+**QA note.** The kickoff push is procedure text executed by cloud cycles; its discriminating proof is the next scheduled fire producing exactly one "cycle started" phone notification — named here as the check, not pre-claimed as done.
+
 ## automation-review / ADM-1-v1.5-evidence-cards (v7.0.141, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the runner's evidence reaches the app, read-only, flag-off, leak-proof by construction
 
 **Mission.** `ADM-1` — briefing access / Super Admin (Tooling per John's 2026-08-21 reclass tap; originally Feature) v1.5: the read-only runner evidence cards on the `/admin` screen. The last open build of the automation scope.
