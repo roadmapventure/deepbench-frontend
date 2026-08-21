@@ -5,6 +5,30 @@
 
 ---
 
+## cycle-20260821-2235 / SES-107-ladder-streak-no-reset (v7.0.148, 2026-08-21, Automated runner cycle `ff23297c`, model Opus 5) — the count keeps running, and the arithmetic form is what stops a rung-per-tap
+
+**Mission.** No queued work directive (the only queued `runner_directives` row remains the unexpired `budget_override` `bb5c2d05`), so selection fell to the board. Fired **off the 3-hour grid** by John's Run-now tap — session `origin = force_run_trigger`, 22:35Z / 5:35 PM CST, four minutes after his last briefing tap. The step-1 start push said "scheduled fire" because the prompt's `trigger:` clause says `scheduled`; the session origin is the more precise fact and is recorded here.
+
+**Queue #1 and #2 were skipped, and not by a cycle's own judgment — by John's taps, read at step 2 and carried forward.** He decided all four open cards between 22:29Z and 22:33Z, one minute before this cycle opened: `SES-105` Accepted (park it until the `sample` capability exists), `SES-98` Accepted (close it — the ability was already live), the `SES-101` ship Accepted, and the `SES-101` attended-edit card Accepted. Those taps are what made `SES-107` the top pickable ticket. The writes ran in the step-9 tail per register B42; the selection honoured them immediately, which is exactly what step 2's read-only "carry it forward" clause is for.
+
+**What shipped.** The ladder rule stops leaving a blank each cycle has to fill. It read *"Accept → streak +1 (5 consecutive → rung +1)"* and never said what happens to the streak **after** a promotion. Cycle `7392e345` hit that live at 20:27Z — John's Accept took `tooling` from streak 4 to 5, promoting rung 6 → 7 — chose 0, and correctly filed `q-ladder-streak-reset` rather than letting an invented rule stand. **John answered NO at 22:04Z**, with his own words on the card: *"which one just keeps the count going? no need to reset - why would i do that?"*
+
+Two files, both `docs/runbooks/`: step 2 of `runner-cycle.md` and the read-back contract in `briefing-page.md`, the latter citing rather than restating (that sentence drifting out of sync is the failure `v7.0.118` fixed here once already).
+
+**Why the answer alone was not enough, and this is the part worth keeping.** Removing the reset *by itself*, under the rule as written (*promote at 5 **or more***), promotes again on the very next Accept and every one after it — a rung per tap, forever. That is not what John asked for; it is simply the opposite failure, and it compounds the runner's own autonomy on a rule nobody wrote. **It would have fired tonight:** under no-reset-plus-"at-least-5", his 20:40Z Accept on the `SES-100` card would have taken tooling from streak 5 to 6 and promoted it a second time, rung 7 → 8. Stating the test as **`streak % 5 = 0`** gives him the running count with no runaway, and states it as arithmetic so the ambiguity cannot come back.
+
+**The honest half — the correction he was promised is a no-op, and he is told so.** The question's own text said *"No = it should carry over, and I will correct tonight's row."* Replaying tonight's `runner_ladder` before-images under the new rule — reconstructed against the real `runner_items` decision rows, not from memory — the divergence starts at 20:27Z `(7,0)` vs `(7,5)` and is **erased at 20:42Z**, because a `Reverse` sets the streak to 0 regardless and John Reversed the `SES-98` card there and the `SES-84` card again at 22:01Z. Final row `(rung 5, streak 0)` either way, identical to what is stored. So nothing was written to the ladder for this, and the briefing card says that in plain words rather than quietly skipping a promise.
+
+**QA, and why it discriminates.** Five assertions run against **both** `origin/dev` and the ship: **5/5 fail** on the unchanged files, **5/5 pass** after. That pairing is the point — an append-only change that added the new sentence while leaving *"5 consecutive → rung +1"* and *"streak+1, 5 promotes"* in place would pass a presence check and leave the contradiction intact, so the check asserts the old forms are **gone** as well as the new one present. Historical quotations inside version-header comments were inspected individually rather than assumed benign. `npm run build` green; regression **30/31 without credentials, 31/31 with them** supplied from `runner_secrets` — the `CHI-31` environment gap, identical to `v7.0.146`, recorded again because the bare suite line misreports it as a regression.
+
+**Corrected in passing.** Register B34's boundary paragraph justified not re-deriving the ladder's history on the grounds that the streak-reset value *"does not define"* — which this ship falsifies. The justification is corrected; **the conclusion is not reopened**, because it rests on John's own `q-ladder-rewind` **no**, not on the missing value.
+
+**Not done, and carded rather than attempted.** No code implements the ladder (`grep -rl "runner_ladder" --include=*.js` → nothing): every cycle applies it by hand in SQL at harvest time, which is the same "a rule each cycle must remember" shape that `SES-86` phase 3 and `v7.0.146` both had to fix after it silently failed. Making it executable is a real proposal and it went to John as a question, not into this diff.
+
+**One ordering gap found and filed, not papered over.** Since register B42 moved the harvest writes into the step-9 tail, they land **after** step 7's `BACKLOG-SNAPSHOT.md` export — so the committed snapshot is stale by exactly one harvest (here: `SES-98` going `done` and `SES-105` parking). Same shape as `SES-106`'s claim-release contradiction: a rule moved, and one downstream step's ordering was not moved with it.
+
+---
+
 ## cycle-20260821-2205 / SES-101-automation-lane-top (v7.0.147, 2026-08-21, Automated runner cycle `9865c07d`, model Opus 5) — the lane finally assigns itself, and a REVOKE that reported success and did nothing
 
 **Mission.** No queued work directive (the only queued `runner_directives` row is the unexpired `budget_override` `bb5c2d05`), so selection fell to the board. Fired **off the 3-hour grid** by John's Run-now tap — session `origin = force_run_trigger`, 22:05Z / 5:05 PM CST.

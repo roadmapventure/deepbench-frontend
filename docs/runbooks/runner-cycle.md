@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.148 | runbooks/runner-cycle.md | SES-107 — step 2's ladder rule stops leaving a blank a cycle has to fill. It read "Accept → streak +1 (5 consecutive → rung +1)" and never said what happens to the streak AFTER a promotion; cycle 7392e345 hit that live at 20:27Z (tooling 4 → 5, rung 6 → 7), set the streak to 0, and correctly filed `q-ladder-streak-reset` instead of inventing the rule. John answered NO at 22:04Z — "which one just keeps the count going? no need to reset - why would i do that?" — so the streak now keeps running and the promotion test is stated as arithmetic, `streak % 5 = 0`, never "at least 5". Both halves are load-bearing: removing the reset ALONE, under a "5 or more" reading, promotes on every tap forever, which is the opposite failure and would compound the runner's autonomy on a rule nobody wrote. A Reverse still zeroes the streak (John, `1d01ea85`, "leave it") — only promotion stops resetting. MEASURED rather than assumed, and it is the honest half of this ship: John was told on the card "No = I will correct tonight's row", and replaying tonight's before-images under the new rule reproduces the STORED row exactly — the Reverses at 21:21Z and 22:22Z each zero the streak regardless, so the promised correction is a no-op. Said plainly on the briefing rather than quietly skipped. The B34 boundary paragraph's justification is corrected with it ("does not define" expired), while its conclusion stands on John's own `q-ladder-rewind` NO rather than on a missing value. NOT DONE, and carded rather than attempted: no code implements the ladder (grep -rl runner_ladder --include=*.js → nothing), so this rule is applied by hand in SQL every cycle; making it executable is his call, filed as a question. -->
 <!-- DeepBench v7.0.147 | runbooks/runner-cycle.md | SES-101 — step 5's automation-lane block gains the filing rule the lane never had: a new automation ticket claims the TOP of the lane with one call, `SELECT public.claim_automation_lane_top('<TICKET-ID>')` (migration ses101_automation_lane_top). `automation_rank` has been recompute_backlog_queue()'s leading key since v7.0.133, but NOTHING assigned it at filing time, so a new automation ticket landed in the class-sorted backlog — the very failure the lane was built to end. John's ruling settles the direction: question q-lane-top, answered YES 2026-08-21T20:47Z (from directive 48ae1939 line 4, "if you create more automation tickets keep making them top of queue"), so the slot is min(open lane) − 1, never max + 1. Measured before shipping: the last three automation tickets filed were hand-assigned to the BOTTOM (SES-99=7, SES-100=8, SES-101=9) — the opposite of his answer, drifting silently for exactly the reason SES-86 phase 3 and v7.0.146 both diagnosed, that a rule each cycle must remember is a rule that gets forgotten. Function is idempotent, runs the recompute itself, and reads the OPEN lane only. A SECOND rule rides along, found live in this migration's own QA and general to every future function: REVOKE EXECUTE FROM anon, authenticated reports success and changes NOTHING while PUBLIC holds the default grant — the function-level twin of .claude/rules/supabase-column-grants.md. Asserted both directions after the corrected revoke. NOT DONE, and carded rather than attempted: the canonical INSERT at session-setup step 3c is under `.claude/`, which an unattended cycle may not write (step 0, register B39) — the exact replacement text is on the card for a session John attends. -->
 <!-- DeepBench v7.0.146 | runbooks/runner-cycle.md | directive dda69acb (+ twin 6b6cdd71) — step 9's card-filing line gains the three plain-language columns (migration ses106_card_plain_language). v7.0.145 made the More-info panel's three fields required at RENDER only, as a per-card JS object literal, so the words had nowhere to live between rebuilds and register B18 ("build cards FROM the DB, never from memory") was unfollowable for them — the next cycle had to re-invent a card's wording from scratch. John Reworked two cards three minutes apart for that confusion (20:44Z, 20:46Z) and Accepted the v7.0.145 render half at 21:32Z; this is its data half. NULL stays NULL: it is what draws the red defect line, and coercing it to '' would make a missing summary look fine. Same prose→column shape as SES-86 phase 3. -->
 <!-- DeepBench v7.0.145 | runbooks/runner-cycle.md | directive edab5908 — step 2 gains the `asks` harvest and step 9's tail gains the duty it creates. John typed a question box into existence ("I need to be able to ask questions about the issue"), and the rule that comes with it is that an ask he can see recorded but never answered is worse than no box: every open runner_card_asks row is answered on its own card in the rebuild. The idempotence note is not decoration — the page keeps every ask in briefing-state forever, so every cycle re-reads asks it already stored, and uniq_card_ask is the only thing stopping the log duplicating on each republish. -->
@@ -357,10 +358,49 @@ and serialized. The rules below govern those writes wherever they run. Original 
 Read the briefing page (URL in
 `docs/runbooks/briefing-page.md`) and parse its `briefing-state` JSON block. For each decided
 item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accept** → ladder
-streak +1 (5 consecutive → rung +1) **on a `shipped` card only — see the gated-card rule below**;
+streak +1, and **promote a rung on every 5th Accept — the test is `streak % 5 = 0`, never "at
+least 5" — leaving the streak to keep counting (see the no-reset rule below)**, **on a `shipped`
+card only — see the gated-card rule below**;
 **Reverse** → revert-forward the item's commits and/or
 restore its before-images, reopen its backlog row carrying John's line, ladder streak → 0 and
 rung −1; **Rework** → John's line becomes a new `runner_directives` row, queued first.
+
+**THE STREAK IS NEVER RESET ON PROMOTION — the count keeps running, and a rung is earned on every
+5th Accept (John, 2026-08-21, question `q-ladder-streak-reset` answered **no** at 22:04Z; `SES-107`,
+`v7.0.148`).** The written rule used to be *"Accept → streak +1 (5 consecutive → rung +1)"*, which
+never said what happens to the streak **after** a promotion. Cycle `7392e345` hit that blank live
+at 20:27Z — John's Accept took `tooling` from streak 4 to 5, promoting rung 6 → 7 — set the streak
+to 0, and filed the question rather than letting an invented rule stand. John's answer was **no**,
+with his own words on the card: *"which one just keeps the count going? no need to reset - why
+would i do that?"*
+
+**Why the reset existed, and why removing it alone would have been wrong.** Written as *promote at
+5 **or more***, a streak left at 5 promotes again on the very next Accept, and again on the one
+after that — **a rung per tap, forever**. That runaway is not what John asked for either; it is
+simply the opposite failure, and it would have compounded the runner's own autonomy on a rule
+nobody wrote. The form that gives him exactly what he asked for **without** the runaway is the one
+now in force, and it is stated as a test so the ambiguity cannot come back:
+
+```
+promotion  ⇔  streak % 5 = 0        -- 5, 10, 15, … ; NEVER "streak >= 5"
+after promotion:  streak keeps its value — it is not reset, not to 0 and not to anything else
+```
+
+Three boundaries, so no later cycle has to guess:
+
+- **A `Reverse` still sets the streak to 0.** That is a different rule, John ruled on it
+  separately ("leave it", directive `1d01ea85`), and it is untouched here. Only *promotion* stops
+  resetting.
+- **Forward only; the ladder's history is NOT re-derived** — register B34's boundary, and John
+  answered `q-ladder-rewind` **no**. Note what this did and did not cost, because it was measured
+  rather than assumed (`SES-107`): replaying tonight's `runner_ladder` before-images under the new
+  rule yields **exactly the stored row**, because the two `Reverse`s at 21:21Z and 22:22Z each set
+  the streak to 0 regardless, erasing the difference. The correction John was promised on the card
+  is a **no-op on this row** — which is worth saying to him plainly rather than quietly skipping.
+- **The rule lives only here and in `briefing-page.md`.** No code implements the ladder
+  (`grep -rl "runner_ladder" --include=*.js` → nothing); every cycle applies it by hand in SQL at
+  harvest time. Making it executable so the arithmetic cannot be got wrong is a real idea and is
+  this platform's own recurring lesson — it is **John's call, filed as a question, not done here**.
 
 **An Accept on a `gated_before_build` card is permission, not a rating — it does NOT touch
 `runner_ladder` (John, 2026-08-21, directive `fb643367`, register B34).** Asked outright
@@ -378,11 +418,15 @@ Two boundaries on that rule, stated so no later cycle has to guess:
 
 - **It applies forward from the 2026-08-21T03:53Z harvest, and the ladder's history is not
   re-derived.** Two earlier harvests (`runner_items` `ae7b57c7` 00:19Z, `bfa4f42a` 02:19Z) did
-  count gated taps. Unwinding them needs the ladder's streak-reset-on-promotion value, which the
-  written rule **does not define** and this platform has done both ways — so a re-derivation
-  would be inventing a rule, not applying one. It is named on the briefing instead. If John says
-  "rewind the ladder", that is the authorisation to re-derive, and the undefined value is the
-  first thing to ask him about.
+  count gated taps. Unwinding them needs the ladder's streak-reset-on-promotion value, which at
+  the time the written rule **did not define** and this platform had done both ways — so a
+  re-derivation would have been inventing a rule, not applying one. It is named on the briefing
+  instead. **That value is now defined** (John, `q-ladder-streak-reset` **no**, 22:04Z; the
+  no-reset rule above, `SES-107`/`v7.0.148`), so the original *reason* has expired — but **the
+  conclusion has not, and it is not reopened by this**: John answered `q-ladder-rewind` **no**
+  at 17:20Z, so the history stands as-is on his word rather than on the absence of a value. If he
+  ever says "rewind the ladder", that is the authorisation to re-derive, and the rule to re-derive
+  under is now written down rather than being the first thing to ask him about.
 - **A Reverse on a gated card still demotes — and that is now John's ruling, not a default
   awaiting one (John, 2026-08-21, directive `1d01ea85`, register B35).** `v7.0.118` left this
   half open on purpose. The symmetric argument — that declining permission should be
