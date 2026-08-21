@@ -358,7 +358,13 @@ Two boundaries on that rule, stated so no later cycle has to guess:
   unclosed asymmetry.** A later cycle that thinks it should change puts a fresh case to John; it
   does not reopen it by inference, in either direction.
 
-Non-empty directive text in the page becomes a `runner_directives` row (verbatim). A saved
+**Pins (`SES-86` — the queue engine, register B5, `v7.0.140`):** a directive-box line matching
+`TICKET-ID — move to N` sets that ticket's `pinned_position = N` (then run the recompute — the
+pin takes its absolute slot, everything else renumbers around it); `TICKET-ID — release` clears
+it. Latest call wins a collision (`updated_at` breaks the tie in the function); completion or
+removal clears the pin automatically inside the recompute. A pin line is consumed as a pin, not
+stored as a directive row. All other non-empty directive text in the page becomes a
+`runner_directives` row (verbatim). A saved
 usage reading (the three meter percentages John types in) becomes a `runner_usage_readings`
 row: store the percentages verbatim, compute `est_tokens_since_prev` (sum of cycle token
 estimates since the prior reading) and `tokens_per_pct` (that sum ÷ the all-models delta,
