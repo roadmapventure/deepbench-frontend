@@ -19,6 +19,14 @@
 
 **Not done, deliberately.** B5 pins, B6 lifecycle status, B10 `filed_at` from git; adding `queue` to `BACKLOG-SNAPSHOT.md`'s explicit column list (its whitelist means the snapshot is unaffected today); and `session-setup`'s manual-session recompute call site — a `.claude/` edit, which an unattended cycle does not enter (step 0). **Also of note for cloud cycles:** the regression suite reports 30/31 in a fresh clone because `CHI-31` needs `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; exported from `runner_secrets` it is 31/31. That is an environment gap, not a code failure, and reading it as one would be the `v7.0.115` mistake in a new costume.
 
+## automation-review / SES-83e-filing-path (v7.0.132, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the last SES-83 phase: filing gets its canonical INSERT
+
+**Mission.** `SES-83` (Tooling · `P10 - Tooling`) phase (e), the fifth cut of John's "table is authority" Accept (2026-08-21T00:19Z): the filing path points at the table. Cycle 3 (`v7.0.114`) had already moved the *destination* into `CLAUDE-DESIGN.md`'s Backlog Capture rule; what remained was the *mechanics* — and the gap was proven live this same day when this session's own `SES-96` filing failed on `row_ordinal`'s NOT NULL constraint, a trap nothing documented.
+
+**What shipped (2 work files).** `session-setup` SKILL.md step 3c — the canonical filing INSERT, verbatim, carrying the three live traps (`row_ordinal` NOT NULL, found live; `priority_class` required at filing, register B9, named form; `title` is the human sentence, never the class string — the imported-rows trap) plus the mandatory `recompute_backlog_queue()` call (register B4) so a new ticket gets its queue number at birth. `CLAUDE-DESIGN.md`'s Backlog Capture banner now points at it. **`SES-83` is complete — all five phases (a)–(e) shipped.**
+
+**QA.** The INSERT shape's both arms were proven live earlier today on a real filing: without `row_ordinal` → error 23502 (the failure arm), with the `max+1` form → `SES-96` filed cleanly; `recompute_backlog_queue()` called from this manual session → 0 rows changed (idempotent, callable, board unchanged — correct, since nothing was filed by this phase itself). No new test ticket was filed just to re-prove a path already proven on real work today (scope-live-tests-to-novel-risk).
+
 ## automation-review / B41-inflight-marker-move (v7.0.131, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the marker that forced every session under the permission gate moves out
 
 **Mission.** Register B41 — John's live approval ("yes move the marker") of the fix B38 identified and B39 left to him: relocate the per-session inflight marker from `.claude/inflight/` to repo-root `inflight/`, because the `.claude/` path fires the human-only harness permission prompt and the marker was the one thing `CLAUDE.md`'s router forced every session to write there.

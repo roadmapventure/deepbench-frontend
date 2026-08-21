@@ -199,6 +199,37 @@ are frozen — never claim a new legacy-prefixed ID through this or any other me
 
 ## Close of session
 
+### 3c. File a new backlog ticket — the canonical INSERT (`SES-83` phase (e), 2026-08-21)
+
+Tickets are filed straight into `public.backlog_items` — never into the `FEATURES*.md` stubs.
+Claim the `backlog_id` first (step 3b, one block call per prefix), then file with this shape;
+every column below is load-bearing:
+
+```sql
+INSERT INTO backlog_items
+  (backlog_id, tier, type, priority_class, title, description, status,
+   source_file, session_ref, row_ordinal)
+SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>',
+       '<named P-class — REQUIRED at filing, register B9>',
+       '<one-line human title — never the class string>',
+       '<description; convention opens with the bolded named class>',
+       'missing', 'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
+       coalesce(max(row_ordinal),0)+1
+  FROM backlog_items
+RETURNING backlog_id, priority_class;
+```
+
+- **`priority_class` is mandatory at filing** (register B9 — nothing enters the board
+  undecided), always the full named form (`P10 - Tooling`), `· FLAGGED` suffix only on
+  `P9 - Bug Fixes` pixel-moving fixes.
+- **`row_ordinal` is NOT NULL** — omit it and the INSERT fails (found live filing `SES-96`,
+  2026-08-21); the `SELECT … max+1` form above handles it.
+- **`title` is the human sentence.** Phases (a)/(b) imported the class string into `title` for
+  old rows — that is the trap, not the convention.
+- **Then run `SELECT public.recompute_backlog_queue();`** — a new classed ticket is a queue
+  recompute event (register B4), and without it the ticket has no queue number and is invisible
+  to "Next up".
+
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
 Before any push to `dev` (kickoff commit, close-out commit — anything), from inside the worktree:

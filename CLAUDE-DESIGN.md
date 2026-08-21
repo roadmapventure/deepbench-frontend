@@ -108,6 +108,12 @@ Defaults (John's explicit call 2026-08-01, `design-scaling-arch-0731` — "Fable
 > (`now` / `next` / `later`), and the priority class is its **`priority_class`** column — so the
 > classification rules below are applied as column values, not as a choice of file.
 >
+> **The canonical filing INSERT lives in `.claude/skills/session-setup/SKILL.md` step 3c
+> (`SES-83` phase (e), `v7.0.132`) — use it verbatim.** It carries the three live traps a
+> hand-written INSERT hits (`row_ordinal` NOT NULL; `priority_class` required at filing per
+> register B9; `title` is the human sentence, never the class string) and the mandatory
+> `recompute_backlog_queue()` call that gives the new ticket its queue number (register B4).
+>
 > - **Filing procedure + the ID claim:** `docs/FEATURES.md` § "Where the rows are now".
 > - **Claim the ID atomically** from `feature_id_counter` (`.claude/skills/session-setup/SKILL.md`
 >   §3b), one call per prefix for the whole block — unchanged, and now the only way.
