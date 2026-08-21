@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.118 | RUNNER-GOV-0820-REQUIREMENTS.md | directive fb643367 — register B34 appended: John's ruling that an Accept on a gated_before_build card is permission, not a rating, and does not move the trust ladder. Records the ruling's provenance, what shipped, and the two things deliberately left undone (no retroactive ladder re-derivation; Reverse-on-gated not covered and still demoting). -->
 <!-- DeepBench v7.0.108 | RUNNER-GOV-0820-REQUIREMENTS.md | design-runner-gov-0820 — the running requirements register for John's governance recalibration session (2026-08-20). Updated same-turn as decisions land; the automation tickets are cut from this file. -->
 # Runner Governance Recalibration — Requirements Register
 
@@ -206,6 +207,25 @@
   `SES-83` phases (d)/(e) flip the database to authoritative. **Consequence for any future
   markdown↔DB reconciliation:** `source_file='heal-engine'` must be added to that script's
   ignore-list, or a naive orphan sweep will delete every heal-filed ticket as unmatched.
+- **B34. A gated Accept is permission, not a rating (John, 2026-08-21, directive `fb643367`):**
+  asked outright whether an Accept on a `gated_before_build` card should count toward the trust
+  ladder, John answered **"no"**. An Accept there authorises that one build and re-enters the
+  ticket at queue #1 (B23); it writes `decision`/`decision_reason`/`decided_at` like any tap and
+  **does not touch `runner_ladder`**. The ladder measures the runner's *unattended* judgment, fed
+  by John's verdict on work already done — a gated card is the opposite transaction, and paying
+  the runner for asking permission would tax the one behaviour that must stay free. Shipped
+  `v7.0.118` into `runner-cycle.md` step 2 (the operative home) and `briefing-page.md`'s read-back
+  contract, which cites rather than restates it. **Two things deliberately NOT done, and both are
+  on the briefing rather than decided here:** (1) the ladder's history is **not** re-derived —
+  harvests `ae7b57c7` (00:19Z) and `bfa4f42a` (02:19Z) counted gated taps, and unwinding them
+  needs the streak-reset-on-promotion value, which the written rule does not define and this
+  platform has done both ways, so re-deriving would invent a rule rather than apply one; (2)
+  **Reverse-on-gated is not covered and still demotes** — John ruled on Accept only, and the
+  symmetric argument (declining permission should not penalise the runner for asking) is an
+  inference a cycle must not use to widen its own autonomy rule. `ARCHITECTURE.md` §19v's trust-
+  ladder paragraph still carries the undistinguished sentence: it is an architecture supersession,
+  the gated lane, so `v7.0.118` **carded** the exact replacement text for John's Accept instead of
+  editing it.
 
 ## D. Ticket ledger
 

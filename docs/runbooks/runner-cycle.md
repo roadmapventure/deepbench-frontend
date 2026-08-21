@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.118 | runbooks/runner-cycle.md | directive fb643367 — John's Q1 ruling reaches the procedure. Step 2's flat "Accept → streak +1" now excludes `gated_before_build` cards: a gated Accept is permission, not a rating, and does not touch `runner_ladder`. Two boundaries written down with it, both deliberate: the rule applies forward and the ladder's history is NOT re-derived (the streak-reset-on-promotion value is undefined in the written rule, so unwinding the two earlier gated-counting harvests would invent a rule); and Reverse-on-gated is NOT covered — John ruled on Accept only, so it still demotes and the asymmetry goes to him as an open question rather than being harmonised by inference. -->
 <!-- DeepBench v7.0.117 | runbooks/runner-cycle.md | directive 73e41d2c — two corrections a cycle paid for in blood. Step 0's `.claude/` clause is widened from "no inflight file" to "a cloud cycle writes NOTHING under `.claude/`, it cards the edit for a laptop session", with the three measurements behind it (a ~35-minute probe return, two cycles dead mid-run on that one mission, and a fresh probe that produced no tool result at all). Step 6 gains the rule those cycles broke: a subagent that has not returned is NOT a result — wait for it or report the question open, and leave a breadcrumb outside the paths under test so a hang still says where it hung. -->
 <!-- DeepBench v7.0.114 | runbooks/runner-cycle.md | SES-83 (d) cycle 3 — step 7's close-out line stops telling every cycle to edit a `FEATURES*.md` row (status + P-class) and names the Supabase write instead. Cycle 1 flipped SELECTION to the table but left this WRITE line pointing at the files, so from v7.0.113 (the trim) until now the runbook contradicted itself: step 5 read the table, step 7 told the same cycle to update a stub. Found by the cycle-3 ceremony sweep. NOTE FOR JOHN: the stored routine prompt's step 4 still names the three markdown files for work selection — superseded by step 5 here, but only he can edit that prompt. -->
 <!-- DeepBench v7.0.112 | runbooks/runner-cycle.md | SES-83 (d) — step 5's selection layer (3) stops parsing FEATURES.md / FEATURES-NEXT.md / FEATURES-LATER.md and reads public.backlog_items via one canonical SQL query, quoted verbatim. John's "table is authority" call, Accepted 2026-08-21T00:19Z. Four live traps encoded in the query itself: numeric P-class ordering (lexical puts P10 before P2), the `· FLAGGED` suffix, the Beta-gate/Post-beta declaration regex (ILIKE '%beta%' over-matches by 20), and `title` holding the class string for imported tickets. Layers (1) directives and (2) John's automation queue are unchanged and still outrank the table. -->
@@ -118,9 +119,38 @@ RETURNING released_at;   -- 0 rows = you were stolen from; leave the new holder 
 **2. Harvest John's judgment.** Read the briefing page (URL in
 `docs/runbooks/briefing-page.md`) and parse its `briefing-state` JSON block. For each decided
 item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accept** → ladder
-streak +1 (5 consecutive → rung +1); **Reverse** → revert-forward the item's commits and/or
+streak +1 (5 consecutive → rung +1) **on a `shipped` card only — see the gated-card rule below**;
+**Reverse** → revert-forward the item's commits and/or
 restore its before-images, reopen its backlog row carrying John's line, ladder streak → 0 and
 rung −1; **Rework** → John's line becomes a new `runner_directives` row, queued first.
+
+**An Accept on a `gated_before_build` card is permission, not a rating — it does NOT touch
+`runner_ladder` (John, 2026-08-21, directive `fb643367`, register B34).** Asked outright
+whether a gated Accept should count toward the ladder, John answered **"no"**. The reason it
+matters is not bookkeeping: the ladder measures whether the runner's *unattended judgment* can
+be trusted, and it is fed by John's verdict on work the runner **already did**. A gated card is
+the opposite transaction — the runner did not build, and is asking. Counting "yes, go ahead" as
+five-sixths of a promotion pays the runner for asking permission, which is the one behaviour
+that must always be free. So a gated Accept does exactly two things, both unchanged: it
+authorises that one build, and it re-enters the ticket at queue #1 (register B23). It writes
+`decision`/`decision_reason`/`decided_at` like any other tap, and it leaves `rung` and `streak`
+alone.
+
+Two boundaries on that rule, stated so no later cycle has to guess:
+
+- **It applies forward from the 2026-08-21T03:53Z harvest, and the ladder's history is not
+  re-derived.** Two earlier harvests (`runner_items` `ae7b57c7` 00:19Z, `bfa4f42a` 02:19Z) did
+  count gated taps. Unwinding them needs the ladder's streak-reset-on-promotion value, which the
+  written rule **does not define** and this platform has done both ways — so a re-derivation
+  would be inventing a rule, not applying one. It is named on the briefing instead. If John says
+  "rewind the ladder", that is the authorisation to re-derive, and the undefined value is the
+  first thing to ask him about.
+- **A Reverse on a gated card is NOT covered and still demotes.** John ruled on Accept only.
+  The symmetric argument — that declining permission should be ladder-neutral too, since the
+  runner is otherwise penalised for asking and being told no — is a good one, and it is
+  *deliberately not applied*: a cycle does not widen its own autonomy rule on an inference. It
+  stays on the briefing as an open question until John answers it in his own words.
+
 Non-empty directive text in the page becomes a `runner_directives` row (verbatim). A saved
 usage reading (the three meter percentages John types in) becomes a `runner_usage_readings`
 row: store the percentages verbatim, compute `est_tokens_since_prev` (sum of cycle token

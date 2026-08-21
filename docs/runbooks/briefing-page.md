@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.118 | runbooks/briefing-page.md | directive fb643367 — the read-back contract's one-line ladder summary said "Accept streak+1, 5 promotes" with no card-kind distinction, which is exactly the sentence John's Q1 ruling retires. It now updates the ladder from `shipped` cards only; a `gated_before_build` Accept is permission, not a rating. The full rule is CITED from runner-cycle.md step 2 rather than restated, because this line drifting out of sync with the runbook is the failure being fixed. -->
 <!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
 # Runbook — The Morning Briefing Page (`SES-78b`)
 
@@ -56,9 +57,20 @@ from the served document —
 same state block when Needs-your-call cards exist.
 
 Harvested decisions are written to `runner_items.decision/decision_reason/decided_at` and the
-ladder is updated (§19v: Accept streak+1, 5 promotes; Reverse → streak 0, demote; Rework
-neutral) before any new work starts. Un-decided cards carry forward to the rebuilt page —
+ladder is updated before any new work starts — **but only from `shipped` cards.** On a
+`shipped` card: Accept → streak+1, 5 promotes; Reverse → streak 0, demote; Rework neutral. On a
+`gated_before_build` card, **an Accept is permission to build, not a rating, and does not touch
+the ladder at all** (John, 2026-08-21, directive `fb643367`, register B34) — it authorises that
+one build and re-enters the ticket at queue #1 (B23). A Reverse on a gated card still demotes:
+John ruled on Accept only, and that asymmetry is an open question on the page, not a gap to
+close by inference. **The full statement, including why the history is not re-derived, lives in
+`runner-cycle.md` step 2 — do not restate it here, cite it**, so the two runbooks cannot drift
+the way this line did. Un-decided cards carry forward to the rebuilt page —
 **silence is never an Accept.**
+
+Two consequences for the page itself, both required on every rebuild: a gated card's buttons
+must not be captioned or described as rating the work (Accept there means "yes, do this"), and
+the trust-ladder table's note must not attribute a rung movement to a gated tap.
 
 ## Standing facts
 
