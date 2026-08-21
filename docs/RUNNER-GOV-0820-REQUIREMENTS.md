@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.122 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 34865f07 — register B39 appended and B38 corrected in place under a dated banner (its wrong sentences kept; the mistake is the lesson). John's testimony — "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." — names the mechanism four probes could not: the .claude/ gate is a harness permission prompt rendered ONLY in the human session UI, invisible and unanswerable to the agent, cleared by a person. B38's location was right, its clearing model wrong: the stall does not self-clear, so "a cost, not a prohibition — budget ~35 minutes" was a sample of the ATTENDED cases only. The partition is exact and was re-derived from live rows: John's taps stop 03:48Z, resume 12:50Z; every probe that cleared ran inside his waking window, all three that parked 8h+/never ran inside the nine-hour hole, and the two parked cycles resumed TOGETHER eighteen minutes after his first morning tap. New rule: an unattended cycle never enters the gate (no bounded recovery); the edit stays legitimate work needing a session he attends. SES-95 superseded as "the decisive probe" — unattended it parks rather than confirms. His onset attribution is contradicted by 21 hours and said so; his mechanism is right, and a real mediated link survives. Three residues kept labelled as inference, the steelman shipped alongside, and two questions left to John: relocate the inflight marker out of .claude/, and whether a pre-approval can be granted these cloud sessions at all. -->
 <!-- DeepBench v7.0.121 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 1d01ea85 — four registers appended. B35 records John's three answers (Reverse-on-gated "leave it"; the budget day is an America/Chicago day; a silent run must push why + what to do next). B36 logs his fourth item — subagents appearing to ask permission — as a question the RUNNER owes evidence on, not one John must rule on. B37 is the correction this cycle made to its own unshipped rule: a silent cycle is not a dead cycle, measured live when the two cycles presumed dead resumed after nine hours and finished. B38 narrows B36 with the surviving hypothesis — the .claude/ stall tracks Bash redirection, not the path (Write/Edit writes under .claude/ succeeded in seconds), which would make v7.0.117's blanket rule too wide; held open, with the next cycle's own edit as the decisive probe. -->
 <!-- DeepBench v7.0.118 | RUNNER-GOV-0820-REQUIREMENTS.md | directive fb643367 — register B34 appended: John's ruling that an Accept on a gated_before_build card is permission, not a rating, and does not move the trust ladder. Records the ruling's provenance, what shipped, and the two things deliberately left undone (no retroactive ladder re-derivation; Reverse-on-gated not covered and still demoting). -->
 <!-- DeepBench v7.0.108 | RUNNER-GOV-0820-REQUIREMENTS.md | design-runner-gov-0820 — the running requirements register for John's governance recalibration session (2026-08-20). Updated same-turn as decisions land; the automation tickets are cut from this file. -->
@@ -349,6 +350,87 @@
   measurements would sharpen it first, both cheap: time an identical first `.claude/` write from
   a **parent** session (does the stall scope to subagents?), and from a **second fresh subagent**
   (is it once per agent, or once per session?).
+
+  > **CORRECTED 2026-08-21 (`v7.0.122`, directive `34865f07`, register B39) — B38's location was
+  > right and its clearing model was wrong; the wrong sentences are kept because the mistake is
+  > the lesson.** What B38 concluded: *"an intermittent multi-minute stall that CLEARS,"* therefore
+  > *"a cost, not a prohibition,"* budget ~35 minutes, and *"`SES-95` does the edit, and its own
+  > success or stall is the confirmation."* What is now known: the stall does **not** clear on its
+  > own — it clears when **a human opens the session and answers a permission prompt the agent
+  > cannot see**. B38's own sentence *"what is not happening is anyone being asked in a way they
+  > could answer"* is the one that falls: John was asked, and answered. Its ~35-minute cost figure
+  > is not a distribution but **a sample of the attended cases**; unattended, the measured values
+  > are ~9h, ~8h and never. **`SES-95` is therefore superseded as "the decisive probe"** — run
+  > unattended it parks the cycle rather than confirming anything. Everything else in B38 stands,
+  > including its candidate fix (below), which B39 endorses and escalates.
+
+- **B39. John's testimony names the mechanism — the `.claude/` gate is a human-answered permission
+  prompt, and an unattended cycle has no bounded recovery from it (`v7.0.122`, 2026-08-21;
+  John's word, runner-implemented).** He wrote, verbatim: *"Those sessions came back alive because
+  I opened them and allowed permissions. That should not be happening. This all started yesterday
+  after the new rules of the database for the backlog"*. Three parts, and they do not share a fate.
+
+  **TESTIMONY — the mechanism, and it resolves four days of contradictory probes.** The gate is a
+  harness permission prompt rendered **only in the human-facing session UI**, never in the agent's
+  transcript. An agent cannot see it, report it or answer it; from inside, an unanswered prompt is
+  indistinguishable from latency, from suspend/resume, and from a hang — which is precisely why
+  `v7.0.115` ("blocked"), `633fe486` ("suspend/resume") and B38 ("intermittent latency") each read
+  the same silence differently and each read it wrong. It is corroborated by a line that has been
+  on the record since 2026-08-20 and was never connected to this: `SES-78c` run 1's stalls were
+  *"flagged sensitive twice, **each stall needing John's tap**"* (`docs/SESSIONS.md:639`).
+
+  **MEASUREMENT — the partition, derived by a Fable 5 subagent and re-derived independently from
+  live `runner_cycles` / `runner_items` rows before being written here.** Sort every `.claude/`
+  probe by whether John was demonstrably in the app, using his timestamped briefing taps as the
+  proxy. **His taps stop at `03:48Z` and resume at `12:50Z`** — a nine-hour hole on the night of
+  2026-08-20→21. `c6c50bdc` (`02:06Z`, attended) returned in ~35 min; `55defd59` (`13:01Z`,
+  attended) returned in 18m04s with its next `.claude/` call at ~6 s; `ba8f2ce3` (`03:52Z`, four
+  minutes after his last tap) parked ~9h20m; `633fe486` (`05:07Z`) parked ~8h05m; `12953ca8`
+  (`08:07Z`) **never returned**. The partition is exact, and the clincher is the resumption: the
+  two parked cycles came back **together at 13:09–13:12Z, eighteen minutes after his first tap of
+  the morning.** Latency does not synchronise on a human's alarm clock.
+
+  **RULING → what shipped.** `runner-cycle.md` step 0's clause, rewritten a fourth time but for the
+  first time on an observed mechanism: **an unattended cycle never enters the gate**, because it has
+  no bounded recovery; it cards the edit with exact replacement text for **a session John attends**
+  (attendance, not the machine, is the operative property). Narrower than `v7.0.117`'s blanket
+  prohibition — the edit is legitimate work, and the path was never blocked — and broader than
+  B38's "budget 35 minutes". Step 0b gains the leading evidenced hypothesis for a silence, the
+  caveat that a silence during his waking hours is a *different* finding, and one prohibition that
+  follows directly from *"that should not be happening"*: **"open the session and approve" is never
+  written to John as the remedy.** It works, and offering it converts his instruction into a chore.
+
+  **CONTRADICTED — the onset half, said plainly rather than softened.** `SES-78c`'s stalls close
+  with `b5f263d`, **2026-08-20T03:37:46Z = Aug 19, 22:37 CST**. The backlog-DB change is `752f1e4`,
+  **2026-08-21T00:37:33Z = Aug 20, 19:37 CST**. The stalls predate the change he names by **21
+  hours almost to the minute**, and selection SQL has no mechanism for altering harness permission
+  behaviour. What survives is real and worth telling him: the backlog-DB migration made
+  `session-hygiene/SKILL.md` stale, which **manufactured the first missions requiring a `.claude/`
+  write** — so it is genuinely when unattended cycles began hitting the gate repeatedly. The other
+  correlate is Automated go-live itself (`0c8b058`, Aug 19, 23:26 CST), forty-nine minutes after the
+  first recorded stall. Right phenomenon, wrong first cause.
+
+  **STILL INFERENCE, labelled so the fifth rewrite does not inherit false confidence.** No prompt
+  has ever been directly captured; `v7.0.115`'s 35-minute clearance has no identified clearer; and
+  `ba8f2ce3`'s fast `Write`/`Edit` calls are not ordered against John's approval, so "Write/Edit
+  never prompts" is not excluded. **What would legitimately reopen this:** a captured prompt, or a
+  pre-approval that survives an unattended run. A fast `.claude/` write is not evidence the gate is
+  gone — it is evidence somebody was watching.
+
+  **THE STEELMAN AGAINST IT, shipped alongside because omitting it is how the last three flips
+  happened.** A standing prohibition exiles all `.claude/` skill and rule maintenance to scarce
+  attended sessions — exactly the drift this week demonstrated, with `session-hygiene/SKILL.md`
+  stale through five consecutive cycles that each declined to touch it. And the confirming
+  experiment is cheap: `SES-95`'s text is already written and pushed. The answer is in the rule's
+  shape — it prohibits **unattended** entry, not the edit — but the cost is real and belongs on the
+  record.
+
+  **TWO THINGS FOR JOHN, both his and neither done here.** (1) The permanent fix B38 already
+  identified: move the inflight marker out of `.claude/` entirely, which takes this whole class of
+  stall off the table for every session. It edits `CLAUDE.md`'s router, which is his. (2) The new
+  question his testimony raises, which nobody had standing to ask before: **is there a pre-approval
+  he can grant these cloud sessions so the prompt never fires?** His configuration, his call — and
+  if the answer is yes, this register's rule is the thing it retires.
 
 ## D. Ticket ledger
 
