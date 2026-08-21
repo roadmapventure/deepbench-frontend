@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.135 | runbooks/briefing-template.html | SES-99, directive 48ae1939 — the question list: open rows of public.runner_questions render as Yes/No rows that record on the tap, answers ride briefing-state under `answers`, and the note input is optional by construction. Contract: briefing-page.md's question-list section. -->
 <title>DeepBench Morning Briefing</title>
 <link id="f" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style id="s">
@@ -104,25 +105,49 @@
   .directive textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
   .savebar{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:6px;min-height:14px}
   .note{font-size:11.5px;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+  /* SES-99 — the question list. A question is answered with a thumb, never with prose. */
+  .q{background:var(--card);border:1px solid var(--line);border-radius:7px;
+     padding:12px 13px 10px;margin-bottom:10px}
+  .q[data-answer]{border-color:var(--brass)}
+  .q .qtext{font-size:14.5px;font-weight:600;margin:0 0 4px;text-wrap:balance}
+  .q .qctx{font-size:12.5px;color:var(--muted-deep);margin:0 0 9px}
+  .yn{display:flex;gap:8px}
+  .yn button{flex:1;font-family:var(--body);font-weight:600;font-size:14px;padding:9px 4px;
+     border-radius:6px;border:1.5px solid var(--line);background:var(--card-alt);color:var(--ink);
+     cursor:pointer;min-height:44px}
+  .yn button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .yn button.yes.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  .yn button.no.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  .qnote{display:none;margin-top:9px}
+  .qnote.show{display:block}
+  .qnote input{width:100%;font-family:var(--body);font-size:14px;padding:8px 10px;
+     border:1.5px solid var(--line-soft);border-radius:6px;background:var(--white);color:var(--ink)}
+  .qnote input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .qnote .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .qverdict{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:7px;min-height:15px}
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 <div id="page"></div>
 
-<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null}</script>
+<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null,"answers":{}}</script>
 
 <script id="code">
 // SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
 // version via claude.use('artifact').publish(fullDoc). Never serializes the live DOM.
 (function(){
   var stEl = document.getElementById('briefing-state');
-  var state = {items:{}, directive:'', reading:null};
+  var state = {items:{}, directive:'', reading:null, answers:{}};
   try { state = JSON.parse(stEl.textContent); } catch(e) {}
   // Recover state stashed before a publish that may not have landed (docs: stash first).
   try {
     var stash = sessionStorage.getItem('briefing-pending');
     if (stash) { state = JSON.parse(stash); }
   } catch(e) {}
+  // SES-99: a page published before the question list existed has no `answers` key. Absent is
+  // not empty-and-broken — default it, or the first tap throws on an undefined and records
+  // nothing, which is the one failure mode a decision surface may never have.
+  if (!state.answers || typeof state.answers !== 'object') { state.answers = {}; }
 
   var readOnly = false;
 
@@ -146,6 +171,27 @@
       +'<input type="text" value="'+esc(d.reason)+'" placeholder="One line — then press Save">'
       +'<div class="hint">Press Enter or tap Save to record the line.</div></div>'
       +'<div class="verdict">'+(dec?('recorded: '+dec.toUpperCase()+' · '+esc(d.at||'')):'')+'</div>'
+      +'</div>';
+  }
+
+  // SES-99 — one open row of public.runner_questions. `qid` is the table's stable slug and is
+  // the key the harvest writes back on, so it is the DOM id too: the page and the ledger cannot
+  // drift apart. Two buttons, no text box in the way — the note is optional and appears only
+  // after an answer exists to attach it to.
+  function question(qid, text, ctx){
+    var a = state.answers[qid] || {};
+    var ans = a.a || '';
+    return '<div class="q" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':'')+'>'
+      +'<p class="qtext">'+text+'</p>'
+      +(ctx ? '<p class="qctx">'+ctx+'</p>' : '')
+      +'<div class="yn">'
+      +'<button class="yes'+(ans==='yes'?' on':'')+'" data-a="yes">Yes</button>'
+      +'<button class="no'+(ans==='no'?' on':'')+'" data-a="no">No</button>'
+      +'</div>'
+      +'<div class="qnote'+(ans?' show':'')+'">'
+      +'<input type="text" value="'+esc(a.note)+'" placeholder="Optional — a line only if you want to add one">'
+      +'<div class="hint">Not required. The Yes/No above is already recorded.</div></div>'
+      +'<div class="qverdict">'+(ans?('recorded: '+ans.toUpperCase()+' · '+esc(a.at||'')):'')+'</div>'
       +'</div>';
   }
 
@@ -202,6 +248,14 @@
       '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>')
     +'<h2>Gated before build — your promote / kill</h2><p class="empty">None tonight.</p>'
     +'<h2>Needs your call</h2><p class="empty">No budget overrides pending. Day and month envelopes untouched.</p>'
+    // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
+    // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
+    // below are sample values. A question that cannot be asked as yes/no does not belong here;
+    // it belongs on a gated_before_build card with a proposal.
+    +'<h2>Questions — tap yes or no</h2>'
+    +question('q-sample-slug',
+      'Should new automation tickets I create go above your current lane, ahead of ADM-1?',
+      'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.')
     +'<h2>Trust ladder</h2><table>'
     +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
     +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
@@ -286,6 +340,29 @@
         }
         inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commit(); } });
         inp.addEventListener('blur', commit);
+      }
+    });
+    // SES-99 — question rows. Same publish path as a card tap: the answer is recorded the
+    // instant the thumb lands, and the note is a strictly optional afterthought.
+    document.querySelectorAll('.q').forEach(function(qEl){
+      var qid = qEl.id;
+      qEl.querySelectorAll('.yn button').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var cur = state.answers[qid] || {};
+          state.answers[qid] = { a:btn.getAttribute('data-a'), note:(cur.note||''),
+                                 at:new Date().toISOString().slice(0,16)+'Z' };
+          save(); render();
+        });
+      });
+      var ni = qEl.querySelector('.qnote input');
+      if (ni) {
+        function commitNote(){
+          var cur = state.answers[qid];
+          if (!cur || cur.note === ni.value) return;
+          cur.note = ni.value; save();
+        }
+        ni.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commitNote(); } });
+        ni.addEventListener('blur', commitNote);
       }
     });
     var ta = document.querySelector('.directive textarea');

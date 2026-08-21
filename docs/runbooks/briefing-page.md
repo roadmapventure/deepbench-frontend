@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.135 | runbooks/briefing-page.md | SES-99, directive 48ae1939 — John's line: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." The "Help me — the questions" paragraph becomes a tappable yes/no list backed by the new public.runner_questions table; answers ride the briefing-state block under a new `answers` key and are harvested exactly like card decisions. Silence is never an answer. -->
 <!-- DeepBench v7.0.129 | runbooks/briefing-page.md | SES-96 — regeneration step 4 added: never shell-process the WebFetch result's saved file. John's captured permission prompt (2026-08-21) showed the rebuild sed-slicing the prior page's HTML out of ~/.claude/projects/…/tool-results/ — a permission-gated path that parks an unattended cycle exactly like a .claude/ write. Parse briefing-state in context; rebuild structurally from briefing-template.html + the runner_ tables. -->
 <!-- DeepBench v7.0.121 | runbooks/briefing-page.md | directive 1d01ea85 — two changes from John's line. The read-back contract's Reverse-on-gated sentence stops calling the asymmetry an open question: he answered "leave it", so it is settled and the page stops carrying it. And the regeneration contract gains the died-mid-run line: when a cycle has gone silent since the last rebuild the page says so — which cycle, how long, what it had picked, what John needs to do — because v7.0.106 deliberately kept the lease and its `steals` counter off this page, leaving a death visible only as a stat-strip number. The push (runner-cycle.md step 0b) is the primary channel; this is the durable copy. Same honesty limit as the push: observable state and a named hypothesis, never an invented cause, and never the word "died" before something proves it. -->
 <!-- DeepBench v7.0.118 | runbooks/briefing-page.md | directive fb643367 — the read-back contract's one-line ladder summary said "Accept streak+1, 5 promotes" with no card-kind distinction, which is exactly the sentence John's Q1 ruling retires. It now updates the ladder from `shipped` cards only; a `gated_before_build` Accept is permission, not a rating. The full rule is CITED from runner-cycle.md step 2 rather than restated, because this line drifting out of sync with the runbook is the failure being fixed. -->
@@ -42,7 +43,8 @@ Store UTC internally as before; the conversion is display-only.
    observable state and a named hypothesis, never an invented cause; and the page says **"went
    silent"**, never "died", because two cycles this page called dead were still working and came
    back nine hours later. If the cycle later returns and finishes, the line is **updated, not
-   deleted** — John should be able to see that a silence resolved.
+   deleted** — John should be able to see that a silence resolved. **Also required on every
+   rebuild: the open-questions list**, per "The question list (every rebuild — SES-99)" below.
 2. **Republish to the SAME URL** — pass the URL above as `url` to the Artifact tool (a publish
    without `url` from a new conversation creates a stray page; never do that). Same favicon.
 3. **Before rebuilding, READ the current page first** (WebFetch the URL) and harvest John's
@@ -71,6 +73,42 @@ marked `HIGH (John's words, <date>)`. **Reverse** deletes the claim and records 
 `vision/rejected-paths.md` if it asserts a path. Decisions ride the same `briefing-state`
 harvest as every other card; the corpus edit lands in the cycle's normal ship commit. On-demand
 bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.
+
+## The question list (every rebuild — SES-99)
+
+Every rebuild renders the **open rows of `public.runner_questions`** (`status='open'`) as a
+question list, one row per question: the yes/no sentence, one clause of context, and two
+buttons — **Yes** and **No**. This section **replaces** the old prose "Help me — the questions"
+paragraph; register B29's daily help-me **ticket** is unchanged and stays — it is a backlog
+card, not a question.
+
+The rule that earns the section: **a question that cannot be asked as yes/no is not ready to be
+asked.** It belongs on a `gated_before_build` card with a concrete proposal instead — never ask
+John to compose prose to answer a question.
+
+A tap records into the `briefing-state` block under a new `answers` key, shape:
+`{"<qid>": {"a":"yes"|"no","at":"<iso>Z","note":""}}` — and self-publishes through the same
+`claude.use('artifact').publish(doc)` path every card already uses. An optional one-line note
+input appears after the tap and is **never required**.
+
+Harvest: answered questions are written to `runner_questions` (before-image first) with
+`status='answered'` plus `answer`/`answered_at`/`answer_note`/`acted_cycle`, and drop off the
+next rebuild; unanswered ones carry forward. **Silence is never an answer**, exactly as silence
+is never an Accept.
+
+Cap it: **at most 5 open questions on the page at once, newest-asked first**, so the list never
+becomes the paragraph it replaced.
+
+The measured reason this shipped, stated as fact: the old questions section was a `<p>` with no
+controls in it, so **not one question could ever be answered through it** — every answer John
+has given arrived as a hand-numbered line typed into the **directive** box (`runner_directives`
+`fb643367` "1.no 2. Updates every 5 hours 3.I don't know how to answer" and `1d01ea85` "1.leave
+it 2. Midnight cst 3.need to know why it died"), which the next cycle then had to map back onto
+the questions by guessing — and one of those answers is literally *"I don't know how to
+answer"*, which is what a question costs when it is asked in prose. Meanwhile, over the same
+week, **37 of 37 cards were decided by tap, none left open** (counted from `runner_items`
+2026-08-21T17:0xZ, not quoted). Questions were the last thing on the page still asking for
+sentences.
 
 ## Decision read-back contract (every cycle, step 2) — CORRECTED after live QA 2026-08-19
 

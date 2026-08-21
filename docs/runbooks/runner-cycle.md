@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.135 | runbooks/runner-cycle.md | SES-99, directive 48ae1939 — step 2's harvest gains `answers` (the briefing's new yes/no question list, table public.runner_questions) and step 9's "help me" line stops describing a paragraph. John: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." -->
 <!-- DeepBench v7.0.133 | runbooks/runner-cycle.md | SES-86 phase 3, directive f47e5a95 — John's automation queue stops being prose a cycle has to remember and becomes the board's leading sort key. His line: "keep closing automation tooling tickets first before getting to the classified backlog." Step 5's layer (2) was a doc section every cycle had to go read and correctly interpret; the forgetting was silent, and it had already happened — measured 16:29Z, his automation tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told him the next cycle would be "building product, not tooling". New nullable backlog_items.automation_rank (C4 step number, NULL = not in lane) is now recompute_backlog_queue()'s LEADING ORDER BY key, NULLS LAST, with all six prior clauses preserved beneath it; migration ses86c_automation_lane. Self-retiring by construction — a done ticket leaves the ranked set, so the lane evaporates when his automation queue completes, which is his "until automation is complete". Two boundaries written into the migration header so they travel with the code: a future pin (B23) goes ABOVE automation_rank, and the five load-bearing clauses from ses86b are unchanged. QA proved the lane discriminating (before: 5 of 7 past position 240; after: queue 1-5) and idempotence the honest way this time — 551 -> 0, then a REAL change (the SES-89 status correction) -> 548 -> 0, never one clean re-run on an unchanged board. -->
 <!-- DeepBench v7.0.130 | runbooks/runner-cycle.md | SES-86 phase 2 (register B4) — the board's order stops being re-derived on every read. New `backlog_items.queue` column + `public.recompute_backlog_queue()`, one idempotent full renumber (550 rows numbered 1..550 on first run; second run changed 0). Step 5's five-clause selection query is retired in favour of `ORDER BY queue`, with the five load-bearing traps moved into the function and repeated in its migration header; `queue IS NULL` now IS the not-pickable condition. Step 7 gains the completed/removed recompute; step 9's "Next up" reads real numbers instead of recomputing the sort per render. Two corrections ride along, both measured live rather than reasoned: the "456 of 550 unpickable" paragraph is FALSE since `SES-85` landed (now 550 open, 0 unclassed, all numbered — a cycle quoting the old figure under-reads its queue by 6×), and the queue's top is no longer all Tooling. The renumber deliberately does NOT touch `updated_at`: stamping every row would destroy the sort-field-edit signal the recompute is triggered by and would churn BACKLOG-SNAPSHOT.md on cycles that changed nothing. -->
 <!-- DeepBench v7.0.129 | runbooks/runner-cycle.md | SES-96 — the second gated path class, named from John's captured prompt (2026-08-21): Bash against ~/.claude/projects/…/tool-results/ (where WebFetch saves its result) fires the same human-only permission prompt as .claude/ writes, and the briefing rebuild was doing exactly that (sed-slicing the prior page's HTML). Step 9 now prohibits shell-processing the fetched page's saved file; the safe procedure (parse briefing-state in context, rebuild from briefing-template.html + runner_ tables) is spelled out in briefing-page.md regeneration step 4. -->
@@ -329,6 +330,14 @@ otherwise leave it NULL rather than storing a confounded number). Update the
 ladder with a before-image first, always. *(Supervised run: if the page is unreachable from
 the cloud session, log that in the cycle row and continue — this run's decisions were already
 harvested manually; whether cloud can reach it is one of the things this run measures.)*
+
+A non-empty `answers` object in the page's `briefing-state` (`SES-99`) is harvested the same
+way: for each answered `qid`, write a `runner_before_images` row first, then UPDATE
+`public.runner_questions` SET `answer`, `answered_at`, `answer_note`, `status='answered'`,
+`acted_cycle` = this cycle's id. An answer is John's word and outranks a cycle's own reasoning
+on that question, exactly as a directive does. An unanswered question is **not** a "no" — it
+carries forward. The page-side contract (rendering, the yes/no-askable rule, the 5-open cap)
+lives in `briefing-page.md`'s question-list section — cited here, not restated.
 
 **3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** Every
 `did_not_run` exit from this step **releases the lease** (statement in step 0) before it ends —
@@ -698,7 +707,11 @@ tickets remaining in tier `now` per named class, plus the unclassed remainder, w
 **"Next 3" (`ID — title`)** at the page top (register B26), the **exposure-rate line** — cards
 that needed John this week vs. last (register B28) — and the **daily "help me" ticket**: the
 top pending-on-John ticket by the standard ordering, its specific questions on the card,
-inviting a manual session or a Rework line; resolution re-enters it at queue #1 (register B29). **Register B18 (SES-B17, 2026-08-20): build the briefing cards FROM the database's undecided
+inviting a manual session or a Rework line; resolution re-enters it at queue #1 (register B29).
+**The page's open QUESTIONS now render as the yes/no question list from `runner_questions`
+(`SES-99`), max 5, newest first** — this does not replace B29's ticket, which stays. A question
+a cycle wants to ask John is **INSERTed into `runner_questions`** (before-image `row_data = NULL`,
+the INSERT convention from step 8b) rather than written into prose on the page. **Register B18 (SES-B17, 2026-08-20): build the briefing cards FROM the database's undecided
 `runner_items` set (`WHERE decision IS NULL`), never from this cycle's memory of what it
 filed** — in-memory reconstruction drifts silently the moment two sessions overlap or a prior
 cycle's card was Reversed after you already forgot it, so the DB is the only trustworthy
