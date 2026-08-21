@@ -49,6 +49,22 @@
 - **B4. Materialized `queue` field** — position visible, not recalculated per read. Recompute
   events: new ticket (classed), ticket picked, completed/removed, any sort-field edit. One
   idempotent full renumber. No queue number = not pickable (unclassed / P-GATED).
+  **[SHIPPED `v7.0.130`, `SES-86` phase 2, runner cycle `6b078b06`.** `backlog_items.queue`
+  (integer, nullable) + `public.recompute_backlog_queue()` (migration
+  `ses86b_backlog_queue_numbers`), wired to the pick and close-out events in
+  `runbooks/runner-cycle.md` steps 5/7 and read directly by step 9's "Next up". First renumber:
+  551 tickets numbered `1..551`, no gaps, no duplicates; six consecutive recomputes change **0**
+  rows. **The first idempotence result was a false pass** — `550 → 0` looked clean, then a real
+  new ticket produced `435 → 2 → 0`, because `backlog_id` has no unique constraint, `CHI-48`
+  occupies two rows identical on all five sort keys, and `row_number()` is non-deterministic
+  across ties. Fixed by appending the primary key as a sixth tie-break
+  (`ses86b_queue_deterministic_tiebreak`); the duplicate is filed as `SES-97`. B3's ordering is
+  copied clause-for-clause with all five live
+  traps preserved — verified by a negative control on the same rows, where a lexical
+  implementation yields 17,616 class and 81,281 tier inversions against the shipped function's 0.
+  The renumber does not touch `updated_at`, and claims do not affect the number. **Not yet
+  covered:** `session-setup`'s manual-session call site (a `.claude/` edit, carded for a session
+  John attends) and adding `queue` to `BACKLOG-SNAPSHOT.md`'s explicit column list.**]**
 - **B5. John's pins:** "TICKET-ID — move to N" (briefing directive box / chat / Super Admin).
   Pinned tickets hold absolute slots through recomputes; latest call wins collisions; released
   by completion, removal, or "— release."

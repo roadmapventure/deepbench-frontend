@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.130 | runbooks/runner-cycle.md | SES-86 phase 2 (register B4) — the board's order stops being re-derived on every read. New `backlog_items.queue` column + `public.recompute_backlog_queue()`, one idempotent full renumber (550 rows numbered 1..550 on first run; second run changed 0). Step 5's five-clause selection query is retired in favour of `ORDER BY queue`, with the five load-bearing traps moved into the function and repeated in its migration header; `queue IS NULL` now IS the not-pickable condition. Step 7 gains the completed/removed recompute; step 9's "Next up" reads real numbers instead of recomputing the sort per render. Two corrections ride along, both measured live rather than reasoned: the "456 of 550 unpickable" paragraph is FALSE since `SES-85` landed (now 550 open, 0 unclassed, all numbered — a cycle quoting the old figure under-reads its queue by 6×), and the queue's top is no longer all Tooling. The renumber deliberately does NOT touch `updated_at`: stamping every row would destroy the sort-field-edit signal the recompute is triggered by and would churn BACKLOG-SNAPSHOT.md on cycles that changed nothing. -->
 <!-- DeepBench v7.0.129 | runbooks/runner-cycle.md | SES-96 — the second gated path class, named from John's captured prompt (2026-08-21): Bash against ~/.claude/projects/…/tool-results/ (where WebFetch saves its result) fires the same human-only permission prompt as .claude/ writes, and the briefing rebuild was doing exactly that (sed-slicing the prior page's HTML). Step 9 now prohibits shell-processing the fetched page's saved file; the safe procedure (parse briefing-state in context, rebuild from briefing-template.html + runner_ tables) is spelled out in briefing-page.md regeneration step 4. -->
 <!-- DeepBench v7.0.127 | runbooks/runner-cycle.md | SES-86 phase 1 (claim-on-pick), John-approved live 2026-08-21 ("yes, ship it") — step 5 gains the atomic ticket claim: the moment any session (manual or scheduled) picks a backlog ticket it claims it with one UPDATE (claimed_by/claimed_at, new columns, migration ses86a_backlog_claim_on_pick); 0 rows returned = another session holds it, drop to the next ticket exactly as B24 drops past a gated card. The selection query now filters claimed tickets (24h expiry — the B37 evidence bar — so a dead session cannot strand one). Claims release in the step-7 close-out write. Manual sessions run the same claim via session-setup skill step 2c. QA: all three arms proven live on real rows (fresh claim → 1 row, contested → 0 rows, 25h-stale → re-claimable). This is the shared-board coordination John asked for after today's duplicate (SES-95 shipped attended while a cycle carded it). -->
 <!-- DeepBench v7.0.123 | runbooks/runner-cycle.md | directive c4d95dc7 — the lease gains an enforcement point it never had. Self-filed by cycle 633fe486 before it stood down: the lease was asserted ONCE at claim time and never again, so a cycle whose lease was stolen on the TTL keeps building and pushing, because nothing tells it. 633fe486 came one command short of pushing a duplicate of already-shipped work to dev — the exact ADM-1 double-build (e36d4379/4da5a7bd) B31 built the lease to prevent, reached by a route the lease did not cover — and was saved only by happening to re-fetch origin/dev at the ship point. Luck, not a control. New: a holder-guarded re-assertion SELECT, defined once in step 0 and wired as a hard gate before the step-7 push and before every counter claim, with the stolen-from procedure spelled out (do not push, do not claim, do NOT release the lease, close your OWN row, push the session branch so the work is cherry-pickable, and check whether the successor already shipped the item before discarding). Step 0's TTL bullet is CORRECTED with it: the sentence "a stolen lease means the holder is dead, not slow" is disproved by measurement — 633fe486 was stolen from at ~05:52Z and was still executing normally at 13:10:51Z, ~8h, because a cloud session can be suspended and resumed across gaps invisible from inside it. A steal means SILENT, not dead — the same correction step 0b already makes for `failed`, now applied to the lease that produced it. -->
@@ -417,33 +418,47 @@ step's ticket. Without this layer the 63 open `P9 - Bug Fixes` tickets would out
 `P10 - Tooling` automation ticket and bury the queue he set. (3) Only when both are empty, the
 backlog by class — **read from `public.backlog_items` via SQL, never by parsing the markdown
 files (`SES-83` (d), `v7.0.112`; John's "table is authority" call, Accepted 2026-08-21T00:19Z).**
-Run this query verbatim; do not re-derive it:
+**The order is now STORED, not re-derived on every read (`SES-86` phase 2, `v7.0.130`,
+register B4).** `backlog_items.queue` holds each ticket's position, maintained by one idempotent
+full renumber, `public.recompute_backlog_queue()`. Recompute first, then read — two statements,
+both verbatim:
 
 ```sql
-SELECT backlog_id, tier, priority_class, status,
-       (description ~* '(Beta-gate|Post-beta)') AS beta_marked,
-       created_at,
+-- (1) Recompute. Idempotent: returns the number of rows whose position actually moved,
+--     so a board that did not change returns 0 and writes nothing.
+SELECT public.recompute_backlog_queue();
+
+-- (2) Read the top of the queue. Claims filter SELECTION, never the numbering.
+SELECT backlog_id, queue, tier, priority_class, status,
        left(regexp_replace(coalesce(description,''), '^\*\*P[0-9]+[^*]*\*\*\s*', ''), 200) AS gist
   FROM public.backlog_items
- WHERE status <> 'done'
-   AND priority_class IS NOT NULL
+ WHERE queue IS NOT NULL
    AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
- ORDER BY CASE tier WHEN 'now' THEN 0 WHEN 'next' THEN 1 ELSE 2 END,
-          (substring(priority_class FROM 'P([0-9]+)'))::int,
-          (description ~* '(Beta-gate|Post-beta)') DESC,
-          created_at DESC,
-          backlog_id
+ ORDER BY queue
  LIMIT 5;
 ```
 
-Each `ORDER BY` clause is one of John's rules in his order: tier `now → next → later`, then
-`P1 - Improves John's Skills` → `P10 - Tooling`, then beta-marked first, then newest filed, then
-oldest (John, 2026-08-20); `backlog_id` last so two cycles reading the same table always see the
-same #1. Five things about this query are load-bearing and were each found live, so do not
-"simplify" any of them:
+`queue IS NULL` **is** the not-pickable condition (B4) — it is set for exactly the tickets the old
+`WHERE` excluded by hand (`status = 'done'`, or no `priority_class`), so the filter cannot drift
+from the numbering the way two hand-maintained copies of one `ORDER BY` could. **Gated tickets
+still get a number** (B15): gated-ness is a lane flag, never a missing position.
+
+**John's rules live inside the function now — that is the point, and it does not make them
+optional.** The function's `ORDER BY` is the retired query's, clause for clause: tier
+`now → next → later`, then `P1 - Improves John's Skills` → `P10 - Tooling`, then beta-marked
+first, then newest filed, then oldest (John, 2026-08-20); `backlog_id` last so two readers of the
+same board always see the same #1. Five things about that ordering are load-bearing and were each
+found live. **Anyone editing `recompute_backlog_queue()` must preserve all five** — they are
+repeated in the migration's own header comment (`ses86b_backlog_queue_numbers`) so they travel
+with the code:
 
 - **Order the class numerically, never lexically.** `ORDER BY priority_class` is a text sort and
   puts `P10 - Tooling` *ahead of* `P2 - Inventive` — exactly backwards. Hence the digit extract.
+  **Measured against the live board 2026-08-21 (`v7.0.130`'s negative control), because "it looks
+  right" is not a test:** numbering the same 550 tickets lexically produces **17,616** class
+  inversions and **81,281** tier inversions; the shipped function produces **0** of each. That
+  gap is what makes the QA discriminating — an implementation that merely gave every ticket
+  *some* number would pass a completeness check and fail this one.
 - **`priority_class` carries suffixes.** Live values include `P9 - Bug Fixes · FLAGGED` (19
   tickets). Matching the ten legend strings by equality silently drops every one of them;
   extracting the digit tolerates the suffix.
@@ -458,16 +473,29 @@ same #1. Five things about this query are load-bearing and were each found live,
   tickets are the coordination point across ALL sessions, manual and scheduled).** A claimed
   ticket is invisible to selection until its claim expires (24h — the same evidence bar as
   step 0b's silent-cycle rule). See the claim step below.
+- **`id` is the final tie-break, and `backlog_id` is NOT unique (`SES-86` phase 2, found live by
+  its own QA).** The sixth and last `ORDER BY` clause is the primary key. It exists because
+  `backlog_id` carries no unique constraint and **`CHI-48` occupies two rows** (queue 152/153;
+  filed as `SES-97`). Two rows identical on all five preceding keys make `row_number()`
+  **non-deterministic** for that pair, so the renumber could swap them and report work on a board
+  where nothing moved — measured: `550 → 0` (which looked like idempotence and was luck), then
+  `435 → 2 → 0`. Adding `id` changes no position that was ever well-defined; it only decides ties
+  that previously had no defined answer. **Do not drop it**, and do not assume a ticket ID
+  identifies one row: `UPDATE … WHERE backlog_id = 'CHI-48'` writes both.
 - **`status='partial'` does not mean the phase you are about to build is unbuilt.** It means
   *some* of the ticket shipped — layer 3's current #1, `ADM-1`, shipped v1 on 2026-08-20 and
   stays `partial` only because v1.5 was deferred. Read the ticket and its harvest before
   building; `SES-86`'s lifecycle status is the structural fix.
 
-**456 of the 550 open tickets have `priority_class IS NULL` and are therefore unpickable, leaving
-94 pickable** (measured live 2026-08-21 at the close of `v7.0.112`; NEXT 0 of 23 classed, LATER 0
-of 247). That is not a regression — the markdown rule was
-identically blind to them — and `SES-85`'s classification sweep is what unlocks them. Until it
-lands, a thin-looking queue is expected, not a bug. **Classify its lane against
+**That constraint is GONE — `SES-85` landed (`v7.0.128`) and the whole board is pickable.**
+Measured live 2026-08-21 at 16:0xZ, after this cycle's first renumber: **550 open tickets, 0
+unclassed, all 550 numbered `1..550`** (now 280, next 23, later 247; 10 tickets `done`). The
+figure this paragraph used to carry — "456 of 550 unpickable, leaving 94" — was true at the close
+of `v7.0.112` and is now false; a cycle quoting it would under-read its own queue by 6×. **Take
+your own census rather than quoting this one.** The visible consequence is that the top of the
+queue is no longer all `P10 - Tooling`: at first numbering it read `DAT-003`
+(`P1 - Improves John's Skills`), `ADM-1` and `AGT-015` (`P2 - Inventive`), `LOG-126`
+(`P4 - New Customers`), `CHI-89` (`P5 - Enhancements`). **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
 your reasoning — then the ticket goes pending and you DROP TO THE NEXT available queued
 ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
@@ -546,7 +574,11 @@ the paths under test after every step, so a hang still leaves evidence of exactl
 - Close-out ticket update — **a Supabase write, not a file edit** (`SES-83` (d) cycle 3,
   `v7.0.114`): set the ticket's `backlog_items.status` (and `priority_class` if it changed) with a
   `runner_before_images` row first — **and clear the claim in the same UPDATE**
-  (`claimed_by = NULL, claimed_at = NULL`; SES-86 phase 1). This line used to read "`FEATURES*.md` row (status + P-class)"
+  (`claimed_by = NULL, claimed_at = NULL`; SES-86 phase 1). **Then run
+  `SELECT public.recompute_backlog_queue();`** — completed/removed is one of B4's recompute
+  events, and a ticket that just went `done` must lose its number before John sees the board
+  (`SES-86` phase 2, `v7.0.130`). It is idempotent and returns 0 when nothing moved, so running
+  it is never wrong. This line used to read "`FEATURES*.md` row (status + P-class)"
   and was left behind by cycle 2's trim — those files hold no ticket rows to edit, so it
   contradicted this same runbook's step-5 selection query. A cycle that still edits a
   `FEATURES*.md` row is writing to a stub.
@@ -631,8 +663,9 @@ labeled estimated; never invented**), plus outcome and push SHA. The briefing's 
 show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
 latest reading + calibration; the reading-entry card (three percentages + save) must be on
 every rebuild, and so must the **"Next up" section — the queue's top five** (queue #, ticket
-ID, named class, short title, gated flag; computed from the selection rules until `SES-86`'s
-queue numbers are real) so John can see what upcoming cycles will do and run the schedule
+ID, named class, short title, gated flag; **read `backlog_items.queue` directly — the numbers are
+real as of `SES-86` phase 2, `v7.0.130`, and are no longer computed from the selection rules per
+render**) so John can see what upcoming cycles will do and run the schedule
 early with foreknowledge (register B25), the **`now`-tier census** — count of open backlog
 tickets remaining in tier `now` per named class, plus the unclassed remainder, with a compact
 **"Next 3" (`ID — title`)** at the page top (register B26), the **exposure-rate line** — cards
