@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.136 | docs/JOHN-DECISION-PATTERNS.md | p1p3-now-review — criterion 137 (P1–P4 pull tests, John 2026-08-21): P2 needs hard-to-replicate uniqueness, P4 needs "I have to buy this" pull, administrative expectations classify by function; FAANG-showcase promotes to P1. Live reclass: ADM-1 → P10, LOG-126 → P5, AGT-015 → P1. -->
 <!-- DeepBench v7.0.126 | docs/JOHN-DECISION-PATTERNS.md | SES-90 — the local-archive mining pass: criteria 101–136, mined from John's own typed messages across all 186 local Claude Code sessions (2026-07-08 → 2026-08-21; 2,303 messages read in full, no sampling). Local-archive citations are quote+date durable, file-path best-effort (the archive is not in git); scripts/check-decision-pattern-quotes.js skips them by design and verifies everything in-repo. Coverage/privacy record: docs/harvests/SES-90.md. -->
 <!-- DeepBench v7.0.110 | docs/JOHN-DECISION-PATTERNS.md | SES-79 — the full mining pass: the seed set of 5 criteria (one session, `design-log-38-0724`) grows to 100, mined from ~3 months of docs/SESSIONS.md + docs/FEATURES-ARCHIVE.md. Every "Seen in" is a real recorded exchange; every one was grepped back against its source before landing. -->
 
@@ -576,6 +577,18 @@ automation-rules session — "you can save your pushes and aggregate - i have no
 push is too much." *(local archive `323a6e02-475b-45c4-83e8-2713b2a345b0.jsonl`, 2026-08-19)*
 
 ---
+
+**137. P1–P4 are pull tests, not category labels — administrative expectations never qualify.**
+P2 - Inventive requires hard-to-replicate uniqueness ("easy to replicate" disqualifies); P4 - New
+Customers requires functionality that makes a customer say *"I have to buy this"* — a capability
+customers merely expect (accounts, admin screens) wins nobody and classifies by its actual function
+(P5/P10). Conversely, a genuine FAANG-showcase read promotes to P1 - Improves John's Skills. *Seen
+in:* live design conversation 2026-08-21 (`p1p3-now-review`) — John reversed Claude's classes on all
+three reviewed tickets: ADM-1 "more or less 'administrative' expectations — it would not make my
+product unique in the industry - easy to replicate" (P2 → P10 - Tooling); LOG-126 "would not bring
+in new customers. Again administrative… I am looking for functionality that would make a customer
+say 'I have to buy this'" (P4 → P5 - Enhancements); "I think AGT-015 would showcase me for FAANG"
+(P2 → P1 - Improves John's Skills).
 
 ## Testing, QA, and ship gates
 

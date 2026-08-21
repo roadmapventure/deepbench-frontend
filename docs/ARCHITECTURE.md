@@ -2452,9 +2452,15 @@ cycle's mission before any list item.
    agentic-engineering skill and make him more hireable, especially for FAANG-level AI roles;
    the platform is his living portfolio (added 2026-08-20, John, `design-runner-gov-0820` —
    inserted above the original list, every other class pushed down one)
-2. **P2 - Inventive** — new inventive features: white space, competitive differentiation
+2. **P2 - Inventive** — new inventive features: white space, competitive differentiation.
+   **The bar is hard-to-replicate uniqueness (John, 2026-08-21):** a feature competitors can
+   easily copy — an admin screen, an expected surface, "administrative expectations" — is not
+   P2, however new it is to the platform
 3. **P3 - Investor Value** — new features that add investor / buyout value
-4. **P4 - New Customers** — new features that win new customers
+4. **P4 - New Customers** — new features that win new customers. **The bar is buy-pull (John,
+   2026-08-21):** functionality that makes a customer say *"I have to buy this."* Administrative
+   capability (accounts, billing plumbing, admin surfaces) is not P4 even when customers require
+   it — classify it by its actual function (P5/P10)
 5. **P5 - Enhancements** — enhancements to existing features (prioritized by 1–4)
 6. **P6 - Agent Enhancement** — extend existing agents to perform across the platform
 7. **P7 - Agent Creation** — a new agent when functionality requires a competency the bench lacks
