@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.145 | runbooks/briefing-template.html | directive edab5908 — More info. Every card and every question gains a "More info" button opening a plain-language panel (what you can't do today / what you could after / why it's worth something), what each button DOES on that card, the conversation log, and a box to ask a question in your own words. Yes/No rows now carry the consequence of each tap under the button that causes it. Asks ride briefing-state under `asks` and are harvested into public.runner_card_asks. Contract: briefing-page.md's More-info section. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-template.html | SES-99, directive 48ae1939 — the question list: open rows of public.runner_questions render as Yes/No rows that record on the tap, answers ride briefing-state under `answers`, and the note input is optional by construction. Contract: briefing-page.md's question-list section. -->
 <title>DeepBench Morning Briefing</title>
 <link id="f" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -125,6 +126,33 @@
   .qnote input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
   .qnote .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
   .qverdict{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:7px;min-height:15px}
+  /* v7.0.145, directive edab5908 — More info. John: "often your wording is very confusing and
+     does not make sense to which button to push". The panel is plain language plus what each
+     button DOES on this card, and it sits ABOVE the buttons so the reading precedes the choice. */
+  .morebtn{width:100%;font-family:var(--body);font-weight:600;font-size:13.5px;padding:9px 4px;
+     margin-top:12px;border-radius:6px;border:1.5px dashed var(--line);background:transparent;
+     color:var(--brass-deep);cursor:pointer;min-height:44px}
+  .morebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .morebtn.on{background:var(--card-alt);border-style:solid}
+  .more{display:none;margin-top:10px;padding:12px 13px;background:var(--card-alt);
+        border:1px solid var(--line-soft);border-radius:7px}
+  .more.show{display:block}
+  .more p{margin:0 0 9px;font-size:13.5px}
+  .more p:last-of-type{margin-bottom:0}
+  .more .btnmeans{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line-soft);font-size:13px}
+  .more .btnmeans b{font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+  .more .missing{color:var(--flag);font-weight:600}
+  .thread{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-soft)}
+  .thread .qq{font-size:13.5px;font-weight:600;margin:0 0 2px}
+  .thread .aa{font-size:13.5px;margin:0 0 10px;padding-left:10px;border-left:2px solid var(--brass-light)}
+  .thread .pending{font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 10px;
+        padding-left:10px;border-left:2px solid var(--line-soft)}
+  .ask input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;margin-top:9px;
+     border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .ask input:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
+  .ask .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .ynmean{display:flex;gap:8px;margin-top:5px}
+  .ynmean span{flex:1;font-size:11.5px;color:var(--muted-deep);text-align:center;line-height:1.35}
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -137,7 +165,7 @@
 // version via claude.use('artifact').publish(fullDoc). Never serializes the live DOM.
 (function(){
   var stEl = document.getElementById('briefing-state');
-  var state = {items:{}, directive:'', reading:null, answers:{}};
+  var state = {items:{}, directive:'', reading:null, answers:{}, asks:{}};
   try { state = JSON.parse(stEl.textContent); } catch(e) {}
   // Recover state stashed before a publish that may not have landed (docs: stash first).
   try {
@@ -148,13 +176,76 @@
   // not empty-and-broken — default it, or the first tap throws on an undefined and records
   // nothing, which is the one failure mode a decision surface may never have.
   if (!state.answers || typeof state.answers !== 'object') { state.answers = {}; }
+  // v7.0.145 — same defensive default for `asks`, and for the same reason SES-99 needed it:
+  // a page published before this key existed must not throw on John's first tap.
+  if (!state.asks || typeof state.asks !== 'object') { state.asks = {}; }
 
   var readOnly = false;
 
   function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                     .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  function card(id, kindCls, kindTxt, idTxt, title, bodyHtml){
+  // v7.0.145, directive edab5908 — what each button DOES, in this card's own terms. A cycle may
+  // override any of the three; these are the defaults, and they differ by card kind because a
+  // gated Accept and a shipped Accept are genuinely different transactions (John's B34 ruling).
+  function buttonMeanings(kindCls, over){
+    var d = kindCls==='gate'
+      ? { accept:'Build it. The ticket goes to the top of the queue. This is permission, not a score — it does not move the trust ladder.',
+          reverse:'Do not build it. The proposal is killed and the reason recorded.',
+          rework:'Neither yet — your line rewrites the ask and comes back changed.' }
+      : { accept:'Keep it. It counts toward the runner’s trust score for this kind of work.',
+          reverse:'Undo it. The commit is reverted forward, any data restored from before-images, and the ticket reopens carrying your line.',
+          rework:'Keep it live, but your line becomes the next cycle’s first job.' };
+    over = over || {};
+    return { accept: over.accept || d.accept, reverse: over.reverse || d.reverse,
+             rework: over.rework || d.rework };
+  }
+
+  // The conversation log for one target, newest last — John's question, then the runner's answer
+  // if a cycle has written one. A question with no answer yet says so plainly rather than
+  // rendering an empty space that reads like it was ignored.
+  function thread(targetId){
+    var list = state.asks[targetId] || [];
+    if (!list.length) return '';
+    var h = '<div class="thread">';
+    for (var i=0;i<list.length;i++){
+      var t = list[i] || {};
+      h += '<p class="qq">You asked · '+esc(t.at||'')+'<br>'+esc(t.q)+'</p>';
+      h += t.a ? '<p class="aa">'+esc(t.a)+'</p>'
+               : '<p class="pending">Not answered yet — the next cycle answers it here, and keeps this thread.</p>';
+    }
+    return h + '</div>';
+  }
+
+  function askBox(targetId){
+    return '<div class="ask"><input type="text" data-ask="'+targetId+'" value="" '
+      +'placeholder="Ask me about this — then press Enter">'
+      +'<div class="hint">Your question is recorded now; the answer appears on this card next cycle.</div></div>';
+  }
+
+  // `more` = {cant, after, worth, buttons:{accept,reverse,rework}} — the plain-language panel John
+  // asked for: what he cannot do today, what he could after, why it is worth anything. A card
+  // published without it says so in red rather than rendering a convincing blank.
+  function moreInfo(id, kindCls, more){
+    var open = state.asks[id] && state.asks[id].length;   // a card he has asked about opens open
+    var m = more || null;
+    var b = buttonMeanings(kindCls, m && m.buttons);
+    var body = m
+      ? '<p><span class="lbl">What you can’t do today</span>'+m.cant+'</p>'
+        +'<p><span class="lbl">What you could do after</span>'+m.after+'</p>'
+        +'<p><span class="lbl">Why that’s worth something</span>'+m.worth+'</p>'
+      : '<p class="missing">This card was published without its plain-language summary. '
+        +'That is a defect in the cycle that wrote it, not something you need to decode.</p>';
+    return '<button class="morebtn'+(open?' on':'')+'" data-more="'+id+'">'
+      +(open?'Hide info':'More info')+'</button>'
+      +'<div class="more'+(open?' show':'')+'" id="more-'+id+'">'+body
+      +'<p class="btnmeans"><b>Accept</b> — '+b.accept+'<br>'
+      +'<b>Reverse</b> — '+b.reverse+'<br>'
+      +'<b>Rework</b> — '+b.rework+'</p>'
+      +thread(id)+askBox(id)+'</div>';
+  }
+
+  function card(id, kindCls, kindTxt, idTxt, title, bodyHtml, more){
     var d = state.items[id] || {};
     var dec = d.decision || '';
     var showReason = dec==='reverse' || dec==='rework';
@@ -162,6 +253,7 @@
       +'<div class="top"><span class="kind '+kindCls+'">'+kindTxt+'</span>'
       +'<span class="id">'+idTxt+'</span></div>'
       +'<h3>'+title+'</h3>'+bodyHtml
+      +moreInfo(id, kindCls, more)
       +'<div class="decide">'
       +'<button class="accept'+(dec==='accept'?' on':'')+'" data-c="accept">Accept</button>'
       +'<button class="reverse'+(dec==='reverse'?' on':'')+'" data-c="reverse">Reverse</button>'
@@ -178,9 +270,20 @@
   // the key the harvest writes back on, so it is the DOM id too: the page and the ledger cannot
   // drift apart. Two buttons, no text box in the way — the note is optional and appears only
   // after an answer exists to attach it to.
-  function question(qid, text, ctx){
+  // v7.0.145, directive edab5908 — John: "Your yes/no did not clarify that statement … Perhaps
+  // make a statement next to the button, so it clarifies it." `yesMeans`/`noMeans` are the
+  // consequence of each tap in one line, rendered directly beneath the button that causes it, so
+  // the question never has to be re-parsed to work out which way round it runs. They are
+  // REQUIRED: a question row without them renders the defect in red rather than two bare buttons.
+  function question(qid, text, ctx, yesMeans, noMeans){
     var a = state.answers[qid] || {};
     var ans = a.a || '';
+    var open = state.asks[qid] && state.asks[qid].length;
+    var means = (yesMeans && noMeans)
+      ? '<div class="ynmean"><span>Yes &rarr; '+yesMeans+'</span><span>No &rarr; '+noMeans+'</span></div>'
+      : '<div class="ynmean"><span class="missing">This question was published without its '
+        +'Yes/No consequences — a defect in the cycle that asked it. Tap More info and ask me '
+        +'what it means rather than guessing.</span></div>';
     return '<div class="q" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':'')+'>'
       +'<p class="qtext">'+text+'</p>'
       +(ctx ? '<p class="qctx">'+ctx+'</p>' : '')
@@ -188,6 +291,13 @@
       +'<button class="yes'+(ans==='yes'?' on':'')+'" data-a="yes">Yes</button>'
       +'<button class="no'+(ans==='no'?' on':'')+'" data-a="no">No</button>'
       +'</div>'
+      +means
+      +'<button class="morebtn'+(open?' on':'')+'" data-more="'+qid+'">'
+      +(open?'Hide info':'More info')+'</button>'
+      +'<div class="more'+(open?' show':'')+'" id="more-'+qid+'">'
+      +'<p>Not sure what this is asking? Ask in your own words — I answer here next cycle, and '
+      +'the thread stays on the question so neither of us loses the thread.</p>'
+      +thread(qid)+askBox(qid)+'</div>'
       +'<div class="qnote'+(ans?' show':'')+'">'
       +'<input type="text" value="'+esc(a.note)+'" placeholder="Optional — a line only if you want to add one">'
       +'<div class="hint">Not required. The Yes/No above is already recorded.</div></div>'
@@ -242,7 +352,12 @@
       +'<p><span class="lbl">Before → after</span>Before: the runner design existed only on paper. After: all six runner_ tables live in Supabase, budget seeded ($100 month / $3.30 day, fail closed), trust ladder at rung 1, zero public access.</p>'
       +'<p><span class="lbl">QA evidence</span>5/5 green, including a before-image → restore round-trip (row corrupted on purpose, restored byte-equal) and a live catch: new tables came up publicly readable by default — revoked, verified zero.</p>'
       +'<div class="meta"><span>cost $0.00 API</span><span>model Fable 5 (manual session)</span><span>push 5de2398</span></div>'
-      +'<p class="links"><span class="lbl">Where</span><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a> (data-layer only — log: docs/SES-78a-migration-log.md)</p>')
+      +'<p class="links"><span class="lbl">Where</span><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a> (data-layer only — log: docs/SES-78a-migration-log.md)</p>',
+      // v7.0.145 — the 7th argument. Three plain sentences, no jargon, no ticket IDs, phrased as
+      // John phrased the ask: what he can't do, what he could, why it is worth anything.
+      { cant:  'Nothing the runner does overnight is written down anywhere you can undo it from.',
+        after: 'Every overnight change has a recorded before-state, so one tap puts it back.',
+        worth: 'It is what makes leaving the runner unattended a reasonable thing to do.' })
     +card('item-tap-test','test','Test','SES-78b tap QA',
       'Tap test — prove the round trip from your phone',
       '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>')
@@ -255,7 +370,11 @@
     +'<h2>Questions — tap yes or no</h2>'
     +question('q-sample-slug',
       'Should new automation tickets I create go above your current lane, ahead of ADM-1?',
-      'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.')
+      'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.',
+      // v7.0.145 — arguments 4 and 5, required: the consequence of each tap, one line, rendered
+      // under the button that causes it.
+      'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
+      'it joins the bottom of your lane and waits its turn.')
     +'<h2>Trust ladder</h2><table>'
     +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
     +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
@@ -319,6 +438,32 @@
   function bar(t){ var b=document.getElementById('savebar'); if(b) b.textContent=t; }
 
   function wire(){
+    // v7.0.145 — More info toggles WITHOUT publishing. Opening a panel is not a decision, and a
+    // publish reloads the view, which would slam the panel shut the instant it opened.
+    document.querySelectorAll('.morebtn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var panel = document.getElementById('more-'+btn.getAttribute('data-more'));
+        if (!panel) return;
+        var nowOpen = !panel.classList.contains('show');
+        panel.classList.toggle('show', nowOpen);
+        btn.classList.toggle('on', nowOpen);
+        btn.textContent = nowOpen ? 'Hide info' : 'More info';
+      });
+    });
+    // An ask, on the other hand, IS recorded — same publish path as a tap. Append, never replace:
+    // the thread is the log John asked to keep, so a second question is a second entry.
+    document.querySelectorAll('.ask input').forEach(function(inp){
+      var target = inp.getAttribute('data-ask');
+      inp.addEventListener('keydown', function(e){
+        if (e.key !== 'Enter') return;
+        var q = inp.value.trim();
+        if (!q) return;
+        if (!state.asks[target]) { state.asks[target] = []; }
+        state.asks[target].push({ q:q, at:new Date().toISOString().slice(0,16)+'Z' });
+        inp.value = '';
+        save(); render();
+      });
+    });
     document.querySelectorAll('.item').forEach(function(cardEl){
       var id = cardEl.id;
       cardEl.querySelectorAll('.decide button').forEach(function(btn){

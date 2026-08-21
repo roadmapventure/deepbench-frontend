@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.145 | runbooks/runner-cycle.md | directive edab5908 — step 2 gains the `asks` harvest and step 9's tail gains the duty it creates. John typed a question box into existence ("I need to be able to ask questions about the issue"), and the rule that comes with it is that an ask he can see recorded but never answered is worse than no box: every open runner_card_asks row is answered on its own card in the rebuild. The idempotence note is not decoration — the page keeps every ask in briefing-state forever, so every cycle re-reads asks it already stored, and uniq_card_ask is the only thing stopping the log duplicating on each republish. -->
 <!-- DeepBench v7.0.135 | runbooks/runner-cycle.md | SES-99, directive 48ae1939 — step 2's harvest gains `answers` (the briefing's new yes/no question list, table public.runner_questions) and step 9's "help me" line stops describing a paragraph. John: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." -->
 <!-- DeepBench v7.0.133 | runbooks/runner-cycle.md | SES-86 phase 3, directive f47e5a95 — John's automation queue stops being prose a cycle has to remember and becomes the board's leading sort key. His line: "keep closing automation tooling tickets first before getting to the classified backlog." Step 5's layer (2) was a doc section every cycle had to go read and correctly interpret; the forgetting was silent, and it had already happened — measured 16:29Z, his automation tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told him the next cycle would be "building product, not tooling". New nullable backlog_items.automation_rank (C4 step number, NULL = not in lane) is now recompute_backlog_queue()'s LEADING ORDER BY key, NULLS LAST, with all six prior clauses preserved beneath it; migration ses86c_automation_lane. Self-retiring by construction — a done ticket leaves the ranked set, so the lane evaporates when his automation queue completes, which is his "until automation is complete". Two boundaries written into the migration header so they travel with the code: a future pin (B23) goes ABOVE automation_rank, and the five load-bearing clauses from ses86b are unchanged. QA proved the lane discriminating (before: 5 of 7 past position 240; after: queue 1-5) and idempotence the honest way this time — 551 -> 0, then a REAL change (the SES-89 status correction) -> 548 -> 0, never one clean re-run on an unchanged board. -->
 <!-- DeepBench v7.0.137 | runbooks/runner-cycle.md | register B42, John's ruling live in chat 2026-08-21 ("routines should be able to run multiple in parallel and not overwrite each other … What if i want to run 100 automated routines at once? should not be an issue - self administered and fixes itself if it happens to notice it is about to overwrite another session") — THE CYCLE-LEVEL LEASE IS RETIRED. Every fire that passes the stamp check runs; coordination moves to the resources: ticket claims (contested claim → take the next queued ticket, John's rule verbatim), atomic counters, rebase-retry×3 pushes, and ONE remaining serial section — the briefing tail (harvest→ladder→republish), guarded by the repurposed runner_lease singleton at a 10-minute TTL with wait-and-retry, never a did_not_run skip. Self-healing at the overwrite point: after taking the tail lease, re-fetch the live page and re-harvest before republishing; decision writes are idempotent (WHERE decision IS NULL). The v7.0.123 re-assertion gate retargets from the dead cycle lease to the ticket claim. Step 0b's silence definition rewritten for parallelism: open rows are normal; silence = 24h-open rows, expired claims, or a wedged 10-min tail lease. Budget walls named as approximate under parallelism (per-cycle-start checks; atomic allowance-claim is the upgrade if the fleet scales to tens). -->
@@ -415,6 +416,17 @@ way: for each answered `qid`, write a `runner_before_images` row first, then UPD
 on that question, exactly as a directive does. An unanswered question is **not** a "no" — it
 carries forward. The page-side contract (rendering, the yes/no-askable rule, the 5-open cap)
 lives in `briefing-page.md`'s question-list section — cited here, not restated.
+
+A non-empty `asks` object (`v7.0.145`, directive `edab5908`) is harvested the same way, and is
+the one harvest that is **read-and-answer, not read-and-record**: each entry is a question John
+typed on a card or a question row in his own words. INSERT each into
+`public.runner_card_asks` (before-image `row_data = NULL`), then **answer every `status='open'`
+row on its own card in the rebuild** — an ask he can see recorded but never answered is worse
+than no ask box at all. **The insert is idempotent by construction and must stay that way:** the
+page carries every ask in `briefing-state` forever, so **every** cycle re-reads asks it already
+stored, and only the `uniq_card_ask (target_id, asked_at, question)` constraint stops the log
+duplicating on every rebuild. Full contract, including the required More-info panel fields and
+the required Yes/No consequence lines: `briefing-page.md`'s More-info section.
 
 **3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** A
 wall-stop still runs the step-9 serial tail (its record must be written), then ends. **Known
@@ -867,8 +879,10 @@ self-healing step: another cycle may have republished while you built, and publi
 pre-lease harvest is exactly the "about to overwrite another session" moment John's ruling
 requires you to notice and absorb; **(3)** write the harvested decisions idempotently
 (`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
-only), store any reading/directive rows; **(4)** rebuild cards from the DB's undecided set and
-republish; **(5)** close your `runner_cycles` row; **(6)** release the publish lease
+only), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
+`uniq_card_ask`); **(4)** rebuild cards from the DB's undecided set — **each with its More-info
+panel, and each open `runner_card_asks` row answered on its own card** (`v7.0.145`; a card
+rendered without those fields carries a visible defect line, by design) — and republish; **(5)** close your `runner_cycles` row; **(6)** release the publish lease
 (holder-guarded statement in step 1). Then end the session cleanly. The tail should take
 seconds to low minutes — everything long-running happened before it, in parallel.
 

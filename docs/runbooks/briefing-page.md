@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.145 | runbooks/briefing-page.md | directive edab5908 — John: "often your wording is very confusing and does not make sense to which button to push, or i don't understand the issue." New section "More info, and asking me a question from the page": every card and question row gains a More info panel (what you can't do today / what you could do after / why that's worth something / what each button does here), Yes/No rows carry their consequences under the buttons, and John can type a question on any card — recorded to public.runner_card_asks (migration ses105_card_asks) and answered on that card by the next cycle, thread kept. The live in-page answer (his conditional "if possible") is carded, not built. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-page.md | SES-99, directive 48ae1939 — John's line: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." The "Help me — the questions" paragraph becomes a tappable yes/no list backed by the new public.runner_questions table; answers ride the briefing-state block under a new `answers` key and are harvested exactly like card decisions. Silence is never an answer. -->
 <!-- DeepBench v7.0.129 | runbooks/briefing-page.md | SES-96 — regeneration step 4 added: never shell-process the WebFetch result's saved file. John's captured permission prompt (2026-08-21) showed the rebuild sed-slicing the prior page's HTML out of ~/.claude/projects/…/tool-results/ — a permission-gated path that parks an unattended cycle exactly like a .claude/ write. Parse briefing-state in context; rebuild structurally from briefing-template.html + the runner_ tables. -->
 <!-- DeepBench v7.0.121 | runbooks/briefing-page.md | directive 1d01ea85 — two changes from John's line. The read-back contract's Reverse-on-gated sentence stops calling the asymmetry an open question: he answered "leave it", so it is settled and the page stops carrying it. And the regeneration contract gains the died-mid-run line: when a cycle has gone silent since the last rebuild the page says so — which cycle, how long, what it had picked, what John needs to do — because v7.0.106 deliberately kept the lease and its `steals` counter off this page, leaving a death visible only as a stat-strip number. The push (runner-cycle.md step 0b) is the primary channel; this is the durable copy. Same honesty limit as the push: observable state and a named hypothesis, never an invented cause, and never the word "died" before something proves it. -->
@@ -112,6 +113,71 @@ answer"*, which is what a question costs when it is asked in prose. Meanwhile, o
 week, **37 of 37 cards were decided by tap, none left open** (counted from `runner_items`
 2026-08-21T17:0xZ, not quoted). Questions were the last thing on the page still asking for
 sentences.
+
+## More info, and asking me a question from the page (every rebuild — directive `edab5908`, `v7.0.145`)
+
+John, 2026-08-21, directive box, verbatim: *"For each question, and each ticket accept/reject,
+need another button - "More Info" - often your wording is very confusing and does not make sense
+to which button to push, or i don't understand the issue. I need to be able to ask questions
+about the issue. But would like to be able to solve them in the brief."* Two of the four taps on
+that same page were **Rework**, and both said the same thing in different words: *"i don't
+understand what you are trying to get at here - please simply your ask"* and *"You need to
+summarize better what is happening. i don't understand, you are giving too much technical
+jargon. I need a business value statement - what can't the user do today? What would they be
+able to do after? How does this make the platform more valuable?"* Those three sentences are the
+panel's three fields. They are not a suggested format; they are the format.
+
+**Every card gets a `More info` button**, rendered above the decision buttons so the reading
+comes before the choice, opening a panel with, in order:
+
+1. **What you can't do today** — the gap, in a sentence a person outside this repo would follow.
+2. **What you could do after** — the same sentence from the other side.
+3. **Why that's worth something** — the platform-value claim, plainly.
+4. **What each button does *here*** — Accept / Reverse / Rework, spelled out **in this card's own
+   terms**. Defaults differ by card kind and the difference is real, not cosmetic: a gated Accept
+   is permission and never touches the ladder (John's B34 ruling), a shipped Accept is a rating.
+   A cycle may override any of the three when the generic sentence would mislead.
+5. **The conversation log**, then **the ask box**.
+
+Three rules that keep this honest, each of which the template enforces rather than trusts:
+
+- **No summary, no silence.** A card rendered without its three fields shows a red line saying
+  the cycle that wrote it is at fault. A blank panel that looked plausible would be worse than
+  the jargon it replaced, and this is also the negative control the QA leans on: an
+  implementation that merely rendered *a* panel would pass a completeness check and fail this.
+- **Opening the panel publishes nothing.** A publish reloads the view, which would slam the
+  panel shut the instant it opened. Only a decision, an answer, or an ask publishes.
+- **The three fields carry no ticket IDs, no table names, no register letters.** If a sentence
+  needs one to make sense, it is not written yet.
+
+**Yes/No rows carry their consequences under the buttons** (`ynMeans`): John, same directive —
+*"Your yes/no did not clarify that statement. i need to you to make your yes/ no better
+understood. Perhaps make a statement next to the button, so it clarifies it."* `question()`
+takes `yesMeans` and `noMeans` and renders `Yes → …` / `No → …` beneath the button each one
+describes. **Both are required**; a question row missing them renders the same red defect line.
+
+**The ask box and the log — `public.runner_card_asks` (migration `ses105_card_asks`).** John
+types a question in his own words on any card or question row and presses Enter. It records into
+`briefing-state` under `asks`, shape
+`{"<targetId>": [{"q":"…","at":"<iso>Z"}, …]}` — **an array, appended to, never replaced**,
+because he asked for *"a log of the conversation if its needed to update the ticket."* `targetId`
+is the card's `runner_items.id` or the question's `qid`, so the page and the ledger cannot drift.
+A blank or whitespace-only Enter records nothing.
+
+Harvest, in the step-9 tail: for each ask, INSERT into `runner_card_asks` (before-image first,
+`row_data = NULL` — the INSERT convention). The insert is idempotent by the
+`uniq_card_ask (target_id, asked_at, question)` constraint, which is load-bearing: **the page
+keeps every ask in `briefing-state` forever, so every cycle re-reads asks it has already
+stored.** Then, on the rebuild, **answer every `status='open'` row on its own card** — write
+`answer`/`answered_at`/`answered_cycle`, set `status='answered'`, and render the whole thread
+(his question, your answer, in order) inside that card's panel. An unanswered ask renders as
+*"Not answered yet"* rather than as blank space that reads like it was ignored.
+
+**What this is NOT, and it is the half John marked conditional.** He wrote *"b) **if possible**,
+make it so i can get a response from in the brief based on my questions"* — a live answer while
+he is standing there. This ships the deferred loop: he asks now, the next cycle answers on the
+card. The live version needs the artifact `sample` capability (the page asking Claude directly)
+and is carded, not assumed.
 
 ## Decision read-back contract (every cycle — the WRITES now run inside step 9's serial tail under the publish lease, register B42, 2026-08-21; step 2 reads only) — CORRECTED after live QA 2026-08-19
 
