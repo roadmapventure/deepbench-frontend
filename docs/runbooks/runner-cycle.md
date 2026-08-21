@@ -1,5 +1,6 @@
 <!-- DeepBench v7.0.135 | runbooks/runner-cycle.md | SES-99, directive 48ae1939 — step 2's harvest gains `answers` (the briefing's new yes/no question list, table public.runner_questions) and step 9's "help me" line stops describing a paragraph. John: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." -->
 <!-- DeepBench v7.0.133 | runbooks/runner-cycle.md | SES-86 phase 3, directive f47e5a95 — John's automation queue stops being prose a cycle has to remember and becomes the board's leading sort key. His line: "keep closing automation tooling tickets first before getting to the classified backlog." Step 5's layer (2) was a doc section every cycle had to go read and correctly interpret; the forgetting was silent, and it had already happened — measured 16:29Z, his automation tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told him the next cycle would be "building product, not tooling". New nullable backlog_items.automation_rank (C4 step number, NULL = not in lane) is now recompute_backlog_queue()'s LEADING ORDER BY key, NULLS LAST, with all six prior clauses preserved beneath it; migration ses86c_automation_lane. Self-retiring by construction — a done ticket leaves the ranked set, so the lane evaporates when his automation queue completes, which is his "until automation is complete". Two boundaries written into the migration header so they travel with the code: a future pin (B23) goes ABOVE automation_rank, and the five load-bearing clauses from ses86b are unchanged. QA proved the lane discriminating (before: 5 of 7 past position 240; after: queue 1-5) and idempotence the honest way this time — 551 -> 0, then a REAL change (the SES-89 status correction) -> 548 -> 0, never one clean re-run on an unchanged board. -->
+<!-- DeepBench v7.0.137 | runbooks/runner-cycle.md | register B42, John's ruling live in chat 2026-08-21 ("routines should be able to run multiple in parallel and not overwrite each other … What if i want to run 100 automated routines at once? should not be an issue - self administered and fixes itself if it happens to notice it is about to overwrite another session") — THE CYCLE-LEVEL LEASE IS RETIRED. Every fire that passes the stamp check runs; coordination moves to the resources: ticket claims (contested claim → take the next queued ticket, John's rule verbatim), atomic counters, rebase-retry×3 pushes, and ONE remaining serial section — the briefing tail (harvest→ladder→republish), guarded by the repurposed runner_lease singleton at a 10-minute TTL with wait-and-retry, never a did_not_run skip. Self-healing at the overwrite point: after taking the tail lease, re-fetch the live page and re-harvest before republishing; decision writes are idempotent (WHERE decision IS NULL). The v7.0.123 re-assertion gate retargets from the dead cycle lease to the ticket claim. Step 0b's silence definition rewritten for parallelism: open rows are normal; silence = 24h-open rows, expired claims, or a wedged 10-min tail lease. Budget walls named as approximate under parallelism (per-cycle-start checks; atomic allowance-claim is the upgrade if the fleet scales to tens). -->
 <!-- DeepBench v7.0.130 | runbooks/runner-cycle.md | SES-86 phase 2 (register B4) — the board's order stops being re-derived on every read. New `backlog_items.queue` column + `public.recompute_backlog_queue()`, one idempotent full renumber (550 rows numbered 1..550 on first run; second run changed 0). Step 5's five-clause selection query is retired in favour of `ORDER BY queue`, with the five load-bearing traps moved into the function and repeated in its migration header; `queue IS NULL` now IS the not-pickable condition. Step 7 gains the completed/removed recompute; step 9's "Next up" reads real numbers instead of recomputing the sort per render. Two corrections ride along, both measured live rather than reasoned: the "456 of 550 unpickable" paragraph is FALSE since `SES-85` landed (now 550 open, 0 unclassed, all numbered — a cycle quoting the old figure under-reads its queue by 6×), and the queue's top is no longer all Tooling. The renumber deliberately does NOT touch `updated_at`: stamping every row would destroy the sort-field-edit signal the recompute is triggered by and would churn BACKLOG-SNAPSHOT.md on cycles that changed nothing. -->
 <!-- DeepBench v7.0.129 | runbooks/runner-cycle.md | SES-96 — the second gated path class, named from John's captured prompt (2026-08-21): Bash against ~/.claude/projects/…/tool-results/ (where WebFetch saves its result) fires the same human-only permission prompt as .claude/ writes, and the briefing rebuild was doing exactly that (sed-slicing the prior page's HTML). Step 9 now prohibits shell-processing the fetched page's saved file; the safe procedure (parse briefing-state in context, rebuild from briefing-template.html + runner_ tables) is spelled out in briefing-page.md regeneration step 4. -->
 <!-- DeepBench v7.0.127 | runbooks/runner-cycle.md | SES-86 phase 1 (claim-on-pick), John-approved live 2026-08-21 ("yes, ship it") — step 5 gains the atomic ticket claim: the moment any session (manual or scheduled) picks a backlog ticket it claims it with one UPDATE (claimed_by/claimed_at, new columns, migration ses86a_backlog_claim_on_pick); 0 rows returned = another session holds it, drop to the next ticket exactly as B24 drops past a gated card. The selection query now filters claimed tickets (24h expiry — the B37 evidence bar — so a dead session cannot strand one). Claims release in the step-7 close-out write. Manual sessions run the same claim via session-setup skill step 2c. QA: all three arms proven live on real rows (fresh claim → 1 row, contested → 0 rows, 25h-stale → re-claimable). This is the shared-board coordination John asked for after today's duplicate (SES-95 shipped attended while a cycle carded it). -->
@@ -76,39 +77,60 @@ prompt carries a `stamp:` clause; call `list_triggers` and match that stamp agai
 current routine's stored prompt verbatim. A mismatch means the routine was updated and this
 prompt is superseded — CLOSE `did_not_run` immediately with the mismatched pair in `notes`,
 never run superseded instructions (found live, `SES-78`: a retired prompt fired a second
-runner cycle five minutes after the real one). **(2) Claim the lease** — see below. Only after
-both pass do you own the cycle; the claim itself mints its id (step 1).
+runner cycle five minutes after the real one). **(2)** — retired 2026-08-21 (register B42):
+there is no cycle-level lease any more. Mint your cycle id (`gen_random_uuid()`) and open your
+`runner_cycles` row (step 1). **Every fire that passes the stamp check RUNS.**
 
-**The lease — one runner at a time, proven by a write, never by a read (B31, `v7.0.106`).**
-Assertion (2) used to be `SELECT id FROM runner_cycles WHERE ended_at IS NULL`. That read
-**cannot** do this job and was found live doing exactly that: cycle `e36d4379` selected zero
-open cycles ~17 seconds after cycle `4da5a7bd` had already inserted its own row, so both
-picked the same top-of-queue item and both built `ADM-1 v1` (theirs pushed first as
-`a7c66ad`; the loser's work was discarded and version `7.0.103` is a permanent counter gap).
-A read cannot serialise against a concurrent write — only a write on the same row can. So the
-gate is a **single-row `UPDATE` on the `public.runner_lease` singleton**, which Postgres
-serialises for us: the second claimer blocks on the row lock, re-evaluates the `WHERE` clause
-after the first commits, and matches nothing.
+**PARALLEL CYCLES ARE THE DESIGN — the cycle-level lease is RETIRED (John, live in chat
+2026-08-21, register B42).** His ruling, verbatim: *"routines should be able to run multiple in
+parallel and not overwrite each other and manage sessions accordingly. I can run 10 sessions
+manually and there is no problem. What if i want to run 100 automated routines at once? should
+not be an issue - self administered and fixes itself if it happens to notice it is about to
+overwrite another session."* B31's one-runner-at-a-time mutex (`v7.0.106`) was built when
+tickets had no claims — the only way to stop two cycles building `ADM-1` twice was to stop the
+second cycle entirely. Since `v7.0.127` the coordination lives on the resources themselves, so
+the mutex now only throws away throughput. What replaces it, resource by resource:
+
+- **Tickets:** the atomic claim (step 5). A contested claim returns 0 rows → **take the next
+  ticket in the queue** — John's rule, exactly. N cycles work N different tickets.
+- **Version numbers and backlog IDs:** already atomic (`UPDATE … RETURNING`); no lease needed.
+- **`dev` pushes:** fetch → rebase → push (step 7). Under parallelism a non-fast-forward is
+  routine, not an anomaly — re-fetch, re-rebase, retry **up to 3 times** (was once).
+- **Your own ticket, before anything irreversible:** re-assert the CLAIM, not a lease — see
+  the re-assertion gate below.
+- **The briefing tail** — the one genuinely serial section (harvest John's taps → ladder
+  writes → republish). Two cycles republishing at once can overwrite each other's cards and,
+  worse, eat un-harvested taps. That section, and only that section, takes the singleton lock:
 
 ```sql
--- Claim. One statement, one row touched. Returns 1 row = you hold the lease; the returned
--- holder IS your cycle id. Returns 0 rows = another cycle is live.
+-- Publish lease (the repurposed runner_lease row): taken at the START of the serial tail
+-- (step 9), released at its end. Held for seconds-to-minutes, so the TTL is 10 minutes,
+-- not 45. 1 row = the tail is yours. 0 rows = another cycle is publishing.
 UPDATE public.runner_lease
-   SET holder      = gen_random_uuid(),
+   SET holder      = '<your cycle id>',
        stamp       = '<your stamp>',
        held_since  = now(),
        released_at = NULL,
        steals      = steals + (CASE WHEN holder IS NOT NULL THEN 1 ELSE 0 END),
        updated_at  = now()
  WHERE id = 1
-   AND (holder IS NULL OR held_since < now() - INTERVAL '45 minutes')
-RETURNING holder AS cycle_id, steals;
+   AND (holder IS NULL OR held_since < now() - INTERVAL '10 minutes')
+RETURNING holder, steals;
 ```
 
-**0 rows → CLOSE `did_not_run` and END** — insert a runner_cycles row that is already closed
-(`ended_at = now()`, `outcome = 'did_not_run'`) naming the blocking holder in `notes`, and do
-**not** claim the lease for it. Never race a live cycle's counters, pushes, or briefing
-republish.
+**0 rows → WAIT, never skip:** retry every ~30s until you hold it (the 10-minute TTL bounds the
+wait). The tail is where your cycle's record, cards, and John's harvested taps get written —
+a cycle must never end without it. **This wait replaces the old "did not run — lease held by a
+live cycle" exit, which is exactly the behavior John rejected.**
+
+**Self-healing at the overwrite point ("fixes itself if it happens to notice it is about to
+overwrite" — his words, the operative spec):** inside the tail, AFTER taking the publish lease,
+re-fetch the live page and re-parse `briefing-state` — never republish from a harvest taken
+before the lease, because another cycle may have republished while you were building. Decisions
+are harvested idempotently (`UPDATE runner_items SET decision=… WHERE id=… AND decision IS
+NULL` — only rows you actually flipped feed the ladder), so a double-harvest writes nothing
+twice, and cards are always rebuilt from the DB's undecided set (register B18), never from
+memory.
 
 Three properties worth knowing before you edit any of this:
 
@@ -136,35 +158,33 @@ Three properties worth knowing before you edit any of this:
   `runner_before_images` row; anything else you write to it (a QA fixture, a manual repair)
   does, exactly like every other Supabase write.
 
-**RE-ASSERT THE LEASE BEFORE EVERY IRREVERSIBLE ACT — the claim is a starting gun, not a
-standing guarantee (`v7.0.123`, directive `c4d95dc7`, self-filed by cycle `633fe486`).** Until
-now the lease was asserted **once**, at claim time, and never again: nothing between step 0 and
-the push made a cycle re-check that it still owned the run. That is the hole the bullet above
-opens — a stolen-from cycle does not stop, because it does not know. `633fe486` came **one
-command short** of pushing a duplicate of already-shipped work to `dev` — the exact `ADM-1`
-double-build (`e36d4379` / `4da5a7bd`) that B31 built the lease to prevent, reached by a route
-the lease did not cover. It stopped only because it happened to re-fetch `origin/dev` at the ship
-point and see the successor's commits. **That is luck, not a control**, and the standing
-prohibition "never build without holding the lease" had no enforcement point after step 0.
-
-Run this immediately before **any** irreversible act — the step-7 push, and every counter claim
+**RE-ASSERT THE TICKET CLAIM BEFORE EVERY IRREVERSIBLE ACT — a claim is a starting gun, not a
+standing guarantee (`v7.0.123`'s lesson, directive `c4d95dc7`, retargeted from the retired
+cycle lease to the ticket claim, register B42).** The principle `633fe486` paid for is
+unchanged: a cycle that lost its coordination token keeps working, because nothing tells it —
+it came one command short of pushing a duplicate to `dev` and was saved only by an incidental
+`git fetch`. Under parallel cycles the token is the **ticket claim** (24h expiry), so run this
+immediately before **any** irreversible act — the step-7 push, and every counter claim
 (`dev_version_counter`, `feature_id_counter`):
 
 ```sql
--- Re-assertion. 1 row = you still hold the lease, proceed. 0 rows = you were stolen from.
-SELECT holder, held_since FROM public.runner_lease
- WHERE id = 1 AND holder = '<your cycle id>';
+-- Re-assertion. 1 row = the ticket is still yours, proceed. 0 rows = your claim expired
+-- and another session took it.
+SELECT claimed_by, claimed_at FROM public.backlog_items
+ WHERE backlog_id = '<your TICKET-ID>' AND claimed_by = '<your cycle id>'
+   AND claimed_at > now() - INTERVAL '24 hours';
 ```
 
-**0 rows → you were stolen from. STOP, and note precisely what stop means here:**
+**0 rows → your claim is gone. STOP, and note precisely what stop means here:**
 
-- **Do NOT push.** A successor has been running since your lease expired and may have shipped
+- **Do NOT push.** Whoever re-claimed the ticket after your claim expired may have shipped
   the very item you are holding. Pushing now is the duplicate-build failure, arriving late.
-- **Do NOT claim a counter.** A version or ID claimed after you lost the lease is a permanent
+- **Do NOT claim a counter.** A version or ID claimed after you lost the ticket is a permanent
   gap at best and a collision at worst.
-- **Do NOT release the lease.** The release statement is holder-guarded, so it would match
-  nothing anyway — but attempting it is how a cycle talks itself into touching a successor's
-  row. Leave it alone, exactly as step 0b forbids adjudicating a predecessor's outcome.
+- **Do NOT touch the new claimant's claim.** The re-assertion is holder-guarded by
+  construction — but attempting a "repair" write is how a cycle talks itself into touching a
+  successor's state. Leave it alone, exactly as step 0b forbids adjudicating a predecessor's
+  outcome.
 - **Close and annotate your OWN row, then end.** `outcome='did_not_run'`, with the reason and
   the successor's holder id in `notes`. Your work is not necessarily lost: **push your session
   branch** (never `dev`) so the commits survive the container, and name that branch in the
@@ -176,9 +196,9 @@ SELECT holder, held_since FROM public.runner_lease
 
 The gate is cheap (one indexed single-row `SELECT`) and it is the enforcement point the standing
 prohibition never had. **It does not replace the ship-point `git fetch origin dev`** — that
-catches a successor that shipped without ever taking your lease; this catches the case where the
-lease moved. Two different failures, both real, and `633fe486` was saved by the first one only by
-accident.
+catches work that already landed on `dev` regardless of claims; this catches the case where your
+claim expired and moved. Two different failures, both real, and `633fe486` was saved by the
+first one only by accident.
 
 **0b. A SILENT predecessor is PUSHED to John — and is never declared dead by a successor (John,
 2026-08-21, directive `1d01ea85`, register B35; corrected the same cycle by measurement, B37).**
@@ -210,19 +230,28 @@ not a death. So:
   in its third costume; the rule "a subagent that has not returned is not a result" applies to an
   absent *cycle* exactly as it does to an absent *subagent*.
 
-Run this immediately after the claim, every cycle:
+Run this at step 0, every cycle. **Under parallel cycles (register B42) an open row is
+NORMAL — concurrency is the design, not a symptom.** Silence now has three concrete shapes,
+none of which is "another cycle exists":
 
 ```sql
-SELECT id, started_at, item_id, model, left(coalesce(notes,''), 400) AS notes,
-       round(extract(epoch FROM (now() - started_at))/60) AS minutes_silent
+-- (a) open cycle rows older than the 24h evidence bar (B37) — candidates for silence
+SELECT id, started_at, item_id,
+       round(extract(epoch FROM (now() - started_at))/3600, 1) AS hours_open
   FROM public.runner_cycles
  WHERE ended_at IS NULL AND id <> '<your cycle id>'
- ORDER BY started_at;
+   AND started_at < now() - INTERVAL '24 hours';
+-- (b) ticket claims past their 24h expiry (a session that vanished mid-build)
+SELECT backlog_id, claimed_by, claimed_at FROM public.backlog_items
+ WHERE claimed_at < now() - INTERVAL '24 hours' AND claimed_by IS NOT NULL;
+-- (c) the publish lease wedged past its 10-minute TTL
+SELECT holder, held_since FROM public.runner_lease
+ WHERE id = 1 AND holder IS NOT NULL AND held_since < now() - INTERVAL '10 minutes';
 ```
 
-Any row returned, **or** a `steals` value from your claim higher than the previous cycle's
-recorded value, means a cycle has gone silent. **Send a push notification** carrying both halves
-of what John asked for — and leave the row alone:
+Any row from these — or a `steals` jump on your own tail-lease claim — means a session has
+gone silent. **Send a push notification** carrying both halves of what John asked for — and
+leave the row alone:
 
 - **Why it went silent — only what is observable.** Which cycle, when it started, how long it
   has been quiet, what it had picked (`item_id` / `notes`), whether the lease was taken by TTL
@@ -244,7 +273,7 @@ of what John asked for — and leave the row alone:
   explained by B39, and the push should say so rather than reach for the nearest known cause —
   that reflex is how this platform got three wrong rulings in a row.
 - **What to do next — concretely, including "nothing".** Most silences need no action at all:
-  the lease TTL already freed the schedule, the next cycle re-picks the same item, and the silent
+  the claim's 24h expiry re-opens the ticket, the next cycle re-picks it, and the silent
   cycle may simply come back and finish. Say that plainly rather than implying an emergency. Name
   an action only for real residue: a directive stuck `in_progress` (re-claim it — before-image
   first, never quietly), a version number claimed and unused (a permanent counter gap; record it,
@@ -266,21 +295,29 @@ back and pushed their work to their own session branches; the correct action for
 **1. Open the cycle.** INSERT `runner_cycles` **with the id the claim returned** —
 `INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
 the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
-value; found live, SES-78c). Every later step's evidence hangs off this row's id, which is now
-also the lease's `holder`, so "who is running right now" is one `SELECT` away.
+value; found live, SES-78c). Every later step's evidence hangs off this row's id; "who is
+running right now" is `SELECT … FROM runner_cycles WHERE ended_at IS NULL` — and under
+parallel cycles (register B42) **multiple open rows are normal**, not a signal.
 
-**Release the lease at EVERY exit path** — the ship at step 9, every wall-stop at step 3, a
-blocker abort, a `failed` close. The statement is holder-guarded so a cycle that was stolen
-from can never clobber its successor:
+**Release the PUBLISH lease at the end of your tail — and only if you took it.** Every cycle,
+even a wall-stop or a `failed` close, still runs the serial tail (its record must be written),
+so the release always happens there. The statement is holder-guarded so a cycle whose tail
+lease was TTL-stolen can never clobber the new holder:
 
 ```sql
 UPDATE public.runner_lease
    SET holder = NULL, released_at = now(), updated_at = now()
  WHERE id = 1 AND holder = '<your cycle id>'
-RETURNING released_at;   -- 0 rows = you were stolen from; leave the new holder alone
+RETURNING released_at;   -- 0 rows = the tail lease was stolen; leave the new holder alone
 ```
 
-**2. Harvest John's judgment.** Read the briefing page (URL in
+**2. Harvest John's judgment — the WRITES now happen inside the step-9 serial tail (register
+B42), under the publish lease; this step is now READ-ONLY.** Read the page for anything that
+changes your selection — new directive text, a fresh usage reading, taps on gated cards — and
+carry it forward, but write nothing here: decision/ladder/reading/directive writes race under
+parallel cycles and belong in the tail, where they are idempotent (`… AND decision IS NULL`)
+and serialized. The rules below govern those writes wherever they run. Original step text:
+Read the briefing page (URL in
 `docs/runbooks/briefing-page.md`) and parse its `briefing-state` JSON block. For each decided
 item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accept** → ladder
 streak +1 (5 consecutive → rung +1) **on a `shipped` card only — see the gated-card rule below**;
@@ -339,10 +376,14 @@ on that question, exactly as a directive does. An unanswered question is **not**
 carries forward. The page-side contract (rendering, the yes/no-askable rule, the 5-open cap)
 lives in `briefing-page.md`'s question-list section — cited here, not restated.
 
-**3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** Every
-`did_not_run` exit from this step **releases the lease** (statement in step 0) before it ends —
-a wall-stop that keeps the lease holds the next three hours' cycle hostage until the TTL
-expires.
+**3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** A
+wall-stop still runs the step-9 serial tail (its record must be written), then ends. **Known
+approximation under parallel cycles (register B42, named rather than hidden):** each cycle
+reads the day's spend at its own start, so N cycles starting together can each pass a wall the
+sum of them exceeds — the caps are enforced per-cycle-start, not transactionally across the
+fleet. At today's scale that slack is small; if John scales to tens of parallel routines, an
+atomic allowance-claim (same pattern as the counters) is the upgrade, and it should be
+proposed then, not silently assumed now.
 
 **"Today" is an America/Chicago day, not a UTC day (John, 2026-08-21, directive `1d01ea85`,
 register B35).** Asked whether the spending day should end at midnight UTC — 7 PM where he is —
@@ -722,9 +763,19 @@ is a permission-gated path, the same gate as step 0's `.claude/` rule; parse `br
 in context and rebuild from the template + `runner_` tables — `SES-96`, John's captured
 prompt, 2026-08-21**).
 *(Supervised run: if republish is unavailable from cloud, log it — the design session rebuilds
-manually.)* **Release the lease last** (holder-guarded statement in step 0), after the cycle row
-is closed and the briefing is republished — the lease is what stops the next fire from starting
-while you are still writing the record. Then end the session cleanly.
+manually.)*
+
+**THE SERIAL TAIL (register B42) — the only moment of the cycle that is one-at-a-time.** In
+order: **(1)** take the publish lease (step 0's 10-minute-TTL claim; 0 rows → wait ~30s and
+retry, never skip); **(2)** re-fetch the live page and re-parse `briefing-state` — the
+self-healing step: another cycle may have republished while you built, and publishing from a
+pre-lease harvest is exactly the "about to overwrite another session" moment John's ruling
+requires you to notice and absorb; **(3)** write the harvested decisions idempotently
+(`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
+only), store any reading/directive rows; **(4)** rebuild cards from the DB's undecided set and
+republish; **(5)** close your `runner_cycles` row; **(6)** release the publish lease
+(holder-guarded statement in step 1). Then end the session cleanly. The tail should take
+seconds to low minutes — everything long-running happened before it, in parallel.
 
 ## Standing prohibitions (§19v — no step overrides these)
 
@@ -732,7 +783,9 @@ Never: touch the gated lane (terminology, LOCKED sections, schema-destructive mi
 §19e-owned writes, active-agent Skill/Capability edits, the four harness files, dev→main);
 write Supabase without a before-image; report a number that doesn't trace to a row or log;
 retry the same tier twice; push more than once per ship point; proceed past a failed wall;
-build without holding the lease, or end a cycle without releasing it (B31) — and **never push or
-claim a counter without re-asserting the lease first** (`v7.0.123`, directive `c4d95dc7`: the
-enforcement point that "never build without holding the lease" lacked between step 0 and the
-push).
+build a ticket without holding its claim (register B42 — the per-resource successor to B31's
+retired cycle lease); enter the serial tail without the publish lease, republish from a
+pre-lease harvest, or end a cycle without running the tail — and **never push or claim a
+counter without re-asserting the ticket claim first** (`v7.0.123`'s lesson, directive
+`c4d95dc7`, retargeted by B42: the coordination token must be re-proven before every
+irreversible act, whatever the token is).

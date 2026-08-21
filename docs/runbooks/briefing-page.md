@@ -110,7 +110,7 @@ week, **37 of 37 cards were decided by tap, none left open** (counted from `runn
 2026-08-21T17:0xZ, not quoted). Questions were the last thing on the page still asking for
 sentences.
 
-## Decision read-back contract (every cycle, step 2) — CORRECTED after live QA 2026-08-19
+## Decision read-back contract (every cycle — the WRITES now run inside step 9's serial tail under the publish lease, register B42, 2026-08-21; step 2 reads only) — CORRECTED after live QA 2026-08-19
 
 **Found live during SES-78b's own tap QA:** this artifact is a *classic* artifact, not a live
 doc — DOM gestures do NOT auto-persist (the first build assumed they did; John's taps ran the

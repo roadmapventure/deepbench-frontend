@@ -495,6 +495,24 @@
   the gate now matters only if a future task genuinely edits `.claude/` skill/rule files —
   which step 0's carding rule still covers, pending the "Always allow" persistence experiment.
 
+- **B42. Parallel cycles are the design — the cycle-level lease is retired (John, live in chat
+  2026-08-21; `v7.0.137`, attended session `automation-review`).** Verbatim: *"i don't care what
+  the rules are - routines should be able to run multiple in parallel and not overwrite each
+  other and manage sessions accordingly. I can run 10 sessions manually and there is no problem.
+  What if i want to run 100 automated routines at once? should not be an issue - self
+  administered and fixes itself if it happens to notice it is about to overwrite another
+  session."* This supersedes B31's one-runner mutex (kept in `v7.0.106` history; its
+  ADM-1-double-build lesson survives in the per-resource controls) and closes the
+  parallel-cycles gated card `v7.0.133` filed. The model: every stamp-checked fire runs;
+  tickets coordinate via claims (contested → next queued ticket, his rule verbatim); counters
+  are atomic; pushes rebase-retry ×3; the **briefing tail** (harvest → ladder → republish) is
+  the one serial section, guarded by the repurposed `runner_lease` singleton (10-min TTL,
+  wait-and-retry — the "did not run — lease held" exit is deleted as the exact behavior he
+  rejected); self-healing on contention (re-fetch + re-harvest after taking the tail lease;
+  idempotent decision writes). The `v7.0.123` re-assertion principle retargets to the ticket
+  claim. **Named cost, not hidden:** budget walls are per-cycle-start checks, approximate under
+  parallelism; an atomic allowance-claim is the upgrade if the fleet scales to tens.
+
 ## D. Ticket ledger
 
 **Filed this session (8):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter
