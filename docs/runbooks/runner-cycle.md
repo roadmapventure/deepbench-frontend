@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.123 | runbooks/runner-cycle.md | directive c4d95dc7 — the lease gains an enforcement point it never had. Self-filed by cycle 633fe486 before it stood down: the lease was asserted ONCE at claim time and never again, so a cycle whose lease was stolen on the TTL keeps building and pushing, because nothing tells it. 633fe486 came one command short of pushing a duplicate of already-shipped work to dev — the exact ADM-1 double-build (e36d4379/4da5a7bd) B31 built the lease to prevent, reached by a route the lease did not cover — and was saved only by happening to re-fetch origin/dev at the ship point. Luck, not a control. New: a holder-guarded re-assertion SELECT, defined once in step 0 and wired as a hard gate before the step-7 push and before every counter claim, with the stolen-from procedure spelled out (do not push, do not claim, do NOT release the lease, close your OWN row, push the session branch so the work is cherry-pickable, and check whether the successor already shipped the item before discarding). Step 0's TTL bullet is CORRECTED with it: the sentence "a stolen lease means the holder is dead, not slow" is disproved by measurement — 633fe486 was stolen from at ~05:52Z and was still executing normally at 13:10:51Z, ~8h, because a cloud session can be suspended and resumed across gaps invisible from inside it. A steal means SILENT, not dead — the same correction step 0b already makes for `failed`, now applied to the lease that produced it. -->
 <!-- DeepBench v7.0.122 | runbooks/runner-cycle.md | directive 34865f07 — John's testimony names the mechanism behind four days of `.claude/` stalls, and step 0's clause is rewritten on it for the fourth and, this time, evidenced reason. He wrote: "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." So the gate is a harness permission prompt that renders ONLY in the human session UI — invisible to the agent, unanswerable by it, and cleared by a person. The path was never blocked; `v7.0.121`'s 18-minute stall ended in a successful write. What was wrong was B38's clearing model ("an intermittent stall that clears" → "a cost, not a prohibition"), and the partition disproves it exactly: John's briefing taps stop 03:48Z and resume 12:50Z, and every probe that cleared ran inside his waking window while all three that parked 8h+/never ran inside the nine-hour hole — the two parked cycles resuming TOGETHER eighteen minutes after his first morning tap. So "budget ~35 minutes" was a sample of the attended cases only. New rule, narrower than v7.0.117's and broader than B38's: an UNATTENDED cycle never enters the gate, because it has no bounded recovery; the edit stays legitimate work needing a session John attends. Step 0b gains the leading evidenced hypothesis for a silence, plus the rule that "open the session and approve" is never written to John as a remedy — it is the thing he ruled out. His onset claim ("after the new rules of the database for the backlog") is contradicted by 21 hours and said so plainly; his mechanism is right, and a real mediated link survives. -->
 <!-- DeepBench v7.0.121 | runbooks/runner-cycle.md | directive 1d01ea85 — John's three answers reach the procedure. Step 2's Reverse-on-gated bullet stops calling itself an open question: asked directly, John said "leave it", so a Reverse on a gated card still demotes and that is now his ruling (B34's second "deliberately not done" is closed; the no-retroactive-re-derivation half still stands). Step 3 gains the budget day boundary — "today" is an America/Chicago day, SQL quoted verbatim, forward-only so a stored override expiry is never retroactively shortened, and explicitly NOT the same thing as the display-only times rule. New step 0b: a predecessor that has gone quiet is PUSHED to John with why + what to do next. THAT RULE WAS REWRITTEN MID-CYCLE BY MEASUREMENT (B37): its first draft said an open row past the TTL means dead — and while it sat unshipped, the two cycles it was about (ba8f2ce3, 633fe486, both closed `failed` by a successor at 08:24Z) resumed after nine hours, finished, declined to race the live lease, and filed their work. So a successor now never adjudicates a predecessor's outcome, `failed` needs evidence rather than elapsed time, and the word is "went silent". -->
 <!-- DeepBench v7.0.118 | runbooks/runner-cycle.md | directive fb643367 — John's Q1 ruling reaches the procedure. Step 2's flat "Accept → streak +1" now excludes `gated_before_build` cards: a gated Accept is permission, not a rating, and does not touch `runner_ladder`. Two boundaries written down with it, both deliberate: the rule applies forward and the ladder's history is NOT re-derived (the streak-reset-on-promotion value is undefined in the written rule, so unwinding the two earlier gated-counting harvests would invent a rule); and Reverse-on-gated is NOT covered — John ruled on Accept only, so it still demotes and the asymmetry goes to him as an open question rather than being harmonised by inference. -->
@@ -111,15 +112,68 @@ Three properties worth knowing before you edit any of this:
   with that id in the next statement (step 1). Splitting it into claim-then-bind inside one
   statement does not work: Postgres silently drops a second UPDATE of the same row in the same
   statement, which would leave `holder` NULL and the lease effectively open.
-- **The 45-minute TTL is the anti-deadlock.** A cloud session that dies mid-cycle never
-  releases; without a TTL the routine would be wedged until a human noticed. Longest real
+- **The 45-minute TTL is the anti-deadlock — but a steal means the holder is SILENT, not dead
+  (corrected `v7.0.123`, directive `c4d95dc7`).** A cloud session that goes quiet mid-cycle never
+  releases; without a TTL the routine would be wedged until a human noticed, so the TTL has to
+  exist and is unchanged. What was wrong is the sentence that used to sit here: *"Longest real
   cycle to date is ~18 minutes against a 3-hour cadence, so a stolen lease means the holder is
-  dead, not slow. A steal increments `steals` — a non-zero value is the signal that cycles are
-  dying, and belongs in the briefing when it moves.
+  dead, not slow."* Cycle `633fe486` disproves it by measurement — it opened `05:07:15Z`, had its
+  lease stolen on the TTL at ~`05:52Z`, and was **still executing normally at `13:10:51Z`**
+  (`select now()` read from inside that session), ~8 hours later, having completed its probe,
+  subagent delegation, edits, kickoff doc, build, regression and snapshot export. A cloud session
+  can be suspended and resumed across wall-clock gaps that are **invisible from inside it**, so
+  the elapsed-time premise the old sentence rested on does not hold — the same correction step 0b
+  makes for `failed`, applied here. A steal increments `steals`; a non-zero value is the signal
+  that cycles are going silent, and belongs in the briefing when it moves. **Because a stolen-from
+  cycle keeps running, the steal alone protects nothing — see the re-assertion gate below.**
 - **The lease is ledger state, not content.** Its own columns (`holder`, `held_since`,
   `steals`, `released_at`) are the audit trail, so the claim and the release do not each need a
   `runner_before_images` row; anything else you write to it (a QA fixture, a manual repair)
   does, exactly like every other Supabase write.
+
+**RE-ASSERT THE LEASE BEFORE EVERY IRREVERSIBLE ACT — the claim is a starting gun, not a
+standing guarantee (`v7.0.123`, directive `c4d95dc7`, self-filed by cycle `633fe486`).** Until
+now the lease was asserted **once**, at claim time, and never again: nothing between step 0 and
+the push made a cycle re-check that it still owned the run. That is the hole the bullet above
+opens — a stolen-from cycle does not stop, because it does not know. `633fe486` came **one
+command short** of pushing a duplicate of already-shipped work to `dev` — the exact `ADM-1`
+double-build (`e36d4379` / `4da5a7bd`) that B31 built the lease to prevent, reached by a route
+the lease did not cover. It stopped only because it happened to re-fetch `origin/dev` at the ship
+point and see the successor's commits. **That is luck, not a control**, and the standing
+prohibition "never build without holding the lease" had no enforcement point after step 0.
+
+Run this immediately before **any** irreversible act — the step-7 push, and every counter claim
+(`dev_version_counter`, `feature_id_counter`):
+
+```sql
+-- Re-assertion. 1 row = you still hold the lease, proceed. 0 rows = you were stolen from.
+SELECT holder, held_since FROM public.runner_lease
+ WHERE id = 1 AND holder = '<your cycle id>';
+```
+
+**0 rows → you were stolen from. STOP, and note precisely what stop means here:**
+
+- **Do NOT push.** A successor has been running since your lease expired and may have shipped
+  the very item you are holding. Pushing now is the duplicate-build failure, arriving late.
+- **Do NOT claim a counter.** A version or ID claimed after you lost the lease is a permanent
+  gap at best and a collision at worst.
+- **Do NOT release the lease.** The release statement is holder-guarded, so it would match
+  nothing anyway — but attempting it is how a cycle talks itself into touching a successor's
+  row. Leave it alone, exactly as step 0b forbids adjudicating a predecessor's outcome.
+- **Close and annotate your OWN row, then end.** `outcome='did_not_run'`, with the reason and
+  the successor's holder id in `notes`. Your work is not necessarily lost: **push your session
+  branch** (never `dev`) so the commits survive the container, and name that branch in the
+  notes — `ba8f2ce3` and `633fe486` both did exactly this, and their work was recoverable by
+  cherry-pick rather than redone.
+- **Before you discard, check whether your item already shipped.** `git fetch origin dev` and
+  read the log: if the successor shipped it, the discard is correct and deliberate; if it did
+  **not**, say so in the notes so the item is re-picked rather than silently dropped.
+
+The gate is cheap (one indexed single-row `SELECT`) and it is the enforcement point the standing
+prohibition never had. **It does not replace the ship-point `git fetch origin dev`** — that
+catches a successor that shipped without ever taking your lease; this catches the case where the
+lease moved. Two different failures, both real, and `633fe486` was saved by the first one only by
+accident.
 
 **0b. A SILENT predecessor is PUSHED to John — and is never declared dead by a successor (John,
 2026-08-21, directive `1d01ea85`, register B35; corrected the same cycle by measurement, B37).**
@@ -422,7 +476,9 @@ row (register B22).
 governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will
 touch, and the real source files. Inventions additionally pass the R&D gate first (research →
 cheapest-variant POC, measured → logged go/no-go; §19d sniff test — traceable reasoning, never
-a feature mill). Claim your version atomically (`dev_version_counter`, SQL in
+a feature mill). **Re-assert the lease (step 0) before the counter claim** — a version claimed
+after you were stolen from is a permanent gap at best — then claim your version atomically
+(`dev_version_counter`, SQL in
 `.claude/skills/session-setup/SKILL.md`). Write the kickoff doc
 (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3
 files, ≤4 tasks). **Model discipline (John, 2026-08-20, register B21):** you are the Opus 5
@@ -478,8 +534,12 @@ the paths under test after every step, so a hang still leaves evidence of exactl
   export cannot run, say so in the cycle row rather than shipping a silently stale snapshot.
   `--check` (exit 1 = drift) is the read-only form for a cycle that wants to know whether the
   snapshot is current without writing it.
-- **One batched push:** `git fetch origin dev && git rebase origin/dev && git push origin
-  HEAD:dev`. Never per-artifact pushes.
+- **Re-assert the lease, then one batched push.** The re-assertion `SELECT` (step 0) is a **hard
+  gate on the push**: run it, and only on 1 row proceed with
+  `git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev`. Never
+  per-artifact pushes. 0 rows → do not push; follow the stolen-from procedure in step 0. Keep
+  the `git fetch` too — it catches a different failure (a successor that shipped without taking
+  your lease), and `633fe486` survived on that accident alone.
 
 ## Phase 3 — evidence
 
@@ -565,4 +625,7 @@ Never: touch the gated lane (terminology, LOCKED sections, schema-destructive mi
 §19e-owned writes, active-agent Skill/Capability edits, the four harness files, dev→main);
 write Supabase without a before-image; report a number that doesn't trace to a row or log;
 retry the same tier twice; push more than once per ship point; proceed past a failed wall;
-build without holding the lease, or end a cycle without releasing it (B31).
+build without holding the lease, or end a cycle without releasing it (B31) — and **never push or
+claim a counter without re-asserting the lease first** (`v7.0.123`, directive `c4d95dc7`: the
+enforcement point that "never build without holding the lease" lacked between step 0 and the
+push).
