@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.112 | runbooks/runner-cycle.md | SES-83 (d) — step 5's selection layer (3) stops parsing FEATURES.md / FEATURES-NEXT.md / FEATURES-LATER.md and reads public.backlog_items via one canonical SQL query, quoted verbatim. John's "table is authority" call, Accepted 2026-08-21T00:19Z. Four live traps encoded in the query itself: numeric P-class ordering (lexical puts P10 before P2), the `· FLAGGED` suffix, the Beta-gate/Post-beta declaration regex (ILIKE '%beta%' over-matches by 20), and `title` holding the class string for imported tickets. Layers (1) directives and (2) John's automation queue are unchanged and still outrank the table. -->
 <!-- DeepBench v7.0.108 | runbooks/runner-cycle.md | SES-89 — new step 8b, the Heal sweep: `scripts/heal-engine.js` groups `durable_hops` failures into signatures and files evidenced `P9 - Bug Fixes` tickets (dry-run by default; the cycle claims the id block and passes it in). Reads `durable_hops`, NOT `ai_activity_log` — the latter has no error column, verified live. -->
 <!-- DeepBench v7.0.107 | runbooks/runner-cycle.md | SES-83c — step 7 gains the backlog snapshot export: `scripts/export-backlog-snapshot.js` regenerates `docs/backlog/BACKLOG-SNAPSHOT.md` into the ship commit set, so the Supabase board has a git-history + offline restore copy (SES-81's backup gap). Deterministic by construction — an unchanged table writes nothing. -->
 <!-- DeepBench v7.0.106 | runbooks/runner-cycle.md | B31 — step-0 assertion (2) becomes an atomic lease claim on the new public.runner_lease singleton, and every exit path releases it. The read it replaces ("no foreign open cycle") missed a cycle opened 17 seconds earlier and let two cycles build ADM-1 v1 in parallel (e36d4379 vs 4da5a7bd, 2026-08-20). -->
@@ -175,10 +176,55 @@ item.)*
 section, his standing order (briefing access → backlog DB → automation-gap tickets →
 behavior-expert pass → classification sweep; invention parallel): pick the next incomplete
 step's ticket. Without this layer the 63 open `P9 - Bug Fixes` tickets would outrank every
-`P10 - Tooling` automation ticket and bury the queue he set. (3) Only when both are empty,
-the backlog by class: `FEATURES.md` (now) → `FEATURES-NEXT.md` → `FEATURES-LATER.md`,
-`P1 - Improves John's Skills` → `P10 - Tooling` within each; within a
-class: beta-marked first, then newest filed, then oldest (John, 2026-08-20). **Classify its lane against
+`P10 - Tooling` automation ticket and bury the queue he set. (3) Only when both are empty, the
+backlog by class — **read from `public.backlog_items` via SQL, never by parsing the markdown
+files (`SES-83` (d), `v7.0.112`; John's "table is authority" call, Accepted 2026-08-21T00:19Z).**
+Run this query verbatim; do not re-derive it:
+
+```sql
+SELECT backlog_id, tier, priority_class, status,
+       (description ~* '(Beta-gate|Post-beta)') AS beta_marked,
+       created_at,
+       left(regexp_replace(coalesce(description,''), '^\*\*P[0-9]+[^*]*\*\*\s*', ''), 200) AS gist
+  FROM public.backlog_items
+ WHERE status <> 'done'
+   AND priority_class IS NOT NULL
+ ORDER BY CASE tier WHEN 'now' THEN 0 WHEN 'next' THEN 1 ELSE 2 END,
+          (substring(priority_class FROM 'P([0-9]+)'))::int,
+          (description ~* '(Beta-gate|Post-beta)') DESC,
+          created_at DESC,
+          backlog_id
+ LIMIT 5;
+```
+
+Each `ORDER BY` clause is one of John's rules in his order: tier `now → next → later`, then
+`P1 - Improves John's Skills` → `P10 - Tooling`, then beta-marked first, then newest filed, then
+oldest (John, 2026-08-20); `backlog_id` last so two cycles reading the same table always see the
+same #1. Five things about this query are load-bearing and were each found live, so do not
+"simplify" any of them:
+
+- **Order the class numerically, never lexically.** `ORDER BY priority_class` is a text sort and
+  puts `P10 - Tooling` *ahead of* `P2 - Inventive` — exactly backwards. Hence the digit extract.
+- **`priority_class` carries suffixes.** Live values include `P9 - Bug Fixes · FLAGGED` (19
+  tickets). Matching the ten legend strings by equality silently drops every one of them;
+  extracting the digit tolerates the suffix.
+- **Beta-marked means the retired *declaration*, not the word.** `ILIKE '%beta%'` matches 130
+  tickets against the declaration form's 110; the 20-ticket gap is prose, 10 of it the session
+  slug `beta-doc-0728c` quoted as evidence inside unrelated bug tickets. Use the regex form.
+- **`title` is not a title for imported tickets** — phases (a)/(b) stored the class string there
+  (`'P9 - Bug Fixes.'`). The human sentence is the first bolded clause of `description`, which is
+  what `gist` extracts. Anything that *displays* the queue (briefing "Next up", "Next 3") must
+  use `gist`, not `title`, until the stored column is repaired.
+- **`status='partial'` does not mean the phase you are about to build is unbuilt.** It means
+  *some* of the ticket shipped — layer 3's current #1, `ADM-1`, shipped v1 on 2026-08-20 and
+  stays `partial` only because v1.5 was deferred. Read the ticket and its harvest before
+  building; `SES-86`'s lifecycle status is the structural fix.
+
+**456 of the 550 open tickets have `priority_class IS NULL` and are therefore unpickable, leaving
+94 pickable** (measured live 2026-08-21 at the close of `v7.0.112`; NEXT 0 of 23 classed, LATER 0
+of 247). That is not a regression — the markdown rule was
+identically blind to them — and `SES-85`'s classification sweep is what unlocks them. Until it
+lands, a thin-looking queue is expected, not a bug. **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
 your reasoning — then the ticket goes pending and you DROP TO THE NEXT available queued
 ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
@@ -278,9 +324,9 @@ Four things this step deliberately does:
 
 Heal tickets are `P9 - Bug Fixes` in tier `now`, live in `backlog_items` only (`source_file =
 'heal-engine'`), and ride the normal queue — **the fix runs the full ceremony in a later cycle.**
-Because the markdown backlog files are still authoritative for selection, they will not appear in
-`FEATURES.md` until `SES-83` (d)/(e) flips authority to the table; the snapshot export (step 7)
-gives each one a git-committed copy in the meantime. **`source_file='heal-engine'` must go on the
+Since `SES-83` (d) (`v7.0.112`) selection reads the table, so a heal ticket is pickable the moment
+it is filed — it does **not** need to appear in `FEATURES.md` first, and it never will; the
+snapshot export (step 7) is its git-committed copy. **`source_file='heal-engine'` must go on the
 ignore-list of any future markdown→DB reconciliation**, or it will delete every heal ticket as an
 orphan.
 

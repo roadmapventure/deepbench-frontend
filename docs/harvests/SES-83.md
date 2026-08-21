@@ -115,15 +115,57 @@ accident.
 **Build/regression:** `npm run build` green. Regression suite 29/29 (run with Supabase
 credentials present in env). Kickoff: `docs/kickoffs/v7.0.107-SES-83c-backlog-snapshot-export.md`.
 
-## Phases (d) and (e) — what they are, and why they're gated on John
+## Phases (d) and (e) — gated on John, and Accepted 2026-08-21
 
 - **(d)** switches the runner's step-5 selection logic to read the Supabase table via SQL instead
   of the markdown files.
 - **(e)** switches human-session ceremony — `CLAUDE-DESIGN.md`, the hygiene scripts, the skills —
   off the files and onto the table.
 
-Both are process changes every session feels, so both wait for John's sign-off rather than
-shipping unilaterally through the runner. Until they land, the markdown files stay authoritative
-and the table mirrors them — deliberately, so the table can never silently diverge from what
-sessions are actually reading and editing. (d) additionally needs `SES-86`'s queue engine first,
-since step-5 selection depends on the `queue` column phase (c) deferred.
+Both are process changes every session feels, so both waited for John's sign-off rather than
+shipping unilaterally through the runner. **John gave it:** he typed *"Table is authority and
+files are no longer needed and are now smaller, not needing to carry that info"* into the
+briefing on 2026-08-20 (`runner_directives.2255ddf1`), cycle `c1660d2f` turned that into a
+designed `gated_before_build` card rather than a build, and he tapped **Accept** on it at
+**2026-08-21T00:19Z** (`runner_items` `ae7b57c7`). That tap authorises a five-cycle cut, of which
+only cycle 2 is destructive: **(1)** selection flips to SQL and §19v is superseded; **(2)** the
+markdown trim itself, with the snapshot's `--check` in the same commit set proving losslessness
+at the moment of deletion; **(3)** the ceremony docs; **(4)** the checker scripts and hygiene
+skill stop parsing dead files; **(5)** the filing path points at the table.
+
+**Correction (`SES-83` (d), `v7.0.112`) — this section previously said "(d) additionally needs
+`SES-86`'s queue engine first, since step-5 selection depends on the `queue` column phase (c)
+deferred." That is wrong, and cycle 1 disproved it by running the query.** Ordering needs only
+`tier`, `priority_class`, `status`, `description` and `created_at`, all of which exist today. A
+materialized `queue` column would let the runner show John *stable queue numbers*, which is why
+`SES-86` is still worth building, but selection never depended on it. The note would have blocked
+(d) behind an unrelated ticket indefinitely.
+
+## Phase (d) cycle 1 — selection flips to SQL — ✅ done v7.0.112, 2026-08-21, cycle `06b411eb-e95c-4a13-939e-08dafaf325bd`
+
+Doc-only: `docs/runbooks/runner-cycle.md` step 5 layer (3) now carries the canonical selection
+query verbatim, and `ARCHITECTURE.md` §19v's "the files are the urgency axis" paragraph is
+superseded. No file trimmed, no ticket touched, no schema change. Layers (1) `runner_directives`
+and (2) John's automation queue are unchanged and still outrank the table.
+
+**Four traps found live while writing the query — the design card had verified the table's shape,
+not its contents:**
+
+1. **Numeric class ordering is mandatory.** `ORDER BY priority_class` is a text sort, so
+   `P10 - Tooling` sorts *before* `P2 - Inventive` — the lowest priority would have run first.
+2. **`priority_class` carries suffixes.** `P9 - Bug Fixes · FLAGGED` is 19 live tickets; equality
+   against the ten legend strings drops every one.
+3. **The design's own beta predicate was wrong.** The card proposed `ILIKE '%beta%'`; measured
+   live that matches **130** tickets against the real `Beta-gate`/`Post-beta` declarations' 110,
+   and 10 of the 20 false positives are the session slug `beta-doc-0728c` quoted as evidence
+   inside unrelated bug tickets (`AA-161` is the clean case). Shipped form:
+   `description ~* '(Beta-gate|Post-beta)'`.
+4. **`title` holds the class string for every imported ticket** (`'P9 - Bug Fixes.'`) — the human
+   sentence is the first bolded clause of `description`. Selection is unaffected; anything that
+   *displays* the queue is not. The query returns a `gist` expression that strips the prefix.
+   Repairing the stored column is filed as its own ticket.
+
+**QA — equivalence proof, live:** the ordered ticket list the new SQL produces was compared
+against the ordered list derived from the three markdown files under the old rule; the flip is
+behaviour-preserving. Red control: the naive orderings rejected above produce a *different* list,
+so the comparison discriminates. Detail: `docs/kickoffs/v7.0.112-SES-83d-selection-flips-to-sql.md`.

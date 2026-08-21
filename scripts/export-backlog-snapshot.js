@@ -310,16 +310,19 @@ export function buildDocument(tickets) {
     "`public.backlog_items` -- it is NOT hand-maintained and must not be edited directly. The"
   );
   lines.push(
-    "markdown backlog files under `docs/` (`FEATURES.md` and its siblings) remain the"
+    "table IS the authoritative source of truth for backlog content as of SES-83 phase (d)"
   );
   lines.push(
-    "authoritative source of truth for backlog content until SES-83 phases (d) and (e) land and"
+    "(v7.0.112, 2026-08-21, John's call): runner work selection reads it via SQL and no longer"
   );
   lines.push(
-    "flip that authority to the table itself. Until then, this snapshot exists purely as the"
+    "parses the markdown backlog files under `docs/`, which are being trimmed to pointers over"
   );
   lines.push(
-    "git-history and offline-restore copy of the table's contents -- the backup gap SES-81"
+    "the remaining phases. This snapshot is therefore the table's authoritative offline and"
+  );
+  lines.push(
+    "git-history copy, not a secondary mirror -- the backup gap SES-81"
   );
   lines.push(
     "identified, where the table had no point-in-time recovery path independent of Supabase's own"

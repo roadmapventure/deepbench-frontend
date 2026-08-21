@@ -5,6 +5,82 @@
 
 ---
 
+## cycle-20260821-0020 / S-SES-83d-selection-flips-to-sql (v7.0.112, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Sonnet 5, unattended) — the backlog table becomes authority in practice: runner selection stops parsing markdown and reads SQL
+
+**Origin — an Accepted gate, not a queue pick.** Step 2's harvest read two taps on the briefing:
+**Accept** on the `SES-83` (d)/(e) `gated_before_build` card at 2026-08-21T00:19Z
+(`runner_items.ae7b57c7`) and **Accept** on the `SES-90` ship at 00:20Z (`d2ebbbd2`). Register
+**B23** re-enters an Accepted gated ticket at **queue #1**, so this cycle had its work before
+layer 3 was ever consulted. Both Accepts are `tooling`, which took the ladder from **rung 3 /
+streak 3** to **rung 4 / streak 0** — the fifth consecutive Accept promotes. The directive queue
+was empty (four most recent rows all `done`); the reading on file was unchanged
+(2026-08-20T21:56Z), so no new `runner_usage_readings` row. Walls: API $0.00 of $5 day and $0.00
+of $100 month; token track on a fresh UTC day at 0 est of the 10M allowance, weekly meter 22% vs
+the 85% rest wall. Dev root probe HTTP 200.
+
+**What shipped — cycle 1 of the five John authorised.** `docs/runbooks/runner-cycle.md` step 5
+layer (3) no longer names `FEATURES.md` / `FEATURES-NEXT.md` / `FEATURES-LATER.md`; it carries one
+canonical SQL query against `public.backlog_items`, quoted verbatim so no cycle re-derives it.
+`ARCHITECTURE.md` §19v's "the files are the urgency axis" paragraph carries a dated supersession.
+`scripts/export-backlog-snapshot.js` stops generating the sentence that called the markdown files
+authoritative — left alone it would have contradicted this very ship in the snapshot committed
+alongside it. **Layers (1) `runner_directives` and (2) John's automation queue are untouched and
+still outrank the table.** No file trimmed, no schema change, no `src/`/`api/`/`lib/` change; the
+markdown files remain on disk and are still where tickets are filed until cycle 2.
+
+**Four traps found live — three of them absent from the accepted design.** The design card had
+verified the table's *shape*; running the query against its *contents* surfaced more. (1)
+`ORDER BY priority_class` is a **text** sort, so `P10 - Tooling` sorts *ahead of* `P2 - Inventive`
+— the digit must be extracted and cast. (2) `priority_class` carries suffixes: `P9 - Bug Fixes ·
+FLAGGED` is 19 live tickets that equality-matching the ten legend strings drops on the floor. (3)
+**The card's own beta predicate was wrong.** It proposed `ILIKE '%beta%'` to preserve John's
+beta-first tie order; measured live that matches **130** tickets against the real
+`Beta-gate`/`Post-beta` declarations' **110**, and **10 of the 20 false positives are the session
+slug `beta-doc-0728c`** quoted as evidence inside unrelated bug tickets — `AA-161` is the clean
+case, and under the naive predicate it jumps to rank 2. Shipped form:
+`description ~* '(Beta-gate|Post-beta)'`. (4) **`title` is not a title** for any imported ticket —
+phases (a)/(b) stored the class string there (`'P9 - Bug Fixes.'`); the human sentence is the
+first bolded clause of `description`. Selection never reads `title`, but the briefing's "Next up"
+and "Next 3" do, so the query returns a `gist` expression that strips the prefix. Filed as
+**`SES-91`** (`P10 - Tooling`, id claimed atomically, before-image with `row_data = NULL`).
+
+**A doc claim corrected rather than inherited.** `docs/harvests/SES-83.md` closed with "(d)
+additionally needs `SES-86`'s queue engine first, since step-5 selection depends on the `queue`
+column phase (c) deferred." Running the query disproves it: ordering needs only `tier`,
+`priority_class`, `status`, `description` and `created_at`, all of which exist today. A
+materialized `queue` column buys John *stable queue numbers* — still worth `SES-86` — but
+selection never depended on it. Left standing, that sentence would have blocked (d) behind an
+unrelated ticket indefinitely.
+
+**QA — an equivalence proof, because a flip of authority is only safe if it does not change the
+answer.** All **555 tickets** were aligned **positionally** — markdown file order against
+`row_ordinal` within the same `source_file`, which handles the duplicate `CHI-48` exactly and
+additionally proves the table preserved file order, not merely the same ID set. **0 mismatches**
+on ID/order, tier, priority class and beta-marking; row counts equal per file (285 / 23 / 247).
+**Red controls, both required to differ and both did:** the lexical-class ordering returns
+`SES-30 > SES-33 > SES-38 …` where the shipped rule returns `ADM-1 > AGT-55 > CHI-101 …`, and the
+naive-beta ordering promotes `AA-161` into rank 2. Without those controls "0 mismatches" would not
+distinguish a correct rule from a lucky one. The proof was re-run **after** this cycle's own
+`backlog_items` writes (the `SES-91` insert and the `SES-83` description sync) and still passed at
+555/555. Proof type: **live end-to-end** against the real project. Build green; regression
+**31/31**. QA scripts stayed in the session scratchpad and were never committed.
+
+**Known and deliberately not fixed here.** **456 of 549 open tickets are unclassed and therefore
+unpickable, leaving 93** — not a regression, the markdown rule was identically blind to them, and
+`SES-85`'s sweep is what unlocks them. `status='partial'` still does not mean the phase you are
+about to build is unbuilt: layer 3's current #1 is `ADM-1`, whose v1 shipped 2026-08-20 and which
+stays `partial` only because v1.5 was deferred — the runbook now warns at the point of use, and
+`SES-86`'s lifecycle status is the structural fix.
+
+**Still contradicting the new rule, for cycles 3-5.** A delegated sweep enumerated them:
+`docs/RUNNER-GOV-0820-REQUIREMENTS.md` B3 and B30 still state tier-file ordering as current;
+`CLAUDE-DESIGN.md` Step 1 / Step 4.1 and `DeepBench-Session-Init.md` Step 9.1 still direct
+tier-ordered reading of the three files (that is phase (e)'s ceremony work). The two checker
+scripts that *parse* the files — `check-new-id-prefixes.js` and `check-session-docs.js` — are
+lints, not selection, and belong to cycle 4.
+
+---
+
 ## cycle-20260820-2357 / S-SES-90-local-archive-ticket (v7.0.111, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Fable 5, unattended) — John's Rework becomes a ticket, and the table-authority supersession is designed but gated
 
 **Origin — a Rework, not a queue pick.** Step 2's briefing harvest read John's tap on the `SES-79`
@@ -808,7 +884,8 @@ Ship record with full evidence: `docs/harvests/HAR-02.md`. Kickoffs: `docs/kicko
 **Measured context at design time** (window from 2026-07-18, which clears `PAIR_LEGACY_CUTOFF_MS` so `LOG-81`'s `isCountableCall` reduces to `model IS NOT NULL`): 13,612 countable calls, $161.19, 3 models — a figure that moved ~240 in ten minutes with 5–7 sessions live. `agent-turn` is 97.1% of cost. **No full regression run since before 2026-07-18**, so recent spend is overwhelmingly Claude's own live QA — a fair preview of what the drawer will report. Full detail `docs/harvests/LOG-121.md`.
 
 ---
-## S-LAV-7-design / S-LAV-7a–c + S-LAV-7a-patch (v7.0.25–v7.0.28, final `beb53f6`, 2026-08-01, worktree `design-lav-0801`) — LAV UX/UI round 2: Answer drawer, looping open-delegation arrow, console header fix, live-traced prompt-duplication bug
+
+## S-LAV-7-design / S-LAV-7a–c + S-LAV-7a-patch (v7.0.25–v7.0.28, final `beb53f6`, 2026-08-01, worktree `design-lav-0801`) — LAV UX/UI round 2: Answer drawer, looping open-delegation arrow, console header fix, live-traced prompt-duplication bug
 
 **`LAV-7` (UI, Post-beta) ✅ done + archived; every checklist self-verified live on the deployed preview.** John's second annotated-screenshot pass on the Live Agent View, 9 items, worked one at a time per his explicit request this round (a change from round 1's batch-answer format).
 

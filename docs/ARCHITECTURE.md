@@ -2477,12 +2477,26 @@ language, same decision: `noop` → `did_not_run` (displayed "did not run") and 
 `runner_items` check constraints and data, not just display.
 
 **Backlog integration (beta retired 2026-08-19, John):** Beta-gate/Post-beta declarations are
-discontinued — `docs/BETA.md` is historical. `FEATURES.md` (now) / `FEATURES-NEXT.md` /
-`FEATURES-LATER.md` stay as the urgency axis; every row gains a priority class `P1`–`P10` from
-the list above. The engine picks now → next → later, and `P1 - Improves John's Skills` →
-`P10 - Tooling` within each; within a class the tie order is **beta-marked first, then newest
-filed, then oldest** (John, 2026-08-20). Former Beta-gate rows belong in tier `now` unless
-deliberately parked in next/later (`SES-80` is the reclassification pass).
+discontinued — `docs/BETA.md` is historical. Every backlog ticket carries a tier
+(`now`/`next`/`later`) as the urgency axis and a priority class `P1`–`P10` from the list above.
+The engine picks now → next → later, and `P1 - Improves John's Skills` → `P10 - Tooling` within
+each; within a class the tie order is **beta-marked first, then newest filed, then oldest**
+(John, 2026-08-20). Former Beta-gate rows belong in tier `now` unless deliberately parked in
+next/later (`SES-80` is the reclassification pass).
+
+**SUPERSEDED 2026-08-21, `SES-83` (d), `v7.0.112` — the table is authority, not the files.**
+Tier and priority class used to *be* which markdown file a ticket lived in
+(`FEATURES.md` = now, `FEATURES-NEXT.md` = next, `FEATURES-LATER.md` = later) plus a bolded
+string inside the Feature cell. They are now the `tier` and `priority_class` columns of
+`public.backlog_items`, and **work selection reads that table via SQL — parsing the markdown
+files for selection is retired.** John's call, typed into the briefing 2026-08-20 (*"Table is
+authority and files are no longer needed and are now smaller, not needing to carry that info"*)
+and Accepted on the `gated_before_build` card at 2026-08-21T00:19Z. The canonical selection query
+lives in `docs/runbooks/runner-cycle.md` step 5, layer (3), quoted verbatim there so it is
+written down exactly once. Rollout: the files themselves are trimmed in a later cycle of the
+same phase — until then they remain on disk, unchanged, and are still where new tickets are
+filed. `docs/backlog/BACKLOG-SNAPSHOT.md`, regenerated into every ship commit set (`SES-83` (c)),
+is the table's git-history and offline copy.
 
 ### Lane routing — what ships unattended vs. what waits for John
 
