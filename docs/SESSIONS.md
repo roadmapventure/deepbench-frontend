@@ -5,6 +5,82 @@
 
 ---
 
+## cycle-20260821-0049 / S-SES-83d-the-trim (v7.0.113, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Sonnet 5, unattended) — the trim: 555 ticket rows leave the markdown files for good
+
+**Origin — an Accept given after being warned, not silence.** Step 2's harvest read one tap and,
+for the first time, a **second meter reading**. The tap was **Accept** on the `SES-83` (d) cycle-1
+ship at 2026-08-21T00:47Z (`runner_items.f7dc1a4f`), taking the tooling ladder to **rung 4 /
+streak 1**. What makes it load-bearing is what it answered: the briefing rebuilt at 00:39Z opened
+with a banner reading *"The next cycle is the destructive one — and it needs no further tap from
+you… If you have changed your mind, Reverse the card below before 9:00 PM CST."* Eight minutes
+later John tapped Accept on that very card. Silence would have been carry-forward; this was an
+informed second endorsement of the trim, on top of the 00:19Z Accept that authorised all five
+cycles. The directive queue was empty (ten most recent rows `done`; the one `budget_override`,
+`c1d81dd3`, expired at 00:00Z). Dev root probe HTTP 200.
+
+**The calibration John had been asked for three nights running.** His reading — Fable 37% / all
+models 30% / 5-hour 46% at 00:45Z — is the **second** ever, and the first that yields a real
+`tokens_per_pct`. Window: prior reading 21:56Z → 00:45Z; five cycles' estimates inside it
+(`SES-89` 665k, `HAR-41` 620k, `SES-79` 2,735k, `SES-90` 1,250k, `SES-83` (d) c1 830k) =
+**6,100,000 est tokens** against an 8-point all-models delta → **762,500 tokens per percentage
+point**. Stored rather than left NULL, with the reasoning recorded on the row: runner-only is not
+*provable*, but any confounding is **conservative in direction** — unattributed non-runner tokens
+inflate the denominator while the numerator counts runner tokens only, so the figure understates
+tokens-per-percent, understates the pool, and makes the governor plan smaller. Supporting signal:
+the Fable meter moved 26 → 37 and the runner is the documented Fable consumer in that window
+(`SES-79` ran 13 Fable subagents). **Practical effect: the day allowance drops from the flat 10M
+guess to ~3.81M est** — pool (100−30) × 762,500 = 53.375M, ÷ 7 days, × the 50% runner share.
+**Open question surfaced for John: the meter week's reset day is unknown to the runner**, so
+"days left" was taken as the maximum 7, which yields the smallest allowance; a real reset date
+would raise it.
+
+**The work.** `docs/FEATURES.md` 360,938 → 14,535 bytes (450 → 144 lines, 285 rows → 0);
+`FEATURES-NEXT.md` 27,305 → 1,230 (23 → 0); `FEATURES-LATER.md` 130,279 → 1,240 (247 → 0).
+**518,522 bytes → 17,005, a 96.7% cut.** Stubbed rather than deleted on the card's reasoning:
+~1,210 `FEATURES*` references across ~330 files must keep resolving, the `Priority Class` legend is
+cited by name and path from `runner-cycle.md` and `WORKING-WITH-JOHN.md`, and
+`DeepBench-Session-Init.md` fetches `FEATURES.md` by raw GitHub URL from John's Claude.ai sessions,
+where a 404 would break the flow. `FEATURES.md` keeps its header, `Feature ID Format`,
+`Type Taxonomy` and the entire `Priority Class` legend including `P-GATED`.
+
+**The sentence that could not simply be kept.** The legend states that work is selected
+`FEATURES.md` → `FEATURES-NEXT.md` → `FEATURES-LATER.md`. That traversal died in `v7.0.112`.
+Keeping it verbatim ships a commit that argues with itself — the exact failure cycle 1's delegated
+sweep caught at line 326 of the runbook — and editing it silently rewrites text John approved.
+**Resolution: legend kept 100% verbatim (proved byte-identical), supersession stated in a dated
+banner above it**, explicit that only the three-file traversal died and the priority *order* is
+untouched.
+
+**The one cross-reference the trim actually broke.** `FEATURES.md` pointed at
+`FEATURES-LATER.md`'s copy of the legacy area index — deleted by this same commit. Replaced with
+a sentence naming `FEATURES.md`'s own list as the surviving copy, which was already the fuller of
+the two (`SCA` appears here, never there).
+
+**QA — three proofs, each with a red control.** (1) **Positional losslessness at the moment of
+deletion**: per file, the ordered ticket IDs scraped from the rows being deleted vs the ordered IDs
+the snapshot records for that `source_file` — 285/285, 23/23, 247/247, **555 of 555, positional
+match on every row**. Red controls: *drop-one* fails on count and position; ***swap-two* fails with
+the counts still equal**, which is the control that proves the test measures order rather than
+membership. Both exit 1. (2) **Snapshot currency before *and* after** — `--check` returned
+`no drift` both times (555 tickets, payload sha256 `066376c5…747f8`). (3) **Kept-content
+fidelity** — `Priority Class` and `Type Taxonomy` byte-identical against `HEAD`;
+`Feature ID Format` differs on **exactly one line**, the intended repair. Build green (929
+modules); regression **31/31**.
+
+**Found, not caused.** The first suite run read **30/31**:
+`CHI-31-source-simulation-consistency.js` *fails* when `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` are
+absent, where its siblings `AGT-44`, `DAT-11` and `DAT-12` all SKIP loudly instead. Re-run with the
+runner's env exported it passes. A credential-absence failure is indistinguishable from a real
+regression to any cycle that does not know to export env first. Also confirmed environmental, not
+new: `check-session-docs.js` shells out to `C:/Projects/deepbench-frontend`, John's laptop path,
+which does not exist in a cloud clone, so its worktree cross-reference checks skip with a warning.
+
+**Known gap, stated rather than hidden.** Capture is **not** rerouted until phase (e): nothing but
+the Heal engine writes new tickets into `backlog_items`, so a session following an un-updated
+close-out checklist will look for a `FEATURES.md` table that no longer exists. The stubs are
+written so that dead end explains itself instead of failing silently. Phases 3 (ceremony docs),
+4 (checker scripts) and 5 (capture) remain.
+
 ## cycle-20260821-0020 / S-SES-83d-selection-flips-to-sql (v7.0.112, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Sonnet 5, unattended) — the backlog table becomes authority in practice: runner selection stops parsing markdown and reads SQL
 
 **Origin — an Accepted gate, not a queue pick.** Step 2's harvest read two taps on the briefing:
