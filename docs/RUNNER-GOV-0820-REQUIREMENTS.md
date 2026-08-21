@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.133 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-86 phase 3, directive f47e5a95 — B30 amended in place: John's automation queue stops being a selection layer a cycle EXECUTES BY HAND and becomes the board's leading sort key (backlog_items.automation_rank, migration ses86c_automation_lane). B30 predicted this ("post-SES-83 d/e the queue engine's pins express the same thing in data"); this is that, arriving early because the prose layer had already failed silently — measured 16:29Z, C4's tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told John the next cycle would be "building product, not tooling". He overruled it and force-ran the cycle. The self-retiring property B30 described is preserved mechanically (a done ticket leaves the ranked set). Two things named as NOT done so they are not assumed: B23 pins (when built, a pin sorts ABOVE automation_rank — John's live tap outranks a standing build order) and the parallel-cycles half of his line, which collides with the B31 lease and went to him as a gated card. -->
 <!-- DeepBench v7.0.122 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 34865f07 — register B39 appended and B38 corrected in place under a dated banner (its wrong sentences kept; the mistake is the lesson). John's testimony — "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." — names the mechanism four probes could not: the .claude/ gate is a harness permission prompt rendered ONLY in the human session UI, invisible and unanswerable to the agent, cleared by a person. B38's location was right, its clearing model wrong: the stall does not self-clear, so "a cost, not a prohibition — budget ~35 minutes" was a sample of the ATTENDED cases only. The partition is exact and was re-derived from live rows: John's taps stop 03:48Z, resume 12:50Z; every probe that cleared ran inside his waking window, all three that parked 8h+/never ran inside the nine-hour hole, and the two parked cycles resumed TOGETHER eighteen minutes after his first morning tap. New rule: an unattended cycle never enters the gate (no bounded recovery); the edit stays legitimate work needing a session he attends. SES-95 superseded as "the decisive probe" — unattended it parks rather than confirms. His onset attribution is contradicted by 21 hours and said so; his mechanism is right, and a real mediated link survives. Three residues kept labelled as inference, the steelman shipped alongside, and two questions left to John: relocate the inflight marker out of .claude/, and whether a pre-approval can be granted these cloud sessions at all. -->
 <!-- DeepBench v7.0.121 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 1d01ea85 — four registers appended. B35 records John's three answers (Reverse-on-gated "leave it"; the budget day is an America/Chicago day; a silent run must push why + what to do next). B36 logs his fourth item — subagents appearing to ask permission — as a question the RUNNER owes evidence on, not one John must rule on. B37 is the correction this cycle made to its own unshipped rule: a silent cycle is not a dead cycle, measured live when the two cycles presumed dead resumed after nine hours and finished. B38 narrows B36 with the surviving hypothesis — the .claude/ stall tracks Bash redirection, not the path (Write/Edit writes under .claude/ succeeded in seconds), which would make v7.0.117's blanket rule too wide; held open, with the next cycle's own edit as the decisive probe. -->
 <!-- DeepBench v7.0.118 | RUNNER-GOV-0820-REQUIREMENTS.md | directive fb643367 — register B34 appended: John's ruling that an Accept on a gated_before_build card is permission, not a rating, and does not move the trust ladder. Records the ruling's provenance, what shipped, and the two things deliberately left undone (no retroactive ladder re-derivation; Reverse-on-gated not covered and still demoting). -->
@@ -212,6 +213,27 @@
   63 open `P9 - Bug Fixes` tickets would outrank every `P10 - Tooling` automation ticket and
   bury the queue John set. The layer retires itself when the automation queue's steps are all
   complete (post-`SES-83` d/e the queue engine's pins express the same thing in data).
+  **AMENDED 2026-08-21 (`SES-86` phase 3, `v7.0.133`, directive `f47e5a95`) — the middle layer is
+  now DATA, and the closing parenthesis above is what shipped.** John's line: *"keep closing
+  automation tooling tickets first before getting to the classified backlog. run as many in
+  parrellel as possible, and back to back until automation is complete."* As prose, this layer was
+  something each cycle had to remember to consult, recognise the ticket set of, and check the state
+  of — and **the forgetting was silent, and had already happened.** Measured on the live board
+  `16:29Z`, minutes before the change: C4's tickets sat at queue **2, 241, 242, 243, 244, 280,
+  281** of 551, and the `v7.0.130` briefing had told John in writing that *"the next unattended
+  cycle will be building product, not tooling, for the first time."* He read that sentence, typed
+  the directive, and **force-ran the cycle** rather than waiting for the 17:05Z fire. C4's step
+  numbers now live in `backlog_items.automation_rank`, the leading `ORDER BY` key of
+  `recompute_backlog_queue()` — so his order arrives as queue positions 1..N and no cycle has to
+  read this file to honour it. **It still retires itself, exactly as this register said it would:**
+  a `done` ticket leaves the ranked set, so the lane evaporates when the last one closes — that is
+  the mechanical form of his "until automation is complete", and no cycle ever declares it over.
+  **Not yet built, and named so it is not assumed:** B23's pins. When they land, a pin sorts
+  **above** `automation_rank` — John's live tap outranks a standing build order.
+  **Second half of his line NOT actioned, carded instead:** "run as many in parallel as possible"
+  collides with the `runner_lease` (B31), the single-runner control added *after* two cycles built
+  `ADM-1` v1 simultaneously. That is his call, not a cycle's — `gated_before_build` card, per B27
+  outcome 3.
 - **B33. Heal engine v1 shipped, as built (SES-89, v7.0.108, 2026-08-20):** groups failed
   `public.durable_hops` rows into `(capability_slug, error_class)` signatures, fires at ≥3
   occurrences in a 14-day window, dedups forever on a 12-hex `sig_hash` written into the filed

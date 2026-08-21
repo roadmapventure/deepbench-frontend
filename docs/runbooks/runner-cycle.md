@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.133 | runbooks/runner-cycle.md | SES-86 phase 3, directive f47e5a95 — John's automation queue stops being prose a cycle has to remember and becomes the board's leading sort key. His line: "keep closing automation tooling tickets first before getting to the classified backlog." Step 5's layer (2) was a doc section every cycle had to go read and correctly interpret; the forgetting was silent, and it had already happened — measured 16:29Z, his automation tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told him the next cycle would be "building product, not tooling". New nullable backlog_items.automation_rank (C4 step number, NULL = not in lane) is now recompute_backlog_queue()'s LEADING ORDER BY key, NULLS LAST, with all six prior clauses preserved beneath it; migration ses86c_automation_lane. Self-retiring by construction — a done ticket leaves the ranked set, so the lane evaporates when his automation queue completes, which is his "until automation is complete". Two boundaries written into the migration header so they travel with the code: a future pin (B23) goes ABOVE automation_rank, and the five load-bearing clauses from ses86b are unchanged. QA proved the lane discriminating (before: 5 of 7 past position 240; after: queue 1-5) and idempotence the honest way this time — 551 -> 0, then a REAL change (the SES-89 status correction) -> 548 -> 0, never one clean re-run on an unchanged board. -->
 <!-- DeepBench v7.0.130 | runbooks/runner-cycle.md | SES-86 phase 2 (register B4) — the board's order stops being re-derived on every read. New `backlog_items.queue` column + `public.recompute_backlog_queue()`, one idempotent full renumber (550 rows numbered 1..550 on first run; second run changed 0). Step 5's five-clause selection query is retired in favour of `ORDER BY queue`, with the five load-bearing traps moved into the function and repeated in its migration header; `queue IS NULL` now IS the not-pickable condition. Step 7 gains the completed/removed recompute; step 9's "Next up" reads real numbers instead of recomputing the sort per render. Two corrections ride along, both measured live rather than reasoned: the "456 of 550 unpickable" paragraph is FALSE since `SES-85` landed (now 550 open, 0 unclassed, all numbered — a cycle quoting the old figure under-reads its queue by 6×), and the queue's top is no longer all Tooling. The renumber deliberately does NOT touch `updated_at`: stamping every row would destroy the sort-field-edit signal the recompute is triggered by and would churn BACKLOG-SNAPSHOT.md on cycles that changed nothing. -->
 <!-- DeepBench v7.0.129 | runbooks/runner-cycle.md | SES-96 — the second gated path class, named from John's captured prompt (2026-08-21): Bash against ~/.claude/projects/…/tool-results/ (where WebFetch saves its result) fires the same human-only permission prompt as .claude/ writes, and the briefing rebuild was doing exactly that (sed-slicing the prior page's HTML). Step 9 now prohibits shell-processing the fetched page's saved file; the safe procedure (parse briefing-state in context, rebuild from briefing-template.html + runner_ tables) is spelled out in briefing-page.md regeneration step 4. -->
 <!-- DeepBench v7.0.127 | runbooks/runner-cycle.md | SES-86 phase 1 (claim-on-pick), John-approved live 2026-08-21 ("yes, ship it") — step 5 gains the atomic ticket claim: the moment any session (manual or scheduled) picks a backlog ticket it claims it with one UPDATE (claimed_by/claimed_at, new columns, migration ses86a_backlog_claim_on_pick); 0 rows returned = another session holds it, drop to the next ticket exactly as B24 drops past a gated card. The selection query now filters claimed tickets (24h expiry — the B37 evidence bar — so a dead session cannot strand one). Claims release in the step-7 close-out write. Manual sessions run the same claim via session-setup skill step 2c. QA: all three arms proven live on real rows (fresh claim → 1 row, contested → 0 rows, 25h-stale → re-claimable). This is the shared-board coordination John asked for after today's duplicate (SES-95 shipped attended while a cycle carded it). -->
@@ -411,12 +412,14 @@ item.)*
 
 **5. Pick ONE item.** Selection layers, in order (register B30):
 (1) `runner_directives` `status='queued'` oldest first — a directive is the mission, mark it
-`in_progress`. (2) **John's automation queue** — `docs/RUNNER-GOV-0820-REQUIREMENTS.md`'s C4
-section, his standing order (briefing access → backlog DB → automation-gap tickets →
-behavior-expert pass → classification sweep; invention parallel): pick the next incomplete
-step's ticket. Without this layer the 63 open `P9 - Bug Fixes` tickets would outrank every
-`P10 - Tooling` automation ticket and bury the queue he set. (3) Only when both are empty, the
-backlog by class — **read from `public.backlog_items` via SQL, never by parsing the markdown
+`in_progress`. (2) **John's automation queue — NO LONGER A LAYER YOU EXECUTE BY HAND. It is in
+the board (`SES-86` phase 3, `v7.0.133`, directive `f47e5a95`).** It used to read: go to
+`docs/RUNNER-GOV-0820-REQUIREMENTS.md`'s C4 section, work out which of his tickets is the next
+incomplete one, and pick it before touching the class-sorted backlog. **That prose is now
+`backlog_items.automation_rank`, the leading `ORDER BY` key of `recompute_backlog_queue()`** — so
+his order arrives as queue positions 1..N like everything else, and layer (3)'s two statements
+below are the whole of steps (2) and (3) together. Nothing to remember, nothing to re-derive.
+(3) The backlog by class — **read from `public.backlog_items` via SQL, never by parsing the markdown
 files (`SES-83` (d), `v7.0.112`; John's "table is authority" call, Accepted 2026-08-21T00:19Z).**
 **The order is now STORED, not re-derived on every read (`SES-86` phase 2, `v7.0.130`,
 register B4).** `backlog_items.queue` holds each ticket's position, maintained by one idempotent
@@ -442,6 +445,28 @@ SELECT backlog_id, queue, tier, priority_class, status,
 `WHERE` excluded by hand (`status = 'done'`, or no `priority_class`), so the filter cannot drift
 from the numbering the way two hand-maintained copies of one `ORDER BY` could. **Gated tickets
 still get a number** (B15): gated-ness is a lane flag, never a missing position.
+
+**THE AUTOMATION LANE SITS ABOVE ALL SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive
+`f47e5a95` — John, 2026-08-21T16:21Z).** His line, verbatim: *"keep closing automation tooling
+tickets first before getting to the classified backlog."* `backlog_items.automation_rank` holds his
+C4 step number (1–6; NULL = not in the lane) and is the function's **leading** key, `NULLS LAST`.
+Three things about it:
+
+- **Why it stopped being prose.** As a doc section, layer 2 was something each cycle had to
+  remember to consult, and the forgetting was silent. Measured on the live board at `16:29Z`
+  2026-08-21, immediately before this shipped, his automation tickets sat at queue **2, 241, 242,
+  243, 244, 280, 281** of 551 — five of seven past position 240, reachable only by a cycle that
+  went and read C4 by hand. It had already failed: the `v7.0.130` briefing told John in writing
+  that *"the next unattended cycle will be building product, not tooling, for the first time"*,
+  and he overruled it within the hour. After the change, queue **1–5** are his open automation
+  tickets in his own order and the class-sorted backlog resumes at 6.
+- **It retires itself, which is his "until automation is complete".** A `done` ticket leaves the
+  ranked set, so when the last lane ticket closes, the leading key matches nothing open and the
+  order reverts to the six clauses — no migration, no edit, no cycle deciding it is over. Do not
+  add an "is the lane finished?" check; that is the thing this replaced.
+- **When pins land, a pin outranks the lane.** B23's "a gated card's Accept re-enters at queue #1"
+  still has nowhere to store a pin. Add it as the key *above* `automation_rank`, never below:
+  John's live tap is later word than a standing build order.
 
 **John's rules live inside the function now — that is the point, and it does not make them
 optional.** The function's `ORDER BY` is the retired query's, clause for clause: tier
@@ -492,10 +517,12 @@ Measured live 2026-08-21 at 16:0xZ, after this cycle's first renumber: **550 ope
 unclassed, all 550 numbered `1..550`** (now 280, next 23, later 247; 10 tickets `done`). The
 figure this paragraph used to carry — "456 of 550 unpickable, leaving 94" — was true at the close
 of `v7.0.112` and is now false; a cycle quoting it would under-read its own queue by 6×. **Take
-your own census rather than quoting this one.** The visible consequence is that the top of the
-queue is no longer all `P10 - Tooling`: at first numbering it read `DAT-003`
-(`P1 - Improves John's Skills`), `ADM-1` and `AGT-015` (`P2 - Inventive`), `LOG-126`
-(`P4 - New Customers`), `CHI-89` (`P5 - Enhancements`). **Classify its lane against
+your own census rather than quoting this one** — including of the sentence that used to sit here.
+`v7.0.130` reported the queue's top as `DAT-003`, `ADM-1`, `AGT-015`, `LOG-126`, `CHI-89` and drew
+the conclusion that the runner would now be "building product, not tooling"; John read that on the
+briefing and overruled it (directive `f47e5a95`), so since `v7.0.133` the top is the automation
+lane and the class sort resumes beneath it. Measured 2026-08-21T16:4xZ: 549 open, 0 unclassed, all
+numbered `1..549`, lane at 1–5. **Classify its lane against
 §19v: anything gated — or uncertain — becomes a `gated_before_build` `runner_items` row with
 your reasoning — then the ticket goes pending and you DROP TO THE NEXT available queued
 ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
