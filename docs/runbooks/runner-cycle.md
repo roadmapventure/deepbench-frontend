@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.121 | runbooks/runner-cycle.md | directive 1d01ea85 — John's three answers reach the procedure. Step 2's Reverse-on-gated bullet stops calling itself an open question: asked directly, John said "leave it", so a Reverse on a gated card still demotes and that is now his ruling (B34's second "deliberately not done" is closed; the no-retroactive-re-derivation half still stands). Step 3 gains the budget day boundary — "today" is an America/Chicago day, SQL quoted verbatim, forward-only so a stored override expiry is never retroactively shortened, and explicitly NOT the same thing as the display-only times rule. New step 0b: a predecessor that has gone quiet is PUSHED to John with why + what to do next. THAT RULE WAS REWRITTEN MID-CYCLE BY MEASUREMENT (B37): its first draft said an open row past the TTL means dead — and while it sat unshipped, the two cycles it was about (ba8f2ce3, 633fe486, both closed `failed` by a successor at 08:24Z) resumed after nine hours, finished, declined to race the live lease, and filed their work. So a successor now never adjudicates a predecessor's outcome, `failed` needs evidence rather than elapsed time, and the word is "went silent". -->
 <!-- DeepBench v7.0.118 | runbooks/runner-cycle.md | directive fb643367 — John's Q1 ruling reaches the procedure. Step 2's flat "Accept → streak +1" now excludes `gated_before_build` cards: a gated Accept is permission, not a rating, and does not touch `runner_ladder`. Two boundaries written down with it, both deliberate: the rule applies forward and the ladder's history is NOT re-derived (the streak-reset-on-promotion value is undefined in the written rule, so unwinding the two earlier gated-counting harvests would invent a rule); and Reverse-on-gated is NOT covered — John ruled on Accept only, so it still demotes and the asymmetry goes to him as an open question rather than being harmonised by inference. -->
 <!-- DeepBench v7.0.117 | runbooks/runner-cycle.md | directive 73e41d2c — two corrections a cycle paid for in blood. Step 0's `.claude/` clause is widened from "no inflight file" to "a cloud cycle writes NOTHING under `.claude/`, it cards the edit for a laptop session", with the three measurements behind it (a ~35-minute probe return, two cycles dead mid-run on that one mission, and a fresh probe that produced no tool result at all). Step 6 gains the rule those cycles broke: a subagent that has not returned is NOT a result — wait for it or report the question open, and leave a breadcrumb outside the paths under test so a hang still says where it hung. -->
 <!-- DeepBench v7.0.114 | runbooks/runner-cycle.md | SES-83 (d) cycle 3 — step 7's close-out line stops telling every cycle to edit a `FEATURES*.md` row (status + P-class) and names the Supabase write instead. Cycle 1 flipped SELECTION to the table but left this WRITE line pointing at the files, so from v7.0.113 (the trim) until now the runbook contradicted itself: step 5 read the table, step 7 told the same cycle to update a stub. Found by the cycle-3 ceremony sweep. NOTE FOR JOHN: the stored routine prompt's step 4 still names the three markdown files for work selection — superseded by step 5 here, but only he can edit that prompt. -->
@@ -99,6 +100,71 @@ Three properties worth knowing before you edit any of this:
   `runner_before_images` row; anything else you write to it (a QA fixture, a manual repair)
   does, exactly like every other Supabase write.
 
+**0b. A SILENT predecessor is PUSHED to John — and is never declared dead by a successor (John,
+2026-08-21, directive `1d01ea85`, register B35; corrected the same cycle by measurement, B37).**
+Asked what he wanted when a run dies, John answered: **"need to know why it died and what to do
+next."** Detection already existed — the TTL steal and the `ended_at IS NULL` sweep — and it was
+the *only* thing that noticed when `ba8f2ce3` and `633fe486` went quiet on 2026-08-21; John found
+out from a briefing card the next morning. The signal was dying in the ledger. It no longer may.
+
+**Read this before you write anything about a predecessor, because the obvious version of this
+rule is wrong and was disproved live.** An open `runner_cycles` row past the 45-minute TTL means
+the cycle is **silent**. It does **not** mean the cycle is dead. Measured 2026-08-21: cycles
+`ba8f2ce3` (started 03:52Z) and `633fe486` (05:07Z) were closed `outcome='failed'` by a successor
+at 08:24Z on exactly that reasoning — and both were **still executing**. They resumed, finished
+their missions, wrote their own token accounting, discovered the live lease, correctly declined
+to push, and filed their findings as directives at 13:11Z and 13:12Z — **more than nine hours
+after they started and five hours after they were pronounced dead.** A harness suspend/resume,
+not a death. So:
+
+- **A successor never adjudicates a predecessor's outcome.** Take the lease — that is what the
+  TTL is for, and it is still correct — but **do not** set `ended_at` or `outcome` on a row that
+  is not yours. Only a cycle closes its own row. Closing it for them destroys the record they
+  are about to write, and mislabels a working cycle as a failure in the ledger John reads.
+- **`failed` on a silent row needs evidence, not elapsed time.** The longest observed resurrection
+  gap is **~9h20m**. A row may be closed `failed` by someone else only after **24h** of no writes
+  attributable to it (that bar is derived from the measurement, not chosen), and the closing note
+  must say what evidence was used.
+- **Say "went silent", never "died", in the push, the card and the ledger** — until something
+  actually proves death. This is the `v7.0.115` failure (a hung probe's silence read as a finding)
+  in its third costume; the rule "a subagent that has not returned is not a result" applies to an
+  absent *cycle* exactly as it does to an absent *subagent*.
+
+Run this immediately after the claim, every cycle:
+
+```sql
+SELECT id, started_at, item_id, model, left(coalesce(notes,''), 400) AS notes,
+       round(extract(epoch FROM (now() - started_at))/60) AS minutes_silent
+  FROM public.runner_cycles
+ WHERE ended_at IS NULL AND id <> '<your cycle id>'
+ ORDER BY started_at;
+```
+
+Any row returned, **or** a `steals` value from your claim higher than the previous cycle's
+recorded value, means a cycle has gone silent. **Send a push notification** carrying both halves
+of what John asked for — and leave the row alone:
+
+- **Why it went silent — only what is observable.** Which cycle, when it started, how long it
+  has been quiet, what it had picked (`item_id` / `notes`), whether the lease was taken by TTL
+  steal or found free, and whether anything was pushed. **State the limit in the message
+  itself:** a cloud cycle's transcript is not readable from here, so the runner reports last
+  observable *state* plus a named hypothesis — never a cause it did not observe. "It went silent
+  after step N and the last thing it wrote was X" is a real answer; an invented root cause is
+  not, and neither is "it died".
+- **What to do next — concretely, including "nothing".** Most silences need no action at all:
+  the lease TTL already freed the schedule, the next cycle re-picks the same item, and the silent
+  cycle may simply come back and finish. Say that plainly rather than implying an emergency. Name
+  an action only for real residue: a directive stuck `in_progress` (re-claim it — before-image
+  first, never quietly), a version number claimed and unused (a permanent counter gap; record it,
+  never reuse it), an unpushed session branch (**recoverable — cherry-pick it, do not redo the
+  work**; check for one before assuming anything was lost), or the same mission going silent
+  twice, which is the one shape that means *stop and look* rather than *let it retry*.
+
+Two consecutive silences on the same item is itself the finding, and the push says so — that is
+what `ba8f2ce3` and `633fe486` were, and nothing told him at the time. Both, note, later came
+back and pushed their work to their own session branches; the correct action for that pair was
+"cherry-pick `69bc903`", never "the work is gone".
+
 **1. Open the cycle.** INSERT `runner_cycles` **with the id the claim returned** —
 `INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
 the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
@@ -145,11 +211,17 @@ Two boundaries on that rule, stated so no later cycle has to guess:
   would be inventing a rule, not applying one. It is named on the briefing instead. If John says
   "rewind the ladder", that is the authorisation to re-derive, and the undefined value is the
   first thing to ask him about.
-- **A Reverse on a gated card is NOT covered and still demotes.** John ruled on Accept only.
-  The symmetric argument — that declining permission should be ladder-neutral too, since the
-  runner is otherwise penalised for asking and being told no — is a good one, and it is
-  *deliberately not applied*: a cycle does not widen its own autonomy rule on an inference. It
-  stays on the briefing as an open question until John answers it in his own words.
+- **A Reverse on a gated card still demotes — and that is now John's ruling, not a default
+  awaiting one (John, 2026-08-21, directive `1d01ea85`, register B35).** `v7.0.118` left this
+  half open on purpose. The symmetric argument — that declining permission should be
+  ladder-neutral too, since the runner is otherwise penalised for asking and being told no — is
+  a good one, and that cycle refused to apply it, because a cycle does not widen its own
+  autonomy rule on an inference. So it was put to John in his own words. He answered
+  **"leave it"**. The *behaviour* is therefore unchanged — a Reverse on a gated card sets the
+  streak to 0 and demotes a rung, exactly as before — but its *status* is: it is settled.
+  **Stop carrying it as an open question on the briefing, and stop flagging it in the docs as an
+  unclosed asymmetry.** A later cycle that thinks it should change puts a fresh case to John; it
+  does not reopen it by inference, in either direction.
 
 Non-empty directive text in the page becomes a `runner_directives` row (verbatim). A saved
 usage reading (the three meter percentages John types in) becomes a `runner_usage_readings`
@@ -165,6 +237,43 @@ harvested manually; whether cloud can reach it is one of the things this run mea
 `did_not_run` exit from this step **releases the lease** (statement in step 0) before it ends —
 a wall-stop that keeps the lease holds the next three hours' cycle hostage until the TTL
 expires.
+
+**"Today" is an America/Chicago day, not a UTC day (John, 2026-08-21, directive `1d01ea85`,
+register B35).** Asked whether the spending day should end at midnight UTC — 7 PM where he is —
+or at midnight where he is, John answered **"Midnight cst"**. Every "today" and "the day" in
+this step therefore means a **America/Chicago calendar day**, on both tracks. Use this window
+verbatim, in both the dollar sum and the token sum; do not re-derive it:
+
+```sql
+-- today, on John's clock. Substitute into any "today's spend" SELECT.
+ WHERE started_at >= (date_trunc('day', now() AT TIME ZONE 'America/Chicago')
+                      AT TIME ZONE 'America/Chicago')
+```
+
+Four things about this boundary, each of which has already bitten or would have:
+
+- **It is not cosmetic.** The CST day begins at **05:00Z**, so most of a night's cycles fall
+  outside it. Measured live 2026-08-21 at 13:16:54Z over the same `runner_cycles` rows: **12**
+  cycles and `6,620,000` estimated tokens inside the UTC day, **4** cycles and `1,240,000`
+  inside the CST day — a **5.3×** difference, and it is the *structure* (a 5-hour offset across
+  a nightly cadence), not that particular ratio, that is load-bearing. A cycle sitting near the
+  wall is stopped by one boundary and waved through by the other. **Take your own reading rather
+  than quoting this one:** these figures moved by 420,000 in the fourteen minutes this clause was
+  being written, because a cycle presumed dead came back and wrote its own token accounting.
+- **It is NOT the same rule as the display-times rule**, and conflating them is the easy
+  mistake: the times rule (step 9, and `briefing-page.md`) is **display-only** — store UTC,
+  render CST. This one changes an **arithmetic boundary**. Both are John's, they are
+  independent, and neither implies the other.
+- **Forward only. Never retroactively shorten a grant John already made.** A stored
+  `budget_override.expires_at` is honoured exactly as written, even when the new clock would
+  have expired it earlier — re-deriving an existing grant under a later rule is the runner
+  taking back something John gave. New "for the day" overrides are written to the next midnight
+  America/Chicago.
+- **§19v is silent on the boundary** (it states `$100/month, $5/day` and `10M tokens/day` and
+  names no clock), so this defines an undefined term rather than superseding the architecture —
+  no runbook↔§19v disagreement, and no briefing item owed on that account. Verified by reading
+  §19v's budget paragraph, not from memory.
+
 - **API dollars (real money, hard wall):** SELECT `runner_budget` for the current month — no
   row → `did_not_run`, END. Sum this month's and today's `api_cost_dev_usd + api_cost_qa_usd`
   from `runner_cycles`; over the month cap → `did_not_run`, END; over the day default →

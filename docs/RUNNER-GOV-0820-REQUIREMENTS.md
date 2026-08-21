@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.121 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 1d01ea85 — four registers appended. B35 records John's three answers (Reverse-on-gated "leave it"; the budget day is an America/Chicago day; a silent run must push why + what to do next). B36 logs his fourth item — subagents appearing to ask permission — as a question the RUNNER owes evidence on, not one John must rule on. B37 is the correction this cycle made to its own unshipped rule: a silent cycle is not a dead cycle, measured live when the two cycles presumed dead resumed after nine hours and finished. B38 narrows B36 with the surviving hypothesis — the .claude/ stall tracks Bash redirection, not the path (Write/Edit writes under .claude/ succeeded in seconds), which would make v7.0.117's blanket rule too wide; held open, with the next cycle's own edit as the decisive probe. -->
 <!-- DeepBench v7.0.118 | RUNNER-GOV-0820-REQUIREMENTS.md | directive fb643367 — register B34 appended: John's ruling that an Accept on a gated_before_build card is permission, not a rating, and does not move the trust ladder. Records the ruling's provenance, what shipped, and the two things deliberately left undone (no retroactive ladder re-derivation; Reverse-on-gated not covered and still demoting). -->
 <!-- DeepBench v7.0.108 | RUNNER-GOV-0820-REQUIREMENTS.md | design-runner-gov-0820 — the running requirements register for John's governance recalibration session (2026-08-20). Updated same-turn as decisions land; the automation tickets are cut from this file. -->
 # Runner Governance Recalibration — Requirements Register
@@ -226,6 +227,93 @@
   ladder paragraph still carries the undistinguished sentence: it is an architecture supersession,
   the gated lane, so `v7.0.118` **carded** the exact replacement text for John's Accept instead of
   editing it.
+
+- **B35. John's three answers, 2026-08-21 (directive `1d01ea85`, shipped `v7.0.121`):** one line
+  into the briefing directive box — `1.leave it 2. Midnight cst 3.need to know why it died and
+  what to do next` — answering the three "Help me" questions the `v7.0.118` page asked, in its
+  order. All three are now in the procedure rather than in a directive row.
+  - **(1) Reverse-on-gated → "leave it".** `B34` deliberately left this half open rather than
+    close it by inference. John has now ruled: a Reverse on a `gated_before_build` card **still**
+    sets the streak to 0 and demotes a rung. The behaviour does not change; its **status** does —
+    it is settled, and the briefing and the runbooks stop carrying it as an open question. `B34`'s
+    second "deliberately not done" is therefore **closed**; its first (no retroactive re-derivation
+    of the ladder's history) stands untouched and still awaits the word "rewind the ladder".
+  - **(2) The budget day → "Midnight cst".** "Today", on both budget tracks, is an
+    **America/Chicago** calendar day, not a UTC one. Load-bearing, not cosmetic: the CST day
+    starts at 05:00Z, so most of a night's cycles fall outside it — measured live at 13:16:54Z
+    over the same `runner_cycles` rows, **12** cycles / `6,620,000` est. tokens in the UTC day vs
+    **4** / `1,240,000` in the CST day. Two boundaries stated
+    with it: it is **not** the existing display-only times rule (store UTC, render CST — that one
+    governs rendering, this one governs arithmetic, and neither implies the other); and it is
+    **forward-only** — a stored `budget_override.expires_at` is honoured as written and never
+    retroactively shortened, because re-deriving a grant under a later rule is the runner taking
+    back something John gave. §19v is *silent* on the boundary, so this defines an undefined term
+    and supersedes nothing — no gated-lane edit is owed.
+  - **(3) A dead cycle → "need to know why it died and what to do next".** Detection already
+    existed (lease TTL, `steals`, the `ended_at IS NULL` sweep) and was the only thing that
+    noticed `ba8f2ce3` and `633fe486` dying on 2026-08-21; John learned of it from a card the
+    next morning, because `v7.0.106` deliberately kept the lease off the briefing. Now: runbook
+    step **0b** closes each dead row *and* **pushes**, and the page carries a durable copy.
+    **The honest limit is written into the rule itself** — a cloud cycle's transcript dies with
+    its container, so the runner reports last observable state plus a named hypothesis, never a
+    cause it did not observe (the `v7.0.115` failure generalised). "What to do next" explicitly
+    includes **"nothing"**, which is the usual truthful answer; two deaths on the same mission is
+    the one shape that means stop and look.
+- **B36. OPEN — subagents appearing to ask permission inside automated cycles (John's question,
+  2026-08-21, same directive; runner-owned, not John's to decide).** Verbatim: *"Why are
+  subroutines asking for permission? It should have full access and not asking. This is new. All
+  of a sudden."* Logged as a question the **runner** must answer with evidence, not one John
+  must rule on. `v7.0.121` measured it live with an instrumented Fable 5 subagent — six timed
+  probes, breadcrumbed outside the paths under test — and reported the result to John on the
+  briefing rather than converting a single run into a rule. Any doc or config change waits on
+  a defect this reproduces, per the standing rule that one measurement in one environment is
+  evidence, not a general claim.
+
+- **B37. A silent cycle is not a dead cycle — measured, and it corrected this same cycle's own
+  rule before it shipped (`v7.0.121`, 2026-08-21).** While `v7.0.121` was writing B35(3)'s
+  dead-cycle rule, the two cycles that rule was *about* — `ba8f2ce3` (started 03:52Z) and
+  `633fe486` (05:07Z), both pronounced `outcome='failed'` by a successor at 08:24Z on the
+  strength of the 45-minute lease TTL — **woke up and finished**. At 13:11Z and 13:12Z they
+  wrote their own token accounting, detected the live lease, **correctly declined to push and
+  race it**, filed their findings as directives `a55155f3` / `c4d95dc7`, and pushed their work
+  to their own session branches. A harness suspend/resume of more than nine hours, not a death.
+  Three consequences, all now in `runner-cycle.md` step 0b:
+  - **A successor never adjudicates a predecessor's outcome.** Taking the lease on TTL stays
+    correct; writing `ended_at`/`outcome` on someone else's row does not — it destroys the record
+    that cycle is about to write and files a working cycle as a failure in the ledger John reads.
+    `failed` needs evidence, and no sooner than 24h of no attributable writes (a bar derived from
+    the measured ~9h20m resurrection, not chosen).
+  - **"Went silent", never "died"**, in pushes, cards and ledger rows.
+  - **A silent cycle's work is often recoverable.** Both pushed to session branches; the right
+    action for that pair was "cherry-pick `69bc903`", not "the work is gone". Verified live: the
+    branch and commit exist on origin, and `dev` was still at `7e58983` — neither raced the ship.
+  This is the `v7.0.115` failure (a hung probe's silence read as a finding) in its third costume.
+  The rule `v7.0.117` installed — *a subagent that has not returned is not a result* — applies to
+  an absent **cycle** exactly as to an absent **subagent**, and this is that rule finally being
+  applied to the thing it was written about.
+- **B38. OPEN, and it narrows B36 — the `.claude/` block may be BASH REDIRECTION, not the path
+  (`v7.0.121`, 2026-08-21; owner-visible, runner-owned).** `v7.0.117` shipped a blanket rule to
+  `dev`: *a cloud cycle writes NOTHING under `.claude/`*. Cycle `ba8f2ce3`'s own tool-level record
+  contradicts it — four `.claude/` writes via the **Write/Edit tools**, none prompted, none
+  denied, all completing in seconds, including the real `session-hygiene/SKILL.md` edit (59→80
+  lines) by a Sonnet 5 subagent that returned normally in 188,653 ms. Every observation that
+  *did* hang used **Bash redirection** (`printf > .claude/…`). `v7.0.121` reproduced the hang
+  independently: an instrumented Fable 5 probe ran five tool calls — a Bash write outside
+  `.claude/`, a Read of `CLAUDE.md`, `git status`, a Write+delete inside the repo, and a **Read
+  under `.claude/`** — all returning instantly with no prompt, and then exactly one call,
+  `printf > .claude/inflight/…`, **had still not returned when this cycle closed, ~10 minutes
+  later**. Stated exactly that way on purpose: the observation is *did not return within the
+  cycle*, and this register does **not** claim it is blocked, denied, or permanent — `v7.0.115`
+  made that leap from 21 minutes of silence and `v7.0.117`'s own 35-minute return refuted it.
+  What the five instant calls *do* establish is the negative: **nothing here is a permission
+  prompt**, which is the direct
+  answer to John's B36 question: the runner is not being asked to approve anything, one
+  tool-shape stalls indefinitely. **Not yet established:** whether the trigger is redirection
+  specifically or the Bash tool generally against `.claude/`; the probe tested only the redirect
+  form. If the narrow rule holds, the blanket rule costs the platform every future `.claude/`
+  edit and has already cost three cycles — and `73e41d2c` Task 1 (the hygiene-skill retarget)
+  **still has not shipped**, verified live against `dev` at 13:1xZ. The next cycle's own edit is
+  the decisive probe. Not changed here: one build per cycle, and this is not this cycle's build.
 
 ## D. Ticket ledger
 

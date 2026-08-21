@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.121 | runbooks/briefing-page.md | directive 1d01ea85 — two changes from John's line. The read-back contract's Reverse-on-gated sentence stops calling the asymmetry an open question: he answered "leave it", so it is settled and the page stops carrying it. And the regeneration contract gains the died-mid-run line: when a cycle has gone silent since the last rebuild the page says so — which cycle, how long, what it had picked, what John needs to do — because v7.0.106 deliberately kept the lease and its `steals` counter off this page, leaving a death visible only as a stat-strip number. The push (runner-cycle.md step 0b) is the primary channel; this is the durable copy. Same honesty limit as the push: observable state and a named hypothesis, never an invented cause, and never the word "died" before something proves it. -->
 <!-- DeepBench v7.0.118 | runbooks/briefing-page.md | directive fb643367 — the read-back contract's one-line ladder summary said "Accept streak+1, 5 promotes" with no card-kind distinction, which is exactly the sentence John's Q1 ruling retires. It now updates the ladder from `shipped` cards only; a `gated_before_build` Accept is permission, not a rating. The full rule is CITED from runner-cycle.md step 2 rather than restated, because this line drifting out of sync with the runbook is the failure being fixed. -->
 <!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
 # Runbook — The Morning Briefing Page (`SES-78b`)
@@ -30,6 +31,17 @@ Store UTC internally as before; the conversion is display-only.
    kind chip, `ID (Type · named P-class)`, title, Value case, Before → After, QA evidence, meta
    (cost / model / push SHA), links (dev URL; flagged items also the flag-ON link), the three
    buttons, hidden reason input, verdict line.
+   **Went-silent line (John, 2026-08-21, directive `1d01ea85`, register B35):** whenever a
+   cycle went silent since the last rebuild, the page carries it — which cycle, how long it was
+   quiet, what it had picked, and what (if anything) John needs to do. The `steals` counter and
+   the lease were deliberately kept off this page when `v7.0.106` built them, so the only record
+   was a stat-strip number; John has since asked to be told **why it died and what to do next**.
+   The push is the primary channel (`runner-cycle.md` step 0b) — this line is the durable copy,
+   so a missed notification does not erase the event. **Two honesty limits, both from `B37`:**
+   observable state and a named hypothesis, never an invented cause; and the page says **"went
+   silent"**, never "died", because two cycles this page called dead were still working and came
+   back nine hours later. If the cycle later returns and finishes, the line is **updated, not
+   deleted** — John should be able to see that a silence resolved.
 2. **Republish to the SAME URL** — pass the URL above as `url` to the Artifact tool (a publish
    without `url` from a new conversation creates a stray page; never do that). Same favicon.
 3. **Before rebuilding, READ the current page first** (WebFetch the URL) and harvest John's
@@ -61,9 +73,10 @@ ladder is updated before any new work starts — **but only from `shipped` cards
 `shipped` card: Accept → streak+1, 5 promotes; Reverse → streak 0, demote; Rework neutral. On a
 `gated_before_build` card, **an Accept is permission to build, not a rating, and does not touch
 the ladder at all** (John, 2026-08-21, directive `fb643367`, register B34) — it authorises that
-one build and re-enters the ticket at queue #1 (B23). A Reverse on a gated card still demotes:
-John ruled on Accept only, and that asymmetry is an open question on the page, not a gap to
-close by inference. **The full statement, including why the history is not re-derived, lives in
+one build and re-enters the ticket at queue #1 (B23). **A Reverse on a gated card still demotes,
+and that is now settled** — asked directly, John answered "leave it" (2026-08-21, directive
+`1d01ea85`, register B35). It is his ruling, not an unclosed asymmetry: **the page stops
+carrying it as an open question.** **The full statement, including why the history is not re-derived, lives in
 `runner-cycle.md` step 2 — do not restate it here, cite it**, so the two runbooks cannot drift
 the way this line did. Un-decided cards carry forward to the rebuilt page —
 **silence is never an Accept.**
