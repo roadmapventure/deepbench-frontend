@@ -5,6 +5,14 @@
 
 ---
 
+## automation-review / SES-96-gated-path-removal (v7.0.129, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the briefing rebuild stops walking into the permission gate
+
+**Mission.** `SES-96` (Tooling · `P10 - Tooling`), filed earlier this session from John's screenshot — the first directly captured harness permission prompt (the evidence register B39 said would settle its remaining inference). The prompt fired on the briefing rebuild: a Bash `sed` slicing the fetched briefing artifact out of `~/.claude/projects/<project>/tool-results/` — a **second gated path class** beyond `.claude/` writes, capable of parking an unattended cycle mid-step-9.
+
+**What shipped (2 work files).** `docs/runbooks/briefing-page.md` regeneration contract gains step 4: never shell-process the WebFetch result's saved file — parse `briefing-state` **in context** and rebuild structurally from `docs/runbooks/briefing-template.html` + the `runner_` tables (the contract's existing instruction, now with the prohibition that makes it the only path); generalized to "no Bash against any `~/.claude/` path", mirroring step 0's rule. `docs/runbooks/runner-cycle.md` step 9 carries the same prohibition inline. A sweep of `docs/runbooks/` found no other references to harness-storage paths — the sed was a cycle's improvisation, which is why the fix is a stated prohibition plus the prescribed procedure rather than an edit to an existing instruction.
+
+**QA.** Doc-only change; the discriminating check is grep-level: both runbooks now name `tool-results` (0 → 2 files), and the sweep confirms no remaining instruction routes through harness storage. The real confirmation arrives structurally: the next cycle's rebuild either follows the in-context procedure (no prompt fires) or the "Always allow" experiment (John's directive) retires the gate entirely — either way the class is closed. Ticket closed by Supabase write, claim released in the same UPDATE.
+
 ## automation-review / SES-85-classification-sweep (v7.0.128, 2026-08-21, Manual Design & Build — attended local session, model Fable 5 + 8 parallel Fable 5 classification agents) — every open ticket is now pickable
 
 **Mission.** `SES-85` (Tooling · `P10 - Tooling`), automation-queue step (5), worked under this session's own `claimed_by` claim (the first real use of `SES-86` phase 1 — the noon-CST cycle had to skip it). Before: **456 of 552 open tickets carried no priority class** and were invisible to work selection. After: **zero unclassed open tickets**, verified live post-apply.

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.129 | runbooks/briefing-page.md | SES-96 — regeneration step 4 added: never shell-process the WebFetch result's saved file. John's captured permission prompt (2026-08-21) showed the rebuild sed-slicing the prior page's HTML out of ~/.claude/projects/…/tool-results/ — a permission-gated path that parks an unattended cycle exactly like a .claude/ write. Parse briefing-state in context; rebuild structurally from briefing-template.html + the runner_ tables. -->
 <!-- DeepBench v7.0.121 | runbooks/briefing-page.md | directive 1d01ea85 — two changes from John's line. The read-back contract's Reverse-on-gated sentence stops calling the asymmetry an open question: he answered "leave it", so it is settled and the page stops carrying it. And the regeneration contract gains the died-mid-run line: when a cycle has gone silent since the last rebuild the page says so — which cycle, how long, what it had picked, what John needs to do — because v7.0.106 deliberately kept the lease and its `steals` counter off this page, leaving a death visible only as a stat-strip number. The push (runner-cycle.md step 0b) is the primary channel; this is the durable copy. Same honesty limit as the push: observable state and a named hypothesis, never an invented cause, and never the word "died" before something proves it. -->
 <!-- DeepBench v7.0.118 | runbooks/briefing-page.md | directive fb643367 — the read-back contract's one-line ladder summary said "Accept streak+1, 5 promotes" with no card-kind distinction, which is exactly the sentence John's Q1 ruling retires. It now updates the ladder from `shipped` cards only; a `gated_before_build` Accept is permission, not a rating. The full rule is CITED from runner-cycle.md step 2 rather than restated, because this line drifting out of sync with the runbook is the failure being fixed. -->
 <!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
@@ -46,6 +47,17 @@ Store UTC internally as before; the conversion is display-only.
    without `url` from a new conversation creates a stray page; never do that). Same favicon.
 3. **Before rebuilding, READ the current page first** (WebFetch the URL) and harvest John's
    state — rebuilding without harvesting destroys un-acted-on taps.
+4. **Never shell-process the fetched page's saved file (`SES-96`, 2026-08-21 — John captured the
+   prompt).** WebFetch saves its result under `~/.claude/projects/<project>/tool-results/…`, and
+   **any Bash command touching that path (sed/grep/head/cat, read or write) fires the harness
+   permission prompt only a human can see** — John's screenshot caught exactly this: a cycle
+   sed-slicing the prior page's HTML into head/prologue/epilogue parts, parked on
+   "Allow Claude to run Extract reusable head, code prologue, code epilogue?". The safe procedure,
+   which needs no shell at all: parse the `briefing-state` JSON **in context** from the WebFetch
+   response, and rebuild the page **structurally from `docs/runbooks/briefing-template.html` +
+   the `runner_` tables** (the contract below already says this) — never by slicing the previous
+   page's HTML out of harness storage. The same rule generalizes: a cloud cycle runs **no Bash
+   command against any `~/.claude/` path**, mirror of `runner-cycle.md` step 0's `.claude/` rule.
 
 ## Decision read-back contract (every cycle, step 2) — CORRECTED after live QA 2026-08-19
 
