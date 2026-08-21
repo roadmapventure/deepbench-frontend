@@ -5,6 +5,14 @@
 
 ---
 
+## automation-review / SES-94-19v-ladder-supersession (v7.0.125, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the architecture stops saying the opposite of John's ruling
+
+**Mission.** `SES-94` (Tooling · `P10 - Tooling`) — ship the gated `ARCHITECTURE.md` §19v trust-ladder edit John Accepted 2026-08-21T12:51Z (card `runner_items 63a06605`). §19v still read a flat "Accept → streak +1, five consecutive accepts promote one rung" with no shipped-vs-gated distinction — the retired rule, in the document that governs the other documents, while both runbooks already carried John's B34 ruling.
+
+**What shipped.** The card's exact replacement text at its anchor (the "John's briefing answers feed it" sentence, §19v trust-ladder paragraph), plus an amendment header line. **One deliberate deviation from the card's text, flagged Tier 2:** the card (written at `v7.0.118`) still called Reverse-on-gated "an open question on the briefing"; John settled it the same morning ("leave it", directive `1d01ea85`, register B35), and `runner-cycle.md` step 2 explicitly orders the docs to stop carrying it as open. The shipped sentence therefore reads "still demotes — settled by John (…B35…)". Shipping the card verbatim would have written an already-stale open-question claim into the LOCKED architecture doc.
+
+**QA (discriminating).** `grep -c 'gated_before_build' docs/ARCHITECTURE.md` §19v ladder paragraph: prior dev 0 in that paragraph → shipped 1, and the old flat sentence no longer matches. Docs-only change; no build/regression owed. Ticket closed by Supabase write (`backlog_items.SES-94 → done`); before-image convention not available to manual sessions (`runner_before_images.cycle_id` NOT NULL) — the git-committed `BACKLOG-SNAPSHOT.md` diff is the before/after record, same as `SES-95` this session.
+
 ## automation-review / SES-95-hygiene-skill-retarget (v7.0.124, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the parked `.claude/` edit ships the way the rule said it must: in a session John attends
 
 **Mission.** `SES-95` (Tooling · `P10 - Tooling`), John's Accept 2026-08-21T12:51Z plus his live instruction this session to run the machine-bound/attended work. Same job as directive `a55155f3` / gated card `81ea5d7e` (one edit, two records — the briefing's "Help me" section flagged the duplicate). The `session-hygiene` skill still told every session to scan `docs/FEATURES.md`/`-NEXT`/`-LATER` for ticket rows — files that have held zero ticket rows since `v7.0.113` — guidance the checker scripts themselves stopped following at `v7.0.115`.

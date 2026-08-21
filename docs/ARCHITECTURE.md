@@ -1,5 +1,6 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.125 | 2026-08-21 | automation-review (attended) — §19v trust-ladder paragraph: gated-card Accept excluded from the ladder (SES-94, John's Accept 2026-08-21T12:51Z; Reverse-on-gated recorded as settled per B35)
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
 > This document supersedes all prior architecture notes.
@@ -2584,8 +2585,16 @@ remaining deploy quota before every push and **yields headroom to John's manual 
 ### The trust ladder — autonomy widens earned, measured
 
 Data: one row per work class (invention, enhancement, agent creation, determinism removal, bug
-fix), holding rung + streak. John's briefing answers feed it: **Accept** → streak +1, five
-consecutive accepts promote one rung. **Reverse** → streak 0 and demote one rung immediately
+fix), holding rung + streak. John's briefing answers feed it, **and only from `shipped`
+cards**: **Accept** → streak +1, five consecutive accepts promote one rung. **An Accept on a
+`gated_before_build` card is permission, not a rating, and does not touch the ladder at all**
+(John, 2026-08-21, directive `fb643367`, register B34) — it authorises that one build and
+re-enters the ticket at queue #1 (B23). The ladder measures the runner's *unattended* judgment,
+fed by John's verdict on work already done; a gated card is the opposite transaction, and paying
+the runner for asking permission would tax the one behaviour that must stay free. **Reverse on a
+gated card still demotes — settled by John** (2026-08-21, directive `1d01ea85`, register B35:
+"leave it"; his ruling, no longer an open question). The rule applies forward from the
+2026-08-21T03:53Z harvest; the ladder's history is not re-derived (see B34 for why). **Reverse** → streak 0 and demote one rung immediately
 (one reversal outweighs five accepts by design). **Rework** → neutral (steering, not failure).
 **A sweep auto-revert counts as a Reverse.** A rung buys throughput inside the auto lane — rung
 1 = one item/night in that class at minimum blast radius; rung 2 = two, or the next-larger
