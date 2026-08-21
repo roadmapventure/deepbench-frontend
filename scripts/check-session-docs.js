@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v6.3.207 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a
+// DeepBench v7.0.115 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4
+// FEATURE: SES-010 -- mechanizes the session-hygiene skill's checks as one script
+// (retargeted to public.backlog_items by SES-83 (d) cycle 4; see the SNAPSHOT_REL note below)
 //
 // Mechanizes the `session-hygiene` skill's checks 1, 1b, 2, 3, 3c, 3d, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c --
 // previously a markdown checklist a session had to remember to run by hand
@@ -25,6 +27,23 @@ import path from "path";
 import { execFileSync } from "child_process";
 
 const SHARED_CHECKOUT = "C:/Projects/deepbench-frontend";
+
+// SES-83 (d) cycle 4, v7.0.115. The three FEATURES*.md files were emptied to
+// legend-only stubs in cycle 2 (v7.0.113) -- `public.backlog_items` is the
+// authority. Checks 3/3c/3d used to scan those files for ticket rows and, since
+// the trim, found nothing and reported "all clear" (observed live by cycle 3,
+// docs/SESSIONS.md:24). A lint that passes because its subject moved is worse
+// than one that errors, so the row checks are retargeted here to the snapshot.
+//
+// Why the snapshot file and not Supabase directly: this script is a session-start
+// tripwire and the session-hygiene skill's own standing rule is "keep every check
+// cheap -- sizes and greps, never a full read." A network round trip does not
+// belong in this path, and a checker that silently no-ops when credentials are
+// absent would reintroduce exactly the false all-clear being fixed here. The
+// snapshot is in-repo, needs no credentials, and is regenerated into every ship
+// commit set (SES-83 (c)).
+const SNAPSHOT_REL = "docs/backlog/BACKLOG-SNAPSHOT.md";
+const BACKLOG_FILES = ["FEATURES.md", "FEATURES-NEXT.md", "FEATURES-LATER.md"];
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -73,62 +92,167 @@ function checkClaudeState(findings) {
   return text;
 }
 
-// ---- Check 3 & 3c: Done-row leakage + Type-tag coverage ----
-function checkFeatureFile(findings, filename, requireType) {
-  const p = path.join(WORKTREE, "docs", filename);
-  const text = readIfExists(p);
-  if (text === null) return;
+// ---- Check 3s: the trimmed backlog stubs must stay empty of tickets ----
+//
+// Replaces the old row scan over these three files. Since cycle 2 (v7.0.113)
+// they carry no ticket rows at all, so scanning them for Done-status leakage or
+// blank Type cells is guaranteed to find nothing -- the false all-clear. What IS
+// worth asserting about them is the inverse: a ticket row REAPPEARING here means
+// a session filed into a stub instead of `public.backlog_items`, which is exactly
+// the regression cycles 2 and 3 exist to prevent. Fires zero times today by
+// construction; it is meant to be silent until it matters.
+//
+// The size baselines are kept as-is -- they were never part of the row scan and
+// still catch runaway growth in a file that is supposed to stay small.
+function checkTrimmedStubs(findings) {
+  for (const filename of BACKLOG_FILES) {
+    const p = path.join(WORKTREE, "docs", filename);
+    const text = readIfExists(p);
+    if (text === null) {
+      findings.push({ check: "3s", severity: "WARN", detail: `docs/${filename} not found -- cannot check it for stray ticket rows` });
+      continue;
+    }
 
-  const bytes = Buffer.byteLength(text, "utf8");
-  const sizeBaselines = { "FEATURES.md": 40, "FEATURES-LATER.md": 150 };
-  if (sizeBaselines[filename] && bytes > sizeBaselines[filename] * 1024) {
-    findings.push({ check: "3", severity: "FLAG", detail: `${filename} is ${kb(bytes)} KB, over the ~${sizeBaselines[filename]} KB baseline` });
+    const bytes = Buffer.byteLength(text, "utf8");
+    const sizeBaselines = { "FEATURES.md": 40, "FEATURES-LATER.md": 150 };
+    if (sizeBaselines[filename] && bytes > sizeBaselines[filename] * 1024) {
+      findings.push({ check: "3", severity: "FLAG", detail: `${filename} is ${kb(bytes)} KB, over the ~${sizeBaselines[filename]} KB baseline` });
+    }
+
+    for (const line of text.split("\n")) {
+      const idMatch = line.match(/^\|\s*([A-Z]{2,4}-[0-9]+[a-z]?(?:\s*\/\s*[A-Z]{2,4}-[0-9]+[a-z]?)*)\s*\|/);
+      if (!idMatch) continue;
+      findings.push({
+        check: "3s",
+        severity: "FLAG",
+        detail: `docs/${filename} carries a ticket row for ${idMatch[1]}, but that file was trimmed to a legend-only stub (SES-83 (d), v7.0.113) -- new tickets are filed into public.backlog_items. Move it into the table; a ticket left here is invisible to work selection, which reads the table via SQL.`,
+      });
+    }
+  }
+}
+
+// ---- Snapshot cell decoding (format documented in BACKLOG-SNAPSHOT.md's header) ----
+//
+// Escaping is applied in the order `\` -> `\\`, `|` -> `\|`, newline -> `\n`, so
+// unescaping is a single left-to-right pass over those three sequences. An empty
+// cell means SQL NULL; the literal marker `\e` means a stored empty string.
+// Every cell is padded with EXACTLY one space per side and the reader removes one
+// character per side rather than trimming -- four tickets store values with their
+// own leading/trailing whitespace that a .trim() would silently eat.
+function decodeCell(raw) {
+  if (raw === undefined) return "";
+  const inner = raw.slice(1, -1);
+  if (inner === "") return "";
+  if (inner === "\\e") return "";
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === "\\" && i + 1 < inner.length) {
+      const next = inner[i + 1];
+      if (next === "\\") { out += "\\"; i++; continue; }
+      if (next === "|") { out += "|"; i++; continue; }
+      if (next === "n") { out += "\n"; i++; continue; }
+    }
+    out += inner[i];
+  }
+  return out;
+}
+
+function parseSnapshotRows(text) {
+  const rows = [];
+  for (const line of text.split("\n")) {
+    const l = line.endsWith("\r") ? line.slice(0, -1) : line;
+    if (!/^\|\s*\d+\s*\|/.test(l)) continue; // data rows lead with the ordinal column
+    const cells = l.split(/(?<!\\)\|/).slice(1, -1);
+    if (cells.length < 9) continue;
+    rows.push({
+      id: decodeCell(cells[1]).trim(),
+      type: decodeCell(cells[2]).trim(),
+      pclass: decodeCell(cells[3]).trim(),
+      status: decodeCell(cells[5]).trim(),
+      description: decodeCell(cells[8]),
+    });
+  }
+  return rows;
+}
+
+// ---- Checks 3 / 3c / 3d, retargeted to public.backlog_items via the snapshot ----
+//
+// Thresholds were calibrated against the real 556-ticket board BEFORE being
+// chosen, the same ratchet discipline SES-25a set for check 3d: `done` leakage
+// fires 5 times and over-cap descriptions 3 times (both actionable and named
+// individually), while blank Type fires 228 times and blank priority class 458.
+// Emitting 686 individual findings would bury the 8 that can be acted on today,
+// so those two report as one counted WARN line each. The 458 unclassed tickets
+// are not a defect -- that is SES-85's known scope, and the line says so.
+function checkBacklogSnapshot(findings) {
+  const p = path.join(WORKTREE, SNAPSHOT_REL);
+  const text = readIfExists(p);
+
+  // A check that cannot run has to SAY so. Returning quietly here is the exact
+  // failure this cycle exists to close: the caller would report "all clear" for
+  // a backlog it never looked at.
+  if (text === null) {
+    findings.push({ check: "3", severity: "FLAG", detail: `${SNAPSHOT_REL} not found -- the backlog checks (3/3c/3d) could not run at all. Regenerate it with: node scripts/export-backlog-snapshot.js` });
+    return;
   }
 
-  const lines = text.split("\n");
-  for (const line of lines) {
-    const idMatch = line.match(/^\|\s*([A-Z]{2,4}-[0-9]+[a-z]?(?:\s*\/\s*[A-Z]{2,4}-[0-9]+[a-z]?)*)\s*\|/);
-    if (!idMatch) continue; // not a real data row (header/separator/prose)
+  const rows = parseSnapshotRows(text);
+  if (rows.length === 0) {
+    findings.push({ check: "3", severity: "FLAG", detail: `${SNAPSHOT_REL} parsed to zero ticket rows -- the backlog checks (3/3c/3d) could not run. The file is present but unreadable in the expected format; regenerate it with: node scripts/export-backlog-snapshot.js` });
+    return;
+  }
 
-    // Status is always the second-to-last cell, immediately before the final
-    // Session cell and end-of-line -- anchoring on that shape (not a fixed
-    // column index) survives embedded `|` characters earlier in the row
-    // (e.g. a code snippet in the Feature cell), per the skill's documented
-    // gotcha. Only a Status cell that STARTS with the emoji counts -- a
-    // `✅ Done` mention inside another cell's prose (e.g. "Depends on: PE-04
-    // ✅ Done") never satisfies "immediately before the final cell + EOL".
-    const statusMatch = line.match(/\|\s*(✅[^|]*|🔶[^|]*|❌[^|]*)\|\s*[^|]*\|\s*$/);
-    if (statusMatch) {
-      const status = statusMatch[1].trim();
-      if (status.startsWith("✅")) {
-        findings.push({ check: "3", severity: "FLAG", detail: `${filename}: ${idMatch[1]} has Status "${status}" but is still in the active file -- should be archived to docs/FEATURES-ARCHIVE.md` });
-      }
-      if (status !== "✅ Done" && status !== "🔶 Partial" && status !== "❌ Missing") {
-        findings.push({ check: "3", severity: "FLAG", detail: `${filename}: ${idMatch[1]} has non-canonical Status text "${status}" (STANDARDS.md Section 7 requires exactly one of the three canonical values)` });
-      }
-    }
+  // Check 3, ported: B1 (John, 2026-08-20) -- shipped tickets are history, never
+  // maintained on the open board. The markdown-era form of this was a `✅ Done`
+  // row left in an active file instead of moved to FEATURES-ARCHIVE.md.
+  const done = rows.filter(r => r.status === "done");
+  for (const r of done) {
+    findings.push({ check: "3", severity: "FLAG", detail: `backlog_items: ${r.id} has status "done" but is still on the open board -- shipped tickets are history (register B1), not maintained rows. Close it out of the table.` });
+  }
 
-    if (requireType) {
-      const typeMatch = line.match(/^\|\s*[^|]*\|\s*([^|]*)\|/);
-      const type = typeMatch ? typeMatch[1].trim() : "";
-      if (!type) {
-        findings.push({ check: "3c", severity: "FLAG", detail: `${filename}: ${idMatch[1]} has a blank Type cell` });
-      }
-    }
-
-    // Check 3d -- see ROW_LENGTH_CAP's comment for why 2000 and why it's a ratchet.
-    // Measure without the trailing \r: this repo checks out CRLF, so line.length
-    // would report every row 1 char longer than its actual content and would
-    // differ from the same row measured on an LF checkout. The reported number is
-    // the baseline SES-25b works against, so it has to be the content length.
-    const rowLength = line.endsWith("\r") ? line.length - 1 : line.length;
-    if (rowLength > ROW_LENGTH_CAP) {
+  // Check 3d, ported: the per-ticket length cap now applies to `description`,
+  // which is where the narrative lives (CLAUDE-DESIGN.md step 9: move the detail
+  // to docs/harvests/<ID>.md and leave the description a pointer).
+  for (const r of rows) {
+    if (r.description.length > ROW_LENGTH_CAP) {
       findings.push({
         check: "3d",
         severity: "FLAG",
-        detail: `${filename}: ${idMatch[1]} row is ${rowLength} chars, over the ${ROW_LENGTH_CAP}-char cap -- move the detail to docs/harvests/${idMatch[1]}.md and leave a pointer (CLAUDE-DESIGN.md step 9). Never delete: append to the harvest file first, then trim the row.`,
+        detail: `backlog_items: ${r.id} description is ${r.description.length} chars, over the ${ROW_LENGTH_CAP}-char cap -- move the detail to docs/harvests/${r.id}.md and leave a pointer (CLAUDE-DESIGN.md step 9). Never delete: append to the harvest file first, then trim the description.`,
       });
     }
+  }
+
+  // Check 3f, NEW -- duplicate ticket ids. Added because retargeting this script
+  // surfaced one on the live board: CHI-48 exists twice with different Type and
+  // description (two distinct tickets sharing one id), confirmed against
+  // public.backlog_items directly and not just this snapshot. That is the exact
+  // collision class CLAUDE.md's atomic-counter rule exists to prevent, and
+  // nothing was watching for it -- the markdown-era files could not express it
+  // cheaply because a ticket's id was not a queryable column. Fires once today,
+  // so it is actionable rather than noise. Deliberately reports only: choosing
+  // WHICH of two real tickets gets renumbered is a judgment call, not a lint's.
+  const byId = new Map();
+  for (const r of rows) {
+    if (!r.id) continue;
+    byId.set(r.id, (byId.get(r.id) || 0) + 1);
+  }
+  for (const [id, n] of byId) {
+    if (n > 1) {
+      findings.push({ check: "3f", severity: "FLAG", detail: `backlog_items: ticket id ${id} appears ${n} times -- two distinct tickets share one id. Claim ids atomically from feature_id_counter (CLAUDE.md) and renumber one of them; decide which by reading both, since each carries its own Type and description.` });
+    }
+  }
+
+  // Check 3c, ported and aggregated -- see this function's header comment.
+  const blankType = rows.filter(r => !r.type);
+  if (blankType.length) {
+    const examples = blankType.slice(0, 5).map(r => r.id).join(", ");
+    findings.push({ check: "3c", severity: "WARN", detail: `backlog_items: ${blankType.length} of ${rows.length} tickets have a blank Type cell (e.g. ${examples}) -- reported as one line rather than ${blankType.length} findings so it cannot bury the actionable flags above.` });
+  }
+
+  const unclassed = rows.filter(r => !r.pclass);
+  if (unclassed.length) {
+    findings.push({ check: "3e", severity: "WARN", detail: `backlog_items: ${unclassed.length} of ${rows.length} tickets carry no priority class and are therefore unpickable by work selection (runner-cycle.md step 5 requires priority_class IS NOT NULL). This is SES-85's classification sweep, not new drift -- expected until it lands.` });
   }
 }
 
@@ -420,9 +544,8 @@ function main() {
   const findings = [];
   const stateText = checkClaudeState(findings);
   checkEntryLengths(findings, stateText);
-  checkFeatureFile(findings, "FEATURES.md", true);
-  checkFeatureFile(findings, "FEATURES-NEXT.md", true);
-  checkFeatureFile(findings, "FEATURES-LATER.md", false);
+  checkTrimmedStubs(findings);
+  checkBacklogSnapshot(findings);
   checkStandardsDrift(findings);
 
   // Worktree cross-reference checks need the freshest possible CLAUDE-STATE.md/
@@ -445,7 +568,7 @@ function main() {
   for (const f of [...flags, ...warns]) {
     console.log(`  [check ${f.check}, ${f.severity}] ${f.detail}`);
   }
-  console.log("\nReport only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md/FEATURES.md.");
+  console.log("\nReport only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs).");
   process.exit(0);
 }
 

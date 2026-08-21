@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench | scripts/check-new-id-prefixes.js | SES-010 Tier 2
+// DeepBench v7.0.115 | scripts/check-new-id-prefixes.js | SES-010 Tier 2, SES-83 (d) c4
 // FEATURE: SES-010 -- mechanizes CLAUDE-DESIGN.md's new-ID prefix rule (docs/SCREEN-INVENTORY.md)
 //
 // CLAUDE-DESIGN.md: "check docs/SCREEN-INVENTORY.md's taxonomy for the correct
@@ -22,15 +22,32 @@
 // list yet" from "a new row incorrectly defaulting to a legacy prefix"
 // without a human reading the actual taxonomy doc.
 //
+// RETARGETED SES-83 (d) cycle 4, v7.0.115: new tickets are filed into
+// `public.backlog_items`, not into the three FEATURES*.md files, which cycle 2
+// (v7.0.113) emptied to legend-only stubs. Diffing those files can no longer
+// surface a newly-filed ticket, so this check silently passed forever -- the same
+// false all-clear that check-session-docs.js carried. It now reads
+// docs/backlog/BACKLOG-SNAPSHOT.md, the table's in-repo copy regenerated into
+// every ship commit set (SES-83 (c)), which needs no credentials.
+//
+// It compares ID SETS across the merge-base rather than diffing lines, and that
+// is load-bearing rather than stylistic: the snapshot is ordered
+// `source_file.asc, row_ordinal.asc` and carries a leading sequential `| N |`
+// column, so filing ONE ticket renumbers every row beneath it. A line diff then
+// presents hundreds of untouched legacy rows as newly added, and every legacy
+// prefix (AA, MI, AI, TI, AZ, ...) would be flagged on a single filing. A set
+// difference is immune to renumbering. Note the ID is column 2 in the snapshot;
+// it was column 1 in the old files.
+//
 // Usage: node scripts/check-new-id-prefixes.js [--worktree=<path>] [--base=origin/dev]
-// Exit code 1 if any newly-added row uses a prefix outside ACTIVE_PREFIXES, 0 otherwise.
+// Exit code 1 if any newly-filed ticket uses a prefix outside ACTIVE_PREFIXES, 0 otherwise.
 
 import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 
 const ACTIVE_PREFIXES = new Set(["HAR", "SCA", "LOO", "LOG", "MCP", "MKT", "DAT", "AGT", "SES", "MOB", "CHI", "PRO"]);
-const FEATURE_FILES = ["docs/FEATURES.md", "docs/FEATURES-NEXT.md", "docs/FEATURES-LATER.md"];
+const SNAPSHOT_REL = "docs/backlog/BACKLOG-SNAPSHOT.md";
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -41,51 +58,98 @@ function arg(name, fallback) {
 const WORKTREE = arg("worktree", process.cwd());
 const BASE = arg("base", "origin/dev");
 
-// Same merge-base fix as check-version-headers.js: diffing against BASE's
-// live tip picks up concurrent sessions' already-merged changes, not just
-// this session's own additions.
-function addedRows(relPath) {
+// Every ticket id in a snapshot, read from column 2 of the data rows. Data rows
+// lead with the sequential ordinal column, which is what distinguishes them from
+// the header/separator/prose lines above the table.
+function snapshotIds(text) {
+  const ids = new Map(); // id -> the row text, for the finding's excerpt
+  if (!text) return ids;
+  for (const line of text.split("\n")) {
+    const l = line.endsWith("\r") ? line.slice(0, -1) : line;
+    if (!/^\|\s*\d+\s*\|/.test(l)) continue;
+    const cells = l.split(/(?<!\\)\|/).slice(1, -1);
+    if (cells.length < 2) continue;
+    const id = cells[1].slice(1, -1).trim();
+    const m = id.match(/^([A-Z]{2,4})-[0-9]+[a-z]?$/);
+    if (m && !ids.has(id)) ids.set(id, { prefix: m[1], row: l });
+  }
+  return ids;
+}
+
+// Newly-filed tickets = ids present in the snapshot at HEAD but absent from it at
+// the merge-base. HEAD is read from the working tree, not from git, so a ticket
+// filed and exported but not yet committed is still checked (the old line-diff
+// behaved the same way).
+function newlyFiled() {
+  // Same merge-base fix as check-version-headers.js: comparing against BASE's
+  // live tip picks up concurrent sessions' already-merged changes, not just this
+  // session's own additions.
   let mergeBase;
   try {
     mergeBase = execFileSync("git", ["-C", WORKTREE, "merge-base", BASE, "HEAD"], { encoding: "utf8" }).trim();
   } catch {
     return { error: `could not compute merge-base against ${BASE}` };
   }
-  let diff;
+
+  const headText = (() => {
+    try {
+      return fs.readFileSync(path.join(WORKTREE, SNAPSHOT_REL), "utf8");
+    } catch {
+      return null;
+    }
+  })();
+  if (headText === null) {
+    return { error: `${SNAPSHOT_REL} not found in the worktree -- the new-ID prefix check could not run. Regenerate it with: node scripts/export-backlog-snapshot.js` };
+  }
+
+  let baseText;
   try {
-    diff = execFileSync("git", ["-C", WORKTREE, "diff", "-U0", mergeBase, "--", relPath], { encoding: "utf8" });
+    baseText = execFileSync("git", ["-C", WORKTREE, "show", `${mergeBase}:${SNAPSHOT_REL}`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   } catch {
-    return { rows: [] }; // file untouched or doesn't exist at mergeBase -- nothing added
+    // The snapshot did not exist at the merge-base. Treating all of its ids as
+    // "new" would flag the whole legacy backlog on the commit that introduces
+    // the file; say so and skip instead.
+    return { skipped: `${SNAPSHOT_REL} does not exist at the merge-base -- every ticket would read as newly filed, so the prefix check is skipped for this diff (not a pass).` };
   }
-  const rows = [];
-  for (const line of diff.split("\n")) {
-    if (!line.startsWith("+") || line.startsWith("+++")) continue;
-    const idMatch = line.match(/^\+\|\s*([A-Z]{2,4})-[0-9]+[a-z]?\b/);
-    if (idMatch) rows.push({ prefix: idMatch[1], line: line.slice(1).trim() });
+
+  const baseIds = snapshotIds(baseText);
+  const headIds = snapshotIds(headText);
+  if (headIds.size === 0) {
+    return { error: `${SNAPSHOT_REL} parsed to zero ticket rows -- the new-ID prefix check could not run.` };
   }
-  return { rows };
+
+  const added = [];
+  for (const [id, meta] of headIds) {
+    if (!baseIds.has(id)) added.push({ id, ...meta });
+  }
+  return { added, baseCount: baseIds.size, headCount: headIds.size };
 }
 
 function main() {
+  console.log(`\nNew-ID Prefix Check (vs ${BASE})\n`);
+
+  const { added, error, skipped, baseCount, headCount } = newlyFiled();
+  if (error) {
+    console.log(`  [WARN] ${error}`);
+    process.exit(0);
+  }
+  if (skipped) {
+    console.log(`  [SKIPPED] ${skipped}`);
+    process.exit(0);
+  }
+
   const findings = [];
-  for (const relPath of FEATURE_FILES) {
-    const { rows, error } = addedRows(relPath);
-    if (error) {
-      console.log(`check-new-id-prefixes: ${error}`);
-      continue;
-    }
-    for (const { prefix, line } of rows) {
-      if (!ACTIVE_PREFIXES.has(prefix)) {
-        findings.push(`${relPath}: new row uses prefix "${prefix}" -- not in the confirmed active taxonomy (${[...ACTIVE_PREFIXES].join("/")}). Check docs/SCREEN-INVENTORY.md before assuming this is correct: ${line.slice(0, 100)}...`);
-      }
+  for (const { id, prefix, row } of added) {
+    if (!ACTIVE_PREFIXES.has(prefix)) {
+      findings.push(`${SNAPSHOT_REL}: newly-filed ticket ${id} uses prefix "${prefix}" -- not in the confirmed active taxonomy (${[...ACTIVE_PREFIXES].join("/")}). Check docs/SCREEN-INVENTORY.md before assuming this is correct: ${row.slice(0, 100)}...`);
     }
   }
 
-  console.log(`\nNew-ID Prefix Check (vs ${BASE})\n`);
+  console.log(`  ${baseCount} tickets at the merge-base, ${headCount} now, ${added.length} newly filed.`);
   if (findings.length) {
     for (const f of findings) console.log(`  [FLAG] ${f}`);
   } else {
-    console.log("No newly-added rows use a prefix outside the confirmed active taxonomy.");
+    console.log("  No newly-filed tickets use a prefix outside the confirmed active taxonomy.");
   }
 
   process.exit(findings.length > 0 ? 1 : 0);
