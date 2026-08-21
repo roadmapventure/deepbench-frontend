@@ -460,6 +460,31 @@ Four things about this boundary, each of which has already bitten or would have:
 fixes. *(Supervised run: the cheap reachability probe only; the full sweep spec is a 78d
 item.)*
 
+**4b. Invention pass — once per CST day, before selection (`SES-88`, register B12, `v7.0.138`).**
+Deterministic designation, no coordination needed: run this pass **iff no `runner_cycles` row in
+the current America/Chicago day carries `INVENTION PASS` in `notes`** (check with the step-3 CST
+day window; under parallel cycles two simultaneous first-fires may rarely both run it — two
+proposals instead of one, self-limiting and harmless, never a double build). The pass:
+
+1. **Egress probe (precondition C3, measured not assumed):** one live WebSearch. If it fails,
+   write `INVENTION PASS: egress blocked` in `notes`, skip the rest — tomorrow's pass retries.
+   The first success closes C3 permanently; say so in the cycle row.
+2. **Research:** market/competitor/whitespace + the platform's own usage signals, grounded in
+   `docs/vision/market-map.md`, `thesis.md`, and `customer.md` — the corpus is the scoring
+   frame, not your generic priors. The `P1 - Improves John's Skills` lens ranks first (A4).
+3. **Generate exactly as many proposals as the invention trust rung** (`runner_ladder`,
+   `work_class='invention'` — rung 1 = one proposal). Volume widens only by ladder (B12).
+4. **Score against the vision corpus** and run §19v's R&D gate: research → cheapest-variant
+   feasibility check → logged go/no-go with traceable reasoning (§19d sniff test — a proposal
+   whose "why" can't be traced to corpus claims + evidence is a feature mill, kill it).
+5. **File the surviving proposal as a `gated_before_build` `runner_items` card** — value case,
+   the corpus claims it scores against (cite claim ids), cost guess, and the exact first build.
+   **No backlog ticket yet:** John's Accept turns the card into a queued ticket (B17/B23).
+   Reverse kills it and records the rejection in `vision/rejected-paths.md`.
+6. Write `INVENTION PASS: ran, N proposals, card <id>` (or `: no survivor` — an honest zero
+   beats a forced proposal) in `notes`, then **continue to step 5 normally** — the pass is
+   bookkeeping plus research, not this cycle's build (B24 logic; the cycle still delivers one).
+
 **5. Pick ONE item.** Selection layers, in order (register B30):
 (1) `runner_directives` `status='queued'` oldest first — a directive is the mission, mark it
 `in_progress`. (2) **John's automation queue — NO LONGER A LAYER YOU EXECUTE BY HAND. It is in
