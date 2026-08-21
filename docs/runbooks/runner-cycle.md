@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.119 | runbooks/runner-cycle.md | directive 73e41d2c (Tasks 3+4) — step 0's blanket `.claude/` instruction is SUPERSEDED: probed directly this cycle (four writes incl. the exact SES-78c path `.claude/inflight/`, a settings-shaped file, and the real SKILL.md edit) and it does not reproduce — no prompt, no denial, no hook message. The rule is narrowed to what is demonstrable, not flipped; the SES-78c stalls stay on the record with their cause open, and the §19v gated lane / `.claude/settings.json` stay untouched as a GOVERNANCE limit (conflating the two is what caused this). Step 6 gains the standing rule the error produced: a subagent that has not returned is NOT a result — wait, or report the question open, never publish a timeout as a conclusion (v7.0.115 published "`.claude/` is blocked" to six places off 21 minutes of silence; the agent came back clean). -->
 <!-- DeepBench v7.0.114 | runbooks/runner-cycle.md | SES-83 (d) cycle 3 — step 7's close-out line stops telling every cycle to edit a `FEATURES*.md` row (status + P-class) and names the Supabase write instead. Cycle 1 flipped SELECTION to the table but left this WRITE line pointing at the files, so from v7.0.113 (the trim) until now the runbook contradicted itself: step 5 read the table, step 7 told the same cycle to update a stub. Found by the cycle-3 ceremony sweep. NOTE FOR JOHN: the stored routine prompt's step 4 still names the three markdown files for work selection — superseded by step 5 here, but only he can edit that prompt. -->
 <!-- DeepBench v7.0.112 | runbooks/runner-cycle.md | SES-83 (d) — step 5's selection layer (3) stops parsing FEATURES.md / FEATURES-NEXT.md / FEATURES-LATER.md and reads public.backlog_items via one canonical SQL query, quoted verbatim. John's "table is authority" call, Accepted 2026-08-21T00:19Z. Four live traps encoded in the query itself: numeric P-class ordering (lexical puts P10 before P2), the `· FLAGGED` suffix, the Beta-gate/Post-beta declaration regex (ILIKE '%beta%' over-matches by 20), and `title` holding the class string for imported tickets. Layers (1) directives and (2) John's automation queue are unchanged and still outrank the table. -->
 <!-- DeepBench v7.0.108 | runbooks/runner-cycle.md | SES-89 — new step 8b, the Heal sweep: `scripts/heal-engine.js` groups `durable_hops` failures into signatures and files evidenced `P9 - Bug Fixes` tickets (dry-run by default; the cycle claims the id block and passes it in). Reads `durable_hops`, NOT `ai_activity_log` — the latter has no error column, verified live. -->
@@ -34,7 +35,38 @@ dev`, then `git checkout -B session/cycle-<UTC yyyymmdd-hhmm> origin/dev`. This 
 clone + session branch satisfies CLAUDE.md's worktree-isolation rule by construction (the rule
 exists to isolate concurrent sessions sharing one machine checkout; you have the whole clone).
 All other CLAUDE.md hard rules apply verbatim — atomic counters, `push origin HEAD:dev`,
-kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention; this exception is cloud-cycle-specific.) Read `runner_secrets` via the Supabase
+kickoff-gated coding, verify-never-assert. Do NOT create an inflight file — the marker is
+redundant here: the exclusive clone dies with the session and your `runner_cycles` row is the
+liveness signal. (Laptop sessions keep the inflight convention; this exception is
+cloud-cycle-specific.)
+
+> **SUPERSEDED 2026-08-21 (`v7.0.119`, cycle `ba8f2ce3`, directive `73e41d2c` Task 3) — the
+> `.claude/` half of this instruction was wrong and is retired.** It used to read: *"`.claude/`
+> paths are hard-coded protected and prompt for permission even in routine sessions (found live,
+> SES-78c — two stalls)."* **Probed directly this cycle in the cloud environment and it does not
+> reproduce.** Four writes, no prompt, no denial, no hook message: `Write` then `Edit` to
+> `.claude/inflight/probe-ba8f2ce3.md` — the exact `SES-78c` path — a settings-shaped
+> `.claude/settings.local.json.probe`, and the real Task-1 edit to
+> `.claude/skills/session-hygiene/SKILL.md`. All four succeeded in seconds; the probes were
+> deleted immediately. Corroborating read-only evidence from `v7.0.115`: this container has **no
+> `.claude/` deny rule anywhere** (`~/.claude/launcher-settings.json`, `~/.claude/policy-limits.json`,
+> and the repo's own `.claude/settings.json` carry no path denies), and the five `PreToolUse`
+> hooks that enforce this repo's rules live in `C:/Projects/.claude/` on John's laptop, not here.
+>
+> **The cost of leaving it blanket:** it made two cycles defer real work wrongly — `v7.0.115`
+> deferred the `session-hygiene` retarget and carded it as needing one of John's laptop sessions,
+> and `v7.0.116` inherited that. **What is NOT claimed:** that the `SES-78c` stalls never
+> happened. They are recorded and this cycle cannot reproduce their environment — so either they
+> had a different cause (a specific path, a tool other than `Write`/`Edit`, or a different
+> container build) or the behaviour has changed since. **The rule going forward is narrow:**
+> `.claude/` paths are ordinary repo paths for a cloud cycle — write them when the work needs it.
+> The gated lane still binds (§19v: active-agent Skill/Capability edits, the four harness files),
+> and `.claude/settings.json` in particular stays untouched — that is a *governance* limit, not a
+> harness block, and the two must not be conflated again. If a `.claude/` write ever does stall or
+> prompt, that is a finding: record the exact path and tool, and never route around it through a
+> different tool (`CLAUDE.md`'s no-`cd`-compound precedent).
+
+Read `runner_secrets` via the Supabase
 connector and export what a step needs as env vars — secrets never go into files, commits, or
 logs.
 
@@ -253,6 +285,26 @@ every subagent prompt. Attempts-per-tier ≤ 1 — a failed attempt re-runs that
 up or files a gated-before-build item; never grind. If the Agent tool is unavailable in this
 environment, note that in the cycle row and continue on Opus 5 — the first cycle to try it is
 the verification.
+
+**A subagent that has not returned is NOT a result (added 2026-08-21, `v7.0.119`, directive
+`73e41d2c` Task 4 — found live, and it cost a full cycle).** `v7.0.115` delegated a `.claude/`
+write probe to a background Sonnet 5 subagent, the agent was still `running` at close-out ~21
+minutes in, and the cycle **converted that silence into a finding**: it wrote "the probe stalled,
+therefore `.claude/` is blocked" into `runner_items`, `runner_cycles.notes`, `CLAUDE-STATE.md`,
+`docs/SESSIONS.md`, the briefing page and a push notification to John. The agent then returned
+*after* the cycle closed reporting **Write succeeded, Edit succeeded, no prompt and no denial** —
+3 tool calls, 44,179 tokens, 2,090,008 ms wall clock. The 21 minutes were **latency, not a block**,
+and the wrong conclusion had already been published everywhere.
+
+So: **either wait for the agent, or report the question as still open.** A timeout is a timeout —
+it is evidence about *how long the agent took*, and nothing whatsoever about the thing being
+probed. Never let "it didn't come back" become "therefore X." If a cycle must close with a
+delegated probe still running, the honest ledger line is *"probe delegated, not yet returned,
+question OPEN"* — never a conclusion, and never a notification to John presenting one.
+
+Delegating the probe was **correct** and is exactly what made this recoverable: the risky action
+ran in a subagent, so a real stall would have stalled alone. The error was interpretive, not
+architectural — keep the delegation, drop the inference.
 
 **7. QA bar, then ship at ONE ship point.**
 - `npm install && npm run build` green (a `src/`/`api/`/`lib/` change that fails build never
