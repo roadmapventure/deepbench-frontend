@@ -101,6 +101,29 @@ was lost, but only because the pass checked disk before acting on the flag. Befo
 every written instruction was satisfied and the marker still never reached `dev` — its only
 guaranteed appearance in git history was step 5's commit deleting it.*
 
+### 2c. Claim your ticket the moment you start working one (SES-86 phase 1, John, 2026-08-21)
+
+Manual sessions and scheduled runner cycles share one board, so the ticket itself is the
+coordination point. As soon as this session commits to working a specific `backlog_items` ticket
+(John names it, or you pick it), claim it — one atomic write, same never-read-then-increment
+principle as the counters below:
+
+```sql
+UPDATE public.backlog_items
+   SET claimed_by = '<short-session-name>', claimed_at = now(), updated_at = now()
+ WHERE backlog_id = '<TICKET-ID>'
+   AND status <> 'done'
+   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+RETURNING backlog_id;
+```
+
+**1 row → yours. 0 rows → another session (possibly a scheduled cycle) holds it** — tell John
+who holds it (`SELECT claimed_by, claimed_at FROM backlog_items WHERE backlog_id = '<ID>'`)
+rather than working it anyway. **Release it in your close-out** (set `claimed_by = NULL,
+claimed_at = NULL` in the same UPDATE that sets the ticket's final status), and release on an
+abandon too. An unreleased claim expires after 24h, so a dead session cannot strand a ticket.
+Discussion-only sessions that never settle on a ticket claim nothing.
+
 ### 3. Claim your version number atomically (when you need one)
 
 Never read `CLAUDE-STATE.md` and increment — that races under 5–7 concurrent sessions and has caused

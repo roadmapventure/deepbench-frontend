@@ -432,6 +432,19 @@
   he can grant these cloud sessions so the prompt never fires?** His configuration, his call — and
   if the answer is yes, this register's rule is the thing it retires.
 
+- **B40. Claim-on-pick shipped as SES-86 phase 1 (John, live in chat 2026-08-21: "yes, ship it";
+  `v7.0.127`, attended session `automation-review`).** John's mechanism, adopted with one
+  adjustment: the claim lives in two new `backlog_items` columns (`claimed_by`, `claimed_at`,
+  migration `ses86a_backlog_claim_on_pick`) rather than overwriting `status` — an abandoned
+  ticket must get its old status back, and overwriting destroys it. Behavior is exactly what he
+  described: any session — manual or scheduled — atomically claims a ticket at pick
+  (`runner-cycle.md` step 5; `session-setup` skill step 2c), every other session's selection
+  skips claimed tickets, and a claim expires after 24h (the B37 evidence bar) so a dead session
+  cannot strand one. B6's full lifecycle status (`filed`→…→`completed`) remains SES-86's
+  unbuilt remainder; this phase covers only the collision John hit live (SES-95 shipped
+  attended while a cycle carded the same work). QA: three arms live on real rows — fresh → 1,
+  contested → 0, 25h-stale → re-claimable.
+
 ## D. Ticket ledger
 
 **Filed this session (8):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter

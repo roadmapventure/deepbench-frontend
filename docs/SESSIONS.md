@@ -5,6 +5,14 @@
 
 ---
 
+## automation-review / SES-86a-claim-on-pick (v7.0.127, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the ticket board becomes the coordination point across every session, on John's own design
+
+**Mission.** `SES-86` (Tooling · `P10 - Tooling`) phase 1. John, live, after watching today's duplicate (`SES-95` shipped attended while a cycle independently carded the same work): *"should we use the tickets as the central knowledge base, as soon as you pick up a ticket, its status is marked 'in development' so that the next session asked to run, manually or scheduled, skips to the next ticket? I want us to be able to run multiple sessions and not have a problem."* Approved "yes, ship it" on the walkthrough. This is register B6's claim piece, cut to exactly the collision he hit; the full lifecycle/queue-number machinery stays `SES-86`'s remainder.
+
+**What shipped.** Migration `ses86a_backlog_claim_on_pick` (`backlog_items.claimed_by`/`claimed_at`, additive, 0 public grant rows verified); `docs/runbooks/runner-cycle.md` step 5 — atomic claim UPDATE at pick (0 rows = held elsewhere → drop to next ticket per B24), selection query filters claimed tickets, step-7 close-out clears the claim; `.claude/skills/session-setup/SKILL.md` step 2c — manual sessions run the identical claim; register B40 records it. One deviation from John's wording, told to him before approval: the claim is two columns, not a `status` overwrite — an abandoned ticket must get its old status back. Expiry 24h (the B37 evidence bar) so a dead session cannot strand a ticket.
+
+**QA (live, three arms, real rows).** Fresh claim → 1 row; contested claim while held → **0 rows** (the discriminating arm); 25h-stale → re-claimable → 1 row; claim restored. The QA claim doubles as this session's genuine claim on `SES-85`, which was deliberately not started until this mechanism existed — the noon-CST scheduled cycle would otherwise have raced it.
+
 ## automation-review / SES-90-local-archive-mining (v7.0.126, 2026-08-21, Manual Design & Build — attended local session, model Fable 5 + Fable 5 mining subagent) — the runner learns how John decides, from John's own words
 
 **Mission.** `SES-90` (Tooling · `P10 - Tooling`) — the half of automation-queue step (4) a cloud cycle cannot reach: mine John's LOCAL Claude Code session archive (`~/.claude/projects`) into `docs/JOHN-DECISION-PATTERNS.md`. Run on John's machine in this attended session, on his direct instruction ("There is a ticket that states can only be ran when called from my machine … Make that run").

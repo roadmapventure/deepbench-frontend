@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.127 | runbooks/runner-cycle.md | SES-86 phase 1 (claim-on-pick), John-approved live 2026-08-21 ("yes, ship it") — step 5 gains the atomic ticket claim: the moment any session (manual or scheduled) picks a backlog ticket it claims it with one UPDATE (claimed_by/claimed_at, new columns, migration ses86a_backlog_claim_on_pick); 0 rows returned = another session holds it, drop to the next ticket exactly as B24 drops past a gated card. The selection query now filters claimed tickets (24h expiry — the B37 evidence bar — so a dead session cannot strand one). Claims release in the step-7 close-out write. Manual sessions run the same claim via session-setup skill step 2c. QA: all three arms proven live on real rows (fresh claim → 1 row, contested → 0 rows, 25h-stale → re-claimable). This is the shared-board coordination John asked for after today's duplicate (SES-95 shipped attended while a cycle carded it). -->
 <!-- DeepBench v7.0.123 | runbooks/runner-cycle.md | directive c4d95dc7 — the lease gains an enforcement point it never had. Self-filed by cycle 633fe486 before it stood down: the lease was asserted ONCE at claim time and never again, so a cycle whose lease was stolen on the TTL keeps building and pushing, because nothing tells it. 633fe486 came one command short of pushing a duplicate of already-shipped work to dev — the exact ADM-1 double-build (e36d4379/4da5a7bd) B31 built the lease to prevent, reached by a route the lease did not cover — and was saved only by happening to re-fetch origin/dev at the ship point. Luck, not a control. New: a holder-guarded re-assertion SELECT, defined once in step 0 and wired as a hard gate before the step-7 push and before every counter claim, with the stolen-from procedure spelled out (do not push, do not claim, do NOT release the lease, close your OWN row, push the session branch so the work is cherry-pickable, and check whether the successor already shipped the item before discarding). Step 0's TTL bullet is CORRECTED with it: the sentence "a stolen lease means the holder is dead, not slow" is disproved by measurement — 633fe486 was stolen from at ~05:52Z and was still executing normally at 13:10:51Z, ~8h, because a cloud session can be suspended and resumed across gaps invisible from inside it. A steal means SILENT, not dead — the same correction step 0b already makes for `failed`, now applied to the lease that produced it. -->
 <!-- DeepBench v7.0.122 | runbooks/runner-cycle.md | directive 34865f07 — John's testimony names the mechanism behind four days of `.claude/` stalls, and step 0's clause is rewritten on it for the fourth and, this time, evidenced reason. He wrote: "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." So the gate is a harness permission prompt that renders ONLY in the human session UI — invisible to the agent, unanswerable by it, and cleared by a person. The path was never blocked; `v7.0.121`'s 18-minute stall ended in a successful write. What was wrong was B38's clearing model ("an intermittent stall that clears" → "a cost, not a prohibition"), and the partition disproves it exactly: John's briefing taps stop 03:48Z and resume 12:50Z, and every probe that cleared ran inside his waking window while all three that parked 8h+/never ran inside the nine-hour hole — the two parked cycles resuming TOGETHER eighteen minutes after his first morning tap. So "budget ~35 minutes" was a sample of the attended cases only. New rule, narrower than v7.0.117's and broader than B38's: an UNATTENDED cycle never enters the gate, because it has no bounded recovery; the edit stays legitimate work needing a session John attends. Step 0b gains the leading evidenced hypothesis for a silence, plus the rule that "open the session and approve" is never written to John as a remedy — it is the thing he ruled out. His onset claim ("after the new rules of the database for the backlog") is contradicted by 21 hours and said so plainly; his mechanism is right, and a real mediated link survives. -->
 <!-- DeepBench v7.0.121 | runbooks/runner-cycle.md | directive 1d01ea85 — John's three answers reach the procedure. Step 2's Reverse-on-gated bullet stops calling itself an open question: asked directly, John said "leave it", so a Reverse on a gated card still demotes and that is now his ruling (B34's second "deliberately not done" is closed; the no-retroactive-re-derivation half still stands). Step 3 gains the budget day boundary — "today" is an America/Chicago day, SQL quoted verbatim, forward-only so a stored override expiry is never retroactively shortened, and explicitly NOT the same thing as the display-only times rule. New step 0b: a predecessor that has gone quiet is PUSHED to John with why + what to do next. THAT RULE WAS REWRITTEN MID-CYCLE BY MEASUREMENT (B37): its first draft said an open row past the TTL means dead — and while it sat unshipped, the two cycles it was about (ba8f2ce3, 633fe486, both closed `failed` by a successor at 08:24Z) resumed after nine hours, finished, declined to race the live lease, and filed their work. So a successor now never adjudicates a predecessor's outcome, `failed` needs evidence rather than elapsed time, and the word is "went silent". -->
@@ -425,6 +426,7 @@ SELECT backlog_id, tier, priority_class, status,
   FROM public.backlog_items
  WHERE status <> 'done'
    AND priority_class IS NOT NULL
+   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
  ORDER BY CASE tier WHEN 'now' THEN 0 WHEN 'next' THEN 1 ELSE 2 END,
           (substring(priority_class FROM 'P([0-9]+)'))::int,
           (description ~* '(Beta-gate|Post-beta)') DESC,
@@ -451,6 +453,10 @@ same #1. Five things about this query are load-bearing and were each found live,
   (`'P9 - Bug Fixes.'`). The human sentence is the first bolded clause of `description`, which is
   what `gist` extracts. Anything that *displays* the queue (briefing "Next up", "Next 3") must
   use `gist`, not `title`, until the stored column is repaired.
+- **The `claimed_by` filter is SES-86 phase 1 — claim-on-pick (John, 2026-08-21, live in chat:
+  tickets are the coordination point across ALL sessions, manual and scheduled).** A claimed
+  ticket is invisible to selection until its claim expires (24h — the same evidence bar as
+  step 0b's silent-cycle rule). See the claim step below.
 - **`status='partial'` does not mean the phase you are about to build is unbuilt.** It means
   *some* of the ticket shipped — layer 3's current #1, `ADM-1`, shipped v1 on 2026-08-20 and
   stays `partial` only because v1.5 was deferred. Read the ticket and its harvest before
@@ -466,7 +472,29 @@ your reasoning — then the ticket goes pending and you DROP TO THE NEXT availab
 ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
 over one; only walls and blockers end a cycle build-less).** Exactly ONE build per cycle,
 never more. A gated card's later Accept re-enters that ticket at queue #1 (register B23 —
-tap-order stacking, recompute renumbers beneath). **The moment the
+tap-order stacking, recompute renumbers beneath). **The moment the pick is made, CLAIM the ticket — one atomic write, before any work
+(SES-86 phase 1, John-approved 2026-08-21).** The write is the reservation, exactly like the
+lease and the counters — never check-then-claim in two statements:
+
+```sql
+UPDATE public.backlog_items
+   SET claimed_by = '<your cycle id or session name>', claimed_at = now(), updated_at = now()
+ WHERE backlog_id = '<TICKET-ID>'
+   AND status <> 'done'
+   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+RETURNING backlog_id;
+```
+
+**1 row → the ticket is yours. 0 rows → another session (manual or scheduled) holds it — drop
+to the next available queued ticket, exactly as B24 drops past a gated card.** This is what lets
+John's manual sessions and scheduled cycles share one board without duplicate builds: manual
+sessions run the same claim (session-setup skill step 2c). Directives (selection layer 1) are
+already serialized by `in_progress`; this covers layers 2 and 3. **Release the claim in your
+step-7 close-out write** (set `claimed_by = NULL, claimed_at = NULL` in the same UPDATE that
+sets the ticket's status) — and on an abort/wall-stop, release it the same way before ending. A
+claim you never release expires on the 24h boundary, so a dead session cannot strand a ticket;
+QA proved all three arms live on real rows (fresh → 1, contested → 0, 25h-stale → re-claimable).
+**The moment the
 pick is made, rename this session** to `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) —
 import NEXT+LATER") so John's runs list shows the work at a glance; on a wall-stop, rename to
 `"did not run — <wall>"` back at step 3. No title mechanism available → note it in the cycle
@@ -516,7 +544,8 @@ the paths under test after every step, so a hang still leaves evidence of exactl
 - Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
 - Close-out ticket update — **a Supabase write, not a file edit** (`SES-83` (d) cycle 3,
   `v7.0.114`): set the ticket's `backlog_items.status` (and `priority_class` if it changed) with a
-  `runner_before_images` row first. This line used to read "`FEATURES*.md` row (status + P-class)"
+  `runner_before_images` row first — **and clear the claim in the same UPDATE**
+  (`claimed_by = NULL, claimed_at = NULL`; SES-86 phase 1). This line used to read "`FEATURES*.md` row (status + P-class)"
   and was left behind by cycle 2's trim — those files hold no ticket rows to edit, so it
   contradicted this same runbook's step-5 selection query. A cycle that still edits a
   `FEATURES*.md` row is writing to a stub.
