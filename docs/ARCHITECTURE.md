@@ -2493,9 +2493,13 @@ files for selection is retired.** John's call, typed into the briefing 2026-08-2
 authority and files are no longer needed and are now smaller, not needing to carry that info"*)
 and Accepted on the `gated_before_build` card at 2026-08-21T00:19Z. The canonical selection query
 lives in `docs/runbooks/runner-cycle.md` step 5, layer (3), quoted verbatim there so it is
-written down exactly once. Rollout: the files themselves are trimmed in a later cycle of the
-same phase — until then they remain on disk, unchanged, and are still where new tickets are
-filed. `docs/backlog/BACKLOG-SNAPSHOT.md`, regenerated into every ship commit set (`SES-83` (c)),
+written down exactly once. Rollout: the files were trimmed in cycle 2 (`v7.0.113`, 2026-08-21)
+and the ceremony documentation was retargeted in cycle 3 (`v7.0.114`); new tickets are filed into
+`public.backlog_items`. Of the three markdown files only `docs/FEATURES.md` retains reference
+content — the Feature ID Format, Type Taxonomy, Priority Class legend and a "Where the rows are
+now" pointer — while `FEATURES-NEXT.md` and `FEATURES-LATER.md` are retired stubs, kept rather
+than deleted solely so the ~1,210 `FEATURES*` references across the repo keep resolving.
+`docs/backlog/BACKLOG-SNAPSHOT.md`, regenerated into every ship commit set (`SES-83` (c)),
 is the table's git-history and offline copy.
 
 ### Lane routing — what ships unattended vs. what waits for John
