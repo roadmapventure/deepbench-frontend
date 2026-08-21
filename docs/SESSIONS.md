@@ -5,7 +5,15 @@
 
 ---
 
-## cycle-20260821-1409 / directive-c4d95dc7-lease-reassertion-gate (v7.0.123, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — the lease finally gets an enforcement point between claim and push
+## automation-review / SES-95-hygiene-skill-retarget (v7.0.124, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the parked `.claude/` edit ships the way the rule said it must: in a session John attends
+
+**Mission.** `SES-95` (Tooling · `P10 - Tooling`), John's Accept 2026-08-21T12:51Z plus his live instruction this session to run the machine-bound/attended work. Same job as directive `a55155f3` / gated card `81ea5d7e` (one edit, two records — the briefing's "Help me" section flagged the duplicate). The `session-hygiene` skill still told every session to scan `docs/FEATURES.md`/`-NEXT`/`-LATER` for ticket rows — files that have held zero ticket rows since `v7.0.113` — guidance the checker scripts themselves stopped following at `v7.0.115`.
+
+**What shipped.** Cherry-pick of `88c713b` (`origin/session/cycle-20260821-0506`, cycle `633fe486`'s preserved work — cherry-picked, not redone, exactly as its NEVER SHIPPED banner instructed): `.claude/skills/session-hygiene/SKILL.md` retargeted to `public.backlog_items` via `docs/backlog/BACKLOG-SNAPSHOT.md` (checks 3/3s/3b/3c split to match what `scripts/check-session-docs.js` actually runs), plus the preserved kickoff doc. Applied with zero conflicts (= reconciled against current `dev`); in-file `v7.0.120` markers retagged `v7.0.124` and the kickoff banner annotated as shipped — `v7.0.119`/`v7.0.120` stay permanent counter gaps.
+
+**QA (discriminating).** `grep -c BACKLOG-SNAPSHOT` on `origin/dev`'s SKILL.md → **0**; on the shipped copy → **4**. The dev side proves the gap was real at ship time; the pair fails if the change did nothing. Doc/skill-only change — no `src`/`api`/`lib` touched, so no build/regression run owed.
+
+**Why attended.** Under `v7.0.122`'s rule (register B39) an unattended cycle never enters the `.claude/` permission gate — this edit was carded twice for exactly that reason. A local attended session has no such gate; this is the intended path, not an exception. (v7.0.123, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5, unattended) — the lease finally gets an enforcement point between claim and push
 
 **Mission.** `runner_directives` `c4d95dc7`, self-filed by cycle `633fe486` at 13:12Z before it stood down — **not John's word**, and the card said so. Selection layer (1); no John taps or directive text were pending at harvest (`briefing-state.items` empty, `directive` empty), and the 12:59Z usage reading was already stored (`f0855c2d`), so the ladder was untouched and no reading row was written.
 
