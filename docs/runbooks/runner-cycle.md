@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.147 | runbooks/runner-cycle.md | SES-101 — step 5's automation-lane block gains the filing rule the lane never had: a new automation ticket claims the TOP of the lane with one call, `SELECT public.claim_automation_lane_top('<TICKET-ID>')` (migration ses101_automation_lane_top). `automation_rank` has been recompute_backlog_queue()'s leading key since v7.0.133, but NOTHING assigned it at filing time, so a new automation ticket landed in the class-sorted backlog — the very failure the lane was built to end. John's ruling settles the direction: question q-lane-top, answered YES 2026-08-21T20:47Z (from directive 48ae1939 line 4, "if you create more automation tickets keep making them top of queue"), so the slot is min(open lane) − 1, never max + 1. Measured before shipping: the last three automation tickets filed were hand-assigned to the BOTTOM (SES-99=7, SES-100=8, SES-101=9) — the opposite of his answer, drifting silently for exactly the reason SES-86 phase 3 and v7.0.146 both diagnosed, that a rule each cycle must remember is a rule that gets forgotten. Function is idempotent, runs the recompute itself, and reads the OPEN lane only. A SECOND rule rides along, found live in this migration's own QA and general to every future function: REVOKE EXECUTE FROM anon, authenticated reports success and changes NOTHING while PUBLIC holds the default grant — the function-level twin of .claude/rules/supabase-column-grants.md. Asserted both directions after the corrected revoke. NOT DONE, and carded rather than attempted: the canonical INSERT at session-setup step 3c is under `.claude/`, which an unattended cycle may not write (step 0, register B39) — the exact replacement text is on the card for a session John attends. -->
 <!-- DeepBench v7.0.146 | runbooks/runner-cycle.md | directive dda69acb (+ twin 6b6cdd71) — step 9's card-filing line gains the three plain-language columns (migration ses106_card_plain_language). v7.0.145 made the More-info panel's three fields required at RENDER only, as a per-card JS object literal, so the words had nowhere to live between rebuilds and register B18 ("build cards FROM the DB, never from memory") was unfollowable for them — the next cycle had to re-invent a card's wording from scratch. John Reworked two cards three minutes apart for that confusion (20:44Z, 20:46Z) and Accepted the v7.0.145 render half at 21:32Z; this is its data half. NULL stays NULL: it is what draws the red defect line, and coercing it to '' would make a missing summary look fine. Same prose→column shape as SES-86 phase 3. -->
 <!-- DeepBench v7.0.145 | runbooks/runner-cycle.md | directive edab5908 — step 2 gains the `asks` harvest and step 9's tail gains the duty it creates. John typed a question box into existence ("I need to be able to ask questions about the issue"), and the rule that comes with it is that an ask he can see recorded but never answered is worse than no box: every open runner_card_asks row is answered on its own card in the rebuild. The idempotence note is not decoration — the page keeps every ask in briefing-state forever, so every cycle re-reads asks it already stored, and uniq_card_ask is the only thing stopping the log duplicating on each republish. -->
 <!-- DeepBench v7.0.135 | runbooks/runner-cycle.md | SES-99, directive 48ae1939 — step 2's harvest gains `answers` (the briefing's new yes/no question list, table public.runner_questions) and step 9's "help me" line stops describing a paragraph. John: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." -->
@@ -595,6 +596,33 @@ Three things about it:
 - **When pins land, a pin outranks the lane.** B23's "a gated card's Accept re-enters at queue #1"
   still has nowhere to store a pin. Add it as the key *above* `automation_rank`, never below:
   John's live tap is later word than a standing build order.
+- **A NEW automation ticket claims the TOP of the lane, and one call does it —
+  `SELECT public.claim_automation_lane_top('<TICKET-ID>');` (`SES-101`, `v7.0.147`, migration
+  `ses101_automation_lane_top`).** Nothing assigned `automation_rank` at filing time, so a newly
+  filed automation ticket landed in the class-sorted backlog exactly like the seven tickets that
+  sat at queue 241–281 *before the lane existed*. **John's ruling is that it goes above the
+  existing lane, not below** — question `q-lane-top`, answered **yes** 2026-08-21T20:47Z, from his
+  directive `48ae1939` line 4: *"if you create more automation tickets keep making them top of
+  queue."* The slot is therefore `min(open lane) − 1`, **never `max + 1`**. Three things worth
+  knowing before you edit it: it is **idempotent** (a ticket already at the open lane's minimum is
+  left alone, so a second call cannot ratchet it further negative); it **runs the queue recompute
+  itself**, because making the caller remember a second statement is the exact class of forgetting
+  this ticket exists to remove; and it reads the **open** lane only, so `done`/`removed` tickets
+  keep their historical rank (`ADM-1` = 1) without competing. It is **not** `SECURITY DEFINER` and
+  `EXECUTE` is revoked from `PUBLIC` — see the grants note below. **Measured, because the drift was
+  already real:** the last three automation tickets filed before this shipped were hand-assigned to
+  the *bottom* of the lane (`SES-99` = 7, `SES-100` = 8, `SES-101` = 9), the opposite of what he
+  answered.
+- **Revoking a function's `EXECUTE` from `anon, authenticated` does NOTHING — you must revoke from
+  `PUBLIC` (found live, `SES-101` QA, `v7.0.147`).** This is the exact function-level twin of
+  `.claude/rules/supabase-column-grants.md`: Postgres grants `EXECUTE` to `PUBLIC` by default, and
+  a narrower revoke cannot subtract from the broader grant. The first migration's
+  `REVOKE EXECUTE … FROM anon, authenticated` **reported success and changed nothing** —
+  `has_function_privilege('anon', …)` still returned `true`. The working form is
+  `REVOKE EXECUTE ON FUNCTION … FROM PUBLIC, anon, authenticated;` followed by an explicit
+  `GRANT … TO postgres, service_role;`. **Assert both directions** — the denied role denied *and*
+  the permitted role still permitted — exactly as the column rule requires; a one-directional
+  check passes on a function nobody can call at all.
 
 **John's rules live inside the function now — that is the point, and it does not make them
 optional.** The function's `ORDER BY` is the retired query's, clause for clause: tier
