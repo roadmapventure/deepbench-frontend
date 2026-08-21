@@ -5,6 +5,69 @@
 
 ---
 
+## cycle-20260820-2357 / S-SES-90-local-archive-ticket (v7.0.111, 2026-08-21, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Fable 5, unattended) — John's Rework becomes a ticket, and the table-authority supersession is designed but gated
+
+**Origin — a Rework, not a queue pick.** Step 2's briefing harvest read John's tap on the `SES-79`
+card, recorded 2026-08-20 23:54Z: decision **rework**, reason verbatim *"Pass. Also Create another
+ticket to mine local files"*. Two clauses, and they matter separately. *"Pass."* means the `SES-79`
+ship (`bf070e8`, 5 → 100 criteria) is fine — nothing reverted. The rest is an instruction to file
+the unmined half as its own ticket. Written to `runner_items.0edac766` (before-image
+`148ac2ba` first) and re-filed as `runner_directives.58e13c5d` with `item_ref` back to the card.
+**Ladder: unchanged** — a Rework is neutral, so tooling stays rung 3 / streak 3. Silence is never an
+Accept and neither is a Rework.
+
+**Selection.** Layer 1 (directives, oldest first) held two work rows: `2255ddf1` (23:40Z, John's
+"table is authority" line → `SES-83` d/e) and `58e13c5d` (23:54Z, this Rework). The older one is the
+mission — and it classified **gated**.
+
+**`SES-83` (d)/(e) — gated before build, with a real plan attached.** Retiring markdown authority in
+favour of `public.backlog_items` is an **architecture supersession**, which §19v's gated lane names
+explicitly and which no trust rung ever unlocks; it also rewrites how *every* later cycle selects
+work (runbook step 5 and `CLAUDE.md`'s router both name the markdown files). So this cycle designed
+it rather than building it — the design delegated to a **Fable 5** subagent per register B21 — and
+filed it as a `gated_before_build` `runner_items` card for John's tap. Per register B24 a card is
+bookkeeping, not a build, so the cycle dropped to the next queued ticket and built that.
+
+**The build — `SES-90`.** One ticket, filed into both authorities while files are still the
+selection source: a row in `docs/FEATURES.md` and a row in `public.backlog_items`
+(`b119d535`, tier `now`, `P10 - Tooling`). Scope: mine `~/.claude/projects` — John's local Claude
+Code transcript archive — into `docs/JOHN-DECISION-PATTERNS.md`, the half of automation-queue step
+(4) (`docs/RUNNER-GOV-0820-REQUIREMENTS.md` line 106, *"the full local session archive + structured
+taps"*) that `SES-79` could not reach.
+
+**The constraint that shapes the whole ticket.** `~/.claude/projects` is on John's laptop: not in
+this repo, not in Supabase, not reachable from a runner container. No budget changes that. So the
+ticket is written **to be run by a laptop session and says so on its face**, in the row itself and
+in its `session_ref` — otherwise a future cloud cycle picks it up, finds nothing to read, and burns
+a cycle rediscovering what was already known.
+
+**Two things the ticket carries that are not obvious.** (1) **Privacy**, which `SES-79` did not have
+to think about: the in-repo corpora were already in git, the local archive never was, and it may
+hold secrets, credentials, customer or personal material — so the pass extracts *criteria* and cites
+short decision quotes plus a session reference, never bulk transcript text pasted into a committed
+file. (2) **`SES-79`'s QA checker was never committed** — verified this cycle, not recalled:
+`git log --name-only bf070e8` lists five files and no script, and nothing matching `quote` or
+`pattern` exists under `scripts/` or `tests/`. It was a throwaway `test-*.mjs`, which `STANDARDS.md`
+correctly forbids committing. The consequence is concrete: the gate that proved 112/112 evidence
+phrases and caught three near-miss fabrications would have to be rebuilt from prose. `SES-90`
+commits it as `scripts/check-decision-pattern-quotes.js` so the bar survives as a real gate for that
+pass and every later edit of the governing file.
+
+**Discriminating QA — the red control ran before the write, not after.** The assertion is round-trip
+selectability in **both** authorities: the runbook step-5 selection query
+(`status` open ∧ `tier = 'now'` ∧ `priority_class = 'P10 - Tooling'`) returns `SES-90`, **and**
+`docs/FEATURES.md` carries a well-formed `| SES-90 |` row with the same class. Before the write both
+returned **0**; after, both return the row. Would it pass if the change did nothing? No — that is
+exactly the state the red control captured. Proof type: **live end-to-end** against the real project,
+not a seam proof. The `backlog_items` INSERT was authorised by a `runner_before_images` row written
+first with `row_data = NULL` — the `SES-89` convention meaning *this row did not exist; Reverse is a
+DELETE of this pk*.
+
+**Doc-only.** Zero `src/`/`api/`/`lib/` change, no schema change, no flag — nothing is exposed, so
+§19v's exposure rule has nothing to govern here.
+
+---
+
 ## cycle-20260820-2309 / S-SES-79-decision-patterns (v7.0.110, 2026-08-20, Automated runner cycle `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, model Opus 5 + Fable 5, unattended) — the decision-patterns mining pass: §19v's criteria source goes from 5 criteria to 100
 
 **Origin.** The directive queue held only the unexpired `budget_override` `c1d81dd3` — a wall instrument, not a mission — so selection fell to layer 2, John's automation queue (`docs/RUNNER-GOV-0820-REQUIREMENTS.md` C4 as superseded), step **(4)**: *"Claude reads ALL sessions and becomes the behavior expert on John's decisions."* That is `SES-79` (Tooling, `P10 - Tooling`, tier `now`). Lane: auto, ships live — one markdown doc, no `src/`/`api/`/`lib/` change, no schema change, nothing §19e-owned, no terminology coined. Session renamed at pick per register B22.
