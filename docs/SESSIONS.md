@@ -5,6 +5,18 @@
 
 ---
 
+## automation-review / SES-90-local-archive-mining (v7.0.126, 2026-08-21, Manual Design & Build — attended local session, model Fable 5 + Fable 5 mining subagent) — the runner learns how John decides, from John's own words
+
+**Mission.** `SES-90` (Tooling · `P10 - Tooling`) — the half of automation-queue step (4) a cloud cycle cannot reach: mine John's LOCAL Claude Code session archive (`~/.claude/projects`) into `docs/JOHN-DECISION-PATTERNS.md`. Run on John's machine in this attended session, on his direct instruction ("There is a ticket that states can only be ran when called from my machine … Make that run").
+
+**Method (the inverse of reading transcripts).** A Fable 5 subagent extracted **every message John personally typed** — 2,303 messages across all 186 session files, 2026-07-08 → 2026-08-21 — and read 100% of the extract; Claude-side text, tool results and sidechains were never read, which is also what kept the privacy surface minimal. No sampling caps; the only unread material is itemized in `docs/harvests/SES-90.md`.
+
+**What shipped (3 work files).** (1) `docs/JOHN-DECISION-PATTERNS.md`: **+36 criteria (101–136)** appended into all seven themed sections, ~25 candidates deduped away against the existing 100, 4 existing criteria corroborated with their verbatim archive origins (no wording changes), header/intro/footer updated — the corpus contract now names `docs/harvests/*.md` and the checker. (2) `scripts/check-decision-pattern-quotes.js` — the `SES-79` quote-verification gate finally committed (its 112/112 verification was never committed; git-verified absent). (3) `docs/harvests/SES-90.md` — coverage + privacy record.
+
+**QA (discriminating, both arms).** Real doc: **91 in-repo entries / 124 quoted phrases all ground to their corpus, exit 0**; control copy with one corrupted quote: **exit 1 naming `#100`**. Every one of the 51 archive quotes used was pre-verified as a verbatim JSON-escaped substring of its named session file. Integration itself surfaced and fixed three real checker gaps, each found live: ESM conversion (repo is `"type":"module"`), hard-wrap splitting "local archive" (entries 101/104/118/128 silently unskipped) and even the `*Seen in:*` marker (#112 fell out of both sets), and entry-text truncation at headings/rules (the amendments subsection had merged into #100 and silently flipped it to skipped). The last two are exactly the vacuous-pass shapes `feedback-qa-assertion-must-discriminate` exists for.
+
+**Privacy.** Zero withholdings needed; sensitive material observed in the archive (home IP, a personal LinkedIn exchange, family/travel/spend details) was deliberately kept out of all deliverables; no secrets encountered in John's typed messages.
+
 ## automation-review / SES-94-19v-ladder-supersession (v7.0.125, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the architecture stops saying the opposite of John's ruling
 
 **Mission.** `SES-94` (Tooling · `P10 - Tooling`) — ship the gated `ARCHITECTURE.md` §19v trust-ladder edit John Accepted 2026-08-21T12:51Z (card `runner_items 63a06605`). §19v still read a flat "Accept → streak +1, five consecutive accepts promote one rung" with no shipped-vs-gated distinction — the retired rule, in the document that governs the other documents, while both runbooks already carried John's B34 ruling.

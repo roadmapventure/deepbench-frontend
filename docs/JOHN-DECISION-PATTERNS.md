@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.126 | docs/JOHN-DECISION-PATTERNS.md | SES-90 — the local-archive mining pass: criteria 101–136, mined from John's own typed messages across all 186 local Claude Code sessions (2026-07-08 → 2026-08-21; 2,303 messages read in full, no sampling). Local-archive citations are quote+date durable, file-path best-effort (the archive is not in git); scripts/check-decision-pattern-quotes.js skips them by design and verifies everything in-repo. Coverage/privacy record: docs/harvests/SES-90.md. -->
 <!-- DeepBench v7.0.110 | docs/JOHN-DECISION-PATTERNS.md | SES-79 — the full mining pass: the seed set of 5 criteria (one session, `design-log-38-0724`) grows to 100, mined from ~3 months of docs/SESSIONS.md + docs/FEATURES-ARCHIVE.md. Every "Seen in" is a real recorded exchange; every one was grepped back against its source before landing. -->
 
 # John's Decision Patterns — Reference
@@ -6,7 +7,10 @@
 > seed set, distilled from the four corrections in `design-log-38-0724`. Criteria 6–100 were mined
 > 2026-08-20 (`SES-79`, `v7.0.110`) from ~3 months of `docs/SESSIONS.md` and
 > `docs/FEATURES-ARCHIVE.md` — every recorded instance where Claude proposed one thing and John
-> decided another, or where he stated a standing rule in his own words.
+> decided another, or where he stated a standing rule in his own words. Criteria 101–136 were mined
+> 2026-08-21 (`SES-90`, `v7.0.126`) from the LOCAL Claude Code session archive — every message John
+> personally typed across all 186 sessions (2026-07-08 → 2026-08-21), read in full — appended at the
+> end of each themed section; their `Seen in:` cites the local archive (quote + date durable).
 >
 > **`ARCHITECTURE.md` §19v makes this file the criteria source for every autonomous choice, and
 > anything it does not cover fails closed to the gated lane.** That is why density matters here:
@@ -146,6 +150,40 @@ ceiling, John's call was to "prove checkpoint-and-resume across invocation bound
 
 ---
 
+**101. Before committing to a novel mechanism, research how the industry does it and say which you are
+proposing — a standard practice or a homegrown solution.** *Seen in:* designing the Conversations RAG
+store, John's gate before the kickoff — "What we are propsoing, is it industry standard best practice for
+multi-agent platforms? Research first and tell me if this is just our solution vs how others do it." *(local
+archive `7ad2c4ae-cf0c-4727-8cbd-03ff21829b83.jsonl`, 2026-07-22)*
+
+**102. Existing code is not evidence of intent — when the goal and the code conflict, condition on the goal:
+rewriting is ok, and even the architecture doc may be wrong.** For foundational definitions, start from
+published best practice outward, then make architecture and code fit. *Seen in:* John naming the root cause
+of a two-day misalignment — "you also are sticking to your roots based on what the code is telling you" —
+"and perhaps the architecture doc is wrong"; then, redefining pattern tracking: "i need you to stop looking
+at existing code or current md documents to define this." *(local archive
+`28a6f45d-e8d3-404c-912e-e630cc1b01cf.jsonl`, 2026-07-21)*
+
+**103. External input — an article, a question, anything from outside the Library — travels intact through
+the whole agent chain; any agent may verify the original, none is required to.** Never solve a provenance
+gap by handing the artifact to named agents. *Seen in:* rejecting "give owen and marcus the article" as
+hardcoding, John restated the class rule — "carry that information all the way through each agent
+routing/orchestration" — with acceptance of the summary allowed. *(local archive
+`aba9b6b9-7e86-4fee-a34d-afbb55f95082.jsonl`, 2026-07-21)*
+
+**104. When an agent catches bad or missing content, the correction routes back to the producing agent to
+fix and iterate — never patched downstream and never handed to the user as their problem.** *Seen in:* on a
+hallucinated-numbers catch — "it needs to send that information back to the previous agent and tell them to
+fix it"; surfacing the block to the user instead was ruled a failure of the platform's premise. *(local
+archive `aba9b6b9-7e86-4fee-a34d-afbb55f95082.jsonl`, 2026-07-22)*
+
+**105. Telemetry and attribution are best-effort — a declined cookie, a failed capture, a missing consent
+never blocks or errors the product path.** *Seen in:* on visitor logging when a user rejects cookies — "the
+system continues and does its best logging anyways? i don't want the platform to error out." *(local archive
+`52a3da2a-35bc-4c1d-a97c-34248300fcec.jsonl`, 2026-08-01)*
+
+---
+
 ## Diagnosing and fixing
 
 **22. No blind fixes — root-cause measurement comes before any fix ships.** A plausible theory is not
@@ -197,6 +235,25 @@ auto-recovery: "the 16 rows are suspects, not a queue."
 though it costs more.** *Seen in:* presented with the `logAgentTurn()` pattern-data gap, John — "i am not
 sure of my options. i want the real deal" — chose the harness fix over the frontend workaround; same call
 on Nadia's raw-markdown card.
+
+---
+
+**106. Before removing anything that looks vestigial, find why it was added — name the bug that returns if
+it's gone.** *Seen in:* asked to delete a suspicious canvas element, John's condition — "there was a reason
+that was added, first find out, because if you remove, what bug will kick off again?" *(local archive
+`8b29a9b3-cf3f-4345-8cbf-6248c9ae0df5.jsonl`, 2026-08-01)*
+
+**107. When one instance fails where its siblings work, diagnose from the working siblings — suspect a
+hidden special case on the failing one, not a new mechanism.** *Seen in:* John's own differential on the
+Michelle status bug — "if this works for all agents, why is michelle the only agent not working — is
+something hardcoded"; the same instinct on the new-agent hop failure ("how come all the other agents are
+hopping correctly"). *(local archive `7ad2c4ae-cf0c-4727-8cbd-03ff21829b83.jsonl`, 2026-07-22)*
+
+**108. When shipped behavior diverges from the design language John approved, diagnose why the build lost
+the intent and add a fidelity check — re-fixing the output alone is not the fix.** *Seen in:* the run-list
+receipts shipped flat against an approved rich example; John's ask — "how do we make sure you follow
+original design intent?" — and the session adopted the fidelity-check rule alongside the content fix.
+*(local archive `49890d86-290b-4057-ba22-76d54d40977b.jsonl`, 2026-08-03)*
 
 ---
 
@@ -270,6 +327,31 @@ viewer" — the raw column went service-key-only with a masked generated column 
 contributing tier.** *Seen in:* `confidence_tier` split three ways across identical runs because no
 resolution rule existed; John's direction fixed it as weakest-link — "one `synthesized` citation makes the
 whole answer `synthesized`, never averaged up."
+
+---
+
+**109. Credit a behavior from the attempt, not the yield — a retrieval that returns zero rows is still a
+real retrieval and earns its pattern credit.** *Seen in:* ruling on RAG attribution for empty vector
+queries — "If you are attempting vector, then that is RAG" — because the agent "did query the vectors no
+matter how small and should get credit." *(local archive `06603750-da50-4dde-90a9-534efb93930b.jsonl`,
+2026-07-25)*
+
+**110. Every displayed content element has a stateable provenance — hardcoded or agent-authored, and by
+whom; when a surface is under review, present that as an explicit per-element matrix.** *Seen in:* John
+demanding the source column twice on the assembly review — "i can't tell what is hardcoded for routing vs
+assembly, can you recreate matrix and have a column for both" — then "What is the source of the hardcode for
+each? Who created that content?" *(local archive `32d57824-c785-48d9-a89a-0070b8ec726a.jsonl`, 2026-08-07)*
+
+**111. Never place John's personal contact details on a public surface — no email buttons, no direct
+contact links; real users will know how to reach him.** *Seen in:* approving the spend-gate popup except one
+element — "Don't have the email button. The true users will know how to get a hold of me. I don't want to
+expose my email to everyone." *(local archive `2d6d2c59-f11d-4ce5-b613-e232389ae544.jsonl`, 2026-08-08)*
+
+**112. Any number that leaves the platform — a post, a pitch, a public claim — is verified against its
+source first and shipped with its defense: how it was measured, what counts, and the confidence.** *Seen
+in:* before the LinkedIn metrics went out — "you mentioned verifying the metrics in the post. can you double
+check and state how i can defend if asked" — which produced an end-to-end trace spot-check. *(local archive
+`80539f2b-7273-4dd7-b766-3a716d4a73e6.jsonl`, 2026-07-24)*
 
 ---
 
@@ -371,6 +453,42 @@ open while blocked, John's vision" — and the popup offers "Keep browsing."
 
 ---
 
+**113. A deliberately empty section stays visible, carrying the agent's own stated reason it's empty —
+silent omission reads as an oversight.** The line is agent-authored (the screen still authors nothing), and
+an occasional lapse is monitored, not screen-enforced. *Seen in:* on empty analysis sections — "If its not
+shown, it may appear to have been overlooked" — with the agent stating why; "and if she forgets, that is ok.
+We will catch it a future session with an agent guardrail." *(local archive
+`673a6369-709e-4dd7-aecd-7cbe74db85aa.jsonl`, 2026-07-23)*
+
+**114. Agent copy defines a term or abbreviation at first mention — the first sentence establishes the
+definition and the abbreviation, and only then may the short form recur.** *Seen in:* the EMEA correction
+on `CHI-19` — "the first sentence must establish the defintion and the abreviation." *(local archive
+`0259eaca-6c7c-4a00-b068-d8ff2bbd0bad.jsonl`, 2026-07-17)*
+
+**115. Recurring visual elements keep stable positions run-to-run — the user builds muscle memory for where
+things live.** *Seen in:* the mobile bench spec — keep agent avatars "relitvely close so they always appear
+near the same location in every run so the user gets used to seeing them in the same place." *(local archive
+`6953a897-ca3a-4229-a11e-df74b578ad81.jsonl`, 2026-08-01)*
+
+**116. A self-recovered failure is narrated honestly in the live status stream with an updated expectation —
+never hidden, and never promoted into the artifact drawers.** This is the deliberate boundary on the
+no-back-office rule: recovery status is user-relevant in the moment; drawers stay artifact-only. *Seen in:*
+on `HAR-17` auto-recovery display — "do not put in drawer that status… its ok to let the user know you hit a
+snag and selfed recovered", plus adjusting the expected time "so the user knows its ok." *(local archive
+`b9b0773a-9eac-4bc8-9b5d-a8265529f3b0.jsonl`, 2026-07-28)*
+
+**117. A run view must show what each agent tangibly delivered toward the final artifact — visible
+choreography without visible output fails the premise.** *Seen in:* John's house-contractors framing of the
+console gap — "All we have is the question, a bunch of busy agents, then a final ouptut" — which drove the
+per-agent receipt design. *(local archive `49890d86-290b-4057-ba22-76d54d40977b.jsonl`, 2026-08-04)*
+
+**118. A platform-wide vocabulary word must not collide with an existing surface or product name — check the
+namespace before proposing it.** *Seen in:* naming the screen journey concept — "i don't want to use the
+word workflow as a name across the entire platform, because we have a project management screen." *(local
+archive `027e7f3c-54eb-4ad7-b796-f5aa808332d0.jsonl`, 2026-07-25)*
+
+---
+
 ## Scope, sequencing, and the backlog
 
 **64. One session works exactly one issue; everything else surfaced becomes its own backlog row.** *Seen
@@ -411,6 +529,51 @@ invisible to a reviewer, so it does not belong on the beta board."
 **72. The 3-file cap is John's to waive, never Claude's — ask when splitting would lose real value.** *Seen
 in:* the `dispatch_latency_ms` column needed a fourth file; "John approved 4 files over the 3-file cap
 rather than lose the measurement," and the same waiver recurs in `HAR-15`, `SH-23`, `LOG-36`, `LOG-67`.
+
+---
+
+**119. Optimize for showcase quality that survives expert scrutiny, not for a date.** *Seen in:* handed a
+long pre-Apple fix list — "we are not going for a deadline, we are going for the best showcase of my
+abilities that will not be scrutinized." *(local archive `28a6f45d-e8d3-404c-912e-e630cc1b01cf.jsonl`,
+2026-07-20)*
+
+**120. When the central mechanism is future architecture rather than a current fix, ship the working
+per-instance version today and file the normalization as its own ticket.** *Seen in:* on format skills —
+"right now all agents can have their own format skill", then "go with what works for now, and make a next
+bucket ticket for the format future." *(local archive `027e7f3c-54eb-4ad7-b796-f5aa808332d0.jsonl`,
+2026-07-27)*
+
+**121. Don't re-architect a process that just stabilized — a working process's stability outranks a marginal
+optimization.** *Seen in:* declining a process refactor the same day the session pipeline settled — "we
+spent over 6 hours today to get where it is now, and it seems to be working ok." *(local archive
+`567941f2-a34c-49c8-9201-29e8d50d41e1.jsonl`, 2026-07-24)*
+
+**122. When a mechanism needs days more to finish, stop and audit it for over-engineering before continuing —
+ask whether a leaner mechanism gets the same value.** *Seen in:* mid-build on the pattern pipeline — "tell
+me if my ai audit log writer and displayer and pattern definer has been over engineered. Knowing its going
+to take minimum 2 more days to fully build out, is it really worth it?" *(local archive
+`610c3047-0cc3-4dab-8a7f-498690f97388.jsonl`, 2026-07-25)*
+
+**123. The objective function is a platform that scales and generates fewer future tickets — never
+closing the current ticket.** A fix that closes a row while leaving the class open is optimizing the wrong
+thing. *Seen in:* John's charter for the working-relationship review — "your goal is not to close a ticket,
+but to create a more efficient platform that scales and creates less tickets." *(local archive
+`6cb78f08-92b1-416a-873c-370421999476.jsonl`, 2026-07-29)*
+
+**124. A bug that a new feature itself introduces is fixed inside that feature's work before it ships —
+filed tickets are for pre-existing gaps, not self-made ones.** *Seen in:* setting the automation rules —
+"i have seen you create a list of bugs as tickets, instead of just fixing those as part of the new feature -
+i want to keep new bugs appearing from new features at a minimum." *(local archive
+`323a6e02-475b-45c4-83e8-2713b2a345b0.jsonl`, 2026-08-19)*
+
+**125. Choose the model by total economics inside the budget cap — when a cheaper model will grind for
+hours, a short run on the expensive model is the cheaper choice.** *Seen in:* the automation cost rules
+($100/month cap) — "know when 4 hours of opus is not worth 30 min of using Fable instead." *(local archive
+`323a6e02-475b-45c4-83e8-2713b2a345b0.jsonl`, 2026-08-19)*
+
+**126. Batch pushes to ship points — never push per-ticket or per-finding.** *Seen in:* the same
+automation-rules session — "you can save your pushes and aggregate - i have notice the number of times you
+push is too much." *(local archive `323a6e02-475b-45c4-83e8-2713b2a345b0.jsonl`, 2026-08-19)*
 
 ---
 
@@ -457,6 +620,28 @@ waits; it never raises, resets, or routes around the limit. *Seen in:* QA spendi
 cap and 403'd every model call including his own browsing; the session left the block standing —
 "Deliberately not changed unilaterally: it is his spend protection" — and he raised it himself that
 evening.
+
+---
+
+**127. In an automated run, fix every branch choice to a deterministic canonical pick so runs are
+reproducible and comparable.** *Seen in:* locking the true-regression decisions — "always pick the first
+theory", then "always take the review path." *(local archive `10aedc75-8ce6-4240-82b8-cb3914650508.jsonl`,
+2026-07-28)*
+
+**128. State the dollar cost of a test plan before running it, scope the run to the smallest segment that
+answers the question, and sanity-check the estimate against John's own observed per-run cost.** *Seen in:*
+the console regression estimate — "you are telling me $100 to test 2 questions, give them 5 tries a piece?"
+— against his measured ~$.31/run, collapsing to "how can we regression the 2 runs for under $2?" *(local
+archive `49d6eff5-60f7-4a31-9a6e-a41e21694d23.jsonl`, 2026-08-02)*
+
+**129. QA judges the content and context of what was generated, not just that output rendered — a
+well-formed answer in the wrong register is a fail.** *Seen in:* failing a receipt that met the format but
+missed the register — "QA must test also for context and content what is created." *(local archive
+`b26025cf-3c14-4b9c-b19c-8c9c5cd9cbe0.jsonl`, 2026-08-07)*
+
+**130. A regression suite covers every user entry door end-to-end, not just the canonical flow.** *Seen in:*
+extending the 23-question suite the moment it was defined — "the 24th, choose an article from the web and
+run it through end to end." *(local archive `10aedc75-8ce6-4240-82b8-cb3914650508.jsonl`, 2026-07-28)*
 
 ---
 
@@ -520,6 +705,41 @@ piece of work" — and the next session eliminated the credential need entirely.
 
 ---
 
+**131. A close-out answers exactly two questions first, directly: is the ticket complete, and what
+newly-opened work is required — before any narrative.** John had to send the same recovery prompt to six
+sessions in one morning. *Seen in:* verbatim, repeatedly — "I am confused. Can you be straight forward with
+me. Is log-60 complete, and are there new tickets required for beta?" *(local archive
+`1ce79e25-5f52-458a-9889-97dbe45e32f7.jsonl`, 2026-07-29; near-identical prompts in five sibling sessions
+the same day)*
+
+**132. State explicitly whether each item is being fixed now or only filed as a ticket — never blur doing
+and filing.** *Seen in:* mid-close confusion — "hold on, are you fixing something, or just writing it up as
+a ticket to fix?… I am confused on yoru solution here." *(local archive
+`044f6d4d-c5fb-480a-9938-f0022b258ec7.jsonl`, 2026-07-27)*
+
+**133. Opening a design session on a ticket returns the ticket's full story unprompted — problem, current
+state, history — not a request for more input.** *Seen in:* the session-process review — "when i state an
+issue i want to design, i expect it to come back with the full story right away." *(local archive
+`567941f2-a34c-49c8-9201-29e8d50d41e1.jsonl`, 2026-07-24)*
+
+**134. Every ticket and kickoff names its model, and any prompt John must launch is handed to him
+paste-ready in chat.** *Seen in:* made standing on 2026-07-28 — "from now on, i need for each ticket, either
+written in the ticket which model to use, and you tell me which model to kick off the session to use. also,
+repost the prompt here so i can copy/paste." *(local archive `0b5f157c-4c1c-41e4-8cc1-d0a6051d51ba.jsonl`,
+2026-07-28)*
+
+**135. Never ask permission to run a read-only query that answers the open question — run it and report.**
+*Seen in:* offered a data question as an option instead of an answer — "i don't get it. why do i not want
+you to run a query to find out this data?" *(local archive `1f29550a-20a7-4792-b0c0-c70cf02cb933.jsonl`,
+2026-08-11)*
+
+**136. Every Skill change names the Skill's type and justifies the type choice.** *Seen in:* on a fix routed
+through a Skill edit — "each time you update a skill, i need to know the type. It seems you are giving this
+a type 'intent'? Why not 'format'?" *(local archive `027e7f3c-54eb-4ad7-b796-f5aa808332d0.jsonl`,
+2026-07-27)*
+
+---
+
 ## The record itself
 
 **92. Persist every finding and decision where a cold future session will find it — real backlog IDs and
@@ -574,7 +794,20 @@ purpose as the guardrail showcase with an explicit demo-label prefix.
 
 ---
 
+### Local-archive corroborations (SES-90 — no wording changes)
+
+The `SES-90` pass found the verbatim origins of four existing criteria in the local archive, recorded here
+so their provenance is on file: **#74** — "i don't accept the rejections. it seems like sometimes they work"
+(`10aedc75-8ce6-4240-82b8-cb3914650508.jsonl`, 2026-07-28); **#64** — "no this session is log-15 only. all
+other issues will be worked in a seperate session" (`516e6549-2d62-4771-9916-20cf14e7a907.jsonl`,
+2026-07-17); **#50** — 'i mean "question completed" - so perhaps the satus is "Question Answered"'
+(`7d32a87d-04c9-4996-a5fe-68bbf419cd0d.jsonl`, 2026-08-01); **#21** — "Do the structural fix, but let's
+heavily test in a POC of concept first" (`196574a9-e824-4618-8c65-96d0d18650b6.jsonl`, 2026-07-20).
+
 *Format for new entries: a one-line **criterion** (imperative), then a concrete **Seen in:** instance so it
 stays grounded, not abstract. Only add a criterion that would change a *future* decision — not a one-off.
-Every `Seen in:` must be checkable against `docs/SESSIONS.md` or `docs/FEATURES-ARCHIVE.md`; if you cannot
+Every `Seen in:` must be checkable against `docs/SESSIONS.md`, `docs/FEATURES-ARCHIVE.md`, or
+`docs/harvests/*.md` — verified by `node scripts/check-decision-pattern-quotes.js` (the ship gate; run it
+after any edit here). Local-archive citations (`~/.claude/projects`, the `SES-90` pass) are the one
+exception: not in git, skipped by the checker with a count, quote+date is the durable part. If you cannot
 find the text, the criterion does not go in.*
