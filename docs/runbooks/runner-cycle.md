@@ -631,9 +631,16 @@ import NEXT+LATER") so John's runs list shows the work at a glance; on a wall-st
 `"did not run — <wall>"` back at step 3. No title mechanism available → note it in the cycle
 row (register B22).
 
-**6. Full ceremony — no shortcuts, you earn no exemption.** Read the item's backlog row, the
-governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will
-touch, and the real source files. Inventions additionally pass the R&D gate first (research →
+**6. Full ceremony — no shortcuts, you earn no exemption.** **STEP ONE OF ANY BUILD IS
+PICK-TIME PREMISE REVALIDATION (`SES-87` — the revalidation flow, register B7, `v7.0.139`):**
+before designing anything, re-verify the ticket's premise against live code/data — does the
+gap still exist, or did an intervening ship close it? Premise holds → set
+`revalidated_at = now()` and build. Premise dead → set `status = 'removal proposed'`, file a
+briefing card carrying the ticket (ID — title) plus the evidence the premise died (commit,
+measurement, superseding ticket), run the queue recompute, and **drop to the next queued
+ticket per B24** — never build a dead premise and never remove unattended. Then: read the
+item's backlog row, the governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file
+whose paths you will touch, and the real source files. Inventions additionally pass the R&D gate first (research →
 cheapest-variant POC, measured → logged go/no-go; §19d sniff test — traceable reasoning, never
 a feature mill). **Re-assert the lease (step 0) before the counter claim** — a version claimed
 after you were stolen from is a permanent gap at best — then claim your version atomically
@@ -753,6 +760,29 @@ it is filed — it does **not** need to appear in `FEATURES.md` first, and it ne
 snapshot export (step 7) is its git-committed copy. **`source_file='heal-engine'` must go on the
 ignore-list of any future markdown→DB reconciliation**, or it will delete every heal ticket as an
 orphan.
+
+**8c. Background revalidation sweep (`SES-87` — the revalidation flow, register B7) — on spare
+capacity, never instead of the build.** Query the sinking tail — age triggers, premise decides:
+
+```sql
+SELECT backlog_id, queue, left(title,80) AS title
+  FROM public.backlog_items
+ WHERE status NOT IN ('done','removed','removal proposed')
+   AND (revalidated_at IS NULL OR revalidated_at < now() - INTERVAL '30 days')
+   AND updated_at < now() - INTERVAL '30 days'
+ ORDER BY queue DESC NULLS LAST
+ LIMIT 3;
+```
+
+Also sweep, regardless of age, tickets whose text hits retired vocabulary (`Beta-gate`,
+`Post-beta`, "FEATURES.md row", the pre-rename class digits) — a retired-vocabulary premise is
+the cheapest death to detect. For each (≤3 per cycle): premise still real → `revalidated_at =
+now()`, nothing else; premise dead → `status = 'removal proposed'` + briefing card with
+evidence + queue recompute. **No unattended removal, ever** — `removed` is written only by
+harvesting John's Accept on the card. Card harvest rules (in the step-9 tail): **Accept** →
+`status='removed'`, queue recompute (terminal); **Reverse** → prior status restored,
+`revalidated_at = now()` (the 30-day quiet); **Rework** → his line rewrites the description,
+ticket re-queues.
 
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, backlog ID + Type + named P-class per the Language block above,
