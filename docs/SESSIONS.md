@@ -5,6 +5,18 @@
 
 ---
 
+## automation-review / SES-85-classification-sweep (v7.0.128, 2026-08-21, Manual Design & Build — attended local session, model Fable 5 + 8 parallel Fable 5 classification agents) — every open ticket is now pickable
+
+**Mission.** `SES-85` (Tooling · `P10 - Tooling`), automation-queue step (5), worked under this session's own `claimed_by` claim (the first real use of `SES-86` phase 1 — the noon-CST cycle had to skip it). Before: **456 of 552 open tickets carried no priority class** and were invisible to work selection. After: **zero unclassed open tickets**, verified live post-apply.
+
+**How.** 3 tickets classed by the legend's approved mechanical type mapping (Task Success Rate/Speed → `P9 - Bug Fixes`); the remaining 453 by judgment — 8 parallel Fable 5 agents (register B21) classifying from description+type against the P-class legend and `docs/JOHN-DECISION-PATTERNS.md` (136 criteria as of `v7.0.126`, deliberately shipped first per John's C4 ordering). All 453 validated: each id classified exactly once, classes verbatim legend strings, **zero unclassifiable** (B16 expected a handful; the text was better than feared). The seven `P1 - Improves John's Skills` assignments were spot-checked against their ticket text by the orchestrator before apply (all JL-01 persona/demo-showcase work — they hold).
+
+**Census (judgment-classified 453):** P1 7 · P2 32 · P3 8 · P4 36 · P5 131 · P6 45 · P7 7 · P8 22 · P9 98 + 14 FLAGGED · P10 53. Full board now: 552 open, all classed. **83 `P1 - Improves John's Skills`–`P4 - New Customers` assignments carry one-line rationales and surface to John** (after-the-fact governance per A5) — list in `docs/harvests/SES-85.md`, along with 83 gated-lane observations (harness files, active-agent Skill edits, LOCKED sections) recorded as advance notice for pick-time lane classification.
+
+**Two Tier-2 normalization calls, flagged:** (1) the `· FLAGGED` suffix kept only on `P9 - Bug Fixes` (its documented legend home); 46 further pixel-moving tickets in P2/P4/P5/P6 keep plain classes because §19v's exposure rule governs them at ship time. (2) No gated-lane markers written into rows — B15's lane flag has no column yet (`SES-86` remainder); the harvest carries the notes.
+
+**QA (discriminating).** Post-apply live counts: `priority_class IS NULL AND status <> 'done'` → **0** (was 456 this morning, 453 at agent launch); per-class census read back from the table, not from memory. The apply statements guarded `WHERE priority_class IS NULL`, so a re-run writes nothing (idempotent, no clobber of pre-existing classes).
+
 ## automation-review / SES-86a-claim-on-pick (v7.0.127, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the ticket board becomes the coordination point across every session, on John's own design
 
 **Mission.** `SES-86` (Tooling · `P10 - Tooling`) phase 1. John, live, after watching today's duplicate (`SES-95` shipped attended while a cycle independently carded the same work): *"should we use the tickets as the central knowledge base, as soon as you pick up a ticket, its status is marked 'in development' so that the next session asked to run, manually or scheduled, skips to the next ticket? I want us to be able to run multiple sessions and not have a problem."* Approved "yes, ship it" on the walkthrough. This is register B6's claim piece, cut to exactly the collision he hit; the full lifecycle/queue-number machinery stays `SES-86`'s remainder.
