@@ -461,6 +461,18 @@
   attended while a cycle carded the same work). QA: three arms live on real rows — fresh → 1,
   contested → 0, 25h-stale → re-claimable.
 
+- **B41. The inflight marker is out of `.claude/` (John, live in chat 2026-08-21: "yes move the
+  marker"; `v7.0.131`, attended session `automation-review`).** B38 identified the fix, B39 left
+  it to John (it edits `CLAUDE.md`'s router), and he approved it. Markers now live at repo-root
+  `inflight/<short-session-name>.md` — same filename, content, and lifecycle; only the directory
+  changed. All ten live markers `git mv`-ed in the same commit; `CLAUDE.md`, `CLAUDE-DESIGN.md`,
+  `session-setup` SKILL.md and `scripts/check-session-docs.js` retargeted, with the old path kept
+  as a read fallback in the checker (both the dev-side listing and the on-disk 5e check) so a
+  not-yet-rebased live session's marker is still seen rather than its worktree misread as stale.
+  With `SES-96`'s rebuild fix, no routine procedure touches a permission-gated path any more;
+  the gate now matters only if a future task genuinely edits `.claude/` skill/rule files —
+  which step 0's carding rule still covers, pending the "Always allow" persistence experiment.
+
 ## D. Ticket ledger
 
 **Filed this session (8):** SES-81 (backup tool table discovery) · SES-82 (programmatic meter

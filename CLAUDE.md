@@ -5,7 +5,9 @@
 
 1. **Set up your worktree and inflight file.** Follow the **`session-setup` skill**
    (`.claude/skills/session-setup/SKILL.md`) — worktree branched fresh from `origin/dev`,
-   `.env.local` copied in, your `.claude/inflight/<short-session-name>.md` created. Do this
+   `.env.local` copied in, your `inflight/<short-session-name>.md` created (repo-root
+   `inflight/` — moved out of `.claude/` 2026-08-21, John-approved, because `.claude/` paths
+   fire a harness permission prompt that parks unattended cloud sessions; register B41). Do this
    *first*, before reading or editing anything. A worktree freshly branched from `origin/dev`
    is a correct, current checkout by construction — which is what makes step 2 safe.
    This applies even to audit / investigation / multi-sweep sessions that don't cleanly fit
@@ -135,7 +137,7 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 | **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `.claude/skills/session-setup/SKILL.md` |
 | Rules & reference index (versioning, scope, tokens, roster, schema, patterns) | `CLAUDE-RULES.md` |
 | Design workflow (Automated Design→Code→Verify Loop) | `CLAUDE-DESIGN.md` |
-| Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `.claude/inflight/` |
+| Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `inflight/` (repo root; moved from `.claude/inflight/` 2026-08-21) |
 | Standards, test categories, pre-commit checklist | `docs/STANDARDS.md` |
 | Architecture, stack, URLs, schema, capability model | `docs/ARCHITECTURE.md` |
 | Design tokens / palette / fonts (values) | `src/tokens.js` + `docs/STYLE-GUIDE.md` |

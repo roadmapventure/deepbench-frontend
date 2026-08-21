@@ -65,8 +65,13 @@ prompt (CLAUDE.md hard rule — a sub-agent given a bare task defaults to the sh
 ### 2. Create your inflight file — right after the worktree, not later
 
 ```
-.claude/inflight/<short-session-name>.md
+inflight/<short-session-name>.md
 ```
+
+**(Repo root — moved out of `.claude/inflight/` 2026-08-21, John-approved, register B41:
+`.claude/` paths fire a harness permission prompt that parks unattended cloud sessions for
+hours; the marker was the one thing forcing every session under that path. Same filename,
+same one-line content, same lifecycle — only the directory changed.)**
 
 One line: worktree name, plus a clause on the topic if known. Nothing else is required until there's
 real content to report. Create it as one of your first actions, *not* when you happen to edit
@@ -79,7 +84,7 @@ commits ahead of `origin/dev` and zero uncommitted changes. This file is the onl
 ### 2b. Stage and push it in your **first** commit — creating it is not enough (`SES-23`)
 
 ```
-git -C "<worktree-path>" add ".claude/inflight/<short-session-name>.md"
+git -C "<worktree-path>" add "inflight/<short-session-name>.md"
 ```
 
 The marker only does its job once it's on `origin/dev` — that's the only copy `session-hygiene`'s
@@ -123,6 +128,12 @@ rather than working it anyway. **Release it in your close-out** (set `claimed_by
 claimed_at = NULL` in the same UPDATE that sets the ticket's final status), and release on an
 abandon too. An unreleased claim expires after 24h, so a dead session cannot strand a ticket.
 Discussion-only sessions that never settle on a ticket claim nothing.
+
+**After any close-out write that completes/removes a ticket or files a new classed one, run
+`SELECT public.recompute_backlog_queue();`** — the board's queue numbers are materialized
+(`SES-86` phase 2, register B4) and completed/removed/new-ticket are recompute events. One
+idempotent call; a board that didn't move changes 0 rows. (This is the manual-session call
+site `v7.0.130` carded; wired here 2026-08-21.)
 
 ### 3. Claim your version number atomically (when you need one)
 
@@ -204,7 +215,7 @@ re-rebase, retry once.
 
 ### 5. Delete your inflight file in the close-out commit
 
-When you push your close-out commit, delete your own `.claude/inflight/<short-session-name>.md` in
+When you push your close-out commit, delete your own `inflight/<short-session-name>.md` in
 that same commit — it's your job to remove it, not the next session's to notice it's stale.
 
 ### 6. Remove the worktree
@@ -221,7 +232,7 @@ git -C "C:/Projects/deepbench-frontend" branch -D "session/<short-session-name>"
 ## Exception — lightweight bookkeeping path (`SES-011`)
 
 A session whose only pending edit is a **pure append** — zero deleted or modified lines — confined to
-either (a) a brand-new `.claude/inflight/<short-session-name>.md`, or (b) one new row appended to the
+either (a) a brand-new `inflight/<short-session-name>.md`, or (b) one new row appended to the
 end of `docs/FEATURES.md` / `FEATURES-NEXT.md` / `FEATURES-LATER.md`, may skip part of the ceremony:
 
 - If this session already has a worktree open, make the edit there — no second worktree.

@@ -386,7 +386,11 @@ function extractSectionLines(stateText, header) {
 // call sites (checkWorktrees, checkBulletStaleness) don't need to change,
 // only what feeds them.)
 function extractInFlightBullets(stateText) {
-  return freshDevDirEntries(".claude/inflight");
+  // Markers moved to repo-root inflight/ 2026-08-21 (John-approved, register B41 --
+  // .claude/ paths fire the harness permission gate). Read the new home first; keep the
+  // old path as a transition fallback so a marker pushed by a not-yet-rebased session
+  // is still seen rather than its worktree misread as stale.
+  return [...freshDevDirEntries("inflight"), ...freshDevDirEntries(".claude/inflight")];
 }
 
 // ---- Check 1b: per-entry character cap (added 2026-07-21, John asked directly
@@ -417,9 +421,10 @@ const ROW_LENGTH_CAP = 2000;
 
 function checkEntryLengths(findings, stateText) {
   // "In flight now" (retargeted 2026-07-21, SES-011): each session's status is
-  // now a whole .claude/inflight/<name>.md file, not a CLAUDE-STATE.md bullet
+  // now a whole inflight/<name>.md file (repo root since 2026-08-21, B41; old
+  // path kept as transition fallback), not a CLAUDE-STATE.md bullet
   // -- the file's full text is the "entry" this check caps.
-  for (const entry of freshDevDirEntries(".claude/inflight")) {
+  for (const entry of extractInFlightBullets(null)) {
     const len = entry.text.length;
     if (len > ENTRY_LENGTH_CAP) {
       findings.push({ check: "1b", severity: "FLAG", detail: `"In flight now" entry "${entry.name}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
@@ -475,7 +480,8 @@ function checkWorktrees(findings, stateText) {
     const name = wt.split("/").pop();
     if (name === selfName) continue;
     if (bulletNames.has(name)) continue;
-    if (fs.existsSync(path.join(wt, ".claude", "inflight", `${name}.md`))) {
+    if (fs.existsSync(path.join(wt, "inflight", `${name}.md`)) ||
+        fs.existsSync(path.join(wt, ".claude", "inflight", `${name}.md`))) {
       findings.push({ check: "5e", severity: "FLAG", detail: `worktree "${name}" has an inflight marker on disk that was never pushed to dev (session-setup step 2b) -- it is invisible to every other session and to check 5. Treat as LIVE, not stale: do NOT remove this worktree. The owning session should stage and push its marker.` });
       continue;
     }
