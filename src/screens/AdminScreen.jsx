@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { IS_ADMIN_HOST } from "../AppShell.jsx";
+import { useFeatureFlag } from "../lib/featureFlags.js";            // FEATURE: ADM-1 v1.5
+import AdminEvidenceCards from "../components/AdminEvidenceCards.jsx"; // FEATURE: ADM-1 v1.5
 
 // FEATURE: ADM-1 v1 — briefing artifact URL kept in sync with docs/runbooks/briefing-page.md
 // (single source of truth; the runbook is where the URL is documented and where any redeploy
@@ -20,6 +22,9 @@ const BRIEFING_URL =
 
 export default function AdminScreen() {
   const navigate = useNavigate();
+  // FEATURE: ADM-1 v1.5 — read-only evidence cards, default-off flag (HAR-41; data row, not a
+  // code constant). John previews via ?ff=adm-1-evidence-cards; flag-off renders v1 unchanged.
+  const showEvidence = useFeatureFlag("adm-1-evidence-cards");
 
   // Defense in depth: if a link is shared and lands on a non-dev host, redirect out.
   // The gate constant is the same one AppShell uses to gate the nav entry.
@@ -135,8 +140,11 @@ export default function AdminScreen() {
             </p>
           </a>
 
+          {/* FEATURE: ADM-1 v1.5 — the evidence cards, flag-guarded mount. */}
+          {showEvidence && <AdminEvidenceCards />}
+
           {/* Coming later — v1.5 note (kept small so it doesn't compete with the primary CTA) */}
-          <div
+          {!showEvidence && <div
             style={{
               background: T.cardAlt,
               border: `1px solid ${T.lineSoft}`,
@@ -165,7 +173,7 @@ export default function AdminScreen() {
               the <code style={{ fontFamily: mono, fontSize: 11.5 }}>runner_</code> tables. Decision
               buttons are excluded from the in-app surface until real auth ships.
             </span>
-          </div>
+          </div>}
 
           {/* Footer hint — gate note (dev-only, so this is only visible on dev/localhost anyway) */}
           <div
