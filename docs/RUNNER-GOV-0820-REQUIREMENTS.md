@@ -300,20 +300,55 @@
   *did* hang used **Bash redirection** (`printf > .claude/…`). `v7.0.121` reproduced the hang
   independently: an instrumented Fable 5 probe ran five tool calls — a Bash write outside
   `.claude/`, a Read of `CLAUDE.md`, `git status`, a Write+delete inside the repo, and a **Read
-  under `.claude/`** — all returning instantly with no prompt, and then exactly one call,
-  `printf > .claude/inflight/…`, **had still not returned when this cycle closed, ~10 minutes
-  later**. Stated exactly that way on purpose: the observation is *did not return within the
-  cycle*, and this register does **not** claim it is blocked, denied, or permanent — `v7.0.115`
-  made that leap from 21 minutes of silence and `v7.0.117`'s own 35-minute return refuted it.
-  What the five instant calls *do* establish is the negative: **nothing here is a permission
-  prompt**, which is the direct
-  answer to John's B36 question: the runner is not being asked to approve anything, one
-  tool-shape stalls indefinitely. **Not yet established:** whether the trigger is redirection
-  specifically or the Bash tool generally against `.claude/`; the probe tested only the redirect
-  form. If the narrow rule holds, the blanket rule costs the platform every future `.claude/`
-  edit and has already cost three cycles — and `73e41d2c` Task 1 (the hygiene-skill retarget)
-  **still has not shipped**, verified live against `dev` at 13:1xZ. The next cycle's own edit is
-  the decisive probe. Not changed here: one build per cycle, and this is not this cycle's build.
+  under `.claude/`** — all returning instantly with no prompt. The sixth,
+  `printf > .claude/inflight/probe-fable.md`, **returned after 1,084 s (18 min 4 s) with no
+  visible prompt, and the write SUCCEEDED.** Then the decisive control: the probe's own cleanup
+  `rm` of that same file — a second Bash write-class call under `.claude/` in the same session —
+  **returned in ~6 s. The stall did not repeat.**
+
+  **John's instinct was right about where this lives, and the answer to B36 is more precise than
+  "no".** The sharpest measurement the probe made: inside the stalled call, `date +%s` printed
+  **the same second** before and after the command body — so the 18 minutes elapsed *between
+  tool-call issuance and shell execution*, *i.e.* **in the harness permission layer, not in the
+  shell**. So something permission-shaped is indeed happening; what is *not* happening is anyone
+  being asked in a way they could answer. No prompt surfaced on any of the seven calls, and no
+  configured rule explains it: `~/.claude/settings.json` does not exist, the repo's
+  `.claude/settings.json` is an allow-list with **no deny rules and no `.claude/` entries**,
+  `policy-limits.json` is restrictions-only, `remote-settings.json` is `{}` — all re-read this
+  cycle. The gate is therefore **path-based and harness-level**, not tool-based: `Bash` is on the
+  routine's own `allowed_tools` grant and the call stalled anyway, which means **no tool-name
+  allowlist can pre-approve it** and no settings change of John's can fix it.
+
+  **Why it feels sudden, which was the other half of his question:** `CLAUDE.md`'s router makes
+  creating `.claude/inflight/<name>.md` the *first action of every session*, so the runner only
+  began hitting this path routinely once it started running unattended. Whether the harness
+  behaviour itself is new was **not** measured — the mechanism was, the start date was not.
+
+  **What it actually is, on the evidence: an intermittent multi-minute stall that CLEARS, on a
+  path that IS writable.** Three returns now sit on the record — ~35 min (`v7.0.115`), 18 min
+  (this cycle), and instant on the very next `.claude/` write in the same session — plus
+  `ba8f2ce3`'s four Write/Edit writes in seconds. **This retires the redirection hypothesis this
+  register was first filed with:** the cleanup `rm` was a Bash write-class call under `.claude/`
+  and it was instant, so "Bash vs Write/Edit" does not separate the cases either. Nothing
+  reproducible distinguishes a stalling call from a fast one; what is established is only that
+  **the write lands and the stall clears**, and `v7.0.115`'s "blocked" and `v7.0.117`'s blanket
+  *"a cloud cycle writes NOTHING under `.claude/`"* are both wrong — the first two cycles thought
+  dead were merely slow (B37), and the path was never closed. **The practical rule is a cost, not
+  a prohibition:** a `.claude/` edit may cost up to ~35 minutes of wall clock and must therefore
+  never be the last thing a cycle attempts, but it is legitimate work and does not need carding
+  to a laptop session. Rewriting `runner-cycle.md`'s step-0 clause on that basis is **not** this
+  cycle's build — `SES-95` does the edit, and its own success or stall is the confirmation.
+  `73e41d2c` Task 1 **still has not shipped**, verified live against `dev` at 13:1xZ.
+
+  **The candidate fix, which is cheap and worth a ticket rather than a cycle's cleverness:** stop
+  writing to that path at all. The inflight marker is the only thing that *forces* a cloud cycle
+  under `.claude/`, and step 0 already exempts cloud cycles from creating one — so moving the
+  laptop convention to a top-level `inflight/` (or the scratchpad) would take the whole class of
+  stall off the table for every session, rather than teaching each one to tolerate it. Not done
+  here: it edits `CLAUDE.md`'s router, which is John's, and one build per cycle. Two further
+  measurements would sharpen it first, both cheap: time an identical first `.claude/` write from
+  a **parent** session (does the stall scope to subagents?), and from a **second fresh subagent**
+  (is it once per agent, or once per session?).
 
 ## D. Ticket ledger
 
