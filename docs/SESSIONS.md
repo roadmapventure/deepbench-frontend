@@ -61,6 +61,16 @@
 
 **Not done, deliberately.** B5 pins, B6 lifecycle status, B10 `filed_at` from git; adding `queue` to `BACKLOG-SNAPSHOT.md`'s explicit column list (its whitelist means the snapshot is unaffected today); and `session-setup`'s manual-session recompute call site — a `.claude/` edit, which an unattended cycle does not enter (step 0). **Also of note for cloud cycles:** the regression suite reports 30/31 in a fresh clone because `CHI-31` needs `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; exported from `runner_secrets` it is 31/31. That is an environment gap, not a code failure, and reading it as one would be the `v7.0.115` mistake in a new costume.
 
+## automation-review / SES-103-permission-stall-tripwire (v7.0.143, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the frozen session gets a voice: its peers
+
+**Mission.** `SES-103` — permission-stall tripwire (Tooling · `P10 - Tooling`). John: *"can you also make sure it sends a notification if a session is asking for permission?"* The B39 constraint rules out the naive build — a prompted session is frozen inside the gated call and can send nothing — so the design gives the frozen session a voice through its peers.
+
+**What shipped.** Migration `ses103_permission_stall_tripwire`: `runner_cycles.heartbeat_at` (every cycle updates it at every numbered step boundary, one cheap write) + `last_step` + `stall_notified_at`. `runner-cycle.md`: the heartbeat instruction, and step-0b silence shape **(d)** — an open peer whose heartbeat is >20 minutes stale and unreported gets **one immediate push** (atomic `stall_notified_at` claim dedupes across however many peers sweep concurrently): which cycle, frozen since when, its last step, and the permission-prompt hypothesis *stated as a hypothesis* when the last step touched a known gated class. Approval is never phrased as a task John owes (the 34865f07 rule holds); where the prompt is, and whether to open it, is information — his call.
+
+**Honest limits, in the ticket.** Detection latency is the gap to the next running or firing cycle (≤3h on the schedule, less under parallel/manual fires) — not instantaneous, because instantaneous is physically unavailable under B39. And the tripwire fires on *any* 20-minute freeze; the permission prompt is the named leading hypothesis, not a certainty — B37's silent-not-dead rules still govern what may be written.
+
+**QA (seam, all three arms, fixture deleted).** A fixture cycle with a 35-minute-stale heartbeat: detected by shape (d) with zero false positives on live cycles; first notify-claim returned 1 row, second returned 0 (the dedupe that keeps it to one push per stall); fixture removed.
+
 ## automation-review / SES-102-phone-transparency (v7.0.142, 2026-08-21, Manual Design & Build — attended local session, model Fable 5) — the runner tells John's phone when it starts, and Run-now is one tap away
 
 **Mission.** `SES-102` — runner transparency on the phone (Tooling · `P10 - Tooling`), John's live ask: routines don't show in the iPhone app; he wants a manual push path and a kickoff notification.

@@ -230,8 +230,15 @@ not a death. So:
   in its third costume; the rule "a subagent that has not returned is not a result" applies to an
   absent *cycle* exactly as it does to an absent *subagent*.
 
+**Heartbeat first (`SES-103` — permission-stall tripwire, John's ask 2026-08-21, `v7.0.143`):
+at every numbered step boundary, update your own row** —
+`UPDATE runner_cycles SET heartbeat_at = now(), last_step = '<step name>' WHERE id = '<your id>'`
+— one cheap write per step. This is what lets your peers tell John *where* you froze if a
+permission prompt catches you: a prompted session is stuck inside the gated call and can send
+nothing itself (register B39), so the heartbeat trail is its only voice.
+
 Run this at step 0, every cycle. **Under parallel cycles (register B42) an open row is
-NORMAL — concurrency is the design, not a symptom.** Silence now has three concrete shapes,
+NORMAL — concurrency is the design, not a symptom.** Silence now has FOUR concrete shapes,
 none of which is "another cycle exists":
 
 ```sql
@@ -247,7 +254,27 @@ SELECT backlog_id, claimed_by, claimed_at FROM public.backlog_items
 -- (c) the publish lease wedged past its 10-minute TTL
 SELECT holder, held_since FROM public.runner_lease
  WHERE id = 1 AND holder IS NOT NULL AND held_since < now() - INTERVAL '10 minutes';
+-- (d) the PERMISSION-STALL TRIPWIRE (SES-103): an open peer whose heartbeat is >20 min stale
+--     and who has not yet been reported — the fast detector John asked for
+SELECT id, started_at, last_step, heartbeat_at,
+       round(extract(epoch FROM (now() - heartbeat_at))/60) AS minutes_frozen
+  FROM public.runner_cycles
+ WHERE ended_at IS NULL AND id <> '<your cycle id>'
+   AND heartbeat_at < now() - INTERVAL '20 minutes'
+   AND stall_notified_at IS NULL;
 ```
+
+**A row from (d) gets its own IMMEDIATE push — this is the "a session is asking for
+permission" alert (`SES-103`).** First claim the report atomically so John gets exactly one
+push per stall, however many peers are sweeping:
+`UPDATE runner_cycles SET stall_notified_at = now() WHERE id = '<stalled id>' AND
+stall_notified_at IS NULL RETURNING id` — 0 rows means another peer already pushed; stand down.
+On 1 row, push: which cycle, frozen since when, its `last_step`, and the hypothesis stated as a
+hypothesis — *"likely waiting on a permission prompt only you can see, in that session's
+window"* when the last step touched a known gated path class, plainer "went quiet at step X"
+otherwise. Tell John where the prompt would be; whether to open it is his call — never phrase
+approval as a task he owes (the 34865f07 rule). If the cycle later resumes, its own next
+heartbeat is the all-clear; note the resolution in your tail if you observe it.
 
 Any row from these — or a `steals` jump on your own tail-lease claim — means a session has
 gone silent. **Send a push notification** carrying both halves of what John asked for — and
