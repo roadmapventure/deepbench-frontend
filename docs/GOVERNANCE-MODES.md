@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.144 | GOVERNANCE-MODES.md | SES-100, directive 48ae1939 line 2 ("update governance rules that the new backlog status enables sessions from overwriting on top of each other") — the shared-invariants section gains the TICKET CLAIM as a named invariant covering manual and scheduled sessions alike, with what it does and does not protect spelled out (it serializes ticket selection; it does NOT serialize the dev branch or the briefing republish) and the 24h expiry stated as the reason a dead session cannot strand a ticket. Claim-on-pick shipped in SES-86 phase 1 (v7.0.127) and was documented only in runner-cycle.md step 5 and the session-setup skill; the governance docs still described worktree isolation as the whole coordination story, which is exactly the gap that let e36d4379 and 4da5a7bd both build ADM-1. Second drift corrected in passing, inside the same sentence: "FEATURES row" is retired — the close-out is a Supabase write on backlog_items (SES-83 (d) cycle 3, v7.0.114). -->
 <!-- DeepBench v7.0.99 | GOVERNANCE-MODES.md | SES-78 series -- governance-mode registry, created by discovery design-selfbuilding-0819 (2026-08-19). Extensible by rows, never rewrites. -->
 # Governance-Mode Registry
 
@@ -20,10 +21,60 @@ John's judgment is exercised** — during the work, the morning after on evidenc
 
 ## Shared invariants — identical in every DeepBench mode
 
-Worktree isolation, branch discipline (`HEAD:dev`, dev→main is John's always), atomic
-version/ID counters, full session ceremony (design-before-code, kickoff docs, self-QA with
-discriminating assertions, FEATURES row, close-out), verify-never-assert-from-memory. The modes
-differ **only** in when John judges — never in what the ceremony requires.
+Worktree isolation, **the ticket claim (below)**, branch discipline (`HEAD:dev`, dev→main is
+John's always), atomic version/ID counters, full session ceremony (design-before-code, kickoff
+docs, self-QA with discriminating assertions, the Supabase close-out write on the ticket's
+`backlog_items` row, close-out), verify-never-assert-from-memory. The modes differ **only** in
+when John judges — never in what the ceremony requires.
+
+> The close-out used to be "a `FEATURES` row". It is not, and has not been since `SES-83` (d)
+> cycle 3 (`v7.0.114`) — the ticket board is `public.backlog_items`, and `FEATURES*.md` holds no
+> ticket rows to edit. A session that edits one is writing to a stub.
+
+### The ticket claim — the shared-board rule (`SES-86` phase 1, `v7.0.127`; written down here by `SES-100`)
+
+Worktree isolation keeps two sessions from overwriting each other's **files**. It does nothing
+to stop them building the **same ticket** — and that failure is what actually happened: cycles
+`e36d4379` and `4da5a7bd` started 17 seconds apart on 2026-08-20, both picked `ADM-1`, and both
+built it. Version `7.0.103` is the permanent counter gap where the discarded build used to be.
+
+So the claim is the coordination point across **every** session, manual and scheduled alike. The
+moment a session picks a ticket it claims it, in one atomic write, before any work — never
+check-then-claim in two statements, because the write *is* the reservation:
+
+```sql
+UPDATE public.backlog_items
+   SET claimed_by = '<your cycle id or session name>', claimed_at = now(), updated_at = now()
+ WHERE backlog_id = '<TICKET-ID>'
+   AND status <> 'done'
+   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+RETURNING backlog_id;
+```
+
+**1 row → the ticket is yours. 0 rows → another session holds it; take the next queued ticket
+and keep going** (John's rule, verbatim: *"self administered and fixes itself if it happens to
+notice it is about to overwrite another session"*). Release it in the close-out write, in the
+same `UPDATE` that sets the ticket's status.
+
+**Name what it protects, because a half-understood coordination rule is worse than none:**
+
+- **It serializes ticket selection.** That is the whole of its job, and it does it completely.
+- **It does NOT serialize the `dev` branch.** Two sessions still land on one branch: fetch →
+  rebase → push, retried up to 3 times under parallel cycles (register B42).
+- **It does NOT serialize the briefing republish.** That is a separate lock — the `runner_lease`
+  singleton, repurposed at a 10-minute TTL over the serial tail, plus re-fetch-and-re-harvest
+  before publishing so a concurrent republish cannot eat John's un-harvested taps (`SES-98`).
+- **A claim is a starting gun, not a standing guarantee.** Re-assert it immediately before any
+  irreversible act — the push, and every counter claim. A cycle that lost its claim and kept
+  working came one command short of pushing a duplicate to `dev` (`v7.0.123`).
+
+**The 24-hour expiry is why a dead session cannot strand a ticket.** A session that vanishes
+mid-build holds its claim for at most 24 hours; after that the ticket is re-claimable and the
+board heals with nobody intervening. That bar is the same evidence bar used for calling a cycle
+silent — derived from the longest observed resurrection gap (~9h20m), not chosen for neatness.
+
+Mechanics and the exact SQL for a manual session: `.claude/skills/session-setup/SKILL.md`
+step 2c. Runner-cycle specifics: `docs/runbooks/runner-cycle.md` step 5.
 
 ## Manual Design & Build
 

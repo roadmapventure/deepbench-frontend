@@ -93,6 +93,20 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 > a signal something upstream went wrong: `git -C "C:/Projects/deepbench-frontend" fetch origin dev`
 > then read via `git … show origin/dev:<path>` instead, and flag the misdirection to John.
 
+> **Claim the ticket the moment you pick it — the worktree protects files, not tickets (2026-08-21,
+> `SES-100`; mechanism shipped `SES-86` phase 1, `v7.0.127`):** Worktree isolation stops two
+> sessions overwriting each other's *files*. It does nothing to stop them building the *same
+> ticket*, and that is not hypothetical — cycles `e36d4379` and `4da5a7bd` started 17 seconds
+> apart and both built `ADM-1`; `v7.0.103` is the permanent version gap where the discarded build
+> used to be. So the claim is the coordination point across **every** session, manual and
+> scheduled: one atomic `UPDATE … RETURNING` on `backlog_items` before any work (SQL:
+> `session-setup` skill step 2c), never check-then-claim in two statements. **1 row → it's yours;
+> 0 rows → someone holds it, take the next queued ticket.** Release it in the close-out write.
+> It serializes ticket *selection* only — the `dev` branch is still fetch/rebase/push, and the
+> briefing republish has its own lock. A claim expires after 24h, which is why a dead session
+> cannot strand a ticket; re-assert it before the push and before every counter claim. Full rule
+> with what it does and does not protect: `docs/GOVERNANCE-MODES.md`.
+
 > **Sub-agents inherit the worktree, never nest one (2026-07-16, extended 2026-07-17):** Any
 > sub-agent spawned via the `Agent` tool — coding, research, audit, or sweep — operates inside
 > *this* session's worktree; do **not** pass `isolation: "worktree"`. State the worktree's
