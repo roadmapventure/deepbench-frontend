@@ -5,6 +5,88 @@
 
 ---
 
+## cycle-20260822-1944 / SES-112-design-status-kickoff-link (v7.0.157, 2026-08-22, Automated runner cycle `6ae2f38c`, model Opus 5 orchestrator, no subagent) — why a ticket is not being built becomes a column
+
+**Ticket:** `SES-112` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,
+automation lane rank −12. Shipped **`done`**. Migration `ses112_design_status`. Schema + tooling
+only — no `src/`, no `api/`, no `lib/`, no user-visible surface, no flag (§19v).
+
+**Selection note — queue 1 was skipped, deliberately and on the record.** `SES-110` holds queue 1
+with status `partial`, and its only remaining half is a `.claude/` write register B39 forbids an
+unattended cycle. It is already carded (`9e7d8bf2`) for a session John attends, so this cycle
+dropped to queue 2 per register B24 rather than filing a duplicate card. That skip is exactly the
+re-derivation `SES-112` exists to end: three cycles have now independently reasoned their way to
+the same conclusion about the same ticket, and none of them could write the answer down.
+
+**The gap, measured before building.** `information_schema.columns` returned **22 columns** for
+`public.backlog_items` at 19:47Z, with neither `design_status` nor `kickoff_link` among them. The
+premise held.
+
+**What shipped.**
+
+- **Migration `ses112_design_status`** — `design_status text NULL` with
+  `ck_design_status_values` (`auto` / `needs-john` / `needs-desktop` / `designed`),
+  `kickoff_link text NULL`, and `ck_design_status_kickoff`:
+  `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)`. **A row cannot claim
+  `designed` without naming the artifact that proves it** — the constraint is what stops the
+  column drifting into a claim the repo does not back. Both columns are nullable and additive:
+  no DROP, no retype, no default, so this is not a schema-destructive migration (§19v gated lane)
+  and no existing writer can fail on it.
+- **The backfill stamps only what is provable.** Every open ticket (`status IN
+  ('missing','partial')`) whose id matches a `docs/kickoffs/v<ver>-<ID>-<slug>.md` filename —
+  whole dash-delimited segment, newest version winning — became `designed` + `kickoff_link`.
+  That is **18 tickets** of 559 open. One `runner_before_images` row per ticket, written first
+  and its success the authorisation for the write (§19v).
+- **540 open tickets stay `NULL`, and that is the feature.** John's semantics, verbatim: `NULL`
+  is "not yet triaged — an HONEST backfill leftover, counted by hygiene, never guessed to auto."
+  Coercing them would have told the runner it may build 540 tickets nobody has read. The
+  `needs-john` / `needs-desktop` candidates go to John as a **briefing card** for his review;
+  they are not auto-stamped, because the evidence for them is a judgement call and the evidence
+  for `designed` is a filename.
+- **The mirror pair** — `scripts/export-backlog-snapshot.js` gained both fields in `COLUMNS`,
+  `ROW_FIELDS`, the emitted header prose, the table header, the separator and the row emit;
+  `scripts/check-session-docs.js`'s `parseSnapshotRows()` reads `cells[10]`/`cells[11]`. Both are
+  appended **LAST**, for the index reason `SES-110` wrote down: the reader addresses cells by
+  position, so any other placement silently re-points every existing one. The reader's guard
+  stays `< 9`, so a 9-cell (pre-`SES-110`) and a 10-cell (pre-`SES-112`) snapshot both still
+  parse; the strict count check stays in `parseDocument()`, the reference reader.
+
+**QA — what discriminates, and the proof it does.**
+
+- **Live round-trip, all 586 rows:** the repo's own `buildDocument()` → `parseDocument()`, every
+  ticket compared field-for-field across 11 fields. **0 mismatches.** 18 `designed` rows recover
+  their `kickoff_link`; the 568 untriaged rows recover **`null`, not `""`** — the distinction the
+  `\e` marker exists to preserve, and the one a lossy encoding would have quietly destroyed.
+- **Negative control, run first:** the identical test against the pre-change exporter read out of
+  `origin/dev` **FAILS** — 36 mismatches, 0 `designed` survivors, header absent. The test can
+  therefore detect the change *not* having happened, which is the only thing that makes the
+  passing run mean anything.
+- **Constraint arms, with no residue:** all three exercised inside a `DO` block that raises at the
+  end, so the statement rolls back and **no probe write persisted** (hence no before-image owed).
+  Bad value → rejected. `designed` with a NULL link → rejected. `designed` with a link →
+  accepted.
+- **Grants, both directions** (`.claude/rules/supabase-column-grants.md`):
+  `has_column_privilege('anon', …, 'design_status', 'SELECT')` = **false**, `service_role` =
+  **true**. `backlog_items` carries **zero** `anon`/`authenticated` table or column grants, so the
+  new columns inherit no public exposure and none was added.
+- Build clean; regression suite **34/34 with credentials**; `check-session-docs.js` clean on the
+  regenerated snapshot (its flags are the pre-existing `done`-on-board and over-cap-description
+  ones, none new); kickoff doc passes all 11 required sections.
+
+**One deliberate omission, stated rather than left to be found.** The 18 backfilled rows did
+**not** get `updated_at` stamped. That column is the age signal `SES-87`'s background revalidation
+sweep reads (`updated_at < now() - 30 days`), and stamping it would have hidden 18 tickets from
+that sweep for a month in exchange for nothing — a mechanical backfill is not a revalidation.
+Same reasoning `recompute_backlog_queue()` uses for not touching it during a renumber.
+
+**Not in scope, and not quietly attempted.** Teaching selection to *skip* on `design_status` is
+`SES-114` (queue 3); the `backlog_active` view is `SES-115`. This ticket ships the storage and the
+honest backfill, and nothing reads the column for selection yet — it is inert until `SES-114`
+lands, which is the correct order and worth saying so no one reads the census as a behaviour
+change.
+
+---
+
 ## cycle-20260822-1911 / SES-111-epic-drain-directive (v7.0.156, 2026-08-22, Automated runner cycle `1df7d9c6`, model Opus 5 orchestrator, no subagent) — John's standing order becomes a row the board can hold
 
 **Ticket:** `SES-111` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,

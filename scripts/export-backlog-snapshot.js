@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// DeepBench v7.0.155 | scripts/export-backlog-snapshot.js | SES-83c, SES-110
+// DeepBench v7.0.157 | scripts/export-backlog-snapshot.js | SES-83c, SES-110, SES-112
+// FEATURE: SES-112 -- the snapshot carries `design_status` and `kickoff_link` as its last two
+// columns, so WHY a ticket is not being built (and the kickoff doc proving it is designed)
+// survives in the backup exactly like the ticket text does.
 // FEATURE: SES-110 -- the snapshot carries each ticket's epic NAME as its last column,
 // joined through backlog_items.epic_id, so the board's grouping survives in the backup.
 // FEATURE: SES-83c -- exports public.backlog_items to a deterministic, git-committed markdown
@@ -76,7 +79,7 @@ function arg(name, fallback) {
 const WORKTREE = arg("worktree", process.cwd());
 const JSON_OUT = process.argv.includes("--json");
 
-// The 12 tracked fields, in the fixed order used both for the exported markdown
+// The 14 tracked fields, in the fixed order used both for the exported markdown
 // table's columns and for canonicalPayload()'s hash input. `id`, `created_at`,
 // and `updated_at` are deliberately excluded -- they are row churn (surrogate
 // key, timestamps), not backlog content, and including them would make the
@@ -96,6 +99,17 @@ const JSON_OUT = process.argv.includes("--json");
 //     the end would silently re-point every one of them at the wrong field.
 const EPIC_FIELD = "epic_name";
 
+// `design_status` / `kickoff_link` (SES-112, v7.0.157) are real backlog_items columns and are
+// appended AFTER epic_name for the same index reason stated above -- the mirror reader keeps
+// addressing cells by position, so new fields only ever go on the end. Two encoding facts
+// travel with them, both already guaranteed by esc()/unesc() and worth stating because a
+// reader that gets them wrong looks correct:
+//   - An untriaged ticket stores SQL NULL, which writes as an EMPTY cell. That is NOT the same
+//     as design_status = '' (which would write `\e`), and it must never be read back as 'auto':
+//     "nobody has triaged this" is the honest value SES-112 deliberately keeps (John, 2026-08-22).
+//   - `kickoff_link` is only ever non-NULL when design_status = 'designed' -- the table's
+//     ck_design_status_kickoff CHECK enforces it, so a snapshot row carrying a link with any
+//     other status means the constraint was dropped, not that the exporter drifted.
 const COLUMNS = [
   "backlog_id",
   "tier",
@@ -109,6 +123,8 @@ const COLUMNS = [
   "harvest_link",
   "row_ordinal",
   EPIC_FIELD,
+  "design_status",
+  "kickoff_link",
 ];
 
 // What the REST select actually asks for: the real columns, plus the embedded
@@ -204,6 +220,8 @@ const ROW_FIELDS = [
   "harvest_link",
   "description",
   EPIC_FIELD,
+  "design_status",
+  "kickoff_link",
 ];
 
 export function parseDocument(text) {
@@ -395,7 +413,7 @@ export function buildDocument(tickets) {
     "leading or trailing whitespace, and a `.trim()` reader would silently eat precisely those."
   );
   lines.push(
-    "`tier` and `source_file` come from each section heading; the other ten fields come from the"
+    "`tier` and `source_file` come from each section heading; the other twelve fields come from the"
   );
   lines.push(
     "row. `parseDocument()` in the generating script is the reference reader and restores this"
@@ -416,16 +434,35 @@ export function buildDocument(tickets) {
   );
   lines.push("by index, so any other position would silently re-point every one of them.");
   lines.push("");
+  lines.push(
+    "`Design status` and `Kickoff` (SES-112) are the last two columns, appended for that same"
+  );
+  lines.push(
+    "index reason. `Design status` is why the ticket is not being built -- `auto` (Claude designs"
+  );
+  lines.push(
+    "it solo), `needs-john` (a decision only John makes), `needs-desktop` (the build needs an"
+  );
+  lines.push(
+    "attended session -- `.claude/` paths and other gated files), or `designed` (a kickoff doc"
+  );
+  lines.push(
+    "exists and `Kickoff` names it). An EMPTY `Design status` cell means SQL NULL: not yet"
+  );
+  lines.push(
+    "triaged. That is a real, deliberate value -- it is never to be read or restored as `auto`."
+  );
+  lines.push("");
 
   for (const g of groups) {
     const count = g.rows.length;
     lines.push(`## tier \`${g.tier}\` — \`${g.source_file}\` (${count} ticket${count === 1 ? "" : "s"})`);
     lines.push("");
-    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic |");
-    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|------|");
+    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff |");
+    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|");
     for (const t of g.rows) {
       lines.push(
-        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} | ${esc(t[EPIC_FIELD])} |`
+        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} | ${esc(t[EPIC_FIELD])} | ${esc(t.design_status)} | ${esc(t.kickoff_link)} |`
       );
     }
     lines.push("");
