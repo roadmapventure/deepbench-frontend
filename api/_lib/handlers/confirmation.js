@@ -1,3 +1,4 @@
+// DeepBench v7.0.151 | api/_lib/handlers/confirmation.js | DAT-003 — the accept now records itself on the fact it promoted. Both accept-completion functions (resolvePendingConfirmation's tail, markAcceptedDelegated — which between them cover all three real paths: plain accept, delegated sync accept, checkpointed accept via `continue`) call the new lib/librarian.js recordLibraryConfirmation(). Stamping AFTER resolution rather than threading a confirmation id through the write was the deliberate call: handler_context is not persisted to durable_hops, and §19d's own CHI-60 note records that this exact flow checkpoints on essentially every real invocation — so a write-time stamp would be dropped precisely when it mattered, and would have cost execute.js plus another migration. Best-effort by construction: the stamp never fails the accept.
 // DeepBench v6.3.102 | api/_lib/handlers/confirmation.js | LOO-17 — checkpoint-linked accept lifecycle (accepting/accept_failed), widened eligibility guard
 // DeepBench v6.0.8 | api/_lib/handlers/confirmation.js | S-APPLE-04b — AA-103 generic accept hand-off
 // FEATURE: AA-100 — accept/reject/edit resume for execute.js's consequential-action gate (AA-87).
@@ -5,6 +6,33 @@
 // Zero capability-specific logic — works identically for any agent/capability that pauses.
 
 import { sendRequest } from '../../prompt/request-receivable.js';
+import { recordLibraryConfirmation } from '../../../lib/librarian.js';
+
+// FEATURE: DAT-003 -- once an accept has fully resolved, stamp the promoted the_library row with who
+// confirmed it and the pending_confirmations row that proves it. Generic by data shape, never by
+// identity: it reads a result that happens to carry entry_id and a proposed_action that happens to
+// carry chunk_id -- the same generic read the accept path already makes -- and names no agent and no
+// capability, per §19d's code/data test. Calling the existing librarian export is not a second write
+// path into the_library (§19c); it is the same broker file, reached exactly as
+// api/_lib/handlers/library-write.js already reaches writeLibrary().
+//
+// BEST-EFFORT ON PURPOSE: a stamp that fails must never fail or roll back the accept the human
+// already gave. The row then stays NULL -- unconfirmed -- which is the fail-closed direction for
+// this claim. The inverse (a false 'confirmed') is the only outcome that would matter, and it
+// cannot happen here.
+async function stampLibraryConfirmation(row, result) {
+  try {
+    await recordLibraryConfirmation({
+      entry_id: result?.entry_id ?? null,
+      superseded_chunk_id: row?.proposed_action?.chunk_id ?? null,
+      confirmed_by: 'human',
+      confirmation_id: row.id,
+      not_before: row.created_at,
+    });
+  } catch (e) {
+    console.warn('[confirmation] DAT-003 provenance stamp failed (row stays unconfirmed):', e.message);
+  }
+}
 
 function getSupabaseHeaders(key) {
   return { "Content-Type": "application/json", "apikey": key, "Authorization": `Bearer ${key}` };
@@ -91,6 +119,7 @@ export async function resolvePendingConfirmation({ confirmation_id, resolution }
     throw e;
   }
   await updateStatus(confirmation_id, { status: 'accepted', resolution: result });
+  await stampLibraryConfirmation(row, result);   // DAT-003 -- `row` fetched at the top of this fn
   return result;
 }
 
@@ -114,7 +143,13 @@ export async function getOnAcceptIntentSlug(intent_slug) {
 // follow-up intent (getOnAcceptIntentSlug found one) rather than by resolvePendingConfirmation's
 // own terminal dispatch. Mirrors that function's accept tail exactly, minus the sendRequest call.
 export async function markAcceptedDelegated(confirmation_id, result) {
+  // FEATURE: DAT-003 -- read BEFORE updateStatus so proposed_action.chunk_id and created_at are in
+  // hand for the provenance stamp. This function is the completion point for BOTH the delegated
+  // sync accept (resolveAccept) and the checkpointed accept (the `continue` branch), which is why
+  // the stamp lives here rather than at either call site.
+  const row = await getPendingConfirmation(confirmation_id);
   await updateStatus(confirmation_id, { status: 'accepted', resolution: result });
+  if (row) await stampLibraryConfirmation(row, result);
 }
 
 // FEATURE: LOO-17 -- links a checkpointed accept to its job_id without marking it resolved yet
