@@ -5,6 +5,96 @@
 
 ---
 
+## cycle-20260822-2006 / SES-113-removal-proposed-keeps-slot (v7.0.158, 2026-08-22, Automated runner cycle `d8e43a76`, model Opus 5 orchestrator, no subagent) — a ticket awaiting John's verdict stops vanishing from his board
+
+**Ticket:** `SES-113` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,
+automation lane rank −11. Shipped **`done`**. Migration `ses113_removal_proposed_keeps_slot`.
+Schema/function + runbook only — no `src/`, no `api/`, no `lib/`, no user-visible surface, no flag
+(§19v).
+
+**John's ruling, and what it was about.** His words, 2026-08-22: **"what if I reject the
+proposal?"** When the revalidation sweep (step 8c) decides a ticket's premise has died, it does not
+remove the ticket — it sets `status = 'removal proposed'` and files a card asking John to confirm.
+That ticket is therefore **awaiting his verdict**, which is precisely the situation a `needs-john`
+ticket is in. The two were treated **oppositely**: `needs-john` kept its queue number and was merely
+skipped, while removal-proposed was **stripped from the standings** the moment the proposal was
+filed. It then vanished from every ranked view John has — "Next up", the "Next 3" line, the
+`now`-tier census, the snapshot's ordering — and if he tapped **Reverse** ("no, keep it") the ticket
+had to be re-inserted from nowhere and landed wherever the next renumber happened to put it. Nothing
+ever justified the difference. **The asymmetry was the bug.**
+
+**Premise revalidation (step 6) — measured live before a line changed, not recalled.** One row held
+`status = 'removal proposed'`: `CHI-89` (`P5 - Enhancements`, tier `now`), `queue = NULL`. 558
+tickets numbered `1..558`; 559 eligible under the proposed rule; **0** live pins. And the gap was not
+theoretical — `CHI-89` carries an **undecided `gated_before_build` card** (`e1c7a940`, "A mobile fix
+you do not need"), so at that moment John had a **pending decision on a ticket his own board would
+not show him in any ordered list**. That is the failure, live, on the day.
+
+**The change: one function, three predicates.** `'removal proposed'` appeared in exactly three
+places in `recompute_backlog_queue()` — the ineligible-clear `WHERE`, the `v_total` count, and the
+`eligible` CTE. All three became `status NOT IN ('done','removed')`. Everything else is byte-for-byte
+the prior body. **All five documented ordering traps are preserved** (numeric class extract, suffix
+tolerance, the `(Beta-gate|Post-beta)` declaration regex, `filed_at`-before-`created_at`, and the
+`id` primary-key tie-break `SES-86` phase 2 paid for) and were asserted **individually** against
+`prosrc` rather than assumed to have survived a paste. The **pin-clear was deliberately left** at
+`status IN ('done','removed')` — it already read that way — so a removal-proposed ticket now keeps
+its **pin** as well as its number: the same rule applied consistently for the first time, not a
+second change riding along.
+
+**The half that would have shipped a live hazard on its own.** Step 5's selection read filters on
+`queue IS NOT NULL` and the claim expiry — **it does not filter on `status`**. So the instant
+`CHI-89` has a number it becomes *selectable*, and a later cycle could build a ticket whose premise
+**the runner itself has argued is dead**, while John's verdict is still pending. `status` is already
+a projected column of that query, which is why the ticket specified a procedural skip; it ships **in
+this same commit**, not a later one. Step 5 now states it, along with the two consequences: John's
+Reverse is **zero-motion re-entry** (the position is already held), and the ticket is never re-carded
+or tidied to `removed` — **no unattended removal, ever**. `SES-114` (now queue 2) generalises the
+skip across `design_status` so all three flags read from one place.
+
+**QA — discriminating, not merely complete.**
+- **Negative control run FIRST** and recorded before the migration: `CHI-89.queue = NULL`, 558
+  numbered. A no-op change leaves both untouched.
+- **The expectation was computed by a query that never calls the function** — the same seven
+  `ORDER BY` clauses as a standalone `row_number()` over the new eligible set put `CHI-89` at slot
+  **23**, *not* 559. An implementation that merely appended the ticket, or gave it *some* number,
+  passes a completeness check and **fails this one**. Live result: slot **23**, matching exactly.
+- **The pre-change body re-run inside a deliberately rolled-back transaction** (the `SES-112`
+  precedent — no probe write persisted): it strips `CHI-89` to `NULL` and numbers **559**, against
+  the shipped body's **23** and **560**. That is the proof the difference is this migration's.
+- **Ordering integrity:** 560 numbered `1..560`, all distinct, **0** tier inversions and **0** class
+  inversions. Idempotence: a further recompute moved **0** rows.
+- **Grants asserted both directions** per `SES-101`'s function-level rule: `anon` and `authenticated`
+  denied `EXECUTE`, `service_role` permitted; exactly **1** `pg_proc` overload survives.
+- Build clean; regression suite **34/34 with credentials**. Before-images written for the prior
+  function body (Reverse = restore that `prosrc`) and for both touched rows.
+
+**Said plainly rather than dressed up — this cycle's own first recompute returned `0` rows moved.**
+That looked like a pass and was not evidence of anything: a concurrent actor filed `SES-122` at
+20:12Z and ran the recompute against the **already-live new function** before this cycle called it,
+so there was genuinely nothing left to move. It is the exact false-pass shape `SES-86` phase 2 was
+bitten by (`550 → 0` looked like idempotence and was luck), and it is why the rolled-back negative
+control — not the `0` — is what carries the proof here. Worth recording because under parallel
+cycles (register B42) a peer's write landing inside your measurement window is now **normal**, and a
+cycle that reads its own `0` as success will ship an unverified change.
+
+**Board result.** The **560-vs-559 gap `v7.0.157` flagged is closed**, and closed by the ticket that
+was filed to close it: **559 open tickets, 559 numbered, 0 open-but-unnumbered**, 587 rows total.
+`CHI-89` sits at queue **22** after close-out, its removal card still undecided — **visible to John,
+skipped by cycles**, which is the whole point.
+
+**Ledger.** Cycle `d8e43a76`, stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`,
+trigger scheduled (20:06Z fire, on the 3-hour grid). Walls at cycle start: **$0.00** month /
+**$0.00** day against $100/$5; **6.55M** estimated tokens in the CST day against a calibrated
+**~8.0M** runner share (latest reading 2026-08-22T13:50Z, 6.3h fresh, all-models **18%**, well under
+the 85% rest wall; `tokens_per_pct` ≈ 1.37M from the 13% → 18% window, days-left taken as 7 because
+the meter-week boundary is not stored — the **conservative** choice, since fewer days left would
+raise the allowance). No unexpired `budget_override`. Step 4b's invention pass **skipped**: 8 cycles
+in this CST day already carry `INVENTION PASS`. Step 0b found one silent peer (`db8b9eee`, open
+26.7h) — already stall-notified 2026-08-21T20:11Z, so no duplicate push, and its outcome left
+untouched (a successor never adjudicates a predecessor's, register B37). Harvest read clean: the
+briefing's `briefing-state` carried `items:{}`, `directive:""`, `answers:{}`, `asks:{}` — **no taps
+to harvest, and silence is not an Accept**.
+
 ## cycle-20260822-1944 / SES-112-design-status-kickoff-link (v7.0.157, 2026-08-22, Automated runner cycle `6ae2f38c`, model Opus 5 orchestrator, no subagent) — why a ticket is not being built becomes a column
 
 **Ticket:** `SES-112` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,

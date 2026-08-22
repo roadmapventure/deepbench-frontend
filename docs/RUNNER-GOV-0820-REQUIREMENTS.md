@@ -66,6 +66,25 @@
   The renumber does not touch `updated_at`, and claims do not affect the number. **Not yet
   covered:** `session-setup`'s manual-session call site (a `.claude/` edit, carded for a session
   John attends) and adding `queue` to `BACKLOG-SNAPSHOT.md`'s explicit column list.**]**
+  **[AMENDED `v7.0.158`, `SES-113`, runner cycle `d8e43a76`.** The line above — *"No queue number
+  = not pickable"* — conflated two different things, and the conflation cost John a ticket he was
+  being asked to rule on. **The rule is now:** `queue IS NULL` = **out of the standings entirely**
+  (`done` / `removed` / unclassed). A **flag** — a live claim, `needs-john`, `needs-desktop`, or
+  `removal proposed` — means the ticket is **IN the standings, holding its earned position, and
+  skipped procedurally** at step 5 (drop to next, B24). His ruling, verbatim: *"what if I reject
+  the proposal?"* A removal-proposed ticket is awaiting **his verdict**, exactly like a
+  `needs-john` one; the two were treated oppositely, and nothing ever justified the difference.
+  Measured before the change: `CHI-89` sat at `queue = NULL` while carrying an **undecided**
+  removal card (`e1c7a940`), so his own board would not show it in any ordered list
+  while his decision was pending. Migration `ses113_removal_proposed_keeps_slot` moves three
+  predicates in `recompute_backlog_queue()` to `status NOT IN ('done','removed')`; the pin-clear
+  stays `('done','removed')`, so the ticket keeps its pin too. All five documented ordering traps
+  preserved and asserted individually. Negative control (pre-change body, rolled-back
+  transaction): strips `CHI-89` to NULL, 559 numbered — against the shipped body's slot **23** and
+  560 numbered, with 0 tier and 0 class inversions; the slot-23 expectation was computed by a
+  standalone `row_number()` that never calls the function. **Consequence for John:** a Reverse on
+  a removal card is now zero-motion re-entry — the position is already held. `SES-114` generalises
+  the step-5 skip across `design_status` so all three flags read from one place.**]**
 - **B5. John's pins:** "TICKET-ID — move to N" (briefing directive box / chat / Super Admin).
   Pinned tickets hold absolute slots through recomputes; latest call wins collisions; released
   by completion, removal, or "— release."
