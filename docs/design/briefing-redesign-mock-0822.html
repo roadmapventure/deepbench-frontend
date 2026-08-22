@@ -1,0 +1,585 @@
+<title>Briefing Redesign Mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --paper:#ebe5d5; --card:#f8f2e2; --card-alt:#f2ead4;
+    --navy:#12243c; --ink:#28221a;
+    --muted:#786d52; --muted-deep:#58503a; --line:#c8bb9a; --line-soft:#d8cbac;
+    --brass:#b6873a; --brass-deep:#886224; --brass-light:#e4c786;
+    --navy-text-hi:#b8c5d8; --moss:#5a7538; --moss-light:#a6bc82; --flag:#a83319; --white:#ffffff;
+    --mock:#7a5a9e;
+    --display:"Fraunces",Georgia,serif; --body:"Inter",-apple-system,system-ui,sans-serif;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+       font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:0 14px 48px}
+  header{background:var(--navy);color:var(--card);border-bottom:3px solid var(--brass);
+         padding:14px;display:flex;align-items:center;gap:11px}
+  .db{width:34px;height:34px;border-radius:50%;background:var(--brass);color:var(--navy);
+      display:flex;align-items:center;justify-content:center;font-family:var(--display);
+      font-weight:700;font-size:14px;border:2px solid var(--card);flex-shrink:0}
+  header h1{font-family:var(--display);font-size:17px;font-weight:600;margin:0;line-height:1.1}
+  header .sub{font-family:var(--mono);font-size:9px;color:var(--navy-text-hi);
+              letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  header .date{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--brass-light);
+               text-align:right;line-height:1.3}
+  .mocktag{font-family:var(--mono);font-size:9px;letter-spacing:1px;background:var(--mock);
+           color:var(--white);border-radius:3px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .legend-note{font-size:11.5px;color:var(--muted-deep);background:var(--card-alt);
+        border:1px dashed var(--line);border-radius:6px;padding:8px 10px;margin:14px 0 4px}
+  .legend-note .tag{margin-right:4px}
+  .tag{font-family:var(--mono);font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;
+       border-radius:3px;padding:1px 5px;vertical-align:2px}
+  .tag.new{background:var(--moss);color:var(--white)}
+  .tag.moved{background:var(--brass);color:var(--white)}
+  .tag.data{background:var(--mock);color:var(--white)}
+  h2{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.4px;
+     text-transform:uppercase;color:var(--muted-deep);margin:26px 0 10px;
+     border-bottom:1px solid var(--line);padding-bottom:5px}
+  h2 .secnum{font-family:var(--mono);font-size:11px;color:var(--brass-deep);margin-right:7px}
+  .stats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);
+         border-radius:6px;overflow:hidden;margin:12px 0 8px}
+  .stat{flex:1;background:var(--card);padding:9px 6px;text-align:center}
+  .stat b{display:block;font-family:var(--mono);font-size:15px;font-weight:700;
+          font-variant-numeric:tabular-nums;color:var(--navy)}
+  .stat span{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);line-height:1.3;display:block;margin-top:2px}
+  .strip-def{font-size:11.5px;color:var(--muted-deep);margin:0 0 4px;line-height:1.5}
+  .strip-def b{color:var(--ink)}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:7px;
+        margin-bottom:12px;overflow:hidden}
+  .item .head{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer}
+  .item .head:hover{background:var(--card-alt)}
+  .cardnum{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brass-deep);
+           min-width:20px}
+  .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+        padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
+        background:var(--card-alt);flex-shrink:0}
+  .kind.ship{color:var(--moss);border-color:var(--moss-light)}
+  .kind.gate{color:var(--brass-deep);border-color:var(--brass-light)}
+  .kind.vision{color:var(--mock);border-color:var(--mock)}
+  .head .ttl{font-family:var(--display);font-size:14.5px;font-weight:600;line-height:1.25;flex:1}
+  .idchip{font-family:var(--mono);font-size:10px;color:var(--brass-deep);flex-shrink:0}
+  h2.clickable{cursor:pointer}
+  h2.clickable:hover{color:var(--ink)}
+  h2 .chev{float:right;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .countchip{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--navy);
+       color:var(--white);border-radius:9px;padding:1px 8px;vertical-align:1px}
+  .secwrap{display:none}
+  .secwrap.open{display:block}
+  .unblock{font-family:var(--body);font-weight:600;font-size:11px;padding:5px 8px;
+       border-radius:5px;border:1.5px solid var(--brass-light);background:var(--card-alt);
+       color:var(--brass-deep);cursor:pointer;white-space:nowrap}
+  .clschip{font-family:var(--mono);font-size:9.5px;color:var(--white);background:var(--navy);
+       border-radius:3px;padding:1px 6px;flex-shrink:0}
+  .head .st{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+  .head .st.done{color:var(--moss);font-weight:700}
+  .chev{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+  .bodyc{display:none;padding:2px 13px 13px;border-top:1px solid var(--line-soft)}
+  .item.open .bodyc,.q.open .bodyc{display:block}
+  .idline{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:9px 0 8px}
+  .plain p{margin:0 0 8px;font-size:14px}
+  .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+       color:var(--brass-deep);display:block;margin-bottom:1px}
+  .decide{display:flex;gap:8px;margin-top:12px}
+  .decide button{flex:1;font-family:var(--body);font-weight:600;font-size:13.5px;
+                 padding:10px 4px;border-radius:6px;border:1.5px solid var(--line);
+                 background:var(--card-alt);color:var(--ink);cursor:pointer;min-height:44px}
+  .decide button:focus-visible,.yn button:focus-visible,.morebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button.accept.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  button.reverse.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  button.rework.on{background:var(--brass);border-color:var(--brass-deep);color:var(--white)}
+  .ask{margin-top:10px}
+  .ask input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;
+     border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .ask input:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
+  .ask .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .ask .got{display:none;font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:4px}
+  .ask .got.show{display:block}
+  .morebtn{width:100%;font-family:var(--body);font-weight:600;font-size:13px;padding:8px 4px;
+     margin-top:11px;border-radius:6px;border:1.5px dashed var(--line);background:transparent;
+     color:var(--brass-deep);cursor:pointer;min-height:40px}
+  .morebtn.on{background:var(--card-alt);border-style:solid}
+  .more{display:none;margin-top:10px;padding:12px 13px;background:var(--card-alt);
+        border:1px solid var(--line-soft);border-radius:7px}
+  .more.show{display:block}
+  .more p{margin:0 0 9px;font-size:13px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:11px;
+        color:var(--muted-deep);margin:8px 0 0;font-variant-numeric:tabular-nums}
+  .links a{color:var(--brass-deep);font-weight:600;font-size:13px;text-decoration:underline;
+           text-underline-offset:2px;margin-right:14px}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+        border-radius:7px;overflow:hidden;font-size:12px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  th{font-family:var(--mono);font-size:9px;letter-spacing:.7px;text-transform:uppercase;
+     color:var(--muted);background:var(--card-alt)}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  td.mono{font-family:var(--mono);font-size:11px}
+  tr:last-child td{border-bottom:none}
+  .tblwrap{overflow-x:auto;border-radius:7px}
+  .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
+          padding:13px 14px;margin-bottom:14px}
+  .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
+             color:var(--brass-deep);margin:0 0 8px}
+  .bar{height:8px;border-radius:4px;background:var(--card-alt);border:1px solid var(--line-soft);
+       overflow:hidden;display:flex;margin:6px 0 4px}
+  .bar .dev{background:var(--navy);height:100%}
+  .bar .qa{background:var(--brass);height:100%}
+  .barlbl{font-family:var(--mono);font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10.5px;
+          color:var(--muted-deep);font-variant-numeric:tabular-nums}
+  .legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+  .calib{font-size:12.5px;color:var(--muted-deep);margin:8px 0 0;line-height:1.5}
+  .recorded{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:8px}
+  .readgrid{display:flex;gap:8px;margin-top:9px}
+  .readgrid label{flex:1;font-family:var(--mono);font-size:9px;letter-spacing:.6px;
+       text-transform:uppercase;color:var(--muted-deep)}
+  .readgrid input{width:100%;font-family:var(--mono);font-size:15px;padding:8px 9px;margin-top:3px;
+       border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .savebtn{margin-top:10px;width:100%;font-family:var(--body);font-weight:600;font-size:13.5px;
+       padding:10px;border-radius:6px;border:1.5px solid var(--moss);background:var(--moss);
+       color:var(--white);cursor:pointer;min-height:44px}
+  .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
+        padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
+        color:var(--ink);resize:vertical}
+  .savedline{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:5px}
+  .q{background:var(--card);border:1px solid var(--line);border-radius:7px;margin-bottom:10px;overflow:hidden}
+  .q .head{display:flex;align-items:flex-start;gap:8px;padding:11px 13px;cursor:pointer}
+  .q .head:hover{background:var(--card-alt)}
+  .q .qtext{font-size:14px;font-weight:600;flex:1;line-height:1.35}
+  .yn{display:flex;gap:8px;margin-top:4px}
+  .yn button{flex:1;font-family:var(--body);font-weight:600;font-size:14px;padding:9px 4px;
+     border-radius:6px;border:1.5px solid var(--line);background:var(--card-alt);color:var(--ink);
+     cursor:pointer;min-height:44px}
+  .yn button.yes.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  .yn button.no.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  .ynmean{display:flex;gap:8px;margin-top:5px}
+  .ynmean span{flex:1;font-size:11.5px;color:var(--muted-deep);text-align:center;line-height:1.35}
+  .qctx{font-size:12.5px;color:var(--muted-deep);margin:8px 0 0}
+  .empty{font-size:13.5px;color:var(--muted);font-style:italic;padding:4px 2px}
+  .finding p{margin:0 0 8px;font-size:14px}
+  .samplebar{font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;
+       color:var(--mock);margin:4px 0 6px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header><div class="db">DB</div><div><h1>Morning Briefing <span class="mocktag">Redesign mock</span></h1>
+<div class="sub">DeepBench · Automated Development</div></div>
+<div class="date">Aug 22, 2026 CST<br>v7.0.152<br><b id="waiting" style="color:var(--card)">9 decisions waiting</b></div></header>
+
+<div class="wrap">
+
+<div class="legend-note">
+  <b>Mock legend:</b> <span class="tag moved">moved</span> section relocated ·
+  <span class="tag new">new</span> section added ·
+  <span class="tag data">needs data</span> works only after we add a column/record for it.
+  Purple numbers are section IDs for our iteration. Figures are today's real numbers where I had them; tables marked "sample" are invented rows.
+</div>
+
+<!-- ===================== 2 · DAILY ACTIVITY ===================== -->
+<h2><span class="secnum">2</span>Daily activity — today, 12:00 AM to 11:59 PM CST</h2>
+<div class="stats">
+  <div class="stat"><b>3</b><span>Shipped today</span></div>
+  <div class="stat"><b>2</b><span>Gated before build</span></div>
+  <div class="stat"><b>0</b><span>Cycles: did not run</span></div>
+  <div class="stat"><b>$0.00</b><span>API spend of $5.00 day</span></div>
+  <div class="stat"><b>~3.9M<br>39%</b><span>Tokens of 10M daily max</span></div>
+</div>
+<p class="strip-def"><b>Gated before build</b> = the run designed the work but a rule said it needs your permission to ship — it's a card below. <b>Did not run</b> = a cycle started, checked the board, and found nothing it was allowed to do.</p>
+
+<!-- ===================== 3 · TODAY'S FINDINGS ===================== -->
+<h2><span class="secnum">3</span>Today&rsquo;s findings <span class="tag moved">moved</span></h2>
+<div class="finding">
+<p><span class="lbl">Latest — 11:06 AM cycle</span>This run reached position 12 on your board before it found work it was allowed to do — and then could not ship that either. Positions 1 through 11 were each blocked for their own reason and each was checked, not assumed. Position 12, CHI-89, asked for a mobile fix; the measurement says the fix is not needed. Position 13, CHI-84, is real and worth doing, and it is built and waiting on a branch. Both are cards below. Nothing shipped to the site today from this run.</p>
+</div>
+<div class="item" id="fh">
+  <div class="head" data-toggle="fh"><span class="cardnum">3.1</span>
+    <span class="ttl">Earlier today — 3 cycles</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="strip-def"><b>8:06 AM</b> — Shipped DAT-003 — a promoted Library fact records who confirmed it. Found five orphaned fixture rows leaking through a self-referencing delete; removed, before-images filed.</p>
+    <p class="strip-def"><b>5:06 AM</b> — Shipped SES-107 — the trust-count rule, written as arithmetic. Ran the corrected claim-release order for its own ship.</p>
+    <p class="strip-def"><b>2:06 AM</b> — Did not run: the queue&rsquo;s top positions were all waiting on you; nothing eligible.</p>
+  </div>
+</div>
+
+<!-- ===================== 4 · BUDGET & USAGE ===================== -->
+<h2><span class="secnum">4</span>Budget &amp; usage <span class="tag moved">moved</span></h2>
+<div class="budget"><h4>API dollars — real money, hard wall</h4>
+  <div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>
+  <div class="barlbl">Bar = share of today&rsquo;s $5.00 spent</div>
+  <div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work $0.00</span>
+  <span><span class="sw" style="background:var(--brass)"></span>QA $0.00</span>
+  <span>= $0.00 of $5.00 today</span><span>$0.00 of $100 this month</span></div></div>
+
+<div class="budget"><h4>Subscription tokens — your allowance, runner&rsquo;s share (estimated)</h4>
+  <div class="bar"><span class="dev" style="width:10%"></span><span class="qa" style="width:4%"></span></div>
+  <div class="barlbl">Bar = share of the 10M daily max used</div>
+  <div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work ~1.05M</span>
+  <span><span class="sw" style="background:var(--brass)"></span>QA ~0.38M</span>
+  <span>= ~3.9M of 10M today (39%), across 4 cycles</span></div>
+  <div class="tblwrap"><table style="margin-top:10px">
+    <tr><th>Model</th><th>Runner tokens today (est)</th><th>Your weekly meter</th></tr>
+    <tr><td>Opus 5 (orchestrator)</td><td class="num">est.</td><td class="num">all models 18%</td></tr>
+    <tr><td>Fable 5 (subagents)</td><td class="num">173,913 measured</td><td class="num">Fable 20%</td></tr>
+    <tr><td>Sonnet 5 (page rebuild)</td><td class="num">this task</td><td class="num">5-hour 5%</td></tr>
+  </table></div>
+  <p class="calib">The 10M/day cap is still the uncalibrated default — turning your meter percentages into a real tokens-per-percent rate needs a window where only the runner was working.</p></div>
+
+<div class="budget"><h4>Today&rsquo;s readings — morning and night, recalibrates the budget</h4>
+  <p class="recorded">✓ Latest recorded — Aug 22, 2026, 8:50 AM CST (morning): Fable 20% · All models 18% · 5-hour 5%. (8 readings on file.)</p>
+  <p class="barlbl" style="margin-top:8px">Morning — when you wake</p>
+  <div class="readgrid">
+    <label>Fable %<input type="number" inputmode="numeric" value="20"></label>
+    <label>All models %<input type="number" inputmode="numeric" value="18"></label>
+    <label>5-hour %<input type="number" inputmode="numeric" value="5"></label>
+  </div>
+  <p class="barlbl" style="margin-top:10px">Night — before bed</p>
+  <div class="readgrid">
+    <label>Fable %<input type="number" inputmode="numeric"></label>
+    <label>All models %<input type="number" inputmode="numeric"></label>
+    <label>5-hour %<input type="number" inputmode="numeric"></label>
+  </div>
+  <button class="savebtn">Save reading</button>
+  <p class="calib">The night → morning pair brackets a window where only the runner was working — the next cycle uses it to recalculate tokens-per-percent and set the day&rsquo;s real max automatically. A directive (&ldquo;max 15M today&rdquo;) always overrides the calculated number.</p></div>
+
+<!-- ===================== 5 · SHIPPED ===================== -->
+<h2><span class="secnum">5</span>Shipped — 3 today, tap a row to open <span class="tag moved">moved</span></h2>
+
+<div class="item" id="s1">
+  <div class="head" data-toggle="s1"><span class="cardnum">5.1</span><span class="kind ship">Ship</span><span class="idchip">LOG-128</span>
+    <span class="ttl">By Caller stops merging automated traffic into a named org&rsquo;s row</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <div class="idline">LOG-128 (Log · P05 - Enhancements) · behind flag, currently OFF</div>
+    <div class="plain">
+      <p><span class="lbl">What you couldn&rsquo;t do before</span>The By Caller report lumped robot traffic (regression runs, scripts) into the same row as a real organization at the same address — so a row saying &ldquo;Google Fiber, 853 calls&rdquo; was mostly your own test robots.</p>
+      <p><span class="lbl">What you can do now</span>Robot traffic gets its own clearly-labeled row, so a named org&rsquo;s count is real visitors only.</p>
+      <p><span class="lbl">Why it matters</span>You read this report to know who is actually using DeepBench — it&rsquo;s only useful if the numbers aren&rsquo;t polluted by your own automation.</p>
+    </div>
+    <button class="morebtn" data-more="m1">More info — the technical record</button>
+    <div class="more" id="m1">
+      <p><span class="lbl">Before → after</span>Before: xxx.xx.43.148 = 845 regression + 8 ui in ONE bucket. After: automated rows split to their own ip-automated bucket; NULL call_source deliberately stays put.</p>
+      <p><span class="lbl">QA evidence</span>With the hook reverted the test fails 1 !== 2; restored it passes. Build clean; regression 33/33 with credentials.</p>
+      <div class="meta"><span>model Opus 5 + Fable 5</span><span>push 769fb66f</span><span>flag log-128-automated-caller-split</span></div>
+      <p class="links"><a href="#">dev site</a><a href="#">preview with flag ON</a></p>
+    </div>
+    <div class="decide">
+      <button class="accept">Accept</button><button class="reverse">Reverse</button><button class="rework">Rework</button>
+    </div>
+    <div class="ask"><input type="text" placeholder="Ask or tell me anything about this — then press Enter">
+      <div class="hint">Counts the same as the buttons — your line is recorded now and answered on this card next cycle.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears on this card next cycle</div></div>
+  </div>
+</div>
+
+<div class="item" id="s2">
+  <div class="head" data-toggle="s2"><span class="cardnum">5.2</span><span class="kind ship">Ship</span><span class="idchip">DAT-003</span>
+    <span class="ttl">A promoted Library fact records who confirmed it</span>
+    <span class="st done">ACCEPT ✓</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <div class="idline">DAT-003 (Data · P01 - Improves John&rsquo;s Skills) · decided Aug 22, 2026 9:02 AM CST</div>
+    <div class="plain">
+      <p><span class="lbl">What you couldn&rsquo;t do before</span>A promoted Library fact carried no record of who confirmed it — you could trust the review gate but never check it.</p>
+      <p><span class="lbl">What you can do now</span>Every newly promoted fact stamps who confirmed it and which confirmation it came from.</p>
+      <p><span class="lbl">Why it matters</span>The Library is the platform&rsquo;s memory; an auditable &ldquo;who approved this&rdquo; is what makes it trustworthy.</p>
+    </div>
+    <button class="morebtn" data-more="m2">More info — the technical record</button>
+    <div class="more" id="m2">
+      <p><span class="lbl">QA evidence</span>Stamp neutralised → live seam proof FAILS; restored → PASSES. Regression 32/32 with credentials.</p>
+      <div class="meta"><span>model Opus 5 + Fable 5</span><span>push cec1d9dd</span></div>
+    </div>
+    <div class="decide">
+      <button class="accept on">Accept</button><button class="reverse">Reverse</button><button class="rework">Rework</button>
+    </div>
+    <div class="ask"><input type="text" placeholder="Ask or tell me anything about this — then press Enter">
+      <div class="hint">Counts the same as the buttons — recorded now, answered on this card next cycle.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears on this card next cycle</div></div>
+  </div>
+</div>
+
+<div class="item" id="s3">
+  <div class="head" data-toggle="s3"><span class="cardnum">5.3</span><span class="kind ship">Ship</span><span class="idchip">SES-107</span>
+    <span class="ttl">Your trust count now keeps running — a rung on every 5th Accept</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <div class="idline">SES-107 (Tooling · P10 - Tooling)</div>
+    <div class="plain">
+      <p><span class="lbl">What you couldn&rsquo;t do before</span>The trust rule went silent after a promotion, so each run guessed — and two runs guessed differently.</p>
+      <p><span class="lbl">What you can do now</span>Your count keeps running exactly as you asked; a rung lands at 5, 10, 15 — written as arithmetic, so it can&rsquo;t drift.</p>
+      <p><span class="lbl">Why it matters</span>The trust score decides how much the runner does without asking you. It should move by a rule you set, checkably.</p>
+    </div>
+    <button class="morebtn" data-more="m3">More info — the technical record</button>
+    <div class="more" id="m3">
+      <p><span class="lbl">QA evidence</span>Five checks run against both old and new files: fail 5/5 before, pass 5/5 after. Build clean.</p>
+      <div class="meta"><span>model Opus 5</span><span>push 61fd3e4</span></div>
+    </div>
+    <div class="decide">
+      <button class="accept">Accept</button><button class="reverse">Reverse</button><button class="rework">Rework</button>
+    </div>
+    <div class="ask"><input type="text" placeholder="Ask or tell me anything about this — then press Enter">
+      <div class="hint">Counts the same as the buttons — recorded now, answered on this card next cycle.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears on this card next cycle</div></div>
+  </div>
+</div>
+
+<!-- QUESTIONS moved below The queue (section 9) -->
+
+<!-- ===================== 7 · GATED BEFORE BUILD ===================== -->
+<h2><span class="secnum">6</span>Gated before build — 2 need your call <span class="tag moved">moved</span></h2>
+
+<div class="item" id="g1">
+  <div class="head" data-toggle="g1"><span class="cardnum">6.1</span><span class="kind gate">Gated</span><span class="idchip">CHI-84</span>
+    <span class="ttl">Tapping a step chip in chat jumps you to that step — built, parked on a branch</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <div class="idline">CHI-84 (Channel Intelligence · P05 - Enhancements)</div>
+    <div class="plain">
+      <p><span class="lbl">What you can&rsquo;t do today</span>The numbered step chips in chat look like buttons and act like stickers — you scroll and find the step yourself.</p>
+      <p><span class="lbl">What you could do after</span>Tap the chip and the right drawer opens and scrolls into view; on a phone the tab flips for you.</p>
+      <p><span class="lbl">Why it&rsquo;s worth something</span>It turns the step numbers from labels into navigation. But the unattended-work rule forbids rewriting an existing screen&rsquo;s lines, and this feature is nothing but such rewrites — so it&rsquo;s finished, parked, and waiting on a session you&rsquo;re in.</p>
+    </div>
+    <button class="morebtn" data-more="mg1">More info — the technical record</button>
+    <div class="more" id="mg1">
+      <p><span class="lbl">Why gated, exactly</span>§19v P5 lane: zero deleted lines in src/screens/. Measured on the branch: 78 insertions, 18 deletions in MarketIntelligenceScreen.jsx. Cannot be restructured to pass — six components all live in that file.</p>
+      <p><span class="lbl">What exists</span>Branch session/cycle-20260822-1407-CHI-84-gated, commit 9369992, builds clean, regression 33/33. Not done: regression test unwritten, flag row not inserted, live QA not run.</p>
+      <div class="meta"><span>model Opus 5 + Fable 5</span><span>commit 9369992</span></div>
+    </div>
+    <div class="decide">
+      <button class="accept">Accept</button><button class="reverse">Reverse</button><button class="rework">Rework</button>
+    </div>
+    <div class="ynmean" style="margin-top:6px"><span>Accept → an attended session lands the branch, flag stays OFF until you flip it.</span><span>Reverse → drop it.</span><span>Rework → your line changes the design.</span></div>
+    <div class="ask"><input type="text" placeholder="Ask or tell me anything about this — then press Enter">
+      <div class="hint">Counts the same as the buttons.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears on this card next cycle</div></div>
+  </div>
+</div>
+
+<div class="item" id="g2">
+  <div class="head" data-toggle="g2"><span class="cardnum">6.2</span><span class="kind gate">Gated</span><span class="idchip">AGT-015</span>
+    <span class="ttl">Wire recorded lessons into agent prompts — needs your OK, it edits an active agent</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <div class="idline">AGT-015 (Agent · P01 - Improves John&rsquo;s Skills)</div>
+    <div class="plain">
+      <p><span class="lbl">What you can&rsquo;t do today</span>267 recorded reasoning lessons exist and no agent prompt can read any of them.</p>
+      <p><span class="lbl">What you could do after</span>Agents actually use what the platform has learned.</p>
+      <p><span class="lbl">Why it&rsquo;s worth something</span>It&rsquo;s the difference between a platform that logs lessons and one that learns them — but it edits an active agent&rsquo;s Skills, which is gated to you.</p>
+    </div>
+    <button class="morebtn" data-more="mg2">More info — the technical record</button>
+    <div class="more" id="mg2"><p><span class="lbl">Why gated</span>§19v P6: prompt assembly can&rsquo;t be flag-guarded. Magnitude corrected 15× from the ticket&rsquo;s claim (18 → 267 active rows, measured).</p></div>
+    <div class="decide">
+      <button class="accept">Accept</button><button class="reverse">Reverse</button><button class="rework">Rework</button>
+    </div>
+    <div class="ask"><input type="text" placeholder="Ask or tell me anything about this — then press Enter">
+      <div class="hint">Counts the same as the buttons.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears on this card next cycle</div></div>
+  </div>
+</div>
+
+<!-- ===================== 8 · DIRECTIVE QUEUE ===================== -->
+<h2><span class="secnum">7</span>Directive queue — your seed, any time <span class="tag moved">moved</span></h2>
+<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first."></textarea>
+<div class="savedline">✓ Last directive saved Aug 21, 2026, 10:05 PM CST — picked up by cycle 83069516</div></div>
+<div class="item" id="dh" style="margin-top:12px">
+  <div class="head" data-toggle="dh"><span class="cardnum">7.1</span>
+    <span class="ttl">Your last 3 directives — what became of them</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="strip-def"><b>Aug 21, 10:05 PM</b> — &ldquo;need to know why it died&rdquo; → acted on: the went-silent line now appears on the page whenever a cycle goes quiet (shipped v7.0.121).</p>
+    <p class="strip-def"><b>Aug 21, 2:12 PM</b> — &ldquo;More Info button on each ticket…&rdquo; → shipped as the More info panels (v7.0.145); the live-answer half was carded, not built.</p>
+    <p class="strip-def"><b>Aug 20, 9:40 PM</b> — &ldquo;1.no 2. Updates every 5 hours 3.I don&rsquo;t know how to answer&rdquo; → mapped onto the three open questions; produced the Yes/No question list (SES-99).</p>
+  </div>
+</div>
+
+<!-- ===================== 9 · THE QUEUE ===================== -->
+<h2><span class="secnum">8</span>The queue — what the runner works next</h2>
+<div class="tblwrap"><table>
+  <tr><th>Queue</th><th>ID</th><th>Class</th><th>Status</th><th>Design status</th><th>Title</th></tr>
+  <tr><td class="num">1</td><td class="mono">SES-106</td><td>P10 - Tooling</td><td>partial</td><td>designed</td><td>Claim-release order, manual half</td></tr>
+  <tr><td class="num">2</td><td class="mono">SES-84</td><td>P10 - Tooling</td><td>partial</td><td>designed</td><td>Vision-corpus ratification drip</td></tr>
+  <tr><td class="num">3</td><td class="mono">SES-101</td><td>P10 - Tooling</td><td>partial</td><td>designed</td><td>Automation tickets file to top of queue</td></tr>
+  <tr><td class="num">4</td><td class="mono">AGT-015</td><td>P01 - Improves John&rsquo;s Skills</td><td>missing</td><td>designed</td><td>Wire lessons into agent prompts</td></tr>
+  <tr><td class="num">5</td><td class="mono">LOG-134</td><td>P05 - Enhancements</td><td>missing</td><td>not designed</td><td>By Source drill-down rows</td></tr>
+  <tr><td class="num">6</td><td class="mono">LAV-30</td><td>P05 - Enhancements</td><td>missing</td><td>not designed</td><td>Gate capture on fast runs</td></tr>
+</table></div>
+<p class="samplebar">&ldquo;Queue&rdquo; is the board&rsquo;s own queue number, straight from the database — rows keep it even when skipped. Design-status column is new <span class="tag data">needs data</span>.</p>
+
+<!-- ===================== 9 · QUESTIONS ===================== -->
+<h2><span class="secnum">9</span>Questions — 2 open, tap a row to open <span class="tag moved">moved</span></h2>
+
+<div class="q" id="q1">
+  <div class="head" data-toggle="q1"><span class="cardnum">9.1</span>
+    <span class="qtext">Should screen-rewrite tickets skip the runner and go straight to a session you&rsquo;re in?</span>
+    <span class="st">unanswered</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="qctx">Some Channel Intelligence improvements can only be built by rewriting lines inside the screen&rsquo;s file — which an unattended run is not allowed to do. 32 of your 276 open now-tier tickets name that screen.</p>
+    <div class="yn"><button class="yes">Yes</button><button class="no">No</button></div>
+    <div class="ynmean"><span>Yes → these tickets get tagged for an attended session at filing; the runner stops picking them up.</span><span>No → the runner keeps reaching them in queue order and cards them for you one at a time.</span></div>
+    <div class="ask"><input type="text" placeholder="Ask or answer in your own words — then press Enter">
+      <div class="hint">Counts the same as the buttons — recorded now, answered here next cycle.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears here next cycle</div></div>
+  </div>
+</div>
+
+<div class="q" id="q2">
+  <div class="head" data-toggle="q2"><span class="cardnum">9.2</span>
+    <span class="qtext">When a ticket says in its own text that it needs your decision, should it step out of the queue?</span>
+    <span class="st">unanswered</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="qctx">Today five of the top eight queue positions defer to you in their own filed text, so every cycle re-reads and re-skips them.</p>
+    <div class="yn"><button class="yes">Yes</button><button class="no">No</button></div>
+    <div class="ynmean"><span>Yes → self-deferred tickets move to the &ldquo;Skipped — needs your input&rdquo; list and stop holding queue slots.</span><span>No → they keep their queue positions and each cycle re-checks them.</span></div>
+    <div class="ask"><input type="text" placeholder="Ask or answer in your own words — then press Enter">
+      <div class="hint">Counts the same as the buttons — recorded now, answered here next cycle.</div>
+      <div class="got">✓ Received Aug 22, 2026 · answer appears here next cycle</div></div>
+  </div>
+</div>
+
+<!-- ===================== 10 · SKIPPED, NEEDS YOUR INPUT ===================== -->
+<h2 class="clickable" data-toggle="skipsec"><span class="secnum">10</span>Skipped — waiting on your input <span class="countchip">5 · 2 new</span> <span class="tag new">new</span> <span class="chev">▸</span></h2>
+<div class="secwrap" id="skipsec">
+<p class="strip-def">Sorted: what you can unblock with a Yes/No first, then everything else, newest skip on top. Rows added since your last brief carry the NEW chip.</p>
+<div class="tblwrap"><table>
+  <tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th><th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>
+  <tr><td><button class="unblock">Answer as a question</button></td><td class="mono">SES-101</td><td>P10 - Tooling</td><td class="num">3</td><td>designed</td><td>partial</td><td>Automation tickets file to top of queue</td><td>Needs your ruling on queue-jump behavior</td><td class="mono">Aug 22</td></tr>
+  <tr><td><button class="unblock">Answer as a question</button></td><td class="mono">LOG-134</td><td>P05 - Enhancements</td><td class="num">5</td><td>not designed</td><td>missing</td><td>By Source drill-down rows</td><td>Its own text says &ldquo;John prioritizes when&rdquo;</td><td class="mono">Aug 22</td></tr>
+  <tr><td><button class="unblock">Decide on card 6.2</button> <span class="tag new">new</span></td><td class="mono">AGT-015</td><td>P01 - Improves John&rsquo;s Skills</td><td class="num">4</td><td>designed</td><td>missing</td><td>Wire lessons into agent prompts</td><td>Edits an active agent — gated, carded above (6.2)</td><td class="mono">Aug 22</td></tr>
+  <tr><td><button class="unblock">Prep our session</button> <span class="tag new">new</span></td><td class="mono">CHI-84</td><td>P05 - Enhancements</td><td class="num">13</td><td>built, parked</td><td>missing</td><td>Step chips tappable</td><td>Rule forbids screen rewrites unattended — carded above (6.1)</td><td class="mono">Aug 22</td></tr>
+  <tr><td><button class="unblock">Prep our session</button></td><td class="mono">SES-106</td><td>P10 - Tooling</td><td class="num">1</td><td>designed</td><td>partial</td><td>Claim-release order, manual half</td><td>Needs a .claude/ edit only an attended session can make</td><td class="mono">Aug 21</td></tr>
+</table></div>
+<p class="strip-def"><b>Unblock buttons:</b> &ldquo;Answer as a question&rdquo; puts the blocking decision into section 9 as a Yes/No on the next rebuild — answer it and the ticket rejoins the queue, no session needed. &ldquo;Prep our session&rdquo; tells the next cycle to package everything (kickoff-ready prompt, branch, context) so the ticket is one paste away when you sit down — the page can record the ask, but it cannot start a Claude Code session by itself.</p>
+<p class="samplebar">Needs cycles to record skips as rows, not prose <span class="tag data">needs data</span>. Rows above reconstructed from today&rsquo;s real cycle notes.</p>
+</div>
+
+<!-- ===================== 11 · NOW-TIER BY CLASS ===================== -->
+<h2><span class="secnum">11</span>Now-tier tickets, by priority class</h2>
+<div class="tblwrap"><table>
+  <tr><th>Priority class</th><th>Open count</th></tr>
+  <tr><td>P01 - Improves John&rsquo;s Skills</td><td class="num">1</td></tr>
+  <tr><td>P05 - Enhancements</td><td class="num">38</td></tr>
+  <tr><td>P06 - Agent Enhancement</td><td class="num">14</td></tr>
+  <tr><td>P08 - Determinism Removal</td><td class="num">9</td></tr>
+  <tr><td>P09 - Bug Fixes</td><td class="num">119</td></tr>
+  <tr><td>P09 - Bug Fixes · FLAGGED</td><td class="num">27</td></tr>
+  <tr><td>P10 - Tooling</td><td class="num">68</td></tr>
+</table></div>
+<p class="strip-def" style="margin-top:6px">Beyond the now bucket: <b>25</b> tickets in next · <b>247</b> in later (open, live counts).</p>
+
+<!-- ===================== 12 · VISION CLAIMS ===================== -->
+<h2><span class="secnum">12</span>Vision claims — always 3, tap a row to open</h2>
+<p class="strip-def">Each claim sets criteria for one of the judgment classes (P1 - Improves John&rsquo;s Skills · P2 - Inventive · P3 - Investor Value · P4 - New Customers) — the chip shows which. A claim keeps coming back every day until you decide it — Yes, No, or your own wording. Only silence carries it forward.</p>
+
+<div class="q" id="v1">
+  <div class="head" data-toggle="v1"><span class="cardnum">12.1</span><span class="clschip">P4 - New Customers</span>
+    <span class="qtext">DeepBench&rsquo;s nearest defensible market is the mid-market/agency buyer — true?</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="qctx">They want a working bench of experts with visible reasoning and sellable deliverables — not a build-your-own-agents toolkit. Every future customer-facing feature would be judged against this one buyer. (docs/vision/thesis.md · C-thesis-30 · confidence LOW)</p>
+    <div class="yn"><button class="yes">Yes</button><button class="no">No</button></div>
+    <div class="ynmean"><span>Yes → ratified — this stops appearing and becomes a rule the runner builds by.</span><span>No → rejected — deleted from the vision docs and recorded as a rejected path.</span></div>
+    <div class="ask"><input type="text" placeholder="Or say it in your own words — then press Enter">
+      <div class="hint">Your line replaces the claim, marked as your words — that also resolves it.</div>
+      <div class="got">✓ Received Aug 22, 2026 · the claim is rewritten in your words</div></div>
+  </div>
+</div>
+
+<div class="q" id="v2">
+  <div class="head" data-toggle="v2"><span class="cardnum">12.2</span><span class="clschip">P1 - Improves John&rsquo;s Skills</span>
+    <span class="qtext">The hiring-facing &ldquo;done&rdquo; state is one screen presentable to a FAANG interviewer without a guided tour — true?</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="qctx">A case-study screen or this briefing page itself becomes the named target, so work toward it can be tracked and finished instead of staying open-ended. (docs/vision/current-mission.md · C-mission-29 · confidence LOW)</p>
+    <div class="yn"><button class="yes">Yes</button><button class="no">No</button></div>
+    <div class="ynmean"><span>Yes → ratified — one named screen becomes the finish line.</span><span>No → rejected — recorded, and &ldquo;done&rdquo; stays undefined until a new claim is written.</span></div>
+    <div class="ask"><input type="text" placeholder="Or say it in your own words — then press Enter">
+      <div class="hint">Your line replaces the claim, marked as your words — that also resolves it.</div>
+      <div class="got">✓ Received Aug 22, 2026 · the claim is rewritten in your words</div></div>
+  </div>
+</div>
+
+<div class="q" id="v3">
+  <div class="head" data-toggle="v3"><span class="cardnum">12.3</span><span class="clschip">P3 - Investor Value</span>
+    <span class="qtext">A feature that can&rsquo;t be demoed in under 2 minutes is not worth building next — true?</span>
+    <span class="st">undecided</span><span class="chev">▸</span></div>
+  <div class="bodyc">
+    <p class="qctx">Sample claim to show the always-3 rule — the real third card would be the next highest-value unratified claim from the vision docs. (docs/vision/decision-criteria.md · sample)</p>
+    <div class="yn"><button class="yes">Yes</button><button class="no">No</button></div>
+    <div class="ynmean"><span>Yes → ratified as a decision rule.</span><span>No → rejected and recorded.</span></div>
+    <div class="ask"><input type="text" placeholder="Or say it in your own words — then press Enter">
+      <div class="hint">Your line replaces the claim, marked as your words — that also resolves it.</div>
+      <div class="got">✓ Received Aug 22, 2026 · the claim is rewritten in your words</div></div>
+  </div>
+</div>
+
+<!-- ===================== 13 · TRUST LADDER ===================== -->
+<h2><span class="secnum">13</span>Trust ladder — how much I do without asking, per kind of work</h2>
+<div class="tblwrap"><table>
+  <tr><th>Class</th><th>Work class</th><th>Rung (autonomy level)</th><th>Accept streak</th></tr>
+  <tr><td class="mono">P02</td><td>Inventive</td><td class="num">0</td><td class="num">0</td></tr>
+  <tr><td class="mono">P05</td><td>Enhancements</td><td class="num">1</td><td class="num">0</td></tr>
+  <tr><td class="mono">P07</td><td>Agent Creation</td><td class="num">1</td><td class="num">0</td></tr>
+  <tr><td class="mono">P08</td><td>Determinism Removal</td><td class="num">1</td><td class="num">0</td></tr>
+  <tr><td class="mono">P09</td><td>Bug Fixes</td><td class="num">1</td><td class="num">0</td></tr>
+  <tr><td class="mono">P10</td><td>Tooling</td><td class="num">5</td><td class="num">1</td></tr>
+</table></div>
+<p class="strip-def">A rung is earned on every 5th Accept of shipped work in that class; a Reverse drops the rung and resets the streak. These are today&rsquo;s real values.</p>
+
+<!-- ===================== 14 · PRODUCTION USAGE ===================== -->
+<h2><span class="secnum">14</span>Who used DeepBench — last 5 uses <span class="tag new">new</span></h2>
+<div class="tblwrap"><table>
+  <tr><th>Time (CST)</th><th>IP</th><th>Location</th><th>Name</th><th>What they did</th><th>Cost</th></tr>
+  <tr><td class="mono">Aug 22 · 9:41 AM</td><td class="mono">xx.xx.184.22</td><td>Austin, TX</td><td>Unknown visitor #14</td><td>Channel Intelligence — asked 3 questions</td><td class="num">$0.11</td></tr>
+  <tr><td class="mono">Aug 22 · 8:16 AM</td><td class="mono">xx.xx.33.12</td><td>Kansas City, MO</td><td>John (dev URL)</td><td>Agent Console — 2 runs</td><td class="num">$0.38</td></tr>
+  <tr><td class="mono">Aug 21 · 9:52 PM</td><td class="mono">xx.xx.90.7</td><td>Chicago, IL</td><td>Unknown visitor #13</td><td>Viewed AI Audit</td><td class="num">$0.00</td></tr>
+  <tr><td class="mono">Aug 21 · 7:34 PM</td><td class="mono">xx.xx.184.22</td><td>Austin, TX</td><td>Unknown visitor #14</td><td>Channel Intelligence — 1 question</td><td class="num">$0.04</td></tr>
+  <tr><td class="mono">Aug 21 · 2:10 PM</td><td class="mono">xx.xx.33.12</td><td>Kansas City, MO</td><td>John (dev URL)</td><td>Teach screen — 1 upload</td><td class="num">$0.07</td></tr>
+</table></div>
+<p class="samplebar">Sample rows — the real table comes from the activity log + visitor ledger, same rules as your standing usage report.</p>
+
+</div>
+
+<script>
+document.querySelectorAll('[data-toggle]').forEach(function(h){
+  h.addEventListener('click', function(e){
+    if (e.target.closest('button,input,textarea,a')) return;
+    var el = document.getElementById(h.getAttribute('data-toggle'));
+    var open = el.classList.toggle('open');
+    var ch = h.querySelector('.chev'); if (ch) ch.textContent = open ? '▾' : '▸';
+  });
+});
+document.querySelectorAll('.morebtn').forEach(function(b){
+  b.addEventListener('click', function(){
+    var p = document.getElementById(b.getAttribute('data-more'));
+    if (!p) return;
+    var on = p.classList.toggle('show');
+    b.classList.toggle('on', on);
+    b.textContent = on ? 'Hide the technical record' : 'More info — the technical record';
+  });
+});
+document.querySelectorAll('.decide button, .yn button').forEach(function(b){
+  b.addEventListener('click', function(){
+    b.parentElement.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    var head = b.closest('.item,.q').querySelector('.st');
+    if (head){ head.textContent = (b.textContent.toUpperCase())+' ✓'; head.classList.add('done'); }
+    updateWaiting();
+  });
+});
+function updateWaiting(){
+  var n = document.querySelectorAll('.head .st:not(.done)').length;
+  var w = document.getElementById('waiting');
+  if (w) w.textContent = n ? (n + ' decision' + (n===1?'':'s') + ' waiting') : 'Nothing needs you ✓';
+}
+updateWaiting();
+document.querySelectorAll('.unblock').forEach(function(b){
+  b.addEventListener('click', function(e){ e.stopPropagation(); b.textContent='✓ recorded'; });
+});
+document.querySelectorAll('.ask input').forEach(function(i){
+  i.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && i.value.trim()){
+      var g = i.parentElement.querySelector('.got'); if (g) g.classList.add('show');
+      i.value = '';
+    }
+  });
+});
+</script>
