@@ -5,6 +5,141 @@
 
 ---
 
+## cycle-20260822-1106 / LOG-128-automated-caller-split (v7.0.152, 2026-08-22, Automated runner cycle `769fb66f`, model Opus 5 orchestrator + two Fable 5 subagents) — By Caller stops merging John's regression driver into a named org's row
+
+**Ticket:** `LOG-128` (Log · `P5 - Enhancements`), queue position 9, tier `now`. Shipped `done`, **flagged**.
+
+### The defect
+
+`identityForRow()` (`src/hooks/useAIActivity.js`) resolves one `ai_activity_log` row to one By Caller
+identity through four tiers. Its **final fallback** keys an unlabelled row by its masked address
+alone — `{ key: \`ip:${ip}\`, label: org || ip }` — with **no `call_source` check**. Neither earlier
+tier can divert automated traffic away from it:
+
+- **Tier 1/2** needs a `known_callers` match. Read live this cycle: the table holds **4 rows, all
+  `match_type='visitor_id'`** — there is not one IP-type entry, so the address arm cannot fire at all.
+- **Tier 3** (`LOG-127`'s cookie-gap fold) is explicitly `call_source === 'ui'` only.
+
+So every cookie-less row at one address collapses into a single `ip:` bucket regardless of what
+produced it. **Measured live** (`ai_activity_log`, no-`visitor_id` rows by masked address × source):
+
+| Masked address | Contents of the one `ip:` bucket |
+|---|---|
+| `xxx.xx.43.148` | **845 regression** + 8 ui |
+| `xxx.xx.33.12` | 210 regression + 2 script + 616 ui |
+| `xxx.xx.22.58` | 9 script + 4 session-test + 62 ui + 96 NULL |
+
+`xxx.xx.22.58` and `xxx.xx.33.12` both resolve in `ip_org_cache` to **"AS16591 Google Fiber Inc."** —
+the ticket's own example, confirmed rather than assumed. A row wearing a real org's name is part
+regression driver and part unattributable browser traffic, with nothing on screen saying so. This is
+a **labelling** defect: no number is wrong, the rows are merged under one name.
+
+### The fix (3 files)
+
+1. **`src/lib/callerBuckets.js` (new, pure).** `AUTOMATED_NOVID_SOURCES = {regression, script,
+   session-test}` — a **closed allow-list**, deliberately not "anything that isn't `'ui'`" — plus
+   `isAutomatedNoVidRow()` and `automatedBucketIdentity()`. No React, no I/O, which is what lets the
+   regression test prove the split without rendering.
+2. **`src/hooks/useAIActivity.js`.** `identityForRow(row, idx, opts)` and
+   `buildByCaller(rows, known, orgs, opts)` gain a trailing optional argument; one guarded
+   early-return sits **before** the address fallback. The hook reads
+   `useFeatureFlag('log-128-automated-caller-split')` and passes it at the single call site.
+3. **`tests/regression/LOG-128-automated-caller-split.js`** (below).
+
+**`buildBySource()` cannot change, by construction** — it calls `identityForRow` with two arguments
+and only for `call_source === 'ui'` rows, which this branch never matches.
+
+### Two decisions worth keeping
+
+- **A NULL `call_source` does NOT move.** It is the pre-`LOG-121` unknown, not evidence of
+  automation; inferring automation from an absent fact is exactly the backfill §19i forbids. The
+  96 NULL rows at `xxx.xx.22.58` stay in the browser bucket, and the test asserts it.
+- **Ships flagged, not live.** §19v's exposure rule read literally: *"changes what an approved
+  surface looks like … → default-off feature flag (a data row, `HAR-41` — never a code constant)"*.
+  Splitting rows in By Caller changes the AI Audit's appearance, so flag row
+  `log-128-automated-caller-split` is `enabled = false` and John flips it. Noted on the card because
+  it is a real consequence: with the flag ON, `platformUserCount` (`byCaller.length`) rises by one
+  per split address. **Calls and cost are conserved by construction** — the same rows, redistributed
+  — and the test asserts that too.
+
+### QA — discriminating, proven in both directions
+
+Seam proof (**labelled as such**: it imports the repo's own `buildByCaller` against a fixture; it
+does not render the screen or read live Supabase).
+
+- Flag **OFF** (opts omitted): exactly **one** group holding all three rows — proves the default is a
+  real no-op, not a differently-shaped default.
+- Flag **ON**: exactly **two** groups; the automated bucket holds only the regression row; the `ui`
+  and NULL rows keep the original key; the org label is preserved on both halves.
+- Conservation: calls and cost sum identically across the ON groups and the OFF group.
+- A row carrying its own `visitor_id` never re-keys, whatever its `call_source`.
+
+**"Would it still pass if the change did nothing?"** — answered by experiment, not argument:
+`git stash push -- src/hooks/useAIActivity.js`, re-run → **FAIL, `1 !== 2`**; restore → **PASS**. The
+OFF assertion alone would pass vacuously against unmodified code, which is precisely why the
+two-group ON assertion is the discriminating half.
+
+`npm install && npm run build` clean (8.72s). Regression suite **33/33 with credentials** from
+`runner_secrets`; without them the suite reports 32/33, the one failure being `CHI-31`'s known
+"SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured" env gap — unrelated to this diff and the same
+gap `v7.0.148`/`v7.0.150` recorded. §19v P5 zero-deletion assertion:
+`git diff --numstat origin/dev -- src/screens src/AppShell.jsx` returns **nothing**.
+
+### Also this cycle — `AGT-015` gated before build, and a 15× premise correction
+
+`AGT-015` (`P1 - Improves John's Skills`) was the top class-sorted ticket and was **claimed, revalidated,
+classified `gated_before_build`, carded (`a9c4d1e2`), and released** rather than built. All four of its
+premise claims were re-verified live by a Fable 5 subagent:
+
+- `MarketIntelligenceScreen.jsx:4503` still calls `memory-consolidation`/`reasoner-intent`, and
+  `api/_lib/handlers/reasoning-write.js:75-83` still writes `the_reasoning` — **CONFIRMED**.
+- `the_reasoning` has exactly 13 columns, none discriminating "corrects the library" from "makes an
+  agent wiser" — **CONFIRMED** by live `information_schema` read.
+- `promoted_to_library_id` non-null = **0 of 318 rows** — **CONFIRMED**.
+- All 7 `knowledge`-type `skill_profiles` rows point at `the_library`/`the_library_catalog`/`roster`/
+  null; **zero** read `the_reasoning` — **CONFIRMED**.
+
+**Magnitude corrected 15×:** the ticket, filed 2026-07-15, said 18 active rows. Live count is **267**
+(elena 163, nadia 104) — 15× more unused lessons than when diagnosed, and still none reachable by any
+prompt. The gate is not the code: `ai-enrichment.js:103` already routes `fi.source === 'the_reasoning'`
+through `queryContent()` and `db-assembly.js:194` passes any Skill's `traits.source` through, so the
+missing piece is **one agent-configuration data row** — which is exactly why §19v P6 gates it (editing
+an ACTIVE agent's Skills/Capabilities has no inert state, and no flag can guard prompt assembly), and
+why the one non-gated slice — a column nothing writes and nothing reads — was **refused** as the
+feature mill §19d's sniff test kills.
+
+### The structural finding: a nine-deep unbuildable prefix
+
+`83069516` and `cec1d9dd` each reported that queue positions **1–3** are permanently unfinishable by an
+unattended cycle. This cycle confirms that independently and **extends it**: positions **4 through 8**
+are equally unavailable, each for its own verified reason —
+
+| # | Ticket | Why an unattended cycle cannot build it |
+|---|---|---|
+| 1 | `SES-106` | remainder is a `.claude/` edit (register B39); gated card `1b331855` already open |
+| 2 | `SES-84` | advances only by John tapping vision-claim cards — the drip **is** firing (`C-CUST-20` et al. are on the live page); 0 of 79 unratified claims tapped |
+| 3 | `SES-101` | remainder is a `.claude/` edit |
+| 4 | `AGT-015` | gated: active-agent Skill edit + a naming decision (carded this cycle) |
+| 5 | `LOG-134` | ticket text defers itself — *"John prioritizes when"*, each row needs Trainer judgment |
+| 6 | `LAV-30` | (a) is a Trainer-path Skill edit on an active agent; (b) is an open gate-design decision |
+| 7 | `LAV-31` | ticket text says verbatim *"Design decision required before building (John)"* |
+| 8 | `LAV-17` | only remaining carrier must land in `api/prompt/ai-enrichment.js`, a gated harness file |
+
+So the first unattended-buildable ticket on the board was **position 9**. The earlier framing — one
+blocked automation lane — understates it: **five of the eight blockers have nothing to do with the
+lane or with `.claude/`**, and three are tickets that deferred themselves to John at filing time and
+then kept their queue numbers. `q-lane-partial-blocked` (asked 05:18Z by `cec1d9dd`) remains
+unanswered, and silence is not a "no".
+
+`LOG-134`'s premise was re-verified in passing and is **larger than filed**: **17 of 33**
+`pattern_vocabulary` rows have `criteria IS NULL`, against the ticket's "15+".
+
+Heal sweep clean (exit 0 — 1 failed hop in 14 days, 1 signature, below the threshold of 3).
+
+Kickoff: `docs/kickoffs/v7.0.152-LOG-128-automated-caller-split.md`.
+
+---
+
 ## cycle-20260822-0806 / DAT-003-confirmation-provenance (v7.0.151, 2026-08-22, Automated runner cycle `cec1d9dd`, model Opus 5 orchestrator + one Fable 5 subagent) — a promoted Library fact can finally be *checked*, not just trusted
 
 **Mission.** No queued work directive (the only `runner_directives` row is `budget_override` `bb5c2d05`, now expired), so selection fell to the board. Scheduled 3:00 AM CST fire (08:06Z). Harvest was empty — no taps, no directive text, no new meter reading, no asks, no answers — and silence was not read as an Accept.

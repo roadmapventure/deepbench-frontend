@@ -1,3 +1,4 @@
+// DeepBench v7.0.152 | useAIActivity.js | LOG-128 -- By Caller stops merging automated traffic into a named org's row: identityForRow()/buildByCaller() take an opts arg, and behind the default-off `log-128-automated-caller-split` flag a no-visitor-id row whose call_source is regression/script/session-test gets its own `ip:<addr>|automated` bucket. NULL and 'ui' sources keep their existing key byte-for-byte; buildBySource() is untouched (it calls identityForRow with two args, and only for 'ui' rows)
 // DeepBench v7.0.45 | useAIActivity.js | LOG-129 -- buildByDevice(): a third cut of the SAME By Platform User row set (Desktop/Mobile/Unknown), a pure aggregate across every caller and source rather than something nested inside them, returned from the hook as `byDevice` beside bySource/byCaller and reconciling with both by construction
 // DeepBench v7.0.43 | useAIActivity.js | LOG-127 -- By Platform User stops over-merging callers: the fourth, host-derived bucket is gone (exactly three -- a known caller's name, Public, Unattributed) and the hardcoded production-host constant with it; identity donation now folds a cookie-less `ui` row only into the ONE visitor seen at its address+host, never regression/script traffic and never a row carrying its own different visitor id
 // DeepBench v7.0.39 | useAIActivity.js | LOG-121 -- By Platform User: buildBySource()/buildByCaller() (two reconciling cuts of one row set) + the known_callers/ip_org_cache read; LOG-124 -- hydrateFromSupabase() stops asking for '*' and reads caller_ip_masked, never the raw address
@@ -22,6 +23,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from '../lib/supabase.js';
+import { isAutomatedNoVidRow, automatedBucketIdentity } from '../lib/callerBuckets.js';
+import { useFeatureFlag } from '../lib/featureFlags.js';
 // FEATURE: LOG-36 -- PATTERN_CATALOG is no longer read by anything in this file; it is imported
 // solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
 // (LOG-56), which renders patterns precisely BECAUSE they have no logs and is out of scope here.
@@ -777,7 +780,7 @@ function buildIdentityIndex(rows, known, orgs) {
 // (a known caller's name / Public / Unattributed -- LOG-127: exactly three, never a fourth split by
 // which host was hit), By Caller answers "which caller is this" and an anonymous group is named by
 // its org, falling back to its blurred address so two of them can never merge on screen.
-function identityForRow(row, idx) {
+function identityForRow(row, idx, opts = {}) {
   const ip = ipKeyOf(row);
   const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
   const host = row?.request_host || null;
@@ -797,6 +800,14 @@ function identityForRow(row, idx) {
       const key = soleLabel ? `name:${soleLabel}` : `visitor:${soleVid}`;
       return { key, name, label: name, ip, org, city };
     }
+  }
+  // FEATURE: LOG-128 -- automated traffic that carries no visitor id gets its own bucket instead of
+  // merging into the org row its address happens to resolve to. Guarded by a default-off flag
+  // (§19v exposure rule) and deliberately narrow: only the closed AUTOMATED_NOVID_SOURCES list
+  // moves, so a NULL call_source (the pre-LOG-121 unknown) and 'ui' both keep their existing key.
+  if (opts.splitAutomated && ip && isAutomatedNoVidRow(row, Boolean(vid))) {
+    const auto = automatedBucketIdentity(ip, org);
+    return { key: auto.key, name: host ? PUBLIC_CALLER : UNATTRIBUTED, label: auto.label, ip, org, city };
   }
   // Unlabelled. A row with neither an address nor a visitor id is a pre-LOG-121 row: there is no
   // fact to attribute it with and none is derivable (§19i -- no backfill), so it says so plainly
@@ -856,12 +867,17 @@ export function buildBySource(rows, known = [], orgs = []) {
 /**
  * FEATURE: LOG-121 -- By Caller: one row per distinct caller, the same rows cut the other way.
  * Returns [{ label, device, org, city, calls, cost, firstSeen, lastSeen, ips[] }].
+ *
+ * FEATURE: LOG-128 -- `opts.splitAutomated` (the default-off flag) gives no-visitor-id automated
+ * traffic its own bucket per address instead of merging it into that address's org row. Omitting
+ * opts reproduces the pre-LOG-128 grouping exactly, which is what makes the flag's off state a
+ * real no-op rather than a differently-shaped default.
  */
-export function buildByCaller(rows, known = [], orgs = []) {
+export function buildByCaller(rows, known = [], orgs = [], opts = {}) {
   const idx = buildIdentityIndex(rows, known, orgs);
   const groups = new Map();
   for (const row of rows || []) {
-    const id = identityForRow(row, idx);
+    const id = identityForRow(row, idx, opts);
     if (!groups.has(id.key)) {
       groups.set(id.key, {
         label: id.label, org: id.org, city: id.city, calls: 0, cost: 0,
@@ -1359,6 +1375,11 @@ export function useAIActivity() {
   // FEATURE: LOG-121 -- the By Platform User drawer's two read-time tables (cached module-level,
   // one Supabase read each per page load, same shape as the two directory reads above).
   const { known: knownCallers, orgs: ipOrgs } = useCallerDirectory();
+  // FEATURE: LOG-128 -- default-off exposure flag (§19v: a data row, never a code constant). Read
+  // unconditionally at the top of the hook, and fail-closed by construction: useFeatureFlag starts
+  // false and stays false until a row says otherwise, so a slow or failed table read renders exactly
+  // today's By Caller rather than a half-applied split.
+  const splitAutomatedCallers = useFeatureFlag("log-128-automated-caller-split");
 
   // Aggregate by type
   const byType = {};
@@ -1524,7 +1545,7 @@ export function useAIActivity() {
   // header tiles are built from, so their totals reconcile with Total Calls / Total Cost as well as
   // with each other. platformUserCount is the distinct-caller count behind the new stat tile.
   const bySource = buildBySource(log, knownCallers, ipOrgs);
-  const byCaller = buildByCaller(log, knownCallers, ipOrgs);
+  const byCaller = buildByCaller(log, knownCallers, ipOrgs, { splitAutomated: splitAutomatedCallers });
   // FEATURE: LOG-129 -- the drawer's third section, from that same `log`: no directory input, because
   // device is a fact already on the row, not an identity to resolve. Same input = reconciles with the
   // two above and with the header tiles, with no extra wiring.
