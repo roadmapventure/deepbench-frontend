@@ -5,6 +5,116 @@
 
 ---
 
+## cycle-20260822-2306 / SES-114-skip-blocked-at-a-glance (v7.0.165, 2026-08-22, Automated runner cycle `693ad2fe`, model Opus 5 orchestrator, no subagent) — the blocked prefix stops being re-derived every cycle
+
+**Ticket:** `SES-114` (Tooling · `P10 - Tooling`), queue position 4 at pick, tier `now`, epic **Automation**.
+Shipped **`done`**. One implementation file (`docs/runbooks/runner-cycle.md`) — no `src/`, no `api/`,
+no `lib/`, no migration, no user-visible surface, no flag (§19v). Nothing under `.claude/` (register B39).
+
+**Selection.** Layer 1a was empty (no queued one-off directive). Layer 1b — John's standing Automation-epic
+drain, directive `b74009ea` — returned `pick = SES-106`, `open_now = 23`. `SES-106` and `SES-110` are both
+permission-gate skips (their remaining halves are `.claude/` edits); `SES-129` was claimed by peer cycle
+`ed1a5eb3` at 23:03:27Z. The drain therefore fell through to queue 4. Both of `SES-114`'s dependencies were
+verified shipped before it was claimed: `SES-112` (`done` 19:59Z, the columns) and `SES-113` (`done` 20:18Z,
+the recompute semantics).
+
+**The premise, revalidated live rather than recalled — and reproduced by this cycle itself.**
+`grep -n "design_status\|kickoff_link" docs/runbooks/runner-cycle.md` returned four hits and **not one of
+them procedural**: two header comments naming `SES-114` as the future fix, `SES-113`'s forward reference, and
+`record_skip()`'s `reason_kind` vocabulary. Step 5's selection query projected `backlog_id, queue, tier,
+priority_class, status` — so the columns `SES-112` shipped were read by nothing. Live `runner_skips` at
+23:10Z held `SES-106` (`permission-gate`), `SES-110` (`permission-gate`) and `CHI-89` (`removal-proposed`),
+the first two at queue **1** and **3**, i.e. the top of the drain John has running. **This cycle then paid
+the exact cost the ticket exists to remove:** to establish that queue 1 and queue 3 were unbuildable it read
+both descriptions in full and reasoned each blocker out again, exactly as cycles `1df7d9c6` (19:12Z) and
+`ed1a5eb3` (23:03Z) had already done today; `skip_count` on both rows went 1 → 2 in the process. Three
+re-derivations of one answer in one day, on a 3-hour cadence.
+
+**THE HALF THAT WOULD HAVE SHIPPED INERT, and is why (b) is in this commit rather than a later one.**
+Census of the live column at 23:11Z, before a line changed: `designed` on **23** rows, `NULL` on **573**,
+and **zero** rows carrying `needs-john` or `needs-desktop`. Shipping (a) alone — adding the column to the
+selection read — would have added a column that is `NULL` on every row the query can return, a skip that can
+never fire, and a QA that passes while changing nothing. So the filing-time write ships with it: at the
+moment a cycle files a `gated_before_build` card it now also writes the ticket's `design_status`
+(`needs-john` when the card asks John to decide, `needs-desktop` when the remaining work is on a surface an
+unattended cycle may not touch), before-image first.
+
+**THE CORRECTION THAT TURNED OUT TO REMOVE A LIVE HAZARD, not merely to populate a column.** The two blocked
+tickets read `design_status = 'designed'` — and step 6's new fast path says `designed` means *the design
+already exists, build from `kickoff_link`*. Shipping (c) without correcting them would have pointed the very
+next cycle at queue 1 as designed-and-buildable, when its only remaining half is a `.claude/` edit no
+unattended cycle may make. Both were corrected to `needs-desktop`, before-image first, **derived from their
+own descriptions** — `SES-106`: *"that half needs a session John attends"*; `SES-110`: *"the `.claude/`
+session-setup half is needs-desktop"* — never from this cycle's opinion. `CHI-89` was deliberately left
+alone: `removal proposed` is a `status`, `SES-113` owns it, and giving one fact a second home in
+`design_status` is how two copies start disagreeing.
+
+**What shipped, in the runbook.**
+
+- Step 5's selection read projects `design_status` and `kickoff_link`. They are **projected, never filtered
+  on** — a flagged ticket keeps its number and is skipped by being read, exactly as `status` is.
+- One block now states all three skip flags in a table with what each means and **who clears it**, replacing
+  `SES-113`'s paragraph promising that `SES-114` would fold them in. Each drops to the next ticket per B24
+  and records a `record_skip()` row first. A contested claim is still explicitly **not** a skip.
+- The gated-card filing rule gains the `design_status` write, with two boundaries: never write
+  `removal proposed` there, and never clear the flag yourself — it is cleared by the thing that unblocks the
+  ticket, the same derive-don't-maintain rule `SES-127` applied to `runner_skips`.
+- Step 6 gains the `designed` fast path (18 open tickets carry it; `SES-112`'s
+  `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` is what makes the link safe to rely on),
+  with **revalidation explicitly not skipped by it** — a designed ticket's premise can die like any other.
+- Stated so no later cycle guesses: **`NULL` is not `auto`.** 545 open rows carry `NULL` and run the full
+  ceremony, which is what `auto` also means, but they are not the same claim.
+
+**QA — a side-by-side whose "before" is its own negative control.** The same top-of-queue read, run against
+the live board before and after the correction:
+
+| | queue 1 | queue 2/3 | next three |
+|---|---|---|---|
+| **before** | `SES-106` `designed` | `SES-110` `designed` | `SES-115`/`SES-116`/`SES-91` `NULL` |
+| **after** | `SES-106` **`needs-desktop`** | `SES-110` **`needs-desktop`** | `SES-115`/`SES-116`/`SES-91` `NULL` |
+
+Would it still pass if the change did nothing? No, twice. The retired projection returns five rows that are
+indistinguishable, which is the ambiguity that costs a cycle two description reads; and an implementation
+that shipped (a) without (b) returns `design_status = NULL` on all five — the same failure wearing the new
+column's name. `kickoff_link` proven still present on both corrected rows (the `designed`-implies-link CHECK
+is not being dodged, it is no longer being *claimed*). The CHECK itself proven still live in the denying
+direction by a probe that sets `designed` on a link-less row, catches the `check_violation`, and **raises to
+roll itself back** — `SES-115` untouched, asserted after. One `runner_before_images` row per written ticket
+row, written first, `row_data` carrying the full prior row, so a Reverse is a restore.
+
+`npm install && npm run build` clean. Regression **34/34 with credentials**; the single FAIL without them is
+`CHI-31` reporting missing `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`, an environment gap in this cloud clone and
+not a regression — re-run with the values from `runner_secrets` it passes. Blocker sweeps #1 and #2 both
+probed the dev root with `x-vercel-protection-bypass`: **HTTP 200** each time.
+
+**Model discipline (register B21), stated plainly.** Opus 5 end-to-end, **no subagent**. B21 routes
+judgment-dense steps for `P1`–`P5` work to Fable 5 and mechanical sweeps to Sonnet 5; this is `P10 - Tooling`,
+no `P1`–`P4` classification or root-cause diagnosis arose, and the work was a procedure edit whose
+correctness turns on a live board census — not the doc sweep B21 hands to Sonnet. Recorded as a decision
+rather than left as an omission.
+
+**Named as not done, rather than left to be discovered.** The 545 `NULL` rows are **not** backfilled to
+`auto`: that is a classification of the whole board and it is not this ticket's. The skip is still
+read-and-decide by a cycle, not automatic — the saving is one column instead of a 1,500-character
+description. And neither `SES-106` nor `SES-110` is unblocked by any of this; their remaining halves still
+need a session John attends. What changed is that no future cycle has to rediscover that.
+
+**Ledger.** Cycle `693ad2fe`, stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, trigger
+scheduled (on-grid 23:06Z fire). Walls at cycle start: **$0.00** month / **$0.00** day against $100/$5;
+**10,815,000** estimated tokens spent in the CST day across 17 cycles, against John's unexpired
+`budget_override` directive `43a9d4ae` (**25,000,000** tokens, expires 2026-08-23T05:00Z) — precedence line
+(1), which is what carried this cycle past the 10M uncalibrated cap. `derive_token_allowance('693ad2fe')`
+returned `guard = 'no bracketing pair: no night reading'` and `NULL`, which is a fall-through, not a failure —
+the tenth reading in a row with `tokens_per_pct` uncalibrated, and for the reason `SES-128` shipped: no
+night→morning pair has been declared yet. Latest meter reading 2026-08-22T13:50Z (9.3h fresh), all-models
+**18%**, well under the 85% rest wall. Step 4b's invention pass **skipped**: 13 cycles in this CST day
+already carry `INVENTION PASS`. Step 0b found one silent peer (`db8b9eee`, open 29.7h) — already
+stall-notified at 2026-08-21T20:11Z, so no duplicate push, and its outcome left untouched (a successor never
+adjudicates a predecessor's, register B37). One live peer (`ed1a5eb3`) ran the whole cycle in parallel and
+shipped `SES-129`; the two coordinated entirely through ticket claims, exactly as register B42 intends.
+
+---
+
 ## cycle-20260822-2259 / SES-129-directive-follow-through (v7.0.164, 2026-08-22, Automated runner cycle `ed1a5eb3`, model Opus 5 orchestrator, no subagent) — the briefing redesign closes, and a directive stops disappearing after John writes it
 
 **Ticket:** `SES-129` (Tooling · `P10 - Tooling`), queue position **2**, tier `now`, epic

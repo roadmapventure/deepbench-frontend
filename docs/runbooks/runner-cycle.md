@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.165 | runbooks/runner-cycle.md | SES-114 — the blocked prefix of the queue is READ, not re-derived. Three flags mean "keeps its number, step past it" — `status = 'removal proposed'` (SES-113), `design_status = 'needs-john'`, `design_status = 'needs-desktop'` — and until now only the first was visible to step 5's selection query, so a blocked ticket looked exactly like a buildable one and the only way to tell was to read its description and reason the blocker out again. MEASURED, and this cycle paid the cost it is fixing: live `runner_skips` at 23:10Z held SES-106 and SES-110 at queue 1 and 3, the top of John's standing Automation drain, and their `skip_count` went 1 -> 2 while this cycle re-established for the THIRD time that day what cycles 1df7d9c6 (19:12Z) and ed1a5eb3 (23:03Z) had already established. Three re-derivations of one answer on a 3-hour cadence. THE HALF THAT WOULD HAVE SHIPPED INERT: census before a line changed — `design_status` was `designed` on 23 rows and NULL on 573, with ZERO rows carrying `needs-john` or `needs-desktop`. Projecting the column alone adds a skip that can never fire and a QA that passes while nothing changes, so (b) the filing-time write ships in the SAME commit, and the two live permission-gate rows were corrected to `needs-desktop` from THEIR OWN descriptions (before-image first), never from this cycle's opinion. CHI-89 deliberately untouched: `removal proposed` lives in `status`, and giving one fact a second home is how two copies start disagreeing. Step 6 gains the `designed` fast path — 18 open tickets carry it and SES-112's CHECK guarantees the `kickoff_link` is there — with revalidation explicitly NOT skipped by it. Same prose->column correction as SES-86 phase 3 / SES-101 / SES-111 / SES-127: a rule each cycle must re-derive is a rule that gets re-derived differently, or three times. -->
 <!-- DeepBench v7.0.164 | runbooks/runner-cycle.md | SES-129 — step 9's "mark the directive `done`" becomes the one call that cannot forget the half John reads. §7's new follow-through card tells him what became of each directive he wrote, and the outcome it needs exists nowhere: measured before a line changed, runner_cycles.item_id — the only plausible derivation — holds a runner_items uuid, the directive's OWN id, and free prose (one value a 96-character sentence) across the 24 closed rows, so deriving it renders a column of uuids and half-sentences. New close_directive(cycle, directive, outcome, note), migration ses129_directive_outcome, sets status + acted_cycle + outcome + note in one call, writes its own before-image, and RAISES rather than defaulting when the outcome or the note is missing. That is deliberate and is the whole point: a second write a cycle must remember is the failure this platform has now paid for six times (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128), and the previous wording — three words, "mark it done" — is exactly the shape those six took. Idempotent in the direction that matters: a directive already closed WITH an outcome returns already_closed and is untouched, so a re-run can never overwrite a verdict already sitting on John's card. 'closed_unrecorded' is rejected by the function and accepted only by the column's CHECK, so the 24 backfilled rows can say what is true while no cycle can ever label its own work unrecorded. QA proved all five arms live on a fixture inside a rolled-back transaction (bad outcome rejected by the function's OWN message, backfill-only value rejected, blank note rejected, real close lands, second call preserves the note), and the grants were asserted BOTH directions per SES-101 — anon/authenticated false, service_role true. -->
 <!-- DeepBench v7.0.163 | runbooks/runner-cycle.md | SES-128 — step 3's token track stops describing a calibration nobody performs and gains the call that performs it. MEASURED BEFORE A LINE CHANGED: all eight rows in runner_usage_readings carry tokens_per_pct = NULL, so step (c)'s "calibrate from the two most recent readings" has NEVER ONCE been carried out in the life of this runner — every allowance it has computed fell through to the uncalibrated 10M cap or the 3M stale floor. THE HALF THAT MATTERS AND IS NOT A FORGETTING: the two most recent readings are the WRONG WINDOW. John's meter is spent by his own manual sessions as well as the runner, so a rate measured across a mixed window is confidently wrong no matter how carefully a cycle does the arithmetic. Only a night→morning pair brackets a runner-only window, which is why SES-128 puts a slot on the reading and why derive_token_allowance() reads that pair and nothing else. Same prose→code correction as SES-86 phase 3 / v7.0.146 / SES-101 / SES-111 / SES-127, and the sixth time this platform has paid for the alternative. Four guards return NULL rather than a number, and NULL is explicitly NOT a failure — it means fall back to the guardrails that already exist. The one that would have shipped wrong: a 57-hour bracket with a positive delta and 28M real tokens inside it satisfies every arithmetic precondition and is not a runner-only window, so the 24h guard is what stands between this feature and an allowance eleven times too large. Precedence is written down as three ranked lines so no cycle re-derives it differently: John's unexpired budget_override.max_tokens outranks the derived number, which outranks the 10M/3M fallbacks, with the weekly rest wall above all three and overridable by none. And the ONE assumption inside the function is named in the open rather than buried: the meter-week reset day is stored nowhere, so the pool is divided by the worst case of 7 — fail-closed, can only under-spend — with question q-meter-week-anchor filed to replace it with John's real answer, at which point the allowance gets larger and never smaller. -->
 <!-- DeepBench v7.0.162 | runbooks/runner-cycle.md | SES-127 — step 5 stops letting a skip be a sentence, and the step-9 tail gains the two writes that creates. MEASURED BEFORE A LINE CHANGED, not recalled: fifteen public.runner_* tables exist and NOT ONE stores a skip, so every skip this platform has ever made lives as prose in runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z: "Step 5: queue #1 SES-110 skipped per B24 …". That sentence is real, correct, and completely invisible to John, who does not read the ledger; it was the only record that four of his top-five queue positions were being stepped past every cycle. New: one call, public.record_skip(cycle, ticket, reason_kind, reason), before you drop to the next ticket — migration ses127_skip_records, which writes its own before-image on both paths so the call is the whole obligation. THE HALF THAT WOULD HAVE BEEN GOT WRONG: it is idempotent AND you are meant to call it every time. John's standing Automation drain re-reads 25 open now-tier members eight cycles a day, so an INSERT-per-skip design puts the same SES-110 row in front of him 8×/day forever; uniq_open_skip bumps skip_count instead, and skip_count is itself the signal ("this has blocked 14 times"). Two boundaries stated so no cycle re-derives them differently: a skip you can resolve YOURSELF is never recorded ('claimed-by-peer' is deliberately absent from the vocabulary — a contested claim expires in 24h and the section is titled "waiting on YOUR input"), and you never resolve a skip afterwards, because §10 derives "still skipped" from backlog_items.status NOT IN ('done','removed') — building the ticket later clears the row with no write from anyone. That is the SES-86 phase 3 / SES-101 / SES-111 prose→code lesson applied by DELETING a rule rather than writing one. Tail: (3) harvests the new `unblocks` briefing-state key alongside `answers`/`asks`, and new (5b) stamps briefed_at AFTER the republish returns — briefed_at IS NULL is the NEW chip, so stamping first eats it on rows a failed publish never showed him, and stamping after risks only one extra night marked new. -->
@@ -667,7 +668,9 @@ both verbatim:
 SELECT public.recompute_backlog_queue();
 
 -- (2) Read the top of the queue. Claims filter SELECTION, never the numbering.
-SELECT backlog_id, queue, tier, priority_class, status,
+--     design_status and kickoff_link are PROJECTED, never filtered on (SES-114): a flagged
+--     ticket keeps its number and you skip it by reading it, exactly as status does.
+SELECT backlog_id, queue, tier, priority_class, status, design_status, kickoff_link,
        left(regexp_replace(coalesce(description,''), '^\*\*P[0-9]+[^*]*\*\*\s*', ''), 200) AS gist
   FROM public.backlog_items
  WHERE queue IS NOT NULL
@@ -704,10 +707,49 @@ ever** (step 8c) — `removed` is written only by harvesting John's Accept.
 Two consequences worth knowing before you edit any of this. **John's Reverse is now zero-motion
 re-entry:** the ticket already holds its earned slot, so "no, keep it" restores `status` and
 `revalidated_at` and moves nothing — where it used to land wherever the next renumber happened
-to put it. And **`SES-114` (queue 3) generalises this skip** across `design_status`
-(`needs-john` / `needs-desktop`) so all three flags are read at a glance from one place; this
-block covers the one case `SES-113` opened, and `SES-114` is where it stops being three separate
-rules a cycle has to remember.
+to put it. And the skip above is now **one of three**, read from the same query — see the block
+immediately below, which is where `SES-114` stopped them being three separate rules a cycle has
+to remember.
+
+**THE BLOCKED PREFIX IS READ AT A GLANCE, NOT RE-DERIVED EVERY CYCLE (`SES-114`, `v7.0.165`).**
+Three different flags mean *this ticket keeps its number and you step past it*, and until this
+ticket they lived in three places with only `status` visible to the selection query. Read them
+off the two columns the query now projects, in this order, and drop to the next ticket (B24) on
+any of them:
+
+| What you see at the queue top | What it means | Who clears it |
+|---|---|---|
+| `status = 'removal proposed'` | The runner argued the premise is dead; John's verdict is pending (`SES-113`) | John, on the removal card |
+| `design_status = 'needs-john'` | A decision is owed on a filed `gated_before_build` card | John, on that card |
+| `design_status = 'needs-desktop'` | The remaining work is on a surface an unattended cycle may not touch (`.claude/`, register B39) | A session John attends |
+| `design_status = 'designed'` | **Not a skip** — the design already exists; see step 6's fast path | — |
+
+Each one is a `record_skip()` call before you drop (`reason_kind` `removal-proposed` /
+`needs-john` / `needs-desktop` — or `permission-gate` when the block is the `.claude/` gate
+specifically). **A contested claim is still NOT a skip** — it clears itself in 24h and John can
+do nothing about it.
+
+**Measured before this shipped, because the waste was real and this cycle paid it too.** The
+step-5 query projected `status` and nothing else, so a `needs-desktop` ticket looked exactly like
+a buildable one and the only way to tell was to read its description and reason the blocker out
+again. Live `runner_skips` at `23:10Z` 2026-08-22 held `SES-106` and `SES-110`, at queue **1** and
+**3** — the top of John's standing Automation drain — and their `skip_count` went 1 → 2 while this
+cycle re-established, for the third time that day, what two earlier cycles had already
+established. Three re-derivations of one answer, on a 3-hour cadence.
+
+**The honest half: the flag had to be made TRUE, not just visible.** Census at `23:11Z`, before a
+line changed: `design_status` was `designed` on 23 rows and `NULL` on the other 573 — **zero rows
+carried `needs-john` or `needs-desktop`**. Projecting the column alone would have shipped a skip
+that can never fire and a QA that passes while nothing changes. So the filing-time write below
+ships in the same commit, and the two live permission-gate rows were corrected to `needs-desktop`
+from **their own descriptions** (`SES-106`: *"that half needs a session John attends"*;
+`SES-110`: *"the `.claude/` session-setup half is needs-desktop"*), before-image first.
+`CHI-89` was deliberately left alone: `removal proposed` lives in `status`, and giving one fact a
+second home is how two copies start disagreeing.
+
+**`NULL` is not `auto`.** 545 open rows carry `NULL` and run the full ceremony, which is what
+`auto` also means — but they are not the same claim, and no cycle may backfill `auto` onto a row
+nobody has classified.
 
 **LAYER 1b — A STANDING EPIC DRAIN (`SES-111`, `v7.0.156`, migration `ses111_drain_epic`).**
 John's ask, filed with the Automation epic 2026-08-22: *"run the Automation epic to completion
@@ -867,6 +909,26 @@ over one; only walls and blockers end a cycle build-less).** Exactly ONE build p
 never more. A gated card's later Accept re-enters that ticket at queue #1 (register B23 —
 tap-order stacking, recompute renumbers beneath).
 
+**FILING THE CARD ALSO WRITES THE TICKET'S `design_status` — same act, not a later one
+(`SES-114`, `v7.0.165`).** The card is the *ask*; the row is the *state*, and until this ticket
+only the ask existed, which is why the next cycle had to rediscover the block from prose. So in
+the same breath as the `runner_items` insert, **before-image first** (§19v):
+
+```sql
+-- 'needs-john'    = the card asks John to DECIDE something.
+-- 'needs-desktop' = the remaining work is on a surface an unattended cycle may not touch.
+UPDATE public.backlog_items
+   SET design_status = '<needs-john|needs-desktop>', updated_at = now()
+ WHERE backlog_id = '<TICKET-ID>'
+RETURNING backlog_id, design_status;
+```
+
+Two boundaries. **Never write `removal proposed` here** — that is a `status`, `SES-113` owns it,
+and duplicating it into `design_status` gives one fact two homes. And **never clear the flag
+yourself**: it is cleared by the thing that unblocks the ticket — John's tap, or the attended
+session that makes the edit — exactly as `record_skip()`'s row is cleared by the ticket going
+`done` rather than by a cycle deciding it has waited long enough.
+
 **EVERY SKIP YOU MAKE IS A ROW, NEVER A SENTENCE (`SES-127`, `v7.0.162`, migration
 `ses127_skip_records`).** Whenever you step past a ticket for a reason **John** has to clear —
 a gated card already filed, a `removal proposed` verdict pending, a `needs-john` /
@@ -943,7 +1005,18 @@ gap still exist, or did an intervening ship close it? Premise holds → set
 `revalidated_at = now()` and build. Premise dead → set `status = 'removal proposed'`, file a
 briefing card carrying the ticket (ID — title) plus the evidence the premise died (commit,
 measurement, superseding ticket), run the queue recompute, and **drop to the next queued
-ticket per B24** — never build a dead premise and never remove unattended. Then: read the
+ticket per B24** — never build a dead premise and never remove unattended.
+
+**`design_status = 'designed'` MEANS THE DESIGN ALREADY EXISTS — build from `kickoff_link`,
+do not re-design it (`SES-114`, `v7.0.165`).** 18 open numbered tickets carry it (census
+`23:11Z` 2026-08-22). The row cannot claim it without its artifact — `SES-112` shipped
+`CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` — so the link is guaranteed
+present, and re-deriving a kickoff for a ticket that has one is the same waste in a different
+costume. `auto` or `NULL` runs the full ceremony below exactly as today. **Revalidation is NOT
+skipped by this** — a designed ticket's premise can die like any other, and the fast path starts
+after the revalidation above, never instead of it.
+
+Then: read the
 item's backlog row, the governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file
 whose paths you will touch, and the real source files. Inventions additionally pass the R&D gate first (research →
 cheapest-variant POC, measured → logged go/no-go; §19d sniff test — traceable reasoning, never
