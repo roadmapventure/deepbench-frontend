@@ -5,6 +5,108 @@
 
 ---
 
+## cycle-20260822-1706 / LOG-70-agent-summary-column-set (v7.0.154, 2026-08-22, Automated runner cycle `fcbd475e`, model Opus 5 orchestrator + one Fable 5 subagent) — the CHI Agents drawer stops fetching a column nothing reads
+
+**Ticket:** `LOG-70` (Architecture · `P5 - Enhancements`), queue position 16, tier `now`. Shipped
+**`partial`**, live, **no flag**.
+
+### The defect, and why it survived six versions
+
+`LOG-112` (v6.3.218) rewrote `buildActivitySummary()` to stop reading the frozen legacy
+`patterns_used` field — the per-agent breakdown now records only `{id, latencyMs}` per row and joins
+verified names afterwards from the Log Displayer rollup (`src/hooks/useAIActivity.js:269-277`). It
+shipped `tests/regression/LOG-112-drawer-pattern-source.js` to hold that rule.
+
+**That test's scan roots are `["src/screens", "src/components"]`.** `src/hooks/useAgents.js` —
+`buildActivitySummary()`'s *other* caller — is outside them. So its `.select()` kept requesting
+`patterns_used` on every page of every agent-activity query, read by nothing, from `LOG-112` until
+now. This is not a subtle failure of the rule; it is a **coverage boundary in the guard**, and it is
+the transferable lesson: a test that names its scan roots is only as good as those roots, and the
+one file most likely to be missed is the one that is neither a screen nor a component.
+
+The residue was not unknown — `docs/SESSIONS.md` already carried it (*"`LOG-70` narrowed:
+`useAgents.js` still selects `patterns_used`, now read by nothing. Drop the column when that row is
+taken."*), and `LOG-70` names the file. It simply had nothing enforcing it.
+
+### The premise was proven live, not inferred
+
+Two independent traces, because a dead-code claim is exactly the kind that reads as obvious and is
+occasionally wrong:
+
+1. **Static.** Every field read off the rows `fetchAll()` produces was walked: `inScope()`, the
+   scoped filter, the turn-timestamp pass, `buildActivitySummary()` and its `pairedAgentTurnIds()` /
+   `classifyRow()` helpers. `useAgentActivitySummary()` has exactly two consumers, both in
+   `MarketIntelligenceScreen.jsx` (`:3041`, `:3761`), and every read of the returned summary is
+   `operations` / `calls` / `avgCost` / `rows` / `byKind`. A **Fable 5 subagent instructed to refute
+   the claim rather than confirm it** (register B21) reached the same result independently and found
+   no path.
+2. **Live measurement, which is the one that counts.** 400 real `ai_activity_log` rows — **305 of
+   them carrying a non-empty `patterns_used`**, across 8 agents — passed through the real
+   `buildActivitySummary()` twice, once as fetched and once with the column stripped. The summaries
+   are `deepStrictEqual`.
+
+**The negative control is what makes that finding mean anything.** Stripping `latency_ms` instead —
+a column the function demonstrably reads — *does* change the result. Without that control, assertion
+2 would also pass against a function that ignored its input entirely.
+
+### Exposure call: ships live, no flag, deliberately
+
+§19v's exposure rule asks whether the change alters what an approved surface looks like. The summary
+object driving the CHI Agents drawer is provably byte-identical, so there is **no exposure for a flag
+to govern** — and §19v itself warns against exactly that shape (*"a flag governs exposure, never
+correctness"*, the `LOO-013` failure). The P5 clause's checkable assertion — zero deleted lines in
+`src/screens/*` / `src/AppShell.jsx` — passes trivially: `git diff --numstat origin/dev -- src/screens
+src/AppShell.jsx` returns nothing. **Stated honestly:** that clause's *template* ("the enhancement
+lives in a new component file, the screen gains an import + one guarded mount") plainly contemplates
+surface-adding enhancements and does not describe a query-string trim at all. The mismatch cuts
+toward "this is dead-fetch cleanup filed under a P5 umbrella ticket," and the governing exposure rule
+decides it.
+
+### QA — discriminating by experiment, not by assertion
+
+New `tests/regression/LOG-70-agent-summary-column-set.js`, three assertions: (1) no `patterns_used`
+in `useAgents.js` code, comments stripped so the comment explaining the removal is not mistaken for a
+re-introduction; (2) the real `buildActivitySummary()` returns a deep-equal summary with and without
+the field; (3) the negative control above.
+
+**The test was run against the unchanged file to prove it discriminates** — `git stash` on
+`useAgents.js` only, re-run: **FAIL**, naming line 162 and quoting the offending select. Restored:
+**PASS**. Build clean (baseline 6.89s, after 6.60s). Regression **34/34 with credentials** from
+`runner_secrets` (baseline 33/33).
+
+### Closed `partial` — the other half is John's call, not a shortcut
+
+`src/aiPatterns.js` is `LOG-70`'s other named consumer and was deliberately not touched. `AI_PAT` is
+nine **design-time** label strings built from `PATTERN_CATALOG`, and `AGENT_PATTERNS` carries
+hand-maintained `built: true/false` flags for deferred work; together they are imported by **8
+screen/component files** and rendered synchronously on controls *before any call happens*. The Log
+Displayer classifies rows that already happened. Rewiring needs a flow→log mapping per badge site (a
+taxonomy decision), async loading/empty states on 8 static screens, and a product decision about what
+an unrun flow shows — and **`built: false` is underivable from the log by construction**, since an
+unbuilt flow has no rows. There is standing precedent that design-time display of log-less patterns
+is a sanctioned category (`useAIActivity.js:28-31` keeps `PATTERN_CATALOG` exported for the Platform
+Roadmap precisely *because* those patterns have no logs). That half changes 8 approved surfaces,
+blows the file cap, and turns on a declared-intent-vs-observed question. It needs a session John
+attends.
+
+### Residue logged
+
+- **`LOG-142` filed** (`P9 - Bug Fixes`, tier `now`) — found in this cycle's own trace, **pre-existing
+  and not introduced here**. `buildActivitySummary()`'s cost fallback reads
+  `row.cache_creation_input_tokens` / `cache_read_input_tokens` (`useAIActivity.js:255`); the AI
+  Audit's own fetch selects both (`:1128`), the `useAgents` fetch never has. So the two surfaces price
+  the same NULL-`cost_usd` cached-token row differently, and the drawer's `avgCost` under-reports.
+  **Deliberately not fixed here:** correcting it moves numbers on an approved surface, which §19v
+  routes to flagged-or-gated — a different lane, and folding it in would have converted a
+  zero-surface-delta cleanup into an appearance change.
+- **`LOG-104`'s second call site** remains open and is worth doing with `LOG-142`: the same paged
+  fetch carries no `.order()` at all across its `.range()` pages.
+- **`npm install` mutates `package-lock.json`** in this container (39 lines of `libc` metadata, an
+  npm-version artifact). Restored before committing; a cycle that does not check will otherwise ship
+  it as unrelated diff noise.
+
+---
+
 ## cycle-20260822-1106 / LOG-128-automated-caller-split (v7.0.152, 2026-08-22, Automated runner cycle `769fb66f`, model Opus 5 orchestrator + two Fable 5 subagents) — By Caller stops merging John's regression driver into a named org's row
 
 **Ticket:** `LOG-128` (Log · `P5 - Enhancements`), queue position 9, tier `now`. Shipped `done`, **flagged**.

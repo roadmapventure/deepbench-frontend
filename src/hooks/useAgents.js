@@ -1,3 +1,12 @@
+// DeepBench v7.0.154 | useAgents.js | LOG-70 — useAgentActivitySummary() stops selecting the frozen
+// legacy `patterns_used` column. LOG-112 (v6.3.218) removed the only read of it on this path
+// (buildActivitySummary()'s byPattern bucket); this hook is that function's other caller, so the
+// column has been fetched-and-discarded on every page of every agent-activity query since. Proven
+// dead against 400 live rows (305 carrying a non-empty value, 8 agents): the summary is
+// deep-equal with and without it, while dropping latency_ms changes it — the negative control that
+// makes the comparison discriminating. Payload-only change; no surface reads it, nothing renders
+// differently. Second of LOG-70's two named consumers (src/aiPatterns.js) is NOT done — it is a
+// design question, carded for John.
 // DeepBench v6.3.50 | useAgents.js | CHI-10 — the "p75 latency buckets" line below is now p90; the
 // actual computation lives in useAIActivity.js (moved there by LOG-21) and is only re-exported
 // here — see that file's CHI-10 comment for the real change. Left as a pointer, not rewritten in
@@ -159,7 +168,15 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global', re
           // FEATURE: AI-51 — 'id' added so pairedAgentTurnIds() can key its Set by real per-row
           // id instead of every row sharing `undefined` (which would falsely pair every row in
           // the batch as soon as any single agent-turn row paired).
-          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at,patterns_used')
+          // FEATURE: LOG-70 -- 'patterns_used' dropped. LOG-112 (v6.3.218) rewrote
+          // buildActivitySummary()'s per-agent pattern breakdown to stop reading the frozen legacy
+          // field, and this hook is that function's only other caller -- so from that ship onward
+          // the column was fetched on every page of every agent-activity query and read by
+          // nothing. It is the last consumer named in LOG-70. Do not re-add it: pattern names are
+          // derived at read time by the Log Displayer (.claude/rules/ai-pattern-signature.md,
+          // ARCHITECTURE.md §19k/§19l), and LOG-112's own guard test does not cover src/hooks,
+          // which is exactly how this line survived that session.
+          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))
