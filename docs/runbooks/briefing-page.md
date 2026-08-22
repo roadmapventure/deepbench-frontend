@@ -1,5 +1,6 @@
 <!-- DeepBench v7.0.148 | runbooks/briefing-page.md | SES-107 — the read-back contract's one-line ladder summary said "Accept → streak+1, 5 promotes", carrying the identical undefined-after-promotion blank as `runner-cycle.md` step 2 and in nearly the identical words. It now states the same rule John ruled on (`q-ladder-streak-reset` NO, 22:04Z): promote on every 5th Accept, `streak % 5 = 0`, streak never reset on promotion. CITED, not restated — this exact sentence drifting out of sync with the runbook is the failure `v7.0.118` fixed here once already, so the full rule (and the promote-every-tap runaway that removing the reset alone would cause) lives in step 2 and this line points at it. -->
 <!-- DeepBench v7.0.146 | runbooks/briefing-page.md | directive dda69acb (+ twin 6b6cdd71) — the More-info panel's fields 1-3 are READ FROM runner_items.plain_cant/.plain_after/.plain_worth instead of being composed fresh at render time. Read them, do not re-author them; NULL renders the red defect line and is never coerced to ''. -->
+<!-- DeepBench v7.0.159 | runbooks/briefing-page.md | SES-124 — the LOCKED SECTION ORDER section is added and the regeneration contract's ad-hoc structure list ("stat strip, Shipped, Gated, Needs-your-call, Trust ladder, Directive textarea") is replaced by it. Source of truth for the redesign is docs/BRIEFING-REDESIGN-0822.md (behavior) + docs/design/briefing-redesign-mock-0822.html (look/feel), John-approved 2026-08-22; the table names which of SES-124..129 builds each of the 14 sections, so a rebuilding cycle stops re-deriving the page's shape from prose. Three rules every later section must honour ride with it: §1's counter is COMPUTED from `data-awaits`, never typed by a cycle (the masthead may not be able to disagree with the cards beneath it; singular at 1, "Nothing needs you ✓" at 0); §2's day is the CST day, stated in the heading, matching the budget arithmetic's boundary and not a UTC day; and §3 is the ONLY place narrative prose belongs. The collapse framework's contract is written down here (fold()/.item.fold/.secwrap, one handler, and the rule that a fold NEVER publishes and never enters briefing-state — it is a view state, not a decision). John's explicit removals are listed as do-not-reinstate, and the one real cost is stated rather than left to be discovered: striking "Next up — top 5" and "Next 3" leaves the page with NO forward view of the queue until SES-126 ships §8/§11, which is the spec's own sequencing and is on SES-124's card so he can reverse it in one tap. -->
 <!-- DeepBench v7.0.145 | runbooks/briefing-page.md | directive edab5908 — John: "often your wording is very confusing and does not make sense to which button to push, or i don't understand the issue." New section "More info, and asking me a question from the page": every card and question row gains a More info panel (what you can't do today / what you could do after / why that's worth something / what each button does here), Yes/No rows carry their consequences under the buttons, and John can type a question on any card — recorded to public.runner_card_asks (migration ses105_card_asks) and answered on that card by the next cycle, thread kept. The live in-page answer (his conditional "if possible") is carded, not built. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-page.md | SES-99, directive 48ae1939 — John's line: "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph and i have to type out the answer." The "Help me — the questions" paragraph becomes a tappable yes/no list backed by the new public.runner_questions table; answers ride the briefing-state block under a new `answers` key and are harvested exactly like card decisions. Silence is never an answer. -->
 <!-- DeepBench v7.0.129 | runbooks/briefing-page.md | SES-96 — regeneration step 4 added: never shell-process the WebFetch result's saved file. John's captured permission prompt (2026-08-21) showed the rebuild sed-slicing the prior page's HTML out of ~/.claude/projects/…/tool-results/ — a permission-gated path that parks an unattended cycle exactly like a .claude/ write. Parse briefing-state in context; rebuild structurally from briefing-template.html + the runner_ tables. -->
@@ -24,9 +25,8 @@ Store UTC internally as before; the conversion is display-only.
    `runner_ladder` — same structure as the live page: masthead **(which carries a one-tap
    "▶ Run a cycle now" link to `https://claude.ai/code/routines` — `SES-102`, John's ask
    2026-08-21: the routines page works in his phone's browser and has the Run button, and this
-   page is already on his phone every morning)**, stat strip (shipped /
-   gated before build / reverted / day spend / month left), Shipped cards, Gated before build,
-   Needs-your-call (budget overrides), Trust ladder, Directive textarea. **Language (John,
+   page is already on his phone every morning)** **plus the `N decisions waiting` counter, and
+   then the LOCKED SECTION ORDER below (`SES-124`, `v7.0.159`)**. **Language (John,
    2026-08-20):** outcomes display as "did not run" / "gated before build" (data values
    `did_not_run` / `gated_before_build`; `noop`/`proposal` retired), and every P-class is
    written named (`P10 - Tooling`, never bare `P9`) — see the Language block in
@@ -66,6 +66,62 @@ Store UTC internally as before; the conversion is display-only.
    the `runner_` tables** (the contract below already says this) — never by slicing the previous
    page's HTML out of harness storage. The same rule generalizes: a cloud cycle runs **no Bash
    command against any `~/.claude/` path**, mirror of `runner-cycle.md` step 0's `.claude/` rule.
+
+## The locked section order (`SES-124`, `v7.0.159` — spec: `docs/BRIEFING-REDESIGN-0822.md`)
+
+John iterated this section by section in the `design-briefing-redesign` session and approved the
+mock ("this is good"). **The spec doc is canonical for behavior; the mock
+(`docs/design/briefing-redesign-mock-0822.html`) is canonical for look and feel; where they
+disagree the spec wins.** Every rebuild renders these, in this order, with the section number
+shown:
+
+| # | Section | Built by |
+|---|---------|----------|
+| 1 | Masthead + `N decisions waiting` | `SES-124` ✔ |
+| 2 | Daily activity (CST day) | `SES-124` ✔ |
+| 3 | Today's findings | `SES-124` ✔ |
+| 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` readings |
+| 5 | Shipped | `SES-125` |
+| 6 | Gated before build | `SES-125` |
+| 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
+| 8 | The queue (matrix) | `SES-126` |
+| 9 | Questions | `SES-125` |
+| 10 | Skipped — waiting on your input | `SES-127` |
+| 11 | Now-tier by class | `SES-126` |
+| 12 | Vision claims | `SES-125` |
+| 13 | Trust ladder | `SES-126` |
+| 14 | Who used DeepBench | `SES-126` |
+
+**The three rules `SES-124` adds, which every later section must honour:**
+
+- **§1's counter is computed, never typed.** Each undecided card / unanswered question / undecided
+  vision row renders `data-awaits="1"`; `countWaiting()` counts them. A cycle must never write the
+  number itself — the masthead is the first thing John reads and it may not be able to disagree
+  with the cards beneath it. Singular at 1; `Nothing needs you ✓` at 0.
+- **§2's day is the CST day** — 12:00 AM–11:59 PM America/Chicago, the same boundary the budget
+  arithmetic uses (`runner-cycle.md` step 3), and it is stated **in the heading**, not assumed.
+  Every stat is labeled and the tokens stat carries the **percentage as well as the absolute**.
+- **§3 is the only place narrative prose belongs.** John removed the stray paragraphs that sat
+  between sections; a cycle with something to say says it in Today's findings or not at all.
+
+**Collapse framework (`SES-124`).** One card folds as `.item.fold` + `.head[data-toggle="<id>"]`
++ `.bodyc`, via the `fold(id, num, title, body, headExtra)` helper; a whole section folds as
+`h2.clickable[data-toggle="<id>"]` over a `.secwrap`. One handler drives both. **A fold never
+publishes and is never written to `briefing-state`** — it is a view state, not a decision, and
+publishing reloads the view, which would shut whatever John just opened (the same reason More info
+does not publish). `fold` is a modifier rather than a restyle of `.item`, so cards not yet
+converted are untouched; that one word is the only difference from the mock's markup.
+
+**Removed, on John's explicit instruction** — do not reinstate any of these without a fresh
+ruling: the need-you stat pair, the footer note, the standalone "Needs your call" budget-override
+section (**an override renders as a §9 question now**), the `Next 3` line, `Next up — top 5`, and
+stray narrative outside §3.
+
+> **Known gap, stated rather than discovered later.** `Next up — top 5` and the `Next 3` line are
+> struck here, but their replacement — **§8's queue matrix and §11's now-tier census — ships in
+> `SES-126`**. Until `SES-126` lands, the page carries **no forward view of the queue**. That is
+> the spec's own sequencing, not an oversight, and it is on `SES-124`'s briefing card so John can
+> reverse the order in one tap if losing that view for a few cycles is not acceptable to him.
 
 ## Vision-corpus drip cards (every rebuild — `SES-84` phase 2, register B13, `v7.0.134`)
 

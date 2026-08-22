@@ -5,6 +5,84 @@
 
 ---
 
+## cycle-20260822-2029 / SES-124-briefing-section-frame (v7.0.159, 2026-08-22, Automated runner cycle `0a8af947`, model Opus 5 orchestrator, no subagent) — the briefing's new section frame, and the collapse framework the next three tickets stand on
+
+**Ticket:** `SES-124` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
+automation lane rank −21. Shipped **`done`**. Doc/template only — no `src/`, no `api/`, no `lib/`,
+no migration, no user-visible surface, no flag (§19v).
+
+**How it was selected — the first live use of `SES-111`'s epic drain.** Layer 1a was empty. John
+filed a `drain-epic` directive (`b74009ea`) at **20:28:37Z, one minute before this fire**, reading
+verbatim: *"run out the automation epic tickets until completion in the now bucket."*
+`drain_epic_next()` returned `pick` → `SES-124`, `open_now = 28`. The standing order was **not
+consumed** — exactly the property `SES-111`'s migration header calls load-bearing — so the next
+cycle reads it again.
+
+**Premise revalidation (step 6), measured at source rather than recalled.**
+`docs/runbooks/briefing-template.html` was at **v7.0.145**, still carrying the `Needs your call`
+section (one of John's explicit removals) and **none** of the frame — no decisions-waiting counter,
+no `Daily activity`, no `Today's findings`, no section numbers. Premise held; `revalidated_at` set.
+
+**What shipped.** The locked spec is `docs/BRIEFING-REDESIGN-0822.md` (behavior) over
+`docs/design/briefing-redesign-mock-0822.html` (look/feel), which John iterated section by section
+and approved ("this is good"). This ticket is **1 of 6**: §§1–4 + removals + the collapse framework.
+
+- **§1 — the counter is computed, never typed.** Every undecided card / unanswered question
+  renders `data-awaits="1"`; `countWaiting()` counts them. The alternative — a cycle writing the
+  number — lets the masthead and the cards disagree, and the masthead is the half John reads
+  first. Singular at 1; `Nothing needs you ✓` at 0.
+- **§2 Daily activity** — the **CST day is stated in the heading** (12:00 AM–11:59 PM
+  America/Chicago), the same boundary the budget arithmetic uses and deliberately not a UTC day;
+  the 5.3× gap between those two clocks is the measurement `v7.0.121` already paid for. Every
+  number labeled; tokens shown **absolute and as % of the daily max**; "gated before build" and
+  "did not run" defined beneath the strip.
+- **§3 Today's findings** — new, and now the **only** place narrative prose belongs, which is what
+  makes the "stray paragraphs" removal enforceable rather than a style note.
+- **§4** — both bars gain a one-line label of what they measure, and the
+  `✓ Your latest reading was recorded` line **moves onto the reading card**. It had been sitting one
+  card away from the inputs it acknowledged. Morning/Night rows stay `SES-128`.
+- **The collapse framework** — `fold()`, `.item.fold` + `.head[data-toggle]` + `.bodyc` for a card;
+  `h2.clickable[data-toggle]` + `.secwrap` for a section; one handler for both. **A fold never
+  publishes and never enters `briefing-state`** — it is a view state, not a decision, and a publish
+  reloads the view, which would shut whatever John just opened (the same reason More info does not
+  publish, `v7.0.145`). `fold` is a **modifier** rather than a restyle of `.item`, so the
+  not-yet-converted cards are untouched and this ticket ships the framework **without editing a
+  single card** — that one word is the only difference from the mock's markup.
+- **Removals**, John explicit: the standalone `Needs your call` override section (an override is a
+  yes/no with a consequence either way — it renders as a §9 question now, and it said "nothing
+  here" on nearly every rebuild), and the footer note (its read-only signal is not lost — it lives
+  on `#savebar`, in place, where a failed save reports itself).
+
+**QA — and what the standard checks are actually worth here, said plainly.** `npm run build` green
+and `tests/regression/run-all.js` **34/34 with credentials** are necessary and prove **nothing about
+this change**: the template is a doc, nothing imports it, so both pass identically if the ticket did
+nothing at all. The discriminating test renders the template's **own `render()` chain** under a
+minimal DOM shim and asserts on the HTML it produces — **19/19 pass on the shipped file**. The
+**negative control carries the proof**: the identical assertions pointed at the pre-change template
+from `origin/dev` **fail 18 of 19**, including both removals. That asymmetry is the point — an
+implementation that merely *added* the new headings while leaving `Needs your call` and the footer
+note in place would pass a completeness check and fail this one. The counter is tested as
+**arithmetic over state**, not eyeballed: 2 cards + 1 question undecided → `3 decisions waiting`;
+all decided → `Nothing needs you ✓`; **exactly one → the singular**, which is the off-by-one a
+"looks right" check misses. **The one assertion that passes on both files is named rather than
+counted as a win** — "every stat carries a label": the old strip had labels, they were merely
+uninformative, so that check does not discriminate and is reported as such.
+
+**A real cost, disclosed rather than left to be discovered.** `Next up — top 5` and the `Next 3`
+line are struck from both `briefing-page.md` and `runner-cycle.md` step 9 (retiring registers
+B25/B26's requirements) because John removed those sections. Their replacement — **§8's queue matrix
+and §11's now-tier census — ships in `SES-126`**. So from this ship until `SES-126` lands, the
+briefing carries **no forward view of the queue at all**. That is the spec's own sequencing rather
+than an oversight; it is stated on `SES-124`'s card so John can reorder the epic in one tap, and the
+runbook now forbids a cycle in the gap from quietly reinstating the old sections to paper over it.
+
+**Three files, at the cap:** `docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`
+(the new **locked section order** table, naming which of `SES-124..129` builds each of the 14
+sections, so a rebuilding cycle stops re-deriving the page's shape from prose), and
+`docs/runbooks/runner-cycle.md` step 9 — the third file only because leaving step 9's own copy of
+the page structure in place would have recreated exactly the step-5-vs-step-7 contradiction
+`v7.0.114` was filed to fix.
+
 ## cycle-20260822-2006 / SES-113-removal-proposed-keeps-slot (v7.0.158, 2026-08-22, Automated runner cycle `d8e43a76`, model Opus 5 orchestrator, no subagent) — a ticket awaiting John's verdict stops vanishing from his board
 
 **Ticket:** `SES-113` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,

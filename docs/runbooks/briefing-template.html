@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.159 | runbooks/briefing-template.html | SES-124 — briefing redesign 1 of 6: the SECTION FRAME. Locked spec docs/BRIEFING-REDESIGN-0822.md (John approved the mock, "this is good"); mock docs/design/briefing-redesign-mock-0822.html. §1 masthead gains the decisions-waiting counter — rendered EMPTY and filled by countWaiting() from `data-awaits` on the elements themselves, never from a number a cycle typed, because the masthead is the half John reads first and it must not be able to disagree with the cards under it; singular at 1, "Nothing needs you ✓" at 0. §2 is Daily activity: the CST day is stated IN THE HEADING (12:00 AM–11:59 PM America/Chicago — the same boundary the budget arithmetic uses, deliberately not a UTC day), every number labeled, tokens shown absolute AND as % of the daily max, and one-line definitions of "gated before build" and "did not run" beneath the strip. §3 Today's findings is new and is now the ONLY place narrative prose belongs — latest cycle's finding labeled with its CST time, earlier cycles folded into one default-closed card. §4 keeps its three cards; both bars gain a one-line label of what they measure, and the "✓ Your latest reading was recorded" line MOVES onto the reading card, where the tap it acknowledges actually happens. THE COLLAPSE FRAMEWORK ships here for §§5/6/9/10/12 to build on (SES-125/126/127): `.item.fold` + `.head[data-toggle]` + `.bodyc` for one card, `h2.clickable[data-toggle]` + `.secwrap` for a whole section, one handler for both, and `fold()` as the helper. `fold` is a MODIFIER, not a restyle of `.item`, so the always-open cards still on this page are untouched until SES-125 converts them — that one word is the only difference from the mock. A fold NEVER publishes and is never written to briefing-state: it is a view state, not a decision, and publishing reloads the view. REMOVED on John's explicit instruction: the standalone "Needs your call" override section (an override is a yes/no with consequences either way — it renders as a §9 question now), the footer note (the read-only signal it restated lives on #savebar, in place, where a failed save reports itself), and the stray narrative paragraphs between sections. Sections now carry their locked numbers and sit in the locked order (§7 Directive queue moved above §9). Slots this ticket does not fill are named HTML comments, never placeholders that render. -->
 <!-- DeepBench v7.0.145 | runbooks/briefing-template.html | directive edab5908 — More info. Every card and every question gains a "More info" button opening a plain-language panel (what you can't do today / what you could after / why it's worth something), what each button DOES on that card, the conversation log, and a box to ask a question in your own words. Yes/No rows now carry the consequence of each tap under the button that causes it. Asks ride briefing-state under `asks` and are harvested into public.runner_card_asks. Contract: briefing-page.md's More-info section. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-template.html | SES-99, directive 48ae1939 — the question list: open rows of public.runner_questions render as Yes/No rows that record on the tap, answers ride briefing-state under `answers`, and the note input is optional by construction. Contract: briefing-page.md's question-list section. -->
 <title>DeepBench Morning Briefing</title>
@@ -26,18 +27,56 @@
               letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
   header .date{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--brass-light);
                text-align:right;line-height:1.3}
+  header .date b{display:block;color:var(--card);font-weight:700}
   .stats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);
-         border-radius:6px;overflow:hidden;margin:16px 0 22px}
+         border-radius:6px;overflow:hidden;margin:12px 0 8px}
   .stat{flex:1;background:var(--card);padding:9px 6px;text-align:center}
   .stat b{display:block;font-family:var(--mono);font-size:15px;font-weight:700;
           font-variant-numeric:tabular-nums;color:var(--navy)}
-  .stat span{font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  /* SES-124 — every number is labeled, and a label may wrap to two lines ("Tokens of 10M daily
+     max"). letter-spacing drops from .8 to .6 and the label becomes a block so the wrap is even. */
+  .stat span{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+             line-height:1.3;display:block;margin-top:2px}
+  .strip-def{font-size:11.5px;color:var(--muted-deep);margin:0 0 4px;line-height:1.5}
+  .strip-def b{color:var(--ink)}
+  .finding p{margin:0 0 8px;font-size:14px}
   h2{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.4px;
      text-transform:uppercase;color:var(--muted-deep);margin:26px 0 10px;
      border-bottom:1px solid var(--line);padding-bottom:5px}
+  h2 .secnum{font-family:var(--mono);font-size:11px;color:var(--brass-deep);margin-right:7px}
   .item{background:var(--card);border:1px solid var(--line);border-radius:7px;
         padding:14px 14px 12px;margin-bottom:14px}
   .item[data-decision]{border-color:var(--brass)}
+  /* ---- SES-124 · THE COLLAPSE FRAMEWORK -------------------------------------------------
+     The shared mechanism §§5/6/9/10/12 are built on (SES-125/126/127). Two shapes:
+       (a) ONE CARD folds — <div class="item fold" id="X"> with a <div class="head" data-toggle="X">
+           and a <div class="bodyc">. Closed by default; `.open` on the .item reveals the body.
+       (b) A WHOLE SECTION folds — <h2 class="clickable" data-toggle="Y"> over a
+           <div class="secwrap" id="Y">. Same `.open` switch, same chevron.
+     `fold` is deliberately a MODIFIER rather than a restyle of `.item`: the always-open cards
+     still on this page (converted by SES-125) keep their padding untouched, so this ticket can
+     ship the framework without touching a single card. The mock's cards are shape (a) with
+     `fold` added — that one word is the only difference from docs/design/briefing-redesign-mock-0822.html. */
+  .item.fold{padding:0;overflow:hidden}
+  .item.fold .head{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer}
+  .item.fold .head:hover{background:var(--card-alt)}
+  .cardnum{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brass-deep);
+           min-width:20px}
+  .head .ttl{font-family:var(--display);font-size:14.5px;font-weight:600;line-height:1.25;flex:1}
+  .idchip{font-family:var(--mono);font-size:10px;color:var(--brass-deep);flex-shrink:0}
+  .head .st{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+  .head .st.done{color:var(--moss);font-weight:700}
+  .chev{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+  .bodyc{display:none;padding:2px 13px 13px;border-top:1px solid var(--line-soft)}
+  .item.open .bodyc,.q.open .bodyc{display:block}
+  h2.clickable{cursor:pointer}
+  h2.clickable:hover{color:var(--ink)}
+  h2 .chev{float:right;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .countchip{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--navy);
+       color:var(--white);border-radius:9px;padding:1px 8px;vertical-align:1px}
+  .secwrap{display:none}
+  .secwrap.open{display:block}
+  .tblwrap{overflow-x:auto;border-radius:7px}
   .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
         padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
         background:var(--card-alt)}
@@ -84,6 +123,10 @@
        overflow:hidden;display:flex;margin:6px 0 4px}
   .bar .dev{background:var(--navy);height:100%}
   .bar .qa{background:var(--brass);height:100%}
+  /* SES-124 — a bar nobody can read is decoration. Every bar states what it measures. */
+  .barlbl{font-family:var(--mono);font-size:9px;letter-spacing:.6px;text-transform:uppercase;
+          color:var(--muted);margin-top:2px}
+  .recorded{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:8px}
   .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10.5px;
           color:var(--muted-deep);font-variant-numeric:tabular-nums}
   .legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:baseline}
@@ -245,11 +288,27 @@
       +thread(id)+askBox(id)+'</div>';
   }
 
+  // SES-124 — the collapse framework's card helper. One default-closed card: a clickable head
+  // (number · title · chevron) over a hidden body. `headExtra` is markup dropped between the
+  // number and the title — SES-125 puts the kind chip, ticket ID and decision state there, which
+  // is why it is a slot rather than three more arguments this ticket cannot yet fill.
+  // It carries NO `data-awaits`: folding is a view state, never a decision John owes.
+  function fold(id, num, title, bodyHtml, headExtra){
+    return '<div class="item fold" id="'+id+'">'
+      +'<div class="head" data-toggle="'+id+'"><span class="cardnum">'+num+'</span>'
+      +(headExtra||'')
+      +'<span class="ttl">'+title+'</span><span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'+bodyHtml+'</div></div>';
+  }
+
   function card(id, kindCls, kindTxt, idTxt, title, bodyHtml, more){
     var d = state.items[id] || {};
     var dec = d.decision || '';
     var showReason = dec==='reverse' || dec==='rework';
-    return '<div class="item" id="'+id+'"'+(dec?' data-decision="'+dec+'"':'')+'>'
+    // SES-124 — `data-awaits` is how the masthead counter (§1) knows this card still needs John.
+    // It is set from STATE, not from the DOM's appearance, so a card that renders in some future
+    // collapsed shape still counts correctly. Every decidable element carries it; nothing else does.
+    return '<div class="item" id="'+id+'"'+(dec?' data-decision="'+dec+'"':' data-awaits="1"')+'>'
       +'<div class="top"><span class="kind '+kindCls+'">'+kindTxt+'</span>'
       +'<span class="id">'+idTxt+'</span></div>'
       +'<h3>'+title+'</h3>'+bodyHtml
@@ -284,7 +343,7 @@
       : '<div class="ynmean"><span class="missing">This question was published without its '
         +'Yes/No consequences — a defect in the cycle that asked it. Tap More info and ask me '
         +'what it means rather than guessing.</span></div>';
-    return '<div class="q" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':'')+'>'
+    return '<div class="q" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':' data-awaits="1"')+'>'
       +'<p class="qtext">'+text+'</p>'
       +(ctx ? '<p class="qctx">'+ctx+'</p>' : '')
       +'<div class="yn">'
@@ -307,45 +366,80 @@
 
   function render(){
     document.getElementById('page').innerHTML =
+    // ===== §1 · MASTHEAD (SES-124) =========================================================
+    // The decisions-waiting counter is rendered EMPTY here and filled by countWaiting() in
+    // wire(), from `data-awaits` on the elements themselves. Rendering it from a number the
+    // rebuilding cycle typed in would let the masthead and the cards disagree — and the
+    // masthead is the half John reads first.
     '<header><div class="db">DB</div><div><h1>Morning Briefing</h1>'
-    +'<div class="sub">DeepBench · Automated Development</div></div>'
-    +'<div class="date">2026-08-19<br>v7.0.94</div></header>'
+    +'<div class="sub">DeepBench · Automated Development · '
+    +'<a href="https://claude.ai/code/routines" style="color:inherit">&#9654; Run a cycle now</a></div></div>'
+    +'<div class="date">Aug 19, 2026 CST<br>v7.0.94<br><b id="waiting"></b></div></header>'
     +'<div class="wrap">'
+    // ===== §2 · DAILY ACTIVITY (SES-124) ====================================================
+    // Was an unlabeled five-box strip. Three things John asked for, all load-bearing: the DAY
+    // is stated in the heading (this is a CST day — 12:00 AM to 11:59 PM America/Chicago, the
+    // same boundary the budget arithmetic uses, NOT a UTC day); every number says what it
+    // counts; and the tokens box carries the percentage as well as the absolute, because
+    // "~3.9M" means nothing without the ceiling next to it.
+    // Figures below are sample values — regenerate from runner_cycles over the CST day.
+    +'<h2><span class="secnum">2</span>Daily activity — today, 12:00 AM to 11:59 PM CST</h2>'
     +'<div class="stats">'
-    +'<div class="stat"><b>1</b><span>Shipped</span></div>'
+    +'<div class="stat"><b>1</b><span>Shipped today</span></div>'
     +'<div class="stat"><b>0</b><span>Gated before build</span></div>'
-    +'<div class="stat"><b>0</b><span>Did not run</span></div>'
-    +'<div class="stat"><b>$0.00</b><span>API of $5 day</span></div>'
-    +'<div class="stat"><b>0M</b><span>tokens of 10M</span></div>'
+    +'<div class="stat"><b>0</b><span>Cycles: did not run</span></div>'
+    +'<div class="stat"><b>$0.00</b><span>API spend of $5.00 day</span></div>'
+    +'<div class="stat"><b>~0M<br>0%</b><span>Tokens of 10M daily max</span></div>'
     +'</div>'
-    +'<h2>Budget &amp; usage</h2>'
+    +'<p class="strip-def"><b>Gated before build</b> = the run designed the work but a rule said '
+    +'it needs your permission to ship — it&rsquo;s a card below. <b>Did not run</b> = a cycle '
+    +'started, checked the board, and found nothing it was allowed to do.</p>'
+    // ===== §3 · TODAY'S FINDINGS (SES-124) ==================================================
+    // The latest cycle's finding, labeled with its CST time, then every earlier cycle of the
+    // same CST day folded into one default-closed card. This section is the ONLY place
+    // narrative prose belongs — John removed the stray paragraphs that used to sit between
+    // sections, so a rebuilding cycle with something to say says it here or not at all.
+    +'<h2><span class="secnum">3</span>Today&rsquo;s findings</h2>'
+    +'<div class="finding"><p><span class="lbl">Latest — 3:29 PM cycle</span>'
+    +'One line to a short paragraph: what this run actually found. Sample value.</p></div>'
+    +fold('fh','3.1','Earlier today — 0 cycles',
+       '<p class="strip-def">One line per earlier cycle of the CST day, newest first — time, '
+      +'outcome, and the single thing worth knowing. Sample value.</p>')
+    // ===== §4 · BUDGET & USAGE (SES-124 touches the frame only) =============================
+    +'<h2><span class="secnum">4</span>Budget &amp; usage</h2>'
     // Regenerate these three cards from runner_cycles / runner_budget / runner_usage_readings —
     // spec: docs/runbooks/briefing-page.md (John, 2026-08-20). Figures below are sample values.
     +'<div class="budget"><h4>API dollars — real money, hard wall</h4>'
     +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
-    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>dev $0.00</span>'
+    +'<div class="barlbl">Bar = share of today&rsquo;s $5.00 spent</div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work $0.00</span>'
     +'<span><span class="sw" style="background:var(--brass)"></span>QA $0.00</span>'
-    +'<span>= $0.00 of $5.00 day</span><span>$0.00 of $100 month</span></div></div>'
+    +'<span>= $0.00 of $5.00 today</span><span>$0.00 of $100 this month</span></div></div>'
     +'<div class="budget"><h4>Subscription tokens — your allowance, runner\'s share<span class="est">all estimated</span></h4>'
     +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
-    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>dev ~0M</span>'
+    +'<div class="barlbl">Bar = share of the daily max used</div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work ~0M</span>'
     +'<span><span class="sw" style="background:var(--brass)"></span>QA ~0M</span>'
-    +'<span>= ~0M of 10M allowance</span></div>'
+    +'<span>= ~0M of 10M today (0%)</span></div>'
     +'<table style="margin-top:10px"><tr><th>Model</th><th>Runner today (est)</th><th>Your weekly meter</th></tr>'
     +'<tr><td>Fable 5</td><td class="num">0</td><td class="num">—</td></tr>'
     +'<tr><td>Opus 5</td><td class="num">0</td><td class="num">all models —</td></tr>'
     +'<tr><td>Sonnet 5</td><td class="num">0</td><td class="num"></td></tr></table>'
-    +'<p class="calib">'+(state.reading
-        ? 'Your last reading — <b>'+esc(state.reading.at)+'</b>: Fable <b>'+esc(state.reading.fable)+'%</b> · All models <b>'+esc(state.reading.all)+'%</b> · 5-hour <b>'+esc(state.reading.h5)+'%</b>.'
-        : 'No reading yet — the runner is on its conservative allowance until your first one.')
-    +' Guardrails: rest at 85% weekly · 50% share · 10M/day uncalibrated · 3M/day if the reading is over 48h old.</p></div>'
+    +'<p class="calib">Guardrails: rest at 85% weekly · 50% share · 10M/day uncalibrated · 3M/day if the reading is over 48h old.</p></div>'
+    // SES-124 — the "what you last gave me" line MOVES here, onto the card that asks for it.
+    // It sat on the tokens card above, one card away from the inputs it was acknowledging, so
+    // the confirmation for John's tap was not where his tap was. Morning/Night rows: SES-128.
     +'<div class="budget"><h4>Today\'s reading — 10 seconds, recalibrates the budget</h4>'
+    +'<p class="recorded">'+(state.reading
+        ? '&#10003; Your latest reading was recorded — <b>'+esc(state.reading.at)+'</b>: Fable <b>'+esc(state.reading.fable)+'%</b> · All models <b>'+esc(state.reading.all)+'%</b> · 5-hour <b>'+esc(state.reading.h5)+'%</b>.'
+        : 'No reading yet — the runner is on its conservative allowance until your first one.')
+    +'</p>'
     +'<div class="readgrid">'
     +'<label>Fable %<input type="number" inputmode="numeric" id="r-fable" value="'+esc(state.reading?state.reading.fable:'')+'"></label>'
     +'<label>All models %<input type="number" inputmode="numeric" id="r-all" value="'+esc(state.reading?state.reading.all:'')+'"></label>'
     +'<label>5-hour %<input type="number" inputmode="numeric" id="r-h5" value="'+esc(state.reading?state.reading.h5:'')+'"></label>'
     +'</div><button class="savebtn" id="r-save">Save reading</button></div>'
-    +'<h2>Shipped</h2>'
+    +'<h2><span class="secnum">5</span>Shipped</h2>'
     +card('item-ses78a','ship','Ship','SES-78a (Tooling · P10 - Tooling)',
       'Runner foundation — six tables and your budget, live',
       '<p><span class="lbl">Value case</span>The ground the Automated mode stands on: your directives, the $100/month budget, the cycle ledger, the trust ladder, and the before-images that make every overnight change reversible by one tap.</p>'
@@ -361,13 +455,22 @@
     +card('item-tap-test','test','Test','SES-78b tap QA',
       'Tap test — prove the round trip from your phone',
       '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>')
-    +'<h2>Gated before build — your promote / kill</h2><p class="empty">None tonight.</p>'
-    +'<h2>Needs your call</h2><p class="empty">No budget overrides pending. Day and month envelopes untouched.</p>'
+    +'<h2><span class="secnum">6</span>Gated before build — your promote / kill</h2><p class="empty">None tonight.</p>'
+    // SES-124 · REMOVED, on John's explicit instruction: the standalone "Needs your call"
+    // budget-override section. An override is a yes/no with a consequence either way, which is
+    // exactly what §9 already is — so it renders as a §9 question now and stops being a section
+    // that says "nothing here" on almost every rebuild. Do not reinstate it.
+    // ===== §7 · DIRECTIVE QUEUE (moved up to the locked order by SES-124) ===================
+    +'<h2><span class="secnum">7</span>Directive queue — your seed, any time</h2>'
+    +'<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first.">'+esc(state.directive)+'</textarea>'
+    +'<div class="savebar" id="savebar">'+(readOnly?'read-only view — decisions record for the owner only':'')+'</div></div>'
+    // §7's "your last 3 directives — what became of them" card: SES-129.
+    // §8 · The queue (matrix: Queue · ID · Class · Status · Design status · Title): SES-126.
     // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
     // below are sample values. A question that cannot be asked as yes/no does not belong here;
     // it belongs on a gated_before_build card with a proposal.
-    +'<h2>Questions — tap yes or no</h2>'
+    +'<h2><span class="secnum">9</span>Questions — tap yes or no</h2>'
     +question('q-sample-slug',
       'Should new automation tickets I create go above your current lane, ahead of ADM-1?',
       'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.',
@@ -375,7 +478,9 @@
       // under the button that causes it.
       'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
       'it joins the bottom of your lane and waits its turn.')
-    +'<h2>Trust ladder</h2><table>'
+    // §10 · Skipped — waiting on your input: SES-127.  §11 · Now-tier by class: SES-126.
+    // §12 · Vision claims (formatted exactly like §9): SES-125.
+    +'<h2><span class="secnum">13</span>Trust ladder</h2><table>'
     +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
     +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
     +'<tr><td>Enhancement</td><td class="num">1</td><td class="num">0</td></tr>'
@@ -384,10 +489,11 @@
     +'<tr><td>Bug fix</td><td class="num">1</td><td class="num">0</td></tr>'
     +'<tr><td>Tooling</td><td class="num">1</td><td class="num">0</td></tr>'
     +'</table>'
-    +'<h2>Directive queue — your seed, any time</h2>'
-    +'<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first.">'+esc(state.directive)+'</textarea>'
-    +'<div class="savebar" id="savebar">'+(readOnly?'read-only view — decisions record for the owner only':'')+'</div></div>'
-    +'<p class="note">Decisions and directives record for the page owner only — anyone else with this link sees a read-only briefing. Recorded taps are read by the next runner cycle. DeepBench · ARCHITECTURE.md §19v · SES-78b.</p>'
+    // §14 · Who used DeepBench (last 5 production uses): SES-126.
+    // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
+    // read-only rule that the savebar already states in place, at the moment it matters, and
+    // then closed the page on housekeeping instead of on his board. The read-only signal is
+    // NOT lost — it lives on `#savebar` above, which is where a failed save reports itself.
     +'</div>';
     wire();
   }
@@ -437,7 +543,35 @@
 
   function bar(t){ var b=document.getElementById('savebar'); if(b) b.textContent=t; }
 
+  // SES-124 — §1's counter. Counts `data-awaits` elements: every undecided card and unanswered
+  // question, and (from SES-125) every undecided vision row, because they all carry the same
+  // attribute. Singular at 1 — "1 decisions waiting" is the kind of small wrongness that makes
+  // the whole page read as unmaintained. At zero it says so affirmatively rather than "0".
+  function countWaiting(){
+    var n = document.querySelectorAll('[data-awaits]').length;
+    var w = document.getElementById('waiting');
+    if (!w) return;
+    w.textContent = n ? (n + ' decision' + (n===1?'':'s') + ' waiting') : 'Nothing needs you ✓';
+  }
+
   function wire(){
+    countWaiting();
+    // SES-124 — the collapse framework's one handler, for BOTH shapes: a folding card
+    // (`.item.fold` + `.head[data-toggle]`) and a folding section (`h2.clickable[data-toggle]`
+    // + `.secwrap`). It does NOT publish, for the same reason More info does not: a fold is a
+    // view state, not a decision, and publishing reloads the view — which would shut the thing
+    // John just opened. Nothing about a fold is written to briefing-state.
+    document.querySelectorAll('[data-toggle]').forEach(function(h){
+      h.addEventListener('click', function(e){
+        // A tap on a control inside the head is that control's, never the fold's.
+        if (e.target.closest('button,input,textarea,a')) return;
+        var el = document.getElementById(h.getAttribute('data-toggle'));
+        if (!el) return;
+        var open = el.classList.toggle('open');
+        var ch = h.querySelector('.chev');
+        if (ch) ch.innerHTML = open ? '&#9662;' : '&#9656;';
+      });
+    });
     // v7.0.145 — More info toggles WITHOUT publishing. Opening a panel is not a decision, and a
     // publish reloads the view, which would slam the panel shut the instant it opened.
     document.querySelectorAll('.morebtn').forEach(function(btn){
