@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.162 | runbooks/runner-cycle.md | SES-127 — step 5 stops letting a skip be a sentence, and the step-9 tail gains the two writes that creates. MEASURED BEFORE A LINE CHANGED, not recalled: fifteen public.runner_* tables exist and NOT ONE stores a skip, so every skip this platform has ever made lives as prose in runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z: "Step 5: queue #1 SES-110 skipped per B24 …". That sentence is real, correct, and completely invisible to John, who does not read the ledger; it was the only record that four of his top-five queue positions were being stepped past every cycle. New: one call, public.record_skip(cycle, ticket, reason_kind, reason), before you drop to the next ticket — migration ses127_skip_records, which writes its own before-image on both paths so the call is the whole obligation. THE HALF THAT WOULD HAVE BEEN GOT WRONG: it is idempotent AND you are meant to call it every time. John's standing Automation drain re-reads 25 open now-tier members eight cycles a day, so an INSERT-per-skip design puts the same SES-110 row in front of him 8×/day forever; uniq_open_skip bumps skip_count instead, and skip_count is itself the signal ("this has blocked 14 times"). Two boundaries stated so no cycle re-derives them differently: a skip you can resolve YOURSELF is never recorded ('claimed-by-peer' is deliberately absent from the vocabulary — a contested claim expires in 24h and the section is titled "waiting on YOUR input"), and you never resolve a skip afterwards, because §10 derives "still skipped" from backlog_items.status NOT IN ('done','removed') — building the ticket later clears the row with no write from anyone. That is the SES-86 phase 3 / SES-101 / SES-111 prose→code lesson applied by DELETING a rule rather than writing one. Tail: (3) harvests the new `unblocks` briefing-state key alongside `answers`/`asks`, and new (5b) stamps briefed_at AFTER the republish returns — briefed_at IS NULL is the NEW chip, so stamping first eats it on rows a failed publish never showed him, and stamping after risks only one extra night marked new. -->
 <!-- DeepBench v7.0.158 | runbooks/runner-cycle.md | SES-113 — a `removal proposed` ticket KEEPS its earned queue slot, and step 5 gains the procedural skip that keeps it safe. John's ruling 2026-08-22, verbatim: "what if I reject the proposal?" A removal-proposed ticket is one awaiting his verdict — exactly like `needs-john` — and the two were treated oppositely: `needs-john` kept its number and was skipped, removal-proposed was stripped from the standings the moment the proposal was filed and vanished from every ranked view he has, so his Reverse had to re-insert it from nowhere. That asymmetry WAS the bug. Migration `ses113_removal_proposed_keeps_slot` changes `recompute_backlog_queue()` in exactly three predicates (the ineligible-clear WHERE, the `v_total` count, the `eligible` CTE) to `status NOT IN ('done','removed')`; everything else is byte-for-byte the prior body, all five documented ordering traps preserved and re-asserted individually against `prosrc`. The pin-clear deliberately stays `('done','removed')` — it already was — so a removal-proposed ticket now keeps its PIN as well as its number, the same rule applied consistently for the first time. MEASURED BEFORE A LINE CHANGED, not recalled: CHI-89 (`P5 - Enhancements`, tier `now`) sat at `queue = NULL` while carrying an UNDECIDED gated card (`e1c7a940`) — so John had a live decision pending on a ticket his own board would not show him in any ordered list. THE HALF THAT WOULD HAVE SHIPPED A LIVE HAZARD ALONE: step 5's read filters on `queue IS NOT NULL` and claims, NOT on status, so numbering CHI-89 makes it selectable — a cycle could build a ticket whose premise the runner has already argued is dead. The procedural skip therefore ships in THIS commit, not a later one. QA was discriminating rather than merely complete: the pick expectation (CHI-89 → slot 23, never 559) was computed by a standalone `row_number()` that never calls the function, and the NEGATIVE CONTROL restored the pre-change body inside a deliberately rolled-back transaction — it strips CHI-89 to NULL and numbers 559, against the shipped body's 23 and 560. Note honestly: this cycle's own first recompute returned 0 rows moved, because a concurrent actor filing `SES-122` at 20:12Z ran the recompute against the already-live new function first — that 0 is idempotence, NOT evidence the change works, and is precisely the false pass `SES-86` phase 2 was bitten by; the negative control is what carries the proof. 560 numbered `1..560`, all distinct, 0 tier and 0 class inversions. Register B4 amended in RUNNER-GOV-0820-REQUIREMENTS.md: NULL = out of the standings entirely; a flag (claim / needs-john / needs-desktop / removal proposed) = IN the standings, currently skipped. `SES-114` (queue 3) generalises the skip across `design_status`. -->
 <!-- DeepBench v7.0.159 | runbooks/runner-cycle.md | SES-124 — step 9 stops carrying its own copy of the briefing page's shape. The page's structure is now the LOCKED SECTION ORDER table in briefing-page.md (spec: docs/BRIEFING-REDESIGN-0822.md, John-approved mock 2026-08-22), so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Two of this step's standing requirements are STRUCK because John removed the sections that carried them: the "Next up — top five" section (register B25) and the compact "Next 3" line (register B26). Said plainly rather than left to be discovered: their replacement is §8's queue matrix and §11's now-tier census, and those ship in SES-126 — so from this ship until SES-126 lands the briefing carries NO forward view of the queue. That is the redesign's own sequencing, it is disclosed on SES-124's card so John can reorder the epic in one tap, and a cycle in the gap must NOT reinstate the old sections to paper over it. Everything else in step 9 is unchanged. -->
 <!-- DeepBench v7.0.156 | runbooks/runner-cycle.md | SES-111 — step 5's selection layer 1 splits into 1a (one-off directives, unchanged) and 1b, a STANDING epic drain: one `runner_directives` row John writes once (`type='drain-epic'` + `epic_id`) meaning "work this epic's open now-tier members cycle after cycle until none are left". Migration `ses111_drain_epic` adds the kind, the FK, the exclusivity CHECK, and `public.drain_epic_next(uuid)` — the rule as CODE, because a rule each cycle re-derives from John's sentence is one that gets re-derived differently (SES-86 phase 3 and v7.0.146 are the same lesson twice). Premise MEASURED before a line was written, not recalled: inserting a drain-epic row returned 23514 against the old two-value type CHECK, so the sentence could not even be stored. Five properties, all preserved by anyone who edits this: the epic is an FK not prose; a drain is never consumed (1a's "mark it in_progress" would kill the standing-ness on cycle 1, which IS the feature); now-tier only (John's SES-110 boundary verbatim); `blocked` is NOT `retired`; and it NEVER self-activates. That fourth one is the parallel-cycles trap and the one that would have shipped wrong — the obvious implementation retires when the pick query finds nothing, which passes fourteen of fifteen checks and silently cancels John's standing order the first time two peers hold the last two claims between them. QA proved it live (sole member claimed by a peer -> blocked, open_now=1, directive untouched) alongside the ticket's own bar: two consecutive cycles with no re-declaration, cycle B advancing past TWO claimed tickets, directive still `queued`; self-retirement writing its own before-image (§19v) then returning `none`. Fixtures deleted, recompute 0 rows moved. NOT DONE and said plainly rather than discovered later: the Automation epic cannot yet drain to completion, because SES-110 is `partial` with one `.claude/` half register B39 forbids an unattended cycle (carded 9e7d8bf2) — SES-112/SES-114 are the filed fix. With no drain declared, selection is byte-for-byte v7.0.155. -->
@@ -811,7 +812,44 @@ your reasoning — then the ticket goes pending and you DROP TO THE NEXT availab
 ticket and continue (register B24: a card is bookkeeping, not a build — never end the cycle
 over one; only walls and blockers end a cycle build-less).** Exactly ONE build per cycle,
 never more. A gated card's later Accept re-enters that ticket at queue #1 (register B23 —
-tap-order stacking, recompute renumbers beneath). **The moment the pick is made, CLAIM the ticket — one atomic write, before any work
+tap-order stacking, recompute renumbers beneath).
+
+**EVERY SKIP YOU MAKE IS A ROW, NEVER A SENTENCE (`SES-127`, `v7.0.162`, migration
+`ses127_skip_records`).** Whenever you step past a ticket for a reason **John** has to clear —
+a gated card already filed, a `removal proposed` verdict pending, a `needs-john` /
+`needs-desktop` `design_status`, a `.claude/` permission gate — record it with one call, before
+you drop to the next ticket:
+
+```sql
+SELECT public.record_skip('<your cycle id>', '<TICKET-ID>',
+       '<gated|removal-proposed|needs-john|needs-desktop|permission-gate|other>',
+       '<one sentence in John''s register: why it is skipped and what would unblock it>');
+```
+
+**Measured, because this was already failing silently.** Before this shipped, fifteen
+`public.runner_*` tables existed and **none stored a skip** — so every skip this platform ever
+made lived as prose inside `runner_cycles.notes` (live example: cycle `1df7d9c6`, 19:12Z, *"Step
+5: queue #1 `SES-110` skipped per B24 …"*). That sentence is real, correct, and completely
+invisible to John, who does not read the ledger. §10 of the briefing is what it feeds.
+
+Four things about the call, each of which prevents a real failure:
+
+- **It is idempotent and you are meant to call it every time.** A repeat skip of the same ticket
+  for the same reason bumps `skip_count` and `last_skipped_at` on the existing row rather than
+  adding a second one — which is what stops John's standing drain (25 open `now`-tier members,
+  eight cycles a day) from showing him the same row 8×/day.
+- **Do NOT record a skip you can resolve yourself.** A contested ticket claim (0 rows, a peer
+  holds it) expires in 24h with nothing for John to do, and `claimed-by-peer` is deliberately
+  absent from the `reason_kind` vocabulary — the section is titled *waiting on **your** input*,
+  and filling it with rows he cannot action is how an actionable section stops being read.
+- **You do not resolve it afterwards.** §10 derives "still skipped" by joining `backlog_items`
+  and filtering `status NOT IN ('done','removed')`, so building the ticket later removes the row
+  from the section with no write from you. `resolved_at` is only for a ticket that is still open
+  when its blocker goes away.
+- **It writes its own before-image**, both paths (§19v), so this one call is the whole of your
+  obligation.
+
+**The moment the pick is made, CLAIM the ticket — one atomic write, before any work
 (SES-86 phase 1, John-approved 2026-08-21).** The write is the reservation, exactly like the
 lease and the counters — never check-then-claim in two statements:
 
@@ -1097,7 +1135,7 @@ pre-lease harvest is exactly the "about to overwrite another session" moment Joh
 requires you to notice and absorb; **(3)** write the harvested decisions idempotently
 (`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
 only), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
-`uniq_card_ask`); **(4)** re-export the backlog snapshot now that the harvest writes have
+`uniq_card_ask`) **and any `unblocks` (`SES-127`, `v7.0.162`)**; **(4)** re-export the backlog snapshot now that the harvest writes have
 landed — the fix for the one-harvest staleness `SES-109` found (`v7.0.149`). Re-run step 7's
 `scripts/export-backlog-snapshot.js`; the script is deterministic and prints `unchanged`,
 writing nothing, when John's taps moved no board row — the common case, and then there is
@@ -1112,7 +1150,12 @@ rebase conflict that survives the retries is not a wall: leave the snapshot one 
 exactly as before this fix — the next cycle's step-7 export captures the same writes — and note
 it in the cycle row; **(5)** rebuild cards from the DB's undecided set — **each with its More-info
 panel, and each open `runner_card_asks` row answered on its own card** (`v7.0.145`; a card
-rendered without those fields carries a visible defect line, by design) — and republish; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
+rendered without those fields carries a visible defect line, by design) — and republish; **(5b)
+stamp `briefed_at` on the §10 skip rows you just rendered, and ONLY after the republish returns**
+(`SES-127`): `UPDATE public.runner_skips SET briefed_at = now() WHERE briefed_at IS NULL AND
+resolved_at IS NULL;` — `briefed_at IS NULL` *is* the NEW chip, so stamping before the publish
+lands silently eats the chip on rows John never saw, and stamping after means the worst case is
+one extra night marked new; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
 (holder-guarded statement in step 1). Then end the session cleanly. The tail should take
 seconds to low minutes — everything long-running happened before it, in parallel.
 

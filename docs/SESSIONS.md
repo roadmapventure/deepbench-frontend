@@ -5,6 +5,93 @@
 
 ---
 
+## cycle-20260822-2155 / SES-127-skip-records (v7.0.162, 2026-08-22, Automated runner cycle `f5637109`, model Opus 5 orchestrator, no subagent) — a skip stops being a sentence
+
+**Ticket:** `SES-127` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
+automation lane rank −18. Shipped **`done`**. Three build files + one migration — no `src/`,
+no `api/`, no `lib/`, no user-visible surface on dev, no flag (§19v).
+
+**Selected by layer 1b** — John's standing Automation-epic drain (directive `b74009ea`, *"run out
+the automation epic tickets until completion in the now bucket."*): `drain_epic_next()` → `pick`
+`SES-127`, `open_now = 25`. Claim taken atomically, 1 row.
+
+### The premise, measured this session rather than recalled
+
+1. `information_schema.tables` → **fifteen** `public.runner_*` tables. **None stores a skip.**
+2. So every skip lives as prose in `runner_cycles.notes`. Live example read this session:
+   cycle `1df7d9c6`, `2026-08-22T19:12Z` — *"Step 5: queue #1 `SES-110` skipped per B24 — its only
+   open half is the `.claude/` session-setup INSERT…"*. Correct, complete, and **invisible to
+   John**, who does not read the ledger.
+3. `briefing-template.html:680` was the named comment `// §10 · Skipped — waiting on your input`.
+
+### What shipped
+
+**Migration `ses127_skip_records`** — `public.runner_skips` + `public.record_skip()`. Six
+load-bearing properties, written into the migration's own header so they travel with the code:
+one open row per `(backlog_id, reason_kind)`; `first_skipped_at` never moves while
+`last_skipped_at` does; `briefed_at IS NULL` **is** the NEW chip; resolution is derived, never
+maintained; a skip the runner can resolve itself is never recorded; `record_skip()` writes its own
+before-image on both paths.
+
+**`runner-cycle.md`** — step 5 gains the one-call recording rule and the two boundaries a cycle
+would otherwise re-derive differently (`claimed-by-peer` is not in the vocabulary; you never
+resolve a skip afterwards). The step-9 tail gains the `unblocks` harvest and new sub-step **(5b)**,
+stamping `briefed_at` **after** the republish returns.
+
+**`briefing-template.html`** — §10 built: the first real use of `SES-124`'s section-fold framework
+(shape (b), `h2.clickable` over `.secwrap`), default closed, `N · M new` count chip, nine columns
+in the spec's order with Unblock first, live `question`/`prep` buttons that record into
+`briefing-state.unblocks`, and `card` rows rendered **disabled** pointing at the card that already
+carries the decision.
+
+**`briefing-page.md`** — §10's data contract, the verbatim query, and the LOCKED SECTION ORDER row
+marked built.
+
+### The one that would have shipped wrong
+
+An INSERT-only skip table. John's standing drain re-reads **25** open `now`-tier members, **eight
+cycles a day**, so the same `SES-110` row would have landed in front of him **8×/day forever**.
+`uniq_open_skip (backlog_id, reason_kind) WHERE resolved_at IS NULL` bumps `skip_count` and
+`last_skipped_at` instead — and `skip_count` is itself the signal worth having.
+
+### QA (discriminating, and honest about what each check is worth)
+
+- **Dedup:** three `record_skip` calls → **two** rows. An INSERT-only build returns three. This is
+  the test the design turns on.
+- **`last_skipped_at` moves independently:** proven across *separate transactions* (10 s apart,
+  `first_skipped_at` held) after the first attempt — same-statement — produced equal timestamps
+  and proved nothing. The untouched second row is the control.
+- **Vocabulary:** `claimed-by-peer` rejected by `ck_skip_reason_kind`; row count stays **2, not 3**.
+- **`briefed_at` survives a re-skip:** stamped, re-skipped (`skip_count` → 4), still set.
+- **Grants, both directions** (the `SES-101` lesson — a one-directional check passes on a function
+  nobody can call): `anon`/`authenticated` hold **zero** privileges on the table and
+  `has_function_privilege(...,'execute')` is **false** for both, while `service_role` is **true**.
+- **Render:** the template is loaded in **jsdom** and asserted on the real DOM — §10 exists, folds,
+  is default-closed, header order matches the spec's nine columns exactly, chip reads `2 · 2 new`,
+  2 rows × 9 cells, 2 NEW chips, every card button disabled, **zero `data-awaits`**, `.tscroll`
+  present, `unblocks` in state. **Negative control: the identical assertions against
+  `origin/dev`'s template fail on every one — it renders no §10 at all.**
+- **Unblock tap:** with the artifact runtime stubbed (jsdom has no `window.claude`), a tap on a
+  live `question` row flips the button to `✓ Asked for` and `.on` from `state.unblocks`. Stated
+  honestly: the **publish** round trip is not proven by this harness — `claude.use()` resolves on a
+  microtask the test process exits before — only the state write and re-render are.
+- Build clean; regression **34/34 with credentials**. Both would pass unchanged if this ticket had
+  done nothing — the template is a doc and nothing imports it — so neither is evidence here.
+- Fixtures (`ZZZ-QA-127`) and their before-images deleted; `runner_skips` verified back to 0 before
+  the two real rows were written.
+
+### Named as not done, rather than left to be discovered
+
+- The render harness ran from the scratchpad and is **not** committed as a permanent regression
+  guard. `tests/regression/` still has no DOM fixture — **four tickets running** (`SES-124`,
+  `SES-125`, `SES-126`, this one). It is a real gap and it is compounding.
+- §10's two rows are the **two real skips live on the board** — `SES-110` (permission-gate, card
+  `9e7d8bf2` undecided) and `CHI-89` (removal-proposed, card `e1c7a940` undecided) — each
+  re-verified against `backlog_items.status` and the card this session. Nothing else was
+  backfilled from the ledger's prose, deliberately: a skip nobody can re-verify is not evidence.
+- Neither shipped row has a **live** Unblock button (both are `card` rows), so John cannot exercise
+  `question`/`prep` from tonight's page. The handler is proven in the harness, not on his phone.
+
 ## cycle-20260822-2133 / SES-126-board-tables (v7.0.161, 2026-08-22, Automated runner cycle `f426b281`, model Opus 5 orchestrator, no subagent) — the board tables, and the class-digit split that would have understated bug fixes by 27
 
 **Ticket:** `SES-126` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,

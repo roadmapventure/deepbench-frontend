@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.162 | runbooks/briefing-template.html | SES-127 — briefing redesign 4 of 6: §10 SKIPPED, AND THE SKIPS BEHIND IT BECOME ROWS. The section is the visible half; the half that makes it possible is migration ses127_skip_records (public.runner_skips + public.record_skip()), because MEASURED FIRST rather than assumed: fifteen public.runner_* tables exist and not one stores a skip, so every skip this platform has ever made lives as PROSE inside runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z, "Step 5: queue #1 SES-110 skipped per B24 …". John cannot sort, count or act on a sentence in a ledger row he never opens. THE ONE THAT WOULD HAVE SHIPPED WRONG: an INSERT-only skip table. John's standing Automation drain re-reads 25 open now-tier members every cycle, eight cycles a day, so the same SES-110 row would land in front of him 8×/day forever — uniq_open_skip (backlog_id, reason_kind) WHERE resolved_at IS NULL makes a repeat bump skip_count/last_skipped_at instead, and THAT is the discriminating QA (three record_skip calls → two rows; an INSERT-only build returns three). NEW is briefed_at IS NULL — no global last-brief timestamp, a row is new exactly once, a re-skip after briefing does not clear it (John has seen it), and the rebuild stamps briefed_at AFTER republishing so a failed publish cannot silently eat the chip. Resolution is DERIVED, never maintained: §10 joins backlog_items and filters status NOT IN ('done','removed'), so a shipped ticket leaves the section with no write and no rule for a cycle to forget — the same prose→code correction as SES-86 phase 3 / SES-101 / SES-111, applied by deleting the rule rather than writing one. The join is LATERAL … LIMIT 1 because backlog_id is NOT unique (CHI-48 holds two rows, found by SES-86 phase 2's own QA). 'claimed-by-peer' is deliberately ABSENT from the reason_kind vocabulary: the section says "waiting on YOUR input" and a contested claim clears itself in minutes, so recording one would fill his one actionable section with rows that action nothing. This is shape (b) of SES-124's collapse framework's first real use (h2.clickable over .secwrap), default closed per the spec, and rows carry NO data-awaits — a skipped ticket is information, not a decision owed, and inflating §1's counter is the masthead-disagrees-with-the-page failure countWaiting() exists to prevent. Divergence from the mock, stated rather than left to be found: the table uses SES-126's .tscroll, not .tblwrap — nine columns under .tblwrap have no min-width and crush on a phone, and .tscroll is the wrapper SES-126 built for exactly this. Rows shipped are the two REAL skips live on the board (SES-110 permission-gate, CHI-89 removal-proposed), both re-verified this session against status + an undecided card, not copied from another cycle's prose. -->
 <!-- DeepBench v7.0.161 | runbooks/briefing-template.html | SES-126 — briefing redesign 3 of 6: THE BOARD TABLES. §§8/11/14 were named comments that rendered nothing and §13 rendered without a class column; all four now build. §8 is the matrix that ENDS the gap SES-124 opened and disclosed — striking “Next up — top 5” and the “Next 3” line left the page with no forward view of the queue at all since v7.0.159, and this is the ticket that was always going to close it. Its Queue column is the DB’s OWN `queue` number (SES-86 phase 2), never a position the render counted out, and its Title column is the `gist` extract rather than `title`, because for imported tickets `title` holds the CLASS STRING (‘P9 - Bug Fixes.’) — a matrix keyed on it renders a column of class names and no titles (true until SES-91). THE ONE THAT WOULD HAVE SHIPPED WRONG AND WAS MEASURED FIRST: §11 groups the now tier on the class DIGIT, not the `priority_class` string. Grouped by string the live board returns SEVEN rows for six classes — ‘P9 - Bug Fixes · FLAGGED’ (27) is a different string from ‘P9 - Bug Fixes’ (120) — so John would read 120 bug fixes against a true now-tier 147. Same · FLAGGED suffix trap recompute_backlog_queue() already solves, and the zero-padded sort is the same numeric-vs-lexical fix (P10 sorts ahead of P2 lexically). §13 gains the class column with the fixed work_class→P-class mapping written down rather than re-derived, plus a NOTE that P6 - Agent Enhancement has no rung at all: runner_ladder holds six work classes, and a blank row would read as ‘rung 0, not yet trusted’, which is a different and untrue claim (SES-122 tracks rungs unlocking autonomy). §14 is last 5 PRODUCTION uses on two measured filters: request_host = deepbench.roadmapventure.com is the only production host (the dev URL is John himself, and request_host IS NULL covers 12,212 pre-LOG-134 rows), and ONE USE = ONE trace_id with calls counted as model IS NOT NULL — LOG-81’s rule that ‘AI calls’ means real model calls, never raw rows. Its Cost column renders — and MUST: cost_usd is NULL on every production row, and a NULL shown as $0.00 claims the run was free, which is not the same as not knowing (same rule as the plain_* red defect line). Name resolves visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org, because one live cache label is a 130-character provenance paragraph that would otherwise BE the Name column. New `.tscroll` wrapper gives the two six-column tables their own horizontal scroll so the page body never scrolls sideways on a phone; §§11/13 are narrow and deliberately do not get it. Sections stay OPEN — SES-124 built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10 default-closed, so nothing here folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-template.html | SES-125 — briefing redesign 2 of 6: THE DECISION CARDS. SES-124 shipped the collapse framework and deliberately converted nothing; this ticket converts §§5/6/9 and builds §12, which had never existed. THE ONE CHANGE THAT IS NOT COSMETIC: the card display is REVERSED. Since v7.0.145 the technical record (Value case, Before → after, QA evidence, meta, links) was the card's body and the three plain-language sentences were hidden behind More info — which is backwards against the directive that created them (edab5908, John: "you are giving too much technical jargon. I need a business value statement"). Now plain language IS the body and `More info — the technical record` holds the record. Nothing is deleted: the record stays on the card, one tap away. THE SECOND REAL CHANGE: the ask box LEAVES the More-info panel and sits under the buttons on every card and every row, always visible, with a "✓ Received <ts>" line — John's typed line counts the same as a tap (v7.0.145), so it may not be hidden behind a second button, and a line that vanishes with no acknowledgement reads as a line that was lost. Button meanings move out of the panel with it, rendering as consequence lines under the buttons exactly as §9's Yes/No rows have carried them since v7.0.145 — a consequence you must open a panel to read is one John decides without. Cards and rows are default CLOSED and numbered (5.1 / 6.1 / 9.1 / 12.1); a collapsed card carries number · kind chip · TICKET ID · ticket title · decision state, so the row is decidable-at-a-glance without opening it. §12 vision claims are literally `question()` with a class chip and three different ask-box strings — the spec's word is "formatted exactly like Questions", so they are ONE function rather than two that must be kept in step; their row ids MUST start `vision-`, which is the only thing telling the harvest a claim from a runner_questions row when both land in briefing-state under `answers`. UNCHANGED AND STILL BINDING, because reversing which half is hidden changes neither rule: `plain_*` are READ from runner_items, never re-authored at render time (v7.0.146), a NULL still draws the red defect line and is never coerced to '', a Yes/No row without both consequence lines still renders its defect in red, `data-awaits` is still set from STATE not appearance (§12's rows join §1's counter by carrying it), and a fold still NEVER publishes and never enters briefing-state. Slots this ticket does not fill (§§8/10/11/13/14) remain named HTML comments. -->
 <!-- DeepBench v7.0.159 | runbooks/briefing-template.html | SES-124 — briefing redesign 1 of 6: the SECTION FRAME. Locked spec docs/BRIEFING-REDESIGN-0822.md (John approved the mock, "this is good"); mock docs/design/briefing-redesign-mock-0822.html. §1 masthead gains the decisions-waiting counter — rendered EMPTY and filled by countWaiting() from `data-awaits` on the elements themselves, never from a number a cycle typed, because the masthead is the half John reads first and it must not be able to disagree with the cards under it; singular at 1, "Nothing needs you ✓" at 0. §2 is Daily activity: the CST day is stated IN THE HEADING (12:00 AM–11:59 PM America/Chicago — the same boundary the budget arithmetic uses, deliberately not a UTC day), every number labeled, tokens shown absolute AND as % of the daily max, and one-line definitions of "gated before build" and "did not run" beneath the strip. §3 Today's findings is new and is now the ONLY place narrative prose belongs — latest cycle's finding labeled with its CST time, earlier cycles folded into one default-closed card. §4 keeps its three cards; both bars gain a one-line label of what they measure, and the "✓ Your latest reading was recorded" line MOVES onto the reading card, where the tap it acknowledges actually happens. THE COLLAPSE FRAMEWORK ships here for §§5/6/9/10/12 to build on (SES-125/126/127): `.item.fold` + `.head[data-toggle]` + `.bodyc` for one card, `h2.clickable[data-toggle]` + `.secwrap` for a whole section, one handler for both, and `fold()` as the helper. `fold` is a MODIFIER, not a restyle of `.item`, so the always-open cards still on this page are untouched until SES-125 converts them — that one word is the only difference from the mock. A fold NEVER publishes and is never written to briefing-state: it is a view state, not a decision, and publishing reloads the view. REMOVED on John's explicit instruction: the standalone "Needs your call" override section (an override is a yes/no with consequences either way — it renders as a §9 question now), the footer note (the read-only signal it restated lives on #savebar, in place, where a failed save reports itself), and the stray narrative paragraphs between sections. Sections now carry their locked numbers and sit in the locked order (§7 Directive queue moved above §9). Slots this ticket does not fill are named HTML comments, never placeholders that render. -->
@@ -147,6 +148,22 @@
   td.dim{color:var(--muted)}
   td.ttl2{font-family:var(--display);font-size:12.5px}
   .tnote{font-size:11.5px;color:var(--muted);margin:5px 2px 0;line-height:1.45}
+  /* ---- SES-127 · §10 SKIPPED, WAITING ON YOU --------------------------------------------
+     Two cell treatments the mock's §10 needs and no earlier section did. `.unblock` is a real
+     control living inside a table cell, so it carries the same 44px tap target every other
+     button on this page has — a button John cannot reliably hit on a phone is a button that
+     records nothing. `.newchip` is the mock's per-row NEW tag; it is brass-on-card rather than
+     navy-on-white so it reads as a marker beside the button and never competes with it. */
+  button.unblock{font-family:var(--body);font-weight:600;font-size:12px;padding:7px 9px;
+       border-radius:5px;border:1.5px solid var(--brass);background:var(--card-alt);
+       color:var(--brass-deep);cursor:pointer;min-height:44px;white-space:nowrap}
+  button.unblock:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button.unblock.on{background:var(--brass);border-color:var(--brass-deep);color:var(--white)}
+  button.unblock[disabled]{border-style:dashed;color:var(--muted);cursor:default}
+  .newchip{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.7px;
+       text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass-light);
+       border-radius:3px;padding:1px 5px;margin-left:5px;white-space:nowrap}
+  td.reason{font-size:12px;color:var(--muted-deep);min-width:200px}
   .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
           padding:13px 14px;margin-bottom:14px}
   .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
@@ -239,7 +256,7 @@
 
 <div id="page"></div>
 
-<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null,"answers":{}}</script>
+<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null,"answers":{},"unblocks":{}}</script>
 
 <script id="code">
 // SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
@@ -260,8 +277,20 @@
   // v7.0.145 — same defensive default for `asks`, and for the same reason SES-99 needed it:
   // a page published before this key existed must not throw on John's first tap.
   if (!state.asks || typeof state.asks !== 'object') { state.asks = {}; }
+  // SES-127 — same defensive default, same reason as SES-99's and v7.0.145's: a page published
+  // before §10 existed has no `unblocks` key, and John's first tap on an Unblock button must not
+  // throw on an undefined and record nothing.
+  if (!state.unblocks || typeof state.unblocks !== 'object') { state.unblocks = {}; }
 
   var readOnly = false;
+
+  // SES-127 — §10's count chip, written by the rebuilding cycle from the SAME query that
+  // produced the rows below it. `n` is open skips on still-open tickets, `nnew` is how many of
+  // those have `briefed_at IS NULL`. They live together in one object because the chip's two
+  // halves disagreeing with each other — or with the rows — is the exact class of small
+  // wrongness that makes the whole page read as unmaintained (SES-124's countWaiting() rule,
+  // applied to the one counter that cannot be derived from the DOM).
+  var SKIPS = { n:2, nnew:2 };
 
   function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                     .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -499,6 +528,33 @@
     return '<tr><td class="mono dim">'+cid+'</td><td>'+work+'</td>'
       +'<td class="num">'+rung+'</td><td class="num">'+streak+'</td></tr>';
   }
+  // SES-127 — ONE §10 ROW. Nine columns, Unblock first (the spec's order: the action comes
+  // before the identifiers, because the section exists to be acted on, not read).
+  //   sid    the runner_skips row id — the key `state.unblocks` is written under, so a tap
+  //          survives the republish and the harvest can find the row it belongs to
+  //   unb    'question' | 'prep' | 'card' | null — which button this row gets
+  //   ref    the card id a 'card' row points at (rendered as its short id, John taps the card
+  //          itself in §5/§6 — the page deliberately does not try to scroll him there)
+  //   isNew  briefed_at IS NULL, i.e. skipped since his last brief
+  // A row carries NO `data-awaits`: a skipped ticket is information, not a decision John owes,
+  // and inflating §1's counter with rows that need no tap is exactly the masthead-disagrees-with
+  // -the-page failure SES-124 built countWaiting() to prevent.
+  function skipRow(sid, id, cls, q, design, status, title, reason, when, unb, ref, isNew){
+    var taken = state.unblocks[sid];
+    var label = unb==='question' ? 'Answer as a question'
+              : unb==='prep'     ? 'Prep our session'
+              : unb==='card'     ? 'Decide on card '+esc(String(ref||'').slice(0,8))
+              : 'No action here yet';
+    var btn = unb==='card'
+      ? '<button class="unblock" disabled>'+label+'</button>'
+      : '<button class="unblock'+(taken?' on':'')+'" data-skip="'+sid+'" data-unb="'+unb+'">'
+        +(taken?'&#10003; Asked for':'')+' '+label+'</button>';
+    return '<tr><td>'+btn+(isNew?' <span class="newchip">new</span>':'')+'</td>'
+      +'<td class="mono">'+esc(id)+'</td><td class="mono dim">'+esc(cls)+'</td>'
+      +'<td class="num">'+esc(q)+'</td><td class="dim">'+esc(design)+'</td>'
+      +'<td class="dim">'+esc(status)+'</td><td class="ttl2">'+esc(title)+'</td>'
+      +'<td class="reason">'+esc(reason)+'</td><td class="mono dim">'+esc(when)+'</td></tr>';
+  }
   function useRow(t, ip, loc, name, did, cost){
     return '<tr><td class="mono">'+esc(t)+'</td><td class="mono">'+esc(ip)+'</td>'
       +'<td class="dim">'+esc(loc)+'</td><td>'+esc(name)+'</td><td class="dim">'+esc(did)+'</td>'
@@ -677,7 +733,55 @@
       // them — the same prose-instead-of-column gap v7.0.146 closed for cards, still open here.
       'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
       'it joins the bottom of your lane and waits its turn.')
-    // §10 · Skipped — waiting on your input: SES-127.
+    // ===== §10 · SKIPPED — WAITING ON YOUR INPUT (SES-127) ==================================
+    // THE WHOLE SECTION FOLDS, default CLOSED — shape (b) of SES-124's collapse framework
+    // (`h2.clickable[data-toggle]` over a `.secwrap`), its first real use. Closed by default is
+    // the spec's word and it is right: this is the section that grows without bound, and a list
+    // of blocked work open above the questions would push §§11-14 off the phone.
+    //
+    // THE COUNT CHIP IS "N · M new" AND BOTH HALVES ARE LIVE. M is `briefed_at IS NULL` — see
+    // the migration's property (3): the rebuild stamps briefed_at on the rows it renders, so a
+    // row is NEW exactly once and a missed rebuild can neither age a new row nor freshen an old
+    // one. Stamp AFTER republishing, never before, or a failed publish silently eats the chip.
+    //
+    // Regenerate every rebuild from public.runner_skips. Contract + the verbatim query:
+    // docs/runbooks/briefing-page.md's §10 section. Two things in that query are not style:
+    // it JOINs backlog_items LATERAL-with-LIMIT-1 (backlog_id is NOT unique — CHI-48 occupies
+    // two rows, SES-86 phase 2's own QA found it), and it filters b.status NOT IN
+    // ('done','removed') rather than reading a maintained resolved flag, so a ticket that ships
+    // leaves this section with no write at all.
+    //
+    // SORT: question-unblockable first, then newest skip. That is not cosmetic either — it puts
+    // the rows John can clear with one thumb above the rows that need him at a keyboard.
+    +'<h2 class="clickable" data-toggle="skipsec"><span class="secnum">10</span>'
+    +'Skipped &mdash; waiting on your input <span class="countchip">'+SKIPS.n+' &middot; '
+    +SKIPS.nnew+' new</span> <span class="chev">&#9656;</span></h2>'
+    +'<div class="secwrap" id="skipsec">'
+    +'<p class="strip-def">Sorted: what you can unblock with a Yes/No first, then everything '
+    +'else, newest skip on top. Rows added since your last brief carry the NEW chip.</p>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th>'
+    +'<th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>'
+    // Rows below are this cycle's REAL runner_skips rows, not samples.
+    +skipRow('cc4ac066-3760-4bf9-87ee-7f8a2247c1c5','CHI-89','P5 - Enhancements',25,'—',
+       'removal proposed','Third mobile footer kind',
+       'Its premise is argued dead and the removal card is waiting on your verdict, so it keeps '
+       +'its queue number and is stepped past.','Aug 22','card',
+       'e1c7a940-3d52-4f8b-a6d1-9b04c2f75e83',true)
+    +skipRow('5c244929-88a2-49cd-9d09-0d2708a35645','SES-110','P10 - Tooling',4,'designed',
+       'partial','Epics table — the one half left',
+       'Its one open half is a .claude/ edit, which an unattended run may not make. The text is '
+       +'written and waiting on the card.','Aug 22','card',
+       '9e7d8bf2-46e3-489e-95d1-9fcfc603c201',true)
+    +'</table></div>'
+    +'<p class="strip-def"><b>Unblock buttons:</b> &ldquo;Answer as a question&rdquo; puts the '
+    +'blocking decision into section 9 as a Yes/No on the next rebuild &mdash; answer it and the '
+    +'ticket rejoins the queue, no session needed. &ldquo;Prep our session&rdquo; tells the next '
+    +'run to package everything (kickoff-ready prompt, branch, context) so the ticket is one '
+    +'paste away when you sit down &mdash; this page can record the ask, but it cannot start a '
+    +'session by itself. A row whose blocker is already a card above says so instead, and you '
+    +'decide it there.</p>'
+    +'</div>'
     // ===== §11 · NOW-TIER BY CLASS (SES-126) ================================================
     // THE ONE THING THAT WILL BE GOT WRONG IF IT IS NOT WRITTEN DOWN: group on the class
     // DIGIT, never on the `priority_class` string. Measured on the live board this cycle —
@@ -896,6 +1000,20 @@
         // same line from state a moment later; this is what John sees the instant he hits Enter.
         var g = inp.parentElement.querySelector('.got');
         if (g) g.classList.add('show');
+        save(); render();
+      });
+    });
+    // SES-127 — §10's Unblock buttons. Recorded like a tap, not like a fold: it IS a decision
+    // (it tells the next run to do something), so it publishes. Idempotent by construction —
+    // tapping twice records the same intent once, because the harvest is keyed on the skip id
+    // and the state entry is replaced rather than appended. A 'card' row's button is disabled:
+    // its blocker is already a card in §5/§6 and a second way to decide the same thing is how
+    // two half-decisions get made about one ticket.
+    document.querySelectorAll('button.unblock[data-skip]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var sid = btn.getAttribute('data-skip');
+        state.unblocks[sid] = { kind: btn.getAttribute('data-unb'),
+                                at: new Date().toISOString().slice(0,16)+'Z' };
         save(); render();
       });
     });

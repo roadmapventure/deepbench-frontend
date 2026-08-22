@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.162 | runbooks/briefing-page.md | SES-127 — §10 gets its data contract and the LOCKED SECTION ORDER marks it built. The contract exists because the section's hard parts are all in the QUERY, not the markup, and each is wrong in a way that looks fine: the backlog_items join is LATERAL … LIMIT 1 (backlog_id is NOT unique — CHI-48 holds two rows, SES-86 phase 2's own QA found it, and a plain join silently doubles any skip on a duplicated ticket); "still skipped" is DERIVED from b.status NOT IN ('done','removed') rather than a maintained flag, so a shipped ticket leaves the section with no write and no rule for a cycle to forget; the sort is question-unblockable first because that is the difference between a thumb and a keyboard; and briefed_at is stamped AFTER the republish returns, never before, because stamping first eats the NEW chip on rows a failed publish never showed him. The Unblock column's live buttons record under a new briefing-state key `unblocks`, harvested in the tail like `answers` and `asks`; a `card` row's button is DISABLED and names the card that already carries the decision, because a second way to decide one thing is how two half-decisions get made. §10 rows carry no data-awaits — a skipped ticket is information, not a decision owed. Divergence from the mock is stated rather than left to be found: .tscroll, not .tblwrap, because nine columns with no min-width crush on a phone. -->
 <!-- DeepBench v7.0.161 | runbooks/briefing-page.md | SES-126 — the LOCKED SECTION ORDER table marks §§8/11/13/14 built, and the page gains the four board tables' data contracts. The forward view of the queue is BACK: SES-124 struck “Next up — top 5” and the “Next 3” line and disclosed on its own card that the page would carry NO forward view until this ticket landed, so the gap runner-cycle.md step 9 describes is now closed — and the struck sections stay struck, the matrix is the forward view. Four contracts written down because each was MEASURED here rather than reasoned about, and each is wrong in a way that looks fine: §8's Queue is the DB's stored `queue` and its Title is the `gist` extract (imported tickets keep the class string in `title`, so a matrix keyed on it shows class names and no titles, until SES-91); §11 groups on the class DIGIT — by string the live now tier returns SEVEN rows for six classes, splitting P9 into 120 + 27 FLAGGED against a true 147 — and sorts zero-padded because P10 sorts before P2 lexically; §13's work_class→P-class mapping is fixed here, and P6 - Agent Enhancement has NO rung (six work classes, ten board classes) which is stated as a note rather than rendered as a blank row that would read “rung 0, not yet trusted”; §14 filters to the one production host (the dev URL is John, and 12,212 pre-LOG-134 rows carry no host at all), counts one use = one trace_id with model IS NOT NULL per LOG-81, resolves Name through visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org because one live label is a 130-character paragraph, and renders Cost as — because cost_usd is NULL and a NULL shown as $0.00 claims the run was free. Plus: the two six-column tables scroll themselves (.tscroll) so the phone's page body never does, the two narrow ones deliberately do not, and none of the four folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-page.md | SES-125 — the More-info contract is REVERSED and the ask box leaves the panel. v7.0.145 required the three plain-language fields and then put them behind a button while the technical record was the card's body — backwards against the directive that created them (edab5908: "you are giving too much technical jargon. I need a business value statement"). John's redesign settles it: plain language IS the body, `More info — the technical record` holds Value case / Before → after / QA evidence / meta / links, and nothing is deleted. The ask box moves out of the panel to sit under the buttons, always visible, with a "✓ Received <ts>" line, because a typed line counts the same as a tap and may not be hidden behind a second button; the button-meaning lines move with it and render under the buttons like §9's Yes/No consequences. §§5/6/9/12 are default-closed and numbered, a collapsed card carries number · kind · TICKET ID · title · decision state, and §12 vision claims are the SAME renderer as §9 with a class chip — one function, because "formatted exactly like Questions" is the spec's word and two near-copies drift. NEW RULE with teeth: a vision row's briefing-state key MUST start `vision-`, since claims and questions both land under `answers` and nothing else distinguishes them at harvest. Unchanged and restated because reversing which half is hidden changes neither: `plain_*` are READ from the row and NULL still draws the red defect line; both Yes/No consequence lines stay required; `data-awaits` still comes from state, and §12's rows now feed §1's counter. -->
 <!-- DeepBench v7.0.148 | runbooks/briefing-page.md | SES-107 — the read-back contract's one-line ladder summary said "Accept → streak+1, 5 promotes", carrying the identical undefined-after-promotion blank as `runner-cycle.md` step 2 and in nearly the identical words. It now states the same rule John ruled on (`q-ladder-streak-reset` NO, 22:04Z): promote on every 5th Accept, `streak % 5 = 0`, streak never reset on promotion. CITED, not restated — this exact sentence drifting out of sync with the runbook is the failure `v7.0.118` fixed here once already, so the full rule (and the promote-every-tap runaway that removing the reset alone would cause) lives in step 2 and this line points at it. -->
@@ -88,7 +89,7 @@ shown:
 | 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
 | 8 | The queue (matrix) | `SES-126` ✔ |
 | 9 | Questions | `SES-125` ✔ |
-| 10 | Skipped — waiting on your input | `SES-127` |
+| 10 | Skipped — waiting on your input | `SES-127` ✔ |
 | 11 | Now-tier by class | `SES-126` ✔ |
 | 12 | Vision claims | `SES-125` ✔ |
 | 13 | Trust ladder | `SES-126` ✔ class column |
@@ -144,6 +145,62 @@ does. §11 and §13 are narrow and deliberately do **not** get it — a scroll a
 that already fits reads as a table that is cut off. **None of these four sections folds:**
 `SES-124` built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10
 default-closed.
+
+### §10 — Skipped, waiting on your input (`SES-127`, `v7.0.162`)
+
+The section is the visible half of `SES-127`; the half that makes it possible is
+`public.runner_skips` + `public.record_skip()` (migration `ses127_skip_records`, whose header
+carries the six load-bearing properties). **Cycles record skips there — never as prose** —
+see `runner-cycle.md` step 5. Regenerate §10 on every rebuild from this query, verbatim:
+
+```sql
+SELECT s.id, s.backlog_id, b.priority_class, b.queue,
+       coalesce(b.design_status,'—') AS design_status, b.status,
+       left(regexp_replace(coalesce(b.description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70) AS gist,
+       s.reason, s.unblock_kind, s.unblock_ref, (s.briefed_at IS NULL) AS is_new,
+       to_char(s.last_skipped_at AT TIME ZONE 'America/Chicago','Mon DD') AS skipped_cst,
+       s.skip_count
+  FROM public.runner_skips s
+  JOIN LATERAL (SELECT bi.* FROM public.backlog_items bi
+                 WHERE bi.backlog_id = s.backlog_id ORDER BY bi.id LIMIT 1) b ON true
+ WHERE s.resolved_at IS NULL AND b.status NOT IN ('done','removed')
+ ORDER BY (s.unblock_kind = 'question') DESC, s.last_skipped_at DESC;
+```
+
+Five things in it are not style, and each is wrong in a way that looks fine:
+
+- **The join is `LATERAL … LIMIT 1`, not a plain join.** `backlog_id` carries no unique
+  constraint and **`CHI-48` occupies two rows** (found by `SES-86` phase 2's own QA), so a plain
+  join silently doubles any skip on a duplicated ticket. The `ORDER BY bi.id` matches the
+  queue function's own final tie-break, so both readers pick the same row.
+- **`resolved_at IS NULL AND b.status NOT IN ('done','removed')` — resolution is DERIVED.** A
+  ticket that ships leaves this section with no write at all and no rule for a cycle to
+  remember; `resolved_at` covers only the other case (ticket still open, blocker gone). This is
+  the `SES-86` phase 3 / `SES-101` / `SES-111` prose→code correction applied by *deleting* a rule
+  rather than writing one.
+- **The sort puts `unblock_kind = 'question'` first**, then newest skip. It is the difference
+  between rows John clears with one thumb and rows that need him at a keyboard.
+- **The count chip is `N · M new`, both halves from this same query** — `N` is the row count,
+  `M` is `is_new`. They are written into the template's one `SKIPS` object so the chip cannot
+  disagree with the rows beneath it.
+- **Stamp `briefed_at` AFTER the republish returns, never before:**
+  `UPDATE public.runner_skips SET briefed_at = now() WHERE briefed_at IS NULL AND resolved_at IS
+  NULL;`. Stamping first means a failed publish silently eats the NEW chip on rows John never saw.
+
+**The Unblock column, and the one thing it must not become.** `question` and `prep` rows render a
+live button that records into `briefing-state` under a new **`unblocks`** key
+(`{ "<runner_skips.id>": {kind, at} }`), harvested in the step-9 tail exactly like `answers` and
+`asks`. `card` rows render the button **disabled**, naming the card that already carries the
+decision — a second way to decide the same thing is how two half-decisions get made about one
+ticket. **A §10 row carries no `data-awaits`:** a skipped ticket is information, not a decision
+owed, and inflating §1's counter with rows that need no tap is the masthead-disagrees-with-the-
+page failure `countWaiting()` exists to prevent.
+
+**Divergence from the mock, stated rather than left to be discovered.** The mock wraps §10 in
+`.tblwrap`; the template uses `SES-126`'s `.tscroll`. Nine columns under `.tblwrap` have no
+`min-width` and crush on a phone — `.tscroll` is the wrapper `SES-126` built for exactly this,
+and it preserves the mock's look (a rounded, horizontally scrolling table) while keeping the
+page body from scrolling sideways. The spec is canonical for behavior and it is unchanged.
 
 **The three rules `SES-124` adds, which every later section must honour:**
 
