@@ -5,6 +5,129 @@
 
 ---
 
+## cycle-20260822-2133 / SES-126-board-tables (v7.0.161, 2026-08-22, Automated runner cycle `f426b281`, model Opus 5 orchestrator, no subagent) — the board tables, and the class-digit split that would have understated bug fixes by 27
+
+**Ticket:** `SES-126` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
+automation lane rank −19. Shipped **`done`**. Doc/template only — no `src/`, no `api/`, no `lib/`,
+no migration, no user-visible surface on dev, no flag (§19v). Two build files:
+`docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`.
+
+**Selected by layer 1b**, John's standing Automation-epic drain (`runner_directives` `b74009ea` —
+*"run out the automation epic tickets until completion in the now bucket."*).
+`drain_epic_next('f426b281-…')` returned `pick` / `SES-126` / `open_now = 26`. Claim returned 1 row.
+
+**Premise revalidated live before a line was written**, by reading the template at `origin/dev`
+rather than trusting `SES-125`'s hand-off note: §8 (line 593), §11 (line 608) and §14 (line 646)
+were **named comments that rendered nothing**, and §13 rendered a three-column table with no class
+column. The gap was real and unclosed, so `revalidated_at` was set and the build proceeded.
+
+### What shipped
+
+**§8 — The queue, matrix only.** `Queue · ID · Class · Status · Design status · Title`, twelve rows
+with the window stated in the heading ("top 12 of 565 numbered"). Two rules ride with it and are
+written into both the template and `briefing-page.md`:
+
+- **The Queue column is `backlog_items.queue`** — the DB's own stored number (`SES-86` phase 2) —
+  never a position the render counted out. A matrix that numbers its own rows is a second copy of
+  an ordering that already exists, and the two drift.
+- **The Title column is the `gist` extract, not `title`.** For imported tickets
+  `backlog_items.title` holds the **class string** (`'P9 - Bug Fixes.'`), so a matrix keyed on
+  `title` renders a column of class names and no titles at all. This is the standing rule the
+  runbook already applies to anything that *displays* the queue; it stays true until `SES-91`
+  repairs the column.
+
+**This is the ticket that closes the gap `SES-124` opened and disclosed.** Striking *"Next up —
+top 5"* and the *"Next 3"* line left the page with **no forward view of the queue at all** from
+`v7.0.159` onward — the spec's own sequencing, carded so John could reorder it in one tap. §8 and
+§11 are the replacement. **The struck sections stay struck**; the matrix is the forward view now,
+and `briefing-page.md` says so in the do-not-reinstate list.
+
+**§11 — Now-tier by class. THE ONE THAT WOULD HAVE SHIPPED WRONG, AND WAS MEASURED FIRST.**
+Grouping the now tier on the raw `priority_class` string returns **seven rows for six classes** on
+the live board, because `P9 - Bug Fixes · FLAGGED` (27 tickets) is a different string from
+`P9 - Bug Fixes` (120). John would have read **120 bug fixes** off his own board against a true
+now-tier figure of **147** — and nothing about the rendered table would have looked wrong. §11
+therefore groups on the extracted class **digit**, exactly as `recompute_backlog_queue()` already
+has to, and sorts zero-padded (`P01…P10`) for the same numeric-vs-lexical reason the queue's class
+sort is numeric: lexically `P10` comes before `P2`. The footnote's next/later counts (25 / 248) are
+live from the same table, never carried forward from a previous rebuild.
+
+**§13 — Trust ladder, plus the class column.** The ladder's `work_class` is the runner's own
+vocabulary (`bug_fix`); John reads the board in P-classes. Both are now shown, sorted by the same
+zero-padded class id, with the mapping **written down rather than re-derived each rebuild**:
+`invention` → P02, `enhancement` → P05, `agent_creation` → P07, `determinism_removal` → P08,
+`bug_fix` → P09, `tooling` → P10. **The note is not decoration:** `runner_ladder` holds six work
+classes and the board has ten, so **`P6 - Agent Enhancement` has no rung at all**. Rendering it as
+a blank row would read *"rung 0, not yet trusted"* — a different and untrue claim — so the section
+says the row does not exist and points at `SES-122`, where rungs start actually unlocking autonomy.
+
+**§14 — Who used DeepBench, last 5 production uses.** Two filters carry it, both measured live:
+
+- **`request_host = 'deepbench.roadmapventure.com'` is the only production host** in
+  `ai_activity_log`. The dev URL is John himself under the standing dev-URL=John attribution rule,
+  and `request_host IS NULL` covers **12,212** pre-`LOG-134` rows with no host recorded at all — so
+  any looser filter files the runner's own traffic under a heading that says "who used DeepBench".
+- **One use is one `trace_id`, not one row.** Calls are counted `FILTER (WHERE model IS NOT NULL)`,
+  which is `LOG-81`'s standing rule that "AI calls" means real model calls and never raw log rows.
+  A five-call run reads as one use.
+
+Two honesty rules ship with it. **Cost renders `—` and must:** `cost_usd` is NULL on every
+production row today, and a NULL shown as `$0.00` is a claim that the run was free, which is not
+the same as not knowing — the same rule that makes a NULL `plain_*` draw a red defect line rather
+than an empty string. And **Name resolves `visitor_labels.user_label` → the first clause of
+`ip_org_cache.user_label` → `org`**, because one live cache label is a 130-character provenance
+paragraph that would otherwise *be* the Name column.
+
+**One CSS addition, `.tscroll`.** §8 and §14 are six-column matrices and this page is read on a
+phone every morning, where six columns of text either squeeze to a character per line or push the
+whole page sideways. Both wide tables now scroll inside their own wrapper so the page body never
+does. §11 and §13 are narrow and deliberately do **not** get it — a scroll affordance on a table
+that already fits reads as a table that is cut off. **Nothing here folds:** `SES-124` built the
+section-fold framework for §§5/6/9/10/12 and the spec marks only §10 default-closed.
+
+### QA — and what the standard checks are actually worth here
+
+**Build and regression prove nothing about this change**, and saying so is part of the evidence:
+the template is a doc, nothing imports it, so both pass identically if the ticket did nothing.
+They ran and were green (`npm run build` clean; regression **34/34 with credentials** — the one
+non-pass without them is `CHI-31`, which fails for missing `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`
+rather than for anything in this diff).
+
+**The real test loads `briefing-template.html` in real Chromium** (Playwright installed into the
+session scratchpad, never into the repo's `package.json`) and asserts on the rendered DOM:
+**26/26 content assertions pass.** Each is false on the pre-change file *by construction* — §§8,
+11 and 14 render **nothing** there, and §13's header row is three columns, not four. Among them:
+§8's row 1 carries the DB's queue number and ID; no §8 Title cell matches `^P\d+ - ` (the `SES-91`
+trap, asserted rather than eyeballed); §11 has exactly six class rows summing to the live 292;
+§13's classes are `P02,P05,P07,P08,P09,P10` with **no P06 row**; §14 has exactly five use rows,
+every Cost cell `—`, every Name cell under 40 characters. Page-level: no JS errors (the Google
+Fonts stylesheet fetch is sandbox-blocked and excluded by name), and
+`documentElement.scrollWidth <= innerWidth` — the phone-overflow check the `.tscroll` wrapper
+exists for.
+
+**The discriminating assertion is the `· FLAGGED` one, and its negative control is a live query,
+not a stub.** Grouping the same now tier by raw string: 7 rows, `P9 - Bug Fixes` = 120,
+`P9 - Bug Fixes · FLAGGED` = 27. Grouping by digit (shipped): 6 rows, P9 = **147**, and the six
+counts sum to 292, which is the board's independently-measured now-tier total. An implementation
+that merely *added* a §11 heading with some numbers under it would pass a completeness check and
+fail this.
+
+### Named as not done, rather than left to be discovered
+
+**The browser harness is still not committed as a permanent regression guard.**
+`tests/regression/` has no DOM or browser fixture, and building one is its own design decision
+(which browser, installed where, how it stays fast). `SES-124` named this gap, `SES-125` named it
+again, and this is the third ticket to run its structural proof from the scratchpad and throw it
+away. That it keeps recurring is now the finding, not the footnote — it belongs to John as a
+question rather than being half-built inside a ticket scoped to four render sections.
+
+**Ledger:** version claimed atomically (`dev_version_counter` → `7.0.161`); before-images written
+for both `backlog_items` writes (`85f85ad3` revalidation, `75aae213` status) before either one;
+close-out recompute moved **565** rows as `SES-126` left the ranked set; board now **564 open,
+564 numbered, 0 open-but-unnumbered**, 595 rows total.
+
+---
+
 ## cycle-20260822-2103 / SES-125-decision-card-overhaul (v7.0.160, 2026-08-22, Automated runner cycle `708dead0`, model Opus 5 orchestrator, no subagent) — the decision cards, and the display reversal that puts John's own words first
 
 **Ticket:** `SES-125` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.161 | runbooks/briefing-template.html | SES-126 — briefing redesign 3 of 6: THE BOARD TABLES. §§8/11/14 were named comments that rendered nothing and §13 rendered without a class column; all four now build. §8 is the matrix that ENDS the gap SES-124 opened and disclosed — striking “Next up — top 5” and the “Next 3” line left the page with no forward view of the queue at all since v7.0.159, and this is the ticket that was always going to close it. Its Queue column is the DB’s OWN `queue` number (SES-86 phase 2), never a position the render counted out, and its Title column is the `gist` extract rather than `title`, because for imported tickets `title` holds the CLASS STRING (‘P9 - Bug Fixes.’) — a matrix keyed on it renders a column of class names and no titles (true until SES-91). THE ONE THAT WOULD HAVE SHIPPED WRONG AND WAS MEASURED FIRST: §11 groups the now tier on the class DIGIT, not the `priority_class` string. Grouped by string the live board returns SEVEN rows for six classes — ‘P9 - Bug Fixes · FLAGGED’ (27) is a different string from ‘P9 - Bug Fixes’ (120) — so John would read 120 bug fixes against a true now-tier 147. Same · FLAGGED suffix trap recompute_backlog_queue() already solves, and the zero-padded sort is the same numeric-vs-lexical fix (P10 sorts ahead of P2 lexically). §13 gains the class column with the fixed work_class→P-class mapping written down rather than re-derived, plus a NOTE that P6 - Agent Enhancement has no rung at all: runner_ladder holds six work classes, and a blank row would read as ‘rung 0, not yet trusted’, which is a different and untrue claim (SES-122 tracks rungs unlocking autonomy). §14 is last 5 PRODUCTION uses on two measured filters: request_host = deepbench.roadmapventure.com is the only production host (the dev URL is John himself, and request_host IS NULL covers 12,212 pre-LOG-134 rows), and ONE USE = ONE trace_id with calls counted as model IS NOT NULL — LOG-81’s rule that ‘AI calls’ means real model calls, never raw rows. Its Cost column renders — and MUST: cost_usd is NULL on every production row, and a NULL shown as $0.00 claims the run was free, which is not the same as not knowing (same rule as the plain_* red defect line). Name resolves visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org, because one live cache label is a 130-character provenance paragraph that would otherwise BE the Name column. New `.tscroll` wrapper gives the two six-column tables their own horizontal scroll so the page body never scrolls sideways on a phone; §§11/13 are narrow and deliberately do not get it. Sections stay OPEN — SES-124 built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10 default-closed, so nothing here folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-template.html | SES-125 — briefing redesign 2 of 6: THE DECISION CARDS. SES-124 shipped the collapse framework and deliberately converted nothing; this ticket converts §§5/6/9 and builds §12, which had never existed. THE ONE CHANGE THAT IS NOT COSMETIC: the card display is REVERSED. Since v7.0.145 the technical record (Value case, Before → after, QA evidence, meta, links) was the card's body and the three plain-language sentences were hidden behind More info — which is backwards against the directive that created them (edab5908, John: "you are giving too much technical jargon. I need a business value statement"). Now plain language IS the body and `More info — the technical record` holds the record. Nothing is deleted: the record stays on the card, one tap away. THE SECOND REAL CHANGE: the ask box LEAVES the More-info panel and sits under the buttons on every card and every row, always visible, with a "✓ Received <ts>" line — John's typed line counts the same as a tap (v7.0.145), so it may not be hidden behind a second button, and a line that vanishes with no acknowledgement reads as a line that was lost. Button meanings move out of the panel with it, rendering as consequence lines under the buttons exactly as §9's Yes/No rows have carried them since v7.0.145 — a consequence you must open a panel to read is one John decides without. Cards and rows are default CLOSED and numbered (5.1 / 6.1 / 9.1 / 12.1); a collapsed card carries number · kind chip · TICKET ID · ticket title · decision state, so the row is decidable-at-a-glance without opening it. §12 vision claims are literally `question()` with a class chip and three different ask-box strings — the spec's word is "formatted exactly like Questions", so they are ONE function rather than two that must be kept in step; their row ids MUST start `vision-`, which is the only thing telling the harvest a claim from a runner_questions row when both land in briefing-state under `answers`. UNCHANGED AND STILL BINDING, because reversing which half is hidden changes neither rule: `plain_*` are READ from runner_items, never re-authored at render time (v7.0.146), a NULL still draws the red defect line and is never coerced to '', a Yes/No row without both consequence lines still renders its defect in red, `data-awaits` is still set from STATE not appearance (§12's rows join §1's counter by carrying it), and a fold still NEVER publishes and never enters briefing-state. Slots this ticket does not fill (§§8/10/11/13/14) remain named HTML comments. -->
 <!-- DeepBench v7.0.159 | runbooks/briefing-template.html | SES-124 — briefing redesign 1 of 6: the SECTION FRAME. Locked spec docs/BRIEFING-REDESIGN-0822.md (John approved the mock, "this is good"); mock docs/design/briefing-redesign-mock-0822.html. §1 masthead gains the decisions-waiting counter — rendered EMPTY and filled by countWaiting() from `data-awaits` on the elements themselves, never from a number a cycle typed, because the masthead is the half John reads first and it must not be able to disagree with the cards under it; singular at 1, "Nothing needs you ✓" at 0. §2 is Daily activity: the CST day is stated IN THE HEADING (12:00 AM–11:59 PM America/Chicago — the same boundary the budget arithmetic uses, deliberately not a UTC day), every number labeled, tokens shown absolute AND as % of the daily max, and one-line definitions of "gated before build" and "did not run" beneath the strip. §3 Today's findings is new and is now the ONLY place narrative prose belongs — latest cycle's finding labeled with its CST time, earlier cycles folded into one default-closed card. §4 keeps its three cards; both bars gain a one-line label of what they measure, and the "✓ Your latest reading was recorded" line MOVES onto the reading card, where the tap it acknowledges actually happens. THE COLLAPSE FRAMEWORK ships here for §§5/6/9/10/12 to build on (SES-125/126/127): `.item.fold` + `.head[data-toggle]` + `.bodyc` for one card, `h2.clickable[data-toggle]` + `.secwrap` for a whole section, one handler for both, and `fold()` as the helper. `fold` is a MODIFIER, not a restyle of `.item`, so the always-open cards still on this page are untouched until SES-125 converts them — that one word is the only difference from the mock. A fold NEVER publishes and is never written to briefing-state: it is a view state, not a decision, and publishing reloads the view. REMOVED on John's explicit instruction: the standalone "Needs your call" override section (an override is a yes/no with consequences either way — it renders as a §9 question now), the footer note (the read-only signal it restated lives on #savebar, in place, where a failed save reports itself), and the stray narrative paragraphs between sections. Sections now carry their locked numbers and sit in the locked order (§7 Directive queue moved above §9). Slots this ticket does not fill are named HTML comments, never placeholders that render. -->
 <!-- DeepBench v7.0.145 | runbooks/briefing-template.html | directive edab5908 — More info. Every card and every question gains a "More info" button opening a plain-language panel (what you can't do today / what you could after / why it's worth something), what each button DOES on that card, the conversation log, and a box to ask a question in your own words. Yes/No rows now carry the consequence of each tap under the button that causes it. Asks ride briefing-state under `asks` and are harvested into public.runner_card_asks. Contract: briefing-page.md's More-info section. -->
@@ -133,6 +134,19 @@
      color:var(--muted);background:var(--card-alt)}
   td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   tr:last-child td{border-bottom:none}
+  /* ---- SES-126 · THE BOARD TABLES (§§8/11/13/14) ----------------------------------------
+     §8 and §14 are six-column matrices and this page is read on a phone every morning, where
+     six columns of text either squeeze to one character per line or push the whole page
+     sideways. `.tscroll` gives the WIDE tables their own horizontal scroll so the body never
+     scrolls sideways; `.mono`/`.dim` are the two cell treatments those tables need. §11 and
+     §13 are narrow and deliberately do NOT get the wrapper — a scroll affordance on a table
+     that fits reads as a table that is cut off. */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:7px}
+  .tscroll table{min-width:560px}
+  td.mono{font-family:var(--mono);font-size:11px}
+  td.dim{color:var(--muted)}
+  td.ttl2{font-family:var(--display);font-size:12.5px}
+  .tnote{font-size:11.5px;color:var(--muted);margin:5px 2px 0;line-height:1.45}
   .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
           padding:13px 14px;margin-bottom:14px}
   .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
@@ -467,6 +481,30 @@
     });
   }
 
+  // SES-126 — the three board-table row helpers (§§8, 11/13, 14). They exist for the same
+  // reason `card()` and `question()` do: a table whose rows are hand-written strings drifts a
+  // cell at a time, and these are the rows a cycle regenerates on EVERY rebuild. Each escapes
+  // its own text — §8 titles and §14 names are ticket prose and visitor labels, i.e. the two
+  // places on this page where the content is not written by a cycle.
+  function queueRow(q, id, cls, status, design, title){
+    return '<tr><td class="num">'+q+'</td><td class="mono">'+esc(id)+'</td>'
+      +'<td class="mono dim">'+esc(cls)+'</td><td class="dim">'+esc(status)+'</td>'
+      +'<td class="dim">'+esc(design)+'</td><td class="ttl2">'+title+'</td></tr>';
+  }
+  function classRow(cid, name, n){
+    return '<tr><td><span class="mono dim">'+cid+'</span> &nbsp;'+name+'</td>'
+      +'<td class="num">'+n+'</td></tr>';
+  }
+  function ladderRow(cid, work, rung, streak){
+    return '<tr><td class="mono dim">'+cid+'</td><td>'+work+'</td>'
+      +'<td class="num">'+rung+'</td><td class="num">'+streak+'</td></tr>';
+  }
+  function useRow(t, ip, loc, name, did, cost){
+    return '<tr><td class="mono">'+esc(t)+'</td><td class="mono">'+esc(ip)+'</td>'
+      +'<td class="dim">'+esc(loc)+'</td><td>'+esc(name)+'</td><td class="dim">'+esc(did)+'</td>'
+      +'<td class="num">'+esc(cost)+'</td></tr>';
+  }
+
   function render(){
     document.getElementById('page').innerHTML =
     // ===== §1 · MASTHEAD (SES-124) =========================================================
@@ -590,7 +628,41 @@
     +'<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first.">'+esc(state.directive)+'</textarea>'
     +'<div class="savebar" id="savebar">'+(readOnly?'read-only view — decisions record for the owner only':'')+'</div></div>'
     // §7's "your last 3 directives — what became of them" card: SES-129.
-    // §8 · The queue (matrix: Queue · ID · Class · Status · Design status · Title): SES-126.
+    // ===== §8 · THE QUEUE (SES-126) =========================================================
+    // MATRIX ONLY — no prose (John's explicit instruction; this section replaces the struck
+    // "Next 3" line and "Next up — top 5", and with SES-124 having removed those, the page has
+    // carried NO forward view of the queue since v7.0.159. This is what ends that gap).
+    // Regenerate every rebuild from public.backlog_items — the queue number is the DB's OWN
+    // `queue` column (SES-86 phase 2), never a position this render counted out:
+    //
+    //   SELECT queue, backlog_id, priority_class, status, coalesce(design_status,'—'),
+    //          left(regexp_replace(coalesce(description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70)
+    //     FROM public.backlog_items WHERE queue IS NOT NULL ORDER BY queue LIMIT 12;
+    //
+    // TWO THINGS THAT ARE NOT STYLE. (1) The Title column uses that `gist` extract, NOT
+    // `title`: for imported tickets `backlog_items.title` holds the CLASS STRING
+    // ('P9 - Bug Fixes.'), so a matrix keyed on `title` renders a column of class names and no
+    // titles at all — the runbook's standing rule for anything that DISPLAYS the queue, true
+    // until SES-91 repairs the column. (2) The heading states the scope (top N of the numbered
+    // board) because a 12-row window onto 565 tickets that does not say so reads as the whole
+    // board. Rows below are this cycle's real values.
+    +'<h2><span class="secnum">8</span>The queue — top 12 of 565 numbered</h2>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Queue</th><th>ID</th><th>Class</th><th>Status</th><th>Design status</th>'
+    +'<th>Title</th></tr>'
+    +queueRow(1,'SES-126','P10 - Tooling','missing','—','Briefing redesign 3 of 6 — board tables on the page')
+    +queueRow(2,'SES-127','P10 - Tooling','missing','—','Structured skip records + §10 with unblock actions')
+    +queueRow(3,'SES-128','P10 - Tooling','missing','—','Morning/night readings + auto-recalibration')
+    +queueRow(4,'SES-129','P10 - Tooling','missing','—','Directive follow-through card')
+    +queueRow(5,'SES-110','P10 - Tooling','partial','designed','New table public.epics — epic membership for tickets')
+    +queueRow(6,'SES-114','P10 - Tooling','missing','—','design_status in the selection read — skip all three flags at a glance')
+    +queueRow(7,'SES-115','P10 - Tooling','missing','—','Rows are never deleted — done/removed stay in the table')
+    +queueRow(8,'SES-116','P10 - Tooling','missing','—','Gated cards are storing the wrong plain-language fields')
+    +queueRow(9,'SES-91','P10 - Tooling','missing','—','backlog_items.title holds the class string, not a title')
+    +queueRow(10,'SES-117','P10 - Tooling','missing','—','Two CHECKs on backlog_items, both John-confirmed')
+    +queueRow(11,'SES-118','P10 - Tooling','missing','—','&ldquo;missing&rdquo; is markdown-audit-era vocabulary — retire it')
+    +queueRow(12,'SES-119','P10 - Tooling','missing','—','Standing instruction across every session type')
+    +'</table></div>'
     // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
     // below are sample values. A question that cannot be asked as yes/no does not belong here;
@@ -605,7 +677,35 @@
       // them — the same prose-instead-of-column gap v7.0.146 closed for cards, still open here.
       'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
       'it joins the bottom of your lane and waits its turn.')
-    // §10 · Skipped — waiting on your input: SES-127.  §11 · Now-tier by class: SES-126.
+    // §10 · Skipped — waiting on your input: SES-127.
+    // ===== §11 · NOW-TIER BY CLASS (SES-126) ================================================
+    // THE ONE THING THAT WILL BE GOT WRONG IF IT IS NOT WRITTEN DOWN: group on the class
+    // DIGIT, never on the `priority_class` string. Measured on the live board this cycle —
+    // grouping by the raw string returns SEVEN rows for six classes, because
+    // 'P9 - Bug Fixes · FLAGGED' (27) is a different string from 'P9 - Bug Fixes' (120), so
+    // John reads 120 bug fixes when the true now-tier figure is 147. Same `· FLAGGED` suffix
+    // trap recompute_backlog_queue() already had to solve; the sort is zero-padded for the
+    // same reason the queue's is numeric — lexically, P10 sorts ahead of P2.
+    //
+    //   SELECT lpad(substring(priority_class from 'P([0-9]+)'),2,'0') AS class_id,
+    //          min(regexp_replace(priority_class,'\s*·.*$','')) AS class_name, count(*)
+    //     FROM public.backlog_items WHERE queue IS NOT NULL AND tier='now'
+    //    GROUP BY 1 ORDER BY 1;
+    //
+    // The footnote's next/later counts are LIVE from the same table, never carried forward from
+    // a previous rebuild. Figures below are this cycle's real values (292 now / 25 next /
+    // 248 later = 565 numbered).
+    +'<h2><span class="secnum">11</span>Now-tier by class</h2>'
+    +'<table><tr><th>Class</th><th>Tickets in now</th></tr>'
+    +classRow('P01','P1 - Improves John&rsquo;s Skills',1)
+    +classRow('P05','P5 - Enhancements',40)
+    +classRow('P06','P6 - Agent Enhancement',14)
+    +classRow('P08','P8 - Determinism Removal',9)
+    +classRow('P09','P9 - Bug Fixes',147)
+    +classRow('P10','P10 - Tooling',81)
+    +'</table>'
+    +'<p class="tnote">Beyond the now bucket: <b>25</b> in next &middot; <b>248</b> in later. '
+    +'A class with no now-tier tickets is left out rather than shown as a zero.</p>'
     // ===== §12 · VISION CLAIMS (SES-125) ====================================================
     // ALWAYS THREE ROWS — drawn from docs/vision/*.md, LOW confidence first, then MED, then each
     // doc's "Open questions for John" (SES-84 phase 2, register B13). A claim reappears every
@@ -634,16 +734,58 @@
       'Sample row, here to hold the always-3 rule — the real third card is the next highest-value unratified claim in the vision corpus. (sample)',
       'ratified as a decision rule.',
       'rejected and recorded.')
+    // ===== §13 · TRUST LADDER (SES-126 adds the class column) ===============================
+    // Regenerate from public.runner_ladder (six rows — work_class, rung, streak). The CLASS
+    // column is the addition: the ladder's `work_class` is the runner's own vocabulary
+    // ('bug_fix'), and John reads the board in P-classes, so the two are shown side by side and
+    // sorted by ZERO-PADDED class id — the same P01…P10 sort §11 uses, and for the same reason.
+    // The mapping is fixed and lives here so a rebuild does not re-derive it:
+    //   invention → P02 · enhancement → P05 · agent_creation → P07
+    //   determinism_removal → P08 · bug_fix → P09 · tooling → P10
+    // THE NOTE IS NOT DECORATION: runner_ladder has SIX rows and the board has ten classes, so
+    // P6 - Agent Enhancement has no rung at all. Saying so is the honest rendering; a blank row
+    // would read as "rung 0, not yet trusted", which is a different and untrue claim.
+    // Rows below are this cycle's real values.
     +'<h2><span class="secnum">13</span>Trust ladder</h2><table>'
-    +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
-    +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
-    +'<tr><td>Enhancement</td><td class="num">1</td><td class="num">0</td></tr>'
-    +'<tr><td>Agent creation</td><td class="num">1</td><td class="num">0</td></tr>'
-    +'<tr><td>Determinism removal</td><td class="num">1</td><td class="num">0</td></tr>'
-    +'<tr><td>Bug fix</td><td class="num">1</td><td class="num">0</td></tr>'
-    +'<tr><td>Tooling</td><td class="num">1</td><td class="num">0</td></tr>'
+    +'<tr><th>Class</th><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
+    +ladderRow('P02','Invention',0,0)
+    +ladderRow('P05','Enhancement',1,0)
+    +ladderRow('P07','Agent creation',1,0)
+    +ladderRow('P08','Determinism removal',1,0)
+    +ladderRow('P09','Bug fix',1,0)
+    +ladderRow('P10','Tooling',5,1)
     +'</table>'
-    // §14 · Who used DeepBench (last 5 production uses): SES-126.
+    +'<p class="tnote">No ladder row exists for <b>P6 - Agent Enhancement</b> — the ladder tracks '
+    +'six work classes and that is not one of them. <b>SES-122</b> (next bucket) is where rungs '
+    +'start actually unlocking autonomy.</p>'
+    // ===== §14 · WHO USED DEEPBENCH (SES-126) ===============================================
+    // Last 5 PRODUCTION uses. Two filters carry this section and both were measured live:
+    //   (1) request_host = 'deepbench.roadmapventure.com' — the only production host in
+    //       ai_activity_log. The dev URL is John himself (the standing dev-URL=John attribution
+    //       rule) and request_host IS NULL covers 12,212 pre-LOG-134 rows with no host recorded,
+    //       so any looser filter files the runner's own traffic under "who used DeepBench".
+    //   (2) ONE USE = ONE trace_id, not one row. LOG-81's standing rule is that "AI calls" means
+    //       real model calls, never raw log rows; the calls count below is
+    //       count(*) FILTER (WHERE model IS NOT NULL), so a five-call run reads as one use.
+    // Name resolves visitor_labels.user_label → the FIRST CLAUSE of ip_org_cache.user_label →
+    // org. That middle step is not fussiness: one live cache label is a 130-character
+    // provenance paragraph, and unsliced it becomes the Name column.
+    // COST IS '—' AND MUST STAY '—': cost_usd is NULL on every production row today. A NULL
+    // rendered as $0.00 is a claim that the run was free, which is a different thing from not
+    // knowing — same rule as the plain_* red defect line.
+    // The heading says "last 5", not "today", because the most recent production use is Aug 18.
+    +'<h2><span class="secnum">14</span>Who used DeepBench — last 5 production uses</h2>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Time (CST)</th><th>IP</th><th>Location</th><th>Name</th><th>What they did</th>'
+    +'<th>Cost</th></tr>'
+    +useRow('Aug 18, 1:02 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 5 AI calls','—')
+    +useRow('Aug 18, 1:01 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 7 AI calls','—')
+    +useRow('Aug 18, 1:00 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 4 AI calls','—')
+    +useRow('Aug 18, 1:00 PM','146.75.136.146','San Jose, California, US','Private Relay egress','Live agent console — 3 AI calls','—')
+    +useRow('Aug 14, 4:56 PM','136.62.184.220','Austin, Texas, US','David','Live agent console — 6 AI calls','—')
+    +'</table></div>'
+    +'<p class="tnote">Cost shows &ldquo;&mdash;&rdquo; because these runs carry no recorded '
+    +'per-call cost &mdash; not because they were free.</p>'
     // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
     // read-only rule that the savebar already states in place, at the moment it matters, and
     // then closed the page on housekeeping instead of on his board. The read-only signal is

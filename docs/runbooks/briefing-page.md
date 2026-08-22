@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.161 | runbooks/briefing-page.md | SES-126 — the LOCKED SECTION ORDER table marks §§8/11/13/14 built, and the page gains the four board tables' data contracts. The forward view of the queue is BACK: SES-124 struck “Next up — top 5” and the “Next 3” line and disclosed on its own card that the page would carry NO forward view until this ticket landed, so the gap runner-cycle.md step 9 describes is now closed — and the struck sections stay struck, the matrix is the forward view. Four contracts written down because each was MEASURED here rather than reasoned about, and each is wrong in a way that looks fine: §8's Queue is the DB's stored `queue` and its Title is the `gist` extract (imported tickets keep the class string in `title`, so a matrix keyed on it shows class names and no titles, until SES-91); §11 groups on the class DIGIT — by string the live now tier returns SEVEN rows for six classes, splitting P9 into 120 + 27 FLAGGED against a true 147 — and sorts zero-padded because P10 sorts before P2 lexically; §13's work_class→P-class mapping is fixed here, and P6 - Agent Enhancement has NO rung (six work classes, ten board classes) which is stated as a note rather than rendered as a blank row that would read “rung 0, not yet trusted”; §14 filters to the one production host (the dev URL is John, and 12,212 pre-LOG-134 rows carry no host at all), counts one use = one trace_id with model IS NOT NULL per LOG-81, resolves Name through visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org because one live label is a 130-character paragraph, and renders Cost as — because cost_usd is NULL and a NULL shown as $0.00 claims the run was free. Plus: the two six-column tables scroll themselves (.tscroll) so the phone's page body never does, the two narrow ones deliberately do not, and none of the four folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-page.md | SES-125 — the More-info contract is REVERSED and the ask box leaves the panel. v7.0.145 required the three plain-language fields and then put them behind a button while the technical record was the card's body — backwards against the directive that created them (edab5908: "you are giving too much technical jargon. I need a business value statement"). John's redesign settles it: plain language IS the body, `More info — the technical record` holds Value case / Before → after / QA evidence / meta / links, and nothing is deleted. The ask box moves out of the panel to sit under the buttons, always visible, with a "✓ Received <ts>" line, because a typed line counts the same as a tap and may not be hidden behind a second button; the button-meaning lines move with it and render under the buttons like §9's Yes/No consequences. §§5/6/9/12 are default-closed and numbered, a collapsed card carries number · kind · TICKET ID · title · decision state, and §12 vision claims are the SAME renderer as §9 with a class chip — one function, because "formatted exactly like Questions" is the spec's word and two near-copies drift. NEW RULE with teeth: a vision row's briefing-state key MUST start `vision-`, since claims and questions both land under `answers` and nothing else distinguishes them at harvest. Unchanged and restated because reversing which half is hidden changes neither: `plain_*` are READ from the row and NULL still draws the red defect line; both Yes/No consequence lines stay required; `data-awaits` still comes from state, and §12's rows now feed §1's counter. -->
 <!-- DeepBench v7.0.148 | runbooks/briefing-page.md | SES-107 — the read-back contract's one-line ladder summary said "Accept → streak+1, 5 promotes", carrying the identical undefined-after-promotion blank as `runner-cycle.md` step 2 and in nearly the identical words. It now states the same rule John ruled on (`q-ladder-streak-reset` NO, 22:04Z): promote on every 5th Accept, `streak % 5 = 0`, streak never reset on promotion. CITED, not restated — this exact sentence drifting out of sync with the runbook is the failure `v7.0.118` fixed here once already, so the full rule (and the promote-every-tap runaway that removing the reset alone would cause) lives in step 2 and this line points at it. -->
 <!-- DeepBench v7.0.146 | runbooks/briefing-page.md | directive dda69acb (+ twin 6b6cdd71) — the More-info panel's fields 1-3 are READ FROM runner_items.plain_cant/.plain_after/.plain_worth instead of being composed fresh at render time. Read them, do not re-author them; NULL renders the red defect line and is never coerced to ''. -->
@@ -85,13 +86,64 @@ shown:
 | 5 | Shipped | `SES-125` ✔ |
 | 6 | Gated before build | `SES-125` ✔ |
 | 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
-| 8 | The queue (matrix) | `SES-126` |
+| 8 | The queue (matrix) | `SES-126` ✔ |
 | 9 | Questions | `SES-125` ✔ |
 | 10 | Skipped — waiting on your input | `SES-127` |
-| 11 | Now-tier by class | `SES-126` |
+| 11 | Now-tier by class | `SES-126` ✔ |
 | 12 | Vision claims | `SES-125` ✔ |
-| 13 | Trust ladder | `SES-126` |
-| 14 | Who used DeepBench | `SES-126` |
+| 13 | Trust ladder | `SES-126` ✔ class column |
+| 14 | Who used DeepBench | `SES-126` ✔ |
+
+**The forward view of the queue is BACK (`SES-126`, `v7.0.161`).** `SES-124` struck "Next up —
+top 5" and the "Next 3" line and disclosed, on its own card, that the page would carry no forward
+view of the queue at all until this ticket landed. §8 and §11 are that replacement and they are
+now live, so the gap paragraph in `runner-cycle.md` step 9 describes a window that has closed.
+**The struck sections stay struck** — do not reinstate them; the matrix is the forward view now.
+
+### The four board tables' data contracts (`SES-126`)
+
+Sections 8, 11, 13 and 14 are regenerated from live tables on **every** rebuild. Four rules, each
+measured against the live board/log when this shipped rather than reasoned about — a rebuild that
+re-derives any of them will get it wrong in a way that looks fine:
+
+- **§8's Queue column is `backlog_items.queue`** — the DB's own stored number (`SES-86` phase 2),
+  never a position the render counted out. **Its Title column is the `gist` extract, not
+  `title`:** for imported tickets `title` holds the class string (`'P9 - Bug Fixes.'`), so a
+  matrix keyed on it renders a column of class names and no titles. True until `SES-91` repairs
+  the column, and it is the same rule the runbook already applies to anything that *displays* the
+  queue. The heading states the window ("top N of M numbered") because a 12-row view of 565
+  tickets that does not say so reads as the whole board.
+- **§11 groups on the class DIGIT, never the `priority_class` string.** Measured live: grouped by
+  string the now tier returns **seven** rows for six classes, because `P9 - Bug Fixes · FLAGGED`
+  (27) is a different string from `P9 - Bug Fixes` (120) — John would read 120 bug fixes against a
+  true now-tier **147**. The sort is zero-padded (`P01…P10`) for the same reason the queue's class
+  sort is numeric: lexically `P10` comes before `P2`. The next/later footnote counts are live from
+  the same table, never carried forward from the previous rebuild.
+- **§13's class column uses a fixed mapping, written down so it is not re-derived:** `invention`
+  → P02, `enhancement` → P05, `agent_creation` → P07, `determinism_removal` → P08, `bug_fix` →
+  P09, `tooling` → P10. `runner_ladder` holds six work classes and the board has ten, so
+  **`P6 - Agent Enhancement` has no rung**; the section says so in a note. Do not render it as a
+  blank row — that reads as "rung 0, not yet trusted", which is a different and untrue claim.
+  (`SES-122`, next bucket, is where rungs start unlocking autonomy.)
+- **§14 is PRODUCTION only, and one use is one `trace_id`.**
+  `request_host = 'deepbench.roadmapventure.com'` is the only production host in
+  `ai_activity_log`; the dev URL is John himself under the standing dev-URL=John attribution rule,
+  and `request_host IS NULL` covers 12,212 pre-`LOG-134` rows with no host recorded — so a looser
+  filter files the runner's own traffic under "who used DeepBench". Calls are counted
+  `FILTER (WHERE model IS NOT NULL)`, which is `LOG-81`'s standing rule that "AI calls" means real
+  model calls and never raw rows. Name resolves `visitor_labels.user_label` → the **first clause**
+  of `ip_org_cache.user_label` → `org`: one live cache label is a 130-character provenance
+  paragraph that would otherwise become the Name column. **Cost renders `—` and must:** `cost_usd`
+  is NULL on every production row today, and a NULL shown as `$0.00` claims the run was free,
+  which is not the same as not knowing — the same rule that makes a NULL `plain_*` draw a red
+  defect line instead of an empty string.
+
+**Wide tables scroll themselves.** §8 and §14 are six-column matrices and this page is read on a
+phone; both sit in a `.tscroll` wrapper so the table scrolls sideways and the page body never
+does. §11 and §13 are narrow and deliberately do **not** get it — a scroll affordance on a table
+that already fits reads as a table that is cut off. **None of these four sections folds:**
+`SES-124` built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10
+default-closed.
 
 **The three rules `SES-124` adds, which every later section must honour:**
 
