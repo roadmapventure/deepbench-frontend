@@ -5,6 +5,93 @@
 
 ---
 
+## cycle-20260822-2103 / SES-125-decision-card-overhaul (v7.0.160, 2026-08-22, Automated runner cycle `708dead0`, model Opus 5 orchestrator, no subagent) — the decision cards, and the display reversal that puts John's own words first
+
+**Ticket:** `SES-125` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
+automation lane rank −20. Shipped **`done`**. Doc/template only — no `src/`, no `api/`, no `lib/`,
+no migration, no user-visible surface on dev, no flag (§19v). Two files:
+`docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`.
+
+**Selected by layer 1b**, John's standing Automation-epic drain (`runner_directives` `b74009ea` —
+*"run out the automation epic tickets until completion in the now bucket."*).
+`drain_epic_next('708dead0-…')` returned `pick` / `SES-125` / `open_now = 27`. Claim returned 1 row.
+
+**Premise revalidated live before a line was written**, by reading the template at `origin/dev`
+rather than recalling `SES-124`'s hand-off: `card()` rendered an always-open `.item` with the
+technical record as its body; `moreInfo()` held the plain-language fields; `askBox()` was emitted
+*inside* the `.more` panel by both `card()` and `question()`; and §12 existed only as the comment
+`// §12 · Vision claims (formatted exactly like §9): SES-125.` The gap was real and untouched.
+
+**What shipped, and why the first item is not cosmetic.**
+
+1. **The card display is REVERSED.** `v7.0.145` made the three plain-language fields *required*
+   and then put them behind a button, leaving Value case / Before → after / QA evidence / meta /
+   links as the card's body. That is backwards against the directive that created them
+   (`edab5908`, John: *"you are giving too much technical jargon. I need a business value
+   statement — what can't the user do today? What would they be able to do after? How does this
+   make the platform more valuable?"*). Those three sentences are now the card's default body;
+   `More info — the technical record` holds the record. **Nothing is deleted** — the record is
+   still on the card, one tap away, which is what makes this a re-ordering and not a removal.
+2. **The ask box leaves the panel.** It sits under the buttons on every card and every row,
+   always visible, with a **`✓ Received <ts>`** line once anything has been recorded for that
+   target. John's typed line counts the same as a tap (`v7.0.145`), so it may not be behind a
+   second button; and a line that vanishes with no acknowledgement reads as a line that was lost.
+   The button-meaning sentences move out with it, rendering under the buttons in the same
+   `.ynmean` row §9's Yes/No consequences have used since `v7.0.145` — a consequence John has to
+   open a panel to read is one he decides without.
+3. **Default closed and numbered.** §§5/6/9/12 fold onto `SES-124`'s framework. A collapsed card
+   carries **number · kind chip · ticket ID · ticket title · decision state**; a collapsed
+   question carries its text and answer state. Enough to decide whether to open it, which is the
+   only thing that makes closing it an improvement rather than a hiding place.
+4. **§12 vision claims are `question()` itself.** The spec's word is *"formatted exactly like
+   Questions"*, so `visionClaim()` is a thin wrapper adding a class chip and three ask-box
+   strings — one renderer, not two near-copies that must be kept in step. Always three rows,
+   default closed, reappearing until decided.
+
+**The one new rule, and it has teeth.** A vision row's `briefing-state` key **must** start
+`vision-`. Claims and questions both land under the same `answers` key, so the id prefix is the
+only thing telling the harvest whether an answer belongs to `public.runner_questions` or to a
+claim in `docs/vision/*.md`. A row published with a bare slug would be harvested against a `qid`
+that does not exist — a **silent no-op on John's tap**, which is the one failure a decision
+surface may never have. Written into both the template and `briefing-page.md`.
+
+**QA — and what the standard checks are honestly worth here.** `npm run build` (clean) and the
+regression suite (**34/34 with credentials** from `runner_secrets`; 33/34 without, the known
+`CHI-31` env gap) **prove nothing about this change**: the template is a doc, nothing imports it,
+so both pass unchanged if the ticket did nothing at all. The discriminating test extracts the
+template's own `<script id="code">`, executes it against a DOM stub, and asserts on the HTML it
+produces — 24 assertions covering the fold shape, the ID chip, the ordering of `.plain` before
+`.morebtn`, the ask box being **outside** `.more` and **after** `.decide`, the `✓ Received` line,
+exactly three `vision-`-prefixed rows each with a class chip, and `data-awaits` still coming from
+state. **Shipped: 24/24. Negative control — the identical assertions against `origin/dev`'s copy
+of the file: 14 of 24 FAIL.** An implementation that merely *added* new headings would pass a
+completeness check and fail this one. The harness also parse-checks the generated script before
+asserting, because an apostrophe inside a single-quoted string blanked this page once already
+(caught pre-publish by cycle `c6387c5e`).
+
+**A harness bug found and fixed in its own first run, recorded because it is the interesting
+kind.** The card-matching regex initially counted §3's *"Earlier today"* fold as a decision card —
+it is also an `.item.fold` — and reported three failures on a correct page. The discriminator is
+the `item-` id prefix. Worth writing down: a structural assertion that over-matches fails *the
+ship*, not the harness, and a cycle that had trusted it would have "fixed" working code.
+
+**NOT done, stated rather than left to be discovered.** The structural harness ran from the
+session scratchpad and is **not** committed as a permanent regression guard. `tests/regression/`
+carries no DOM-stub fixture and building one is its own design decision (which shim, how the
+template is located, what happens when the template legitimately changes shape next ticket) —
+larger than the remainder of this ticket's scope cap. Filed to John as a question rather than
+half-built here. This matters more than it sounds: `LOG-70` closed with the finding that *a guard
+test is only as good as the roots it names*, and this page now has four sections whose shape is
+guarded by nothing between rebuilds.
+
+**Board after close-out:** ticket set `done` (before-image first, claim untouched),
+`design_status = 'designed'` with its kickoff link, recompute moved **566** rows. Census taken
+live: **565 open, 565 numbered, 0 open-but-unnumbered**, 595 rows total. Queue top is now
+`SES-126` / `SES-127` / `SES-128` / `SES-129` — the remaining four redesign tickets — then
+`SES-110` (`partial`, `.claude/`-blocked) at 5.
+
+---
+
 ## cycle-20260822-2029 / SES-124-briefing-section-frame (v7.0.159, 2026-08-22, Automated runner cycle `0a8af947`, model Opus 5 orchestrator, no subagent) — the briefing's new section frame, and the collapse framework the next three tickets stand on
 
 **Ticket:** `SES-124` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,

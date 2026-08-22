@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.160 | runbooks/briefing-page.md | SES-125 — the More-info contract is REVERSED and the ask box leaves the panel. v7.0.145 required the three plain-language fields and then put them behind a button while the technical record was the card's body — backwards against the directive that created them (edab5908: "you are giving too much technical jargon. I need a business value statement"). John's redesign settles it: plain language IS the body, `More info — the technical record` holds Value case / Before → after / QA evidence / meta / links, and nothing is deleted. The ask box moves out of the panel to sit under the buttons, always visible, with a "✓ Received <ts>" line, because a typed line counts the same as a tap and may not be hidden behind a second button; the button-meaning lines move with it and render under the buttons like §9's Yes/No consequences. §§5/6/9/12 are default-closed and numbered, a collapsed card carries number · kind · TICKET ID · title · decision state, and §12 vision claims are the SAME renderer as §9 with a class chip — one function, because "formatted exactly like Questions" is the spec's word and two near-copies drift. NEW RULE with teeth: a vision row's briefing-state key MUST start `vision-`, since claims and questions both land under `answers` and nothing else distinguishes them at harvest. Unchanged and restated because reversing which half is hidden changes neither: `plain_*` are READ from the row and NULL still draws the red defect line; both Yes/No consequence lines stay required; `data-awaits` still comes from state, and §12's rows now feed §1's counter. -->
 <!-- DeepBench v7.0.148 | runbooks/briefing-page.md | SES-107 — the read-back contract's one-line ladder summary said "Accept → streak+1, 5 promotes", carrying the identical undefined-after-promotion blank as `runner-cycle.md` step 2 and in nearly the identical words. It now states the same rule John ruled on (`q-ladder-streak-reset` NO, 22:04Z): promote on every 5th Accept, `streak % 5 = 0`, streak never reset on promotion. CITED, not restated — this exact sentence drifting out of sync with the runbook is the failure `v7.0.118` fixed here once already, so the full rule (and the promote-every-tap runaway that removing the reset alone would cause) lives in step 2 and this line points at it. -->
 <!-- DeepBench v7.0.146 | runbooks/briefing-page.md | directive dda69acb (+ twin 6b6cdd71) — the More-info panel's fields 1-3 are READ FROM runner_items.plain_cant/.plain_after/.plain_worth instead of being composed fresh at render time. Read them, do not re-author them; NULL renders the red defect line and is never coerced to ''. -->
 <!-- DeepBench v7.0.159 | runbooks/briefing-page.md | SES-124 — the LOCKED SECTION ORDER section is added and the regeneration contract's ad-hoc structure list ("stat strip, Shipped, Gated, Needs-your-call, Trust ladder, Directive textarea") is replaced by it. Source of truth for the redesign is docs/BRIEFING-REDESIGN-0822.md (behavior) + docs/design/briefing-redesign-mock-0822.html (look/feel), John-approved 2026-08-22; the table names which of SES-124..129 builds each of the 14 sections, so a rebuilding cycle stops re-deriving the page's shape from prose. Three rules every later section must honour ride with it: §1's counter is COMPUTED from `data-awaits`, never typed by a cycle (the masthead may not be able to disagree with the cards beneath it; singular at 1, "Nothing needs you ✓" at 0); §2's day is the CST day, stated in the heading, matching the budget arithmetic's boundary and not a UTC day; and §3 is the ONLY place narrative prose belongs. The collapse framework's contract is written down here (fold()/.item.fold/.secwrap, one handler, and the rule that a fold NEVER publishes and never enters briefing-state — it is a view state, not a decision). John's explicit removals are listed as do-not-reinstate, and the one real cost is stated rather than left to be discovered: striking "Next up — top 5" and "Next 3" leaves the page with NO forward view of the queue until SES-126 ships §8/§11, which is the spec's own sequencing and is on SES-124's card so he can reverse it in one tap. -->
@@ -81,14 +82,14 @@ shown:
 | 2 | Daily activity (CST day) | `SES-124` ✔ |
 | 3 | Today's findings | `SES-124` ✔ |
 | 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` readings |
-| 5 | Shipped | `SES-125` |
-| 6 | Gated before build | `SES-125` |
+| 5 | Shipped | `SES-125` ✔ |
+| 6 | Gated before build | `SES-125` ✔ |
 | 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
 | 8 | The queue (matrix) | `SES-126` |
-| 9 | Questions | `SES-125` |
+| 9 | Questions | `SES-125` ✔ |
 | 10 | Skipped — waiting on your input | `SES-127` |
 | 11 | Now-tier by class | `SES-126` |
-| 12 | Vision claims | `SES-125` |
+| 12 | Vision claims | `SES-125` ✔ |
 | 13 | Trust ladder | `SES-126` |
 | 14 | Who used DeepBench | `SES-126` |
 
@@ -135,6 +136,25 @@ marked `HIGH (John's words, <date>)`. **Reverse** deletes the claim and records 
 `vision/rejected-paths.md` if it asserts a path. Decisions ride the same `briefing-state`
 harvest as every other card; the corpus edit lands in the cycle's normal ship commit. On-demand
 bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.
+
+**§12's SHAPE, since `SES-125` (`v7.0.160`) — a claim is a question row, not a card.** John's
+spec word is *"formatted exactly like Questions"*, so the template renders §12 through the **same
+`question()` function** as §9 rather than a second near-copy that has to be kept in step:
+`visionClaim()` is a thin wrapper that adds a **class chip** (the `P1`–`P4` judgment class the
+claim sets criteria for; "All classes" when broader) and swaps the ask box's three strings, since
+John's own wording **replaces** a claim rather than asking about it. **Always three rows, always
+default closed**, and a claim reappears every rebuild until it is decided — only silence carries
+it forward. The three taps are unchanged: **Yes** ratifies to `HIGH`, **No** deletes it and
+records it in `vision/rejected-paths.md`, a **typed line** replaces the claim in John's words and
+resolves it.
+
+**The one new rule, and it is load-bearing: a vision row's id MUST start `vision-`.** Claims and
+questions both land in `briefing-state` under the **same `answers` key**, so at harvest time the
+id prefix is the *only* thing that says whether an answer belongs to `public.runner_questions` or
+to a claim in `docs/vision/*.md`. A vision row published with a bare slug would be harvested as a
+question against a `qid` that does not exist — a silent no-op on John's tap, which is the one
+failure a decision surface may never have. Use `vision-<doc>-<claim id>`
+(e.g. `vision-thesis-C-thesis-30`).
 
 ## The question list (every rebuild — SES-99)
 
@@ -185,8 +205,29 @@ jargon. I need a business value statement - what can't the user do today? What w
 able to do after? How does this make the platform more valuable?"* Those three sentences are the
 panel's three fields. They are not a suggested format; they are the format.
 
-**Every card gets a `More info` button**, rendered above the decision buttons so the reading
-comes before the choice, opening a panel with, in order:
+**REVERSED BY `SES-125` (`v7.0.160`), on John's redesign — read this before the list below, which
+now describes the card, not a panel.** `v7.0.145` made these three fields required and then put
+them *behind the button* while the technical record stayed the card's body. That is backwards
+against the directive that created them, and the mock John approved fixes it. The shape now:
+
+- **Fields 1–3 are the card's DEFAULT BODY** — the first thing on an opened card, in `.plain`.
+- **`More info — the technical record`** holds what used to be the body: Value case,
+  Before → after, QA evidence, the meta line, the links. **Nothing is deleted** — the record is
+  still on the card, one tap away, which is what makes the reversal a re-ordering rather than a
+  removal.
+- **Field 4 (what each button does here) leaves the panel** and renders as consequence lines
+  directly under the buttons, in the same `.ynmean` row §9's Yes/No rows have carried since
+  `v7.0.145`. A consequence John has to open a panel to read is one he decides without.
+- **Field 5 (the thread, then the ask box) leaves the panel too** and sits under the buttons,
+  **always visible**, with a **"✓ Received `<ts>`" line** once anything has been recorded for
+  that target. John's typed line counts the same as a tap, so it may not be hidden behind a
+  second button, and a line that vanishes with no acknowledgement reads as a line that was lost.
+- **Cards and rows are default CLOSED and numbered** (`5.1`, `6.1`, `9.1`, `12.1`). A collapsed
+  card carries **number · kind chip · ticket ID · ticket title · decision state** — enough to
+  decide whether to open it, which is the whole point of closing it.
+
+**Every card gets a `More info` button**, rendered between the plain-language body and the
+decision buttons, opening the technical record. The three plain-language fields, in order, are:
 
 1. **What you can't do today** — the gap, in a sentence a person outside this repo would follow.
 2. **What you could do after** — the same sentence from the other side.
@@ -207,7 +248,9 @@ comes before the choice, opening a panel with, in order:
    terms**. Defaults differ by card kind and the difference is real, not cosmetic: a gated Accept
    is permission and never touches the ladder (John's B34 ruling), a shipped Accept is a rating.
    A cycle may override any of the three when the generic sentence would mislead.
-5. **The conversation log**, then **the ask box**.
+   **Since `SES-125` this renders under the buttons, not in the panel** (`decideMeans()`).
+5. **The conversation log**, then **the ask box** — **since `SES-125` both sit under the buttons,
+   outside the panel, always visible** (`thread()` then `askBox()`).
 
 Three rules that keep this honest, each of which the template enforces rather than trusts:
 

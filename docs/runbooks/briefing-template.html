@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.160 | runbooks/briefing-template.html | SES-125 — briefing redesign 2 of 6: THE DECISION CARDS. SES-124 shipped the collapse framework and deliberately converted nothing; this ticket converts §§5/6/9 and builds §12, which had never existed. THE ONE CHANGE THAT IS NOT COSMETIC: the card display is REVERSED. Since v7.0.145 the technical record (Value case, Before → after, QA evidence, meta, links) was the card's body and the three plain-language sentences were hidden behind More info — which is backwards against the directive that created them (edab5908, John: "you are giving too much technical jargon. I need a business value statement"). Now plain language IS the body and `More info — the technical record` holds the record. Nothing is deleted: the record stays on the card, one tap away. THE SECOND REAL CHANGE: the ask box LEAVES the More-info panel and sits under the buttons on every card and every row, always visible, with a "✓ Received <ts>" line — John's typed line counts the same as a tap (v7.0.145), so it may not be hidden behind a second button, and a line that vanishes with no acknowledgement reads as a line that was lost. Button meanings move out of the panel with it, rendering as consequence lines under the buttons exactly as §9's Yes/No rows have carried them since v7.0.145 — a consequence you must open a panel to read is one John decides without. Cards and rows are default CLOSED and numbered (5.1 / 6.1 / 9.1 / 12.1); a collapsed card carries number · kind chip · TICKET ID · ticket title · decision state, so the row is decidable-at-a-glance without opening it. §12 vision claims are literally `question()` with a class chip and three different ask-box strings — the spec's word is "formatted exactly like Questions", so they are ONE function rather than two that must be kept in step; their row ids MUST start `vision-`, which is the only thing telling the harvest a claim from a runner_questions row when both land in briefing-state under `answers`. UNCHANGED AND STILL BINDING, because reversing which half is hidden changes neither rule: `plain_*` are READ from runner_items, never re-authored at render time (v7.0.146), a NULL still draws the red defect line and is never coerced to '', a Yes/No row without both consequence lines still renders its defect in red, `data-awaits` is still set from STATE not appearance (§12's rows join §1's counter by carrying it), and a fold still NEVER publishes and never enters briefing-state. Slots this ticket does not fill (§§8/10/11/13/14) remain named HTML comments. -->
 <!-- DeepBench v7.0.159 | runbooks/briefing-template.html | SES-124 — briefing redesign 1 of 6: the SECTION FRAME. Locked spec docs/BRIEFING-REDESIGN-0822.md (John approved the mock, "this is good"); mock docs/design/briefing-redesign-mock-0822.html. §1 masthead gains the decisions-waiting counter — rendered EMPTY and filled by countWaiting() from `data-awaits` on the elements themselves, never from a number a cycle typed, because the masthead is the half John reads first and it must not be able to disagree with the cards under it; singular at 1, "Nothing needs you ✓" at 0. §2 is Daily activity: the CST day is stated IN THE HEADING (12:00 AM–11:59 PM America/Chicago — the same boundary the budget arithmetic uses, deliberately not a UTC day), every number labeled, tokens shown absolute AND as % of the daily max, and one-line definitions of "gated before build" and "did not run" beneath the strip. §3 Today's findings is new and is now the ONLY place narrative prose belongs — latest cycle's finding labeled with its CST time, earlier cycles folded into one default-closed card. §4 keeps its three cards; both bars gain a one-line label of what they measure, and the "✓ Your latest reading was recorded" line MOVES onto the reading card, where the tap it acknowledges actually happens. THE COLLAPSE FRAMEWORK ships here for §§5/6/9/10/12 to build on (SES-125/126/127): `.item.fold` + `.head[data-toggle]` + `.bodyc` for one card, `h2.clickable[data-toggle]` + `.secwrap` for a whole section, one handler for both, and `fold()` as the helper. `fold` is a MODIFIER, not a restyle of `.item`, so the always-open cards still on this page are untouched until SES-125 converts them — that one word is the only difference from the mock. A fold NEVER publishes and is never written to briefing-state: it is a view state, not a decision, and publishing reloads the view. REMOVED on John's explicit instruction: the standalone "Needs your call" override section (an override is a yes/no with consequences either way — it renders as a §9 question now), the footer note (the read-only signal it restated lives on #savebar, in place, where a failed save reports itself), and the stray narrative paragraphs between sections. Sections now carry their locked numbers and sit in the locked order (§7 Directive queue moved above §9). Slots this ticket does not fill are named HTML comments, never placeholders that render. -->
 <!-- DeepBench v7.0.145 | runbooks/briefing-template.html | directive edab5908 — More info. Every card and every question gains a "More info" button opening a plain-language panel (what you can't do today / what you could after / why it's worth something), what each button DOES on that card, the conversation log, and a box to ask a question in your own words. Yes/No rows now carry the consequence of each tap under the button that causes it. Asks ride briefing-state under `asks` and are harvested into public.runner_card_asks. Contract: briefing-page.md's More-info section. -->
 <!-- DeepBench v7.0.135 | runbooks/briefing-template.html | SES-99, directive 48ae1939 — the question list: open rows of public.runner_questions render as Yes/No rows that record on the tap, answers ride briefing-state under `answers`, and the note input is optional by construction. Contract: briefing-page.md's question-list section. -->
@@ -76,12 +77,29 @@
        color:var(--white);border-radius:9px;padding:1px 8px;vertical-align:1px}
   .secwrap{display:none}
   .secwrap.open{display:block}
+  /* ---- SES-125 · THE DECISION CARDS -----------------------------------------------------
+     §§5/6/9/12 now USE the framework above. `.q` gains the same `fold` modifier `.item` got,
+     for the same reason: it is a modifier, so nothing that has not been converted moves.
+     `.q.fold .head` aligns to flex-start rather than center — a question's text is a sentence
+     and wraps to three lines on a phone, where a centered chevron drifts into the middle of it. */
+  .q.fold{padding:0;overflow:hidden}
+  .q.fold .head{display:flex;align-items:flex-start;gap:8px;padding:11px 13px;cursor:pointer}
+  .q.fold .head:hover{background:var(--card-alt)}
+  .q.fold .head .qtext{flex:1;margin:0;font-size:14px;line-height:1.35}
+  .head .kind{flex-shrink:0}
+  .idline{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:9px 0 8px}
+  .plain p{margin:0 0 8px;font-size:14px}
+  /* The judgment class a vision claim sets criteria for (§12). Navy on white, so it reads as a
+     label rather than competing with the brass card number beside it. */
+  .clschip{font-family:var(--mono);font-size:9.5px;color:var(--white);background:var(--navy);
+       border-radius:3px;padding:1px 6px;flex-shrink:0}
   .tblwrap{overflow-x:auto;border-radius:7px}
   .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
         padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
         background:var(--card-alt)}
   .kind.ship{color:var(--moss);border-color:var(--moss-light)}
   .kind.test{color:var(--brass-deep);border-color:var(--brass-light)}
+  .kind.gate{color:var(--brass-deep);border-color:var(--brass-light)}
   .item .top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
   .item .id{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
   .item h3{font-family:var(--display);font-size:17px;font-weight:600;margin:0 0 8px;text-wrap:balance}
@@ -190,10 +208,16 @@
   .thread .aa{font-size:13.5px;margin:0 0 10px;padding-left:10px;border-left:2px solid var(--brass-light)}
   .thread .pending{font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 10px;
         padding-left:10px;border-left:2px solid var(--line-soft)}
+  /* SES-125 — the ask box LEAVES the More-info panel and sits under the buttons on every card
+     and every row, always visible. `.got` is the "✓ Received" acknowledgement John asked for:
+     a line he typed must visibly land, or the box reads like it swallowed it. */
+  .ask{margin-top:10px}
   .ask input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;margin-top:9px;
      border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
   .ask input:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
   .ask .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .ask .got{display:none;font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:4px}
+  .ask .got.show{display:block}
   .ynmean{display:flex;gap:8px;margin-top:5px}
   .ynmean span{flex:1;font-size:11.5px;color:var(--muted-deep);text-align:center;line-height:1.35}
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -260,32 +284,58 @@
     return h + '</div>';
   }
 
-  function askBox(targetId){
+  // SES-125 — the ask box now sits UNDER the buttons, always visible, on cards (§§5/6),
+  // questions (§9) and vision claims (§12). John's line counts the same as a tap, so it may not
+  // be hidden behind a second button. `got` is the acknowledgement: once anything has been
+  // recorded for this target the "✓ Received <ts>" line shows, carrying the time of his most
+  // recent line — a typed line that vanishes without a mark reads as a line that was lost.
+  function askBox(targetId, placeholder, hint, gotTail){
+    var list = state.asks[targetId] || [];
+    var last = list.length ? (list[list.length-1] || {}) : null;
     return '<div class="ask"><input type="text" data-ask="'+targetId+'" value="" '
-      +'placeholder="Ask me about this — then press Enter">'
-      +'<div class="hint">Your question is recorded now; the answer appears on this card next cycle.</div></div>';
+      +'placeholder="'+placeholder+'">'
+      +'<div class="hint">'+hint+'</div>'
+      +'<div class="got'+(last?' show':'')+'">&#10003; Received '+esc(last?last.at:'')
+      +' &middot; '+gotTail+'</div></div>';
   }
 
-  // `more` = {cant, after, worth, buttons:{accept,reverse,rework}} — the plain-language panel John
-  // asked for: what he cannot do today, what he could after, why it is worth anything. A card
-  // published without it says so in red rather than rendering a convincing blank.
-  function moreInfo(id, kindCls, more){
-    var open = state.asks[id] && state.asks[id].length;   // a card he has asked about opens open
-    var m = more || null;
-    var b = buttonMeanings(kindCls, m && m.buttons);
-    var body = m
-      ? '<p><span class="lbl">What you can’t do today</span>'+m.cant+'</p>'
-        +'<p><span class="lbl">What you could do after</span>'+m.after+'</p>'
-        +'<p><span class="lbl">Why that’s worth something</span>'+m.worth+'</p>'
-      : '<p class="missing">This card was published without its plain-language summary. '
-        +'That is a defect in the cycle that wrote it, not something you need to decode.</p>';
-    return '<button class="morebtn'+(open?' on':'')+'" data-more="'+id+'">'
-      +(open?'Hide info':'More info')+'</button>'
-      +'<div class="more'+(open?' show':'')+'" id="more-'+id+'">'+body
-      +'<p class="btnmeans"><b>Accept</b> — '+b.accept+'<br>'
-      +'<b>Reverse</b> — '+b.reverse+'<br>'
-      +'<b>Rework</b> — '+b.rework+'</p>'
-      +thread(id)+askBox(id)+'</div>';
+  // The three plain-language sentences are the card's DEFAULT BODY now (SES-125 reverses
+  // v7.0.145's display). They are still READ from runner_items.plain_cant/.plain_after/
+  // .plain_worth and never re-authored here, and a NULL still draws the red defect line rather
+  // than a convincing blank — reversing which half is hidden changes neither rule.
+  function plainBlock(more){
+    return more
+      ? '<div class="plain">'
+        +'<p><span class="lbl">What you can’t do today</span>'+more.cant+'</p>'
+        +'<p><span class="lbl">What you could do after</span>'+more.after+'</p>'
+        +'<p><span class="lbl">Why that’s worth something</span>'+more.worth+'</p></div>'
+      : '<div class="plain"><p class="missing">This card was published without its '
+        +'plain-language summary. That is a defect in the cycle that wrote it, not something '
+        +'you need to decode.</p></div>';
+  }
+
+  // What each button does, in this card's own terms — rendered as consequence lines directly
+  // under the buttons they describe, exactly as §9's Yes/No rows have carried them since
+  // v7.0.145. They used to live inside the More-info panel; the panel now holds the technical
+  // record (SES-125), and a consequence John has to open a panel to read is one he decides
+  // without. Same defaults, same per-card override.
+  function decideMeans(kindCls, over){
+    var b = buttonMeanings(kindCls, over);
+    return '<div class="ynmean"><span>Accept &rarr; '+b.accept+'</span>'
+      +'<span>Reverse &rarr; '+b.reverse+'</span>'
+      +'<span>Rework &rarr; '+b.rework+'</span></div>';
+  }
+
+  // SES-125 — MORE INFO IS THE TECHNICAL RECORD NOW. The display is reversed from v7.0.145:
+  // the plain-language sentences are the body John reads first, and Value case / Before → after /
+  // QA evidence / meta / links — the material he told us was "too much technical jargon" — moves
+  // behind the button. Nothing is deleted; the record is still one tap away and still on the card.
+  // Default closed: a card he has asked a question about no longer opens this panel, because the
+  // thread and the ask box left the panel and now live under the buttons where he types.
+  function techPanel(id, techHtml){
+    if (!techHtml) return '';
+    return '<button class="morebtn" data-more="'+id+'">More info — the technical record</button>'
+      +'<div class="more" id="more-'+id+'">'+techHtml+'</div>';
   }
 
   // SES-124 — the collapse framework's card helper. One default-closed card: a clickable head
@@ -301,28 +351,51 @@
       +'<div class="bodyc">'+bodyHtml+'</div></div>';
   }
 
-  function card(id, kindCls, kindTxt, idTxt, title, bodyHtml, more){
+  // SES-125 — ONE DECISION CARD, §§5 and 6. Default CLOSED, numbered, and the collapsed row
+  // carries everything John needs to decide whether to open it: number · kind · TICKET ID ·
+  // ticket title · decision state. Arguments, in order:
+  //   num      '5.1'                    — the section-relative card number shown in the head
+  //   id       'item-LOG-128'           — DOM id AND the runner_items key the harvest writes on
+  //   kindCls  'ship' | 'gate' | 'test' — drives the chip colour and the button meanings
+  //   kindTxt  'Ship' | 'Gated'         — the chip's word
+  //   tid      'LOG-128'                — the ID chip, visible while collapsed (John's rule)
+  //   idLine   'LOG-128 (Log · P05 - Enhancements) · behind flag, currently OFF'
+  //   title    the board's ticket title — not a re-worded headline
+  //   techHtml Value case / Before → after / QA evidence / meta / links, i.e. the record
+  //   more     {cant, after, worth, buttons:{…}} read from runner_items.plain_*
+  function card(num, id, kindCls, kindTxt, tid, idLine, title, techHtml, more){
     var d = state.items[id] || {};
     var dec = d.decision || '';
     var showReason = dec==='reverse' || dec==='rework';
     // SES-124 — `data-awaits` is how the masthead counter (§1) knows this card still needs John.
-    // It is set from STATE, not from the DOM's appearance, so a card that renders in some future
-    // collapsed shape still counts correctly. Every decidable element carries it; nothing else does.
-    return '<div class="item" id="'+id+'"'+(dec?' data-decision="'+dec+'"':' data-awaits="1"')+'>'
-      +'<div class="top"><span class="kind '+kindCls+'">'+kindTxt+'</span>'
-      +'<span class="id">'+idTxt+'</span></div>'
-      +'<h3>'+title+'</h3>'+bodyHtml
-      +moreInfo(id, kindCls, more)
+    // It is set from STATE, not from the DOM's appearance, so a card that renders collapsed
+    // still counts correctly. Every decidable element carries it; nothing else does.
+    return '<div class="item fold" id="'+id+'"'+(dec?' data-decision="'+dec+'"':' data-awaits="1"')+'>'
+      +'<div class="head" data-toggle="'+id+'"><span class="cardnum">'+num+'</span>'
+      +'<span class="kind '+kindCls+'">'+kindTxt+'</span>'
+      +'<span class="idchip">'+tid+'</span>'
+      +'<span class="ttl">'+title+'</span>'
+      +'<span class="st'+(dec?' done':'')+'">'+(dec?(dec.toUpperCase()+' ✓'):'undecided')+'</span>'
+      +'<span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'
+      +'<div class="idline">'+idLine+(dec&&d.at?(' &middot; decided '+esc(d.at)):'')+'</div>'
+      +plainBlock(more)
+      +techPanel(id, techHtml)
       +'<div class="decide">'
       +'<button class="accept'+(dec==='accept'?' on':'')+'" data-c="accept">Accept</button>'
       +'<button class="reverse'+(dec==='reverse'?' on':'')+'" data-c="reverse">Reverse</button>'
       +'<button class="rework'+(dec==='rework'?' on':'')+'" data-c="rework">Rework</button>'
       +'</div>'
+      +decideMeans(kindCls, more && more.buttons)
       +'<div class="reason'+(showReason?' show':'')+'">'
       +'<input type="text" value="'+esc(d.reason)+'" placeholder="One line — then press Save">'
       +'<div class="hint">Press Enter or tap Save to record the line.</div></div>'
       +'<div class="verdict">'+(dec?('recorded: '+dec.toUpperCase()+' · '+esc(d.at||'')):'')+'</div>'
-      +'</div>';
+      +thread(id)
+      +askBox(id, 'Ask or tell me anything about this — then press Enter',
+              'Counts the same as the buttons — your line is recorded now and answered on this card next cycle.',
+              'answer appears on this card next cycle')
+      +'</div></div>';
   }
 
   // SES-99 — one open row of public.runner_questions. `qid` is the table's stable slug and is
@@ -334,34 +407,64 @@
   // consequence of each tap in one line, rendered directly beneath the button that causes it, so
   // the question never has to be re-parsed to work out which way round it runs. They are
   // REQUIRED: a question row without them renders the defect in red rather than two bare buttons.
-  function question(qid, text, ctx, yesMeans, noMeans){
+  // SES-125 — folded, numbered, and the ask box is out of the More-info panel: a question row
+  // has no technical record to hide, so the panel it used to carry existed only to hold the ask
+  // box, and John had to open a button to answer in his own words. The box is now under the
+  // buttons, where the Yes/No is. `opts` is how §12 reuses this row verbatim rather than
+  // growing a near-copy — the spec's word is "formatted exactly like Questions", so §9 and §12
+  // are one function, not two that must be kept in step:
+  //   opts.chip            markup shown before the text in the head (§12's class chip)
+  //   opts.ask{ph,hint,got} the ask box's three strings, which differ in meaning for a claim
+  function question(num, qid, text, ctx, yesMeans, noMeans, opts){
     var a = state.answers[qid] || {};
     var ans = a.a || '';
-    var open = state.asks[qid] && state.asks[qid].length;
+    opts = opts || {};
+    var ask = opts.ask || { ph:'Ask or answer in your own words — then press Enter',
+                            hint:'Counts the same as the buttons — recorded now, answered here next cycle.',
+                            got:'answer appears here next cycle' };
     var means = (yesMeans && noMeans)
       ? '<div class="ynmean"><span>Yes &rarr; '+yesMeans+'</span><span>No &rarr; '+noMeans+'</span></div>'
       : '<div class="ynmean"><span class="missing">This question was published without its '
-        +'Yes/No consequences — a defect in the cycle that asked it. Tap More info and ask me '
-        +'what it means rather than guessing.</span></div>';
-    return '<div class="q" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':' data-awaits="1"')+'>'
-      +'<p class="qtext">'+text+'</p>'
+        +'Yes/No consequences — a defect in the cycle that asked it. Ask me what it means in the '
+        +'box below rather than guessing.</span></div>';
+    return '<div class="q fold" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':' data-awaits="1"')+'>'
+      +'<div class="head" data-toggle="'+qid+'"><span class="cardnum">'+num+'</span>'
+      +(opts.chip||'')
+      +'<span class="qtext">'+text+'</span>'
+      +'<span class="st'+(ans?' done':'')+'">'+(ans?(ans.toUpperCase()+' ✓'):(opts.undecidedTxt||'unanswered'))+'</span>'
+      +'<span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'
       +(ctx ? '<p class="qctx">'+ctx+'</p>' : '')
       +'<div class="yn">'
       +'<button class="yes'+(ans==='yes'?' on':'')+'" data-a="yes">Yes</button>'
       +'<button class="no'+(ans==='no'?' on':'')+'" data-a="no">No</button>'
       +'</div>'
       +means
-      +'<button class="morebtn'+(open?' on':'')+'" data-more="'+qid+'">'
-      +(open?'Hide info':'More info')+'</button>'
-      +'<div class="more'+(open?' show':'')+'" id="more-'+qid+'">'
-      +'<p>Not sure what this is asking? Ask in your own words — I answer here next cycle, and '
-      +'the thread stays on the question so neither of us loses the thread.</p>'
-      +thread(qid)+askBox(qid)+'</div>'
       +'<div class="qnote'+(ans?' show':'')+'">'
       +'<input type="text" value="'+esc(a.note)+'" placeholder="Optional — a line only if you want to add one">'
       +'<div class="hint">Not required. The Yes/No above is already recorded.</div></div>'
       +'<div class="qverdict">'+(ans?('recorded: '+ans.toUpperCase()+' · '+esc(a.at||'')):'')+'</div>'
-      +'</div>';
+      +thread(qid)
+      +askBox(qid, ask.ph, ask.hint, ask.got)
+      +'</div></div>';
+  }
+
+  // §12 · A VISION CLAIM (SES-125). Spec: "formatted exactly like Questions" — so it IS a
+  // question row, with a class chip in front and the three ask-box strings that fit a claim
+  // (John's own wording REPLACES the claim rather than asking about it, which is a different
+  // transaction from asking a question and has to say so). Always three rows, always default
+  // closed, and a claim reappears every day until it is decided — only silence carries it
+  // forward, exactly as silence never decides anything else on this page.
+  // `vid` MUST be the `vision-<doc>-<claim id>` form: the harvest reads answers by key, and
+  // this is what tells it a row belongs to docs/vision/*.md rather than runner_questions.
+  function visionClaim(num, vid, cls, text, ctx, yesMeans, noMeans){
+    return question(num, vid, text, ctx, yesMeans, noMeans, {
+      chip: '<span class="clschip">'+cls+'</span>',
+      undecidedTxt: 'undecided',
+      ask: { ph:'Or say it in your own words — then press Enter',
+             hint:'Your line replaces the claim, marked as your words — that also resolves it.',
+             got:'the claim is rewritten in your words' }
+    });
   }
 
   function render(){
@@ -439,23 +542,45 @@
     +'<label>All models %<input type="number" inputmode="numeric" id="r-all" value="'+esc(state.reading?state.reading.all:'')+'"></label>'
     +'<label>5-hour %<input type="number" inputmode="numeric" id="r-h5" value="'+esc(state.reading?state.reading.h5:'')+'"></label>'
     +'</div><button class="savebtn" id="r-save">Save reading</button></div>'
-    +'<h2><span class="secnum">5</span>Shipped</h2>'
-    +card('item-ses78a','ship','Ship','SES-78a (Tooling · P10 - Tooling)',
+    // ===== §5 · SHIPPED (SES-125) ===========================================================
+    // Rebuild these from public.runner_items WHERE decision IS NULL — register B18, FROM the DB,
+    // never from the rebuilding cycle's memory of what it filed. Number them 5.1, 5.2, … in the
+    // order they render. Rows below are sample values.
+    +'<h2><span class="secnum">5</span>Shipped — tap a row to open</h2>'
+    +card('5.1','item-ses78a','ship','Ship','SES-78a',
+      'SES-78a (Tooling · P10 - Tooling)',
       'Runner foundation — six tables and your budget, live',
       '<p><span class="lbl">Value case</span>The ground the Automated mode stands on: your directives, the $100/month budget, the cycle ledger, the trust ladder, and the before-images that make every overnight change reversible by one tap.</p>'
       +'<p><span class="lbl">Before → after</span>Before: the runner design existed only on paper. After: all six runner_ tables live in Supabase, budget seeded ($100 month / $3.30 day, fail closed), trust ladder at rung 1, zero public access.</p>'
       +'<p><span class="lbl">QA evidence</span>5/5 green, including a before-image → restore round-trip (row corrupted on purpose, restored byte-equal) and a live catch: new tables came up publicly readable by default — revoked, verified zero.</p>'
       +'<div class="meta"><span>cost $0.00 API</span><span>model Fable 5 (manual session)</span><span>push 5de2398</span></div>'
-      +'<p class="links"><span class="lbl">Where</span><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a> (data-layer only — log: docs/SES-78a-migration-log.md)</p>',
-      // v7.0.145 — the 7th argument. Three plain sentences, no jargon, no ticket IDs, phrased as
-      // John phrased the ask: what he can't do, what he could, why it is worth anything.
+      +'<p class="links"><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a></p>',
+      // Three plain sentences, no jargon, no ticket IDs — read from the row's plain_* columns
+      // (v7.0.146), and since SES-125 they are the card's default body rather than its panel.
       { cant:  'Nothing the runner does overnight is written down anywhere you can undo it from.',
         after: 'Every overnight change has a recorded before-state, so one tap puts it back.',
         worth: 'It is what makes leaving the runner unattended a reasonable thing to do.' })
-    +card('item-tap-test','test','Test','SES-78b tap QA',
+    +card('5.2','item-tap-test','test','Test','SES-78b',
+      'SES-78b (Tooling · P10 - Tooling) · tap QA',
       'Tap test — prove the round trip from your phone',
-      '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>')
-    +'<h2><span class="secnum">6</span>Gated before build — your promote / kill</h2><p class="empty">None tonight.</p>'
+      '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>',
+      { cant:  'You cannot tell, from your phone, whether a tap on this page actually reached me.',
+        after: 'One tap and one typed line prove the whole round trip in ten seconds.',
+        worth: 'Every other card on this page is worth nothing if the buttons do not record.' })
+    // ===== §6 · GATED BEFORE BUILD (SES-125) ================================================
+    // Same card treatment as §5, numbered 6.1, 6.2, …, `kindCls='gate'` — which is what makes
+    // the buttons say "permission, not a score" (John's B34 ruling, buttonMeanings()). Render
+    // `<p class="empty">None tonight.</p>` in place of the cards when there are none.
+    +'<h2><span class="secnum">6</span>Gated before build — tap a row to open</h2>'
+    +card('6.1','item-sample-gate','gate','Gated','SES-000',
+      'SES-000 (Tooling · P10 - Tooling)',
+      'Sample gated card — replace with the cycle’s real undecided gated items',
+      '<p><span class="lbl">Why gated, exactly</span>The rule that stopped the build, named, with the measurement that shows it applies to this ticket rather than to tickets like it.</p>'
+      +'<p><span class="lbl">What exists</span>Branch and commit if anything was built and parked, and — honestly — what is not done on it.</p>'
+      +'<div class="meta"><span>model Opus 5</span><span>commit —</span></div>',
+      { cant:  'Sample value — what you can’t do today, in a sentence with no jargon in it.',
+        after: 'Sample value — the same sentence from the other side.',
+        worth: 'Sample value — why that is worth something to the platform.' })
     // SES-124 · REMOVED, on John's explicit instruction: the standalone "Needs your call"
     // budget-override section. An override is a yes/no with a consequence either way, which is
     // exactly what §9 already is — so it renders as a §9 question now and stops being a section
@@ -470,16 +595,45 @@
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
     // below are sample values. A question that cannot be asked as yes/no does not belong here;
     // it belongs on a gated_before_build card with a proposal.
-    +'<h2><span class="secnum">9</span>Questions — tap yes or no</h2>'
-    +question('q-sample-slug',
+    +'<h2><span class="secnum">9</span>Questions — tap a row to open</h2>'
+    +question('9.1','q-sample-slug',
       'Should new automation tickets I create go above your current lane, ahead of ADM-1?',
       'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.',
-      // v7.0.145 — arguments 4 and 5, required: the consequence of each tap, one line, rendered
-      // under the button that causes it.
+      // v7.0.145 — the consequence of each tap, one line, rendered under the button that causes
+      // it. STILL REQUIRED: a row without both renders the defect in red rather than two bare
+      // buttons. They are composed at render time because runner_questions has no column for
+      // them — the same prose-instead-of-column gap v7.0.146 closed for cards, still open here.
       'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
       'it joins the bottom of your lane and waits its turn.')
     // §10 · Skipped — waiting on your input: SES-127.  §11 · Now-tier by class: SES-126.
-    // §12 · Vision claims (formatted exactly like §9): SES-125.
+    // ===== §12 · VISION CLAIMS (SES-125) ====================================================
+    // ALWAYS THREE ROWS — drawn from docs/vision/*.md, LOW confidence first, then MED, then each
+    // doc's "Open questions for John" (SES-84 phase 2, register B13). A claim reappears every
+    // rebuild until it is decided; only silence carries it forward. Yes ratifies the claim to
+    // HIGH, No deletes it and records it in vision/rejected-paths.md, and a typed line replaces
+    // it in John's words — the corpus edit rides the deciding cycle's ship commit.
+    // The row id MUST start `vision-` so the harvest can tell a claim from a runner_questions
+    // row: both land in briefing-state under `answers`, keyed by this id.
+    +'<h2><span class="secnum">12</span>Vision claims — always 3, tap a row to open</h2>'
+    +'<p class="strip-def">Each claim sets criteria for one of the judgment classes '
+    +'(<b>P1 - Improves John&rsquo;s Skills</b> · <b>P2 - Inventive</b> · '
+    +'<b>P3 - Investor Value</b> · <b>P4 - New Customers</b>) — the chip shows which. A claim '
+    +'keeps coming back every day until you decide it: Yes, No, or your own wording.</p>'
+    +visionClaim('12.1','vision-thesis-C-thesis-30','P4 - New Customers',
+      'DeepBench&rsquo;s nearest defensible market is the mid-market/agency buyer — true?',
+      'They want a working bench of experts with visible reasoning and sellable deliverables, not a build-your-own-agents toolkit. Every future customer-facing feature would be judged against this one buyer. (docs/vision/thesis.md · C-thesis-30 · confidence LOW)',
+      'ratified — it stops appearing and becomes a rule the runner builds by.',
+      'rejected — deleted from the vision docs and recorded as a rejected path.')
+    +visionClaim('12.2','vision-mission-C-mission-29','P1 - Improves John&rsquo;s Skills',
+      'The hiring-facing &ldquo;done&rdquo; state is one screen presentable without a guided tour — true?',
+      'A case-study screen, or this briefing page itself, becomes the named target — so work toward it can be tracked and finished instead of staying open-ended. (docs/vision/current-mission.md · C-mission-29 · confidence LOW)',
+      'ratified — one named screen becomes the finish line.',
+      'rejected — recorded, and &ldquo;done&rdquo; stays undefined until a new claim is written.')
+    +visionClaim('12.3','vision-sample-C-sample-1','P3 - Investor Value',
+      'A feature that can&rsquo;t be demoed in under 2 minutes is not worth building next — true?',
+      'Sample row, here to hold the always-3 rule — the real third card is the next highest-value unratified claim in the vision corpus. (sample)',
+      'ratified as a decision rule.',
+      'rejected and recorded.')
     +'<h2><span class="secnum">13</span>Trust ladder</h2><table>'
     +'<tr><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
     +'<tr><td>Invention</td><td class="num">1</td><td class="num">0</td></tr>'
@@ -581,7 +735,8 @@
         var nowOpen = !panel.classList.contains('show');
         panel.classList.toggle('show', nowOpen);
         btn.classList.toggle('on', nowOpen);
-        btn.textContent = nowOpen ? 'Hide info' : 'More info';
+        // SES-125 — the panel is the technical record now, so the label says which record it is.
+        btn.textContent = nowOpen ? 'Hide the technical record' : 'More info — the technical record';
       });
     });
     // An ask, on the other hand, IS recorded — same publish path as a tap. Append, never replace:
@@ -595,6 +750,10 @@
         if (!state.asks[target]) { state.asks[target] = []; }
         state.asks[target].push({ q:q, at:new Date().toISOString().slice(0,16)+'Z' });
         inp.value = '';
+        // SES-125 — acknowledge in place, before the publish round trip. render() will draw the
+        // same line from state a moment later; this is what John sees the instant he hits Enter.
+        var g = inp.parentElement.querySelector('.got');
+        if (g) g.classList.add('show');
         save(); render();
       });
     });
