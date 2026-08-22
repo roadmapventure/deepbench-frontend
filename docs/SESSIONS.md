@@ -9029,3 +9029,96 @@ rather than double-pushing. Step 4b's invention pass was skipped by its own rule
 already carry `INVENTION PASS` in this America/Chicago day.
 
 Kickoff: `docs/kickoffs/v7.0.146-dda69acb-card-plain-language-fields.md`.
+
+## 2026-08-22 — cycle-20260822-0506 (v7.0.150) — `SES-106`: the ticket claim is released AFTER the push, and step 7 stops contradicting itself
+
+Runner cycle `83069516-bbdf-47c7-94e0-c33d3901d4b6`, scheduled fire 05:06Z (12:06 AM CST), branch
+`session/cycle-20260822-0506`, Opus 5 throughout. Ticket `SES-106` — tier `now`,
+`P10 - Tooling`, `automation_rank = -1` (queue #1), claimed 05:10:47Z. Closed **`partial`**.
+
+**The defect.** `docs/runbooks/runner-cycle.md` step 7 told a cycle to clear its ticket claim *in
+the same UPDATE that sets the ticket's status*, and two bullets later told the same cycle that
+re-asserting that claim is a **hard gate on the push**. The gate defines 0 rows as *"your claim is
+gone — do NOT push"*, so a cycle that obeys the close-out bullet literally is forbidden from
+pushing by its own next instruction. The two rules cannot both be satisfied; the pair deadlocks
+every ship. The same instruction appeared twice more — step 5's `SES-86` phase 1 paragraph said
+it in the same words, and step 9's tail parenthetical assumed it.
+
+**Why it mattered more than a wording clash.** The re-assertion gate is not decoration: it exists
+because cycle `633fe486` (directive `c4d95dc7`, `v7.0.123`) kept working for ~8 hours after losing
+its coordination token, came one command short of pushing a duplicate to `dev`, and was saved only
+by an incidental `git fetch`. In practice cycles have been resolving the contradiction by hand,
+each one silently picking an order — which is precisely the per-cycle re-derivation that
+`SES-86` phase 3 and `v7.0.146` were both filed to eliminate.
+
+**Whose call it was.** Not this cycle's. Cycle `cb9d1417` filed it as question
+`q-claim-release-order`; **John answered `yes` at 2026-08-21T22:05Z** — release the claim after the
+push. Read live from `public.runner_questions` this session rather than recalled, per the
+verify-never-assert rule. The build applies his answer and does not re-argue the direction.
+
+**What shipped.** The order is now stated once and referenced everywhere: status write
+(before-image first, **claim untouched**) → `recompute_backlog_queue()` → re-assert → push →
+**then** one release. Three corrections plus a tightening:
+
+- step 5's `SES-86` phase 1 paragraph — rewritten to give the order and to say *why* the old
+  wording could not be obeyed;
+- step 7's close-out bullet — now **LEAVE THE CLAIM ALONE here**, with the retired sentence quoted
+  so a later reader can see what changed rather than wondering whether it was ever different;
+- a new step-7 bullet + SQL block for the release itself, **holder-guarded**
+  (`WHERE backlog_id = … AND claimed_by = '<your cycle id>'`) so a cycle whose claim expired and
+  was re-taken can never clear its successor's — the same discipline as the lease release;
+- step 9's tail parenthetical — now names *when* step 7 released, instead of leaving the order
+  implicit and re-openable.
+
+The abort/wall-stop path is preserved and stated explicitly (no push, so release at the point the
+cycle stops), and the note that an unreleased claim still expires on the 24h boundary is kept, so
+no ordering choice here can strand a ticket.
+
+**QA.** Doc-only; no `src/`, `api/` or `lib/` file touched, so nothing on the site can move.
+`npm install && npm run build` green. Regression **30/31** without credentials — the one failure is
+`CHI-31`, which needs `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` — and **31/31** with them exported from
+`runner_secrets`, the same env gap recorded in `v7.0.146`/`v7.0.148`. The discriminating check runs
+seven assertions against `origin/dev`'s copy of the file and against the ship: five content
+assertions (old instruction absent after / new statement present after) plus a **negative control**
+(the re-assertion gate itself must survive in both) and a **file-order assertion** (status write <
+re-assert gate < release). The old file fails 5 of the 6 content expectations; the ship passes 7/7.
+Stated as the bar requires — *would it still pass if the change did nothing?* No: an append-only
+edit that added the new rule while leaving *"clear the claim in the same UPDATE"* in place passes a
+presence check and fails this one, because the **contradiction**, not a missing sentence, is the
+defect. This cycle also ran the corrected order for its own ship, so the procedure was exercised
+rather than only written.
+
+**Not done, and carded rather than attempted.** `.claude/skills/session-setup/SKILL.md` step 2c
+carries the same contradiction for John's manual sessions. `.claude/` is not writable by an
+unattended cycle (register B39; John's `34865f07`: *"That should not be happening"*), so the exact
+replacement text is on a briefing card for a session he attends, and the ticket closes `partial`,
+not `done` — the same shape as `SES-101`.
+
+**A structural finding surfaced, not worked around.** After this ship all three open automation-lane
+tickets are `partial`: `SES-106` (rank −1), `SES-84` (rank 6, drip-only — it advances only through
+John's taps), `SES-101` (rank 9). In two of the three the *only* remaining work is a `.claude/`
+edit an unattended cycle may not make. Because a `partial` ticket keeps its queue number, those two
+hold queue positions 1 and 3 indefinitely, so an unattended cycle will re-pick them, re-confirm
+they cannot be finished, and never reach the class-sorted backlog beneath. `SES-86` phase 3's
+self-retiring argument — *"a `done` ticket leaves the ranked set, so the lane evaporates"* — assumed
+lane tickets reach `done`; these cannot, unattended. Nothing in the runbook says what to do about
+it, so it went to John as question `q-lane-partial-blocked` rather than being decided here.
+
+**Also this cycle.** Step-0 stamp assertion passed (`list_triggers` stored prompt matched the
+delivered prompt verbatim). Step 0b sweep: one open peer, `db8b9eee` (open 11.7h, heartbeat stale
+since 2026-08-21 18:19Z) — already carrying `stall_notified_at` from 20:11Z, so a peer had pushed
+it and this cycle stood down rather than double-pushing; it is also inside the 24h evidence bar, so
+its outcome was left alone (B37). No stale ticket claims, publish lease free. Harvest was **empty**
+— `briefing-state` carried no taps, no directive text, no new reading, no asks, no answers — so the
+ladder did not move and silence was not read as an Accept. Walls: API **$0.00** of $5 day / $100
+month; tokens **0** at cycle start on the new CST day (the day rolled over at 05:00Z, five minutes
+before this fire — the previous cycle `61df92ce` had stopped at the 10M line and said this run
+would start with a full allowance, which it did). Latest reading 2026-08-21T20:39Z, 8.5h old, all
+models 13% — well under the 85% rest wall, and not stale. `tokens_per_pct` still uncomputable: both
+available windows are confounded by John being in the app, so it stays NULL rather than being
+guessed, an eighth time. Step 4b's invention pass **ran** (first cycle of this CST day): the egress
+probe succeeded, closing precondition C3 by measurement; the invention ladder rung is **0**
+(demoted 2026-08-21T22:52Z), and the rule is *"generate exactly as many proposals as the invention
+trust rung"* — so zero proposals, honestly, rather than a forced one.
+
+Kickoff: `docs/kickoffs/v7.0.150-SES-106-claim-release-after-push.md`.

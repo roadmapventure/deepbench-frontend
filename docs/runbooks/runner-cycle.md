@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.150 | runbooks/runner-cycle.md | SES-106 — the ticket claim is released AFTER the push, and the runbook stops telling a cycle to do two things it cannot both do. Step 7's close-out bullet said "clear the claim in the same UPDATE that sets the ticket status"; two bullets later the same step made re-asserting that claim a HARD GATE on the push. Followed literally the gate returns 0 rows — which it defines as "your claim is gone, do NOT push" — so the two rules deadlock every ship, and cycles have been resolving it by hand, each picking an order. That per-cycle re-derivation is the exact failure SES-86 phase 3 and v7.0.146 were filed to end. NOT this cycle's call to settle: cycle cb9d1417 filed it as question q-claim-release-order and JOHN ANSWERED YES at 2026-08-21T22:05Z (read live from runner_questions this session, not recalled) — release after the push. Fixed in three places so the order cannot re-fragment: step 5's SES-86 phase 1 paragraph, step 7's close-out bullet, and a new explicit post-push release statement, holder-guarded (WHERE claimed_by = '<your cycle id>') so a cycle whose claim expired and was re-taken can never clear its successor's. Step 9's tail parenthetical is tightened with them to name WHEN step 7 released rather than leaving it implicit again. The abort/wall-stop path is preserved and stated: no push, so release at the point the cycle stops — and an unreleased claim still expires on the 24h boundary, so no ordering choice here can strand a ticket. This cycle ran the corrected order for its own ship, so the procedure is exercised rather than only written. NOT DONE, and carded rather than attempted: .claude/skills/session-setup/SKILL.md step 2c carries the same contradiction for John's manual sessions, and .claude/ is not writable by an unattended cycle (register B39) — exact replacement text is on the card for a session he attends, so the ticket closes partial. Doc-only; no code, no site change. -->
 <!-- DeepBench v7.0.149 | runbooks/runner-cycle.md | SES-109 — the committed backlog snapshot stops being one harvest stale. Step 7 exports and pushes `docs/backlog/BACKLOG-SNAPSHOT.md` BEFORE the step-9 serial tail, but register B42 (2026-08-21) moved the harvest WRITES — John's Accept/Reverse/Rework, answers that file tickets, a released pin — into that tail, so every board change a tap causes lands AFTER the export meant to capture it, leaving the board's only repo-side copy (the SES-81 restore path) systematically one cycle behind. Found live by cycle ff23297c (v7.0.148): its snapshot in 61fd3e4 recorded 571 tickets and missed SES-98 going done, SES-105 losing its pin, and SES-108 existing — all three written minutes later in its own tail. Of the ticket's two candidate fixes the tail RE-EXPORT is taken over moving the export wholesale, and the reason is structural: the export must ride the step-7 code push, and that push is deliberately kept OUT of the serial section so parallel cycles rebase-retry instead of serialising (B42) — so re-exporting once in the tail, AFTER the harvest writes, is the minimal change. It fires only when the harvest actually moved the board (the script is deterministic and prints `unchanged` otherwise), which makes it the one sanctioned second push: snapshot-only, guarded by the publish lease already held (the ticket claim is released at step-7 close-out, so it is NOT the token here), and a rebase conflict that outlives the retries degrades to exactly today's one-harvest lag, never a wall. The standing prohibition's "one push per ship point" gains that single carve-out. Doc-only; no code, no site change. -->
 <!-- DeepBench v7.0.148 | runbooks/runner-cycle.md | SES-107 — step 2's ladder rule stops leaving a blank a cycle has to fill. It read "Accept → streak +1 (5 consecutive → rung +1)" and never said what happens to the streak AFTER a promotion; cycle 7392e345 hit that live at 20:27Z (tooling 4 → 5, rung 6 → 7), set the streak to 0, and correctly filed `q-ladder-streak-reset` instead of inventing the rule. John answered NO at 22:04Z — "which one just keeps the count going? no need to reset - why would i do that?" — so the streak now keeps running and the promotion test is stated as arithmetic, `streak % 5 = 0`, never "at least 5". Both halves are load-bearing: removing the reset ALONE, under a "5 or more" reading, promotes on every tap forever, which is the opposite failure and would compound the runner's autonomy on a rule nobody wrote. A Reverse still zeroes the streak (John, `1d01ea85`, "leave it") — only promotion stops resetting. MEASURED rather than assumed, and it is the honest half of this ship: John was told on the card "No = I will correct tonight's row", and replaying tonight's before-images under the new rule reproduces the STORED row exactly — the Reverses at 21:21Z and 22:22Z each zero the streak regardless, so the promised correction is a no-op. Said plainly on the briefing rather than quietly skipped. The B34 boundary paragraph's justification is corrected with it ("does not define" expired), while its conclusion stands on John's own `q-ladder-rewind` NO rather than on a missing value. NOT DONE, and carded rather than attempted: no code implements the ladder (grep -rl runner_ladder --include=*.js → nothing), so this rule is applied by hand in SQL every cycle; making it executable is his call, filed as a question. -->
 <!-- DeepBench v7.0.147 | runbooks/runner-cycle.md | SES-101 — step 5's automation-lane block gains the filing rule the lane never had: a new automation ticket claims the TOP of the lane with one call, `SELECT public.claim_automation_lane_top('<TICKET-ID>')` (migration ses101_automation_lane_top). `automation_rank` has been recompute_backlog_queue()'s leading key since v7.0.133, but NOTHING assigned it at filing time, so a new automation ticket landed in the class-sorted backlog — the very failure the lane was built to end. John's ruling settles the direction: question q-lane-top, answered YES 2026-08-21T20:47Z (from directive 48ae1939 line 4, "if you create more automation tickets keep making them top of queue"), so the slot is min(open lane) − 1, never max + 1. Measured before shipping: the last three automation tickets filed were hand-assigned to the BOTTOM (SES-99=7, SES-100=8, SES-101=9) — the opposite of his answer, drifting silently for exactly the reason SES-86 phase 3 and v7.0.146 both diagnosed, that a rule each cycle must remember is a rule that gets forgotten. Function is idempotent, runs the recompute itself, and reads the OPEN lane only. A SECOND rule rides along, found live in this migration's own QA and general to every future function: REVOKE EXECUTE FROM anon, authenticated reports success and changes NOTHING while PUBLIC holds the default grant — the function-level twin of .claude/rules/supabase-column-grants.md. Asserted both directions after the corrected revoke. NOT DONE, and carded rather than attempted: the canonical INSERT at session-setup step 3c is under `.claude/`, which an unattended cycle may not write (step 0, register B39) — the exact replacement text is on the card for a session John attends. -->
@@ -746,9 +747,15 @@ RETURNING backlog_id;
 to the next available queued ticket, exactly as B24 drops past a gated card.** This is what lets
 John's manual sessions and scheduled cycles share one board without duplicate builds: manual
 sessions run the same claim (session-setup skill step 2c). Directives (selection layer 1) are
-already serialized by `in_progress`; this covers layers 2 and 3. **Release the claim in your
-step-7 close-out write** (set `claimed_by = NULL, claimed_at = NULL` in the same UPDATE that
-sets the ticket's status) — and on an abort/wall-stop, release it the same way before ending. A
+already serialized by `in_progress`; this covers layers 2 and 3. **Release the claim AFTER the
+push — never in the write that sets the ticket's status (John, question `q-claim-release-order`
+answered yes 2026-08-21T22:05Z; `SES-106`, `v7.0.150`).** This paragraph used to say the
+opposite, and the opposite could not be obeyed: the claim is the token the push gate re-asserts
+(step 0), so a cycle that cleared it in the status write had nothing left to prove one step
+later and its own re-assertion returned 0 rows — which the gate defines as *"do NOT push"*. The
+order is therefore fixed: status write (before-image first, **claim untouched**) → queue
+recompute → re-assert → push → **then** one holder-guarded release. On an abort or a wall-stop
+there is no push, so the release happens at the point the cycle stops instead. A
 claim you never release expires on the 24h boundary, so a dead session cannot strand a ticket;
 QA proved all three arms live on real rows (fresh → 1, contested → 0, 25h-stale → re-claimable).
 **The moment the
@@ -808,8 +815,12 @@ the paths under test after every step, so a hang still leaves evidence of exactl
 - Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
 - Close-out ticket update — **a Supabase write, not a file edit** (`SES-83` (d) cycle 3,
   `v7.0.114`): set the ticket's `backlog_items.status` (and `priority_class` if it changed) with a
-  `runner_before_images` row first — **and clear the claim in the same UPDATE**
-  (`claimed_by = NULL, claimed_at = NULL`; SES-86 phase 1). **Then run
+  `runner_before_images` row first — **and LEAVE THE CLAIM ALONE here: it is released after the
+  push, in its own statement below (`SES-106`, `v7.0.150`).** This bullet used to read *"and
+  clear the claim in the same UPDATE (`claimed_by = NULL, claimed_at = NULL`)"*, which
+  contradicted the re-assertion gate two bullets down — a cycle cannot treat the claim as a hard
+  gate on the push after its own close-out has already dropped it. John settled the order
+  himself (`q-claim-release-order`, **yes**, 2026-08-21T22:05Z): release after the push. **Then run
   `SELECT public.recompute_backlog_queue();`** — completed/removed is one of B4's recompute
   events, and a ticket that just went `done` must lose its number before John sees the board
   (`SES-86` phase 2, `v7.0.130`). It is idempotent and returns 0 when nothing moved, so running
@@ -843,6 +854,20 @@ the paths under test after every step, so a hang still leaves evidence of exactl
   per-artifact pushes. 0 rows → do not push; follow the stolen-from procedure in step 0. Keep
   the `git fetch` too — it catches a different failure (a successor that shipped without taking
   your lease), and `633fe486` survived on that accident alone.
+- **Release the ticket claim — now, once the push has landed, and not one step earlier
+  (`SES-106`, `v7.0.150`; John's `q-claim-release-order`).** One statement, holder-guarded so a
+  cycle whose claim expired and was re-taken can never clear its successor's:
+
+```sql
+UPDATE public.backlog_items
+   SET claimed_by = NULL, claimed_at = NULL, updated_at = now()
+ WHERE backlog_id = '<your TICKET-ID>' AND claimed_by = '<your cycle id>'
+RETURNING backlog_id;   -- 0 rows = already re-claimed by someone else; leave the new holder alone
+```
+
+  On an abort or a wall-stop this is still where the release happens, just without a push in
+  front of it — release at the point the cycle stops. Nothing here can strand a ticket either
+  way: an unreleased claim expires on the 24h boundary.
 
 ## Phase 3 — evidence
 
@@ -988,7 +1013,8 @@ nothing to push, so skip to (5). Only when it produced a diff do you commit
 `docs/backlog/BACKLOG-SNAPSHOT.md` and push it (`git fetch origin dev && git rebase origin/dev &&
 git push origin HEAD:dev`, the rebase-retry×3 of step 7). **This is the one sanctioned second
 push of a cycle** — snapshot-only, inside the serial tail, guarded by the publish lease you
-already hold (NOT the ticket claim, which your step-7 close-out already released), and it fires
+already hold (NOT the ticket claim, which step 7 released in its own statement after the push —
+`SES-106`, `v7.0.150`), and it fires
 only on cycles that actually changed the board, so the "one push per ship point" spirit holds. A
 rebase conflict that survives the retries is not a wall: leave the snapshot one harvest stale
 exactly as before this fix — the next cycle's step-7 export captures the same writes — and note
