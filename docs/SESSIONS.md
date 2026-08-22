@@ -9430,3 +9430,110 @@ clause (b) removed (appending FEATURES*.md rows is impossible); triage capture r
 `public.backlog_items`; WORKING-WITH-JOHN referencing rule. Startup-path audit result: CLAUDE.md,
 CLAUDE-RULES, CLAUDE-STATE, GOVERNANCE-MODES, runner-cycle, briefing runbook all clean; stale spots
 = the two skills (fixed here), CLAUDE-DESIGN two phrases + Session-Init + script baselines (SES-120).
+
+---
+
+## 2026-08-22 — `session/cycle-20260822-1829` (v7.0.155, Automated runner cycle `c6387c5e`)
+
+**`SES-110` — Epics: projects table + `epic_id` on `backlog_items`, seed the Automation epic**
+(Tooling · `P10 - Tooling`, tier `now`, queue 1, automation lane rank −14) — **SHIPPED `partial`.**
+Kickoff: `docs/kickoffs/v7.0.155-SES-110-epics-table.md`. Push SHA recorded in the cycle row.
+
+**Why this one, and why now.** The attended `design-backlog-model` session filed `SES-110`..`SES-121`
+at 18:23Z — six minutes before this cycle opened — and stacked them at the top of the automation lane
+via `claim_automation_lane_top()`. `SES-110` is the program's foundation: ten of its eleven siblings
+assume grouping exists. `SES-111`'s drain directive ("work the named epic's open members until none
+remain") is not expressible until an epic and its members exist.
+
+**Premise revalidated live before building** (`SES-87` flow, register B7), not taken from the ticket:
+`information_schema` reported **0** `public.epics` tables and **0** `backlog_items.epic_id` columns.
+`revalidated_at` stamped, before-image first.
+
+**What shipped.** Migration `ses110_epics` — `public.epics` (uuid PK, `name` UNIQUE NOT NULL,
+`description`, timestamps), `backlog_items.epic_id uuid NULL REFERENCES epics(id) ON DELETE RESTRICT`
+(RESTRICT, not CASCADE: ungrouping is an explicit UPDATE, John 2026-08-22 — deleting an epic with
+members must fail loudly rather than silently untag 24 tickets), an index on the FK, and table/column
+comments carrying the ask-first rule. The `Automation` epic was seeded with John's approved
+description **verbatim**. **24 members tagged in one UPDATE** — the twelve named tickets
+(`SES-80/81/82/84/91/92/93/97/101/104/105/106`) plus all twelve `source_file='session-design-backlog-model'`
+rows — with `SES-108` and `LOG-142` excluded exactly as his boundary specifies (asserted:
+`wrongly_tagged = 0`). Every mutated row got a `runner_before_images` row first; the epic INSERT used
+the `row_data = NULL` convention (step 8b) with the uuid pre-minted so the before-image genuinely
+preceded the write.
+
+**The grant was the real work, and the trap is live.** `.claude/rules/supabase-column-grants.md`
+warns that a new table auto-exposes to the anon key (`SES-78a`). Measured this session rather than
+assumed: `pg_default_acl` for role `postgres` in schema `public` is
+`{postgres=arwdDxtm/postgres, anon=rm/postgres, authenticated=rm/postgres, service_role=arwdDxtm/postgres}`
+— a new table here auto-grants **SELECT + MAINTAIN** to `anon`, the key that ships in the browser
+bundle. The explicit read-exposure decision the ticket demanded: **zero `anon`/`authenticated`
+privileges**, mirroring `backlog_items` exactly (its live ACL was read first and used as the target),
+because nothing in the browser reads epics — the briefing page is static HTML rebuilt server-side by
+the cycle. The migration does `REVOKE ALL … FROM PUBLIC, anon, authenticated` (ALL, not SELECT: the
+default also carries `MAINTAIN`, which a SELECT-only revoke would leave behind) then grants
+`postgres, service_role`. **QA asserted both directions**, per the rule: `anon` SELECT **false**,
+`anon` INSERT **false**, `authenticated` SELECT **false**, `has_column_privilege('anon', …,'epic_id')`
+**false** — *and* `service_role` SELECT/INSERT **true**, so the check cannot be passing merely because
+the table is unreadable by everyone. Final `epics` `relacl` is **byte-identical** to `backlog_items`',
+RLS off, no `m` residue. Read via `pg_class.relacl`, not `information_schema`, because the latter does
+not report PG17 `MAINTAIN` (`DAT-20`).
+
+**"A grouping lens, never a sort key" was proven structurally, not promised.** `recompute_backlog_queue()`'s
+definition was read this session: its `ORDER BY` is `automation_rank, tier, class digit, beta regex,
+coalesce(filed_at, created_at) desc, backlog_id, id` — `epic_id` appears nowhere, and `updated_at` is
+used only to break pin collisions (none of the 24 rows is pinned, so stamping it was safe). The
+negative control: the recompute returned **0 rows moved** after tagging.
+
+**Snapshot + mirror reader.** `scripts/export-backlog-snapshot.js` gained `epic_name` as the **last**
+tracked field — the NAME, not the uuid, because `epics.name` is UNIQUE and a backup should not depend
+on a surrogate key surviving. Appended last on purpose: `scripts/check-session-docs.js` addresses
+snapshot cells **by index** (`cells[1]`, `[2]`, `[3]`, `[5]`, `[8]`), so any other position would
+silently re-point every one of them. PostgREST returns the join nested (`epics: {name} | null`),
+flattened at the single fetch site; a ticket with no epic flattens to **`null`, never `""`** — `esc()`
+renders `null` as an empty cell and `""` as the `\e` marker, so conflating them would round-trip "no
+epic" back as a stored empty string and quietly corrupt the restore. The mirror reader keeps its
+tolerant `cells.length < 9` guard (it now reads both a 9-column pre-`SES-110` snapshot and a 10-column
+current one); the **strict** cell-count guard stays where it belongs, in `parseDocument()`, which is
+the reference reader and must fail loudly if writer and reader ever drift.
+
+**QA discriminates — proven by experiment, not asserted.** A four-arm live round-trip (seam proof:
+imports the repo's own module against real Supabase): (1) a tagged row recovers `"Automation"`;
+(2) an untagged row recovers `null`; (3) **all 586 tickets compared field-for-field** across all ten
+row fields, writer → `parseDocument()`; (4) the rendered header carries `Epic` and the document shows
+exactly **24** `Automation` cells. All pass. **The negative control is the honest half:** the same QA
+re-run against the pre-change exporter fetched from `origin/dev` **FAILS** at arm 1
+(`epic_name = undefined`) — so the test could detect the change not having happened. Build clean;
+regression **34/34 with credentials** (the single no-credential failure is `CHI-31`'s known env gap —
+root-caused as missing `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`, re-run with them supplied, not waved off
+as a flake). `check-version-headers` and `check-kickoff-doc` both green.
+
+**Closes `partial`, on the `SES-101`/`SES-106` precedent** (both verified live to be `partial` for this
+same reason rather than recalled). The remaining half — the canonical filing INSERT gaining an optional
+`epic_id` — lives in `.claude/skills/session-setup/SKILL.md`, and an unattended cycle writes nothing
+under `.claude/` (step 0, register B39). Its exact replacement text is **carded for a session John
+attends**, not attempted.
+
+**A consequence this cycle names rather than leaves to be rediscovered.** Because `SES-110` closes
+`partial` it keeps queue 1, and its only remaining work is that `.claude/` edit — so the next
+unattended cycle will re-pick it, card it, and drop to `SES-111` (register B24). That costs a card, not
+a build. The structural fix is `SES-112` (queue 3), which stores `design_status`
+(`auto`/`needs-john`/`needs-desktop`/`designed`) precisely so a desktop-only remainder is skippable at a
+glance. This cycle did **not** invent a demotion rule to dodge the loop — widening its own selection
+autonomy on an inference is the failure mode `v7.0.118` and `SES-107` were both filed about — and
+instead put the recurrence to John as a yes/no question.
+
+**Model discipline (register B21), stated plainly.** This ran Opus 5 end-to-end with **no subagent**.
+B21 routes judgment-dense steps for `P1`–`P5` work to Fable 5 and mechanical sweeps to Sonnet 5; this is
+`P10 - Tooling`, no `P1`–`P4` classification or root-cause diagnosis arose, and the two file edits are
+precise index-sensitive code changes rather than a doc sweep — the shape B21 does not delegate. Noted
+here because "no subagent" should be a recorded decision, not an omission.
+
+**Ledger.** Cycle `c6387c5e`, stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`,
+trigger scheduled (fired off-grid at 18:29Z — `origin: force_run_trigger`). Walls at cycle start:
+**$0.00** month / **$0.00** day against $100/$5; **4.42M** estimated tokens spent in the CST day against
+the 10M uncalibrated cap; latest meter reading 2026-08-22T13:50Z (4.7h fresh), all-models **18%**, well
+under the 85% rest wall. `tokens_per_pct` left **NULL** for a ninth reading — both candidate windows are
+confounded by John being in the app, and a confounded number is worse than an honest blank. Step 4b's
+invention pass **skipped**: five cycles in this CST day already carry `INVENTION PASS`. Step 0b found one
+silent peer (`db8b9eee`, open 25h) — already stall-notified at 2026-08-21T20:11Z, so no duplicate push,
+and its outcome left untouched (a successor never adjudicates a predecessor's, register B37).

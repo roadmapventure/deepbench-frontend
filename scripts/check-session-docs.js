@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// DeepBench v7.0.115 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4
+// DeepBench v7.0.155 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110
+// FEATURE: SES-110 -- the snapshot reader tolerates and reads the appended Epic column.
 // FEATURE: SES-010 -- mechanizes the session-hygiene skill's checks as one script
 // (retargeted to public.backlog_items by SES-83 (d) cycle 4; see the SNAPSHOT_REL note below)
 //
@@ -163,6 +164,13 @@ function parseSnapshotRows(text) {
     const l = line.endsWith("\r") ? line.slice(0, -1) : line;
     if (!/^\|\s*\d+\s*\|/.test(l)) continue; // data rows lead with the ordinal column
     const cells = l.split(/(?<!\\)\|/).slice(1, -1);
+    // Deliberately `< 9`, not `!== 10`: cells[0..8] are the nine original fields
+    // and the SES-110 `Epic` column is appended AFTER them, so this reader keeps
+    // working on both a pre-SES-110 snapshot (9 cells) and a current one (10).
+    // Tolerance is the right default here -- this is a lint over a generated
+    // file, not the restore path. The strict cell-count guard lives in
+    // export-backlog-snapshot.js's parseDocument(), which is the reference
+    // reader and the thing that must fail loudly if writer and reader drift.
     if (cells.length < 9) continue;
     rows.push({
       id: decodeCell(cells[1]).trim(),
@@ -170,6 +178,8 @@ function parseSnapshotRows(text) {
       pclass: decodeCell(cells[3]).trim(),
       status: decodeCell(cells[5]).trim(),
       description: decodeCell(cells[8]),
+      // Empty on an older snapshot or an ungrouped ticket -- both mean "no epic".
+      epic: decodeCell(cells[9]).trim(),
     });
   }
   return rows;

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v7.0.107 | scripts/export-backlog-snapshot.js | SES-83c
+// DeepBench v7.0.155 | scripts/export-backlog-snapshot.js | SES-83c, SES-110
+// FEATURE: SES-110 -- the snapshot carries each ticket's epic NAME as its last column,
+// joined through backlog_items.epic_id, so the board's grouping survives in the backup.
 // FEATURE: SES-83c -- exports public.backlog_items to a deterministic, git-committed markdown
 // snapshot so the table has a point-in-time, offline-restorable backup independent of Supabase's
 // own backups.
@@ -74,12 +76,26 @@ function arg(name, fallback) {
 const WORKTREE = arg("worktree", process.cwd());
 const JSON_OUT = process.argv.includes("--json");
 
-// The 11 tracked fields, in the fixed order used both for the exported markdown
+// The 12 tracked fields, in the fixed order used both for the exported markdown
 // table's columns and for canonicalPayload()'s hash input. `id`, `created_at`,
 // and `updated_at` are deliberately excluded -- they are row churn (surrogate
 // key, timestamps), not backlog content, and including them would make the
 // snapshot change on every fetch even when nothing about the ticket itself
 // changed, defeating the "byte-identical across unchanged-table runs" goal.
+//
+// `epic_name` (SES-110, v7.0.155) is the one entry here that is NOT a column on
+// backlog_items: it is epics.name, reached through the epic_id FK. Two decisions
+// about it are load-bearing:
+//   - It is stored as the NAME, never the uuid. epics.name is UNIQUE and human
+//     readable, so a restore can re-establish membership by name without needing
+//     the surrogate key to have survived -- which is the whole point of a backup
+//     that outlives the table.
+//   - It is appended LAST, so every pre-existing cell index is unchanged. The
+//     mirror reader in scripts/check-session-docs.js addresses cells by index
+//     (cells[1], cells[2], cells[3], cells[5], cells[8]); appending anywhere but
+//     the end would silently re-point every one of them at the wrong field.
+const EPIC_FIELD = "epic_name";
+
 const COLUMNS = [
   "backlog_id",
   "tier",
@@ -92,7 +108,15 @@ const COLUMNS = [
   "session_ref",
   "harvest_link",
   "row_ordinal",
+  EPIC_FIELD,
 ];
+
+// What the REST select actually asks for: the real columns, plus the embedded
+// epic. PostgREST returns the embed as a nested object (`epics: {name} | null`),
+// which fetchAllTickets() flattens to EPIC_FIELD before anything else sees it --
+// so every pure helper below keeps working on flat ticket objects.
+const TABLE_COLUMNS = COLUMNS.filter(c => c !== EPIC_FIELD);
+const EPIC_EMBED = "epics(name)";
 
 const TIER_ORDER = ["now", "next", "later"];
 const PAGE_SIZE = 500;
@@ -179,6 +203,7 @@ const ROW_FIELDS = [
   "session_ref",
   "harvest_link",
   "description",
+  EPIC_FIELD,
 ];
 
 export function parseDocument(text) {
@@ -370,23 +395,37 @@ export function buildDocument(tickets) {
     "leading or trailing whitespace, and a `.trim()` reader would silently eat precisely those."
   );
   lines.push(
-    "`tier` and `source_file` come from each section heading; the other nine fields come from the"
+    "`tier` and `source_file` come from each section heading; the other ten fields come from the"
   );
   lines.push(
     "row. `parseDocument()` in the generating script is the reference reader and restores this"
   );
   lines.push("file to the exact table contents.");
   lines.push("");
+  lines.push(
+    "The final `Epic` column (SES-110) is `epics.name` joined through `backlog_items.epic_id` --"
+  );
+  lines.push(
+    "the NAME, not the uuid, because `epics.name` is UNIQUE and a restore should not depend on a"
+  );
+  lines.push(
+    "surrogate key surviving. An empty cell means the ticket belongs to no epic. The column is"
+  );
+  lines.push(
+    "appended LAST on purpose: the mirror reader in `scripts/check-session-docs.js` addresses cells"
+  );
+  lines.push("by index, so any other position would silently re-point every one of them.");
+  lines.push("");
 
   for (const g of groups) {
     const count = g.rows.length;
     lines.push(`## tier \`${g.tier}\` — \`${g.source_file}\` (${count} ticket${count === 1 ? "" : "s"})`);
     lines.push("");
-    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description |");
-    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|");
+    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic |");
+    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|------|");
     for (const t of g.rows) {
       lines.push(
-        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} |`
+        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} | ${esc(t[EPIC_FIELD])} |`
       );
     }
     lines.push("");
@@ -411,7 +450,7 @@ export function buildDocument(tickets) {
 // success, because a backup script that can silently truncate is worse than
 // one that refuses to run.
 async function fetchAllTickets(supabaseUrl, supabaseKey) {
-  const cols = COLUMNS.join(",");
+  const cols = `${TABLE_COLUMNS.join(",")},${EPIC_EMBED}`;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
   const base = supabaseUrl.replace(/\/+$/, "");
 
@@ -446,6 +485,17 @@ async function fetchAllTickets(supabaseUrl, supabaseKey) {
 
     if (!Array.isArray(body)) {
       return { error: "Supabase REST returned a non-array response for a select query (unexpected shape)" };
+    }
+
+    // Flatten the embedded epic to EPIC_FIELD immediately, at the only place that
+    // ever sees PostgREST's nested shape. `epics` is the object (or null) the
+    // embed returns; a ticket with no epic must come out as null, NOT the empty
+    // string -- esc() renders null as an empty cell and "" as the `\e` marker, so
+    // conflating them would make "no epic" round-trip back as a stored empty
+    // string and quietly corrupt the restore.
+    for (const t of body) {
+      t[EPIC_FIELD] = t.epics ? t.epics.name : null;
+      delete t.epics;
     }
 
     all = all.concat(body);
