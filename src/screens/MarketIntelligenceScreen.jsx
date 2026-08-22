@@ -467,6 +467,8 @@ import { SERVICE_CATALOG, usePatternClassification, buildAgentPatternRows } from
 import { NON_MEASURABLE_EVENT_TYPES, resolveEventDuration, resolveEmbeddedDuration, buildTransactionBoundaryEvent, buildEndStatusEstimate } from "../lib/turnTracking.js";
 import { articleFaultText } from "../lib/articleFaultText.js"; // FEATURE: LOG-109/CHI-91
 import { resolveNewsCardContext } from "../lib/newsCardContext.js"; // FEATURE: SES-57
+import { nextRevealRequest, resolveStepChipKey } from "../lib/stepReveal.js"; // FEATURE: CHI-84
+import { useFeatureFlag } from "../lib/featureFlags.js"; // FEATURE: CHI-84 (HAR-41 exposure rule)
 // FEATURE: LOG-79 -- per-hop governed pattern names now come from the ai_call_patterns view (the
 // Log Displayer, §19k), joined via the response's trace_id/span_id -- never the frozen legacy
 // patterns_used field. See src/lib/tracePatterns.js + useTracePatterns below.
@@ -555,12 +557,31 @@ function currentStage({ qaEvidence, hypFlow }) {
 // user (§19n Decision 3: exactly one step named per handoff, number + name together, same visual
 // chip the drawer wears). Renders nothing while the step is unassigned (n == null), which is also
 // the defensive title fallback — a rendered drawer with no number shows its plain fixed name.
-const StepChip = ({ n, label }) => n == null ? null : (
-  <span style={{display:"inline-flex",alignItems:"center",gap:5,verticalAlign:"middle"}}>
-    <span style={{background:T.brass,color:T.card,fontFamily:mono,fontSize:10,fontWeight:700,padding:"1px 6px",lineHeight:1.4}}>{n}</span>
-    {label && <span style={{fontFamily:mono,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep}}>{label}</span>}
-  </span>
-);
+// FEATURE: CHI-84 -- optional `onTap` makes the chip a real control. Omitted (the default, and what
+// every drawer title and every flag-OFF chat bubble passes) the return value is the byte-identical
+// CHI-82 span: no button, no cursor change, no aria attribute, no handler. Given onTap, the SAME
+// span is wrapped in a real <button type="button"> so keyboard focus and Enter/Space come for free
+// rather than being reimplemented on a div. The padding/negative-margin pair lifts the hit target
+// to the MOB-001 30px touch floor (the chip's own visual is ~16px tall) WITHOUT moving a pixel of
+// layout, so CHI-82's visual contract is untouched.
+const StepChip = ({ n, label, onTap }) => {
+  if (n == null) return null;
+  const visual = (
+    <span style={{display:"inline-flex",alignItems:"center",gap:5,verticalAlign:"middle"}}>
+      <span style={{background:T.brass,color:T.card,fontFamily:mono,fontSize:10,fontWeight:700,padding:"1px 6px",lineHeight:1.4}}>{n}</span>
+      {label && <span style={{fontFamily:mono,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep}}>{label}</span>}
+    </span>
+  );
+  if (!onTap) return visual;
+  return (
+    <button type="button" onClick={onTap}
+      aria-label={`Go to step ${n}${label ? `: ${label}` : ""} in Steps & Evidence`}
+      style={{background:"none",border:"none",font:"inherit",cursor:"pointer",
+              padding:"10px 6px",margin:"-10px -6px",display:"inline-flex",verticalAlign:"middle"}}>
+      {visual}
+    </button>
+  );
+};
 
 // FEATURE: AA-130 — Sam's intake-failure-intent schema (traits.schema, confirmed live in Supabase)
 // only ever outputs recommend_escalate/suggested_research_request, per the original spec
@@ -1849,7 +1870,16 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
 // EvidenceColumn, Task 3/4); `qaEvidence` added so the shrunk `qa` case's review-outcome note
 // (Good, thanks / Sent to Priya) can still render in chat, sourced from the shared qaEvidence
 // state slot instead of msg.reviewChoice (onGoodThanks/onReview no longer index into messages).
-function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
+// FEATURE: CHI-84 -- onStepChipTap is threaded in from the screen (desktop) or from MobileBody
+// (which wraps it to flip to the Steps & Evidence tab first). The flag read is unconditional and at
+// the top of the component, per HAR-41's hook rules, and fail-closed: useFeatureFlag starts false,
+// so a failed flag fetch renders CHI-82's inert chip rather than a control that does nothing.
+function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence, onStepChipTap }) {
+  const chipTapEnabled = useFeatureFlag("chi-84-step-chip-tap");
+  const stepChipKey = resolveStepChipKey(msg.stepRef);
+  const onChipTap = chipTapEnabled && stepChipKey && onStepChipTap
+    ? () => onStepChipTap(stepChipKey)
+    : undefined;
   const isMobile = useIsMobile(); // FEATURE: CHI-88 — the qa pointer sentence below is surface-specific
   // FEATURE: CHI-42 — kind:"user_action" narration bubbles (pushed synchronously at the moment of
   // a user decision, before any async ack) render as "You" bubbles too, via kind rather than role —
@@ -1931,7 +1961,7 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         {msg.text}
         {/* FEATURE: CHI-82 — the handoff's step chip, inline at the end of the bubble text: the
             same visual chip the named drawer's title wears (§19n Decision 3). */}
-        {msg.stepRef && <span style={{marginLeft:4}}><StepChip n={msg.stepRef.n} label={msg.stepRef.label}/></span>}
+        {msg.stepRef && <span style={{marginLeft:4}}><StepChip n={msg.stepRef.n} label={msg.stepRef.label} onTap={onChipTap}/></span>}
       </div>
       {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs), same
           component as the qa branch above. */}
@@ -2186,7 +2216,13 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
 // parallel mechanism. freshDeps: values whose next change ends the post-resolution quiet period
 // (a brand-new question, new content arriving) — deliberately separate from transitionDeps, since
 // "the same flow advancing a stage" and "something genuinely new arriving" are different events.
-function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, freshDeps, alsoOpenWhen = {}) {
+// FEATURE: CHI-84 -- `revealRequest` ({key, token} from lib/stepReveal.js, or null) is how a chat
+// step chip asks this stack to open and scroll to one drawer. It is a REQUEST OBJECT, not a
+// callback the caller invokes, and that is load-bearing: on mobile EvidenceColumn is unmounted
+// while the Chat tab shows, so at the moment the chip is tapped there is no hook instance to call.
+// State survives that gap and is consumed on the next mount; a hoisted callback ref would be null
+// exactly when it was needed.
+function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, freshDeps, alsoOpenWhen = {}, revealRequest = null) {
   const autoCurrent = priorityChecks.find(([, active]) => active)?.[0] ?? null;
   const [manualOverride, setManualOverride] = useState(null); // {key, open} | null
 
@@ -2224,6 +2260,29 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
   // parameter instead of a second bespoke mechanism. Today's only caller passes {"hyp-result":
   // ["hyp-draft"]}: Result stays open once Draft Forecast arrives, reversing CHI-50's original
   // "Result collapses underneath" choice (STYLE-GUIDE.md §40, CHI-58 amendment).
+  // FEATURE: CHI-84 -- the externally requested reveal. Declared AFTER the autoCurrent effect on
+  // purpose: on a mobile tab-flip both run in the same commit, and effects run in declaration
+  // order, so this one's setManualOverride and scrollTo land last and win (a later scrollTo
+  // interrupts an in-flight smooth scroll). It cannot fight the auto-open effect in general
+  // either -- that effect's deps are [autoCurrent, ...transitionDeps], and a reveal changes
+  // neither. Opening goes through the SAME manualOverride channel a drawer-header click uses and
+  // the scroll uses the SAME data-drawer-key lookup and scrollTo arithmetic as above; no second
+  // mechanism is introduced. Keyed on `token`, not `key`, so tapping the same chip twice re-fires.
+  useEffect(() => {
+    if (!revealRequest?.key) return;
+    setManualOverride({ key: revealRequest.key, open: true });
+    const container = scrollRef.current;
+    const el = container?.querySelector(`[data-drawer-key="${revealRequest.key}"]`);
+    // Drawer not currently rendered (e.g. a hyp chip from a journey whose drawers are gone):
+    // do nothing. Deliberately NOT a scroll-to-top fallback -- moving the user's view for a step
+    // that no longer exists is worse than leaving it alone.
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top), behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealRequest?.token]);
+
   const isOpen = (key) => {
     if (manualOverride && manualOverride.key === key) return manualOverride.open;
     if (key === effectiveAutoCurrent) return true;
@@ -2240,7 +2299,7 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
 // hyp "Needs Your Decision" badges: an abandoned previous journey's ambient drawers must not
 // keep soliciting a decision. The qa/Analysis badge is deliberately NOT gated (qaEvidence is a
 // single slot overwritten each journey — no stale case).
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep, hypIsCurrent }) {
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep, hypIsCurrent, stepReveal }) { // FEATURE: CHI-84 — stepReveal threaded into useDrawerStack
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -2313,7 +2372,8 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     [hypFlow?.stage, newsCards],
     isHypResolved(hypFlow),
     [qaEvidence, newsCards],
-    { "hyp-result": ["hyp-draft"] } // FEATURE: CHI-58
+    { "hyp-result": ["hyp-draft"] }, // FEATURE: CHI-58
+    stepReveal // FEATURE: CHI-84
   );
 
   // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
@@ -3291,7 +3351,7 @@ function DataSourceRow({ row }) {
 // drive the crumb), and this component just renders it. qaEvidence stays a raw prop — it is also
 // consumed by MessageBubble's review-outcome note, which must not be membership-filtered. The
 // bare (mobile) branch has no header and never reads crumbStage.
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, crumbStage }) {
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, crumbStage, onStepChipTap }) { // FEATURE: CHI-84
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -3402,7 +3462,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           </div>
         </div>
       ) : (
-        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence}/>)
+        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} onStepChipTap={onStepChipTap}/>)
       )}
       {!bare && workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
     </div>
@@ -3489,7 +3549,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep, hypIsCurrent }) { // FEATURE: CHI-82/CHI-82b — getStep + hypIsCurrent passed through to EvidenceColumn
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep, hypIsCurrent, onStepChipTap, stepReveal }) { // FEATURE: CHI-84 — onStepChipTap is wrapped below to flip to the Steps & Evidence tab first // FEATURE: CHI-82/CHI-82b — getStep + hypIsCurrent passed through to EvidenceColumn
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -3626,7 +3686,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
       <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
         {mobileTab === "chat" ? (
           <>
-          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
+          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare onStepChipTap={(key) => { selectTab("evidence"); onStepChipTap(key); }}/>
           <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
             <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
               onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
@@ -3650,7 +3710,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
              activates the desktop-proven mechanism on mobile too. Nothing inside EvidenceColumn changes,
              and no parallel mobile footer exists. */
           <div style={{flex:1,minHeight:0,overflow:"hidden",padding:14,display:"flex",flexDirection:"column"}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent} stepReveal={stepReveal}/>
           </div>
         )}
       </div>
@@ -4722,8 +4782,8 @@ export default function MarketIntelligenceScreen() {
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             {/* FEATURE: CHI-82b — breadcrumb stage arrives pre-filtered (crumbStage, top-level membership filter), replacing CHI-82's raw hypFlow prop */}
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} crumbStage={crumbStage}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep} hypIsCurrent={hypCurrent}/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} crumbStage={crumbStage} onStepChipTap={onStepChipTap}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep} hypIsCurrent={hypCurrent} stepReveal={stepReveal}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}
