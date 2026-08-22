@@ -263,8 +263,10 @@ git -C "C:/Projects/deepbench-frontend" branch -D "session/<short-session-name>"
 ## Exception — lightweight bookkeeping path (`SES-011`)
 
 A session whose only pending edit is a **pure append** — zero deleted or modified lines — confined to
-either (a) a brand-new `inflight/<short-session-name>.md`, or (b) one new row appended to the
-end of `docs/FEATURES.md` / `FEATURES-NEXT.md` / `FEATURES-LATER.md`, may skip part of the ceremony:
+a brand-new `inflight/<short-session-name>.md`, may skip part of the ceremony. (The old clause (b),
+"one new row appended to a `FEATURES*.md` file," is impossible since `v7.0.113` — those files are
+legend-only stubs; tickets are filed into `public.backlog_items` per step 3c, which needs no
+worktree at all. Updated 2026-08-22, `design-backlog-model`.)
 
 - If this session already has a worktree open, make the edit there — no second worktree.
 - If not, create one as normal (step 1) but **skip step 1b** (`.env.local` copy — no dev server or

@@ -9387,3 +9387,46 @@ probe succeeded, closing precondition C3 by measurement; the invention ladder ru
 trust rung"* — so zero proposals, honestly, rather than a forced one.
 
 Kickoff: `docs/kickoffs/v7.0.150-SES-106-claim-release-after-push.md`.
+
+---
+
+## 2026-08-22 — `design-backlog-model` (Manual Design & Build, John attended; Fable 5)
+
+Design session on the backlog data model itself — no version claimed, no code; output is 12 filed
+tickets + Supabase writes + doc fixes. John iterated requirements one by one; each landed as a
+confirmed list item, then all filed at once (block claim SES-110..121, one call).
+
+**Filed (all Automation epic members once SES-110 builds it; stacked at queue 1–13 via
+`claim_automation_lane_top()` in reverse order, John's declared order):** SES-110 epics table +
+Automation epic seed (members SES-80/81/82/84/91/92/93/97/101/104/105/106 + this
+session's filings; boundary = created since automation started Wed 2026-08-19); SES-111 epic-drain
+directive ("run the Automation epic to completion non-stop" — declarable, self-retiring; back-to-back
+already live per SES-98-done); SES-112 design_status (auto/needs-john/needs-desktop/designed) +
+kickoff_link; SES-113 removal-proposed keeps its queue number (B4 amended: NULL = out of standings,
+flags = in standings skipped); SES-114 selection reads design_status off the row; SES-115
+backlog_active view + computed mode (open/in development/in review/done) — keep-and-filter, rows
+never deleted, revises register B1; SES-116 runner_items.backlog_id display-string pollution repair +
+bare-ID CHECK (found live: 3 of 4 open gated cards fail every card→ticket join); SES-117 structural
+title+type filing guarantees; SES-118 rename status 'missing'→'open'; SES-119 ID + stored title in
+every display + split waiting-on-John list (decisions vs desktop); SES-120 startup-doc modernization
+(Session-Init rewrite to snapshot pointers — John still uses claude.ai browser/mobile chat); SES-121
+shrink the .claude/-mutable surface. Existing SES-91 (title backfill — dedup: covers the 95
+class-string titles, measured live, not the ticket's "all 553") pulled into the lane at #8.
+
+**Other Supabase writes (before-images homed on a `supervised`/`did_not_run` runner_cycles ledger
+row — NOT an automated cycle, no runner stamp):** three runner questions answered per John live in
+chat — q-lane-partial-blocked **yes** (skip, slot kept), q-self-deferred-keeps-queue-slot **no**
+(keeps slot; marked so no re-read), q-screen-edit-lane **yes** (needs-desktop list); SES-108 blank
+Type → Feature.
+
+**John's standing rules captured this session (canonical homes updated):** epic creation is
+ask-first — only "Automation" pre-authorized; epics cross tiers; "finish the <epic> tickets" =
+now-tier members only (rules ride SES-110's description → docs at build). Ticket references are
+**ID + stored title + Type, everywhere** (docs/WORKING-WITH-JOHN.md updated). Status vocabulary:
+'missing' meant nothing to John — renamed via SES-118.
+
+**Doc fixes landed by this session (attended, .claude/ paths):** session-setup lightweight-bookkeeping
+clause (b) removed (appending FEATURES*.md rows is impossible); triage capture rule retargeted to
+`public.backlog_items`; WORKING-WITH-JOHN referencing rule. Startup-path audit result: CLAUDE.md,
+CLAUDE-RULES, CLAUDE-STATE, GOVERNANCE-MODES, runner-cycle, briefing runbook all clean; stale spots
+= the two skills (fixed here), CLAUDE-DESIGN two phrases + Session-Init + script baselines (SES-120).

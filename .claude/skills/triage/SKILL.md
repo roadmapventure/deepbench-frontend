@@ -24,9 +24,10 @@ Report the three answers and wait.
 
 ## Classification
 
-File any new item into the correct backlog file per `CLAUDE-DESIGN.md`'s Backlog
-Capture rule — `docs/FEATURES.md` (now), `docs/FEATURES-NEXT.md`, or
-`docs/FEATURES-LATER.md`. Claim its ID atomically from Supabase per `CLAUDE.md`'s
+File any new item straight into `public.backlog_items` per `CLAUDE-DESIGN.md`'s Backlog
+Capture rule — the canonical INSERT is `session-setup` skill step 3c; the now/next/later
+choice is the row's `tier` column (the three `FEATURES*.md` files are legend-only stubs
+since `v7.0.113` and hold no rows). Claim its ID atomically from Supabase per `CLAUDE.md`'s
 feature-ID-counter rule — never by reading the highest existing number. When unsure
 between now and next, that's Tier 1 if the criterion clearly applies, otherwise ask.
 
