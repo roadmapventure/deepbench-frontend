@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.164 | runbooks/briefing-page.md | SES-129 — §7 gains its data contract and the LOCKED SECTION ORDER marks the LAST unbuilt section built: every one of the fourteen is now live and the briefing redesign epic closes. The contract's hard parts are all in the split between STORED and DERIVED, and each is wrong in a way that looks fine. A consumed directive's verdict is READ from the new runner_directives.outcome/.outcome_note because it cannot be derived — measured live, runner_cycles.item_id holds a runner_items uuid, the directive's own id, and free prose across the 24 closed rows, the same backlog_items.title trap SES-91 tracks, and item_ref covers 3 of 24. Every LIVE state is DERIVED from type+status+expires_at instead, and the one that carries the ticket is `standing`: SES-111 property (2) makes a drain-epic sit at status='queued' forever BY DESIGN, so the natural render tells John the standing order currently serving him is "waiting to be picked up". The word under the textarea is "recorded", not the spec's "saved", and the reason is stated on the page as well as here — briefing-state's `directive` carries no timestamp where `reading` carries an `at`, so created_at is the HARVEST time and can lag his typing by a full cycle; the fix is named on the card rather than guessed. NULL outcome on a done row is a defect that renders red in `td.missing` (the page's existing vocabulary, not a second class), derived from stateOf() returning null so the flag cannot drift from the fact. And the to_char format is HH12:MI, never h:MI — a bare `h` is a literal and renders "Aug 22, h:23 PM", caught in this ticket's QA before it reached the page. -->
 <!-- DeepBench v7.0.163 | runbooks/briefing-page.md | SES-128 — §4 gains its data contract and the LOCKED SECTION ORDER marks its readings half built. The card asks for TWO readings now, Night and Morning, each with its own Save, and the reason is the one thing a rebuilding cycle must not re-derive: John's meter is spent by his own manual sessions AND the runner, so a rate measured over any mixed window is confidently wrong, and only a night→morning bracket is runner-only by construction. The derivation, its four guards and the precedence of John's own budget_override over any derived number live in runner-cycle.md step 3 and are CITED here rather than restated — this file has already had to be resynchronised with that runbook twice (v7.0.118, SES-107) after a one-line summary drifted. Four rebuild rules ride with it: briefing-state.reading is slot-keyed and a legacy flat object migrates to `adhoc` rather than being dropped (John typed those numbers) but NEVER to a slot inferred from its clock time; the harvest stores slot on the row; an unslotted reading still feeds the rest and staleness walls and is not "ignored", it just cannot calibrate; and the card's "✓ latest reading" line is DERIVED from whichever slot holds the newest timestamp, never from a stored latest field — the same derive-don't-maintain rule as §1's counter and §10's resolution, for the same reason. -->
 <!-- DeepBench v7.0.162 | runbooks/briefing-page.md | SES-127 — §10 gets its data contract and the LOCKED SECTION ORDER marks it built. The contract exists because the section's hard parts are all in the QUERY, not the markup, and each is wrong in a way that looks fine: the backlog_items join is LATERAL … LIMIT 1 (backlog_id is NOT unique — CHI-48 holds two rows, SES-86 phase 2's own QA found it, and a plain join silently doubles any skip on a duplicated ticket); "still skipped" is DERIVED from b.status NOT IN ('done','removed') rather than a maintained flag, so a shipped ticket leaves the section with no write and no rule for a cycle to forget; the sort is question-unblockable first because that is the difference between a thumb and a keyboard; and briefed_at is stamped AFTER the republish returns, never before, because stamping first eats the NEW chip on rows a failed publish never showed him. The Unblock column's live buttons record under a new briefing-state key `unblocks`, harvested in the tail like `answers` and `asks`; a `card` row's button is DISABLED and names the card that already carries the decision, because a second way to decide one thing is how two half-decisions get made. §10 rows carry no data-awaits — a skipped ticket is information, not a decision owed. Divergence from the mock is stated rather than left to be found: .tscroll, not .tblwrap, because nine columns with no min-width crush on a phone. -->
 <!-- DeepBench v7.0.161 | runbooks/briefing-page.md | SES-126 — the LOCKED SECTION ORDER table marks §§8/11/13/14 built, and the page gains the four board tables' data contracts. The forward view of the queue is BACK: SES-124 struck “Next up — top 5” and the “Next 3” line and disclosed on its own card that the page would carry NO forward view until this ticket landed, so the gap runner-cycle.md step 9 describes is now closed — and the struck sections stay struck, the matrix is the forward view. Four contracts written down because each was MEASURED here rather than reasoned about, and each is wrong in a way that looks fine: §8's Queue is the DB's stored `queue` and its Title is the `gist` extract (imported tickets keep the class string in `title`, so a matrix keyed on it shows class names and no titles, until SES-91); §11 groups on the class DIGIT — by string the live now tier returns SEVEN rows for six classes, splitting P9 into 120 + 27 FLAGGED against a true 147 — and sorts zero-padded because P10 sorts before P2 lexically; §13's work_class→P-class mapping is fixed here, and P6 - Agent Enhancement has NO rung (six work classes, ten board classes) which is stated as a note rather than rendered as a blank row that would read “rung 0, not yet trusted”; §14 filters to the one production host (the dev URL is John, and 12,212 pre-LOG-134 rows carry no host at all), counts one use = one trace_id with model IS NOT NULL per LOG-81, resolves Name through visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org because one live label is a 130-character paragraph, and renders Cost as — because cost_usd is NULL and a NULL shown as $0.00 claims the run was free. Plus: the two six-column tables scroll themselves (.tscroll) so the phone's page body never does, the two narrow ones deliberately do not, and none of the four folds. -->
@@ -87,7 +88,7 @@ shown:
 | 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` ✔ readings |
 | 5 | Shipped | `SES-125` ✔ |
 | 6 | Gated before build | `SES-125` ✔ |
-| 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
+| 7 | Directive queue | `SES-124` ✔ position · `SES-129` ✔ follow-through card |
 | 8 | The queue (matrix) | `SES-126` ✔ |
 | 9 | Questions | `SES-125` ✔ |
 | 10 | Skipped — waiting on your input | `SES-127` ✔ |
@@ -180,6 +181,65 @@ Four rules for the rebuild:
   holds the newest `at`, never from a stored "latest" field — a second copy of the same fact goes
   out of step the first time a cycle forgets to update it. Same rule as §1's counter and §10's
   resolution: derive it, do not maintain it.
+
+### §7 — the directive follow-through card (`SES-129`, `v7.0.164`)
+
+Two pieces sit under the directive textarea: an acknowledgement line, and the default-closed
+card **"Your last 3 directives — what became of them"**. Both regenerate on every rebuild from
+`public.runner_directives`; the migration is `ses129_directive_outcome`.
+
+```sql
+SELECT left(d.id::text,8) AS id8, d.type, d.status, d.outcome, d.outcome_note,
+       to_char(d.created_at AT TIME ZONE 'America/Chicago','Mon DD, HH12:MI AM') AS recorded_cst,
+       to_char(d.expires_at AT TIME ZONE 'America/Chicago','Mon DD, HH12:MI AM') AS expires_cst,
+       (d.expires_at IS NOT NULL AND d.expires_at > now()) AS override_live,
+       left(coalesce(d.acted_cycle::text,''),8) AS acted8,
+       left(split_part(d.body, E'\n', 1), 76) AS john_line
+  FROM public.runner_directives d
+ ORDER BY d.created_at DESC
+ LIMIT 3;
+```
+
+**Use `HH12:MI`, never `h:MI`.** In `to_char` a bare `h` is a literal, so `h:MI AM` renders
+`Aug 22, h:23 PM` — caught in this ticket's own QA, before it reached the page.
+
+Five things here are not style:
+
+- **STORED vs DERIVED is the whole design.** A **consumed** directive's verdict is READ from
+  `outcome` / `outcome_note`; every **live** state is DERIVED from `type` + `status` +
+  `expires_at`. Do not add a stored value for a live state — those three columns cannot go stale,
+  and a fourth copy of the same fact would.
+- **Why the verdict had to become a column.** The natural derivation — join `acted_cycle` →
+  `runner_cycles` and read `item_id` — cannot work: measured live when this shipped, that `text`
+  column holds a `runner_items` uuid, the directive's *own* id, and free prose (one value is a
+  96-character sentence) across the 24 closed rows. It would render John a column of uuids and
+  half-sentences, the `backlog_items.title` trap (`SES-91`) again. `item_ref` is populated on 3
+  of 24 and is no fallback either.
+- **A standing drain-epic must NOT render as "waiting".** `SES-111` property (2): a drain is
+  never consumed, so it sits at `status='queued'` **by design** while it is actively serving
+  John every cycle. "Waiting to be picked up" would be the opposite of the truth about the
+  directive he is currently being run by. Same for an unexpired `budget_override`: it renders
+  *active until `<ts>`*.
+- **The word is "recorded", not "saved" — and the limit is stated on the page itself.**
+  `briefing-state`'s `directive` is a bare string with **no timestamp** (where `reading` carries
+  an `at`), so the only time available is `created_at`, i.e. when a **cycle harvested** it — up
+  to one cycle's cadence (~3h) after John typed it. Telling him "saved 4:23 PM" for a line he
+  typed at 2:10 PM is confidently wrong in the exact place the page is acknowledging him. The
+  fix — give `directive` an `at`, the shape `reading` already has — is named on `SES-129`'s card.
+- **`NULL outcome` on a `status='done'` row is a DEFECT and renders red** (`td.missing`, the same
+  vocabulary `.more .missing` already uses — not a second class meaning the same thing).
+  `close_directive()` makes recording it unskippable, so a NULL there means the function was
+  bypassed. The render derives the defect from `stateOf()` returning `null`, never from a
+  separate flag — two copies of that one fact would drift, and the copy that drifts decides
+  whether John sees the problem at all.
+
+**The 24 pre-existing rows read "outcome not recorded", deliberately.** They were backfilled
+uniformly to `closed_unrecorded` rather than reconstructed. Three sit beside a real shipped SHA
+and their `outcome` could have been inferred — but the **note** is the half John reads and there
+is no stored wording to recover, only wording a migration would invent. Same call `SES-128` made
+for the eight unslotted readings. Stamping the value uniformly is also what lets `NULL` mean
+*defect* from here on rather than *old row*. The card says this in John's register rather than
+leaving him to wonder.
 
 ### §10 — Skipped, waiting on your input (`SES-127`, `v7.0.162`)
 

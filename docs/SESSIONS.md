@@ -5,6 +5,128 @@
 
 ---
 
+## cycle-20260822-2259 / SES-129-directive-follow-through (v7.0.164, 2026-08-22, Automated runner cycle `ed1a5eb3`, model Opus 5 orchestrator, no subagent) — the briefing redesign closes, and a directive stops disappearing after John writes it
+
+**Ticket:** `SES-129` (Tooling · `P10 - Tooling`), queue position **2**, tier `now`, epic
+**Automation**. Shipped **`done`**. Three build files + one migration — no `src/`, no `api/`, no
+`lib/`, no user-visible surface on dev, no flag (§19v). **This is the sixth and last of the
+briefing-redesign epic (`SES-124`…`SES-129`): every one of the fourteen locked sections now
+builds.**
+
+**Selection, and the skip in front of it.** Layer 1a was empty (no `type='directive'` queued).
+Layer 1b — John's standing Automation-epic drain (`runner_directives b74009ea`) — returned
+`pick SES-106`, `open_now = 23`. `SES-106` is `partial`: its shipped half landed in `v7.0.150`
+and the only piece left is the matching correction to `.claude/skills/session-setup/SKILL.md`
+step 2c, which register B39 forbids an unattended cycle from writing. Skipped per B24 and
+**recorded as a row, not a sentence** — `record_skip(..., 'permission-gate', ...)`, the
+`SES-127` mechanism used for the first time by a cycle that did not build it. Dropped to the
+board read, took queue 2.
+
+**Premise revalidation (`SES-87` / B7) — holds, three checks, all live.** `runner_directives`
+has 11 columns and **no outcome column**; `briefing-template.html` line 752 is still the named
+slot comment `// §7's "your last 3 directives — what became of them" card: SES-129.`; and
+`briefing-page.md`'s LOCKED SECTION ORDER row 7 still reads *`SES-124` ✔ position · `SES-129`
+follow-through card*.
+
+**The measurement that decided the design.** The obvious implementation **derives** a directive's
+outcome by joining `runner_directives.acted_cycle` → `runner_cycles` and reading `item_id`. Read
+live this cycle, that `text` column holds **five different shapes** across the 24 closed
+directives:
+
+| Directive | `runner_cycles.item_id` |
+|---|---|
+| `dda69acb` | `ee6ac097-5834-48fa-a8ea-78b3f599af71` — a `runner_items` uuid |
+| `edab5908` | `directive edab5908` — prose |
+| `c4d95dc7` | `c4d95dc7-9df4-4de4-8d5e-8d4d95f7d2f2` — the directive's **own** id |
+| `34865f07` | `directive 34865f07 — .claude/ stall mechanism named; unattended prohibition restored on evidence` |
+| `a55155f3` | `SES-86 phase 2 — materialized queue numbers (register B4)` |
+
+Rendering that into John's card gives him a column of uuids and half-sentences — the
+`backlog_items.title` trap (`SES-91`) in a second place. `item_ref` is populated on **3 of 24**
+and is no fallback. So the verdict is **stored**: migration `ses129_directive_outcome` adds
+`runner_directives.outcome` (CHECK `shipped|carded|superseded|closed_unrecorded`) and
+`.outcome_note`.
+
+**The design is one line: store what cannot be derived, derive what can.** A *consumed*
+directive's verdict exists nowhere and is stored. Every *live* state — `waiting`, `in progress`,
+a standing drain, an active override — follows from `type` + `status` + `expires_at`, which are
+already columns and cannot go stale, so none of them gets a stored value.
+
+**THE ONE THAT WOULD HAVE SHIPPED WRONG.** `SES-111` property (2): a drain-epic is **never
+consumed**, so it sits at `status='queued'` **forever, by design**, while it is actively
+selecting work every cycle. The natural render therefore tells John that the standing order
+**currently running his runner** is *"waiting to be picked up"* — the exact opposite of the truth
+about the directive serving him. `standing` and `active until <ts>` are derived states with
+deliberately no stored value, and the render test asserts both **against the string `waiting`**
+rather than merely asserting the right words appear.
+
+**The structural half — `close_directive()`.** Step 9 used to say *"mark the directive `done`"*:
+three words, a second write, exactly the shape of the six forgettings this platform has already
+paid for (`SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`). It is now
+one call that **cannot set the status without an outcome and a non-blank note** — both raise
+rather than defaulting. Idempotent in the direction that matters: a directive already closed
+*with* an outcome comes back `already_closed = true` untouched, so a re-run can never overwrite a
+verdict already sitting on John's card. `closed_unrecorded` is rejected by the function and
+accepted only by the column's CHECK, so the backfilled rows can say what is true while no cycle
+can ever label its own work "unrecorded".
+
+**The 24 historical rows were deliberately NOT reconstructed.** Three sit beside a real shipped
+SHA and their `outcome` could have been inferred — but the **note** is the half John reads, and
+there is no stored wording to recover, only wording a migration would invent. Same call `SES-128`
+made for the eight unslotted readings, for the same reason. Stamping `closed_unrecorded`
+uniformly is also what lets `NULL` mean **defect** from here on rather than "old row", and the
+card says so in John's register rather than leaving him to wonder why a column is empty.
+
+**QA, on two layers, each with its own negative control.**
+
+- **Migration, five arms, proven live on a fixture inside a deliberately rolled-back
+  transaction:** a bad outcome is rejected **by the function's own message** (not a
+  "function does not exist" error, which is what makes the arm discriminating);
+  `closed_unrecorded` is rejected; a blank note is rejected; the real close lands
+  (`status=done outcome=shipped already=f`); and a second call returns `already=t` with the
+  original note **preserved**. Rollback verified after: fixture still `queued`, before-image
+  count unmoved. Fixture deleted, before-image written for the delete.
+- **Grants asserted both directions** (`SES-101`'s function-level twin of the column-grants
+  rule): `anon` false, `authenticated` false, `service_role` true.
+- **Backfill:** 24 rows → `closed_unrecorded`, **24** `runner_before_images` rows written first
+  (§19v). The 3 remaining NULLs are the 3 `queued` directives, correctly untouched.
+- **Render, jsdom, 16/16 on the shipped template** — card exists, is a fold, is closed on load,
+  numbered 7.1, 1 header + exactly 3 rows, the four columns in the spec's order, `standing` and
+  not `waiting`, `active until`, the historical rows explained, **zero `data-awaits`** (a
+  follow-through row is information, not a decision owed — the `SES-124` masthead rule, same call
+  `SES-127` made for §10), the acknowledgement line saying **recorded** and never **saved**, and
+  all fourteen sections still rendering with §7 between §6 and §8.
+  **Negative control: 3 hard failures on `origin/dev`'s template**, where `#dirfollow` does not
+  exist at all.
+- **Function-level, 14/14**, with `esc` / `dirRow` / `stateOf` pulled **out of the shipped
+  template** rather than copied — so it dies with *function not found* on `origin/dev`.
+- One assertion of mine **was wrong and the page was right**: I asserted 14 `.secnum` chips and
+  got 13. §1 is the masthead and carries no number chip — verified **identical on `origin/dev`**,
+  i.e. pre-existing and correct. The assertion was corrected to 13 chips plus the masthead;
+  asserting 14 would have failed on the unchanged file too and so would not have been a test of
+  this change at all.
+- `npm install && npm run build` **clean** (the two chunk-size warnings are pre-existing).
+
+**NOT done, and named here rather than left to be discovered.**
+
+- **The page cannot know when John *typed* a directive, only when a cycle *recorded* it.**
+  `briefing-state`'s `directive` is a bare string with **no timestamp**, where `reading` carries
+  an `at`. So the only time available is `runner_directives.created_at` — the harvest moment,
+  which can lag his typing by a full cycle (~3h). The spec's word is *"saved"*; shipping
+  "saved 4:23 PM" for a line typed at 2:10 PM would be confidently wrong in the one place the
+  page is acknowledging him, so the line reads **"recorded"** and states the limit in place. The
+  fix — give `directive` an `at`, the shape `reading` already has — is named on the card.
+- **Regression not run.** Doc-only ship: no `src/`, `api/` or `lib/` file was touched, so the
+  suite does not apply. Said plainly rather than reported as a pass.
+- **The render harness is scratchpad-only again** — `tests/regression/` still has no DOM fixture.
+  That gap is now **six tickets** old.
+
+**Blocker sweeps.** #1 before the build: dev root returns **HTTP 200** with the bypass header
+(2,580 bytes, root div + scripts present), and `check-deploy-current.js` reports the preview
+serving `bb2d125` — current. #2 after: unchanged, and nothing shipped that could move it.
+
+---
+
 ## cycle-20260822-2225 / SES-128-morning-night-readings (v7.0.163, 2026-08-22, Automated runner cycle `c1aff11a`, model Opus 5 orchestrator, no subagent) — the calibration that had never once run
 
 **Ticket:** `SES-128` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
