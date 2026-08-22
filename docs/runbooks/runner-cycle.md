@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.163 | runbooks/runner-cycle.md | SES-128 — step 3's token track stops describing a calibration nobody performs and gains the call that performs it. MEASURED BEFORE A LINE CHANGED: all eight rows in runner_usage_readings carry tokens_per_pct = NULL, so step (c)'s "calibrate from the two most recent readings" has NEVER ONCE been carried out in the life of this runner — every allowance it has computed fell through to the uncalibrated 10M cap or the 3M stale floor. THE HALF THAT MATTERS AND IS NOT A FORGETTING: the two most recent readings are the WRONG WINDOW. John's meter is spent by his own manual sessions as well as the runner, so a rate measured across a mixed window is confidently wrong no matter how carefully a cycle does the arithmetic. Only a night→morning pair brackets a runner-only window, which is why SES-128 puts a slot on the reading and why derive_token_allowance() reads that pair and nothing else. Same prose→code correction as SES-86 phase 3 / v7.0.146 / SES-101 / SES-111 / SES-127, and the sixth time this platform has paid for the alternative. Four guards return NULL rather than a number, and NULL is explicitly NOT a failure — it means fall back to the guardrails that already exist. The one that would have shipped wrong: a 57-hour bracket with a positive delta and 28M real tokens inside it satisfies every arithmetic precondition and is not a runner-only window, so the 24h guard is what stands between this feature and an allowance eleven times too large. Precedence is written down as three ranked lines so no cycle re-derives it differently: John's unexpired budget_override.max_tokens outranks the derived number, which outranks the 10M/3M fallbacks, with the weekly rest wall above all three and overridable by none. And the ONE assumption inside the function is named in the open rather than buried: the meter-week reset day is stored nowhere, so the pool is divided by the worst case of 7 — fail-closed, can only under-spend — with question q-meter-week-anchor filed to replace it with John's real answer, at which point the allowance gets larger and never smaller. -->
 <!-- DeepBench v7.0.162 | runbooks/runner-cycle.md | SES-127 — step 5 stops letting a skip be a sentence, and the step-9 tail gains the two writes that creates. MEASURED BEFORE A LINE CHANGED, not recalled: fifteen public.runner_* tables exist and NOT ONE stores a skip, so every skip this platform has ever made lives as prose in runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z: "Step 5: queue #1 SES-110 skipped per B24 …". That sentence is real, correct, and completely invisible to John, who does not read the ledger; it was the only record that four of his top-five queue positions were being stepped past every cycle. New: one call, public.record_skip(cycle, ticket, reason_kind, reason), before you drop to the next ticket — migration ses127_skip_records, which writes its own before-image on both paths so the call is the whole obligation. THE HALF THAT WOULD HAVE BEEN GOT WRONG: it is idempotent AND you are meant to call it every time. John's standing Automation drain re-reads 25 open now-tier members eight cycles a day, so an INSERT-per-skip design puts the same SES-110 row in front of him 8×/day forever; uniq_open_skip bumps skip_count instead, and skip_count is itself the signal ("this has blocked 14 times"). Two boundaries stated so no cycle re-derives them differently: a skip you can resolve YOURSELF is never recorded ('claimed-by-peer' is deliberately absent from the vocabulary — a contested claim expires in 24h and the section is titled "waiting on YOUR input"), and you never resolve a skip afterwards, because §10 derives "still skipped" from backlog_items.status NOT IN ('done','removed') — building the ticket later clears the row with no write from anyone. That is the SES-86 phase 3 / SES-101 / SES-111 prose→code lesson applied by DELETING a rule rather than writing one. Tail: (3) harvests the new `unblocks` briefing-state key alongside `answers`/`asks`, and new (5b) stamps briefed_at AFTER the republish returns — briefed_at IS NULL is the NEW chip, so stamping first eats it on rows a failed publish never showed him, and stamping after risks only one extra night marked new. -->
 <!-- DeepBench v7.0.158 | runbooks/runner-cycle.md | SES-113 — a `removal proposed` ticket KEEPS its earned queue slot, and step 5 gains the procedural skip that keeps it safe. John's ruling 2026-08-22, verbatim: "what if I reject the proposal?" A removal-proposed ticket is one awaiting his verdict — exactly like `needs-john` — and the two were treated oppositely: `needs-john` kept its number and was skipped, removal-proposed was stripped from the standings the moment the proposal was filed and vanished from every ranked view he has, so his Reverse had to re-insert it from nowhere. That asymmetry WAS the bug. Migration `ses113_removal_proposed_keeps_slot` changes `recompute_backlog_queue()` in exactly three predicates (the ineligible-clear WHERE, the `v_total` count, the `eligible` CTE) to `status NOT IN ('done','removed')`; everything else is byte-for-byte the prior body, all five documented ordering traps preserved and re-asserted individually against `prosrc`. The pin-clear deliberately stays `('done','removed')` — it already was — so a removal-proposed ticket now keeps its PIN as well as its number, the same rule applied consistently for the first time. MEASURED BEFORE A LINE CHANGED, not recalled: CHI-89 (`P5 - Enhancements`, tier `now`) sat at `queue = NULL` while carrying an UNDECIDED gated card (`e1c7a940`) — so John had a live decision pending on a ticket his own board would not show him in any ordered list. THE HALF THAT WOULD HAVE SHIPPED A LIVE HAZARD ALONE: step 5's read filters on `queue IS NOT NULL` and claims, NOT on status, so numbering CHI-89 makes it selectable — a cycle could build a ticket whose premise the runner has already argued is dead. The procedural skip therefore ships in THIS commit, not a later one. QA was discriminating rather than merely complete: the pick expectation (CHI-89 → slot 23, never 559) was computed by a standalone `row_number()` that never calls the function, and the NEGATIVE CONTROL restored the pre-change body inside a deliberately rolled-back transaction — it strips CHI-89 to NULL and numbers 559, against the shipped body's 23 and 560. Note honestly: this cycle's own first recompute returned 0 rows moved, because a concurrent actor filing `SES-122` at 20:12Z ran the recompute against the already-live new function first — that 0 is idempotence, NOT evidence the change works, and is precisely the false pass `SES-86` phase 2 was bitten by; the negative control is what carries the proof. 560 numbered `1..560`, all distinct, 0 tier and 0 class inversions. Register B4 amended in RUNNER-GOV-0820-REQUIREMENTS.md: NULL = out of the standings entirely; a flag (claim / needs-john / needs-desktop / removal proposed) = IN the standings, currently skipped. `SES-114` (queue 3) generalises the skip across `design_status`. -->
 <!-- DeepBench v7.0.159 | runbooks/runner-cycle.md | SES-124 — step 9 stops carrying its own copy of the briefing page's shape. The page's structure is now the LOCKED SECTION ORDER table in briefing-page.md (spec: docs/BRIEFING-REDESIGN-0822.md, John-approved mock 2026-08-22), so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Two of this step's standing requirements are STRUCK because John removed the sections that carried them: the "Next up — top five" section (register B25) and the compact "Next 3" line (register B26). Said plainly rather than left to be discovered: their replacement is §8's queue matrix and §11's now-tier census, and those ship in SES-126 — so from this ship until SES-126 lands the briefing carries NO forward view of the queue. That is the redesign's own sequencing, it is disclosed on SES-124's card so John can reorder the epic in one tap, and a cycle in the gap must NOT reinstate the old sections to paper over it. Everything else in step 9 is unchanged. -->
@@ -553,6 +554,57 @@ Four things about this boundary, each of which has already bitten or would have:
   `max_usd` override. Both new columns are nullable and fail closed: NULL `max_tokens` or a NULL
   / past `expires_at` means no override, and the wall stands.
   All token figures are estimates and are always labeled estimated.
+
+**THE CALIBRATION IS DERIVED BY ONE CALL, NOT BY EACH CYCLE'S ARITHMETIC (`SES-128`,
+`v7.0.163`, migration `ses128_reading_slots`).** Step (c) above describes calibrating
+`tokens_per_pct` from "the two most recent readings", and **that instruction has never once been
+carried out** — measured before this shipped, all eight stored `runner_usage_readings` rows carry
+`tokens_per_pct = NULL`, so every allowance this runner has ever computed fell through to the
+uncalibrated 10M cap or the 3M stale floor. The reason is not that cycles forgot: **the two most
+recent readings are the wrong window.** John's meter is spent by his own manual sessions *and* the
+runner, so any window mixing the two yields a rate that is confidently wrong. Run this instead,
+before you compute the allowance:
+
+```sql
+SELECT * FROM public.derive_token_allowance('<your cycle id>');
+```
+
+- **`guard = 'ok'`** → `day_allowance` is your allowance for the day, and the call has already
+  stored `tokens_per_pct` on the morning row (writing its own before-image, §19v — the
+  `record_skip` precedent).
+- **`guard` anything else** → `tokens_per_pct` and `day_allowance` come back **NULL**, which is
+  not a failure and never an error to report: it means no trustworthy window exists, so you fall
+  back to step (b)/(c)'s existing guardrails exactly as today. The four guards are: no bracketing
+  pair; a non-positive meter delta (a reset or a rolled-over week); an empty window; and a bracket
+  **wider than 24 hours**.
+- **Pass your cycle id, not NULL.** `derive_token_allowance(NULL)` is the read-only dry-run form —
+  it computes and writes nothing. Useful for a probe, wrong for the real check, because then the
+  calibration is never stored and the next cycle re-derives it from scratch.
+
+**Why only a night→morning pair counts.** While John is asleep the runner is the only thing
+spending, so the gap between his last reading of the night and his first of the morning is a clean
+measurement. That is what the `slot` column exists for. **A reading with no slot never brackets a
+window** — it is still a real reading for the rest wall and the 48h staleness check, it simply
+cannot calibrate. The eight readings that predate this ticket are `adhoc` for that reason and were
+deliberately **not** backfilled: `13:50Z` is 8:50 AM in Chicago and reads exactly like a
+"morning", and slotting it on that resemblance would manufacture a pair John never declared.
+
+**JOHN'S NUMBER ALWAYS OUTRANKS THE DERIVED ONE.** An unexpired `budget_override` directive with
+`max_tokens` is the ceiling, full stop — register B32, unchanged by this ticket and restated here
+because a derived allowance is exactly the kind of number a later cycle would be tempted to treat
+as authoritative. Precedence, top down: **(1)** an unexpired `budget_override.max_tokens`;
+**(2)** `derive_token_allowance()`'s `day_allowance` when `guard = 'ok'`; **(3)** the 10M
+uncalibrated cap / 3M stale floor. The rest wall (`all_models_pct ≥ 85`) sits above all three and
+is not overridable by any of them.
+
+**One number in that function is an assumption, and it is named rather than buried.** Turning the
+remaining weekly pool into *one day's* allowance needs the days left in John's meter week, and
+**that value is stored nowhere** — `runner_budget` carries month, caps, share and rest, and no week
+anchor (read live, not recalled). The function therefore divides by **7**, the worst case, which is
+the fail-closed direction: it can only under-spend, never over. Question `q-meter-week-anchor` asks
+John for the real reset day; when he answers, that divisor becomes real and the allowance gets
+**larger, never smaller**. Do not quietly replace the 7 with a guess in the meantime.
+
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
   gated-before-build item over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
 

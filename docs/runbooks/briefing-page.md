@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.163 | runbooks/briefing-page.md | SES-128 — §4 gains its data contract and the LOCKED SECTION ORDER marks its readings half built. The card asks for TWO readings now, Night and Morning, each with its own Save, and the reason is the one thing a rebuilding cycle must not re-derive: John's meter is spent by his own manual sessions AND the runner, so a rate measured over any mixed window is confidently wrong, and only a night→morning bracket is runner-only by construction. The derivation, its four guards and the precedence of John's own budget_override over any derived number live in runner-cycle.md step 3 and are CITED here rather than restated — this file has already had to be resynchronised with that runbook twice (v7.0.118, SES-107) after a one-line summary drifted. Four rebuild rules ride with it: briefing-state.reading is slot-keyed and a legacy flat object migrates to `adhoc` rather than being dropped (John typed those numbers) but NEVER to a slot inferred from its clock time; the harvest stores slot on the row; an unslotted reading still feeds the rest and staleness walls and is not "ignored", it just cannot calibrate; and the card's "✓ latest reading" line is DERIVED from whichever slot holds the newest timestamp, never from a stored latest field — the same derive-don't-maintain rule as §1's counter and §10's resolution, for the same reason. -->
 <!-- DeepBench v7.0.162 | runbooks/briefing-page.md | SES-127 — §10 gets its data contract and the LOCKED SECTION ORDER marks it built. The contract exists because the section's hard parts are all in the QUERY, not the markup, and each is wrong in a way that looks fine: the backlog_items join is LATERAL … LIMIT 1 (backlog_id is NOT unique — CHI-48 holds two rows, SES-86 phase 2's own QA found it, and a plain join silently doubles any skip on a duplicated ticket); "still skipped" is DERIVED from b.status NOT IN ('done','removed') rather than a maintained flag, so a shipped ticket leaves the section with no write and no rule for a cycle to forget; the sort is question-unblockable first because that is the difference between a thumb and a keyboard; and briefed_at is stamped AFTER the republish returns, never before, because stamping first eats the NEW chip on rows a failed publish never showed him. The Unblock column's live buttons record under a new briefing-state key `unblocks`, harvested in the tail like `answers` and `asks`; a `card` row's button is DISABLED and names the card that already carries the decision, because a second way to decide one thing is how two half-decisions get made. §10 rows carry no data-awaits — a skipped ticket is information, not a decision owed. Divergence from the mock is stated rather than left to be found: .tscroll, not .tblwrap, because nine columns with no min-width crush on a phone. -->
 <!-- DeepBench v7.0.161 | runbooks/briefing-page.md | SES-126 — the LOCKED SECTION ORDER table marks §§8/11/13/14 built, and the page gains the four board tables' data contracts. The forward view of the queue is BACK: SES-124 struck “Next up — top 5” and the “Next 3” line and disclosed on its own card that the page would carry NO forward view until this ticket landed, so the gap runner-cycle.md step 9 describes is now closed — and the struck sections stay struck, the matrix is the forward view. Four contracts written down because each was MEASURED here rather than reasoned about, and each is wrong in a way that looks fine: §8's Queue is the DB's stored `queue` and its Title is the `gist` extract (imported tickets keep the class string in `title`, so a matrix keyed on it shows class names and no titles, until SES-91); §11 groups on the class DIGIT — by string the live now tier returns SEVEN rows for six classes, splitting P9 into 120 + 27 FLAGGED against a true 147 — and sorts zero-padded because P10 sorts before P2 lexically; §13's work_class→P-class mapping is fixed here, and P6 - Agent Enhancement has NO rung (six work classes, ten board classes) which is stated as a note rather than rendered as a blank row that would read “rung 0, not yet trusted”; §14 filters to the one production host (the dev URL is John, and 12,212 pre-LOG-134 rows carry no host at all), counts one use = one trace_id with model IS NOT NULL per LOG-81, resolves Name through visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org because one live label is a 130-character paragraph, and renders Cost as — because cost_usd is NULL and a NULL shown as $0.00 claims the run was free. Plus: the two six-column tables scroll themselves (.tscroll) so the phone's page body never does, the two narrow ones deliberately do not, and none of the four folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-page.md | SES-125 — the More-info contract is REVERSED and the ask box leaves the panel. v7.0.145 required the three plain-language fields and then put them behind a button while the technical record was the card's body — backwards against the directive that created them (edab5908: "you are giving too much technical jargon. I need a business value statement"). John's redesign settles it: plain language IS the body, `More info — the technical record` holds Value case / Before → after / QA evidence / meta / links, and nothing is deleted. The ask box moves out of the panel to sit under the buttons, always visible, with a "✓ Received <ts>" line, because a typed line counts the same as a tap and may not be hidden behind a second button; the button-meaning lines move with it and render under the buttons like §9's Yes/No consequences. §§5/6/9/12 are default-closed and numbered, a collapsed card carries number · kind · TICKET ID · title · decision state, and §12 vision claims are the SAME renderer as §9 with a class chip — one function, because "formatted exactly like Questions" is the spec's word and two near-copies drift. NEW RULE with teeth: a vision row's briefing-state key MUST start `vision-`, since claims and questions both land under `answers` and nothing else distinguishes them at harvest. Unchanged and restated because reversing which half is hidden changes neither: `plain_*` are READ from the row and NULL still draws the red defect line; both Yes/No consequence lines stay required; `data-awaits` still comes from state, and §12's rows now feed §1's counter. -->
@@ -83,7 +84,7 @@ shown:
 | 1 | Masthead + `N decisions waiting` | `SES-124` ✔ |
 | 2 | Daily activity (CST day) | `SES-124` ✔ |
 | 3 | Today's findings | `SES-124` ✔ |
-| 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` readings |
+| 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` ✔ readings |
 | 5 | Shipped | `SES-125` ✔ |
 | 6 | Gated before build | `SES-125` ✔ |
 | 7 | Directive queue | `SES-124` ✔ position · `SES-129` follow-through card |
@@ -145,6 +146,40 @@ does. §11 and §13 are narrow and deliberately do **not** get it — a scroll a
 that already fits reads as a table that is cut off. **None of these four sections folds:**
 `SES-124` built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10
 default-closed.
+
+### §4 — the reading card's two slots (`SES-128`, `v7.0.163`)
+
+The reading card asks for **two** readings now, not one: a **Night** row and a **Morning** row,
+each three percentages with its own Save button. Both render on every rebuild, in that order,
+whether or not either is filled — a slot that disappears when empty is a slot John stops
+remembering to fill.
+
+**Why two, and it is the whole point of the ticket.** John's weekly meter is spent by his own
+manual sessions *and* by the runner. A rate measured across any window that mixes the two is
+confidently wrong. A window bracketed by his last reading of the night and his first of the
+morning is **runner-only by construction**, and that pair — nothing else — is what
+`public.derive_token_allowance()` reads. Full derivation, guards and precedence live in
+`runner-cycle.md` step 3; they are **cited here, not restated**, because this exact sentence
+drifting out of sync with the runbook is the failure `v7.0.118` and `SES-107` each had to fix in
+this file already.
+
+Four rules for the rebuild:
+
+- **`briefing-state.reading` is slot-keyed** — `{night:{fable,all,h5,at}, morning:{…},
+  adhoc:{…}}`. It used to be one flat object. A page published before `SES-128` carries that old
+  shape, and the template **migrates it to `adhoc` rather than dropping it** — John typed those
+  numbers. It migrates to `adhoc` and never to a slot: a reading whose slot was inferred from its
+  clock time would manufacture a bracketing pair he never declared.
+- **The harvest writes `slot` on the row it stores** (`runner_usage_readings.slot`, one of
+  `morning` / `night` / `adhoc`). A reading harvested from anywhere that is not one of the two
+  slot rows is `adhoc`.
+- **An unslotted reading still counts for the walls.** It feeds the rest wall
+  (`all_models_pct ≥ 85`) and the 48-hour staleness check exactly as before. It simply cannot
+  calibrate. Do not treat `adhoc` as "ignored".
+- **The card-level "✓ Your latest reading was recorded" line is derived** from whichever slot
+  holds the newest `at`, never from a stored "latest" field — a second copy of the same fact goes
+  out of step the first time a cycle forgets to update it. Same rule as §1's counter and §10's
+  resolution: derive it, do not maintain it.
 
 ### §10 — Skipped, waiting on your input (`SES-127`, `v7.0.162`)
 

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.163 | runbooks/briefing-template.html | SES-128 — briefing redesign 5 of 6: §4's reading card gains NIGHT and MORNING slots, and the pair becomes the runner's automatic calibration. MEASURED BEFORE A LINE CHANGED, not recalled: public.runner_usage_readings held nine columns and NOT ONE of them could tell a night reading from a morning one, and all eight stored rows carried tokens_per_pct = NULL — so in the whole life of this platform the runner has never once derived a calibration, and every allowance it has computed fell back to the uncalibrated 10M cap or the 3M stale floor. The mechanism, and the reason one reading could never have worked: John's weekly meter is spent by his own manual sessions AND the runner, so tokens-per-percent measured over any window that mixes the two is confidently wrong. A window bracketed by his last look at night and his first in the morning is runner-only BY CONSTRUCTION. Migration ses128_reading_slots adds the slot column (CHECK morning|night|adhoc) and public.derive_token_allowance(uuid). THE HALF THAT WOULD HAVE SHIPPED A CONFIDENT WRONG NUMBER: the guards. A naive build returns a rate whenever the arithmetic is defined, and the 24h guard's own QA is what shows why that fails — a 57-hour bracket with a POSITIVE delta and 28,065,000 real tokens inside it has everything such a build needs to hand back 4.68M per percent, roughly eleven times the true rate, and it is not a runner-only window at all. Four guards each return NULL rather than a number (no pair; delta ≤ 0, which is a meter reset or a rolled-over week; an empty window; a bracket wider than 24h), and NULL is not a failure — it is the signal to fall back to the guardrails that already exist. THE EIGHT EXISTING READINGS ARE NOT BACKFILLED, deliberately: 13:50Z is 8:50 AM in Chicago and reads exactly like a "morning", and slotting it that way would manufacture a bracketing pair John never declared and produce a calibration that looks measured and is invented. They default to adhoc, which is what they truthfully are. STATED RATHER THAN HIDDEN: the day's allowance divides the remaining pool by SEVEN, the worst case, because John's meter-week reset day is stored nowhere (runner_budget carries month/caps/share/rest and no week anchor, read live) — that is the fail-closed direction, it can only under-spend, and question q-meter-week-anchor asks him for the real day, at which point the number gets larger and never smaller. The legacy flat `reading` object migrates to `adhoc` rather than being dropped, the same defensive default SES-99, v7.0.145 and SES-127 each needed, plus the migration none of them did. QA was discriminating: the expectation (2,540,000 tokens ÷ 6 pct = 423,333.33) was computed by a standalone query that never calls the function, the pre-migration negative control returns NULL, the dry-run path (p_cycle_id NULL) is proven to write nothing, and grants are asserted BOTH directions after revoking from PUBLIC — anon false, service_role true (SES-101's function-level twin of the column-grants rule). Fixtures deleted; 8 readings, all adhoc, restored exactly. -->
 <!-- DeepBench v7.0.162 | runbooks/briefing-template.html | SES-127 — briefing redesign 4 of 6: §10 SKIPPED, AND THE SKIPS BEHIND IT BECOME ROWS. The section is the visible half; the half that makes it possible is migration ses127_skip_records (public.runner_skips + public.record_skip()), because MEASURED FIRST rather than assumed: fifteen public.runner_* tables exist and not one stores a skip, so every skip this platform has ever made lives as PROSE inside runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z, "Step 5: queue #1 SES-110 skipped per B24 …". John cannot sort, count or act on a sentence in a ledger row he never opens. THE ONE THAT WOULD HAVE SHIPPED WRONG: an INSERT-only skip table. John's standing Automation drain re-reads 25 open now-tier members every cycle, eight cycles a day, so the same SES-110 row would land in front of him 8×/day forever — uniq_open_skip (backlog_id, reason_kind) WHERE resolved_at IS NULL makes a repeat bump skip_count/last_skipped_at instead, and THAT is the discriminating QA (three record_skip calls → two rows; an INSERT-only build returns three). NEW is briefed_at IS NULL — no global last-brief timestamp, a row is new exactly once, a re-skip after briefing does not clear it (John has seen it), and the rebuild stamps briefed_at AFTER republishing so a failed publish cannot silently eat the chip. Resolution is DERIVED, never maintained: §10 joins backlog_items and filters status NOT IN ('done','removed'), so a shipped ticket leaves the section with no write and no rule for a cycle to forget — the same prose→code correction as SES-86 phase 3 / SES-101 / SES-111, applied by deleting the rule rather than writing one. The join is LATERAL … LIMIT 1 because backlog_id is NOT unique (CHI-48 holds two rows, found by SES-86 phase 2's own QA). 'claimed-by-peer' is deliberately ABSENT from the reason_kind vocabulary: the section says "waiting on YOUR input" and a contested claim clears itself in minutes, so recording one would fill his one actionable section with rows that action nothing. This is shape (b) of SES-124's collapse framework's first real use (h2.clickable over .secwrap), default closed per the spec, and rows carry NO data-awaits — a skipped ticket is information, not a decision owed, and inflating §1's counter is the masthead-disagrees-with-the-page failure countWaiting() exists to prevent. Divergence from the mock, stated rather than left to be found: the table uses SES-126's .tscroll, not .tblwrap — nine columns under .tblwrap have no min-width and crush on a phone, and .tscroll is the wrapper SES-126 built for exactly this. Rows shipped are the two REAL skips live on the board (SES-110 permission-gate, CHI-89 removal-proposed), both re-verified this session against status + an undecided card, not copied from another cycle's prose. -->
 <!-- DeepBench v7.0.161 | runbooks/briefing-template.html | SES-126 — briefing redesign 3 of 6: THE BOARD TABLES. §§8/11/14 were named comments that rendered nothing and §13 rendered without a class column; all four now build. §8 is the matrix that ENDS the gap SES-124 opened and disclosed — striking “Next up — top 5” and the “Next 3” line left the page with no forward view of the queue at all since v7.0.159, and this is the ticket that was always going to close it. Its Queue column is the DB’s OWN `queue` number (SES-86 phase 2), never a position the render counted out, and its Title column is the `gist` extract rather than `title`, because for imported tickets `title` holds the CLASS STRING (‘P9 - Bug Fixes.’) — a matrix keyed on it renders a column of class names and no titles (true until SES-91). THE ONE THAT WOULD HAVE SHIPPED WRONG AND WAS MEASURED FIRST: §11 groups the now tier on the class DIGIT, not the `priority_class` string. Grouped by string the live board returns SEVEN rows for six classes — ‘P9 - Bug Fixes · FLAGGED’ (27) is a different string from ‘P9 - Bug Fixes’ (120) — so John would read 120 bug fixes against a true now-tier 147. Same · FLAGGED suffix trap recompute_backlog_queue() already solves, and the zero-padded sort is the same numeric-vs-lexical fix (P10 sorts ahead of P2 lexically). §13 gains the class column with the fixed work_class→P-class mapping written down rather than re-derived, plus a NOTE that P6 - Agent Enhancement has no rung at all: runner_ladder holds six work classes, and a blank row would read as ‘rung 0, not yet trusted’, which is a different and untrue claim (SES-122 tracks rungs unlocking autonomy). §14 is last 5 PRODUCTION uses on two measured filters: request_host = deepbench.roadmapventure.com is the only production host (the dev URL is John himself, and request_host IS NULL covers 12,212 pre-LOG-134 rows), and ONE USE = ONE trace_id with calls counted as model IS NOT NULL — LOG-81’s rule that ‘AI calls’ means real model calls, never raw rows. Its Cost column renders — and MUST: cost_usd is NULL on every production row, and a NULL shown as $0.00 claims the run was free, which is not the same as not knowing (same rule as the plain_* red defect line). Name resolves visitor_labels → the FIRST CLAUSE of ip_org_cache.user_label → org, because one live cache label is a 130-character provenance paragraph that would otherwise BE the Name column. New `.tscroll` wrapper gives the two six-column tables their own horizontal scroll so the page body never scrolls sideways on a phone; §§11/13 are narrow and deliberately do not get it. Sections stay OPEN — SES-124 built the section-fold framework for §§5/6/9/10/12 and the spec marks only §10 default-closed, so nothing here folds. -->
 <!-- DeepBench v7.0.160 | runbooks/briefing-template.html | SES-125 — briefing redesign 2 of 6: THE DECISION CARDS. SES-124 shipped the collapse framework and deliberately converted nothing; this ticket converts §§5/6/9 and builds §12, which had never existed. THE ONE CHANGE THAT IS NOT COSMETIC: the card display is REVERSED. Since v7.0.145 the technical record (Value case, Before → after, QA evidence, meta, links) was the card's body and the three plain-language sentences were hidden behind More info — which is backwards against the directive that created them (edab5908, John: "you are giving too much technical jargon. I need a business value statement"). Now plain language IS the body and `More info — the technical record` holds the record. Nothing is deleted: the record stays on the card, one tap away. THE SECOND REAL CHANGE: the ask box LEAVES the More-info panel and sits under the buttons on every card and every row, always visible, with a "✓ Received <ts>" line — John's typed line counts the same as a tap (v7.0.145), so it may not be hidden behind a second button, and a line that vanishes with no acknowledgement reads as a line that was lost. Button meanings move out of the panel with it, rendering as consequence lines under the buttons exactly as §9's Yes/No rows have carried them since v7.0.145 — a consequence you must open a panel to read is one John decides without. Cards and rows are default CLOSED and numbered (5.1 / 6.1 / 9.1 / 12.1); a collapsed card carries number · kind chip · TICKET ID · ticket title · decision state, so the row is decidable-at-a-glance without opening it. §12 vision claims are literally `question()` with a class chip and three different ask-box strings — the spec's word is "formatted exactly like Questions", so they are ONE function rather than two that must be kept in step; their row ids MUST start `vision-`, which is the only thing telling the harvest a claim from a runner_questions row when both land in briefing-state under `answers`. UNCHANGED AND STILL BINDING, because reversing which half is hidden changes neither rule: `plain_*` are READ from runner_items, never re-authored at render time (v7.0.146), a NULL still draws the red defect line and is never coerced to '', a Yes/No row without both consequence lines still renders its defect in red, `data-awaits` is still set from STATE not appearance (§12's rows join §1's counter by carrying it), and a fold still NEVER publishes and never enters briefing-state. Slots this ticket does not fill (§§8/10/11/13/14) remain named HTML comments. -->
@@ -192,6 +193,18 @@
        padding:10px;border-radius:6px;border:1.5px solid var(--moss);background:var(--moss);
        color:var(--white);cursor:pointer;min-height:44px}
   .savebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  /* ---- SES-128 · THE TWO READING SLOTS (§4) ---------------------------------------------
+     Two forms now sit on one card, so each needs a visible boundary — without the rule and the
+     inset, six number inputs in a column read as one six-field form and John saves the wrong
+     half of the pair. No new token: the divider is --line-soft, the label is the same brass the
+     other card headings use. `.slotmeans` states what the slot DOES, in the same place and the
+     same register §9's consequence lines put theirs, because "Night" and "Morning" alone do not
+     say that the pair is what recalibrates. */
+  .readslot{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
+  .readslot:first-of-type{border-top:none;padding-top:2px}
+  .slotlbl{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
+       color:var(--brass-deep);font-weight:700}
+  .slotmeans{font-size:11.5px;color:var(--muted-deep);margin-top:5px;line-height:1.45}
   .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
         padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
         color:var(--ink);resize:vertical}
@@ -256,7 +269,7 @@
 
 <div id="page"></div>
 
-<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":null,"answers":{},"unblocks":{}}</script>
+<script type="application/json" id="briefing-state">{"items":{},"directive":"","reading":{},"answers":{},"asks":{},"unblocks":{}}</script>
 
 <script id="code">
 // SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
@@ -281,6 +294,19 @@
   // before §10 existed has no `unblocks` key, and John's first tap on an Unblock button must not
   // throw on an undefined and record nothing.
   if (!state.unblocks || typeof state.unblocks !== 'object') { state.unblocks = {}; }
+  // SES-128 — `reading` STOPS BEING ONE FLAT OBJECT and becomes slot-keyed
+  // ({night:{…}, morning:{…}, adhoc:{…}}), because the night→morning pair is what brackets a
+  // runner-only window and a reading with no slot cannot bracket anything. Same defensive
+  // default as the three above, plus the one they did not need: a page published BEFORE this
+  // shipped carries the old flat shape ({fable,all,h5,at}), and that shape must be migrated
+  // rather than dropped — John typed those numbers. It migrates to `adhoc`, never to a slot:
+  // guessing that a 13:50Z reading was "morning" because 8:50 AM in Chicago looks like one
+  // would manufacture a bracketing pair he never declared, and the calibration derived from it
+  // would look measured and be invented.
+  if (!state.reading || typeof state.reading !== 'object') { state.reading = {}; }
+  if (state.reading.fable !== undefined || state.reading.all !== undefined) {
+    state.reading = { adhoc: state.reading };
+  }
 
   var readOnly = false;
 
@@ -392,6 +418,40 @@
       +(headExtra||'')
       +'<span class="ttl">'+title+'</span><span class="chev">&#9656;</span></div>'
       +'<div class="bodyc">'+bodyHtml+'</div></div>';
+  }
+
+  // SES-128 — §4's reading slots. ONE function renders both rows, for the same reason §9 and §12
+  // are one function (SES-125): two near-copies of a form drift, and a Morning row that has
+  // quietly stopped matching the Night row is a calibration bug nobody can see on the page.
+  // `slot` is both the state key and the input-id prefix, so the page and the ledger cannot
+  // disagree about which reading is which — the same rule that made `qid` the DOM id in §9.
+  function readingSlot(slot, label, means){
+    var r = state.reading[slot] || {};
+    return '<div class="readslot"><div class="slotlbl">'+label+'</div>'
+      +'<div class="readgrid">'
+      +'<label>Fable %<input type="number" inputmode="numeric" id="r-'+slot+'-fable" value="'+esc(r.fable)+'"></label>'
+      +'<label>All models %<input type="number" inputmode="numeric" id="r-'+slot+'-all" value="'+esc(r.all)+'"></label>'
+      +'<label>5-hour %<input type="number" inputmode="numeric" id="r-'+slot+'-h5" value="'+esc(r.h5)+'"></label>'
+      +'</div>'
+      +'<div class="slotmeans">'+means+'</div>'
+      +'<button class="savebtn" id="r-save-'+slot+'">Save '+slot+' reading</button>'
+      +(r.at ? '<div class="recorded">&#10003; Recorded '+esc(r.at)+'</div>' : '')
+      +'</div>';
+  }
+
+  // The card-level acknowledgement: the MOST RECENT reading across every slot, whichever that
+  // is. It reads the slots rather than a stored "latest", because a stored latest is a second
+  // copy of the same fact and the two go out of step the first time a cycle forgets to update it.
+  function readingRecordedLine(){
+    var best = null, bestSlot = '';
+    ['night','morning','adhoc'].forEach(function(s){
+      var r = state.reading[s];
+      if (r && r.at && (!best || r.at > best.at)) { best = r; bestSlot = s; }
+    });
+    if (!best) return 'No reading yet — the runner is on its conservative allowance until your first one.';
+    return '&#10003; Your latest reading was recorded — <b>'+esc(best.at)+'</b> ('+esc(bestSlot)
+      +'): Fable <b>'+esc(best.fable)+'%</b> &middot; All models <b>'+esc(best.all)
+      +'%</b> &middot; 5-hour <b>'+esc(best.h5)+'%</b>.';
   }
 
   // SES-125 — ONE DECISION CARD, §§5 and 6. Default CLOSED, numbered, and the collapsed row
@@ -626,16 +686,22 @@
     // SES-124 — the "what you last gave me" line MOVES here, onto the card that asks for it.
     // It sat on the tokens card above, one card away from the inputs it was acknowledging, so
     // the confirmation for John's tap was not where his tap was. Morning/Night rows: SES-128.
+    // SES-128 — TWO SLOTS, NIGHT AND MORNING, because one reading calibrates nothing. John's
+    // meter is spent by his own manual sessions AND the runner, so tokens-per-percent measured
+    // over any window that mixes the two is confidently wrong. A window bracketed by his last
+    // look at night and his first in the morning is runner-only BY CONSTRUCTION — that pair is
+    // the whole mechanism, and public.derive_token_allowance() reads it. Night renders first
+    // because that is the order he types them in.
     +'<div class="budget"><h4>Today\'s reading — 10 seconds, recalibrates the budget</h4>'
-    +'<p class="recorded">'+(state.reading
-        ? '&#10003; Your latest reading was recorded — <b>'+esc(state.reading.at)+'</b>: Fable <b>'+esc(state.reading.fable)+'%</b> · All models <b>'+esc(state.reading.all)+'%</b> · 5-hour <b>'+esc(state.reading.h5)+'%</b>.'
-        : 'No reading yet — the runner is on its conservative allowance until your first one.')
-    +'</p>'
-    +'<div class="readgrid">'
-    +'<label>Fable %<input type="number" inputmode="numeric" id="r-fable" value="'+esc(state.reading?state.reading.fable:'')+'"></label>'
-    +'<label>All models %<input type="number" inputmode="numeric" id="r-all" value="'+esc(state.reading?state.reading.all:'')+'"></label>'
-    +'<label>5-hour %<input type="number" inputmode="numeric" id="r-h5" value="'+esc(state.reading?state.reading.h5:'')+'"></label>'
-    +'</div><button class="savebtn" id="r-save">Save reading</button></div>'
+    +'<p class="recorded">'+readingRecordedLine()+'</p>'
+    +readingSlot('night','Night — your last look before bed',
+                 'Ends the day and opens the runner-only window.')
+    +readingSlot('morning','Morning — your first look of the day',
+                 'Closes the window. The next cycle measures the gap and sets the day’s max.')
+    +'<p class="calib">Only the night&rarr;morning pair recalibrates — while you are asleep the '
+    +'runner is the only thing spending, so the gap between those two numbers is a clean '
+    +'measurement. A number you type at any other time is still recorded and still respected by '
+    +'the rest and staleness walls; it just cannot bracket a window.</p></div>'
     // ===== §5 · SHIPPED (SES-125) ===========================================================
     // Rebuild these from public.runner_items WHERE decision IS NULL — register B18, FROM the DB,
     // never from the rebuilding cycle's memory of what it filed. Number them 5.1, 5.2, … in the
@@ -1067,15 +1133,21 @@
     if (ta) ta.addEventListener('blur', function(){
       if (state.directive !== ta.value) { state.directive = ta.value; save(); }
     });
-    var rs = document.getElementById('r-save');
-    if (rs) rs.addEventListener('click', function(){
-      var f = document.getElementById('r-fable').value,
-          a = document.getElementById('r-all').value,
-          h = document.getElementById('r-h5').value;
-      if (!f && !a && !h) return;
-      state.reading = { fable:f, all:a, h5:h,
-                        at:new Date().toISOString().slice(0,16)+'Z' };
-      save(); render();
+    // SES-128 — one handler per slot, wired from the same list the render used, so a slot can
+    // never exist on the page without a handler behind it. Each slot writes only its own key:
+    // saving a morning reading must never disturb the night reading it is measured against.
+    ['night','morning'].forEach(function(slot){
+      var rs = document.getElementById('r-save-'+slot);
+      if (!rs) return;
+      rs.addEventListener('click', function(){
+        var f = document.getElementById('r-'+slot+'-fable').value,
+            a = document.getElementById('r-'+slot+'-all').value,
+            h = document.getElementById('r-'+slot+'-h5').value;
+        if (!f && !a && !h) return;
+        state.reading[slot] = { fable:f, all:a, h5:h,
+                                at:new Date().toISOString().slice(0,16)+'Z' };
+        save(); render();
+      });
     });
   }
 

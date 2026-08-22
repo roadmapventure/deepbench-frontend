@@ -5,6 +5,118 @@
 
 ---
 
+## cycle-20260822-2225 / SES-128-morning-night-readings (v7.0.163, 2026-08-22, Automated runner cycle `c1aff11a`, model Opus 5 orchestrator, no subagent) — the calibration that had never once run
+
+**Ticket:** `SES-128` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
+automation lane rank −17. Shipped **`done`**. Three build files + one migration — no `src/`,
+no `api/`, no `lib/`, no user-visible surface on dev, no flag (§19v).
+
+**Selection.** Layer 1b, John's standing Automation-epic drain (`runner_directives b74009ea`,
+`type='drain-epic'`). `drain_epic_next('c1aff11a…')` → `pick SES-128`, `open_now = 24`. Claimed
+atomically at 22:29:03Z; claim re-asserted before the version counter claim and again before the
+push; released holder-guarded **after** the push (`SES-106`, `q-claim-release-order`).
+
+**Premise revalidation (`SES-87`, register B7) — HOLDS, on four live checks, none recalled.**
+(1) `information_schema` showed nine columns on `runner_usage_readings` and **not one could tell a
+night reading from a morning one**. (2) All **eight** stored rows carried `tokens_per_pct = NULL`.
+(3) The live page's card rendered **one** row of three inputs, and `briefing-state.reading` was a
+single flat object. (4) `runner-cycle.md` step 3 carried the arithmetic in prose with **no
+derivation step**. One half of spec §4 was **already done** and was deliberately not redone:
+`SES-124` had already moved the "✓ recorded" line onto the reading card.
+
+**The finding, and it is the reason this ticket exists rather than a tidy-up.** Step 3 has told
+every cycle since `v7.0.105` to "calibrate `tokens_per_pct` from the two most recent readings", and
+**that has never once happened** — eight readings, eight NULLs, every allowance this runner ever
+computed falling through to the uncalibrated 10M cap or the 3M stale floor. The interesting part is
+that this was **not a forgetting**: the two most recent readings are the *wrong window*. John's
+weekly meter is spent by his own manual sessions **and** by the runner, so a rate measured across a
+mixed window is confidently wrong no matter how carefully the arithmetic is done. Only a
+**night→morning** pair brackets a window in which the runner was the only thing spending. That is
+why the fix is a `slot` column and not a better paragraph — the sixth time this platform has
+converted a re-derived rule into code (`SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`,
+`SES-127`).
+
+**What shipped.** Migration `ses128_reading_slots`: `runner_usage_readings.slot`
+(`NOT NULL DEFAULT 'adhoc'`, CHECK `morning|night|adhoc`, indexed on `(slot, taken_at DESC)`) and
+`public.derive_token_allowance(uuid)`, which finds the bracketing pair, measures the window, stores
+`tokens_per_pct` on the morning row behind its own before-image, and returns the day's allowance.
+`briefing-template.html`: §4's card gains a **Night** row and a **Morning** row, one `readingSlot()`
+renderer for both (two near-copies drift — the `SES-125` §9/§12 rule), a derived
+"✓ latest reading" line, and a per-slot save handler that writes only its own key.
+`runner-cycle.md` step 3 gains the call, the guard semantics, and the precedence.
+`briefing-page.md` gains §4's data contract and marks the section built.
+
+**THE HALF THAT WOULD HAVE SHIPPED A CONFIDENT WRONG NUMBER — the guards.** The obvious
+implementation returns a rate whenever the arithmetic is defined. This ticket's own QA is what
+shows the cost: a **57-hour** bracket with a **positive** delta and **28,065,000** real tokens
+inside it satisfies every arithmetic precondition a naive build checks, and would hand back
+**4.68M tokens per percent — roughly eleven times the true rate** — while not being a runner-only
+window at all. Four guards each return **NULL rather than a number**: no bracketing pair; a
+non-positive delta (a meter reset or a rolled-over week); an empty window; a bracket wider than
+24 hours. **NULL is explicitly not a failure** and must never be reported as one — it means fall
+back to the guardrails that already exist, which is exactly what today already does.
+
+**The eight existing readings were deliberately NOT backfilled.** `13:50Z` is 8:50 AM in Chicago
+and reads exactly like a "morning". Slotting it on that resemblance would manufacture a bracketing
+pair John never declared and produce a calibration that **looks measured and is invented**. They
+are `adhoc`, which is what they truthfully are, and `adhoc` is in the vocabulary rather than NULL
+because an unslotted reading still feeds the rest wall and the 48h staleness check — it simply
+cannot calibrate.
+
+**Precedence, written down as three ranked lines** so no later cycle re-derives it differently:
+John's unexpired `budget_override.max_tokens` > `derive_token_allowance()`'s `day_allowance` when
+`guard = 'ok'` > the 10M uncalibrated cap / 3M stale floor. The weekly rest wall
+(`all_models_pct ≥ 85`) sits above all three and is overridable by none.
+
+**One assumption is named in the open rather than buried.** Turning the remaining weekly pool into
+*one day's* allowance needs the days left in John's meter week, and **that value is stored
+nowhere** — `runner_budget` carries month, caps, share and rest, and no week anchor (read live,
+not recalled). The function divides by **7**, the worst case, which is the fail-closed direction:
+it can only under-spend, never over. Question **`q-meter-week-anchor`** is filed; when John answers,
+the divisor becomes real and the allowance gets **larger, never smaller**.
+
+**QA — discriminating, with the negative control stated for each.** The expectation
+(**2,540,000** tokens ÷ **6** pct = **423,333.33**, allowance **2,539,999**) was computed by a
+standalone query that **never calls the function**, and the shipped function reproduced it exactly.
+The **pre-migration negative control returns NULL** (`no bracketing pair`), so check 3 cannot pass
+on a build that did nothing. The dry-run path (`p_cycle_id NULL`) is proven to **write nothing**;
+the write path stored `tokens_per_pct` on the **morning row only** and wrote exactly **1** UPDATE
+before-image itself. All four guards fired individually. Grants asserted **both directions** after
+revoking from **`PUBLIC`** — `anon` and `authenticated` `false`, `service_role` `true` — the
+`SES-101` function-level twin of `.claude/rules/supabase-column-grants.md`; exactly **1** overload
+(`supabase-function-signature.md`). The CHECK was proven by forcing a `23514`. Render proof ran in
+**real Chromium** over HTTP: two Save buttons, `r-save` gone, six inputs, both slot labels, 44px
+targets, all 14 sections intact, and — the migration proof that matters — a **legacy flat
+`reading` object migrating to `adhoc` and surviving a later night save**. Fixtures deleted;
+**8 readings, all `adhoc`**, restored exactly. `npm run build` clean; regression **34/34 with
+credentials**; `check-kickoff-doc.js` 11/11.
+
+**Two things named rather than left to be discovered.** (1) A **second Save tap in one page life is
+swallowed** by `save()`'s `saving` latch — and this cycle **proved it pre-existing** rather than
+assuming it, by double-tapping two untouched §9 question buttons and getting the identical
+behaviour. In production a save publishes and the view reloads, and John types the two readings
+~8 hours apart in different page lives, so the latch is correct there; it is written down because
+§4 is now the first card with two Save buttons on it. (2) The render harness is **scratchpad-only
+again** — `tests/regression/` still has no DOM fixture, a gap now **five tickets** old
+(`SES-124`/`125`/`126`/`127`/`128`).
+
+**Dev could not be probed this cycle, and that is recorded as an observation limit, never as a
+deploy claim.** This container's egress proxy **denies `deepbench.roadmapventure.com`** — `curl`
+gets a 403 on CONNECT (`connect_rejected` in the proxy's own `recentRelayFailures`), `WebFetch`
+returns `EGRESS_BLOCKED`. So blocker sweeps #1 and #2 record *not observed*. `api.vercel.com` is
+reachable (308), so the deploy-currency path is not blocked by the same policy. Nothing this ticket
+shipped touches `src/`, `api/` or `lib/`, so no change here could have broken dev. **This is a real
+platform gap for unattended cycles** — a runner that cannot see the site cannot run the sweep the
+runbook opens and closes with — and it is filed for John rather than worked around.
+
+**Ledger:** version claimed atomically (`dev_version_counter` → `7.0.163`); before-images written
+for the ticket's revalidation, its status write, both QA fixtures (`row_data = NULL`, the INSERT
+convention), the function's own `tokens_per_pct` write, and the new question row. Close-out
+recompute moved **563** rows as `SES-128` left the ranked set; snapshot exported (595 tickets,
+sha256 `6f1ac51e…`).
+
+---
+
 ## cycle-20260822-2155 / SES-127-skip-records (v7.0.162, 2026-08-22, Automated runner cycle `f5637109`, model Opus 5 orchestrator, no subagent) — a skip stops being a sentence
 
 **Ticket:** `SES-127` (Tooling · `P10 - Tooling`), queue position 1, tier `now`, epic **Automation**,
