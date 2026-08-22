@@ -5,6 +5,86 @@
 
 ---
 
+## cycle-20260822-1911 / SES-111-epic-drain-directive (v7.0.156, 2026-08-22, Automated runner cycle `1df7d9c6`, model Opus 5 orchestrator, no subagent) — John's standing order becomes a row the board can hold
+
+**Ticket:** `SES-111` (Tooling · `P10 - Tooling`), queue position 2, tier `now`, epic **Automation**,
+automation lane rank −13. Shipped **`done`**. Migration `ses111_drain_epic`. Doc + schema only —
+no `src/`, no `api/`, no `lib/`, no user-visible surface, no flag (§19v).
+
+### The premise, measured before a line was written (register B7)
+
+John's ask — *"run the Automation epic to completion non-stop"* — could not be **stored**, let alone
+honoured. The negative control, run first: inserting `type='drain-epic'` into `runner_directives`
+returns `ERROR 23514 … violates check constraint "runner_directives_type_check"`, because that CHECK
+admitted exactly `directive` and `budget_override`. The dependency the ticket named was satisfied —
+`SES-110` shipped `epics` + `backlog_items.epic_id` in `6bd5a87` (`v7.0.155`), Automation holding 24
+open `now`-tier members — so the gap was real, sole, and one migration wide.
+
+### What shipped
+
+A drain is a `runner_directives` row John writes **once** (`type='drain-epic'`, `epic_id` naming the
+epic) meaning *work this epic's open `now`-tier members, cycle after cycle, until none are left.*
+The migration adds the kind, the FK (`ON DELETE RESTRICT`), the exclusivity
+`CHECK ((type='drain-epic') = (epic_id IS NOT NULL))`, a partial index, and
+`public.drain_epic_next(uuid)` — one call returning `none` / `pick` / `blocked` / `retired`.
+`runner-cycle.md` step 5's layer 1 splits into **1a** (one-off directives, unchanged) and **1b**
+(the drain), 1b beneath 1a because John's latest specific word outranks a standing build order —
+the same reasoning that puts a pin above the automation lane.
+
+**Why a function and not a paragraph.** `SES-86` phase 3 (his automation queue: prose →
+`automation_rank`) and `v7.0.146` (a card's plain language: render-time literal → column) are the
+same measured lesson, and this is its third application: a rule each cycle must re-derive from
+John's sentence is a rule that gets re-derived differently. Retirement also writes **its own**
+before-image (§19v) rather than leaving that as a step the calling cycle must remember.
+
+### The five properties, and the one that would have shipped wrong
+
+The epic is an FK, never prose in `body`. A drain is **never consumed** — layer 1a's *"mark it
+`in_progress`"* would end the standing-ness on cycle 1, which is the entire feature. `now` tier
+only, John's `SES-110` boundary verbatim. It **never self-activates**: nothing but John writes a
+drain row, so with none declared `drain_epic_next()` returns `none` and selection is byte-for-byte
+`v7.0.155` — this ticket widens the runner's autonomy by zero degrees, deliberately.
+
+The fourth is the trap: **`blocked` is not `retired`.** The two predicates differ on purpose —
+retirement asks whether any open `now` member *exists*, claims **ignored**; the pick asks which
+member *you* can claim, claims **honoured** (24h expiry, the B37 bar). The obvious implementation
+retires when the pick query finds nothing. It passes fourteen of the fifteen checks below, and the
+first time two peers hold the last two claims between them (register B42) each of them silently
+cancels John's standing order while both tickets are still being built. Proven live: sole member
+claimed by a peer → `blocked`, `open_now = 1`, directive untouched.
+
+### QA — live Supabase; the retirement arm is a **seam proof**, labeled
+
+Negative control `23514` (pre-migration) · exactly **1** overload
+(`.claude/rules/supabase-function-signature.md`) · grants **both directions** per `SES-101`
+(`anon`/`authenticated` EXECUTE `false`, `service_role` `true`) · `drain-epic` without an epic
+rejected · plain `directive` **with** an epic rejected · no drain declared → `none` · live pick
+`SES-110` q1 **matching an expectation computed by a query that never calls the function** ·
+**two consecutive cycles, no re-declaration** → cycle B got `SES-112`, advancing past *two* claimed
+tickets (`SES-110` by the simulated peer, `SES-111` genuinely by this cycle) · directive still
+`queued` after both · `open_now` unmoved at 24 by those two claims · `blocked` with `open_now=1` ·
+member closed → `retired`, directive `done`, `acted_cycle` stamped · retirement before-image written
+capturing `status='queued'` · then `none` · fixtures deleted, `recompute_backlog_queue()` **0 rows
+moved**. Build clean; regression **34/34 with credentials** (baseline 34/34).
+
+The discriminating pair is the independent expectation (a function returning *any* member fails it)
+and the two-cycle advance (a function ignoring claims hands cycle B the same ticket twice).
+
+### Not done, and said plainly rather than left to be rediscovered
+
+- **The Automation epic cannot currently drain to completion.** `SES-110` is `partial` and its one
+  remaining half is a `.claude/` edit an unattended cycle may not make (register B39; already carded
+  `9e7d8bf2`), so a drain declared today loops past it every cycle — correctly, per B24 — and never
+  reaches `open_now = 0`. `SES-112`/`SES-114` (a `design_status` column, so needs-desktop rows are
+  skipped at a glance) are the filed fix. Not this ticket's job, and not papered over.
+- **Nothing in code calls `drain_epic_next()` yet,** because no code implements selection at all —
+  step 5 is executed by hand from the runbook, exactly as the ladder is. The function makes the rule
+  checkable; wiring selection itself is a separate, larger question.
+- **Observed, not corrected:** `v7.0.155`'s entry in this file sits at line ~9436, at the **bottom**,
+  under a `## 2026-08-22 — session/cycle-…` heading, while every other runner cycle's entry is
+  newest-first at the top under `## cycle-…`. Relocating another cycle's record is outside this
+  ticket and would bury this diff, so it is reported here rather than quietly moved.
+
 ## cycle-20260822-1706 / LOG-70-agent-summary-column-set (v7.0.154, 2026-08-22, Automated runner cycle `fcbd475e`, model Opus 5 orchestrator + one Fable 5 subagent) — the CHI Agents drawer stops fetching a column nothing reads
 
 **Ticket:** `LOG-70` (Architecture · `P5 - Enhancements`), queue position 16, tier `now`. Shipped

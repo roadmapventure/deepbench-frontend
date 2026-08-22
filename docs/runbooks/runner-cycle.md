@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.156 | runbooks/runner-cycle.md | SES-111 — step 5's selection layer 1 splits into 1a (one-off directives, unchanged) and 1b, a STANDING epic drain: one `runner_directives` row John writes once (`type='drain-epic'` + `epic_id`) meaning "work this epic's open now-tier members cycle after cycle until none are left". Migration `ses111_drain_epic` adds the kind, the FK, the exclusivity CHECK, and `public.drain_epic_next(uuid)` — the rule as CODE, because a rule each cycle re-derives from John's sentence is one that gets re-derived differently (SES-86 phase 3 and v7.0.146 are the same lesson twice). Premise MEASURED before a line was written, not recalled: inserting a drain-epic row returned 23514 against the old two-value type CHECK, so the sentence could not even be stored. Five properties, all preserved by anyone who edits this: the epic is an FK not prose; a drain is never consumed (1a's "mark it in_progress" would kill the standing-ness on cycle 1, which IS the feature); now-tier only (John's SES-110 boundary verbatim); `blocked` is NOT `retired`; and it NEVER self-activates. That fourth one is the parallel-cycles trap and the one that would have shipped wrong — the obvious implementation retires when the pick query finds nothing, which passes fourteen of fifteen checks and silently cancels John's standing order the first time two peers hold the last two claims between them. QA proved it live (sole member claimed by a peer -> blocked, open_now=1, directive untouched) alongside the ticket's own bar: two consecutive cycles with no re-declaration, cycle B advancing past TWO claimed tickets, directive still `queued`; self-retirement writing its own before-image (§19v) then returning `none`. Fixtures deleted, recompute 0 rows moved. NOT DONE and said plainly rather than discovered later: the Automation epic cannot yet drain to completion, because SES-110 is `partial` with one `.claude/` half register B39 forbids an unattended cycle (carded 9e7d8bf2) — SES-112/SES-114 are the filed fix. With no drain declared, selection is byte-for-byte v7.0.155. -->
 <!-- DeepBench v7.0.150 | runbooks/runner-cycle.md | SES-106 — the ticket claim is released AFTER the push, and the runbook stops telling a cycle to do two things it cannot both do. Step 7's close-out bullet said "clear the claim in the same UPDATE that sets the ticket status"; two bullets later the same step made re-asserting that claim a HARD GATE on the push. Followed literally the gate returns 0 rows — which it defines as "your claim is gone, do NOT push" — so the two rules deadlock every ship, and cycles have been resolving it by hand, each picking an order. That per-cycle re-derivation is the exact failure SES-86 phase 3 and v7.0.146 were filed to end. NOT this cycle's call to settle: cycle cb9d1417 filed it as question q-claim-release-order and JOHN ANSWERED YES at 2026-08-21T22:05Z (read live from runner_questions this session, not recalled) — release after the push. Fixed in three places so the order cannot re-fragment: step 5's SES-86 phase 1 paragraph, step 7's close-out bullet, and a new explicit post-push release statement, holder-guarded (WHERE claimed_by = '<your cycle id>') so a cycle whose claim expired and was re-taken can never clear its successor's. Step 9's tail parenthetical is tightened with them to name WHEN step 7 released rather than leaving it implicit again. The abort/wall-stop path is preserved and stated: no push, so release at the point the cycle stops — and an unreleased claim still expires on the 24h boundary, so no ordering choice here can strand a ticket. This cycle ran the corrected order for its own ship, so the procedure is exercised rather than only written. NOT DONE, and carded rather than attempted: .claude/skills/session-setup/SKILL.md step 2c carries the same contradiction for John's manual sessions, and .claude/ is not writable by an unattended cycle (register B39) — exact replacement text is on the card for a session he attends, so the ticket closes partial. Doc-only; no code, no site change. -->
 <!-- DeepBench v7.0.149 | runbooks/runner-cycle.md | SES-109 — the committed backlog snapshot stops being one harvest stale. Step 7 exports and pushes `docs/backlog/BACKLOG-SNAPSHOT.md` BEFORE the step-9 serial tail, but register B42 (2026-08-21) moved the harvest WRITES — John's Accept/Reverse/Rework, answers that file tickets, a released pin — into that tail, so every board change a tap causes lands AFTER the export meant to capture it, leaving the board's only repo-side copy (the SES-81 restore path) systematically one cycle behind. Found live by cycle ff23297c (v7.0.148): its snapshot in 61fd3e4 recorded 571 tickets and missed SES-98 going done, SES-105 losing its pin, and SES-108 existing — all three written minutes later in its own tail. Of the ticket's two candidate fixes the tail RE-EXPORT is taken over moving the export wholesale, and the reason is structural: the export must ride the step-7 code push, and that push is deliberately kept OUT of the serial section so parallel cycles rebase-retry instead of serialising (B42) — so re-exporting once in the tail, AFTER the harvest writes, is the minimal change. It fires only when the harvest actually moved the board (the script is deterministic and prints `unchanged` otherwise), which makes it the one sanctioned second push: snapshot-only, guarded by the publish lease already held (the ticket claim is released at step-7 close-out, so it is NOT the token here), and a rebase conflict that outlives the retries degrades to exactly today's one-harvest lag, never a wall. The standing prohibition's "one push per ship point" gains that single carve-out. Doc-only; no code, no site change. -->
 <!-- DeepBench v7.0.148 | runbooks/runner-cycle.md | SES-107 — step 2's ladder rule stops leaving a blank a cycle has to fill. It read "Accept → streak +1 (5 consecutive → rung +1)" and never said what happens to the streak AFTER a promotion; cycle 7392e345 hit that live at 20:27Z (tooling 4 → 5, rung 6 → 7), set the streak to 0, and correctly filed `q-ladder-streak-reset` instead of inventing the rule. John answered NO at 22:04Z — "which one just keeps the count going? no need to reset - why would i do that?" — so the streak now keeps running and the promotion test is stated as arithmetic, `streak % 5 = 0`, never "at least 5". Both halves are load-bearing: removing the reset ALONE, under a "5 or more" reading, promotes on every tap forever, which is the opposite failure and would compound the runner's autonomy on a rule nobody wrote. A Reverse still zeroes the streak (John, `1d01ea85`, "leave it") — only promotion stops resetting. MEASURED rather than assumed, and it is the honest half of this ship: John was told on the card "No = I will correct tonight's row", and replaying tonight's before-images under the new rule reproduces the STORED row exactly — the Reverses at 21:21Z and 22:22Z each zero the streak regardless, so the promised correction is a no-op. Said plainly on the briefing rather than quietly skipped. The B34 boundary paragraph's justification is corrected with it ("does not define" expired), while its conclusion stands on John's own `q-ladder-rewind` NO rather than on a missing value. NOT DONE, and carded rather than attempted: no code implements the ladder (grep -rl runner_ladder --include=*.js → nothing), so this rule is applied by hand in SQL every cycle; making it executable is his call, filed as a question. -->
@@ -586,8 +587,11 @@ proposals instead of one, self-limiting and harmless, never a double build). The
    bookkeeping plus research, not this cycle's build (B24 logic; the cycle still delivers one).
 
 **5. Pick ONE item.** Selection layers, in order (register B30):
-(1) `runner_directives` `status='queued'` oldest first — a directive is the mission, mark it
-`in_progress`. (2) **John's automation queue — NO LONGER A LAYER YOU EXECUTE BY HAND. It is in
+**(1a) One-off directives** — `runner_directives` `WHERE type='directive' AND status='queued'`,
+oldest first: a directive is the mission, mark it `in_progress`. **(1b) A standing epic drain**
+— see the block immediately below; it sits *under* 1a, because John's latest specific word
+outranks a standing build order (the same reasoning that puts a pin above the automation lane).
+(2) **John's automation queue — NO LONGER A LAYER YOU EXECUTE BY HAND. It is in
 the board (`SES-86` phase 3, `v7.0.133`, directive `f47e5a95`).** It used to read: go to
 `docs/RUNNER-GOV-0820-REQUIREMENTS.md`'s C4 section, work out which of his tickets is the next
 incomplete one, and pick it before touching the class-sorted backlog. **That prose is now
@@ -620,6 +624,53 @@ SELECT backlog_id, queue, tier, priority_class, status,
 `WHERE` excluded by hand (`status = 'done'`, or no `priority_class`), so the filter cannot drift
 from the numbering the way two hand-maintained copies of one `ORDER BY` could. **Gated tickets
 still get a number** (B15): gated-ness is a lane flag, never a missing position.
+
+**LAYER 1b — A STANDING EPIC DRAIN (`SES-111`, `v7.0.156`, migration `ses111_drain_epic`).**
+John's ask, filed with the Automation epic 2026-08-22: *"run the Automation epic to completion
+non-stop."* A drain is a `runner_directives` row he writes **once** — `type='drain-epic'`,
+`epic_id` naming the epic — meaning *work this epic's open `now`-tier members, cycle after cycle,
+until none are left.* Run it as **one call**, before layer 2/3's recompute-and-read:
+
+```sql
+SELECT * FROM public.drain_epic_next('<your cycle id>');
+```
+
+Four outcomes, and the whole rule is in them — do not re-derive it:
+
+- **`none`** — no drain declared. The normal case: ignore this layer entirely and read the board
+  exactly as before. **Selection with no drain standing is byte-for-byte what it was in
+  `v7.0.155`.**
+- **`pick`** — build `backlog_id` (claim it with step 5's atomic claim, same as any ticket).
+- **`blocked`** — the drain is live and the epic still has open members, but none you can claim
+  right now (a peer holds them). **Fall through to the class-sorted board and build normally.** A
+  drain must never end a cycle build-less — register B24's rule, binding here for the same reason.
+- **`retired`** — the epic's `now` tier is empty. The function has already written the
+  before-image and closed the directive; nothing is owed. Fall through.
+
+Five properties that are load-bearing, each written into the migration header so they travel with
+the code. **Anyone editing this must preserve all five:**
+
+- **The epic is an FK, never prose in `body`.** `CHECK ((type='drain-epic') = (epic_id IS NOT
+  NULL))` — a drain must name an epic, nothing else may. Same prose→column correction as `SES-86`
+  phase 3 and `v7.0.146`, for the same measured reason.
+- **A drain is NEVER consumed.** Layer 1a's *"mark it `in_progress`"* would end the standing-ness
+  on cycle 1, which is the entire feature. `drain_epic_next()` touches `status` only to retire.
+- **`now` tier only** — John's boundary on `SES-110`, verbatim: *"finish the `<epic>` tickets"* =
+  the epic's NOW-tier members only. `next`/`later` members neither get built nor hold it open.
+- **`blocked` is NOT `retired`, and this is the parallel-cycles trap (register B42).** The two
+  predicates differ on purpose: **retirement** asks whether any open `now` member *exists*, claims
+  ignored; the **pick** asks which member *you* can claim, claims honoured (24h expiry, the B37
+  bar). Conflate them and two peers holding the last two claims between them each cancel John's
+  standing order while both tickets are still being built. Proven live: sole member claimed by a
+  peer → `blocked`, `open_now=1`, directive untouched.
+- **It never self-activates.** Nothing creates a drain row but John — a directive row or a
+  briefing tap. The runner may read one; it may never write one. This is the property that keeps
+  the feature from being a widening of the runner's own autonomy, and it is not negotiable.
+
+**Known and not papered over:** the Automation epic cannot currently drain to completion —
+`SES-110` is `partial` with one `.claude/` half an unattended cycle may not make (register B39,
+carded `9e7d8bf2`), so a drain loops past it every cycle and never reaches `open_now = 0`.
+`SES-112`/`SES-114` (a `design_status` column, skipped at a glance) are the filed fix.
 
 **THE AUTOMATION LANE SITS ABOVE ALL SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive
 `f47e5a95` — John, 2026-08-21T16:21Z).** His line, verbatim: *"keep closing automation tooling
