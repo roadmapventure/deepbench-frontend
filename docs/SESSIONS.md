@@ -25,6 +25,37 @@
 
 ---
 
+## session/cycle-20260823-1640, cycle 3 (v7.0.200, 2026-08-23, runner cycle `caacbd25-2cd5-4454-bd0f-b99f19d883f8`, `trigger = chained (drain continuation)`, model Opus 5) — the briefing rebuild finally has a builder
+
+**Third cycle of one session** (`c4148d2a` v7.0.197 → `7f30ca60` v7.0.199 → this), each a full ceremony with its own `runner_cycles` row, per `runner-cycle.md` v7.0.195 tail step (8). John's directive queue was empty by this point — all three of his Reworks closed by cycles 1 and 2 — and the drain pick (`SES-84`) is `needs-john`, so selection fell through to the board, where `SES-149` sat at **queue 1**, unflagged.
+
+**Ticket:** `SES-149` — *The briefing rebuild has no builder, so every cycle re-derives 14 sections* (Tooling · `P10 - Tooling`, tier `now`). Claimed atomically; closed `done`.
+
+**Premise revalidated live rather than taken from the ticket:** `grep -rln briefing-template scripts/` returns **nothing** — the only files touching the template are six regression tests that *read* it. Meanwhile `briefing-page.md` and `runner-cycle.md` step 9 have required every cycle since `v7.0.99` to rebuild the page *"structurally from `briefing-template.html` + the `runner_` tables"*. So it has been done **by hand** every time: roughly fourteen queries re-derived into hardcoded string literals inside a 1,700-line, ~158 KB file. Two cycles in a row hit that wall, which is what turned a recurring cost into a ticket.
+
+**This cycle was unusually well placed to fix it, and that is worth saying plainly:** it is the third cycle of a session that had already rebuilt and published this page **twice** using a working script in scratch. Shipping it was promoting proven code, not writing new code.
+
+**What shipped.** `scripts/build-briefing.mjs` derives — with no cycle judgment involved — the `briefing-state` seed (`briefing_state_seed()`, v7.0.197), the §5/§6 card set (`briefing_open_cards()`, v7.0.199), `PAGE_BUILT`, and §2 / §8 / §10 / §11 / §13 / §14. It **requires** `--data` for the half it must not invent: §3's findings, §4's calibration sentence, §7/§7.1's directive lines, §9's questions and §12's vision claims. That split is written into the script's own header and asserted by its test, because a builder that silently invents the half it cannot compute is worse than no builder.
+
+**Two arms were found by RUNNING it, not by reasoning about it, and both are the point:**
+
+- **Exit 2 is real.** The builder's very first run against live Supabase **failed with exit 2 and wrote no file** — it called `backlog_display_title` with `title, description` where the function takes `p_title, p_description`. That is the anchor-and-refuse discipline working on its first outing: a wrong call produced a hard stop with a named reason instead of a half-built page. Exit 2 is the same *"could not run"* convention `export-backlog-snapshot.js` and `heal-engine.js` already use, and it is **never a pass**.
+- **It caught the `SES-119` title defect on live rows.** Before the fix, §8 rendered `LOG-134` and `LAV-30` as `` `Post-beta` `` — reading the raw `title` column, which is exactly the defect `SES-119` shipped `public.backlog_display_title()` to end. **Both tickets are in the live top 12**, so this was on John's page, not hypothetical. After the fix both render their description gist. *Would it have passed if the change did nothing?* It did not — the wrong version produced visibly wrong output on two live rows.
+
+**The builder built the page John is reading.** This cycle's tail republish used it end-to-end; a builder that had never been used would be a claim rather than a result.
+
+**QA:** build green; regression **43/43** with credentials; new guard `tests/regression/SES-149-briefing-builder.js` proven to **fail** with the script moved aside and pass on restore. It asserts the anchor/exit-2 discipline, that the two owned rules are *called* rather than re-derived (this script is not a ninth home for them), the `SES-119` title rule, and the never-invent boundary.
+
+**Disclosed rather than left to be found:**
+
+- **A stale output file can pass a smoke test.** When the builder exited 2 it left the *previous* run's `briefing-out.html` on disk, and a smoke render of that stale file still passed. **The exit code is the guard, not the smoke test.** The fix (write to a temp path, rename on success) is named here and deliberately not built.
+- **Half the rebuild is still hand-written, by design.** The ticket's "14 sections" is now roughly seven derived and the rest supplied — a real reduction, not the elimination the ticket's title implies.
+- **Fixed DOM ids are data, not code.** `item-chi84-gate` must survive a rebuild because `runner_card_asks.target_id` is keyed on it; the map lives in `--data` and the builder never invents one.
+
+**Kickoff:** `docs/kickoffs/v7.0.200-SES-149-briefing-builder.md`.
+
+---
+
 ## session/cycle-20260823-1640, continuation cycle (v7.0.199, 2026-08-23, runner cycle `7f30ca60-eafb-4d9e-a12d-7fa1a8eb5439`, `trigger = chained (drain continuation)`, model Opus 5) — section 6 stops asking John to authorise work that has already shipped
 
 **This is the second cycle of one session.** `c4148d2a` shipped `v7.0.197` and, both tail gates passing, continued the drain **in-session** rather than spawning — `runner-cycle.md` v7.0.195 retired all three session-spawning actuators, one of which had been proven to boot a silent dead session. **That version was read fresh from `origin/dev` at the tail and it mattered:** `c4148d2a` had read the runbook at 16:40Z at v7.0.190, whose step (8) still said to spawn. Acting on the copy read 45 minutes earlier would have executed a retired, now-prohibited actuator.

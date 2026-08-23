@@ -99,6 +99,41 @@ Store UTC internally as before; the conversion is display-only.
    with a literal. `state.directive_at` (stamped by the directive box's blur handler, same ship)
    is what finally lets the box he most often uses last count as an action — **forward only**:
    a directive typed before `v7.0.172` has no stamp and contributes nothing rather than a guess.
+1a. **THE REBUILD HAS A BUILDER NOW — USE IT (`SES-149`, `v7.0.200`): `scripts/build-briefing.mjs`.**
+
+   ```
+   SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/build-briefing.mjs \
+     --template docs/runbooks/briefing-template.html --data <cycle.json> --out briefing-out.html
+   ```
+
+   **Until this shipped there was no script at all** — `grep -rln briefing-template scripts/`
+   returned nothing, while this file and `runner-cycle.md` step 9 had told every cycle since
+   `v7.0.99` to rebuild the page *"structurally from the template + the `runner_` tables"*. Every
+   cycle did that **by hand**: ~14 queries re-derived into hardcoded literals inside a 1,700-line
+   file. Two cycles in a row hit that wall, which is what turned a cost into a ticket.
+
+   **It derives what is derivable and refuses to invent the rest** — the split is stated in the
+   script's own header and guarded by its test:
+
+   | Derived from SQL (no cycle judgment) | Supplied by the cycle in `--data` |
+   |---|---|
+   | the `briefing-state` seed (step 1b), the §5/§6 card set (step 1c), `PAGE_BUILT`, §2, §8, §10, §11, §13, §14 | §3 findings, §4's calibration sentence, §4.1 rows, §7/§7.1 directive lines, §9 questions, §12 vision claims |
+
+   Three properties that are not style:
+
+   - **Every substitution is anchored, and a moved anchor is a HARD STOP (exit 2).** The builder
+     edits a template it does not own, by string match. If the template moves under it the honest
+     outcome is a refusal, never a page with one section still reading *"Sample value"*. Exit 2 is
+     the same "could not run" convention `export-backlog-snapshot.js` and `heal-engine.js` use, and
+     it is **never a pass**.
+   - **§8's Title is `public.backlog_display_title()`, never the raw `title` column** (`SES-119`).
+     The builder got this wrong on its own first run and it was caught by looking: reading the
+     column directly rendered `LOG-134` and `LAV-30` as `` `Post-beta` `` — both are in the live
+     top 12, so it is not hypothetical.
+   - **`--data` is required.** There is no default for the narrative sections. A builder that
+     guessed §3 or John's directive lines would be writing his briefing for him.
+
+   Guarded by `tests/regression/SES-149-briefing-builder.js`.
 1b. **SEED THE `briefing-state` BLOCK — it is the verbatim output of one call, never the
    template's sentinel and never hand-composed (`v7.0.197`, directive `b8d5ea7e`; John's Rework
    2026-08-23T13:57Z on card `9eacb4d5`/`SES-132`, repeated 13:59Z on `8c8deaae`/`SES-133`).**
