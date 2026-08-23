@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.208 | scripts/build-briefing.mjs | SES-165 — the retired-strip sentence
+// GENERALIZES (John-approved 2026-08-23). Since briefing_open_cards() now retires a card of ANY
+// kind once its ticket goes terminal, the strip can no longer say the card was "asking permission
+// to build" — most retired cards are ship cards whose verdict already happened. No other builder
+// logic changes: `rendered`/`retired` already split on `c.render`.
 // DeepBench v7.0.204 | scripts/build-briefing.mjs | SES-162 — §2b's AUTOMATION object is now
 // DERIVED (see the splice at the foot of this file and scripts/lib/briefing-automation.mjs).
 // Until v7.0.204 this builder had no anchor for it at all, so every page it produced published
@@ -195,7 +200,7 @@ ships.forEach((it, i) => { block += cardCall(`5.${i + 1}`, it, it.kind === 'test
 block += `+'<h2><span class="secnum">6</span>Gated before build &mdash; tap a row to open</h2>'\n    `;
 if (retired.length) {
   const ids = retired.map(r => r.backlog_id).filter(Boolean).join(', ');
-  block += `+${J(`<p class="strip-def"><b>${retired.length} card${retired.length === 1 ? '' : 's'} retired ${retired.length === 1 ? 'itself' : 'themselves'}</b> (${ids}) &mdash; each was asking permission to build a ticket that has since reached <b>done</b>, so the question is no longer live. Nothing was decided for you: those cards are still undecided in the ledger, just not shown here.</p>`)}\n    `;
+  block += `+${J(`<p class="strip-def"><b>${retired.length} card${retired.length === 1 ? '' : 's'} retired ${retired.length === 1 ? 'itself' : 'themselves'}</b> (${ids}) &mdash; each was asking about a ticket that has since closed, so the question is no longer live. Nothing was decided for you: those cards are still undecided in the ledger, just not shown here.</p>`)}\n    `;
 }
 if (!gates.length) block += `+'<p class="empty">None tonight.</p>'\n    `;
 gates.forEach((it, i) => { block += cardCall(`6.${i + 1}`, it, 'gate', 'Gated'); });

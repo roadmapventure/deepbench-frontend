@@ -1,3 +1,9 @@
+// DeepBench v7.0.208 | tests/regression/DIR-16b3ff73-gated-card-retire.js | SES-165 — assertion 2
+// RETARGETED to the new boundary (migration ses165_ship_card_retire): a card retires when its
+// ticket is TERMINAL, whatever its kind, and `delivered` always renders. The v7.0.199 narrative
+// below is kept as HISTORY — its "only the first retires" conclusion is superseded, see the
+// comment on assertion 2 for why SES-154 (v7.0.205) took its premise away one day later.
+//
 // DeepBench v7.0.199 | tests/regression/DIR-16b3ff73-gated-card-retire.js | directive 16b3ff73
 // FEATURE: section 6 stops asking John to authorise work that has already shipped.
 //
@@ -47,15 +53,27 @@ export async function run() {
     "the contract must name both `render` (the filter) and `retired_reason` (why a row is not " +
     "shown) — a rebuild that knows only the filter drops cards silently");
 
-  // ---- 2. The boundary: gated retires, ship/test never does ----------------------------------
-  // This is the assertion that kills the tidier-looking wrong build.
+  // ---- 2. The boundary: TERMINAL ticket retires ANY kind; `delivered` always renders ---------
+  // REWRITTEN v7.0.208 (SES-165). The v7.0.199 boundary this file was born to guard — gated
+  // cards alone retire — is deliberately superseded, with John's approval 2026-08-23. Its
+  // rationale (a gated card asks permission, moot once built; a ship card asks for a rating,
+  // "meaningful forever") assumed a ship card sits on a ticket the ship itself closed `done`.
+  // SES-154 (v7.0.205) broke that assumption one day later: a ship writes `delivered` and only
+  // John's Accept writes `done`, so a rating-in-waiting now sits on a `delivered` ticket, never
+  // a `done` one — and a ship card on a `done` ticket is one whose verdict already happened.
+  // The file keeps its directive id because that id is history; the contract it guards evolved.
   const seg = c.slice(c.indexOf(FN));
-  assert.ok(/[Oo]nly GATED cards retire/.test(seg) || /gated cards retire/i.test(seg),
-    "the contract must state that ONLY gated cards retire — the ship/test carve-out is the whole " +
-    "difference between this rule and the one that hides the night's work");
-  assert.ok(/rating/i.test(seg) && /permission/i.test(seg),
-    "the contract must keep the permission-vs-rating reasoning: it is why a ship card whose " +
-    "ticket is done still renders, and it is the trust ladder's only input");
+  assert.ok(/TERMINAL[\s\S]{0,80}whatever its kind/i.test(seg),
+    "the contract must state that a card retires when its ticket is TERMINAL (done/removed) " +
+    "WHATEVER ITS KIND — a boundary that still names one kind is the pre-SES-154 rule");
+  assert.ok(/`delivered`\s+ALWAYS\s+renders/i.test(seg),
+    "the contract must state that `delivered` ALWAYS renders — since SES-154 that card IS the " +
+    "Accept mechanism, so a predicate reaching into `delivered` reopens the acceptance-gating " +
+    "defect SES-154 was filed to end");
+  assert.ok(!/[Oo]nly GATED cards retire/.test(seg),
+    "the superseded v7.0.199 boundary sentence (\"Only GATED cards retire\") must be GONE, not " +
+    "left standing beside the new one — two boundary rules in one contract is two contracts, and " +
+    "the next rebuild picks whichever it reads first");
 
   // ---- 3. Nothing vanishes silently ----------------------------------------------------------
   assert.ok(/silently/i.test(seg) || /retired count/i.test(seg),
