@@ -21,6 +21,7 @@
      NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
      its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
      the page. Only a cycle publishing this file hits the window. -->
+<!-- DeepBench v7.0.181 | runbooks/briefing-template.html | SES-144 — §8's queue matrix gains an EPIC column, third from the left (Queue · ID · Epic · Class · Status · Design status · Title), per John 2026-08-23 "on the queue, add a column epic" and the locked spec in docs/BRIEFING-REDESIGN-0822.md §8. Epic is epics.name resolved through backlog_items.epic_id — an FK, never prose in the ticket body, the same standing property SES-111 fixed the drain's epic under — and it renders BLANK for a ticket in no epic, never an em-dash, because this table already spends the dash on Design status where it means a real absence; a dash here would read as a value ("epic: —"). queueRow() takes the epic as its THIRD parameter so the call sites read in column order rather than requiring the reader to hold a mapping. The §8 regeneration SQL in the comment above the table is corrected to the LEFT JOIN form in the same commit: a cycle rebuilding from the old single-table SELECT renders an empty column and has nothing to tell it why — the same "the contract must move with the render" rule SES-124 wrote after step 5 and step 7 drifted. MEASURED, not reasoned: of §8's live top 12 at 05:34Z, TEN are Automation and two (SES-131, AGT-015) belong to no epic — a distinction the page rendered nowhere while John was running that very epic as a standing drain. Heading window refreshed to the live census, 564 numbered. THE PLACEMENT OF THIS COMMENT IS ITSELF THE SES-138 RULE: it sits BELOW the title-tag guard block, never above it. The kickoff doc's own instruction said "first line of the file" and was WRONG; the Sonnet 5 subagent that had the edit refused it and reported the conflict rather than complying, which is the behaviour that guard was written to produce. -->
 <!-- DeepBench v7.0.172 | runbooks/briefing-template.html | directive 603f44ea — the masthead gains a LAST-ACTION STAMP, and the half of John's sentence a bare timestamp misses. His line: "Need a timestamp of the last action on this page at the very top next to the count of decisions. I can't tell what time my last action was compared to if the page has refreshed yet." That is TWO requirements — a time, and whether a run has picked it up — so #lastact carries his newest action, this page's rebuild time, and, only when his action is strictly newer, "Not picked up by a run yet". MEASURED BEFORE A LINE CHANGED, not recalled: the masthead's date block (line 691) held date, version and #waiting and NO timestamp of any kind. THE ONE THAT WOULD HAVE SHIPPED WRONG is a cycle-typed stamp: it is the exact failure countWaiting() exists to prevent (the masthead is the half he reads first and must never disagree with the state under it), and it could not be right even in principle, because the page self-publishes on EVERY tap and no cycle is running between rebuilds to re-type anything. So the action time is DERIVED from briefing-state in stampLastAction(); only PAGE_BUILT is cycle-written, and it lives in #code because doc() carries that script's textContent through a self-publish verbatim — the one value the state genuinely cannot know. THE TRAP, and the red control that proves it is real: an ask thread holds John's questions AND the runner's replies, both carrying an `at`, so without the `[runner,` filter the stamp reports the RUNNER's last reply as "your last action" — measured on the live fixture, 8:50 PM instead of his 8:13 PM tap, with a "not picked up yet" line drawn about the runner's own words. state.directive_at ships with it: typing a directive is the action he is most likely to have taken last, and it was the ONE action the page could not date (the bare-string gap SES-129 named on its card) — FORWARD ONLY, so an older directive contributes nothing rather than a guessed time. Guarded permanently by tests/regression/DIR-603f44ea-last-action-stamp.js, which reads the functions out of THIS file rather than copying them, per John's rule 2026-08-23: "you should never be throwing away tests." -->
 <!-- DeepBench v7.0.170 | runbooks/briefing-template.html | SES-132 — §9.1 ANSWERED, YOUR PAST QUESTIONS: an ask whose target has left the rebuild finally has a renderer. John, 2026-08-23T00:37Z, verbatim: "I could swear i have wrote comments in the gated questions, and most are not showing. shouldn't the thread show each page refresh and what your answers are?" He was right, and the cause is that the act of deciding is what removes the only thing able to render his line — thread() is reachable from exactly two call sites, card() and question() (which visionClaim() delegates to), so it renders ONLY inside a still-live target, while §§5/6 rebuild from runner_items WHERE decision IS NULL, §9 from runner_questions WHERE status='open' capped at 5, and §12 drops a decided claim. MEASURED THIS CYCLE AGAINST THE PUBLISHED PAGE, not recalled, and WORSE THAN THE TICKET ESTIMATED: the ticket said three of seven targets had vanished; parsing the live briefing-state against the render's own call sites says SIX of EIGHT ask targets are orphaned right now, carrying ELEVEN of John's thirteen recorded entries — only item-chi84-gate and q-adhoc-morning-standing still render. The ticket's figure was taken before he answered three more questions between 00:33Z and 00:35Z; it was right when written and is why this is measured again rather than quoted. THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE ORDERING: §9.1 sits between §9 and §10, but §12's vision claims render AFTER that point, so an orphan set computed in place classifies every vision thread as orphaned and prints it twice — the section emits a marker and render() substitutes the block once the whole page is built, which is also why threadedIds resets at the top of every render() rather than living across passes. The substitution passes a FUNCTION, never a string: $& and $1 are special in a String.replace replacement and thread text is John's own prose. Rows carry NO data-awaits — a kept thread is information, not a decision owed, the same call SES-127 made for §10. It is a sub-block under §9 exactly like §4.1 and §7.1, so the LOCKED SECTION ORDER is extended, never renumbered. QA is a real DOM-stub render of THIS file, and the negative control is what carries the proof: the pre-change script renders 0 orphan rows from the same fixture the shipped script renders 1 from, and deleting the substitution from the real file fails the suite (exit 1) before restoring it passes. Test kept, not scratchpadded: tests/regression/SES-132-orphan-ask-threads.js. -->
 <!-- DeepBench v7.0.168 | runbooks/briefing-template.html | directive bee71cf4 — §4 gains DAILY OUTPUT, a default-closed card under the reading card. John's line, verbatim: "you should be able to look a the first entered for that day and the last by looking at the times in CST. Then you should be able to show how much work was done per day. Create a card underneath readings that showcase daily out based on the first and last readings of the day. Have the card collapsed by default." MEASURED BEFORE A LINE CHANGED, not recalled, because his first question was whether the data even exists: it does — all 8 rows of public.runner_usage_readings carry a real taken_at, spanning three CST days (8/20: 3 readings, 8/21: 4, 8/22: 1). THE HALF THAT WOULD HAVE SHIPPED WRONG IS THE THIRD DAY: 8/22 has exactly ONE reading, and every obvious implementation renders its delta as 0 — a number that says the day produced nothing, when the truth is there is nothing to measure from. It renders an em dash, the function returns NULL, and that is the same rule as a NULL plain_* drawing a red defect line and a NULL cost_usd never printing $0.00. Two more the render must not re-derive and therefore does not own: the day is an America/Chicago day (register B35 — the CST day starts at 05:00Z, so a UTC grouping files most of a night's cycles under the wrong date), and a NEGATIVE all-models delta is John's weekly meter RESETTING inside the window, not work being undone. All four live in migration dirbee71cf4_daily_reading_output as public.daily_reading_output(), one call per rebuild — the same prose->code correction as SES-127/128/129, for the seventh time. The two figures on a row measure DIFFERENT THINGS and the headings say so: the meter delta includes John's own manual sessions, while the token figure is the runner's estimate for cycles that started inside the window — 9 cycles in 8/21's window against 12 in the whole CST day, so window-scoping is not cosmetic. QA was discriminating rather than merely complete: the three live rows were computed by a standalone query that never calls the function and matched it exactly (+12/+18/5,320,000/9 and +9/+11/9,685,000/9), then two fixtures inside deliberately rolled-back transactions flipped 8/22 from "one reading only" to a real +7%/11.8M/16-cycle row and, with a reset-shaped reading, to guard "meter reset in window" with a NULL delta — results that are impossible if the NULLs were hardcoded. Fixtures rolled back, 8 readings restored. Grants asserted BOTH directions per SES-101: anon/authenticated false, service_role/postgres true. -->
@@ -671,8 +672,9 @@
   // cell at a time, and these are the rows a cycle regenerates on EVERY rebuild. Each escapes
   // its own text — §8 titles and §14 names are ticket prose and visitor labels, i.e. the two
   // places on this page where the content is not written by a cycle.
-  function queueRow(q, id, cls, status, design, title){
+  function queueRow(q, id, epic, cls, status, design, title){
     return '<tr><td class="num">'+q+'</td><td class="mono">'+esc(id)+'</td>'
+      +'<td class="dim">'+esc(epic)+'</td>'
       +'<td class="mono dim">'+esc(cls)+'</td><td class="dim">'+esc(status)+'</td>'
       +'<td class="dim">'+esc(design)+'</td><td class="ttl2">'+title+'</td></tr>';
   }
@@ -978,33 +980,42 @@
     // Regenerate every rebuild from public.backlog_items — the queue number is the DB's OWN
     // `queue` column (SES-86 phase 2), never a position this render counted out:
     //
-    //   SELECT queue, backlog_id, priority_class, status, coalesce(design_status,'—'),
-    //          left(regexp_replace(coalesce(description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70)
-    //     FROM public.backlog_items WHERE queue IS NOT NULL ORDER BY queue LIMIT 12;
+    //   SELECT b.queue, b.backlog_id, coalesce(e.name,'') AS epic, b.priority_class, b.status,
+    //          coalesce(b.design_status,'—'),
+    //          left(regexp_replace(coalesce(b.description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70)
+    //     FROM public.backlog_items b
+    //     LEFT JOIN public.epics e ON e.id = b.epic_id
+    //    WHERE b.queue IS NOT NULL ORDER BY b.queue LIMIT 12;
     //
     // TWO THINGS THAT ARE NOT STYLE. (1) The Title column uses that `gist` extract, NOT
     // `title`: for imported tickets `backlog_items.title` holds the CLASS STRING
     // ('P9 - Bug Fixes.'), so a matrix keyed on `title` renders a column of class names and no
     // titles at all — the runbook's standing rule for anything that DISPLAYS the queue, true
     // until SES-91 repairs the column. (2) The heading states the scope (top N of the numbered
-    // board) because a 12-row window onto 565 tickets that does not say so reads as the whole
+    // board) because a 12-row window onto 564 tickets that does not say so reads as the whole
     // board. Rows below are this cycle's real values.
-    +'<h2><span class="secnum">8</span>The queue — top 12 of 565 numbered</h2>'
+    // (3) THE EPIC COLUMN RENDERS BLANK, NEVER A DASH (SES-144, v7.0.181; John, 2026-08-23:
+    // "on the queue, add a column epic"). It is `epics.name` resolved through
+    // `backlog_items.epic_id` — an FK, never prose in the ticket body (SES-111's standing
+    // property). A ticket in no epic gets '' and not '—', because this table already spends
+    // the dash on Design status, where it means a real absence: an em-dash here would read as
+    // a value, "epic: —", rather than as "belongs to no epic".
+    +'<h2><span class="secnum">8</span>The queue — top 12 of 564 numbered</h2>'
     +'<div class="tscroll"><table>'
-    +'<tr><th>Queue</th><th>ID</th><th>Class</th><th>Status</th><th>Design status</th>'
-    +'<th>Title</th></tr>'
-    +queueRow(1,'SES-126','P10 - Tooling','missing','—','Briefing redesign 3 of 6 — board tables on the page')
-    +queueRow(2,'SES-127','P10 - Tooling','missing','—','Structured skip records + §10 with unblock actions')
-    +queueRow(3,'SES-128','P10 - Tooling','missing','—','Morning/night readings + auto-recalibration')
-    +queueRow(4,'SES-129','P10 - Tooling','missing','—','Directive follow-through card')
-    +queueRow(5,'SES-110','P10 - Tooling','partial','designed','New table public.epics — epic membership for tickets')
-    +queueRow(6,'SES-114','P10 - Tooling','missing','—','design_status in the selection read — skip all three flags at a glance')
-    +queueRow(7,'SES-115','P10 - Tooling','missing','—','Rows are never deleted — done/removed stay in the table')
-    +queueRow(8,'SES-116','P10 - Tooling','missing','—','Gated cards are storing the wrong plain-language fields')
-    +queueRow(9,'SES-91','P10 - Tooling','missing','—','backlog_items.title holds the class string, not a title')
-    +queueRow(10,'SES-117','P10 - Tooling','missing','—','Two CHECKs on backlog_items, both John-confirmed')
-    +queueRow(11,'SES-118','P10 - Tooling','missing','—','&ldquo;missing&rdquo; is markdown-audit-era vocabulary — retire it')
-    +queueRow(12,'SES-119','P10 - Tooling','missing','—','Standing instruction across every session type')
+    +'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'
+    +'<th>Design status</th><th>Title</th></tr>'
+    +queueRow(1,'SES-144','Automation','P10 - Tooling','missing','—','Briefing queue matrix gains an Epic column')
+    +queueRow(2,'SES-143','Automation','P10 - Tooling','missing','—','Briefing §2b — the Automation panel: scheduler + drain controls')
+    +queueRow(3,'SES-140','Automation','P10 - Tooling','missing','needs-john','The successor fire is refused — an agent cannot fire a routine it did not create')
+    +queueRow(4,'SES-117','Automation','P10 - Tooling','partial','needs-desktop','Structural filing guarantees: title and type can no longer be skipped')
+    +queueRow(5,'SES-118','Automation','P10 - Tooling','missing','—','Rename backlog status value &ldquo;missing&rdquo; to &ldquo;open&rdquo;')
+    +queueRow(6,'SES-119','Automation','P10 - Tooling','missing','—','Displays show ticket ID + stored title everywhere')
+    +queueRow(7,'SES-120','Automation','P10 - Tooling','missing','—','Startup-doc modernization: Session-Init rewritten to snapshot pointers')
+    +queueRow(8,'SES-121','Automation','P10 - Tooling','missing','—','Shrink the .claude/-mutable surface so needs-desktop tickets become rare')
+    +queueRow(9,'SES-84','Automation','P10 - Tooling','partial','—','The vision corpus: nine docs that ground Claude&rsquo;s P1&ndash;P4 calls')
+    +queueRow(10,'SES-101','Automation','P10 - Tooling','partial','designed','New automation tickets file themselves into the automation lane')
+    +queueRow(11,'SES-131','','P1 - Improves John&rsquo;s Skills','missing','—','Research the AI / multi-agent market and FAANG AI job openings')
+    +queueRow(12,'AGT-015','','P1 - Improves John&rsquo;s Skills','missing','—','Agent model/feature tied to MarketIntelligenceScreen&rsquo;s own onCommit')
     +'</table></div>'
     // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows

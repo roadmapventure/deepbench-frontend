@@ -5,6 +5,89 @@
 
 ---
 
+## session/cycle-20260823-0528 (v7.0.181, 2026-08-23, Automated runner cycle `3ebeadbc`, model Opus 5 orchestrator, subagent Sonnet 5 for the mechanical template/contract edits) — the queue's forward view can finally say which epic a row belongs to
+
+**`SES-144` — the briefing's §8 queue matrix gains an Epic column (Tooling · `P10 - Tooling`)
+CLOSED `done`.** Two doc files + one kickoff. No `src/`/`api/`/`lib/` change, no schema change,
+no site change.
+
+**John's line, 2026-08-23, verbatim:** *"on the queue, add a column epic."* The spec was locked
+the same day — `docs/BRIEFING-REDESIGN-0822.md` §8, commit `4feb3cea` — and only the spec half
+existed, so the contract and the template disagreed until this ship.
+
+**Why it earns a cycle rather than being a nit.** §8 is the page's **only** forward view of the
+queue: `SES-124` struck "Next up — top 5" and the "Next 3" line, and `SES-126` replaced them with
+this matrix. John runs the board as **epics** — the standing Automation drain is an epic-scoped
+standing order he wrote himself — so the one view that tells him what is coming next could not say
+which of those rows were inside the epic he had declared a drain over. **Measured before a line
+changed, not reasoned:** of §8's live top 12 at `05:34Z`, **ten are `Automation` and two
+(`SES-131`, `AGT-015`) belong to no epic** — a distinction the page rendered nowhere.
+
+**Selection trail (step 5).** No queued one-off directives. Layer 1b returned `pick` → **`SES-140`**
+(Automation, queue 3, `open_now` 17), which carries `design_status = 'needs-john'` — a `SES-114`
+blocked-prefix skip. Recorded with `record_skip(..., 'needs-john', ...)` (`runner_skips` `39cd8616`,
+`skip_count` 1 → 2), its queue number left alone, and the cycle fell through to the class-sorted
+board per `SES-142`. Board #1 = `SES-144`, unflagged; claimed atomically (1 row). Premise
+revalidated live before building: the §8 header row carried no Epic and `queueRow()` took six
+parameters. `revalidated_at` set.
+
+**What shipped.** Column order is now **Queue · ID · Epic · Class · Status · Design status ·
+Title**. `queueRow()` takes the epic as its **third** parameter so the call sites read in column
+order rather than making the reader hold a mapping. Epic is `epics.name` resolved through
+`backlog_items.epic_id` — an **FK, never prose in the ticket body**, the same standing property
+`SES-111` fixed the drain's epic under.
+
+**THE DECISION MOST LIKELY TO BE GOT WRONG LATER, so it ships as a written property in both files:
+the empty value is `''`, never `—`.** This table already spends the em-dash on Design status, where
+it means a real absence. A dash in the Epic column would therefore read as a *value* — "epic: —" —
+rather than as "belongs to no epic", which is the same class of error as a NULL `cost_usd` rendered
+`$0.00` (`SES-126`) or a NULL `plain_*` coerced to an empty string (`v7.0.146`).
+
+**The §8 regeneration SQL comment is corrected in the same commit**, to the `LEFT JOIN public.epics`
+form. This is not tidying: a cycle rebuilding §8 from the old single-table `SELECT` renders an empty
+Epic column and has nothing to tell it why — the contract has to move with the render, which is the
+lesson `SES-124` wrote after step 5 and step 7 drifted apart.
+
+**THE EDIT THAT WAS REFUSED, AND THE REFUSAL IS THIS SHIP'S BEST EVIDENCE.** The kickoff's own
+instruction (1g) told the subagent to add the new provenance comment as the **first line** of
+`briefing-template.html`. That is precisely the `SES-138` regression: the Artifact tool scans only
+the first 8192 bytes for a title tag, the provenance block grows on every ship, and prepending above
+the tag renames John's page out from under him — it shipped live once as "briefing-out". The file
+carries a guard block saying so in words. **The Sonnet 5 subagent stopped, did not substitute a
+placement of its own, and reported the conflict** — the exact behaviour that guard was written to
+produce, and the reason the delegation instruction says to stop rather than guess when an anchor
+does not hold. The orchestrator placed the header **below** the guard block, at the top of the
+provenance chain, where the file's own rule puts it. The regression test
+(`tests/regression/SES-138-briefing-title-window.js`) passes.
+
+**QA — discriminating, with a negative control.** Four structural assertions (header column order
+byte-for-byte; `queueRow` signature `(q, id, epic, cls, status, design, title)`; the escaped epic
+cell sitting between the ID and Class cells; all 12 call sites passing seven arguments) **plus a
+render proof**: the real `queueRow` is pulled out of the shipped file and executed against 12 rows
+read live from Supabase — 7 cells each, `cell[2] === epics.name` on all 12 (10 `Automation`,
+2 blank). *Would it still pass if the change did nothing?* No: the **pre-change file fails all four**
+structural assertions and the shipped file passes all four, asserted in the same run. Build clean.
+Regression **37/37** with credentials supplied (the lone `CHI-31` failure without them is the known
+`.env.local` gap, not a code failure — proven by re-running with `SUPABASE_URL` /
+`SUPABASE_SERVICE_KEY` exported). Dev root **HTTP 200**.
+
+**Sample rows refreshed from the live board** (the template's standing rule that its rows are the
+rebuilding cycle's real values): queue/ID/Epic/Class/Status/Design status match the live read
+exactly; the Title cells are the stored titles trimmed for width, and the *contract* governing a
+rebuild still says Title is the `gist` extract until `SES-91`'s residue (`AGT-015`) is repaired.
+Heading window refreshed to the live census, **564 numbered**.
+
+**Cycle bookkeeping.** Step 2 harvest read the live page: `briefing-state` was **empty** — no taps,
+directive, reading, answers, asks or unblocks — so nothing was harvested and silence was not treated
+as an Accept. Step 3 walls all passed (month $0.00/$100, CST-day $0/$5, weekly meter 32% against the
+85% rest wall, latest reading 1.9h old, `derive_token_allowance()` guard *"no bracketing pair: night
+reading has no morning after it"* → NULL → the uncalibrated 10M cap). Step 4b invention pass **ran**:
+the egress probe returned live results (precondition **C3 closed**), and **zero proposals** were
+generated because `runner_ladder`'s `invention` rung is **0** — B12's rule that volume widens only by
+ladder, stated rather than quietly skipped.
+
+---
+
 ## session/cycle-20260823-0347 (v7.0.179, 2026-08-23, Automated runner cycle `16514a5d`, model Opus 5 orchestrator, no subagent) — a standing drain gets a finish line the runner cannot move
 
 **`SES-142` — a drain finishes on the list John named, not on a moving predicate
