@@ -39,6 +39,33 @@
 
 ---
 
+## session/cycle-20260823-1640, cycle 4 (v7.0.203, 2026-08-23, runner cycle `63d0fb9e-f594-4175-a3ff-6a0c3d65d2f9`, `trigger = chained (drain continuation)`, model Opus 5) — a new automation ticket claims the lane top at filing time
+
+**Fourth cycle of one session** (`c4148d2a` v7.0.197 → `7f30ca60` v7.0.199 → `caacbd25` v7.0.200 → this). John's directive queue was empty; the drain pick (`SES-84`) is `needs-john`; selection fell through to the board. **A scheduled cycle `61a1fbd7` was running concurrently** (opened 17:41Z, building `SES-147`) — noted because an earlier note in this session guessed the next scheduled fire was ~3h out, and that guess was wrong. The claim filter is what kept the two cycles off each other's work.
+
+**Ticket:** `SES-101` — *New automation tickets file themselves into the automation lane instead of the class-sorted board* (Tooling · `P10 - Tooling`, queue 3, `partial` → `done`). A **named member of John's standing Automation drain**, and one that `runner_skips` shows being stepped past every cycle.
+
+**The gap.** `public.claim_automation_lane_top()` shipped in `v7.0.147` and **nothing called it at filing time**. The rule was written in `runner-cycle.md`; the procedure a session actually follows when filing a ticket — session-setup step 3c — said only *"then run `recompute_backlog_queue()`"*. So a newly filed automation ticket landed in the class-sorted backlog: precisely the failure the lane was built to end. Measured when the function shipped, and it had already happened — the last three automation tickets were hand-assigned to the lane's **bottom** (`SES-99` = 7, `SES-100` = 8, `SES-101` = 9), the opposite of John's ruling on `q-lane-top` (**yes**, 2026-08-21T20:47Z, from directive `48ae1939`: *"if you create more automation tickets keep making them top of queue"*).
+
+**Why it could only be fixed today, and it is the whole reason this cycle could take it.** Step 3c lived under `.claude/`, which an unattended cycle may not write (register B39) — so `SES-101` carried `design_status = 'needs-desktop'` and was skipped, cycle after cycle. **`SES-121` moved the procedure body to `docs/runbooks/session-setup.md` in `v7.0.198`, twenty-four minutes before this cycle picked it up.** Verified live rather than assumed: the file is present at 16 KB, the `.claude/` copy is now an 8-line loader pointing at it, and the canonical `INSERT` sits at line 219 with no mention of the lane call. **This is the first thing that move paid for**, and it is worth recording because the value of that migration was argued rather than demonstrated at the time.
+
+**What shipped.** One bullet in §3c: the call, John's ruling, the `min(open lane) − 1` direction, and the three properties nobody should re-derive — it is **idempotent**, it **runs the queue recompute itself** (so it *replaces* the plain recompute rather than following it), and it reads the **open** lane only, so `done` tickets keep their historical rank without competing. Plus the bound: automation work only — calling it on an ordinary ticket "to be safe" would put unrelated work above John's own queue.
+
+**QA — live, on a real row, both arms, and each falsifies a specific wrong build:**
+
+- **Direction.** Open-lane minimum read first: **−13** across 3 open members. `SELECT public.claim_automation_lane_top('SES-161')` → `automation_rank` **−14**, `queue` **1**. That is `min − 1`. A `max + 1` implementation — the natural assumption, since queues usually append — would have produced a positive rank and left the ticket *below* the lane. Falsified.
+- **Idempotence.** A second identical call left it at **−14**, not −15. A ratcheting implementation would drift the rank further negative on every re-run. Falsified.
+- *Would either arm pass if the change did nothing?* No — before the call `SES-161` had `automation_rank IS NULL` and no lane position at all.
+- Before-image written for `SES-161` before the call (§19v). Function identity and grant re-read live (`claim_automation_lane_top(p_backlog_id text)`, `service_role` true); the body asserted to use `min(`, to run the recompute, and to filter closed rows.
+
+Build green; regression **44/44** with credentials; new guard `tests/regression/SES-101-automation-lane-filing.js` proven to **fail** on the pre-change procedure and pass on restore. It guards the direction, the replaces-not-follows boundary, the automation-only bound and the stated idempotence — the bullet is one paragraph in a 16 KB procedure, exactly what a later tidy-up drops.
+
+**Disclosed rather than left to be found:** only **one** of this session's three new automation tickets was given the lane top. `SES-152`, `SES-153` and `SES-161` are all runner tooling and John's rule arguably covers all three, but promoting three of the runner's own filings above his entire lane in a single cycle is **his** call, not the runner's. `SES-161` — which governs the token wall — took the slot as this ship's live QA; the other two stay in class order and are named on the briefing so he can pin them in one tap.
+
+**Kickoff:** `docs/kickoffs/v7.0.203-SES-101-automation-lane-filing.md`.
+
+---
+
 ## session/cycle-20260823-1640, cycle 3 (v7.0.200, 2026-08-23, runner cycle `caacbd25-2cd5-4454-bd0f-b99f19d883f8`, `trigger = chained (drain continuation)`, model Opus 5) — the briefing rebuild finally has a builder
 
 **Third cycle of one session** (`c4148d2a` v7.0.197 → `7f30ca60` v7.0.199 → this), each a full ceremony with its own `runner_cycles` row, per `runner-cycle.md` v7.0.195 tail step (8). John's directive queue was empty by this point — all three of his Reworks closed by cycles 1 and 2 — and the drain pick (`SES-84`) is `needs-john`, so selection fell through to the board, where `SES-149` sat at **queue 1**, unflagged.

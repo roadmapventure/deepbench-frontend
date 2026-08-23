@@ -241,6 +241,34 @@ RETURNING backlog_id, priority_class;
 - **Then run `SELECT public.recompute_backlog_queue();`** — a new classed ticket is a queue
   recompute event (register B4), and without it the ticket has no queue number and is invisible
   to "Next up".
+- **AN AUTOMATION TICKET CLAIMS THE TOP OF JOHN'S LANE, AND ONE CALL DOES IT — use it INSTEAD of
+  the plain recompute above (`SES-101`, function shipped `v7.0.147`, wired in here `v7.0.203`):**
+
+  ```sql
+  SELECT public.claim_automation_lane_top('<PREFIX-N>');
+  ```
+
+  John's ruling, question `q-lane-top` answered **yes** 2026-08-21T20:47Z, from his directive
+  `48ae1939` line 4: *"if you create more automation tickets keep making them top of queue."* So the
+  slot is `min(open lane) − 1`, **never `max + 1`**.
+
+  **This bullet is the half of `SES-101` that sat unfinished for two days, and the reason is worth
+  one sentence:** the function has assigned `automation_rank` since `v7.0.147`, but **nothing called
+  it at filing time**, so a newly filed automation ticket landed in the class-sorted backlog — the
+  exact failure the lane was built to end. Measured when the function shipped: the last three
+  automation tickets filed had been hand-assigned to the *bottom* of the lane (`SES-99` = 7,
+  `SES-100` = 8, `SES-101` = 9), the opposite of what John answered. It could not be fixed until now
+  because this procedure lived under `.claude/`, which an unattended cycle may not write
+  (register B39); `SES-121` moved the body here in `v7.0.198`, and this is the first thing that move
+  paid for.
+
+  Three properties, so nobody re-derives them: it is **idempotent** (a ticket already at the open
+  lane's minimum is left alone, so a second call cannot ratchet it further negative); it **runs the
+  queue recompute itself**, which is why it replaces rather than follows the bullet above; and it
+  reads the **open** lane only, so `done`/`removed` tickets keep their historical rank (`ADM-1` = 1)
+  without competing. A ticket that is **not** automation work takes the plain recompute and nothing
+  else — do not call this on an ordinary ticket to "be safe": it would put unrelated work above
+  John's own queue.
 - **`epic_id` is optional and defaults to no epic.** Look it up by NAME (`epics.name` is
   UNIQUE), never by pasting a uuid. Epic creation is ask-first (John, 2026-08-22) — only
   `Automation` is pre-authorized, so a session that wants a NEW epic asks first rather than
