@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.171 | docs/vision/customer.md | SES-133 — C-CUST-20 ratified LOW -> HIGH on John's Yes of 2026-08-23T00:40Z, same §12 rule and same stamp form as current-mission.md's C-mission-6 in this ship. Worth noting for whoever reads this claim next: "customer zero is John himself" moving from LOW to HIGH is the self-replication thread (C-mission-8, the Recruiter agent) gaining John's own confirmation on the customer side, not just the mission side. Claim text unchanged. -->
 <!-- DeepBench v7.0.134 | docs/vision/customer.md | SES-84 phase 1 — Claude's best-inference draft, 2026-08-21. NOTHING here is ratified until John's tap; confidence marks are the drip queue. -->
 
 # Customer — Who Actually Uses, Evaluates, and Would Pay for DeepBench
@@ -31,7 +32,7 @@ Defines **P4 - New Customers** concretely: who would pay or adopt, for what job-
 - [C-CUST-17] (MED) Apple functions as a customer-shaped prospect too, not only an employer: John asked what a channel-sales VP would need "for a mvp and v1 release" — the demo doubles as a real product-requirements probe for a channel-sales buyer. — *grounds:* John 2026-07-09; inference on dual role.
 - [C-CUST-18] (LOW) A secondary future customer is the capability buyer rather than the platform buyer: Competencies/Capabilities sold individually (MCP-accessible, priceable) to teams who never adopt the full workbench. — *grounds:* John 2026-07-15 ("both individually marketable in the future"); §0b Capabilities definition; inference.
 - [C-CUST-19] (MED) The buyer persona to convince is a procurement director AND a VP of Product simultaneously — the repo's own design test. — *grounds:* ARCHITECTURE.md §0: "Does this impress a procurement director AND a VP of Product reviewing John's portfolio?"
-- [C-CUST-20] (LOW) John's long-term "customer zero" is himself: an agent trained on his own knowledge generating reports and research on his behalf — the self-replication vision. — *grounds:* Business-Context "Long-term personal vision".
+- [C-CUST-20] (HIGH) (ratified 2026-08-23) John's long-term "customer zero" is himself: an agent trained on his own knowledge generating reports and research on his behalf — the self-replication vision. — *grounds:* Business-Context "Long-term personal vision"; ratified by John on the briefing page 2026-08-23T00:40Z.
 
 ## What P4 - New Customers means concretely (feature classes that win adopters)
 

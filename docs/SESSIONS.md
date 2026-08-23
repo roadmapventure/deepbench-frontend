@@ -5,6 +5,106 @@
 
 ---
 
+## session/cycle-20260823-0127 (v7.0.171, 2026-08-23, runner cycle `76fa8b54`, Automated mode, model Opus 5 orchestrator + a Sonnet 5 subagent) — three of John's vision taps finally reach the corpus, and the reason they were late is not fixed here
+
+**Ticket:** `SES-133` — *Three of John's vision-claim taps have not reached `docs/vision/*.md`,
+and the reason is structural rather than a forgetting* — Type: Runner, `P10 - Tooling`, tier
+`now`, queue **250**. Closed **`partial`**.
+
+### Why a queue-250 ticket was built ahead of queue 1
+
+Selection layer 1a. John typed into the briefing page's directive box, verbatim, read live from
+`briefing-state` at 2026-08-23T01:29Z:
+
+> "ses-132 and 133 are emergencies and need to be ran before anything else - you can't be
+> loosing my answers in shipped, gated, questions, vision all threads should be working
+> accordingly"
+
+At pick time that line had **not yet been harvested** into `runner_directives` — it is harvested
+in this cycle's own step-9 tail — so it was acted on as read, which is what step 2 exists for.
+`SES-132` was already claimed by peer cycle `f0acf9ab` at 01:23:13Z (the atomic claim did its
+job: two cycles, two tickets, no duplicate build), so this cycle took the other half.
+
+**One consequence stated rather than left to be found:** queued directive `603f44ea` (00:57Z —
+a last-action timestamp at the top of the page) is **older** and would normally be layer 1a's
+pick. It stays `queued` and untouched, deferred by John's own *"before anything else"*. The next
+cycle with no emergency outstanding takes it.
+
+### Premise — revalidated live, not recalled
+
+Read from the files at 01:34Z, `revalidated_at` stamped: `C-mission-6` still `(MED)` at
+`current-mission.md:15`; `C-CUST-20` still `(LOW)` at `customer.md:34`; `C-thesis-30` still
+`(LOW)` with its original wording at `thesis.md:54`. No intervening ship had closed any of them.
+
+The taps themselves came from the live page's `briefing-state` — `answers` for the two Yes taps
+(`vision-mission-C-mission-6` 00:14Z, `vision-customer-C-CUST-20` 00:40Z) and `asks` for the
+typed replacement (`vision-thesis-C-thesis-30` 00:08Z). Worth recording because it is not
+obvious: `public.runner_questions` returns **0 rows** for all three qids, and that is correct
+rather than a defect — `briefing-page.md` §12 keys a vision row `vision-*` precisely so the
+harvest resolves it against the corpus file and never against a `qid` that does not exist.
+
+### What shipped — the convention quoted, not re-derived
+
+`briefing-page.md` §12, verbatim: **Accept** ratifies — *"the cycle edits that claim line to
+`HIGH` with `(ratified <date>)`"*; **Rework** — *"replaces the claim text with John's line
+verbatim, marked `HIGH (John's words, <date>)`"*.
+
+1. `docs/vision/current-mission.md` — `C-mission-6` → `(HIGH) (ratified 2026-08-23)`, tap
+   timestamp appended to `grounds`. Claim text unchanged: an Accept ratifies, it does not rewrite.
+2. `docs/vision/customer.md` — `C-CUST-20` → `(HIGH) (ratified 2026-08-23)`, same shape. Note for
+   whoever reads it next: "customer zero is John himself" reaching HIGH is the self-replication
+   thread (`C-mission-8`, the Recruiter agent) gaining his confirmation on the *customer* side.
+3. `docs/vision/thesis.md` — `C-thesis-30` **replaced** by his line verbatim, marked
+   `(HIGH) (John's words, 2026-08-23)`. This is the first vision claim John has **rewritten**
+   rather than ratified, and the correction is a change of shape rather than degree: the retired
+   text asserted one buyer (*"not a build-your-own-agent toolkit"*), his asserts two. The retired
+   sentence is quoted inside `grounds` rather than deleted, so the change is legible.
+
+**The stamp form was chosen on a measurement, not a preference.** `(HIGH)` is kept as its own
+parenthesised token with the stamp as a second parenthetical, because `grep -rln "docs/vision\|
+C-thesis" scripts/ lib/ src/ api/ tests/` returns **no files** — nothing parses the corpus, so
+the readers are cycles and John, and greppability is the only constraint that applies. Asserted
+after the edit: all **262** claim lines across the nine vision files still carry a bare
+`(HIGH)`/`(MED)`/`(LOW)` token.
+
+**Delegation (register B21).** The corpus consistency sweep — every vision file, for claims
+resting on the now-retired exclusion — went to a **Sonnet 5** subagent as a mechanical doc sweep,
+with the clone's absolute path stated in its prompt. It returned **0 contradictions** across all
+nine files; the nearest hit, thesis open question 3 (*"who is the first real paying buyer
+archetype"*), poses an industry-segment either/or, which is a different axis, so it stands and
+was deliberately left alone. The three edits themselves stayed with the orchestrator: two of them
+carry John's verbatim wording, and a hand-off is exactly where a paraphrase gets introduced.
+
+### QA — the negative control is the whole proof
+
+Nine assertions, run against the pre-change files (`git show HEAD:`) and then the working tree.
+**Every one fails before and passes after**, so the check cannot pass on a no-op: each claim's
+old confidence token gone (3), each new stamp present (3), John's line matched **byte-for-byte**
+with `grep -F` rather than semantically (1), the retired exclusion no longer the claim but still
+present in `grounds` (2 — the second assertion exists because the first would otherwise have
+failed on the deliberate quotation). Claim-line counts per file unchanged (30/26/30), so no claim
+was lost in the rewrite. `npm install && npm run build` green. Regression suite **not applicable**
+— doc-only, no `src/`/`api/`/`lib/` touched — stated rather than silently skipped.
+
+### NOT DONE — the half that stops this recurring
+
+`SES-133` carries a second half: name the moment a corpus edit lands, in `briefing-page.md` §12
+**and** `runner-cycle.md` step 2, so a cycle that harvests a vision ratification stops concluding
+it has no push left to apply it in. That is 2 more files, and `CLAUDE.md`'s scope rule is a hard
+**max 3 files**; the three corpus edits alone are exactly 3.
+
+The split follows the ticket's own sequencing — its text marks the three edits *"OWED NOW, and to
+be applied by the next cycle before anything else"*, and this cycle was that next cycle. So the
+ticket closes **`partial`**, keeps its queue slot, and the structural fix is the next cycle's
+first pick.
+
+**The residual risk, stated plainly because John should not have to find it:** until those two
+lines land, a cycle harvesting a vision tap tonight can defer the edit exactly as three cycles
+already did. The *debt* cannot be lost — `SES-133`'s description lists all three owed edits
+verbatim — but the *recurrence* is not yet closed.
+
+---
+
 ## session/cycle-20260823-0115 (v7.0.170, 2026-08-23, runner cycle `f0acf9ab`, Automated, model Opus 5) — John's typed questions stop disappearing when he answers them
 
 **Ticket:** `SES-132` — *Answered questions and decided cards take John's typed comments off the
