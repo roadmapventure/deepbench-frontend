@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-// DeepBench v7.0.157 | scripts/export-backlog-snapshot.js | SES-83c, SES-110, SES-112
+// DeepBench v7.0.173 | scripts/export-backlog-snapshot.js | SES-83c, SES-110, SES-112, SES-115
+// FEATURE: SES-115 -- the snapshot carries a derived `History residue` column as its last one.
+// Rows are never deleted (John's keep-and-filter design, register B1 as revised), so a
+// done/removed row on the board is history rather than drift; this cell names the live-board
+// state such a row should NOT still hold (queue number, claim, pin) and is empty otherwise.
+// Derived rather than three raw columns on purpose -- `queue` and `claimed_at` are row churn
+// and exporting them would break this file's byte-identical-across-unchanged-runs guarantee.
 // FEATURE: SES-112 -- the snapshot carries `design_status` and `kickoff_link` as its last two
 // columns, so WHY a ticket is not being built (and the kickoff doc proving it is designed)
 // survives in the backup exactly like the ticket text does.
@@ -110,6 +116,24 @@ const EPIC_FIELD = "epic_name";
 //   - `kickoff_link` is only ever non-NULL when design_status = 'designed' -- the table's
 //     ck_design_status_kickoff CHECK enforces it, so a snapshot row carrying a link with any
 //     other status means the constraint was dropped, not that the exporter drifted.
+// `history_residue` (SES-115, v7.0.173) is the SECOND entry here that is not a
+// backlog_items column -- it is DERIVED, in residueOf() below, and appended last
+// for the same cell-index reason as every field before it.
+//
+// WHY A DERIVED CELL RATHER THAN THE THREE RAW COLUMNS. SES-115 needs
+// check-session-docs.js's check 3 to answer "does this done/removed row still
+// hold live-board state?", and that lint is deliberately credential-free and
+// network-free -- so the answer has to be visible in this file. The obvious
+// move is to export `queue`, `claimed_at` and `pinned_position` directly, and it
+// would wreck the property stated 30 lines above: `claimed_at` is rewritten
+// twice per cycle across 8 cycles a day, and `queue` churns all ~600 rows on
+// every recompute. Both are exactly the "row churn, not backlog content" class
+// that `id`/`created_at`/`updated_at` are excluded for. So this cell is computed
+// ONLY for history rows (status done/removed) and is null for every active row
+// and for a CLEAN history row -- which means it adds zero bytes today and
+// produces a diff precisely when there is drift worth seeing.
+const RESIDUE_FIELD = "history_residue";
+
 const COLUMNS = [
   "backlog_id",
   "tier",
@@ -125,14 +149,59 @@ const COLUMNS = [
   EPIC_FIELD,
   "design_status",
   "kickoff_link",
+  RESIDUE_FIELD,
 ];
 
 // What the REST select actually asks for: the real columns, plus the embedded
 // epic. PostgREST returns the embed as a nested object (`epics: {name} | null`),
 // which fetchAllTickets() flattens to EPIC_FIELD before anything else sees it --
 // so every pure helper below keeps working on flat ticket objects.
-const TABLE_COLUMNS = COLUMNS.filter(c => c !== EPIC_FIELD);
+//
+// RESIDUE_SOURCE_COLUMNS are fetched but never emitted or hashed on their own:
+// they exist solely as residueOf()'s input and are dropped in the same flatten
+// pass that resolves the epic. Keeping them out of COLUMNS is what stops their
+// churn reaching the file.
+const RESIDUE_SOURCE_COLUMNS = ["queue", "claimed_by", "claimed_at", "pinned_position"];
+const TABLE_COLUMNS = COLUMNS.filter(c => c !== EPIC_FIELD && c !== RESIDUE_FIELD);
 const EPIC_EMBED = "epics(name)";
+
+// A history row (done/removed) has left the standings, so recompute_backlog_queue()
+// should have cleared its queue number and pin. Anything still set is a MISSED
+// RECOMPUTE -- the one thing about a history row that is genuinely drift rather
+// than history. Returns null (an empty cell) for every active row and every clean
+// history row.
+//
+// THE CLAIM IS THE SUBTLE ONE, and this cycle found it live rather than reasoning
+// it out: a LIVE claim on a done row is NORMAL and transient, not drift. John
+// settled the release order himself (q-claim-release-order, yes, 2026-08-21;
+// SES-106, v7.0.150): a cycle writes the ticket's status, runs the recompute,
+// pushes, and only THEN releases its claim -- because the claim is the token the
+// push gate re-asserts. The step-7 snapshot export runs BEFORE that push, so it
+// captures the shipping cycle's own claim on the ticket it just closed, EVERY
+// SHIP. Counting that as residue would commit one guaranteed false flag into
+// every ship's snapshot -- reintroducing the junk-flag class SES-115 exists to
+// remove, in a smaller costume.
+//
+// So only an EXPIRED claim counts (the 24h boundary -- the same B37 evidence bar
+// every other claim check in this platform uses, and the same one backlog_mode()
+// applies). That is the case with a real problem behind it: a session that went
+// silent mid-build and stranded the ticket. A live claim is somebody working.
+const CLAIM_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+export function residueOf(t, now = Date.now()) {
+  if (t.status !== "done" && t.status !== "removed") return null;
+  const parts = [];
+  if (t.queue !== null && t.queue !== undefined) parts.push(`queue=${t.queue}`);
+  if (t.claimed_by !== null && t.claimed_by !== undefined && t.claimed_by !== "") {
+    const at = t.claimed_at ? Date.parse(t.claimed_at) : NaN;
+    // An unparseable/absent claimed_at beside a set claimed_by cannot be aged, and
+    // guessing "live" would hide it forever -- report it and say which it is.
+    if (Number.isNaN(at)) parts.push("claimed(no timestamp)");
+    else if (now - at > CLAIM_EXPIRY_MS) parts.push("claim expired");
+  }
+  if (t.pinned_position !== null && t.pinned_position !== undefined) parts.push(`pin=${t.pinned_position}`);
+  return parts.length ? parts.join(";") : null;
+}
 
 const TIER_ORDER = ["now", "next", "later"];
 const PAGE_SIZE = 500;
@@ -222,6 +291,7 @@ const ROW_FIELDS = [
   EPIC_FIELD,
   "design_status",
   "kickoff_link",
+  RESIDUE_FIELD,
 ];
 
 export function parseDocument(text) {
@@ -453,16 +523,48 @@ export function buildDocument(tickets) {
     "triaged. That is a real, deliberate value -- it is never to be read or restored as `auto`."
   );
   lines.push("");
+  lines.push(
+    "`History residue` (SES-115) is the last column and the only DERIVED one: rows are never"
+  );
+  lines.push(
+    "deleted from `backlog_items`, so a `done`/`removed` row sitting on the board is HISTORY, not"
+  );
+  lines.push(
+    "drift -- but such a row should have lost its queue number, its pin and its claim when it"
+  );
+  lines.push(
+    "closed. This cell names whatever is still set (`queue=N`, `claimed`, `pin=N`), and is EMPTY"
+  );
+  lines.push(
+    "for every active row and every clean history row. A LIVE claim is deliberately not residue --"
+  );
+  lines.push(
+    "a cycle releases its claim only AFTER its push (John, `q-claim-release-order`), so this export"
+  );
+  lines.push(
+    "always runs while the shipping cycle still holds one; only an EXPIRED claim (24h) counts, which"
+  );
+  lines.push(
+    "is the case with a stranded ticket behind it. An empty column here is the healthy state;"
+  );
+  lines.push(
+    "a non-empty cell means a recompute was missed. It is derived rather than three raw columns"
+  );
+  lines.push(
+    "because `queue` and `claimed_at` are row churn -- exporting them would change this file on"
+  );
+  lines.push("nearly every run and destroy the byte-identical guarantee above.");
+  lines.push("");
 
   for (const g of groups) {
     const count = g.rows.length;
     lines.push(`## tier \`${g.tier}\` — \`${g.source_file}\` (${count} ticket${count === 1 ? "" : "s"})`);
     lines.push("");
-    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff |");
-    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|");
+    lines.push("| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff | History residue |");
+    lines.push("|---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|-----------------|");
     for (const t of g.rows) {
       lines.push(
-        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} | ${esc(t[EPIC_FIELD])} | ${esc(t.design_status)} | ${esc(t.kickoff_link)} |`
+        `| ${esc(t.row_ordinal)} | ${esc(t.backlog_id)} | ${esc(t.type)} | ${esc(t.priority_class)} | ${esc(t.title)} | ${esc(t.status)} | ${esc(t.session_ref)} | ${esc(t.harvest_link)} | ${esc(t.description)} | ${esc(t[EPIC_FIELD])} | ${esc(t.design_status)} | ${esc(t.kickoff_link)} | ${esc(t[RESIDUE_FIELD])} |`
       );
     }
     lines.push("");
@@ -487,7 +589,7 @@ export function buildDocument(tickets) {
 // success, because a backup script that can silently truncate is worse than
 // one that refuses to run.
 async function fetchAllTickets(supabaseUrl, supabaseKey) {
-  const cols = `${TABLE_COLUMNS.join(",")},${EPIC_EMBED}`;
+  const cols = `${TABLE_COLUMNS.join(",")},${RESIDUE_SOURCE_COLUMNS.join(",")},${EPIC_EMBED}`;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
   const base = supabaseUrl.replace(/\/+$/, "");
 
@@ -533,6 +635,12 @@ async function fetchAllTickets(supabaseUrl, supabaseKey) {
     for (const t of body) {
       t[EPIC_FIELD] = t.epics ? t.epics.name : null;
       delete t.epics;
+      // SES-115: collapse the four volatile residue inputs into one derived cell
+      // and DROP them here, at the same single place the epic is resolved. They
+      // must not survive into the ticket objects that canonicalPayload() hashes
+      // -- that is what keeps two runs against an unchanged table byte-identical.
+      t[RESIDUE_FIELD] = residueOf(t);
+      for (const c of RESIDUE_SOURCE_COLUMNS) delete t[c];
     }
 
     all = all.concat(body);

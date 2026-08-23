@@ -5,6 +5,122 @@
 
 ---
 
+## session/cycle-20260823-0134 (v7.0.173, 2026-08-23, runner cycle `702aa2db`, model Opus 5) — history stops being drift, and two id-shaped columns that are really prose
+
+**Ticket:** `SES-115` — *`backlog_active` view + computed lifecycle mode; keep-and-filter replaces
+done-row cleanup* — Type: Tooling, `P10 - Tooling`. Closed **`done`** (was `missing`). Picked by
+**selection layer 1b**, John's standing Automation drain (`drain_epic_next` → `pick`, queue 1,
+`open_now = 19`). Kickoff: `docs/kickoffs/v7.0.173-SES-115-backlog-active-view.md`.
+
+### Premise revalidation — held on all three halves, checked live
+
+No `backlog_active` view existed (0 rows in `information_schema.tables`). `check-session-docs.js`
+check 3 still flagged every `done` row: **37 `FLAG` lines out of 49 total findings, 76% of the
+report** — the ticket estimated 26, and the live number was taken rather than quoted. Register B1
+still read *"archived/shipped tickets are history, never imported or maintained"*. Board at pick
+time: 601 rows, 562 active, 39 history, **0 of them holding a queue number, claim or pin.**
+
+### The two things that would have shipped silently wrong
+
+Both are the same failure in different costumes — an **id-shaped column that is really prose** —
+and this platform has now paid for it three times (`backlog_items.title`/`SES-91`,
+`runner_cycles.item_id`/`SES-129`, and these).
+
+1. **`runner_items.kind` is `ship`, never `'shipped'`.** The ticket's own wording says *"an open
+   shipped `runner_items` card"*. Live values are exactly two: `ship` (50) and
+   `gated_before_build` (28). A view built from the ticket's string matches **zero rows**.
+2. **`runner_items.backlog_id` is a display string** — `'SES-132 (Runner · P10 - Tooling)'` — so
+   `ri.backlog_id = b.backlog_id` matches **zero rows**. Census of all 78 card rows: **61** carry
+   a leading `XX-N` id, **16** name no ticket (directive cards, invention proposals,
+   `'no ticket yet …'`), 1 is NULL. The link is
+   `substring(ri.backlog_id from '^[A-Za-z]+-[0-9]+')`, which correctly returns NULL for exactly
+   those 16.
+
+Either mistake makes `'in review'` **permanently unreachable while nothing looks broken** — every
+row simply keeps its stored status. **Negative control, and it is what makes the QA
+discriminating:** the naive join returns `in review = 0`; the shipped form returns `1`
+(`SES-132`, `done` with an undecided `ship` card) and drops `done` from 38 to 37.
+
+### Why mode is a function and the view is thin
+
+The ticket sketches `CREATE VIEW backlog_active AS SELECT *, <CASE> … WHERE status NOT IN
+('done','removed')`. Written that way the `'done'` branch is **dead code by construction** — a
+`done` row cannot appear in a view that excludes `done` rows. The ticket's stated goal is one
+owning definition for *every* display and summary, and the summaries that matter (a now-tier
+census, the promised live epic shipped-counts) are precisely the ones that read history rows. So
+`public.backlog_mode(status, claimed_by, claimed_at, backlog_id)` holds the definition and
+`public.backlog_active` calls it. Precedence is top-down and deliberate: a live claim outranks an
+undecided card, so a re-opened ticket someone is actively building reads `in development`.
+
+Measured distribution over all 602 rows: `missing` 511, `partial` 50, `done` 37,
+`in development` 2, `in review` 1, `removed` 1. The view returns 563 and shows no `done`/`removed`
+— the dead branch is genuinely gone rather than merely unexercised.
+
+**Grants.** `backlog_items` carries **no** `anon`/`authenticated` grants at all (the `DAT-18`
+lockdown), verified before writing. A normal Postgres view runs with its **owner's** privileges,
+so the view is `WITH (security_invoker = true)` — it can never be wider than its caller. Revokes
+name `PUBLIC` first (`SES-101`'s lesson: revoking from `anon, authenticated` alone reports success
+and changes nothing). Asserted **both** directions on the view and the function: `anon`/
+`authenticated` `false`, `postgres`/`service_role` `true`. One `backlog_mode` overload.
+
+### The dependency the ticket did not anticipate — named, not papered over
+
+The ticket says check 3 should *"flag only if such a row still holds a queue number, claim, or
+pin"*. **The snapshot the lint reads carries none of those three columns**, and
+`check-session-docs.js` is deliberately credential-free and network-free. So the retarget was
+unbuildable as specified.
+
+Resolved by appending **one derived column, `History residue`**, following the same append-last
+pattern `SES-110` and `SES-112` used. **Derived rather than three raw columns, and that is the
+load-bearing half:** `claimed_at` is rewritten twice per cycle across eight cycles a day and
+`queue` churns all ~600 rows on every recompute — exactly the "row churn, not backlog content"
+class that `export-backlog-snapshot.js`'s own header excludes `id`/`created_at`/`updated_at` for.
+Exporting them raw would have destroyed the file's byte-identical-across-unchanged-runs guarantee,
+which is the property that makes *"a diff here means the board actually moved"* true. The cell is
+computed only for `done`/`removed` rows and is empty for every active row and every clean history
+row — **zero bytes of churn today**, a diff precisely when there is drift.
+
+### Check 3, retargeted — and the arm that stops it passing vacuously
+
+`37 → 0` junk flags; the whole report `49 → 13` findings. Note what the removed flags said: *"Close
+it out of the table"* — under the revised B1 that is the **wrong instruction**, so they were worse
+than noise.
+
+A silent check always "passes", so both arms were proven on fixtures rather than assumed:
+
+- **Residue arm.** `SES-132` was dirtied live (`queue = 9999`, `pinned_position = 42`,
+  before-image first), the snapshot regenerated to a scratch path, and the check fired on exactly
+  that row — *"still holds live-board state (`queue=9999;pin=42`)"* — and on none of the other 601.
+- **Column-absent arm.** Run against the pre-`SES-115` snapshot from `HEAD`, check 3 reports that
+  the file *"carries no History residue column, so check 3 could not look at its 37 history rows
+  at all"* rather than reporting a clean board it never examined. That is the same false-all-clear
+  failure `SES-83` (d) cycle 4 rewrote this script's header to prevent.
+- **Cleanup and determinism in one assertion.** After restoring `SES-132` from its before-image,
+  the re-export printed `unchanged` with the **identical sha256** (`6ab4d616…`) — which proves both
+  that the fixture left nothing behind and that the new column is deterministic. The dirty export's
+  hash differed (`ed11d906…`), so the cell demonstrably reaches the payload.
+
+### Register B1, formally revised
+
+`docs/RUNNER-GOV-0820-REQUIREMENTS.md`: *"history lives in the table, filtered"* replaces *"history
+leaves the table"*, under a dated note with the original wording kept above it per this file's
+convention. **This is not a softening of John's no-archive rule** — his objection was to
+*maintaining* archived tickets, and nothing about a kept row is maintained. What a closed ticket
+must shed is only its live-board state, which `recompute_backlog_queue()` and the step-7 claim
+release already clear.
+
+### Close-out
+
+`SES-115` → `done`; recompute moved **563** rows and cleared its queue number (self-test of the
+ticket's own residue rule — it left clean). Queue top: 1 `SES-116`, 2 `SES-91`, 3 `SES-117`.
+Snapshot regenerated (602 tickets). Build clean; regression **34/34 with credentials**; dev **200**.
+
+**Named as not done:** John's emergency directive `85ff7b6d` (*"ses-132 and 133 are emergencies"*)
+was claimed by this cycle at layer 1a and **not built by it** — `SES-132` had already shipped as
+`v7.0.170` (`c559f96`) and `SES-133` was held by a **live peer claim** (cycle `76fa8b54`,
+re-verified fresh). Duplicate-building a claimed ticket is the one thing the claim system exists
+to prevent, so this cycle fell through to the board per B24 and the directive's disposition is
+recorded in the tail rather than guessed at here.
 ## session/cycle-20260823-0132 (v7.0.172, 2026-08-23, runner cycle `88833cc2`, model Opus 5) — the masthead learns what time John last touched the page, and whether a run has picked it up
 
 **Mission:** selection layer **1a** — the oldest `queued` one-off directive, `runner_directives`

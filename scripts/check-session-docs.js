@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-// DeepBench v7.0.157 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112
+// DeepBench v7.0.173 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115
+// FEATURE: SES-115 -- check 3 stops flagging every `done` row (37 of this report's 49 findings,
+// measured before the change) and flags only a history row that still holds live-board state,
+// read from the snapshot's new appended History residue column. Register B1 as revised: history
+// lives in the table, filtered -- a closed ticket keeps its row, it just loses queue/pin/claim.
 // FEATURE: SES-112 -- the snapshot reader tolerates and reads the appended Design status /
 // Kickoff columns; an empty Design status is read as untriaged, never as 'auto'.
 // FEATURE: SES-110 -- the snapshot reader tolerates and reads the appended Epic column.
@@ -167,10 +171,11 @@ function parseSnapshotRows(text) {
     if (!/^\|\s*\d+\s*\|/.test(l)) continue; // data rows lead with the ordinal column
     const cells = l.split(/(?<!\\)\|/).slice(1, -1);
     // Deliberately `< 9`, not `!== 12`: cells[0..8] are the nine original fields,
-    // the SES-110 `Epic` column is appended after them, and SES-112's
-    // `Design status` / `Kickoff` after that -- so this reader keeps working on a
-    // pre-SES-110 snapshot (9 cells), a pre-SES-112 one (10), and a current one
-    // (12). Tolerance is the right default here -- this is a lint over a generated
+    // the SES-110 `Epic` column is appended after them, SES-112's
+    // `Design status` / `Kickoff` after that, and SES-115's `History residue`
+    // after those -- so this reader keeps working on a pre-SES-110 snapshot
+    // (9 cells), a pre-SES-112 one (10), a pre-SES-115 one (12), and a current
+    // one (13). Tolerance is the right default here -- this is a lint over a generated
     // file, not the restore path. The strict cell-count guard lives in
     // export-backlog-snapshot.js's parseDocument(), which is the reference
     // reader and the thing that must fail loudly if writer and reader drift.
@@ -189,6 +194,14 @@ function parseSnapshotRows(text) {
       // is the one substitution SES-112 exists to prevent.
       designStatus: decodeCell(cells[10]).trim(),
       kickoffLink: decodeCell(cells[11]).trim(),
+      // SES-115. Derived by the exporter, empty for every active row and every
+      // CLEAN history row; non-empty names the live-board state a done/removed
+      // row should no longer hold. `cellCount` travels with it so check 3 can
+      // tell "no residue anywhere" (healthy) from "this snapshot predates the
+      // column" (the check cannot run) -- reporting those as the same thing is
+      // the false all-clear this script's own header was rewritten to prevent.
+      historyResidue: decodeCell(cells[12]).trim(),
+      cellCount: cells.length,
     });
   }
   return rows;
@@ -221,12 +234,34 @@ function checkBacklogSnapshot(findings) {
     return;
   }
 
-  // Check 3, ported: B1 (John, 2026-08-20) -- shipped tickets are history, never
-  // maintained on the open board. The markdown-era form of this was a `✅ Done`
-  // row left in an active file instead of moved to FEATURES-ARCHIVE.md.
-  const done = rows.filter(r => r.status === "done");
-  for (const r of done) {
-    findings.push({ check: "3", severity: "FLAG", detail: `backlog_items: ${r.id} has status "done" but is still on the open board -- shipped tickets are history (register B1), not maintained rows. Close it out of the table.` });
+  // Check 3, RETARGETED by SES-115 (v7.0.173): a done/removed row is HISTORY, not drift.
+  //
+  // Register B1 as originally written ("archived/shipped tickets are history, never
+  // imported or maintained") was read as "history leaves the table", so this check
+  // flagged every `done` row it found. John's 2026-08-22 design revises that to
+  // keep-and-filter: rows are NEVER deleted -- they stay in backlog_items forever as
+  // live SQL history plus this snapshot's git log -- and "active" is a filter
+  // (public.backlog_active) rather than a cleanup chore nobody was ever going to do.
+  //
+  // MEASURED before the retarget, on this clone: the old form emitted 37 FLAG lines
+  // out of 49 total findings -- 76% of the report was noise, and it told every reader
+  // to "close it out of the table", which is now precisely the wrong instruction.
+  //
+  // What remains genuinely wrong is a history row that never let go of the live board:
+  // recompute_backlog_queue() clears a closed ticket's queue number and pin, and its
+  // cycle releases the claim. Anything still set means a recompute was MISSED. The
+  // exporter derives that into the `History residue` cell (see its residueOf()).
+  const history = rows.filter(r => r.status === "done" || r.status === "removed");
+
+  // A snapshot written before SES-115 has no residue column, so every cell reads
+  // empty and this check would report a clean board it never actually looked at.
+  // Say so instead -- same rule as the two guards above.
+  if (history.length && !rows.some(r => r.cellCount >= 13)) {
+    findings.push({ check: "3", severity: "FLAG", detail: `${SNAPSHOT_REL} predates SES-115 and carries no "History residue" column, so check 3 could not look at its ${history.length} history rows at all. Regenerate it with: node scripts/export-backlog-snapshot.js` });
+  } else {
+    for (const r of history.filter(r => r.historyResidue)) {
+      findings.push({ check: "3", severity: "FLAG", detail: `backlog_items: ${r.id} is "${r.status}" but still holds live-board state (${r.historyResidue}) -- a closed ticket keeps its row (register B1, as revised: history lives in the table, filtered) but must lose its queue number, pin and claim. This is a missed recompute: run SELECT public.recompute_backlog_queue();` });
+    }
   }
 
   // Check 3d, ported: the per-ticket length cap now applies to `description`,

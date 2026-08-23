@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.173 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-115 — register B1 formally REVISED in place under a dated note (its original wording kept above the note, per this file's convention that the superseded sentence stays visible). "History leaves the table" becomes "history lives in the table, filtered": rows are never deleted, public.backlog_active (migration ses115_backlog_active) is the one owning definition of active and carries a computed `mode` via public.backlog_mode(). The revision is not a softening of John's no-archive rule — his objection was to MAINTAINING archived tickets, and nothing about a kept row is maintained; what a closed ticket must shed is only its live-board state (queue number, pin, claim), which recompute_backlog_queue() and the step-7 release already clear. MEASURED, and it is why this could not stay prose: read literally, the old wording made check-session-docs check 3 flag every done row — 37 of that report's 49 findings, 76% noise, every one of them instructing the reader to "close it out of the table", which under the revised rule is the wrong action. Check 3 is retargeted to the residue only, so it now fires on a missed recompute and is silent on history. -->
 <!-- DeepBench v7.0.133 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-86 phase 3, directive f47e5a95 — B30 amended in place: John's automation queue stops being a selection layer a cycle EXECUTES BY HAND and becomes the board's leading sort key (backlog_items.automation_rank, migration ses86c_automation_lane). B30 predicted this ("post-SES-83 d/e the queue engine's pins express the same thing in data"); this is that, arriving early because the prose layer had already failed silently — measured 16:29Z, C4's tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told John the next cycle would be "building product, not tooling". He overruled it and force-ran the cycle. The self-retiring property B30 described is preserved mechanically (a done ticket leaves the ranked set). Two things named as NOT done so they are not assumed: B23 pins (when built, a pin sorts ABOVE automation_rank — John's live tap outranks a standing build order) and the parallel-cycles half of his line, which collides with the B31 lease and went to him as a gated card. -->
 <!-- DeepBench v7.0.122 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 34865f07 — register B39 appended and B38 corrected in place under a dated banner (its wrong sentences kept; the mistake is the lesson). John's testimony — "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." — names the mechanism four probes could not: the .claude/ gate is a harness permission prompt rendered ONLY in the human session UI, invisible and unanswerable to the agent, cleared by a person. B38's location was right, its clearing model wrong: the stall does not self-clear, so "a cost, not a prohibition — budget ~35 minutes" was a sample of the ATTENDED cases only. The partition is exact and was re-derived from live rows: John's taps stop 03:48Z, resume 12:50Z; every probe that cleared ran inside his waking window, all three that parked 8h+/never ran inside the nine-hour hole, and the two parked cycles resumed TOGETHER eighteen minutes after his first morning tap. New rule: an unattended cycle never enters the gate (no bounded recovery); the edit stays legitimate work needing a session he attends. SES-95 superseded as "the decisive probe" — unattended it parks rather than confirms. His onset attribution is contradicted by 21 hours and said so; his mechanism is right, and a real mediated link survives. Three residues kept labelled as inference, the steelman shipped alongside, and two questions left to John: relocate the inflight marker out of .claude/, and whether a pre-approval can be granted these cloud sessions at all. -->
 <!-- DeepBench v7.0.121 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 1d01ea85 — four registers appended. B35 records John's three answers (Reverse-on-gated "leave it"; the budget day is an America/Chicago day; a silent run must push why + what to do next). B36 logs his fourth item — subagents appearing to ask permission — as a question the RUNNER owes evidence on, not one John must rule on. B37 is the correction this cycle made to its own unshipped rule: a silent cycle is not a dead cycle, measured live when the two cycles presumed dead resumed after nine hours and finished. B38 narrows B36 with the surviving hypothesis — the .claude/ stall tracks Bash redirection, not the path (Write/Edit writes under .claude/ succeeded in seconds), which would make v7.0.117's blanket rule too wide; held open, with the next cycle's own edit as the decisive probe. -->
@@ -38,9 +39,32 @@
 
 ## B. Locked requirements — to build (the automation tickets cut from here)
 
-- **B1. Single DB table for all OPEN backlog tickets** (John: no archive — archived/shipped
-  tickets are history, never imported or maintained). Files become generated backups; active
-  files stop carrying tickets so session startup reads shrink. [SES-83 b/c queued; d/e gated]
+- **B1. Single DB table for ALL backlog tickets — history lives in the table, filtered**
+  (John: no archive — archived/shipped tickets are history, never imported or maintained).
+  Files become generated backups; active files stop carrying tickets so session startup reads
+  shrink. [SES-83 b/c queued; d/e gated]
+
+  > **REVISED 2026-08-22 (John's design), shipped `SES-115` / `v7.0.173`.** The original wording
+  > above was read as *"history leaves the table"*, and nothing was ever built to make it leave —
+  > so `done` rows accumulated on the board and `check-session-docs.js` check 3 flagged every one
+  > of them as drift. **Measured before the fix: 37 of that report's 49 findings were those
+  > flags — 76% noise, all of it telling the reader to "close it out of the table".**
+  >
+  > The rule is now **keep-and-filter**: rows are **NEVER deleted**. A closed ticket stays in
+  > `public.backlog_items` forever, which is what gives the platform live SQL history and gives
+  > `docs/backlog/BACKLOG-SNAPSHOT.md` a real git log. *"Active"* becomes one owning definition —
+  > **`public.backlog_active`** (migration `ses115_backlog_active`), which filters
+  > `status NOT IN ('done','removed')` and carries a computed **`mode`** column
+  > (`in development` / `in review` / `done` / else the stored status) via
+  > `public.backlog_mode()`.
+  >
+  > **The no-maintenance spirit survives intact, and that is the point of the revision** —
+  > John's objection was to *maintaining* archived tickets, not to their rows existing. Nothing
+  > is imported, nothing is groomed, nothing is moved. What a closed ticket must lose is only its
+  > **live-board state**: its queue number, its pin, its claim, all cleared automatically by
+  > `recompute_backlog_queue()` and the step-7 claim release. Check 3 is retargeted to exactly
+  > that residue, so it now fires only on a **missed recompute** — real drift — and is silent on
+  > history, which is not.
 - **B2. Both governance modes (Manual + Automated) switch to the DB** for backlog reads/writes.
   [SES-83 d/e — John's sign-off at switchover]
 - **B3. Ordering:** finish ALL of tier `now` before `next`, all `next` before `later`; within a
