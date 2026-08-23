@@ -5,6 +5,22 @@
 
 ---
 
+## session/design-briefing-colwrap (v7.0.193 + v7.0.194, 2026-08-23, attended design session, model Fable 5, coding subagents Sonnet 5) — the briefing's ID chip learns to give up space instead of stealing it
+
+**Ticket:** `SES-148` — *Briefing card heads: a long ID chip cannot shrink and crushes or clips the title on desktop* (Tooling · `P9 - Bug Fixes · FLAGGED`, tier `now`). Filed and closed `done` by this session (found live by John, screenshots of §5/§6 on desktop).
+
+**Root cause.** The `card()` head row in `docs/runbooks/briefing-template.html` is a flex row (`cardnum · kind · idchip · ttl · st · chev`) with `.idchip{flex-shrink:0}`. The chip renders `coalesce(backlog_id, display_ref)` (`SES-116`), and long `display_ref` values — `directive 603f44ea (Runner · P10 - Tooling)`, `no ticket yet — your Accept files one (follows SES-140 / SES-141)` — refuse to shrink, so `.ttl` (`flex:1`, basis 0) collapses to a word per line (card 5.14) or the row's minimum width exceeds the card and `.item.fold{overflow:hidden}` clips `.ttl`/`.st` unreadable (card 6.2). The mock the framework shipped against only ever showed short IDs; the long-chip case arrived with `SES-116`'s display_ref chips.
+
+**Fix (two ships, one rule).** v7.0.193: `.idchip` → `flex:0 1 auto; min-width:0; max-width:45%; overflow-wrap:anywhere`. Design-session QA then measured the shipped rule at the briefing's real 665px card width and caught the 45% cap violating the approved intent ("the title always keeps the majority of the space"): extreme chip 45%, title 27% — the cap ignored the ~150px of fixed head siblings. v7.0.194 patched the cap to 35%. Measured after: extreme chip 34% (2 lines), title 37–38% — title out-weighs the chip on every card; `SES-133`-style short chips single-line and unchanged (title 65%); 360px mobile un-clipped. Negative control re-ran the same injection under the old rule text and reproduced the crush (title 13%), so the assertions discriminate. Live QA mechanics note: the preview pane computes zero layout until the Browser pane is actually displayed (`tabs_select`) — every measurement before fronting the tab returned width 0.
+
+**Propagation.** The live page is artifact `4c22b9b1-6b14-4092-b728-1756a59b3173`, rebuilt from this template every cycle — accepted on documented indirect evidence that the next republish carries the fix (template is the republish's sole CSS source; no manual republish, which would race John's recorded taps).
+
+**Process gap found and filed:** `SES-150` — *Attended sessions cannot record a board before-image — runner_before_images is FK-locked to runner_cycles* (Tooling · `P10 - Tooling`, `open`). CLAUDE-DESIGN steps 9/5c cite §19v's before-image rule for every `backlog_items` UPDATE, but `runner_before_images.cycle_id` is NOT NULL + FK to `runner_cycles(id)` — an attended session has no cycle row and structurally cannot comply. This session's `SES-148` close (status `open`→`done`, description append) shipped with its before-state recorded here instead: the row was created by this same session; its full INSERT is in the session transcript and the kickoff.
+
+**Close-out.** Doc-only commits (template lives under `docs/runbooks/`; no `src/`/`api/` change — `npm run build` still run and green per the standing gate). Board writes: `SES-148` filed → claimed → `done` with claim held; `SES-150` filed `open`; `recompute_backlog_queue()` after each; `BACKLOG-SNAPSHOT.md` regenerated (617 rows). Claim released after the close-out push. Kickoffs `docs/kickoffs/v7.0.193-SES-148-briefing-idchip-wrap.md`, `docs/kickoffs/v7.0.194-SES-148b-idchip-cap-35.md`.
+
+---
+
 ## session/ses-117 (v7.0.192, 2026-08-23, attended design session, model Fable 5, no subagent) — the constraint half shipped days ago; this session makes the documentation stop contradicting the script it documents
 
 **Ticket:** `SES-117` — *Structural filing guarantees: title and type can no longer be skipped or polluted* (Tooling · `P10 - Tooling`, tier `now`, Automation epic). **Closed `done`** (was `partial` / `design_status = 'needs-desktop'`).
