@@ -11430,3 +11430,113 @@ confounded by John being in the app, and a confounded number is worse than an ho
 invention pass **skipped**: five cycles in this CST day already carry `INVENTION PASS`. Step 0b found one
 silent peer (`db8b9eee`, open 25h) — already stall-notified at 2026-08-21T20:11Z, so no duplicate push,
 and its outcome left untouched (a successor never adjudicates a predecessor's, register B37).
+
+---
+
+## 2026-08-23 — `session/cycle-20260823-0313` (v7.0.177, Automated runner cycle `7109c423`)
+
+**`SES-91` — `backlog_items.title` stops holding the priority-class string (Tooling · `P10 - Tooling`) CLOSED `done`.**
+
+**Selection.** Layer 1b, John's standing Automation drain (`drain_epic_next` → `pick`). The
+drain's first answer was `SES-139` at queue 1; its atomic claim returned **0 rows** — cycle
+`b9201486` had claimed it at `03:18:15Z`, three minutes earlier. Dropped to the next claimable
+member (`SES-91`, queue 2) exactly as register B24 drops past a gated card. **No `record_skip()`
+row was written, deliberately:** `SES-127` puts a contested claim outside the vocabulary because
+it clears itself on the 24h boundary and there is nothing John can do about it; §10 is titled
+*waiting on **your** input*.
+
+**Premise revalidation — holds, but the ticket's own number is wrong by 5.6×.** `SES-91` says the
+defect covers *"all 553 imported tickets."* Census taken this cycle before a line changed: **605**
+rows total, **99** matching `^P[0-9]+ - `, of which **98** are a *bare* class string
+(`P9 - Bug Fixes.` ×44, `P10 - Tooling.` ×33, `P9 - Bug Fixes · FLAGGED.` ×19,
+`P1 - Improves John's Skills.` ×1, `P2 - Inventive.` ×1); **0** blank titles, **0** blank
+descriptions. The figure was true the day it was filed — `SES-85`'s classification sweep and every
+ship since repaired the rest incidentally — and is a trap for any cycle that quotes it instead of
+measuring. The 99th row is `ADM-1`, whose title is a real sentence carrying John's own words behind
+a stale class prefix; it is **left alone**, on `SES-117`'s own wording (*"`title ~ '^P[0-9]+ - '`
+**with nothing after the class** is the import defect, not a title"*) rather than on this cycle's
+opinion, because widening a boundary John has already been shown is not a repair.
+
+**The half the ticket got wrong — and it would have passed the ticket's own QA.** `SES-91`'s
+repair rule and its QA bar are one sentence: *"a sample of repaired titles equals the first bolded
+clause of their own description."* Implemented literally over the same 98 rows, after stripping the
+class prefix, that rule produces:
+
+| Result of the ticket's own rule | Rows |
+|---|---|
+| Provenance sentence (`New,` / `Found ` / `Promoted from ` / `⚠️` / `Likely ` / …) | **47** |
+| No leading bold clause at all → NULL | **3** |
+| Longer than 120 characters | **38** |
+| average clause length 116 chars; longest 378 | — |
+
+Concretely it would name `AA-133` *"New, found 2026-07-07 alongside `AA-132`."* and `AGT-003`
+*"Promoted from `FEATURES-NEXT.md` 2026-07-17 (now/next re-check — agent model)."* **That is worse
+than the class string it replaces.** A class string is *visibly* wrong, so nobody trusts it; a
+provenance sentence in the title slot **looks like a title** and is read as one. And it clears the
+ticket's only stated check — zero rows matching `^P[0-9]+ - ` — while leaving the board less
+readable than before: the "would it still pass if the change did nothing?" test running in
+reverse, a change that does the wrong thing and satisfies every check written for it.
+
+**So the rule shipped is: each title is AUTHORED from its own row's description** — the substance
+of the ticket in one line, not the first clause that happens to be bold. All 98 were written this
+cycle from each row's description head.
+
+**QA — five arms, two of them discriminating rather than complete.**
+
+- **A.** Bare-class titles: **98 → 0**.
+- **B.** All 98 replacements non-empty, length **72–108** (bar was 30–120), **0** matching
+  `^P[0-9]+ - `, **0** beginning with a provenance opener.
+- **C — NEGATIVE CONTROL.** The ticket's own rule, run **read-only** against the same 98 live rows,
+  asserted to fail: **47** provenance, **3** NULL, **38** over-length, exactly as tabled above.
+  This is what makes arm A discriminating instead of a presence check — it prices the difference
+  between the specified rule and the shipped one, in numbers, on the real rows.
+- **D — ANTI-FABRICATION.** Every repaired title must share a distinctive token (≥6 chars,
+  stop-words excluded) with its **own** `description`. **98 of 98 pass, 0 failures, 0 rows with no
+  testable token.** This is the arm that makes "authored" checkable rather than trusted, and it is
+  the one a future title pass must keep.
+- **E — BLAST RADIUS.** 605 rows still; rows still matching `^P[0-9]+ - ` = **1**, and it is
+  `ADM-1` by name; before-images for this cycle = **98**.
+
+**Two implementation choices that are easy to get wrong.**
+
+- **Keyed on the primary key `id`, never `backlog_id`.** `backlog_id` carries no unique constraint
+  and **`CHI-48` occupies two rows** (`SES-86` phase 2's own QA found it; filed as `SES-30`).
+  Exactly one of the pair carried the defective title, so `UPDATE … WHERE backlog_id = 'CHI-48'`
+  would have written both. The `UPDATE` is additionally predicated on the bare-class pattern, so a
+  row already repaired cannot be touched twice.
+- **`updated_at` deliberately NOT stamped.** `SES-87`'s background revalidation sweep (step 8c)
+  uses `updated_at < now() - INTERVAL '30 days'` as its *age trigger* for the sinking tail;
+  stamping 98 rows would hide them from revalidation for a month. This pass changes how a ticket
+  **reads**, never what it **claims** — every new title is derived from a description already in
+  the row. Same precedent, same family: `recompute_backlog_queue()` does not touch `updated_at`
+  either (`SES-86` phase 2, `v7.0.130`). The snapshot diff does not depend on it — the exporter is
+  deterministic over payload content, so the change shows up regardless.
+
+**What it unblocks, and what was deliberately not done early.** `SES-117` (now queue 1) adds
+`NOT NULL` + a `CHECK` rejecting the bare-class pattern and says in its own text that constraint
+(1) depends on this backfill; **that CHECK must be written to accept `ADM-1`**, whose title starts
+with a class and continues into real content. `SES-119` (queue 3) can then drop the read-time
+`gist` workaround — **not done here**, because `runner-cycle.md` step 5's `gist` expression stays
+correct for any future row filed the old way, and removing it is `SES-119`'s scope.
+
+**Ledger.** Cycle `7109c423-f806-4c58-b5f7-161837bdca1f`, stamp
+`DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`, trigger scheduled. Step 0 (1) stamp
+matched the stored routine prompt verbatim; (2) retired per B42. Step 0b swept all four silence
+shapes — **0 rows on each**, no silent peers, no stale claims, no wedged publish lease. Walls:
+**$0.0000** month / **$0.0000** day against $100/$5. Rest wall clear — latest meter reading
+2026-08-22T13:50Z, all-models **18%**, well under 85, and 13.4h fresh so not stale.
+`derive_token_allowance()` returned `guard = 'no bracketing pair: no night reading'` for a ninth
+consecutive reading, so `tokens_per_pct` stays **NULL** and the allowance falls to the guardrails —
+that guard is `q-adhoc-morning-standing` in its practical form and is the one open question costing
+a measurable thing. **The day's token track was over its uncalibrated cap and the cycle proceeded
+only on John's own number:** 20,851,000 estimated tokens spent in the CST day (dev 15,000,000 / QA
+5,851,000) across 27 cycles against the 10M uncalibrated cap, covered by his unexpired
+`budget_override` directive `43a9d4ae` (*"Up today's max to 25M tokens"*, expiring 2026-08-23T05:00Z
+= midnight CST), which is precedence rank (1) and outranks any derived number. Step 4b's invention
+pass **skipped** — a cycle in this CST day already carries `INVENTION PASS`. Step 4 dev probe
+**HTTP 200**. Close-out recompute moved **562** rows; queue top 1 `SES-117`, 2 `SES-118`,
+3 `SES-119`, 4 `SES-120`, 5 `SES-121`. **No subagent** (register B21): `P10 - Tooling`, no
+`P1`–`P4` classification and no root-cause diagnosis arose, and the one judgment-dense part —
+authoring 98 titles John reads, and deciding that the ticket's stated rule must not be followed —
+is a John-facing wording call on his own board, the shape B21 keeps on the orchestrator. Recorded
+because "no subagent" should be a decision, not an omission.
