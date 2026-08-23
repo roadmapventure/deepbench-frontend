@@ -5,6 +5,24 @@
 
 ---
 
+## session/design-ses-101 (v7.0.208, 2026-08-23, attended design session, model Fable 5, coding sub-session on Opus 5) — ship cards stop asking for a verdict on tickets that are already done
+
+**`SES-165` — "Ship cards keep asking for a verdict on tickets that are already done" (Tooling · `P10 - Tooling`), Automation epic, DELIVERED (commit `f5f2d0fe`), awaiting John's Accept in chat.**
+
+John opened the session by typing `SES-101` and then: *"this appears in the latest brief i need to address and should not."* The ticket had closed `done` at v7.0.203, and he had already accepted its first ship card on 2026-08-21 — yet a second ship card (`9cdf840b`, filed by the closing cycle) sat undecided on his page asking for an Accept with nothing left to grant. Measured live before a line changed: **7 of the 10 undecided non-gated cards sat on `done` tickets** (`SES-101` `9cdf840b`, `SES-121` `8c421bf3`, `SES-140` `bfd7598b`, `SES-146` `b1ca9305`, `SES-147` `6ce64ed2`, `SES-149` `9a5e922b`, `SES-162` `c1af750f`); the 3 live rows were `SES-154` `5c220f71` and `SES-157` `1f68482a` (tickets `delivered`) plus `edb78e0c` (no `backlog_id`).
+
+**The design conversation's pivot, disclosed because it reversed a one-day-old rule on purpose.** The first walkthrough framed the gated-only retire predicate as an oversight; the architect review then found it was a **deliberate carve-out** shipped at v7.0.199 (directive `16b3ff73`), rationale written down and guard-tested: a ship card asks for a *rating*, "meaningful forever," the trust ladder's only input. The session went back to John with that fact and the supersession argument — `SES-154` (v7.0.205) made John's Accept the only writer of `done`, so a rating-in-waiting now sits on a `delivered` ticket and a ship card on a `done` ticket is by definition spent — plus the stated trade (the 7 stragglers never get rated, the retired-strip copy generalizes). John: *"proceed with the fix."*
+
+**What shipped (3 repo files + migration `ses165_ship_card_retire`):** `briefing_open_cards()` retires **any** card whose ticket is terminal (`done`/`removed`), whatever its kind, each with a kind-appropriate `retired_reason`; `delivered`/`open`/`partial`/`removal proposed` always render. `docs/runbooks/briefing-page.md` step 1c rewritten with the supersession recorded in place; `tests/regression/DIR-16b3ff73-gated-card-retire.js` retargeted (assertion 2 now requires the terminal boundary + the delivered-renders rule and the *absence* of the old "Only GATED cards retire" sentence — proven to fail on the pre-change blob); `scripts/build-briefing.mjs` strip copy generalized.
+
+**QA (run by the design session, per-row and both directions):** the 7 straggler ids return `render = false` each with a reason naming its ticket's real status; the 3 live rows return `render = true` — `SES-154`'s acceptance loop intact; the 4 previously-retired gated cards unchanged; `decision` re-read NULL on all retired rows (nothing decided on John's behalf, §19v); exactly 1 overload; grants both directions (`anon`/`authenticated` false, `postgres`/`service_role` true); build green; regression **46/46**.
+
+**Before-images:** impossible for an attended session (`runner_before_images.cycle_id` is NOT NULL, FK to `runner_cycles`) — before-values recorded here instead: `SES-165` was filed this session (`status='open'` → `delivered` at close-out; claimed and lane-topped at filing per directive `48ae1939` line 4); no `runner_items` row was modified — only the function body was replaced, prior body preserved in the `dir_16b3ff73_gated_card_retire` migration.
+
+**Environment note (coding sub-session):** this worktree had no `node_modules`; the suite read 38/46 with 8 missing-package failures on the *untouched* tree (proven by stash + re-run) until `npm install`, after which 46/46. A red suite in a fresh worktree is an install gap before it is a regression.
+
+**Disclosed:** the 7 straggler ships never get rated (accepted trade); the served page updates on the next cycle rebuild, not tonight; `SES-165` itself has no briefing ship card (attended sessions don't file `runner_items`), so its Accept surface is this chat.
+
 ## session/design-ses-84 (v7.0.209, 2026-08-23, attended design session, model Fable 5, no subagent) — the brief told John to address SES-84, and nothing there was decidable
 
 **Ticket:** `SES-166` — *The brief lists SES-84 under Needs your decision, though nothing there is decidable* (Tooling · `P10 - Tooling`), filed and shipped this session. Closed **`delivered`**, awaiting John's accept. John opened the session with `SES-84`: *"this appears in the latest brief i need to address and should not."*
