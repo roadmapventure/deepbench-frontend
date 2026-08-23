@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.176 | runbooks/runner-cycle.md | SES-139 — the serial tail gains step (8): a draining cycle fires exactly one successor. Root cause of the stall, from John's "find root cause why automation is stalling": SES-111 changed what a cycle PICKS and nothing anywhere fired the NEXT one, so the back-to-back cadence of 2026-08-22→23 was hands on manual fires and fell to the 3h cron the moment they stopped. NOT a widening of §19v — its Operations paragraph has specified "24×7 as chained short sessions" since 2026-08-19 and only the cron half was ever built; John authorised the rest explicitly ("Yes", 2026-08-23, after it was stated plainly). THE GATE THE TICKET DID NOT HAVE, and it is the whole safety of the step: bound (2) reads "only from a cycle that ran its tail", and a wall-stop RUNS its tail (step 3, verbatim) — so as filed, a token-wall stop fires a successor that stops at the same wall and fires another, an unbounded loop of did_not_run rows that converts the budget wall from a brake into a metronome. Gate A (outcome ∈ shipped/gated_before_build/reverted) is what makes a wall-stop the END of the chain. Measured at ship, not reasoned: 20,851,000 est tokens across 27 cycles in the CST day against John's 25M override 43a9d4ae expiring 05:00Z, after which the allowance reverts to a 10M cap the day had already passed — the first fire after 05:00Z wall-stops. Gate B's drain_epic_next call is deliberately NOT a preview: read from pg_get_functiondef, it writes a before-image and closes the directive on the empty path, so the last cycle of a drain closes it and fires nothing. Its parameter is a STAMP, not a selector — this cycle passed the epic id at step 5 and got a correct pick with no write, which is exactly why the trap is written down at the second call site, where retirement makes it cost something. DISCLOSED RATHER THAN PAPERED OVER: the ticket's bound (3) self-termination does not currently hold — SES-110 is partial with a .claude/ half (B39, card 9e7d8bf2) and the pick predicate never reads design_status, so a needs-desktop member returns as a pick, is skipped at step 5 (SES-114), and the cycle builds from the board instead; the real bound is Gate A plus the token wall. Drain CREATION stays John-only (property 5), fleet size stays N not N^2. Doc-only; no code, no schema, no site change. -->
 <!-- DeepBench v7.0.174 | runbooks/runner-cycle.md | SES-116 — step 9's card-filing line stops teaching the defect it caused. It read "backlog ID + Type + named P-class per the Language block above", so every cycle composed 'SES-115 (Tooling · P10 - Tooling)' and stored it in `runner_items.backlog_id` — a JOIN KEY to `backlog_items.backlog_id`. Every card→ticket join therefore returned nothing, silently: the help-me ticket, the pending-on-John views, SES-112's needs-john backfill. The Language block governs what John READS and never governed a key column. MEASURED BEFORE A LINE CHANGED and the ticket UNDER-COUNTED IT 20×: it says "3 of 4 open gated cards"; the live census was 63 of 80 non-NULL rows violating, SEVEN of them undecided (CHI-84 and AGT-015 among them — both real, both mis-joining while sitting on John's page awaiting his tap). Corroboration that this was already costing real work rather than being theoretical: v7.0.173's own SES-115 view had to reach the ticket through `substring(backlog_id from '^[A-Za-z]+-[0-9]+')` because the direct join matched zero rows — a workaround written one cycle earlier, for this. Migration ses116_backlog_id_bare_check: new nullable `display_ref`, 63 rows repaired (41 to a bare id, 22 to display_ref-only), then `ck_runner_items_backlog_id_bare` VALID. THE HALF THE TICKET DID NOT ANTICIPATE, and it is why display_ref exists rather than NULL: the ticket's "NULL stays allowed for non-ticket cards" is right for a card that never had a reference, but 22 live rows carry the ONLY copy of a real one — eleven a directive uuid, two a governance register, two an ARCHITECTURE clause — so nulling them destroys it (§19v) and blanks the id chip on two cards John has not yet decided. THE ONE THAT WOULD HAVE SHIPPED A LIVE HAZARD: `NOT VALID` looks like the safe way to avoid touching history and is the opposite — it is still enforced on UPDATE, so those 22 rows become un-updatable and the next harvest of John's tap on card 477454d7 FAILS. That arm is QA'd explicitly (D=PASS) rather than reasoned about. Pattern surveyed, not chosen: matches all 603 live backlog_items ids, zero exceptions. All five QA arms proved live on fixtures inside a deliberately rolled-back transaction, both directions per SES-101. -->
 <!-- DeepBench v7.0.165 | runbooks/runner-cycle.md | SES-114 — the blocked prefix of the queue is READ, not re-derived. Three flags mean "keeps its number, step past it" — `status = 'removal proposed'` (SES-113), `design_status = 'needs-john'`, `design_status = 'needs-desktop'` — and until now only the first was visible to step 5's selection query, so a blocked ticket looked exactly like a buildable one and the only way to tell was to read its description and reason the blocker out again. MEASURED, and this cycle paid the cost it is fixing: live `runner_skips` at 23:10Z held SES-106 and SES-110 at queue 1 and 3, the top of John's standing Automation drain, and their `skip_count` went 1 -> 2 while this cycle re-established for the THIRD time that day what cycles 1df7d9c6 (19:12Z) and ed1a5eb3 (23:03Z) had already established. Three re-derivations of one answer on a 3-hour cadence. THE HALF THAT WOULD HAVE SHIPPED INERT: census before a line changed — `design_status` was `designed` on 23 rows and NULL on 573, with ZERO rows carrying `needs-john` or `needs-desktop`. Projecting the column alone adds a skip that can never fire and a QA that passes while nothing changes, so (b) the filing-time write ships in the SAME commit, and the two live permission-gate rows were corrected to `needs-desktop` from THEIR OWN descriptions (before-image first), never from this cycle's opinion. CHI-89 deliberately untouched: `removal proposed` lives in `status`, and giving one fact a second home is how two copies start disagreeing. Step 6 gains the `designed` fast path — 18 open tickets carry it and SES-112's CHECK guarantees the `kickoff_link` is there — with revalidation explicitly NOT skipped by it. Same prose->column correction as SES-86 phase 3 / SES-101 / SES-111 / SES-127: a rule each cycle must re-derive is a rule that gets re-derived differently, or three times. -->
 <!-- DeepBench v7.0.164 | runbooks/runner-cycle.md | SES-129 — step 9's "mark the directive `done`" becomes the one call that cannot forget the half John reads. §7's new follow-through card tells him what became of each directive he wrote, and the outcome it needs exists nowhere: measured before a line changed, runner_cycles.item_id — the only plausible derivation — holds a runner_items uuid, the directive's OWN id, and free prose (one value a 96-character sentence) across the 24 closed rows, so deriving it renders a column of uuids and half-sentences. New close_directive(cycle, directive, outcome, note), migration ses129_directive_outcome, sets status + acted_cycle + outcome + note in one call, writes its own before-image, and RAISES rather than defaulting when the outcome or the note is missing. That is deliberate and is the whole point: a second write a cycle must remember is the failure this platform has now paid for six times (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128), and the previous wording — three words, "mark it done" — is exactly the shape those six took. Idempotent in the direction that matters: a directive already closed WITH an outcome returns already_closed and is untouched, so a re-run can never overwrite a verdict already sitting on John's card. 'closed_unrecorded' is rejected by the function and accepted only by the column's CHECK, so the 24 backfilled rows can say what is true while no cycle can ever label its own work unrecorded. QA proved all five arms live on a fixture inside a rolled-back transaction (bad outcome rejected by the function's OWN message, backfill-only value rejected, blank note rejected, real close lands, second call preserves the note), and the grants were asserted BOTH directions per SES-101 — anon/authenticated false, service_role true. -->
@@ -1339,8 +1340,72 @@ stamp `briefed_at` on the §10 skip rows you just rendered, and ONLY after the r
 resolved_at IS NULL;` — `briefed_at IS NULL` *is* the NEW chip, so stamping before the publish
 lands silently eats the chip on rows John never saw, and stamping after means the worst case is
 one extra night marked new; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
-(holder-guarded statement in step 1). Then end the session cleanly. The tail should take
+(holder-guarded statement in step 1); **(8)** fire one successor, if and only if both gates below
+pass. Then end the session cleanly. The tail should take
 seconds to low minutes — everything long-running happened before it, in parallel.
+
+**(8) A DRAINING CYCLE FIRES ITS OWN SUCCESSOR — TWO GATES, BOTH REQUIRED (`SES-139`,
+`v7.0.176`).** Root-caused 2026-08-23 from John's *"find root cause why automation is stalling"*:
+`SES-111` changed what a cycle **picks** and nothing anywhere fired the **next** one. `ARCHITECTURE.md`
+§19v's *Operations* paragraph has always specified the model — *"24×7 as **chained short sessions**:
+a scheduled cloud task fires; each firing runs one cycle"* — but only the 3-hour cron and John's
+masthead "▶ Run a cycle now" link ever existed, so the chained half was never built. The night of
+2026-08-22→23 ran back-to-back on **manual** fires; when his hands stopped, the cadence fell back to
+the cron. That gap is the stall. John authorised the widening explicitly (**"Yes"**, 2026-08-23, in
+chat, after it was stated to him plainly). Run this **after (6) and (7)** — never before your row is
+closed and the lease released:
+
+| Gate | Test | Fail |
+|---|---|---|
+| **A — you actually ran a cycle** | your own `outcome` ∈ `shipped` / `gated_before_build` / `reverted` | fire nothing |
+| **B — a standing drain still has claimable work** | `SELECT * FROM public.drain_epic_next('<your cycle id>')` → `outcome = 'pick'` | fire nothing |
+
+Both pass → **exactly one** fire of the `deepbench-runner` routine
+(`trig_017TZ3JZcLBK6AYH6DKURqMH`) through the attached `Claude_Code_Remote` connection, then note
+`SUCCESSOR FIRED` — or the failure — in your cycle row. **A failed fire is a note, never a wall:**
+the 3-hour cron remains the fallback engine.
+
+**GATE A IS NOT IN THE TICKET AND IT IS THE ENTIRE SAFETY OF THIS STEP. Do not drop it.** The
+ticket's bound reads *"one successor per cycle, only from a cycle that ran its tail"* — and a
+wall-stop **does** run its tail (step 3, verbatim: *"A wall-stop still runs the step-9 serial tail
+(its record must be written), then ends"*). Implemented exactly as filed, a cycle that stops at the
+token wall fires a successor, which stops at the same wall, which fires another: an unbounded loop
+of `did_not_run` rows, each burning a session, with nothing to break it but John noticing. **That
+converts the budget wall from a brake into a metronome** — the precise inversion of what a wall is
+for. Measured at this ship rather than reasoned: 03:14Z the America/Chicago day stood at
+**20,851,000 estimated tokens across 27 cycles** against John's `budget_override` `43a9d4ae`
+(`max_tokens` 25,000,000), **expiring 05:00Z**, after which the allowance reverts to a 10M cap the
+day had already passed — so the first fire after 05:00Z wall-stops. Gate A is what makes that stop
+the **end** of the chain instead of the start of the loop.
+
+**Gate B's call is NOT a preview, and that is correct.** Read from `pg_get_functiondef` rather than
+assumed: when the epic's `now` tier is empty, `drain_epic_next` **writes a `runner_before_images`
+row and closes the directive** before returning `retired`. Leave it that way — the last cycle of a
+drain closes the drain and fires nothing, in the place the emptiness is first observed. Do not add a
+dry-run form to dodge the write.
+
+**Pass YOUR CYCLE ID: the parameter is a stamp, not a selector.** The function ignores its argument
+when choosing the drain (it reads the single oldest queued `drain-epic` row regardless) and uses it
+**only** to stamp that retirement before-image — so a wrong uuid succeeds silently and is correct on
+every path *except* retirement, where it attributes the before-image to a cycle that never existed.
+Recorded because this cycle did it: step 5's call was made with the **epic** id, returned a correct
+`pick`, and wrote nothing. This step adds a second call site on the one path where that mistake
+costs something.
+
+**What does NOT self-terminate — read this before quoting the ticket's bound (3) to John.** *"The
+chain self-terminates; the drain retires at `open_now = 0`"* holds only if the epic's `now` tier can
+empty, and today it cannot: `SES-110` is `partial` with a `.claude/` half an unattended cycle may not
+make (register B39, carded `9e7d8bf2`), and `drain_epic_next`'s pick predicate reads `queue` and
+claims, **never `design_status`** — so a `needs-desktop` member still comes back as a `pick`, gets
+skipped procedurally at step 5 (`SES-114`), and the cycle falls through to the board and builds
+normally. The chain therefore keeps running on real board work, bounded by **Gate A plus the token
+wall**, not by the drain retiring. A real bound, but a different one than the ticket claims.
+
+**Untouched, and not negotiable:** drain **creation** stays John-only (`drain_epic_next` property 5 —
+*"Nothing creates a drain row but John… The runner may read one; it may never write one"*). This step
+continues a drain he wrote; it can never start one. Fleet size stays stable rather than exponential —
+one successor per cycle means N concurrent cycles stay N, each replacing itself, and the cron adds to
+that fleet without multiplying it.
 
 ## Standing prohibitions (§19v — no step overrides these)
 
@@ -1355,4 +1420,7 @@ retired cycle lease); enter the serial tail without the publish lease, republish
 pre-lease harvest, or end a cycle without running the tail — and **never push or claim a
 counter without re-asserting the ticket claim first** (`v7.0.123`'s lesson, directive
 `c4d95dc7`, retargeted by B42: the coordination token must be re-proven before every
-irreversible act, whatever the token is).
+irreversible act, whatever the token is); **fire a successor from a cycle that did not run one**
+(`SES-139` tail step (8), Gate A — a wall-stop, an abort or a `failed` close fires **nothing**, or
+the budget wall becomes a metronome), **fire more than one**, or **create a drain row** (only John
+does that — `drain_epic_next` property 5).

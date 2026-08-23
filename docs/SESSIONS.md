@@ -5,6 +5,79 @@
 
 ---
 
+## session/cycle-20260823-0314 (v7.0.176, 2026-08-23, Automated runner cycle `b9201486`, model Opus 5 orchestrator, no subagent) — the runner learns to keep itself running, and the gate that stops that from becoming a metronome
+
+**`SES-139` — a draining cycle fires its own successor (Tooling · `P10 - Tooling`) CLOSED `done`.**
+Picked by **layer 1b**, John's standing Automation drain (`drain_epic_next` → `pick`, queue 1, 18
+open `now` members). Doc-only: `runner-cycle.md`'s serial tail gains step **(8)**, and
+`briefing-page.md`'s regeneration contract gains step **6**. No code, no schema, no site change.
+
+**The stall's root cause, and why the fix is in-architecture rather than a widening of it.**
+`SES-111` changed what a cycle *picks* and nothing anywhere fired the *next* one — verified live
+this cycle, not recalled: the tail ended at *"release the publish lease. Then end the session
+cleanly"*, and
+`grep -rn "fire_trigger\|force_run\|successor run\|fires its own" docs/runbooks/ docs/ARCHITECTURE.md scripts/`
+returned **zero matches** across the whole procedure surface. So the back-to-back cadence of the
+night of 2026-08-22→23 was John's hands on manual fires, and it fell to the 3-hour cron the moment
+they stopped. `ARCHITECTURE.md` §19v's *Operations* paragraph has specified the model since
+2026-08-19 — *"24×7 as **chained short sessions**: a scheduled cloud task fires; each firing runs
+one cycle"* — and only the cron half was ever built. John authorised the rest explicitly
+(**"Yes"**, 2026-08-23, in chat, after it was stated to him plainly).
+
+**THE GATE THE TICKET DID NOT HAVE, and it is the entire safety of the step.** Its bound (2) reads
+*"one successor per cycle, only from a cycle that ran its tail"* — and a wall-stop **runs its
+tail** (step 3, verbatim: *"A wall-stop still runs the step-9 serial tail (its record must be
+written), then ends"*). Implemented as filed, a cycle that stops at the token wall fires a
+successor, which stops at the same wall, which fires another: an unbounded loop of `did_not_run`
+rows, each burning a session, with nothing to break it but John noticing. **That converts the
+budget wall from a brake into a metronome** — the precise inversion of what a wall is for. So
+**Gate A** ships: fire only when this cycle's own outcome is `shipped` / `gated_before_build` /
+`reverted`. **Measured at ship rather than reasoned:** at 03:14Z the America/Chicago day stood at
+**20,851,000 estimated tokens across 27 cycles** against John's `budget_override` `43a9d4ae`
+(`max_tokens` 25,000,000) **expiring 05:00Z**, after which the allowance reverts to a 10M cap the
+day had already passed — so the first fire after 05:00Z wall-stops. Gate A makes that stop the
+**end** of the chain instead of the start of the loop. It is also written into the standing
+prohibitions, so a later cycle cannot drop it as an optimisation.
+
+**Gate B's call is deliberately NOT a preview.** Read from `pg_get_functiondef` this session:
+`drain_epic_next` writes a `runner_before_images` row and closes the directive on the empty path
+before returning `retired`. Left that way on purpose — the last cycle of a drain closes the drain
+and fires nothing, in the place the emptiness is first observed.
+
+**The parameter is a stamp, not a selector, and this cycle proved it by getting it wrong.** The
+function ignores its argument when choosing the drain (it reads the single oldest queued
+`drain-epic` row regardless) and uses it **only** to stamp the retirement before-image — so a wrong
+uuid succeeds silently and is correct on every path *except* retirement, where it attributes the
+before-image to a cycle that never existed. Step 5's call here was made with the **epic** id; it
+returned a correct `pick` and wrote nothing, so nothing is owed — and the trap is now written at
+the second call site, which is the one path where it would cost something.
+
+**QA — all four Gate B arms proven live on fixtures inside a deliberately rolled-back transaction**
+(`SES-101` pattern): baseline `pick`; every open `now` member claimed by a peer → **`blocked`**;
+the `now` tier emptied → **`retired`** *and* **1 before-image row written** (§19v honoured by the
+function itself); no queued drain → **`none`**. Three of four arms refuse to fire, which is what
+makes the QA discriminating rather than a presence check. **Rollback proved, not assumed:** drain
+still `queued`, `open_now` still **18**, **0** fixture claims, **0** stray before-images, claim
+intact. **Negative control on the premise:** zero fire mechanisms in the tree before the edit,
+exactly **one** call site after it. Gate A's truth table discriminates on its `did_not_run` and
+`failed` arms — the two the unfixed ticket text would have fired on. Build clean; regression
+**37/37 with credentials**; dev **200** (2,580 bytes, root div, correct title).
+
+**Disclosed rather than papered over:** the ticket's bound (3) — *"the chain self-terminates; the
+drain retires at `open_now = 0`"* — does not currently hold. `drain_epic_next`'s pick predicate
+reads `queue` and claims, **never `design_status`**, so a `needs-desktop` member still returns as a
+`pick`, is skipped procedurally at step 5 (`SES-114`), and the cycle falls through to the board and
+builds normally. The chain therefore keeps running on real board work, bounded by **Gate A plus the
+token wall**, not by the drain retiring. A real bound, but a different one than the ticket claims,
+and John should not read bound (3) as the thing that stops this. Drain **creation** stays John-only
+(`drain_epic_next` property 5); fleet size stays N rather than N², since one successor per cycle
+means each concurrent cycle replaces itself.
+
+Recompute **563 rows moved**; queue top 1 `SES-91`, 2 `SES-117`, 3 `SES-118`, 4 `SES-119`,
+5 `SES-120`. Kickoff `docs/kickoffs/v7.0.176-SES-139-drain-fires-successor.md`.
+
+---
+
 ## session/cycle-20260823-0230 (v7.0.175, 2026-08-23, Automated runner cycle `384f3933`, model Opus 5 orchestrator, no subagent) — the page's own name fell out of the scan window, and the defect was caught ratcheting in real time
 
 **Ticket:** `SES-138` — *Briefing republish loses the page title — the title tag sits past the
