@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.201 | runbooks/runner-cycle.md | SES-147 — step 3's token track stops being five ranked rules a cycle applies by hand and becomes ONE CALL, and John's standing DAILY MAX joins the ladder. His words 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. Migration ses147_daily_max_tokens adds runner_settings.daily_max_tokens_millions (nullable, CHECK 1..1000) and public.resolve_day_token_cap(uuid): override > 48h stale floor > the box > SES-128 calibration > the 10M default, returning cap_source and cap_reason so a cycle's ledger note traces to a RUNG rather than to its own reading of a paragraph. TENTH prose→code correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143, dir 16b3ff73) — adding a sixth rank to the prose would have been the tenth repetition of the mistake instead. THE RUNG MOST LIKELY TO BE GOT WRONG, and the reason this ticket has a negative control rather than a checklist: the 48h STALE FLOOR SITS ABOVE THE BOX. The obvious reading of "the box is THE day cap" puts it at rung 1, which hands a runner with no idea how much of John's meter is left a 25M budget; his spec says it in one clause — "a standing number must not defeat the staleness brake" — and on identical fixtures the shipped build returns 3,000,000/stale-floor where the box-above-the-brake build returns 4,000,000. A one-day override still beats the standing box (later, more specific word — the same reasoning that puts a pin above the automation lane). Blank box = rungs 1/2/4/5 EXACTLY as before, which is what makes this additive; NULL must never be coerced to 0, in the column, the harvest, or the render. THE DEFECT THIS TICKET'S OWN QA CAUGHT BEFORE IT SHIPPED, recorded because a completeness check passed on the broken build: the first build declared rest_pct/meter_pct numeric while runner_budget.weekly_rest_pct is integer, so EVERY RETURN QUERY raised 42804 — on rung 1, the rung today takes — and a budget check that errors is a cycle that cannot run at all. Only CALLING each rung found it. All seven arms proved live on fixtures inside a deliberately rolled-back transaction (override-beats-box, box-is-the-cap, stale-beats-box, no-reading-beats-box, blank-box = pre-SES-147 exactly, the CHECK rejecting 0 and 1001, the rest wall REPORTED and not enforced), rollback verified clean (box back to NULL, override still queued, 10 readings intact, max pct 37). Grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role true, revoked from PUBLIC); 1 overload per .claude/rules/supabase-function-signature.md. Step 2's settings harvest gains the daily-max half; the page contract is briefing-page.md §2b, CITED not restated. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.196 | runbooks/runner-cycle.md | SES-151 — step 1b's pacing becomes JOHN'S CLOCK GRID: a scheduled fire runs iff its cycle row's started_at falls in an America/Chicago hour divisible by interval_hours (3 → 12/3/6/9 AM/PM his clock, DST-proof; John's order 2026-08-23 "change the scheduler back to 3 hours, and it runs at 12,3,6,9"). Kills the mixed-clock elapsed-hours test that wrongly paced 3 of 9 hourly fires (cycle 6177c7aa, q-hourly-interval-boundary) and the boundary coin-flip an interval equal to the cron period created. Migration ses151_scheduler_clock_grid_chained_trigger also WIDENED runner_cycles_trigger_check to admit 'chained (drain continuation)' — found live this session: the marker required since SES-141 (v7.0.180) and named as SES-140's proof criterion was never insertable (23514 on the first real attempt, 16:47:12Z; the identical INSERT succeeded post-migration and is cycle a11c94d2, the first chained row in the runner's life). QA: six gate arms discriminating (next cron 17:40Z=12:00 Chicago → run where the retired build paced it; 13:00 → paced; chained exempt; off-grid-minute manual exempt; off switch binds; the killed 15:41Z fire correctly paced under 3h), 1 overload, grants both directions. -->
 <!-- DeepBench v7.0.195 | runbooks/runner-cycle.md | SES-140 FINAL — tail step (8) stops spawning sessions and CONTINUES THE DRAIN IN-SESSION. John's order 2026-08-23 (attended session successional-review, 6-requirement directive), replacing his SES-141 ruling: one ticket per CYCLE ROW stays the law; a session runs successive cycles while a drain stands. Why the spawn era is over, all measured live: fire_trigger refused (routine created via http_api); create_session refused 3x across two parents incl. with permission_mode explicit at 25 min ("parent session's permission mode is not yet available"); the v7.0.190 rung-2 one-shot create_trigger actually FIRED at 15:11:36Z (trig_015wHzkN7kiEBTdChhYaFVua) and the launched session booted without the git source or a usable tool list (create_trigger exposes no sources/allowed_tools) and never wrote a row — a silent dead spawn, checked again 16:19Z, still nothing. Anthropic's Claude Code docs (read this session) confirm session-spawning is not a supported pattern; the supported "work a queue until empty" pattern is one session looping internally with the schedule as the restart net. Gates A/B, one-ticket-per-cycle-row, full ceremony per iteration, walls re-checked every iteration, and drain creation staying John-only are ALL unchanged. The ACTUATOR LADDER block is deleted; its evidence is preserved in step (8)'s retirement paragraph so nobody rebuilds it. Companion ship v7.0.196 (SES-151) puts the scheduler on John's 12/3/6/9 CST clock grid. -->
 <!-- DeepBench v7.0.190 | runbooks/runner-cycle.md | SES-140 — tail step (8)'s actuator becomes a TWO-RUNG LADDER, and the reason is the hardest measurement this file carries: THE CHAIN HAS NEVER ONCE RUN. Measured live 2026-08-23T14:47Z, not recalled — across all 93 cycles in the runner's life `select distinct trigger from runner_cycles` returns `scheduled | supervised`, ZERO chained rows. So ARCHITECTURE.md §19v §Operations' "24x7 as chained short sessions" has been unbuilt in practice since SES-139 shipped the step, and the real cadence has always been the hourly cron alone. JOHN REPORTED IT FIVE TIMES IN ONE HOUR and this cycle is his word, not its own idea: Rework on SES-139 ("still don't see the drain starting the next session on its own"), SES-142 ("still can not get drain to run until completion of list of tickets"), SES-143 ("still have not seen drain run according to the rules that are displayed"), the SES-140 gated card, and its follow-up card ("drain must work no matter what... this ticket and others can not be closed"). A Rework is a directive and selection layer 1a puts a directive above the board, so SES-147 at queue 1 was stepped past on PRECEDENCE, not on a block — and deliberately with NO record_skip row, because a precedence step-past is not something John has to clear. BOTH PRIOR ACTUATORS ARE REFUSED, FOR TWO UNRELATED REASONS: fire_trigger because an agent may not fire a routine it did not create (SES-140), and create_session because "the parent session's permission mode is not yet available" — refused TWICE by predecessor 72561db3 at ~14:0xZ, 25 minutes into that parent, so NOT a warm-up race; the value appears never to be recorded for a trigger-started session, and neither remedy the message offers (retry / run the parent in auto mode) is reachable from inside a cycle. Rung 1 stays create_session (John's ruling, SES-141) with permission_mode passed explicitly, one attempt; rung 2 is a one-shot create_trigger (run_once_at ~2 min, create_new_session_on_fire) where the SCHEDULER creates the session exactly as the :40 cron does twelve times a day, so the parent-mode check is never reached. attempts-per-tier <= 1 is what keeps "exactly one successor" true: a refusal creates no session, so at most one can exist. QA PROVEN LIVE WITHOUT SPAWNING ANYTHING — probe trig_01Y1EeMzj8g7yQHxSeLs4MFF created 14:49:19Z, verified, deleted, rollback clean (list_triggers returns the two real routines only): a one-shot from a scheduled cycle auto-inherits env_01GuEzm2nCHbCB5SumvQVEQ1 and ALL FOUR MCP connections, so environment_id and connectors must NOT be passed (connectors can only narrow, so a partial list would REMOVE connections). NEGATIVE CONTROL is the predecessor's own double refusal an hour earlier on the same platform — one variable, the actuator — which is what makes this discriminating rather than merely complete: doing nothing is exactly what 72561db3 did, and it got refused. DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: the probe's session_context carried a DEFAULT allowed_tools preset and NO sources entry where the runner routine names both, so a rung-2 successor may come up without the clone (fails at step 1, recoverable — Gate A means a failed cycle fires nothing further) or without Artifact (can harvest, build, ship and write its row, but cannot republish the page); the first chained cycle owes that observation and nobody else can make it. Not a SES-019 route-around, and the ladder is shaped to make that plain: what the platform scoped is WHO MAY FIRE and WHICH CALLER MAY CREATE — mechanics, not the runner's authority, which John granted (SES-139 "Yes") and ruled on (SES-141). Gates A and B, exactly one successor, and drain creation staying John-only are all untouched. Also corrected from a live board read: exactly ONE open ticket concerns the drain chain (SES-140 itself) — SES-139/141/142/143 are all done, so John's "more than 5" are their undecided briefing CARDS, which calls for the opposite action from five open tickets. Doc-only; no src/api/lib change, no schema change, no site change. -->
@@ -619,6 +620,14 @@ first, exactly like every other harvest:
   and capture its scope per `SES-142` — one `runner_drain_scope` row per open `now`-tier member of
   that epic **at naming time**, which is the whole finish line from then on. An untick **cancels**
   the standing drain (`status='cancelled'`, before-image first); it never touches shipped work.
+- **Daily-max half (`SES-147`, `v7.0.201`)** — `UPDATE public.runner_settings SET
+  daily_max_tokens_millions = …` for the `daily_max_millions` key. **`null` is a REAL value here and
+  is not the same as an absent key:** absent means *he never touched the box* (leave the DB alone);
+  `null` means *he cleared it*, i.e. "no standing cap, budget exactly as before `SES-147`". Coercing
+  either one to `0` stores a cap of zero tokens — a number he never typed, and one the column's own
+  `CHECK (1..1000)` will refuse anyway, so the harvest would throw on a tap he had just made. Reject
+  anything outside `1..1000` rather than storing it; the page already refuses to record one, so a
+  bad value here means the state was hand-edited.
 - **The runner still may never start one on its own initiative.** A tick is John's; an untick is
   John's; a cycle that finds neither writes nothing. That property is not negotiable and this
   harvest does not weaken it.
@@ -721,8 +730,25 @@ recent readings are the wrong window.** John's meter is spent by his own manual 
 runner, so any window mixing the two yields a rate that is confidently wrong. Run this instead,
 before you compute the allowance:
 
+**AND SINCE `SES-147` (`v7.0.201`) YOU DO NOT CALL IT DIRECTLY — ONE CALL RESOLVES THE WHOLE DAY
+CAP, calibration included:**
+
 ```sql
-SELECT * FROM public.derive_token_allowance('<your cycle id>');
+SELECT * FROM public.resolve_day_token_cap('<your cycle id>');
+```
+
+`day_cap` is your allowance for the day. `cap_source` names which of the five rungs it landed on and
+`cap_reason` is that rung in John's register — **put both in your cycle row's `notes`, so the number
+traces to a rung rather than to a cycle's reading of this paragraph.** The function calls
+`derive_token_allowance('<your cycle id>')` for you and returns its result as `calibrated_allowance`
+/ `calibration_guard`, so the calibration is still stored on the morning row exactly as `SES-128`
+requires — **do not also call `derive_token_allowance` yourself.** It is harmless if you do (it
+writes only when `tokens_per_pct` actually differs, read from `pg_get_functiondef` rather than
+assumed), but it is a second statement to remember, which is the failure this entire family of
+corrections exists to remove. The retired direct call, for reading the paragraphs below:
+
+```sql
+SELECT * FROM public.derive_token_allowance('<your cycle id>');   -- now called FOR you
 ```
 
 - **`guard = 'ok'`** → `day_allowance` is your allowance for the day, and the call has already
@@ -746,12 +772,38 @@ deliberately **not** backfilled: `13:50Z` is 8:50 AM in Chicago and reads exactl
 "morning", and slotting it on that resemblance would manufacture a pair John never declared.
 
 **JOHN'S NUMBER ALWAYS OUTRANKS THE DERIVED ONE.** An unexpired `budget_override` directive with
-`max_tokens` is the ceiling, full stop — register B32, unchanged by this ticket and restated here
-because a derived allowance is exactly the kind of number a later cycle would be tempted to treat
-as authoritative. Precedence, top down: **(1)** an unexpired `budget_override.max_tokens`;
-**(2)** `derive_token_allowance()`'s `day_allowance` when `guard = 'ok'`; **(3)** the 10M
-uncalibrated cap / 3M stale floor. The rest wall (`all_models_pct ≥ 85`) sits above all three and
-is not overridable by any of them.
+`max_tokens` is the ceiling, full stop — register B32, and a derived allowance is exactly the kind
+of number a later cycle would be tempted to treat as authoritative. **`SES-147` (`v7.0.201`) added
+John's STANDING daily-max box to that ladder and moved the whole ladder into
+`resolve_day_token_cap()`, so no cycle applies it by hand any more.** Five rungs, top down —
+`cap_source` tells you which one you got:
+
+| # | `cap_source` | The cap | Whose number it is |
+|---|---|---|---|
+| 1 | `override` | an unexpired `budget_override.max_tokens` | John's number for **this one day** |
+| 2 | `stale-floor` | `runner_budget.stale_fallback_tokens` (3M) | the safety brake — **no reading, or the latest older than 48h** |
+| 3 | `daily-max-box` | `runner_settings.daily_max_tokens_millions × 1,000,000` | John's **standing** number, typed into §2b |
+| 4 | `calibrated` | `derive_token_allowance()`'s `day_allowance` when `guard='ok'` | measured from his night→morning meter pair |
+| 5 | `uncalibrated-default` | `runner_budget.runner_day_token_allowance` (10M) | the standing default |
+
+**Two of those rungs are counter-intuitive and both are deliberate. Do not "simplify" either.**
+
+- **The 48h stale floor sits ABOVE the box, not below it.** John's spec, verbatim: *"a standing
+  number must not defeat the staleness brake."* The obvious reading of *"the box is THE day cap"*
+  puts it at rung 1, and that hands a runner with **no idea how much of John's meter is left** a 25M
+  budget. Proven with a negative control rather than reasoned about: box `4` with every reading aged
+  past 48h returns `3,000,000 / stale-floor` on the shipped build and `4,000,000` on the
+  box-above-the-brake build, from identical fixtures.
+- **A one-day override still beats the standing box.** A number he wrote for today is later, more
+  specific word than a number he left in a box — the same reasoning that puts a pin above the
+  automation lane and layer 1a above layer 1b.
+
+**A blank box (`NULL`) is rungs 1/2/4/5 exactly as they were before `SES-147`** — that is what makes
+this additive rather than a change to how the runner already budgets, and it is why `NULL` must
+never be coerced to `0`. **The rest wall (`all_models_pct ≥ weekly_rest_pct`, 85) sits above all
+five and is overridable by none of them.** `resolve_day_token_cap()` **reports** it as
+`rest_wall_hit` so one call carries the whole token track — **reporting is not enforcing: you still
+check wall (a) yourself, first, and rest the cycle when it is true.**
 
 **One number in that function is an assumption, and it is named rather than buried.** Turning the
 remaining weekly pool into *one day's* allowance needs the days left in John's meter week, and
