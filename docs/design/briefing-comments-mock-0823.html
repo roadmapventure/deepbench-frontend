@@ -1,0 +1,307 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Briefing Comments Mock — 0823</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --paper:#ebe5d5; --card:#f8f2e2; --card-alt:#f2ead4;
+    --navy:#12243c; --ink:#28221a;
+    --muted:#786d52; --muted-deep:#58503a; --line:#c8bb9a; --line-soft:#d8cbac;
+    --brass:#b6873a; --brass-deep:#886224; --brass-light:#e4c786;
+    --navy-text-hi:#b8c5d8; --moss:#5a7538; --moss-light:#a6bc82; --flag:#a83319; --white:#ffffff;
+    --display:"Fraunces",Georgia,serif; --body:"Inter",-apple-system,system-ui,sans-serif;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+       font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:0 14px 48px}
+  header{background:var(--navy);color:var(--card);border-bottom:3px solid var(--brass);
+         padding:14px;display:flex;align-items:center;gap:11px}
+  .db{width:34px;height:34px;border-radius:50%;background:var(--brass);color:var(--navy);
+      display:flex;align-items:center;justify-content:center;font-family:var(--display);
+      font-weight:700;font-size:14px;border:2px solid var(--card);flex-shrink:0}
+  header h1{font-family:var(--display);font-size:17px;font-weight:600;margin:0;line-height:1.1}
+  header .sub{font-family:var(--mono);font-size:9px;color:var(--navy-text-hi);
+              letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  .mockbanner{background:var(--brass-light);color:var(--brass-deep);font-family:var(--mono);
+      font-size:10px;letter-spacing:.8px;text-transform:uppercase;text-align:center;
+      padding:5px 8px;border-bottom:1px solid var(--brass)}
+  h2{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.4px;
+     text-transform:uppercase;color:var(--muted-deep);margin:26px 0 10px;
+     border-bottom:1px solid var(--line);padding-bottom:5px}
+  h2 .secnum{font-family:var(--mono);font-size:11px;color:var(--brass-deep);margin-right:7px}
+  .secdef{font-size:11.5px;color:var(--muted-deep);margin:0 0 10px;line-height:1.5}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:7px;
+        margin-bottom:14px;overflow:hidden}
+  .head{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer}
+  .cardnum{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brass-deep);min-width:20px}
+  .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+        padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
+        background:var(--card-alt);flex-shrink:0}
+  .kind.ship{color:var(--moss);border-color:var(--moss-light)}
+  .kind.gate{color:var(--brass-deep);border-color:var(--brass-light)}
+  .kind.vis{color:var(--navy);border-color:var(--line)}
+  .idchip{font-family:var(--mono);font-size:10px;color:var(--brass-deep);flex:0 1 auto;
+        min-width:0;max-width:35%;overflow-wrap:anywhere}
+  .ttl{font-family:var(--display);font-size:14.5px;font-weight:600;line-height:1.25;flex:1}
+  .st{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0;text-align:right}
+  .st.done{color:var(--moss);font-weight:700}
+  .chev{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+  .bodyc{padding:2px 13px 13px;border-top:1px solid var(--line-soft)}
+  .idline{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:9px 0 8px}
+  .plain p{margin:0 0 8px;font-size:14px}
+  .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+       color:var(--brass-deep);display:block;margin-bottom:1px}
+  .morebtn{width:100%;font-family:var(--body);font-weight:600;font-size:13px;padding:8px 4px;
+     margin-top:4px;border-radius:6px;border:1.5px dashed var(--line);background:transparent;
+     color:var(--brass-deep);min-height:40px}
+  .decide{display:flex;gap:8px;margin-top:12px}
+  .decide button{flex:1;font-family:var(--body);font-weight:600;font-size:13.5px;
+                 padding:10px 4px;border-radius:6px;border:1.5px solid var(--line);
+                 background:var(--card-alt);color:var(--ink);min-height:44px}
+  .decide .accept{border-color:var(--moss);color:var(--moss)}
+  .decide .reject{border-color:var(--flag);color:var(--flag)}
+  .ynmean{display:flex;gap:8px;margin-top:5px}
+  .ynmean span{flex:1;font-size:11.5px;color:var(--muted-deep);text-align:center;line-height:1.35}
+  /* ---- COMMENTS — the one open-text surface ------------------------------------------- */
+  .cmts{margin-top:14px;border-top:1px solid var(--line-soft);padding-top:9px}
+  .cmts .clbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;
+       text-transform:uppercase;color:var(--brass-deep);margin-bottom:7px}
+  .cmt{display:flex;gap:8px;margin-bottom:9px}
+  .who{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.5px;
+       text-transform:uppercase;border-radius:3px;padding:2px 6px;flex-shrink:0;height:fit-content;
+       margin-top:2px}
+  .who.you{background:var(--navy);color:var(--white)}
+  .who.run{background:var(--card-alt);color:var(--brass-deep);border:1px solid var(--brass-light)}
+  .cbody{flex:1}
+  .cbody p{margin:0;font-size:13.5px}
+  .cmeta{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:1px}
+  .reqchip{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.6px;
+       text-transform:uppercase;color:var(--white);background:var(--brass);border-radius:3px;
+       padding:1px 5px;margin-left:6px;vertical-align:1px}
+  .routing{border-left:2px solid var(--moss-light);padding-left:8px}
+  .routing p{color:var(--muted-deep);font-size:13px}
+  .mkreq{font-family:var(--mono);font-size:9.5px;color:var(--brass-deep);border:1px solid var(--brass-light);
+       border-radius:4px;padding:2px 7px;background:transparent;margin-top:4px}
+  /* the box */
+  .cbox{margin-top:4px}
+  .ctoggle{display:flex;gap:6px;margin-bottom:6px}
+  .ctoggle span{font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;
+       border:1px solid var(--line);border-radius:11px;padding:3px 10px;color:var(--muted)}
+  .ctoggle span.on{background:var(--navy);color:var(--white);border-color:var(--navy)}
+  .cbox input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;
+     border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .cbox .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .empty-note{font-size:12px;color:var(--muted);font-style:italic}
+</style></head><body>
+<div class="mockbanner">Mock — sample data · behavior spec: BRIEFING-COMMENTS-0823-DRAFT.md</div>
+<header><div class="db">DB</div><div><h1>Morning Briefing</h1>
+<div class="sub">DeepBench · unified cards mock</div></div></header>
+<div class="wrap">
+
+<!-- ===================== §5 DELIVERED ===================== -->
+<h2><span class="secnum">5</span>Delivered — awaiting your acceptance</h2>
+<p class="secdef">The runner shipped these. Nothing here is <b>done</b> until you accept it.
+Every card: two buttons, one comment stream. Comments are the only open text.</p>
+
+<div class="item">
+  <div class="head"><span class="cardnum">5.1</span>
+    <span class="kind ship">Delivered</span>
+    <span class="idchip">SES-152</span>
+    <span class="ttl">Search filters on the Agent Console</span>
+    <span class="st">delivered ·<br>awaiting you</span>
+    <span class="chev">&#9662;</span></div>
+  <div class="bodyc">
+    <div class="idline">SES-152 (Tooling · P5 - Enhancements) · shipped v7.0.19x · model Opus 5</div>
+    <div class="plain">
+      <p><span class="lbl">What you can’t do today</span>You can’t narrow the console to one agent’s runs without scrolling.</p>
+      <p><span class="lbl">What you could do after</span>Pick an agent and a date and see only those runs.</p>
+      <p><span class="lbl">Why that’s worth something</span>Finding one run stops costing you two minutes of scrolling.</p>
+    </div>
+    <button class="morebtn">More info — the technical record</button>
+    <div class="decide">
+      <button class="accept">Accept</button>
+      <button class="reject">Reject</button>
+    </div>
+    <div class="ynmean"><span>Accept &rarr; the ticket is <b>done</b>. Counts toward the trust score.</span>
+    <span>Reject &rarr; the change is undone from before-images and the ticket reopens with your comments.</span></div>
+
+    <div class="cmts"><div class="clbl">Comments</div>
+      <div class="cmt"><span class="who you">You</span><div class="cbody">
+        <p>Does this filter the live runs too, or only history?</p>
+        <div class="cmeta">Aug 23, 7:41 AM CST · question</div></div></div>
+      <div class="cmt"><span class="who run">Runner</span><div class="cbody">
+        <p>History only — live runs stream into the unfiltered pane. Filtering live too needs the stream to re-subscribe per agent, a separate change.</p>
+        <div class="cmeta">Aug 23, 8:02 AM CST · answer</div>
+        <button class="mkreq">&#8594; make this a requirement</button></div></div>
+      <div class="cmt"><span class="who you">You</span><div class="cbody">
+        <p>do that — live should filter as well<span class="reqchip">requirement</span></p>
+        <div class="cmeta">Aug 23, 8:10 AM CST</div></div></div>
+      <div class="cmt routing"><span class="who run">Runner</span><div class="cbody">
+        <p>Sent back for rework — the whole thread is the spec. This card returns as <b>delivered</b> when the live filter ships. (Card stays open; your Accept still decides it.)</p>
+        <div class="cmeta">Aug 23, 9:00 AM CST · routing</div></div></div>
+      <div class="cbox">
+        <div class="ctoggle"><span class="on">Question</span><span>Requirement</span></div>
+        <input placeholder="Write a comment — Enter or tap away saves it">
+        <div class="hint">Questions are answered on this card by the next run. Requirements change the work. Everything is kept.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- collapsed, decided — history kept -->
+<div class="item">
+  <div class="head"><span class="cardnum">5.2</span>
+    <span class="kind ship">Delivered</span>
+    <span class="idchip">LOG-141</span>
+    <span class="ttl">Audit header shows real model calls</span>
+    <span class="st done">ACCEPTED ✓ · 3 comments kept</span>
+    <span class="chev">&#9656;</span></div>
+</div>
+
+<!-- ===================== §6 GATED ===================== -->
+<h2><span class="secnum">6</span>Gated before build</h2>
+<p class="secdef">Same card, same comments — only the button meanings change: this is permission, not a rating.</p>
+
+<div class="item">
+  <div class="head"><span class="cardnum">6.1</span>
+    <span class="kind gate">Gated</span>
+    <span class="idchip">DAT-22</span>
+    <span class="ttl">Nightly export of visitor labels to cold storage</span>
+    <span class="st">gated ·<br>awaiting you</span>
+    <span class="chev">&#9662;</span></div>
+  <div class="bodyc">
+    <div class="idline">DAT-22 (Data · P10 - Tooling) · rule: data-moving work needs your permission</div>
+    <div class="plain">
+      <p><span class="lbl">Why gated, exactly</span>This moves data on a table with no backups; the rule says you approve data-moving work before it runs.</p>
+    </div>
+    <button class="morebtn">More info — the technical record</button>
+    <div class="decide">
+      <button class="accept">Accept</button>
+      <button class="reject">Reject</button>
+    </div>
+    <div class="ynmean"><span>Accept &rarr; build it. Goes to the top of the queue. Permission, not a score.</span>
+    <span>Reject &rarr; don’t build it. The proposal is closed and kept with your comments.</span></div>
+    <div class="cmts"><div class="clbl">Comments</div>
+      <p class="empty-note">No comments yet.</p>
+      <div class="cbox">
+        <div class="ctoggle"><span class="on">Question</span><span>Requirement</span></div>
+        <input placeholder="Write a comment — Enter or tap away saves it">
+        <div class="hint">A requirement here reshapes the proposal before you approve it.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== §9 QUESTIONS ===================== -->
+<h2><span class="secnum">9</span>Questions</h2>
+<p class="secdef">Runner questions to you. Same anatomy, same comments — buttons read Yes / No
+(open choice: keep Yes/No wording, or the uniform Accept/Reject?).</p>
+
+<div class="item">
+  <div class="head"><span class="cardnum">9.1</span>
+    <span class="kind">Question</span>
+    <span class="ttl">Should a manual “Run a cycle now” tap also be paced by your scheduler setting?</span>
+    <span class="st">unanswered</span>
+    <span class="chev">&#9662;</span></div>
+  <div class="bodyc">
+    <div class="idline">q-manual-fire-pacing · asked Aug 23</div>
+    <div class="decide">
+      <button class="accept">Yes</button>
+      <button class="reject">No</button>
+    </div>
+    <div class="ynmean"><span>Yes &rarr; a manual tap inside your N-hour window waits like a scheduled run.</span>
+    <span>No &rarr; your own tap always runs immediately.</span></div>
+    <div class="cmts"><div class="clbl">Comments</div>
+      <div class="cmt"><span class="who you">You</span><div class="cbody">
+        <p>what happens if I tap it twice?</p>
+        <div class="cmeta">Aug 23, 7:44 AM CST · question</div></div></div>
+      <div class="cmt"><span class="who run">Runner</span><div class="cbody">
+        <p>The second run sees the first one’s claim and stops itself — you’d get one run, not two.</p>
+        <div class="cmeta">Aug 23, 8:02 AM CST · answer</div></div></div>
+      <div class="cbox">
+        <div class="ctoggle"><span class="on">Question</span><span>Requirement</span></div>
+        <input placeholder="Write a comment — Enter or tap away saves it">
+        <div class="hint">Your comment is kept with the question either way you answer.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== §12 VISION ===================== -->
+<h2><span class="secnum">12</span>Vision — the knowledge loop</h2>
+<p class="secdef">Claims live in the database now. Your comments here can become corpus updates,
+research tickets, or feature tickets — the runner routes them and reports the routing.
+Accepted knowledge feeds the second card kind: features I invent for you.</p>
+
+<div class="item">
+  <div class="head"><span class="cardnum">12.1</span>
+    <span class="kind vis">Claim</span>
+    <span class="idchip">C-thesis-30</span>
+    <span class="ttl">DeepBench’s nearest defensible market is the mid-market/agency buyer — true?</span>
+    <span class="st">undecided</span>
+    <span class="chev">&#9662;</span></div>
+  <div class="bodyc">
+    <div class="idline">vision claim · sets criteria for P4 - New Customers · confidence LOW</div>
+    <div class="decide">
+      <button class="accept">Accept</button>
+      <button class="reject">Reject</button>
+    </div>
+    <div class="ynmean"><span>Accept &rarr; ratified. Becomes a rule the runner builds and invents by.</span>
+    <span>Reject &rarr; kept as a rejected path so it’s never re-proposed.</span></div>
+    <div class="cmts"><div class="clbl">Comments</div>
+      <div class="cmt"><span class="who you">You</span><div class="cbody">
+        <p>what would we need to know to be sure about this buyer?</p>
+        <div class="cmeta">Aug 22, 9:12 PM CST · question</div></div></div>
+      <div class="cmt"><span class="who run">Runner</span><div class="cbody">
+        <p>Three things we don’t have: what agencies pay for comparable tools, which deliverable they’d buy first, and whether visible agent reasoning matters to them or only to you.</p>
+        <div class="cmeta">Aug 23, 12:04 AM CST · answer</div>
+        <button class="mkreq">&#8594; make this a requirement</button></div></div>
+      <div class="cmt"><span class="who you">You</span><div class="cbody">
+        <p>find out — research it<span class="reqchip">requirement</span></p>
+        <div class="cmeta">Aug 23, 7:50 AM CST</div></div></div>
+      <div class="cmt routing"><span class="who run">Runner</span><div class="cbody">
+        <p>Routed as a research ticket: <b>SES-1xx — What mid-market agencies pay for, and whether visible reasoning sells</b> (P1 - Improves John’s Skills), queued. Findings will update this claim and be reported here.</p>
+        <div class="cmeta">Aug 23, 9:00 AM CST · routing</div></div></div>
+      <div class="cbox">
+        <div class="ctoggle"><span class="on">Question</span><span>Requirement</span></div>
+        <input placeholder="Write a comment — or your own wording of the claim">
+        <div class="hint">A requirement here can rewrite the claim in your words, start research, or file a feature.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="item">
+  <div class="head"><span class="cardnum">12.2</span>
+    <span class="kind vis">Invention</span>
+    <span class="idchip">no ticket yet</span>
+    <span class="ttl">Client-ready “bench report” PDF from any finished run</span>
+    <span class="st">proposed ·<br>awaiting you</span>
+    <span class="chev">&#9662;</span></div>
+  <div class="bodyc">
+    <div class="idline">invented from ratified claims C-thesis-30 · C-mission-29 · class P4 - New Customers</div>
+    <div class="plain">
+      <p><span class="lbl">The idea</span>Any finished agent run can be exported as a branded one-page report an agency could hand its client — the deliverable is the thing they’d pay for.</p>
+      <p><span class="lbl">Why it fits the vision</span>You ratified that the buyer wants sellable deliverables with visible reasoning; this turns every run into one.</p>
+    </div>
+    <div class="decide">
+      <button class="accept">Accept</button>
+      <button class="reject">Reject</button>
+    </div>
+    <div class="ynmean"><span>Accept &rarr; files the ticket, classed and queued — automation picks it up.</span>
+    <span>Reject &rarr; kept as a rejected path; I won’t re-invent it.</span></div>
+    <div class="cmts"><div class="clbl">Comments</div>
+      <p class="empty-note">No comments yet.</p>
+      <div class="cbox">
+        <div class="ctoggle"><span class="on">Question</span><span>Requirement</span></div>
+        <input placeholder="Write a comment — Enter or tap away saves it">
+        <div class="hint">A requirement here reshapes the idea before it becomes a ticket.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div></body></html>
