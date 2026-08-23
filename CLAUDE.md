@@ -101,7 +101,8 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 > used to be. So the claim is the coordination point across **every** session, manual and
 > scheduled: one atomic `UPDATE … RETURNING` on `backlog_items` before any work (SQL:
 > `session-setup` skill step 2c), never check-then-claim in two statements. **1 row → it's yours;
-> 0 rows → someone holds it, take the next queued ticket.** Release it in the close-out write.
+> 0 rows → someone holds it, take the next queued ticket.** Release it AFTER the push, in its
+> own holder-guarded `UPDATE`, never in the status write (`q-claim-release-order`, `SES-106`).
 > It serializes ticket *selection* only — the `dev` branch is still fetch/rebase/push, and the
 > briefing republish has its own lock. A claim expires after 24h, which is why a dead session
 > cannot strand a ticket; re-assert it before the push and before every counter claim. Full rule

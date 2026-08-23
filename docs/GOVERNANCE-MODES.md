@@ -53,8 +53,10 @@ RETURNING backlog_id;
 
 **1 row → the ticket is yours. 0 rows → another session holds it; take the next queued ticket
 and keep going** (John's rule, verbatim: *"self administered and fixes itself if it happens to
-notice it is about to overwrite another session"*). Release it in the close-out write, in the
-same `UPDATE` that sets the ticket's status.
+notice it is about to overwrite another session"*). Release it AFTER the push, in its own
+holder-guarded `UPDATE` — never in the status write (John, `q-claim-release-order`, yes,
+2026-08-21, `SES-106`: a session that releases at the status write has nothing left to
+re-assert at the push gate).
 
 **Name what it protects, because a half-understood coordination rule is worse than none:**
 

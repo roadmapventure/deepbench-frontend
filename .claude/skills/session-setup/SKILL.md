@@ -124,10 +124,23 @@ RETURNING backlog_id;
 
 **1 row → yours. 0 rows → another session (possibly a scheduled cycle) holds it** — tell John
 who holds it (`SELECT claimed_by, claimed_at FROM backlog_items WHERE backlog_id = '<ID>'`)
-rather than working it anyway. **Release it in your close-out** (set `claimed_by = NULL,
-claimed_at = NULL` in the same UPDATE that sets the ticket's final status), and release on an
-abandon too. An unreleased claim expires after 24h, so a dead session cannot strand a ticket.
-Discussion-only sessions that never settle on a ticket claim nothing.
+rather than working it anyway. **Release the claim AFTER you push, never in the status write**
+(John, `q-claim-release-order`, yes, 2026-08-21 — `SES-106`; the old "release in the same
+UPDATE that sets the final status" wording contradicted the re-assert-before-push gate: a
+session that lets go at the status write has nothing left to re-assert at the push). The one
+stated order: status write with the claim untouched → queue recompute → re-check the claim →
+push → one guarded release:
+
+```sql
+UPDATE public.backlog_items
+   SET claimed_by = NULL, claimed_at = NULL, updated_at = now()
+ WHERE backlog_id = '<TICKET-ID>' AND claimed_by = '<your session name>';
+```
+
+The holder guard is the point — a session can never clear a claim that has since moved to
+another session. On an abort, release at the point you stop. An unreleased claim expires after
+24h, so a dead session cannot strand a ticket. Discussion-only sessions that never settle on a
+ticket claim nothing.
 
 **After any close-out write that completes/removes a ticket or files a new classed one, run
 `SELECT public.recompute_backlog_queue();`** — the board's queue numbers are materialized

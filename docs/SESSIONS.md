@@ -5,6 +5,60 @@
 
 ---
 
+## session/attended-ses106-claim-order (v7.0.169, 2026-08-23, Manual Design & Build — John in chat, model Fable 5) — the claim-release contradiction is dead in all of its homes, and two of them the ticket never named
+
+**Ticket:** `SES-106` — *Step 7 tells a cycle to release its ticket claim and to still hold it —
+John answered which order wins* — Type: Tooling, `P10 - Tooling`. Closed **`done`** (was
+`partial`). This is the attended half card `1b331855` (`gated_before_build`) asked for — the
+`.claude/` edit register B39 forbids an unattended cycle; John approved in chat.
+
+**What shipped — three files, one wording fix.** John's ruling (`q-claim-release-order`, yes,
+2026-08-21T22:05Z): release the ticket claim AFTER the push, never in the status write. The
+runner half shipped in `v7.0.150`; the manual-session homes still said the opposite:
+
+1. `.claude/skills/session-setup/SKILL.md` step 2c — the half the ticket named. Old text told a
+   session to release "in the same UPDATE that sets the ticket's final status", which leaves
+   nothing to re-assert at the push gate. Replaced with the one stated order (status write with
+   claim untouched → recompute → re-check claim → push → one holder-guarded release, SQL block
+   included) plus the abort rule.
+2. `docs/GOVERNANCE-MODES.md` — **carried the exact contradictory sentence and the ticket never
+   named it.** It is the file CLAUDE.md points to as the claim rule's canonical home, so fixing
+   the skill alone would have left the canonical doc teaching the bug. Found by grepping for the
+   release wording before closing, not by luck.
+3. `CLAUDE.md` (repo root) — the vaguer "Release it in the close-out write." Now states
+   after-the-push explicitly.
+
+Both extra homes are repo-root (unattended-editable); they simply were not in the `v7.0.150`
+scope. Three files is this session's whole diff — at the cap, not over it.
+
+**QA — the card's SQL was tested before being pasted, both directions.** Unlike `SES-110`'s card
+(two SQL defects), this card's release statement is clean, and that is now proven rather than
+assumed: in a rolled-back `DO` block against the live `SES-106` row this session actually held,
+(a) a wrong-session release matched **0 rows** and left the claim intact — the holder guard
+discriminates — and (b) the true holder's release matched **1 row**. No probe write persisted.
+The session then closed itself out in the ruled order — status write with claim held, recompute
+(565 rows moved), snapshot regen, push, release after — so the procedure's first consumer was
+this session.
+
+**Board consequence, measured:** queue top after recompute: 1 `SES-115`, 2 `SES-116`, 3 `SES-91`,
+4 `SES-117`, 5 `SES-118`. **Zero open tickets carry `needs-desktop` — the `.claude/`-blocked
+set is now EMPTY** (`SES-110` v7.0.167, `SES-106` this session), so John's standing Automation
+drain no longer has a permanent skip at the top: `drain_epic_next()` can reach every remaining
+member and actually retire. Census: 564 open, 564 numbered, 0 open-but-unnumbered, 601 rows,
+291 `now`-tier; among open, `design_status`: 16 `designed`, 0 `needs-desktop`, 548 `NULL`.
+
+**Process note recorded for future card authors:** two attended-half cards in a row carried
+paste text that had never been executed; one was broken twice over, one was clean. The rule this
+session and `attended-ses110-epic-insert` both followed — **run the card's SQL live (rolled
+back) before pasting it into a rulebook** — is now demonstrated in two consecutive session
+entries and should be treated as the default for every `gated_before_build` card.
+
+**Not done, said plainly:** build/regression not applicable — doc-only, no `src/`/`api/`/`lib/`
+file touched. The session-hygiene auto-check at worktree creation timed out again
+(`spawnSync node ETIMEDOUT`), second occurrence today — noted, not chased.
+
+---
+
 ## session/cycle-20260823-0037 (v7.0.168, 2026-08-23, runner cycle `2e8b0fab`, model Opus 5 orchestrator + a Fable 5 subagent) — his readings were all there; nothing had ever shown them back to him
 
 **Mission:** selection layer **1a** — `runner_directives` `bee71cf4`, two paragraphs John typed
