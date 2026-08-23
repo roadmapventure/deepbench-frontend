@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.182 | runbooks/runner-cycle.md | SES-143 — new step 1b, THE SETTINGS GATE: John's §2b Automation panel stops being a display and becomes binding. Locked spec docs/BRIEFING-REDESIGN-0822.md §2b (committed 840639e5). THE MECHANISM, and it is why the ticket has this shape: a cycle CANNOT edit the routine that fired it — the platform refused exactly that on 2026-08-23 (SES-140, verbatim: "fire_trigger: this routine was created via http_api, not by an agent") — so the panel cannot touch the cron and does not need to. The stored prompt already says "execute runner-cycle.md EXACTLY", so a gate written HERE binds every future cycle with no trigger edit: the cron stays hourly PERMANENTLY and each cycle paces ITSELF down to John's N, which also retires SES-140's restore obligation — there is no interval left to restore. The arithmetic is migration ses143_runner_settings's scheduler_gate(), not prose a cycle re-derives, the eighth time this platform has made that correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129). THE ONE THAT WOULD HAVE SHIPPED WRONG AND WEDGES THE RUNNER SHUT FOREVER: a predecessor read as "the most recent runner_cycles row" means t=0 runs, t=1h paces, and every later fire's predecessor is the paced row an hour before it — always <3h old, so nothing ever runs again and only John notices. The predecessor is therefore the last cycle whose outcome is NOT did_not_run (an open row counts, a failed row counts). NEGATIVE CONTROL, not reasoning: on identical fixtures the shipped predicate returns run and the naive one returns paced. It FAILS OPEN on every unknown — no settings row, a NULL column, no predecessor, an unrecognised trigger — because a gate that can stop the fleet must never stop it by accident; scheduler_on=false is the only off switch and that is John's decision. Scope is his, verbatim: the scheduler governs SCHEDULED cycles only, so a chained drain successor (SES-141) is exempt and while a drain stands the CHAIN, not the interval, sets the cadence — disclosed rather than discovered. THE HALF THE SPEC DID NOT SETTLE: it is silent on John's own manual fire, and §2b puts his "Run a cycle now" link on that very panel, so a paced-out tap is a dead button — a fire off the cron grid is exempt, the same test step 1 already uses, with the minute as a COLUMN (cron_minute) not a literal, and q-manual-fire-pacing asks him to confirm. Step 9's tail gains the settings harvest, including the drain checkbox as drain CREATION — already sanctioned by drain_epic_next property 5 ("a directive row or a briefing tap"), and the runner still may never start one itself. All nine QA arms proved live on fixtures inside a deliberately rolled-back transaction; grants asserted BOTH directions per SES-101 and DAT-18. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.180 | runbooks/runner-cycle.md | SES-141 — tail step (8)'s actuator swapped: fire_trigger (platform-refused on a routine the agent did not create, SES-140) becomes create_session, per John's verbatim ruling 2026-08-23: "we should still only do 1 ticket per session, just have the prompt kick off another session." Gates A/B and every SES-139 bound unchanged; the spawned session carries the runner prompt verbatim with a `chained (drain continuation)` trigger marker and echoes it into its runner_cycles row; GOVERNANCE-MODES.md now states chained sessions are runner-launched. Not a route-around of SES-140 (SES-019's rule stands): John authorized this exact mechanism after the refusal was stated plainly. Shipped by the ATTENDED design-briefing-redesign session — doc-only, and deliberately not left to a cycle, because the chain fix waiting on the chain was itself the stall. Live-spawn proof deliberately still owed: the first chained session appearing with its marker echoed is the QA, observable on the next draining cycle's tail. -->
 <!-- DeepBench v7.0.179 | runbooks/runner-cycle.md | SES-142 — a standing drain finishes on the FIXED member list John named, never on the live now-tier predicate. His ruling, verbatim: "the user must name when the drain is done… The use case is the epic automation — all its current tickets in the now bucket are complete." MEASURED BEFORE A LINE CHANGED, and the defect selected the very cycle that fixed it: John named 18 members on directive b74009ea; the epic's live now tier held 19; the extra one was SES-142 ITSELF, filed 03:51Z after the naming — and drain_epic_next() returned it as the pick. Cycles file into a drained epic continuously (SES-140, SES-141, SES-142 all landed in one night), so open_now = 0 receded as fast as the runner approached it and a standing order John gave with an end in mind was becoming an open-ended mandate the runner granted itself. That is an authorisation defect, not a tidy-up. Migration ses142_drain_scope: new public.runner_drain_scope (one FK row per named member, unique (directive_id, item_id)), drain_epic_next() rewritten to pick from and retire on THAT list, and the standing drain backfilled with John's 18 (before-image per INSERT, row_data = NULL). A TABLE OF FKs RATHER THAN THE text[] THE TICKET ALSO ALLOWED, for a reason this repo has already paid for: backlog_id is NOT unique (CHI-48 occupies two rows, SES-97), so an id array silently pulls in both — the same "the epic is an FK, never prose" property SES-111 already states, applied to the scope. THE DECISION MOST LIKELY TO BE GOT WRONG LATER, so it is written as a property: the named list REPLACES the tier predicate and is not kept alongside it — keeping tier='now' leaves a SECOND moving predicate, so re-tiering a named ticket would silently drop it out of a drain John declared over it (proven live: with SES-141 re-tiered to next, the shipped build still picks it, the retired build picks SES-140 instead). New fifth outcome `unscoped` — a drain with no named list falls through to the board like `blocked` but is deliberately NOT called `blocked`, because the one thing it must never do is quietly fall back to the live predicate, which is the bug wearing a default's clothes; it also does not retire the drain. QA was discriminating rather than merely complete: the retirement arm is claim-independent (all 18 named marked done inside a deliberately rolled-back transaction -> shipped build `retired`, retired build still sees SES-142 open and keeps draining), and the negative control for the pick is this cycle's OWN pre-migration call at 03:52Z, which returned pick SES-142 / open_now 19 against the shipped build's pick SES-141 / open_now 18 on identical live data. Rollback proved clean on every fixture (directive still queued, 0 named done, 0 stray before-images). Grants asserted BOTH directions per SES-101 on the function AND all four DML verbs on the table per DAT-18. Two stale claims in this file corrected from a live read, not recalled: SES-110/SES-106 are both `done`, so the "cannot drain to completion" paragraph and the tail's "does NOT self-terminate" paragraph both named a blocker that is gone — while the half that still holds (the pick predicate never reads design_status, so SES-140's needs-john flag is skipped procedurally at step 5) is kept and said plainly. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.176 | runbooks/runner-cycle.md | SES-139 — the serial tail gains step (8): a draining cycle fires exactly one successor. Root cause of the stall, from John's "find root cause why automation is stalling": SES-111 changed what a cycle PICKS and nothing anywhere fired the NEXT one, so the back-to-back cadence of 2026-08-22→23 was hands on manual fires and fell to the 3h cron the moment they stopped. NOT a widening of §19v — its Operations paragraph has specified "24×7 as chained short sessions" since 2026-08-19 and only the cron half was ever built; John authorised the rest explicitly ("Yes", 2026-08-23, after it was stated plainly). THE GATE THE TICKET DID NOT HAVE, and it is the whole safety of the step: bound (2) reads "only from a cycle that ran its tail", and a wall-stop RUNS its tail (step 3, verbatim) — so as filed, a token-wall stop fires a successor that stops at the same wall and fires another, an unbounded loop of did_not_run rows that converts the budget wall from a brake into a metronome. Gate A (outcome ∈ shipped/gated_before_build/reverted) is what makes a wall-stop the END of the chain. Measured at ship, not reasoned: 20,851,000 est tokens across 27 cycles in the CST day against John's 25M override 43a9d4ae expiring 05:00Z, after which the allowance reverts to a 10M cap the day had already passed — the first fire after 05:00Z wall-stops. Gate B's drain_epic_next call is deliberately NOT a preview: read from pg_get_functiondef, it writes a before-image and closes the directive on the empty path, so the last cycle of a drain closes it and fires nothing. Its parameter is a STAMP, not a selector — this cycle passed the epic id at step 5 and got a correct pick with no write, which is exactly why the trap is written down at the second call site, where retirement makes it cost something. DISCLOSED RATHER THAN PAPERED OVER: the ticket's bound (3) self-termination does not currently hold — SES-110 is partial with a .claude/ half (B39, card 9e7d8bf2) and the pick predicate never reads design_status, so a needs-desktop member returns as a pick, is skipped at step 5 (SES-114), and the cycle builds from the board instead; the real bound is Gate A plus the token wall. Drain CREATION stays John-only (property 5), fleet size stays N not N^2. Doc-only; no code, no schema, no site change. -->
@@ -362,6 +363,58 @@ UPDATE public.runner_lease
 RETURNING released_at;   -- 0 rows = the tail lease was stolen; leave the new holder alone
 ```
 
+**1b. THE SETTINGS GATE — John's Automation panel, honoured (`SES-143`, `v7.0.182`, migration
+`ses143_runner_settings`).** §2b of the briefing gives John a scheduler switch with an interval and
+a drain switch. This is the step that makes them binding. Run it immediately after your cycle row
+exists — it needs a row to close — and before anything else:
+
+```sql
+SELECT * FROM public.scheduler_gate('<your cycle id>', '<your prompt''s trigger: line, verbatim>', now());
+```
+
+- **`verdict = 'run'`** → carry on to step 2. The normal case.
+- **`verdict` anything else** (`paced` / `scheduler-off`) → **close the cycle now**:
+  `outcome='did_not_run'`, the returned `reason` verbatim in `notes`, `item_id` NULL. Then run the
+  step-9 serial tail exactly as any other wall-stop does (its record must be written), rename the
+  session per the routine prompt (`"did not run — paced by your scheduler setting"` /
+  `"did not run — scheduler off"`), release any claim you hold, and **end**. Gate A means you fire
+  no successor.
+
+**Why this is a gate and not a cron change.** A cycle **cannot edit the routine that fired it** —
+the platform refused exactly that on 2026-08-23 (`SES-140`, verbatim: *"fire_trigger: this routine
+was created via http_api, not by an agent"*). It does not need to. The stored prompt already says
+*"execute runner-cycle.md EXACTLY"*, so this step binds every future cycle with no trigger edit at
+all: **the cron stays hourly permanently and each cycle paces itself down to John's `N`.** That is
+also what **retires `SES-140`'s restore obligation** — there is no interval left to restore.
+
+Four properties of `scheduler_gate()` that are load-bearing. **Do not re-derive any of them by
+hand** — that is the eighth time this platform would have made the same mistake (`SES-86` phase 3,
+`v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`, `SES-129`):
+
+- **THE PREDECESSOR IS THE LAST CYCLE THAT ACTUALLY RAN**, i.e. the most recent row whose
+  `outcome` is **not** `did_not_run` (an open row counts — a peer running right now is the runner
+  running; a `failed` row counts — it consumed a slot). The obvious alternative, *"the most recent
+  `runner_cycles` row"*, **wedges the runner shut permanently**: at an hourly cron and a 3-hour
+  interval, `t=0` runs, `t=1h` is paced, and from then on every fire's predecessor is the paced row
+  an hour earlier, which is always `< 3h` old. Nothing would ever run again and only John would
+  notice. Proven with a negative control rather than reasoned about: on identical fixtures the
+  shipped predicate returns `run` and the naive one returns `paced`.
+- **It fails OPEN in every unknown** — no settings row, a NULL column, no predecessor, a trigger
+  word it does not recognise → `run`. A gate that can stop the whole fleet must never stop it by
+  accident. `scheduler_on = false` is the only thing that switches the runner off, and that is
+  John's decision, never a default the code fell into.
+- **The scheduler governs SCHEDULED cycles only** (spec, verbatim). Pass your prompt's `trigger:`
+  line **as written**: `scheduled` is paced, `chained (drain continuation)` (`SES-141`) is exempt
+  and runs regardless of interval. So scheduler OFF + drain ON = the chain still runs, and while a
+  drain is standing **the chain, not the interval, sets the real cadence** — which is the spec's
+  own choice, and John turns it off with the drain checkbox, not the scheduler one.
+- **A manual fire is exempt**, detected as a start that sits **off the cron grid** — the same test
+  step 1 already uses to label a fire `(manual fire)`. This is the one case the spec does not
+  settle, and it had to be settled somehow, because §2b puts John's own *"▶ Run a cycle now"* link
+  on that very panel and a paced-out tap is a dead button. The grid minute is the column
+  `runner_settings.cron_minute` (40, read live from the routine), so correcting it is one `UPDATE`.
+  Filed as question `q-manual-fire-pacing` rather than left as an inference.
+
 **2. Harvest John's judgment — the WRITES now happen inside the step-9 serial tail (register
 B42), under the publish lease; this step is now READ-ONLY.** Read the page for anything that
 changes your selection — new directive text, a fresh usage reading, taps on gated cards — and
@@ -475,6 +528,28 @@ way: for each answered `qid`, write a `runner_before_images` row first, then UPD
 on that question, exactly as a directive does. An unanswered question is **not** a "no" — it
 carries forward. The page-side contract (rendering, the yes/no-askable rule, the 5-open cap)
 lives in `briefing-page.md`'s question-list section — cited here, not restated.
+
+**A non-empty `settings` object (`SES-143`, `v7.0.182`) is §2b's two switches, and it is the one
+harvest that can change what the runner itself does.** Write it in the serial tail, before-image
+first, exactly like every other harvest:
+
+- **Scheduler half** — `UPDATE public.runner_settings SET scheduler_on = …, interval_hours = …,
+  updated_at = now(), updated_by = '<your cycle id>' WHERE id = 1`. Reject an `interval_hours`
+  outside `1..24` rather than storing it (the column's own CHECK will refuse it anyway); the page
+  already refuses to record one, so a bad value here means the state was hand-edited.
+- **Drain half — this is John NAMING a drain, and that is already sanctioned.**
+  `drain_epic_next()` property 5 reads *"Nothing creates a drain row but John's own declaration —
+  a directive row **or a briefing tap**."* A tick is that tap. Resolve `drain_epic` to an
+  `epics.id`, then, **if no queued `drain-epic` directive already names it**, INSERT the directive
+  and capture its scope per `SES-142` — one `runner_drain_scope` row per open `now`-tier member of
+  that epic **at naming time**, which is the whole finish line from then on. An untick **cancels**
+  the standing drain (`status='cancelled'`, before-image first); it never touches shipped work.
+- **The runner still may never start one on its own initiative.** A tick is John's; an untick is
+  John's; a cycle that finds neither writes nothing. That property is not negotiable and this
+  harvest does not weaken it.
+- **Say it back on the page.** `settingsNow()` already renders his un-harvested tap over the DB
+  value, so the acknowledgement line is what tells him the tap was actually picked up — which
+  means the rebuild must read `runner_settings` fresh, in this same tail, **after** these writes.
 
 A non-empty `asks` object (`v7.0.145`, directive `edab5908`) is harvested the same way, and is
 the one harvest that is **read-and-answer, not read-and-record**: each entry is a question John
@@ -1356,7 +1431,8 @@ pre-lease harvest is exactly the "about to overwrite another session" moment Joh
 requires you to notice and absorb; **(3)** write the harvested decisions idempotently
 (`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
 only), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
-`uniq_card_ask`) **and any `unblocks` (`SES-127`, `v7.0.162`)**; **(4)** re-export the backlog snapshot now that the harvest writes have
+`uniq_card_ask`) **and any `unblocks` (`SES-127`, `v7.0.162`)** **and any `settings` (`SES-143`,
+`v7.0.182` — see the block below)**; **(4)** re-export the backlog snapshot now that the harvest writes have
 landed — the fix for the one-harvest staleness `SES-109` found (`v7.0.149`). Re-run step 7's
 `scripts/export-backlog-snapshot.js`; the script is deterministic and prints `unchanged`,
 writing nothing, when John's taps moved no board row — the common case, and then there is
@@ -1476,4 +1552,6 @@ counter without re-asserting the ticket claim first** (`v7.0.123`'s lesson, dire
 irreversible act, whatever the token is); **fire a successor from a cycle that did not run one**
 (`SES-139` tail step (8), Gate A — a wall-stop, an abort or a `failed` close fires **nothing**, or
 the budget wall becomes a metronome), **fire more than one**, or **create a drain row** (only John
-does that — `drain_epic_next` property 5).
+does that — `drain_epic_next` property 5); **skip the step-1b settings gate, or carry on past a
+non-`run` verdict** (`SES-143` — the panel is John's switch on his own runner, and a cycle that
+runs anyway has taken it back).

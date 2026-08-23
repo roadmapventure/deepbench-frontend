@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.182 | runbooks/briefing-page.md | SES-143 — the LOCKED SECTION ORDER gains §2b, the Automation panel, and its data contract. EXTENDED, never renumbered: §3–§14 keep their numbers exactly as §4.1/§7.1/§9.1 already work, because a renumber silently invalidates every §-reference in this file, in runner-cycle.md and in the spec. Three rules written down here rather than left to each rebuild: the panel carries NO data-awaits (a switch is a control, not a decision owed — SES-127's call for §10, and §1's counter must be able to reach zero); the drain status label renders ALWAYS, running or not, per the spec verbatim; and the "Run a cycle now" link now lives on §2b and is REMOVED from the masthead on John's explicit instruction — do not reinstate the second copy. The AUTOMATION object's five sources are tabulated because two of them are wrong in a way that looks fine: drain_named is John's NAMED list (SES-142), never the epic's live now tier, so a ticket filed after naming counts in neither number; and runner_settings must be read AFTER the tail's settings harvest, since the render deliberately shows his un-harvested tap over the stored value and the acknowledgement line is the only thing telling him the tap was picked up. -->
 <!-- DeepBench v7.0.181 | runbooks/briefing-page.md | SES-144 — §8's data contract gains the Epic column rule: epics.name resolved through backlog_items.epic_id, blank (never an em-dash) for a ticket in no epic, third from the left per docs/BRIEFING-REDESIGN-0822.md §8. The scroll paragraph is corrected with it — §8 is a SEVEN-column matrix now, §14 is still six. -->
 <!-- DeepBench v7.0.176 | runbooks/briefing-page.md | SES-139 — new regeneration step 6: the republish is no longer the last thing a cycle does. A cycle that actually ran one (outcome shipped/gated_before_build/reverted) and whose standing drain still returns `pick` fires exactly one successor after the lease release; runner-cycle.md's tail step (8) owns the gates and the reasoning, and nothing about the rebuild changes. Recorded HERE because two of its effects land on this page and would otherwise read as defects: John's "page rebuilt" stamp can move again in minutes rather than on the 3h cron (a suspiciously fresh masthead is the chain working, not a double-publish), and #lastact's "Not picked up by a run yet" clears far sooner after a tap. The third is the one that matters most for not re-root-causing a solved problem: a WALL-STOPPED cycle fires nothing, so a page that stops refreshing overnight is the budget wall doing its job. -->
 <!-- DeepBench v7.0.175 | runbooks/briefing-page.md | SES-138 — the regeneration contract gains the page's NAME, which it has never mentioned at all. Found live 2026-08-23 by cycle 702aa2db on the SERVED artifact, not reasoned about: after the v7.0.173 rebuild the page came back named "briefing-out" — the build file's filename — instead of "DeepBench Morning Briefing". John finds this page by its name in his gallery and by its browser tab. CAUSE, measured: the Artifact tool scans only the first 8192 BYTES for a title tag, and briefing-template.html opens with a provenance block that grows by one comment on every ship, so the tag was present, correct, and never seen — at byte 24,770. THE MEASUREMENT MOVED WHILE BEING TAKEN, which is what decided the fix: the offset was 24,537 when SES-138 was filed at 02:20Z and 24,770 when it was revalidated at 02:34Z — 233 bytes in fourteen minutes, from one ship. It is a ratchet, so the fix is structural (the tag now sits at byte 0 of the template, above the provenance block, with the invariant stated in place) rather than the ticket's option (a), "pass title: on every publish" — that alone is a rule every future cycle must REMEMBER, the exact class of forgetting SES-86 phase 3 / v7.0.146 / SES-101 / SES-111 / SES-127 / SES-128 / SES-129 each had to convert from prose into structure. Seven precedents is enough. title: is still passed, as belt-and-braces, and new step 5 asserts the name on the SERVED artifact afterwards — never on the publish result, which reported success on BOTH wrong-named publishes (the v7.0.166 lesson). NOT CHANGED because it was measured and is already right: doc()'s self-publish head emits its own title inside the first ~150 bytes, so John's own taps have never been able to rename the page; only a cycle publishing the template-derived file hits the window. THE FLAW THE QA CAUGHT IN THE FIX ITSELF, worth recording because it would have shipped a guard that guarded nothing: the first draft of the template's guard comment wrote the literal markup when explaining the rule, which put tag-shaped strings ahead of the real tag and collapsed the regression test's negative control from 24,770 to 262 bytes. The comment now says "title tag" in words, and the test fails if anyone writes the markup back. Guarded permanently by tests/regression/SES-138-briefing-title-window.js, whose negative control asserts the pre-change shape WOULD have failed — two of its four assertions fail on the pre-change tree, which is what makes it QA rather than a presence check. -->
@@ -168,6 +169,7 @@ shown:
 |---|---------|----------|
 | 1 | Masthead + `N decisions waiting` + last-action stamp | `SES-124` ✔ · dir `603f44ea` ✔ stamp |
 | 2 | Daily activity (CST day) | `SES-124` ✔ |
+| 2b | **Automation — scheduler + drain switches, status line** | `SES-143` ✔ |
 | 3 | Today's findings | `SES-124` ✔ |
 | 4 | Budget & usage (3 cards) + `4.1` Daily output, closed | `SES-124` ✔ frame · `SES-128` ✔ readings · dir `bee71cf4` ✔ daily output |
 | 5 | Shipped | `SES-125` ✔ |
@@ -186,6 +188,34 @@ top 5" and the "Next 3" line and disclosed, on its own card, that the page would
 view of the queue at all until this ticket landed. §8 and §11 are that replacement and they are
 now live, so the gap paragraph in `runner-cycle.md` step 9 describes a window that has closed.
 **The struck sections stay struck** — do not reinstate them; the matrix is the forward view now.
+
+### §2b's data contract (`SES-143`, `v7.0.182`)
+
+`§2b` is **extended into** the locked order, never a renumber of §3–§14 — the same rule that gave
+us §4.1, §7.1 and §9.1. Renumbering would silently invalidate every §-reference in this file, in
+`runner-cycle.md` and in the spec itself.
+
+Every rebuild regenerates the `AUTOMATION` object in `#code` — it is the half of the panel the page
+cannot know — from live tables, exactly as `SKIPS` and `PAGE_BUILT` are:
+
+| Key | Source | Rule |
+|---|---|---|
+| `scheduler_on`, `interval_hours` | `public.runner_settings` (`id = 1`) | The DB's values. John's un-harvested tap in `briefing-state.settings` **outranks them in the render** (`settingsNow()`), so read this *after* the tail's settings harvest, never before. |
+| `drain_on`, `drain_epic` | a `queued` `runner_directives` row with `type='drain-epic'`, `epic_id` resolved through `epics.name` | Unticked means no queued drain — not "a drain that finished". |
+| `drain_left`, `drain_named` | `runner_drain_scope` for that directive, joined to `backlog_items` | `drain_named` is John's **named** list (`SES-142`), never the epic's live `now` tier; `drain_left` counts those not yet `done`/`removed`. A ticket filed into the epic after naming is **not** in either number. |
+| `drain_history` | closed `drain-epic` directives | One line per completed drain: `"<epic> completed — N tickets at <time CST>"`. |
+| `last_cycle`, `next_fire` | `runner_cycles` (most recent closed) and the routine's cron | Times in **CST and labeled**, per the page's standing times rule. |
+
+Three rules a rebuild must not re-derive differently:
+
+- **No `data-awaits` anywhere in the panel.** A switch is a control, not a decision owed — the same
+  call `SES-127` made for §10 and `SES-132` for §9.1. §1's counter must be able to reach zero, and
+  a checkbox is always there to be tapped.
+- **The drain status label is shown ALWAYS**, running or not (spec, verbatim) — `"X of N tickets
+  left"` while running, the completion line when done.
+- **The `"▶ Run a cycle now"` link lives here now and NOT in the masthead** (John, explicit, in the
+  §2b spec). Do not reinstate the masthead copy: two copies of one control is how a page starts
+  contradicting itself.
 
 ### The four board tables' data contracts (`SES-126`)
 

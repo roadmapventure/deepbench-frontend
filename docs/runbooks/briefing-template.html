@@ -21,6 +21,7 @@
      NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
      its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
      the page. Only a cycle publishing this file hits the window. -->
+<!-- DeepBench v7.0.182 | runbooks/briefing-template.html | SES-143 — §2b, THE AUTOMATION PANEL: John's two switches, and the first controls on this page that change what the RUNNER does rather than what a ticket does. Locked spec docs/BRIEFING-REDESIGN-0822.md §2b (committed 840639e5), the addendum he added to the redesign on 2026-08-23. Three rows: scheduler checkbox + editable every-N-hours box, drain checkbox + epic box + an always-shown status label, and a status line carrying last run / next run / the "Run a cycle now" link. THE MECHANISM, because it is the whole reason this ticket has the shape it has: a cycle CANNOT edit the routine that fired it — the platform refused exactly that on 2026-08-23 (SES-140, verbatim: "fire_trigger: this routine was created via http_api, not by an agent") — so the panel cannot touch the cron and does not need to. The stored prompt already says "execute runner-cycle.md EXACTLY", so the gate lives in the runbook (new step 1b) and binds every future cycle with no trigger edit at all: the cron stays hourly PERMANENTLY and each cycle paces ITSELF down to John's N. That also retires SES-140's restore obligation — there is no interval left to restore. The arithmetic is migration ses143_runner_settings's scheduler_gate(), not prose a cycle re-derives, which is the eighth time this platform has made that correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129). THE ONE THAT WOULD HAVE SHIPPED WRONG lives in that function and is documented at its own migration: a predecessor read as "the most recent cycle row" wedges the runner shut FOREVER under an hourly cron (t=0 runs, t=1h paces, and every later fire's predecessor is the paced row an hour before it), so the predecessor is the last cycle whose outcome is not did_not_run — proven by a negative control that returns 'paced' from the identical fixtures the shipped predicate returns 'run' from. THE HALF THE SPEC DID NOT SETTLE, stated here rather than discovered later: it is silent on John's own manual fire, and the spec puts his "Run a cycle now" link ON THIS PANEL — so a paced-out manual tap is a dead button. A fire off the cron grid is therefore exempt, which is the same test step 1 of the runbook already uses to label a manual fire, with the minute as a COLUMN (cron_minute) rather than a literal; question q-manual-fire-pacing asks him to confirm. state.settings gets the same defensive default as answers/asks/unblocks/reading before it, and his un-harvested tap OUTRANKS the DB value in the render (settingsNow(), `undefined` and not falsy as the test, because scheduler_on:false is a real answer). NO data-awaits anywhere in the panel — a switch is a control, not a decision owed (SES-127's call for §10), and a counter that included it could never reach zero. The masthead's "Run a cycle now" link is REMOVED, not duplicated, on John's explicit instruction. Guarded permanently by tests/regression/SES-143-automation-panel.js. -->
 <!-- DeepBench v7.0.181 | runbooks/briefing-template.html | SES-144 — §8's queue matrix gains an EPIC column, third from the left (Queue · ID · Epic · Class · Status · Design status · Title), per John 2026-08-23 "on the queue, add a column epic" and the locked spec in docs/BRIEFING-REDESIGN-0822.md §8. Epic is epics.name resolved through backlog_items.epic_id — an FK, never prose in the ticket body, the same standing property SES-111 fixed the drain's epic under — and it renders BLANK for a ticket in no epic, never an em-dash, because this table already spends the dash on Design status where it means a real absence; a dash here would read as a value ("epic: —"). queueRow() takes the epic as its THIRD parameter so the call sites read in column order rather than requiring the reader to hold a mapping. The §8 regeneration SQL in the comment above the table is corrected to the LEFT JOIN form in the same commit: a cycle rebuilding from the old single-table SELECT renders an empty column and has nothing to tell it why — the same "the contract must move with the render" rule SES-124 wrote after step 5 and step 7 drifted. MEASURED, not reasoned: of §8's live top 12 at 05:34Z, TEN are Automation and two (SES-131, AGT-015) belong to no epic — a distinction the page rendered nowhere while John was running that very epic as a standing drain. Heading window refreshed to the live census, 564 numbered. THE PLACEMENT OF THIS COMMENT IS ITSELF THE SES-138 RULE: it sits BELOW the title-tag guard block, never above it. The kickoff doc's own instruction said "first line of the file" and was WRONG; the Sonnet 5 subagent that had the edit refused it and reported the conflict rather than complying, which is the behaviour that guard was written to produce. -->
 <!-- DeepBench v7.0.172 | runbooks/briefing-template.html | directive 603f44ea — the masthead gains a LAST-ACTION STAMP, and the half of John's sentence a bare timestamp misses. His line: "Need a timestamp of the last action on this page at the very top next to the count of decisions. I can't tell what time my last action was compared to if the page has refreshed yet." That is TWO requirements — a time, and whether a run has picked it up — so #lastact carries his newest action, this page's rebuild time, and, only when his action is strictly newer, "Not picked up by a run yet". MEASURED BEFORE A LINE CHANGED, not recalled: the masthead's date block (line 691) held date, version and #waiting and NO timestamp of any kind. THE ONE THAT WOULD HAVE SHIPPED WRONG is a cycle-typed stamp: it is the exact failure countWaiting() exists to prevent (the masthead is the half he reads first and must never disagree with the state under it), and it could not be right even in principle, because the page self-publishes on EVERY tap and no cycle is running between rebuilds to re-type anything. So the action time is DERIVED from briefing-state in stampLastAction(); only PAGE_BUILT is cycle-written, and it lives in #code because doc() carries that script's textContent through a self-publish verbatim — the one value the state genuinely cannot know. THE TRAP, and the red control that proves it is real: an ask thread holds John's questions AND the runner's replies, both carrying an `at`, so without the `[runner,` filter the stamp reports the RUNNER's last reply as "your last action" — measured on the live fixture, 8:50 PM instead of his 8:13 PM tap, with a "not picked up yet" line drawn about the runner's own words. state.directive_at ships with it: typing a directive is the action he is most likely to have taken last, and it was the ONE action the page could not date (the bare-string gap SES-129 named on its card) — FORWARD ONLY, so an older directive contributes nothing rather than a guessed time. Guarded permanently by tests/regression/DIR-603f44ea-last-action-stamp.js, which reads the functions out of THIS file rather than copying them, per John's rule 2026-08-23: "you should never be throwing away tests." -->
 <!-- DeepBench v7.0.170 | runbooks/briefing-template.html | SES-132 — §9.1 ANSWERED, YOUR PAST QUESTIONS: an ask whose target has left the rebuild finally has a renderer. John, 2026-08-23T00:37Z, verbatim: "I could swear i have wrote comments in the gated questions, and most are not showing. shouldn't the thread show each page refresh and what your answers are?" He was right, and the cause is that the act of deciding is what removes the only thing able to render his line — thread() is reachable from exactly two call sites, card() and question() (which visionClaim() delegates to), so it renders ONLY inside a still-live target, while §§5/6 rebuild from runner_items WHERE decision IS NULL, §9 from runner_questions WHERE status='open' capped at 5, and §12 drops a decided claim. MEASURED THIS CYCLE AGAINST THE PUBLISHED PAGE, not recalled, and WORSE THAN THE TICKET ESTIMATED: the ticket said three of seven targets had vanished; parsing the live briefing-state against the render's own call sites says SIX of EIGHT ask targets are orphaned right now, carrying ELEVEN of John's thirteen recorded entries — only item-chi84-gate and q-adhoc-morning-standing still render. The ticket's figure was taken before he answered three more questions between 00:33Z and 00:35Z; it was right when written and is why this is measured again rather than quoted. THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE ORDERING: §9.1 sits between §9 and §10, but §12's vision claims render AFTER that point, so an orphan set computed in place classifies every vision thread as orphaned and prints it twice — the section emits a marker and render() substitutes the block once the whole page is built, which is also why threadedIds resets at the top of every render() rather than living across passes. The substitution passes a FUNCTION, never a string: $& and $1 are special in a String.replace replacement and thread text is John's own prose. Rows carry NO data-awaits — a kept thread is information, not a decision owed, the same call SES-127 made for §10. It is a sub-block under §9 exactly like §4.1 and §7.1, so the LOCKED SECTION ORDER is extended, never renumbered. QA is a real DOM-stub render of THIS file, and the negative control is what carries the proof: the pre-change script renders 0 orphan rows from the same fixture the shipped script renders 1 from, and deleting the substitution from the real file fails the suite (exit 1) before restoring it passes. Test kept, not scratchpadded: tests/regression/SES-132-orphan-ask-threads.js. -->
@@ -241,6 +242,33 @@
   .slotlbl{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
        color:var(--brass-deep);font-weight:700}
   .slotmeans{font-size:11.5px;color:var(--muted-deep);margin-top:5px;line-height:1.45}
+  /* ---- SES-143 · §2b THE AUTOMATION PANEL ------------------------------------------------
+     John's two switches and the status line under them. Deliberately built from the vocabulary
+     already on this page — `.budget` is the card, `.slotlbl` the row label, `.slotmeans` the
+     consequence line, `.recorded` the acknowledgement — because a control that looks like a
+     different product is one John has to learn twice. The only genuinely new thing is a row
+     that puts a checkbox, a label and an inline number box on one baseline.
+     `.autorow input[type=checkbox]` is sized to 22px and the label is a real <label for>, so the
+     tap target on a phone is the whole sentence and not a 13px square. */
+  .autorow{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding-top:11px;
+       border-top:1px solid var(--line-soft)}
+  .autorow:first-of-type{border-top:none;padding-top:2px}
+  .autorow input[type=checkbox]{width:22px;height:22px;min-width:22px;margin-top:1px;
+       accent-color:var(--moss);cursor:pointer}
+  .autorow input[type=checkbox]:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .autobody{flex:1}
+  .autobody label.sw{font-size:14px;color:var(--ink);cursor:pointer;line-height:1.45}
+  .numbox{width:58px;font-family:var(--mono);font-size:14px;padding:4px 6px;margin:0 3px;
+       border:1.5px solid var(--line);border-radius:5px;background:var(--white);color:var(--ink);
+       text-align:center}
+  .numbox:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .txtbox{width:150px;font-family:var(--body);font-size:14px;padding:4px 7px;margin:0 3px;
+       border:1.5px solid var(--line);border-radius:5px;background:var(--white);color:var(--ink)}
+  .txtbox:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .autostat{font-family:var(--mono);font-size:11px;color:var(--muted-deep);margin-top:6px;
+       line-height:1.6}
+  .autostat b{color:var(--ink)}
+  .autohist{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:4px}
   .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
         padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
         color:var(--ink);resize:vertical}
@@ -343,6 +371,12 @@
   if (state.reading.fable !== undefined || state.reading.all !== undefined) {
     state.reading = { adhoc: state.reading };
   }
+  // SES-143 — same defensive default, fifth time and the same reason as SES-99's, v7.0.145's,
+  // SES-127's and SES-128's: a page published before §2b existed has no `settings` key, and John's
+  // first tap on the scheduler checkbox must not throw on an undefined and record nothing. An
+  // EMPTY object is the right default and is not the same as "off" — absent means "he has not
+  // touched it since the last harvest", so settingsNow() falls through to the DB's value.
+  if (!state.settings || typeof state.settings !== 'object') { state.settings = {}; }
 
   var readOnly = false;
 
@@ -353,6 +387,27 @@
   // wrongness that makes the whole page read as unmaintained (SES-124's countWaiting() rule,
   // applied to the one counter that cannot be derived from the DOM).
   var SKIPS = { n:2, nnew:2 };
+
+  // SES-143 — §2b's cycle-written half. Everything here is a fact the PAGE cannot know: the DB's
+  // current settings, the standing drain's real progress, the last cycle's line and the next fire
+  // time. Same contract as SKIPS and PAGE_BUILT — EVERY REBUILD REGENERATES IT from
+  // runner_settings / runner_directives / runner_drain_scope / runner_cycles.
+  //
+  // `scheduler_on` and `interval_hours` here are the DB's values. John's un-harvested tap lives in
+  // `state.settings` and WINS the render (settingsNow() below) — the same precedence `items` and
+  // `answers` already use, so a switch he just flipped never appears to have been discarded while
+  // it waits for the next harvest.
+  var AUTOMATION = {
+    scheduler_on: true,          // runner_settings.scheduler_on
+    interval_hours: 3,           // runner_settings.interval_hours
+    drain_on: true,              // a queued type='drain-epic' directive exists
+    drain_epic: 'Automation',    // epics.name it resolves to
+    drain_left: 17,              // named members still open  (runner_drain_scope join)
+    drain_named: 18,             // rows in runner_drain_scope for that directive
+    drain_history: [],           // ['Automation completed — 18 tickets at 4:10 AM CST'] per finished drain
+    last_cycle: 'sample value — 12:41 AM CST · SES-143 · shipped',
+    next_fire: 'sample value — 8:40 AM CST'
+  };
 
   // v7.0.172, directive 603f44ea — the UTC minute THIS page was last rebuilt by a cycle, in the
   // same 'YYYY-MM-DDTHH:MMZ' shape every tap already writes. It is the one value on the stamp
@@ -771,6 +826,81 @@
       +'<td class="num">'+esc(cost)+'</td></tr>';
   }
 
+  // SES-143 — §2b's effective values. John's un-harvested tap OUTRANKS the DB's value, exactly as
+  // `state.items` outranks a rebuilt card: he flipped the switch, no cycle has picked it up yet,
+  // and a checkbox that springs back to the old value on the next render reads as a tap that was
+  // thrown away. `undefined` — not falsy — is the test, because `false` is a real answer here and
+  // `scheduler_on:false` must not fall through to the DB's `true`.
+  function settingsNow(){
+    var s = state.settings || {};
+    return {
+      scheduler_on:   s.scheduler_on   === undefined ? !!AUTOMATION.scheduler_on : !!s.scheduler_on,
+      interval_hours: s.interval_hours === undefined ? AUTOMATION.interval_hours  : s.interval_hours,
+      drain_on:       s.drain_on       === undefined ? !!AUTOMATION.drain_on      : !!s.drain_on,
+      drain_epic:     s.drain_epic     === undefined ? AUTOMATION.drain_epic      : s.drain_epic,
+      at:             s.at || ''
+    };
+  }
+
+  // §2b · AUTOMATION. Three rows, per the locked spec (docs/BRIEFING-REDESIGN-0822.md §2b):
+  // scheduler, drain, status line.
+  //
+  // NO `data-awaits` ANYWHERE IN HERE, and that is deliberate. A switch is a control, not a
+  // decision owed — the same call SES-127 made for §10 and SES-132 for §9.1. Counting it in §1's
+  // "N decisions waiting" is the masthead-disagrees-with-the-page failure countWaiting() exists to
+  // prevent, and it would never reach zero, because a checkbox is always there to be tapped.
+  function automationPanel(){
+    var s = settingsNow();
+    var hist = (AUTOMATION.drain_history || []).map(function(h){
+      return '<div class="autohist">&#10003; '+esc(h)+'</div>'; }).join('');
+    // The drain's status label is ALWAYS shown (spec: "Status label underneath, always").
+    var drainStat = s.drain_on
+      ? '<b>'+esc(AUTOMATION.drain_left)+'</b> of <b>'+esc(AUTOMATION.drain_named)
+        +'</b> tickets left in '+esc(AUTOMATION.drain_epic)
+      : 'No drain running.';
+    // Both off is the one combination that means nothing happens, so it is said in words rather
+    // than left for John to infer from two unchecked boxes (spec, verbatim).
+    var bothOff = (!s.scheduler_on && !s.drain_on)
+      ? '<div class="slotmeans" style="color:var(--brass-deep)"><b>Both switches are off — '
+        +'no runs will start at all until you turn one back on.</b></div>' : '';
+    return '<h2><span class="secnum">2b</span>Automation &mdash; how this runs, and your switches</h2>'
+      +'<div class="budget"><h4>Scheduler &amp; drain</h4>'
+      // --- row 1 · scheduler ---------------------------------------------------------------
+      +'<div class="autorow">'
+      +'<input type="checkbox" id="sch-on"'+(s.scheduler_on?' checked':'')+'>'
+      +'<div class="autobody"><label class="sw" for="sch-on">Scheduler <b>'
+      +(s.scheduler_on?'on':'off')+'</b> &mdash; run a cycle every '
+      +'<input class="numbox" id="sch-n" type="number" inputmode="numeric" min="1" max="24" value="'
+      +esc(s.interval_hours)+'"> hours</label>'
+      +'<div class="slotmeans">The schedule itself fires every hour and always will &mdash; the run '
+      +'itself keeps to your number, and a run that arrives early stops straight away and says '
+      +'&ldquo;paced by your scheduler setting&rdquo;. Unticking this stops every scheduled run. '
+      +'A run you start yourself from the link below is never paced.</div>'
+      +'</div></div>'
+      // --- row 2 · drain ---------------------------------------------------------------------
+      +'<div class="autorow">'
+      +'<input type="checkbox" id="drn-on"'+(s.drain_on?' checked':'')+'>'
+      +'<div class="autobody"><label class="sw" for="drn-on">Complete epic '
+      +'<input class="txtbox" id="drn-epic" value="'+esc(s.drain_epic)+'"> until done.</label>'
+      +'<div class="autostat">'+drainStat+'</div>'
+      +'<div class="slotmeans">Ticking this is you giving the standing order &mdash; the next run '
+      +'records it and works that epic&rsquo;s tickets one per run until they are gone, chaining '
+      +'run after run without waiting for the schedule. Unticking cancels it; nothing already '
+      +'shipped is undone.</div>'
+      + hist
+      +'</div></div>'
+      + bothOff
+      // --- row 3 · status line ---------------------------------------------------------------
+      +'<div class="autostat" style="border-top:1px solid var(--line-soft);margin-top:11px;'
+      +'padding-top:9px">Last run: <b>'+esc(AUTOMATION.last_cycle)+'</b><br>'
+      +'Next scheduled run: <b>'+esc(AUTOMATION.next_fire)+'</b><br>'
+      +'<a href="https://claude.ai/code/routines" style="color:var(--brass-deep);font-weight:700">'
+      +'&#9654; Run a cycle now</a></div>'
+      +(s.at ? '<div class="recorded">&#10003; Your settings were recorded &mdash; '+esc(s.at)
+               +'. The next run picks them up.</div>' : '')
+      +'</div>';
+  }
+
   function render(){
     // SES-132 — a fresh pass owns a fresh record of which threads it rendered.
     threadedIds = {};
@@ -780,9 +910,12 @@
     // wire(), from `data-awaits` on the elements themselves. Rendering it from a number the
     // rebuilding cycle typed in would let the masthead and the cards disagree — and the
     // masthead is the half John reads first.
+    // SES-143 — the "▶ Run a cycle now" link has MOVED off the masthead onto §2b's status line,
+    // on John's explicit instruction in the §2b spec ("SES-102's masthead link lives here now").
+    // Do not reinstate it here: two copies of one control is how the page starts contradicting
+    // itself, and the panel is where the rest of the run controls now live.
     '<header><div class="db">DB</div><div><h1>Morning Briefing</h1>'
-    +'<div class="sub">DeepBench · Automated Development · '
-    +'<a href="https://claude.ai/code/routines" style="color:inherit">&#9654; Run a cycle now</a></div></div>'
+    +'<div class="sub">DeepBench &middot; Automated Development</div></div>'
     // v7.0.172, directive 603f44ea — `#lastact` sits directly under the decisions counter ("at
     // the very top next to the count of decisions", his words) and is rendered EMPTY here for
     // the same reason `#waiting` is: stampLastAction() fills it from `briefing-state`, never
@@ -810,6 +943,12 @@
     +'<p class="strip-def"><b>Gated before build</b> = the run designed the work but a rule said '
     +'it needs your permission to ship — it&rsquo;s a card below. <b>Did not run</b> = a cycle '
     +'started, checked the board, and found nothing it was allowed to do.</p>'
+    // ===== §2b · AUTOMATION PANEL (SES-143) =================================================
+    // Directly after Daily activity, per the locked spec. It is §2b and NOT a renumber of §3–§14:
+    // SES-124's rule is that the locked order is EXTENDED, never renumbered, which is how §4.1,
+    // §7.1 and §9.1 already work — renumbering would silently invalidate every cross-reference in
+    // briefing-page.md, runner-cycle.md and the spec itself.
+    + automationPanel()
     // ===== §3 · TODAY'S FINDINGS (SES-124) ==================================================
     // The latest cycle's finding, labeled with its CST time, then every earlier cycle of the
     // same CST day folded into one default-closed card. This section is the ONLY place
@@ -1301,6 +1440,12 @@
     // bare string with no `at` (the limitation SES-129 named on its own card). `directive_at` is
     // stamped by the blur handler below, so this is true FORWARD ONLY — a directive typed before
     // this shipped contributes nothing rather than a guessed time.
+    //
+    // SES-143 — a §2b switch is an action too, and for exactly the reason directive 603f44ea gave
+    // for the directive box: flipping the scheduler off is one of the most consequential things
+    // John can do on this page, and a stamp that ignored it would tell him no run had picked up a
+    // tap he had certainly made. `state.settings.at` is stamped by saveSettings().
+    t = newest(t, state.settings && state.settings.at);
     return newest(t, state.directive_at);
   }
 
@@ -1435,6 +1580,46 @@
         ni.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commitNote(); } });
         ni.addEventListener('blur', commitNote);
       }
+    });
+    // SES-143 — §2b's four controls. Every one of them writes the WHOLE settings object, never a
+    // single key, and that is the point: the harvest reads one row, and a state carrying
+    // `{scheduler_on:false}` alone would leave the next cycle unable to tell "he turned the drain
+    // off" from "he never touched the drain". settingsNow() has already resolved tap-over-DB, so
+    // writing its output back is exactly what he is looking at.
+    function saveSettings(patch){
+      var s = settingsNow();
+      Object.keys(patch).forEach(function(k){ s[k] = patch[k]; });
+      s.at = new Date().toISOString().slice(0,16)+'Z';
+      state.settings = s;
+      save();
+    }
+    var schOn = document.getElementById('sch-on');
+    // A checkbox re-renders (the label reads "on"/"off" and the both-off warning appears), which
+    // the number and text boxes deliberately do NOT — re-rendering mid-typing would steal focus.
+    if (schOn) schOn.addEventListener('change', function(){
+      saveSettings({ scheduler_on: schOn.checked }); render();
+    });
+    var schN = document.getElementById('sch-n');
+    if (schN) {
+      var commitN = function(){
+        var n = parseInt(schN.value, 10);
+        // Out of range is not a setting — it is a typo, and storing it would hand the gate a
+        // number its own CHECK rejects. Put the live value back and record nothing.
+        if (!(n >= 1 && n <= 24)) { schN.value = settingsNow().interval_hours; return; }
+        if (n === settingsNow().interval_hours) return;
+        saveSettings({ interval_hours: n });
+      };
+      schN.addEventListener('keydown', function(e){ if (e.key === 'Enter') { commitN(); } });
+      schN.addEventListener('blur', commitN);
+    }
+    var drnOn = document.getElementById('drn-on');
+    if (drnOn) drnOn.addEventListener('change', function(){
+      saveSettings({ drain_on: drnOn.checked }); render();
+    });
+    var drnEpic = document.getElementById('drn-epic');
+    if (drnEpic) drnEpic.addEventListener('blur', function(){
+      if (drnEpic.value === settingsNow().drain_epic) return;
+      saveSettings({ drain_epic: drnEpic.value });
     });
     var ta = document.querySelector('.directive textarea');
     if (ta) ta.addEventListener('blur', function(){
