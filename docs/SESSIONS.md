@@ -25,6 +25,32 @@
 
 ---
 
+## session/cycle-20260823-1640, continuation cycle (v7.0.199, 2026-08-23, runner cycle `7f30ca60-eafb-4d9e-a12d-7fa1a8eb5439`, `trigger = chained (drain continuation)`, model Opus 5) — section 6 stops asking John to authorise work that has already shipped
+
+**This is the second cycle of one session.** `c4148d2a` shipped `v7.0.197` and, both tail gates passing, continued the drain **in-session** rather than spawning — `runner-cycle.md` v7.0.195 retired all three session-spawning actuators, one of which had been proven to boot a silent dead session. **That version was read fresh from `origin/dev` at the tail and it mattered:** `c4148d2a` had read the runbook at 16:40Z at v7.0.190, whose step (8) still said to spawn. Acting on the copy read 45 minutes earlier would have executed a retired, now-prohibited actuator.
+
+**Mission:** selection layer 1a — directive `16b3ff73-c79d-44d8-b99d-15d8491d0ad5`, John's Rework at 14:22Z. He reported the defect the most direct way there is: **he pasted a section-6 row back at us.** Verbatim: *"6.6 Gated CHI-84 Tapping a step chip in chat jumps you to that step — built, but it needs a session you are in"*.
+
+**Premise revalidated live, and it is what the ticket turned out to be.** That card was asking his **permission to build** something that had already been built — `CHI-84` closed `done` at 15:18Z in an attended session (`v7.0.191`) while its gated card `c4f8b217` sat undecided on his page. **Measured before a line changed, and it was not one card:** of the 8 undecided `runner_items` rows carrying a ticket id, **seven** had a ticket already `done`, and **four of the five gated cards were dead questions** — `SES-121` (`b7639b59`), `SES-118` (`76564dde`), `SES-117` (`11451960`) and `CHI-84` (`c4f8b217`). Only `AGT-015` was a live ask. Four of the five things that section asked him to decide were moot, which is exactly how an actionable section stops being read.
+
+**Cause, stated plainly:** sections 5 and 6 were rebuilt from `WHERE decision IS NULL` and nothing else. That predicate is right about *"he has not tapped it"* and completely silent about *"the question is still live."*
+
+**Fix — 2 files and one migration.** New `public.briefing_open_cards()` (migration `dir_16b3ff73_gated_card_retire`) returns every undecided card with two derived columns: `render` (the filter) and `retired_reason` (why a row is not being shown). A **gated** card retires itself once its ticket reaches `done`/`removed`.
+
+**THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE TIDIER-LOOKING ONE, and it was proven live rather than reasoned about.** Hiding *every* undecided card whose ticket is `done` renders **3** rows where the shipped rule renders **6**, and it kills **all three** of tonight's ship cards — hiding the night's work from John and starving the trust ladder, whose only input is his verdict on shipped work. The distinction that saves it: a gated card asks *"may I build this?"* — **permission**, moot once the thing exists; a ship card asks *"was this good?"* — a **rating**, meaningful forever. Only the first retires.
+
+**Three properties that keep this from becoming a different bug:**
+
+- **Nothing vanishes silently.** The call **labels** rather than hides, and the retired count is reported on the page. A card John saw yesterday disappearing with no explanation would be this fix wearing the defect's clothes.
+- **No card is decided on his behalf.** `decision` stays `NULL` and stays his (§19v). Asserted after the fact: all four retired rows re-read `decision IS NULL`. A retired card is *not shown*, never *answered* — the rows are intact if he wants them back.
+- **"Still needed" is DERIVED from `backlog_items.status`, never a maintained flag** — the same self-retiring shape as section 10's skip filter (`SES-127`), so a ticket that ships drops its dead card with **no write from any cycle**. Ninth prose→code correction on this platform.
+
+**QA:** exactly 1 overload; grants asserted both directions (`anon` false, `authenticated` false, `service_role` true, `postgres` true) after revoking from `PUBLIC` as well — revoking from the two roles alone provably does nothing (`SES-101`). Per-row retirement proven individually, not in aggregate. Build green; regression **42/42** with credentials; the new guard `tests/regression/DIR-16b3ff73-gated-card-retire.js` proven to **fail** on the pre-change tree and pass on restore. `LATERAL … LIMIT 1` because `backlog_id` carries no unique constraint (`CHI-48` occupies two rows, `SES-97`).
+
+**Kickoff:** `docs/kickoffs/v7.0.199-DIR-16b3ff73-gated-card-retire.md`.
+
+---
+
 ## session/cycle-20260823-1640 (v7.0.197, 2026-08-23, runner cycle `c4148d2a-24ff-4041-98d9-148b8daab16b`, scheduled fire 16:40Z, model Opus 5 orchestrator + Fable 5 diagnosis subagent) — the briefing page's own rebuild was deleting John's typed threads from it
 
 **Mission:** selection layer **1a** — `runner_directives` `b8d5ea7e-8056-4f88-bc2e-248d500b1a3d`, with its **identical twin** `75b259a5-414c-4cb5-ac19-3a4359190c46` worked as ONE mission (the `v7.0.146` `dda69acb` + `6b6cdd71` precedent: one Rework line John typed on two cards). Three directives shared a `created_at` (15:01:43Z — the 14:42Z cycle's tail harvesting him at once), so the tie was broken on **John's own tap time inside each body**, the only honest "oldest first" available. The third (`16b3ff73`, 14:22Z) was left queued: later, and a different subject.
