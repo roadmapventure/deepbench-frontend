@@ -47,13 +47,13 @@ New section directly AFTER Daily activity: how automation is running, and the co
    cancels the standing drain (status cancelled). Status label underneath, always: while running
    "X of <named> tickets left"; when complete the box shows done with "✓ <epic> completed —
    <N> tickets at <time CST>", and completed drains keep one history line each.
-3. **Daily max** (John, 2026-08-23; SES-145) — an open text box: the day's token allowance in
+3. **Daily max** (John, 2026-08-23; SES-147) — an open text box: the day's token allowance in
    **millions** (e.g. `25` = 25,000,000). Backed by `runner_settings.daily_max_tokens_millions`;
    the harvest writes it, and step 3's budget arithmetic treats it as **the** day cap — it
    replaces the uncalibrated 10M default and sits above the calibration-derived number; a
    `budget_override` directive for a specific day still wins over the standing box, and the
    stale-reading 3M floor still applies when readings are older than 48h (a standing number
-   must not defeat the staleness brake). Blank box = the pre-SES-145 behavior, exactly.
+   must not defeat the staleness brake). Blank box = the pre-SES-147 behavior, exactly.
 4. **Status line** (addition, per John's "add what's needed"): last cycle — time, ticket, outcome;
    next scheduled fire time; and the "▶ Run a cycle now" link (SES-102's masthead link lives
    here now).
