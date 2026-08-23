@@ -5,6 +5,102 @@
 
 ---
 
+## session/cycle-20260823-0115 (v7.0.170, 2026-08-23, runner cycle `f0acf9ab`, Automated, model Opus 5) — John's typed questions stop disappearing when he answers them
+
+**Ticket:** `SES-132` — *Answered questions and decided cards take John's typed comments off the
+page with them — orphaned ask threads have no renderer* — Type: Runner, `P10 - Tooling`. Closed
+**`done`** (was `missing`).
+
+**Picked by selection layer 1a — John's directive, read at step 2 and not yet a ledger row.** He
+typed it into the briefing box, verbatim: *"ses-132 and 133 are emergencies and need to be ran
+before anything else - you can't be loosing my answers in shipped, gated, questions, vision all
+threads should be working accordingly"*. That outranks the queued one-off directive `603f44ea`
+(00:57Z, the page-timestamp ask) and the standing Automation drain, because it is his latest
+specific word and it says "before anything else". The directive row itself is written in the
+step-9 serial tail, where B42 puts harvest writes.
+
+**Premise revalidated against live code before designing anything (register B7).** `thread()` is
+reachable from exactly two call sites — `card()` and `question()`, which `visionClaim()` delegates
+to — so a thread renders **only inside a still-live target**. The act John performs is what
+removes that target from the next rebuild: §§5/6 rebuild from `runner_items WHERE decision IS
+NULL`, §9 from `runner_questions WHERE status='open'` capped at 5, §12 drops a decided claim. His
+line and the runner's reply then sit in `runner_card_asks` displayed nowhere. Premise holds.
+
+**RE-MEASURED AGAINST THE PUBLISHED PAGE RATHER THAN QUOTED, AND WORSE THAN THE TICKET SAID.** The
+ticket recorded three of seven targets vanished. Parsing the live `briefing-state` against the
+render's own call sites says **6 of 8 ask targets are orphaned, carrying 11 of John's 13 recorded
+entries** — only `item-chi84-gate` and `q-adhoc-morning-standing` still rendered. The ticket's
+figure was taken before he answered three more questions between 00:33Z and 00:35Z, so it was
+right when written; that is precisely why it was measured again instead of carried forward. Worth
+recording separately: the first detection attempt looked for `id="<target>"` in the published
+HTML and reported all eight orphaned. That was **the measurement being wrong, not the page** — the
+artifact is a classic artifact whose DOM is built at runtime, so the file holds the code, not the
+rendered markup. The corrected method reads the `card()`/`question()`/`visionClaim()` call sites.
+
+**What shipped — three files.**
+
+1. `docs/runbooks/briefing-template.html` — `thread()` records every id it renders into
+   `threadedIds` (reset at the top of every `render()`); new `orphanThreads()` builds §9.1 from
+   the keys of `state.asks` that no section rendered; §9's slot emits `ORPHAN_MARK`; `render()`
+   substitutes it once the whole page is built.
+2. `docs/runbooks/briefing-page.md` — the ask contract gains the carry-forward rule it could not
+   previously follow, and the LOCKED SECTION ORDER's §9 row gains `9.1`.
+3. `tests/regression/SES-132-orphan-ask-threads.js` — kept, not scratchpadded.
+
+**Three design calls, each one a way this would have shipped wrong.**
+
+- **§9.1 is a SUB-BLOCK, not a fifteenth section.** John approved the fourteen-section order and
+  the standing prohibitions forbid touching a LOCKED section. `§4.1` (daily output) and `§7.1`
+  (directive follow-through) are the established precedent for extending without renumbering.
+- **The orphan set is computed after the whole page is built.** §12's vision claims render *after*
+  §9.1's position, so an in-place computation classifies every vision thread as orphaned and
+  prints it twice — one of the two most-affected categories in John's own complaint. Hence the
+  marker plus one substitution at the end of `render()`.
+- **The substitution passes a function, never a string.** `$&`/`$1` are special in a
+  `String.replace` replacement and the inserted text is John's own prose. A string replacement
+  would silently mangle any thread containing them.
+
+Rows carry no `data-awaits` — a kept thread is information, not a decision owed; the same call
+`SES-127` made for §10, and inflating §1's counter is the masthead-disagrees-with-the-page failure
+`countWaiting()` exists to prevent.
+
+**QA — the negative control is what carries it.** The test lifts the real `<script id="code">` out
+of the shipped template, runs it against a minimal DOM stub, and reads the HTML assigned to
+`#page`. A unit test of an extracted `orphanThreads()` would have passed just as happily on the
+broken page, because the bug was never in that function's arithmetic — it was in where `thread()`
+is called from. Four assertions: the orphan renders with John's line *and* the answer; a live
+target is not duplicated (exactly one occurrence); the **pre-change script renders zero** orphan
+rows from the same fixture; and §9.1 owes no decision, renders no empty heading, and never leaks
+the marker. Proven discriminating rather than asserted to be: deleting the substitution from the
+real file fails the suite (`exit 1`, *"§9.1 must render the orphaned thread q-ladder-streak-reset;
+rendered rows were []"*), restoring it passes.
+
+`npm run build` clean. Regression **35/35 with credentials in env**; credential-free it is 34/35,
+`CHI-31` failing on `SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured` — an environment gap,
+not this diff, which touches no file that test reads.
+
+**Kept, not thrown away — and that is John's rule, not this cycle's taste.** He wrote *"you should
+never be throwing away tests"* at 00:00Z. The last several render harnesses were each written to a
+scratchpad and discarded, now six tickets deep. This one lives in `tests/regression/` and runs
+with the suite. `SES-135` still owns the broader DOM fixture *and* the written keep-or-discard
+rule in `docs/STANDARDS.md`; this is one feature's own test, not that ticket done early.
+
+**NAMED AS NOT DONE.** `SES-133` — the other half of John's emergencies sentence — is **not**
+built here, under one-item-per-cycle. Three of his vision ratifications (`C-mission-6`,
+`C-CUST-20`, `C-thesis-30`) are still not written to `docs/vision/*.md`, and he has now been told
+twice that the next cycle would apply them. It is the next cycle's first pick and is said plainly
+on the briefing rather than left to be rediscovered a third time.
+
+**Blocker sweep, honestly reported.** The dev preview root returns **HTTP 302 to Vercel's SSO
+gate** — the deployment is alive and the edge is healthy. The full 200-with-bypass render probe
+was **not** run, and the production host `deepbench.roadmapventure.com` is **unreachable from this
+container** (`CONNECT tunnel failed, response 403` at the agent proxy — an egress-allowlist fact
+about the environment, not a statement about the site). Neither gap is load-bearing here: this
+ship touches `docs/` and `tests/` only, with no `src/`, `api/` or `lib/` change, so nothing it
+contains can reach the deployed app.
+
+---
+
 ## session/attended-ses106-claim-order (v7.0.169, 2026-08-23, Manual Design & Build — John in chat, model Fable 5) — the claim-release contradiction is dead in all of its homes, and two of them the ticket never named
 
 **Ticket:** `SES-106` — *Step 7 tells a cycle to release its ticket claim and to still hold it —

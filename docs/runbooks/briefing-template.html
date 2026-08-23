@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.170 | runbooks/briefing-template.html | SES-132 — §9.1 ANSWERED, YOUR PAST QUESTIONS: an ask whose target has left the rebuild finally has a renderer. John, 2026-08-23T00:37Z, verbatim: "I could swear i have wrote comments in the gated questions, and most are not showing. shouldn't the thread show each page refresh and what your answers are?" He was right, and the cause is that the act of deciding is what removes the only thing able to render his line — thread() is reachable from exactly two call sites, card() and question() (which visionClaim() delegates to), so it renders ONLY inside a still-live target, while §§5/6 rebuild from runner_items WHERE decision IS NULL, §9 from runner_questions WHERE status='open' capped at 5, and §12 drops a decided claim. MEASURED THIS CYCLE AGAINST THE PUBLISHED PAGE, not recalled, and WORSE THAN THE TICKET ESTIMATED: the ticket said three of seven targets had vanished; parsing the live briefing-state against the render's own call sites says SIX of EIGHT ask targets are orphaned right now, carrying ELEVEN of John's thirteen recorded entries — only item-chi84-gate and q-adhoc-morning-standing still render. The ticket's figure was taken before he answered three more questions between 00:33Z and 00:35Z; it was right when written and is why this is measured again rather than quoted. THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE ORDERING: §9.1 sits between §9 and §10, but §12's vision claims render AFTER that point, so an orphan set computed in place classifies every vision thread as orphaned and prints it twice — the section emits a marker and render() substitutes the block once the whole page is built, which is also why threadedIds resets at the top of every render() rather than living across passes. The substitution passes a FUNCTION, never a string: $& and $1 are special in a String.replace replacement and thread text is John's own prose. Rows carry NO data-awaits — a kept thread is information, not a decision owed, the same call SES-127 made for §10. It is a sub-block under §9 exactly like §4.1 and §7.1, so the LOCKED SECTION ORDER is extended, never renumbered. QA is a real DOM-stub render of THIS file, and the negative control is what carries the proof: the pre-change script renders 0 orphan rows from the same fixture the shipped script renders 1 from, and deleting the substitution from the real file fails the suite (exit 1) before restoring it passes. Test kept, not scratchpadded: tests/regression/SES-132-orphan-ask-threads.js. -->
 <!-- DeepBench v7.0.168 | runbooks/briefing-template.html | directive bee71cf4 — §4 gains DAILY OUTPUT, a default-closed card under the reading card. John's line, verbatim: "you should be able to look a the first entered for that day and the last by looking at the times in CST. Then you should be able to show how much work was done per day. Create a card underneath readings that showcase daily out based on the first and last readings of the day. Have the card collapsed by default." MEASURED BEFORE A LINE CHANGED, not recalled, because his first question was whether the data even exists: it does — all 8 rows of public.runner_usage_readings carry a real taken_at, spanning three CST days (8/20: 3 readings, 8/21: 4, 8/22: 1). THE HALF THAT WOULD HAVE SHIPPED WRONG IS THE THIRD DAY: 8/22 has exactly ONE reading, and every obvious implementation renders its delta as 0 — a number that says the day produced nothing, when the truth is there is nothing to measure from. It renders an em dash, the function returns NULL, and that is the same rule as a NULL plain_* drawing a red defect line and a NULL cost_usd never printing $0.00. Two more the render must not re-derive and therefore does not own: the day is an America/Chicago day (register B35 — the CST day starts at 05:00Z, so a UTC grouping files most of a night's cycles under the wrong date), and a NEGATIVE all-models delta is John's weekly meter RESETTING inside the window, not work being undone. All four live in migration dirbee71cf4_daily_reading_output as public.daily_reading_output(), one call per rebuild — the same prose->code correction as SES-127/128/129, for the seventh time. The two figures on a row measure DIFFERENT THINGS and the headings say so: the meter delta includes John's own manual sessions, while the token figure is the runner's estimate for cycles that started inside the window — 9 cycles in 8/21's window against 12 in the whole CST day, so window-scoping is not cosmetic. QA was discriminating rather than merely complete: the three live rows were computed by a standalone query that never calls the function and matched it exactly (+12/+18/5,320,000/9 and +9/+11/9,685,000/9), then two fixtures inside deliberately rolled-back transactions flipped 8/22 from "one reading only" to a real +7%/11.8M/16-cycle row and, with a reset-shaped reading, to guard "meter reset in window" with a NULL delta — results that are impossible if the NULLs were hardcoded. Fixtures rolled back, 8 readings restored. Grants asserted BOTH directions per SES-101: anon/authenticated false, service_role/postgres true. -->
 <!-- DeepBench v7.0.163 | runbooks/briefing-template.html | SES-128 — briefing redesign 5 of 6: §4's reading card gains NIGHT and MORNING slots, and the pair becomes the runner's automatic calibration. MEASURED BEFORE A LINE CHANGED, not recalled: public.runner_usage_readings held nine columns and NOT ONE of them could tell a night reading from a morning one, and all eight stored rows carried tokens_per_pct = NULL — so in the whole life of this platform the runner has never once derived a calibration, and every allowance it has computed fell back to the uncalibrated 10M cap or the 3M stale floor. The mechanism, and the reason one reading could never have worked: John's weekly meter is spent by his own manual sessions AND the runner, so tokens-per-percent measured over any window that mixes the two is confidently wrong. A window bracketed by his last look at night and his first in the morning is runner-only BY CONSTRUCTION. Migration ses128_reading_slots adds the slot column (CHECK morning|night|adhoc) and public.derive_token_allowance(uuid). THE HALF THAT WOULD HAVE SHIPPED A CONFIDENT WRONG NUMBER: the guards. A naive build returns a rate whenever the arithmetic is defined, and the 24h guard's own QA is what shows why that fails — a 57-hour bracket with a POSITIVE delta and 28,065,000 real tokens inside it has everything such a build needs to hand back 4.68M per percent, roughly eleven times the true rate, and it is not a runner-only window at all. Four guards each return NULL rather than a number (no pair; delta ≤ 0, which is a meter reset or a rolled-over week; an empty window; a bracket wider than 24h), and NULL is not a failure — it is the signal to fall back to the guardrails that already exist. THE EIGHT EXISTING READINGS ARE NOT BACKFILLED, deliberately: 13:50Z is 8:50 AM in Chicago and reads exactly like a "morning", and slotting it that way would manufacture a bracketing pair John never declared and produce a calibration that looks measured and is invented. They default to adhoc, which is what they truthfully are. STATED RATHER THAN HIDDEN: the day's allowance divides the remaining pool by SEVEN, the worst case, because John's meter-week reset day is stored nowhere (runner_budget carries month/caps/share/rest and no week anchor, read live) — that is the fail-closed direction, it can only under-spend, and question q-meter-week-anchor asks him for the real day, at which point the number gets larger and never smaller. The legacy flat `reading` object migrates to `adhoc` rather than being dropped, the same defensive default SES-99, v7.0.145 and SES-127 each needed, plus the migration none of them did. QA was discriminating: the expectation (2,540,000 tokens ÷ 6 pct = 423,333.33) was computed by a standalone query that never calls the function, the pre-migration negative control returns NULL, the dry-run path (p_cycle_id NULL) is proven to write nothing, and grants are asserted BOTH directions after revoking from PUBLIC — anon false, service_role true (SES-101's function-level twin of the column-grants rule). Fixtures deleted; 8 readings, all adhoc, restored exactly. -->
 <!-- DeepBench v7.0.162 | runbooks/briefing-template.html | SES-127 — briefing redesign 4 of 6: §10 SKIPPED, AND THE SKIPS BEHIND IT BECOME ROWS. The section is the visible half; the half that makes it possible is migration ses127_skip_records (public.runner_skips + public.record_skip()), because MEASURED FIRST rather than assumed: fifteen public.runner_* tables exist and not one stores a skip, so every skip this platform has ever made lives as PROSE inside runner_cycles.notes — live example read this session, cycle 1df7d9c6 at 19:12Z, "Step 5: queue #1 SES-110 skipped per B24 …". John cannot sort, count or act on a sentence in a ledger row he never opens. THE ONE THAT WOULD HAVE SHIPPED WRONG: an INSERT-only skip table. John's standing Automation drain re-reads 25 open now-tier members every cycle, eight cycles a day, so the same SES-110 row would land in front of him 8×/day forever — uniq_open_skip (backlog_id, reason_kind) WHERE resolved_at IS NULL makes a repeat bump skip_count/last_skipped_at instead, and THAT is the discriminating QA (three record_skip calls → two rows; an INSERT-only build returns three). NEW is briefed_at IS NULL — no global last-brief timestamp, a row is new exactly once, a re-skip after briefing does not clear it (John has seen it), and the rebuild stamps briefed_at AFTER republishing so a failed publish cannot silently eat the chip. Resolution is DERIVED, never maintained: §10 joins backlog_items and filters status NOT IN ('done','removed'), so a shipped ticket leaves the section with no write and no rule for a cycle to forget — the same prose→code correction as SES-86 phase 3 / SES-101 / SES-111, applied by deleting the rule rather than writing one. The join is LATERAL … LIMIT 1 because backlog_id is NOT unique (CHI-48 holds two rows, found by SES-86 phase 2's own QA). 'claimed-by-peer' is deliberately ABSENT from the reason_kind vocabulary: the section says "waiting on YOUR input" and a contested claim clears itself in minutes, so recording one would fill his one actionable section with rows that action nothing. This is shape (b) of SES-124's collapse framework's first real use (h2.clickable over .secwrap), default closed per the spec, and rows carry NO data-awaits — a skipped ticket is information, not a decision owed, and inflating §1's counter is the masthead-disagrees-with-the-page failure countWaiting() exists to prevent. Divergence from the mock, stated rather than left to be found: the table uses SES-126's .tscroll, not .tblwrap — nine columns under .tblwrap have no min-width and crush on a phone, and .tscroll is the wrapper SES-126 built for exactly this. Rows shipped are the two REAL skips live on the board (SES-110 permission-gate, CHI-89 removal-proposed), both re-verified this session against status + an undecided card, not copied from another cycle's prose. -->
@@ -345,8 +346,17 @@
   // The conversation log for one target, newest last — John's question, then the runner's answer
   // if a cycle has written one. A question with no answer yet says so plainly rather than
   // rendering an empty space that reads like it was ignored.
+  //
+  // SES-132 — EVERY id this function renders is recorded, and §9.1 renders the ones it did not.
+  // The recording is the whole mechanism: `thread()` is reachable only from inside a live target
+  // (card() and question(), which visionClaim() delegates to), so an ask whose target has left
+  // the rebuild has no renderer at all and John's typed line silently disappears from the page.
+  // The set is reset at the top of every render() — a second render (saving a reading calls one)
+  // would otherwise carry the previous pass's ids and orphan nothing.
+  var threadedIds = {};
   function thread(targetId){
     var list = state.asks[targetId] || [];
+    threadedIds[targetId] = true;
     if (!list.length) return '';
     var h = '<div class="thread">';
     for (var i=0;i<list.length;i++){
@@ -423,6 +433,49 @@
       +(headExtra||'')
       +'<span class="ttl">'+title+'</span><span class="chev">&#9656;</span></div>'
       +'<div class="bodyc">'+bodyHtml+'</div></div>';
+  }
+
+  // SES-132 — §9.1 · ANSWERED, YOUR PAST QUESTIONS. John, briefing page 2026-08-23T00:37Z:
+  // "I could swear i have wrote comments in the gated questions, and most are not showing.
+  // shouldn't the thread show each page refresh and what your answers are?" He was right, and
+  // the cause is that the very act of deciding removes the only thing that could render his
+  // line: §§5/6 rebuild from runner_items WHERE decision IS NULL, §9 from runner_questions
+  // WHERE status='open' capped at 5, and §12 drops a decided claim. His comment and the
+  // runner's reply then sit in runner_card_asks displayed nowhere.
+  //
+  // THE ORDERING TRAP, and it is why this is a marker rather than a call in place. §9.1 sits
+  // between §9 and §10, but §12's vision claims render AFTER it — so an orphan set computed at
+  // §9.1's own position would classify every vision-claim thread as orphaned and print it twice.
+  // The section therefore emits a marker where it belongs and render() substitutes the real
+  // block once the whole page has been built. The substitution passes a FUNCTION, never the
+  // string: `$&` and friends are special in a String.replace replacement, and thread text is
+  // John's prose, which may contain them.
+  //
+  // Rows carry NO `data-awaits`: a kept thread is information, not a decision owed, and
+  // inflating §1's counter with it is the masthead-disagrees-with-the-page failure countWaiting()
+  // exists to prevent — the same call SES-127 made for §10.
+  var ORPHAN_MARK = '<!--SES132-ORPHAN-SLOT-->';
+  function orphanThreads(){
+    var ids = Object.keys(state.asks).filter(function(id){
+      return !threadedIds[id] && (state.asks[id] || []).length;
+    });
+    if (!ids.length) return '';
+    var rows = '';
+    for (var i=0; i<ids.length; i++){
+      rows += fold('past-'+ids[i], '9.1.'+(i+1), esc(ids[i]),
+        '<p class="qctx">You decided this one, so the card or row it was attached to stopped '
+        +'being rebuilt. Your line and my answer are kept here.</p>'
+        + thread(ids[i]));
+    }
+    return '<h2 class="clickable" data-toggle="pastasks"><span class="secnum">9.1</span>'
+      +'Answered &mdash; your past questions <span class="countchip">'+ids.length+'</span> '
+      +'<span class="chev">&#9656;</span></h2>'
+      +'<div class="secwrap" id="pastasks">'
+      +'<p class="strip-def">Every question you have typed on this page, kept after the card or '
+      +'row it was attached to was decided and stopped being rebuilt. Nothing here needs a '
+      +'decision — it is your record, not a list of work.</p>'
+      + rows
+      +'</div>';
   }
 
   // SES-128 — §4's reading slots. ONE function renders both rows, for the same reason §9 and §12
@@ -679,7 +732,9 @@
   }
 
   function render(){
-    document.getElementById('page').innerHTML =
+    // SES-132 — a fresh pass owns a fresh record of which threads it rendered.
+    threadedIds = {};
+    var out =
     // ===== §1 · MASTHEAD (SES-124) =========================================================
     // The decisions-waiting counter is rendered EMPTY here and filled by countWaiting() in
     // wire(), from `data-awaits` on the elements themselves. Rendering it from a number the
@@ -920,6 +975,12 @@
       // them — the same prose-instead-of-column gap v7.0.146 closed for cards, still open here.
       'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
       'it joins the bottom of your lane and waits its turn.')
+    // ===== §9.1 · ANSWERED — YOUR PAST QUESTIONS (SES-132) ==================================
+    // The marker's substitution happens at the bottom of render(), NOT here — see
+    // orphanThreads() for why (§12 renders after this point, so the orphan set is not knowable
+    // yet). A sub-block under §9, exactly like §4.1 and §7.1, so the LOCKED SECTION ORDER is
+    // extended rather than renumbered.
+    +ORPHAN_MARK
     // ===== §10 · SKIPPED — WAITING ON YOUR INPUT (SES-127) ==================================
     // THE WHOLE SECTION FOLDS, default CLOSED — shape (b) of SES-124's collapse framework
     // (`h2.clickable[data-toggle]` over a `.secwrap`), its first real use. Closed by default is
@@ -1082,6 +1143,10 @@
     // then closed the page on housekeeping instead of on his board. The read-only signal is
     // NOT lost — it lives on `#savebar` above, which is where a failed save reports itself.
     +'</div>';
+    // SES-132 — §9.1 is filled LAST, once every section has declared the threads it rendered.
+    // The replacement is a FUNCTION so `$&`/`$1` inside John's own prose stay literal.
+    document.getElementById('page').innerHTML =
+      out.replace(ORPHAN_MARK, function(){ return orphanThreads(); });
     wire();
   }
 
