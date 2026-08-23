@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.179 | runbooks/runner-cycle.md | SES-142 — a standing drain finishes on the FIXED member list John named, never on the live now-tier predicate. His ruling, verbatim: "the user must name when the drain is done… The use case is the epic automation — all its current tickets in the now bucket are complete." MEASURED BEFORE A LINE CHANGED, and the defect selected the very cycle that fixed it: John named 18 members on directive b74009ea; the epic's live now tier held 19; the extra one was SES-142 ITSELF, filed 03:51Z after the naming — and drain_epic_next() returned it as the pick. Cycles file into a drained epic continuously (SES-140, SES-141, SES-142 all landed in one night), so open_now = 0 receded as fast as the runner approached it and a standing order John gave with an end in mind was becoming an open-ended mandate the runner granted itself. That is an authorisation defect, not a tidy-up. Migration ses142_drain_scope: new public.runner_drain_scope (one FK row per named member, unique (directive_id, item_id)), drain_epic_next() rewritten to pick from and retire on THAT list, and the standing drain backfilled with John's 18 (before-image per INSERT, row_data = NULL). A TABLE OF FKs RATHER THAN THE text[] THE TICKET ALSO ALLOWED, for a reason this repo has already paid for: backlog_id is NOT unique (CHI-48 occupies two rows, SES-97), so an id array silently pulls in both — the same "the epic is an FK, never prose" property SES-111 already states, applied to the scope. THE DECISION MOST LIKELY TO BE GOT WRONG LATER, so it is written as a property: the named list REPLACES the tier predicate and is not kept alongside it — keeping tier='now' leaves a SECOND moving predicate, so re-tiering a named ticket would silently drop it out of a drain John declared over it (proven live: with SES-141 re-tiered to next, the shipped build still picks it, the retired build picks SES-140 instead). New fifth outcome `unscoped` — a drain with no named list falls through to the board like `blocked` but is deliberately NOT called `blocked`, because the one thing it must never do is quietly fall back to the live predicate, which is the bug wearing a default's clothes; it also does not retire the drain. QA was discriminating rather than merely complete: the retirement arm is claim-independent (all 18 named marked done inside a deliberately rolled-back transaction -> shipped build `retired`, retired build still sees SES-142 open and keeps draining), and the negative control for the pick is this cycle's OWN pre-migration call at 03:52Z, which returned pick SES-142 / open_now 19 against the shipped build's pick SES-141 / open_now 18 on identical live data. Rollback proved clean on every fixture (directive still queued, 0 named done, 0 stray before-images). Grants asserted BOTH directions per SES-101 on the function AND all four DML verbs on the table per DAT-18. Two stale claims in this file corrected from a live read, not recalled: SES-110/SES-106 are both `done`, so the "cannot drain to completion" paragraph and the tail's "does NOT self-terminate" paragraph both named a blocker that is gone — while the half that still holds (the pick predicate never reads design_status, so SES-140's needs-john flag is skipped procedurally at step 5) is kept and said plainly. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.176 | runbooks/runner-cycle.md | SES-139 — the serial tail gains step (8): a draining cycle fires exactly one successor. Root cause of the stall, from John's "find root cause why automation is stalling": SES-111 changed what a cycle PICKS and nothing anywhere fired the NEXT one, so the back-to-back cadence of 2026-08-22→23 was hands on manual fires and fell to the 3h cron the moment they stopped. NOT a widening of §19v — its Operations paragraph has specified "24×7 as chained short sessions" since 2026-08-19 and only the cron half was ever built; John authorised the rest explicitly ("Yes", 2026-08-23, after it was stated plainly). THE GATE THE TICKET DID NOT HAVE, and it is the whole safety of the step: bound (2) reads "only from a cycle that ran its tail", and a wall-stop RUNS its tail (step 3, verbatim) — so as filed, a token-wall stop fires a successor that stops at the same wall and fires another, an unbounded loop of did_not_run rows that converts the budget wall from a brake into a metronome. Gate A (outcome ∈ shipped/gated_before_build/reverted) is what makes a wall-stop the END of the chain. Measured at ship, not reasoned: 20,851,000 est tokens across 27 cycles in the CST day against John's 25M override 43a9d4ae expiring 05:00Z, after which the allowance reverts to a 10M cap the day had already passed — the first fire after 05:00Z wall-stops. Gate B's drain_epic_next call is deliberately NOT a preview: read from pg_get_functiondef, it writes a before-image and closes the directive on the empty path, so the last cycle of a drain closes it and fires nothing. Its parameter is a STAMP, not a selector — this cycle passed the epic id at step 5 and got a correct pick with no write, which is exactly why the trap is written down at the second call site, where retirement makes it cost something. DISCLOSED RATHER THAN PAPERED OVER: the ticket's bound (3) self-termination does not currently hold — SES-110 is partial with a .claude/ half (B39, card 9e7d8bf2) and the pick predicate never reads design_status, so a needs-desktop member returns as a pick, is skipped at step 5 (SES-114), and the cycle builds from the board instead; the real bound is Gate A plus the token wall. Drain CREATION stays John-only (property 5), fleet size stays N not N^2. Doc-only; no code, no schema, no site change. -->
 <!-- DeepBench v7.0.174 | runbooks/runner-cycle.md | SES-116 — step 9's card-filing line stops teaching the defect it caused. It read "backlog ID + Type + named P-class per the Language block above", so every cycle composed 'SES-115 (Tooling · P10 - Tooling)' and stored it in `runner_items.backlog_id` — a JOIN KEY to `backlog_items.backlog_id`. Every card→ticket join therefore returned nothing, silently: the help-me ticket, the pending-on-John views, SES-112's needs-john backfill. The Language block governs what John READS and never governed a key column. MEASURED BEFORE A LINE CHANGED and the ticket UNDER-COUNTED IT 20×: it says "3 of 4 open gated cards"; the live census was 63 of 80 non-NULL rows violating, SEVEN of them undecided (CHI-84 and AGT-015 among them — both real, both mis-joining while sitting on John's page awaiting his tap). Corroboration that this was already costing real work rather than being theoretical: v7.0.173's own SES-115 view had to reach the ticket through `substring(backlog_id from '^[A-Za-z]+-[0-9]+')` because the direct join matched zero rows — a workaround written one cycle earlier, for this. Migration ses116_backlog_id_bare_check: new nullable `display_ref`, 63 rows repaired (41 to a bare id, 22 to display_ref-only), then `ck_runner_items_backlog_id_bare` VALID. THE HALF THE TICKET DID NOT ANTICIPATE, and it is why display_ref exists rather than NULL: the ticket's "NULL stays allowed for non-ticket cards" is right for a card that never had a reference, but 22 live rows carry the ONLY copy of a real one — eleven a directive uuid, two a governance register, two an ARCHITECTURE clause — so nulling them destroys it (§19v) and blanks the id chip on two cards John has not yet decided. THE ONE THAT WOULD HAVE SHIPPED A LIVE HAZARD: `NOT VALID` looks like the safe way to avoid touching history and is the opposite — it is still enforced on UPDATE, so those 22 rows become un-updatable and the next harvest of John's tap on card 477454d7 FAILS. That arm is QA'd explicitly (D=PASS) rather than reasoned about. Pattern surveyed, not chosen: matches all 603 live backlog_items ids, zero exceptions. All five QA arms proved live on fixtures inside a deliberately rolled-back transaction, both directions per SES-101. -->
 <!-- DeepBench v7.0.165 | runbooks/runner-cycle.md | SES-114 — the blocked prefix of the queue is READ, not re-derived. Three flags mean "keeps its number, step past it" — `status = 'removal proposed'` (SES-113), `design_status = 'needs-john'`, `design_status = 'needs-desktop'` — and until now only the first was visible to step 5's selection query, so a blocked ticket looked exactly like a buildable one and the only way to tell was to read its description and reason the blocker out again. MEASURED, and this cycle paid the cost it is fixing: live `runner_skips` at 23:10Z held SES-106 and SES-110 at queue 1 and 3, the top of John's standing Automation drain, and their `skip_count` went 1 -> 2 while this cycle re-established for the THIRD time that day what cycles 1df7d9c6 (19:12Z) and ed1a5eb3 (23:03Z) had already established. Three re-derivations of one answer on a 3-hour cadence. THE HALF THAT WOULD HAVE SHIPPED INERT: census before a line changed — `design_status` was `designed` on 23 rows and NULL on 573, with ZERO rows carrying `needs-john` or `needs-desktop`. Projecting the column alone adds a skip that can never fire and a QA that passes while nothing changes, so (b) the filing-time write ships in the SAME commit, and the two live permission-gate rows were corrected to `needs-desktop` from THEIR OWN descriptions (before-image first), never from this cycle's opinion. CHI-89 deliberately untouched: `removal proposed` lives in `status`, and giving one fact a second home is how two copies start disagreeing. Step 6 gains the `designed` fast path — 18 open tickets carry it and SES-112's CHECK guarantees the `kickoff_link` is there — with revalidation explicitly NOT skipped by it. Same prose->column correction as SES-86 phase 3 / SES-101 / SES-111 / SES-127: a rule each cycle must re-derive is a rule that gets re-derived differently, or three times. -->
@@ -756,49 +757,84 @@ nobody has classified.
 **LAYER 1b — A STANDING EPIC DRAIN (`SES-111`, `v7.0.156`, migration `ses111_drain_epic`).**
 John's ask, filed with the Automation epic 2026-08-22: *"run the Automation epic to completion
 non-stop."* A drain is a `runner_directives` row he writes **once** — `type='drain-epic'`,
-`epic_id` naming the epic — meaning *work this epic's open `now`-tier members, cycle after cycle,
-until none are left.* Run it as **one call**, before layer 2/3's recompute-and-read:
+`epic_id` naming the epic — meaning *work **the members he named**, cycle after cycle, until none
+are left.* Run it as **one call**, before layer 2/3's recompute-and-read:
 
 ```sql
 SELECT * FROM public.drain_epic_next('<your cycle id>');
 ```
 
-Four outcomes, and the whole rule is in them — do not re-derive it:
+**THE FINISH LINE IS A FIXED LIST JOHN NAMED, NOT THE LIVE `now` TIER (`SES-142`, `v7.0.179`,
+migration `ses142_drain_scope`).** John's ruling, 2026-08-23, in chat, verbatim: ***"the user must
+name when the drain is done… The use case is the epic automation — all its current tickets in the
+now bucket are complete."*** Until this shipped, both predicates read the epic's **live** `now`
+tier — and cycles file new tickets into a drained epic continuously, so the finish line receded as
+fast as the runner approached it and a standing order John gave with an end in mind was becoming an
+open-ended mandate the runner granted itself. **Measured, and the defect selected the very cycle
+that fixed it:** John named **18** members on directive `b74009ea`; the live `now` tier held
+**19**; the extra one was `SES-142` **itself**, filed `03:51Z` *after* the naming — and
+`drain_epic_next()` returned it as the `pick`. The scope now lives in
+`public.runner_drain_scope` (one FK row per named member, `unique (directive_id, item_id)`), and a
+ticket filed into the epic **after** naming never joins a standing drain: it queues normally and
+waits for John.
+
+**Five outcomes, and the whole rule is in them — do not re-derive it:**
 
 - **`none`** — no drain declared. The normal case: ignore this layer entirely and read the board
   exactly as before. **Selection with no drain standing is byte-for-byte what it was in
   `v7.0.155`.**
-- **`pick`** — build `backlog_id` (claim it with step 5's atomic claim, same as any ticket).
-- **`blocked`** — the drain is live and the epic still has open members, but none you can claim
-  right now (a peer holds them). **Fall through to the class-sorted board and build normally.** A
-  drain must never end a cycle build-less — register B24's rule, binding here for the same reason.
-- **`retired`** — the epic's `now` tier is empty. The function has already written the
+- **`pick`** — build `backlog_id` (claim it with step 5's atomic claim, same as any ticket). It is
+  the lowest-`queue` **named** member you can claim.
+- **`blocked`** — the drain is live and named members are still open, but none you can claim right
+  now (a peer holds them). **Fall through to the class-sorted board and build normally.** A drain
+  must never end a cycle build-less — register B24's rule, binding here for the same reason.
+- **`unscoped`** (`SES-142`) — a drain exists but **John has named no member list for it**. Behave
+  exactly as for `blocked` — fall through and build from the board. It is a **separate word from
+  `blocked` on purpose**: reusing `blocked` would give one outcome two meanings, and the thing it
+  must never do is quietly fall back to the live-tier predicate, which is the bug wearing a
+  default's clothes. It fails closed and does **not** retire the drain. The only way to reach it is
+  a future drain declared without a list; the standing drain `b74009ea` carries its 18 since this
+  ship.
+- **`retired`** — **every named member** is `done`/`removed`. The function has already written the
   before-image and closed the directive; nothing is owed. Fall through.
 
 Five properties that are load-bearing, each written into the migration header so they travel with
 the code. **Anyone editing this must preserve all five:**
 
-- **The epic is an FK, never prose in `body`.** `CHECK ((type='drain-epic') = (epic_id IS NOT
-  NULL))` — a drain must name an epic, nothing else may. Same prose→column correction as `SES-86`
-  phase 3 and `v7.0.146`, for the same measured reason.
+- **The epic is an FK, never prose in `body` — and so is the SCOPE (`SES-142`).** `CHECK
+  ((type='drain-epic') = (epic_id IS NOT NULL))` — a drain must name an epic, nothing else may.
+  The member list is `runner_drain_scope` rows keyed on `backlog_items.id`, **never a `text[]` of
+  ids**: `backlog_id` carries no unique constraint (`CHI-48` occupies two rows, `SES-97`), so an id
+  array silently pulls in both. `runner_drain_scope.backlog_id` is a naming-time snapshot for
+  provenance and is **never joined on**. Same prose→column correction as `SES-86` phase 3 and
+  `v7.0.146`, for the same measured reason.
 - **A drain is NEVER consumed.** Layer 1a's *"mark it `in_progress`"* would end the standing-ness
   on cycle 1, which is the entire feature. `drain_epic_next()` touches `status` only to retire.
-- **`now` tier only** — John's boundary on `SES-110`, verbatim: *"finish the `<epic>` tickets"* =
-  the epic's NOW-tier members only. `next`/`later` members neither get built nor hold it open.
+- **The NAMED LIST REPLACES the tier predicate — it is not kept alongside it (`SES-142`).** This
+  property used to read *"`now` tier only"*, from John's boundary on `SES-110` (*"finish the
+  `<epic>` tickets"*). His 2026-08-23 ruling supersedes it: the list is captured **from** the `now`
+  bucket at naming time and is thereafter the whole scope. **Do not re-add a `tier` clause** — that
+  would leave a second moving predicate in place, so re-tiering a named ticket to `next` would
+  silently drop it out of a drain John declared over it. Proven live in QA: with `SES-141` re-tiered
+  to `next`, the shipped build still picks it and the retired build drops it and picks `SES-140`.
 - **`blocked` is NOT `retired`, and this is the parallel-cycles trap (register B42).** The two
-  predicates differ on purpose: **retirement** asks whether any open `now` member *exists*, claims
-  ignored; the **pick** asks which member *you* can claim, claims honoured (24h expiry, the B37
-  bar). Conflate them and two peers holding the last two claims between them each cancel John's
-  standing order while both tickets are still being built. Proven live: sole member claimed by a
-  peer → `blocked`, `open_now=1`, directive untouched.
-- **It never self-activates.** Nothing creates a drain row but John — a directive row or a
-  briefing tap. The runner may read one; it may never write one. This is the property that keeps
-  the feature from being a widening of the runner's own autonomy, and it is not negotiable.
+  predicates differ on purpose: **retirement** asks whether any **named** member is still open,
+  claims ignored; the **pick** asks which named member *you* can claim, claims honoured (24h
+  expiry, the B37 bar). Conflate them and two peers holding the last two claims between them each
+  cancel John's standing order while both tickets are still being built. Proven live: sole member
+  claimed by a peer → `blocked`, `open_now=1`, directive untouched.
+- **It never self-activates.** Nothing creates a drain row **or a scope row** but John's own
+  declaration — a directive row or a briefing tap. The runner may read one; it may never write one.
+  This is the property that keeps the feature from being a widening of the runner's own autonomy,
+  and it is not negotiable.
 
-**Known and not papered over:** the Automation epic cannot currently drain to completion —
-`SES-110` is `partial` with one `.claude/` half an unattended cycle may not make (register B39,
-carded `9e7d8bf2`), so a drain loops past it every cycle and never reaches `open_now = 0`.
-`SES-112`/`SES-114` (a `design_status` column, skipped at a glance) are the filed fix.
+**Corrected, because it was measured rather than recalled (`SES-142`, `v7.0.179`).** This paragraph
+used to read *"the Automation epic cannot currently drain to completion — `SES-110` is `partial`
+with one `.claude/` half an unattended cycle may not make."* Read live this cycle,
+`SES-110` **and** `SES-106` are both `status = 'done'`, so that specific blocker is gone. The real
+reason the drain could not terminate was never `SES-110`: it was the **live-tier predicate this
+ticket replaced**, which the runner's own filings extended faster than it drained. Termination now
+depends only on John's 18 named members closing — a set no cycle can add to.
 
 **THE AUTOMATION LANE SITS ABOVE ALL SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive
 `f47e5a95` — John, 2026-08-21T16:21Z).** His line, verbatim: *"keep closing automation tooling
@@ -1392,14 +1428,20 @@ Recorded because this cycle did it: step 5's call was made with the **epic** id,
 `pick`, and wrote nothing. This step adds a second call site on the one path where that mistake
 costs something.
 
-**What does NOT self-terminate — read this before quoting the ticket's bound (3) to John.** *"The
-chain self-terminates; the drain retires at `open_now = 0`"* holds only if the epic's `now` tier can
-empty, and today it cannot: `SES-110` is `partial` with a `.claude/` half an unattended cycle may not
-make (register B39, carded `9e7d8bf2`), and `drain_epic_next`'s pick predicate reads `queue` and
-claims, **never `design_status`** — so a `needs-desktop` member still comes back as a `pick`, gets
-skipped procedurally at step 5 (`SES-114`), and the cycle falls through to the board and builds
-normally. The chain therefore keeps running on real board work, bounded by **Gate A plus the token
-wall**, not by the drain retiring. A real bound, but a different one than the ticket claims.
+**What does NOT self-terminate — read this before quoting the ticket's bound (3) to John. REWRITTEN
+`SES-142`, `v7.0.179`, because half of it has been fixed and the other half has not.** The claim
+*"the chain self-terminates; the drain retires at `open_now = 0`"* was false for two independent
+reasons. **The first is now fixed:** `open_now` was computed over the epic's **live** `now` tier,
+which the runner's own filings extended faster than it drained, so the target receded — that is
+`SES-142`, and `open_now` is now the count of John's **named** members still open, a set no cycle
+can add to. `SES-110`, named in the previous version of this paragraph, is `status = 'done'` as of
+this cycle's live read and is no longer a blocker either. **The second is unchanged and still
+holds:** `drain_epic_next`'s pick predicate reads `queue` and claims, **never `design_status`** — so
+a `needs-desktop` or `needs-john` member still comes back as a `pick`, gets skipped procedurally at
+step 5 (`SES-114`), and the cycle falls through to the board and builds normally. `SES-140` is
+sitting in the named 18 carrying exactly that flag right now. So the chain **can** now terminate in
+principle, and in practice still keeps running on real board work, bounded by **Gate A plus the
+token wall**. A real bound, and now a nearer one than before.
 
 **Untouched, and not negotiable:** drain **creation** stays John-only (`drain_epic_next` property 5 —
 *"Nothing creates a drain row but John… The runner may read one; it may never write one"*). This step
