@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.195 | runbooks/runner-cycle.md | SES-140 FINAL — tail step (8) stops spawning sessions and CONTINUES THE DRAIN IN-SESSION. John's order 2026-08-23 (attended session successional-review, 6-requirement directive), replacing his SES-141 ruling: one ticket per CYCLE ROW stays the law; a session runs successive cycles while a drain stands. Why the spawn era is over, all measured live: fire_trigger refused (routine created via http_api); create_session refused 3x across two parents incl. with permission_mode explicit at 25 min ("parent session's permission mode is not yet available"); the v7.0.190 rung-2 one-shot create_trigger actually FIRED at 15:11:36Z (trig_015wHzkN7kiEBTdChhYaFVua) and the launched session booted without the git source or a usable tool list (create_trigger exposes no sources/allowed_tools) and never wrote a row — a silent dead spawn, checked again 16:19Z, still nothing. Anthropic's Claude Code docs (read this session) confirm session-spawning is not a supported pattern; the supported "work a queue until empty" pattern is one session looping internally with the schedule as the restart net. Gates A/B, one-ticket-per-cycle-row, full ceremony per iteration, walls re-checked every iteration, and drain creation staying John-only are ALL unchanged. The ACTUATOR LADDER block is deleted; its evidence is preserved in step (8)'s retirement paragraph so nobody rebuilds it. Companion ship v7.0.196 (SES-151) puts the scheduler on John's 12/3/6/9 CST clock grid. -->
 <!-- DeepBench v7.0.190 | runbooks/runner-cycle.md | SES-140 — tail step (8)'s actuator becomes a TWO-RUNG LADDER, and the reason is the hardest measurement this file carries: THE CHAIN HAS NEVER ONCE RUN. Measured live 2026-08-23T14:47Z, not recalled — across all 93 cycles in the runner's life `select distinct trigger from runner_cycles` returns `scheduled | supervised`, ZERO chained rows. So ARCHITECTURE.md §19v §Operations' "24x7 as chained short sessions" has been unbuilt in practice since SES-139 shipped the step, and the real cadence has always been the hourly cron alone. JOHN REPORTED IT FIVE TIMES IN ONE HOUR and this cycle is his word, not its own idea: Rework on SES-139 ("still don't see the drain starting the next session on its own"), SES-142 ("still can not get drain to run until completion of list of tickets"), SES-143 ("still have not seen drain run according to the rules that are displayed"), the SES-140 gated card, and its follow-up card ("drain must work no matter what... this ticket and others can not be closed"). A Rework is a directive and selection layer 1a puts a directive above the board, so SES-147 at queue 1 was stepped past on PRECEDENCE, not on a block — and deliberately with NO record_skip row, because a precedence step-past is not something John has to clear. BOTH PRIOR ACTUATORS ARE REFUSED, FOR TWO UNRELATED REASONS: fire_trigger because an agent may not fire a routine it did not create (SES-140), and create_session because "the parent session's permission mode is not yet available" — refused TWICE by predecessor 72561db3 at ~14:0xZ, 25 minutes into that parent, so NOT a warm-up race; the value appears never to be recorded for a trigger-started session, and neither remedy the message offers (retry / run the parent in auto mode) is reachable from inside a cycle. Rung 1 stays create_session (John's ruling, SES-141) with permission_mode passed explicitly, one attempt; rung 2 is a one-shot create_trigger (run_once_at ~2 min, create_new_session_on_fire) where the SCHEDULER creates the session exactly as the :40 cron does twelve times a day, so the parent-mode check is never reached. attempts-per-tier <= 1 is what keeps "exactly one successor" true: a refusal creates no session, so at most one can exist. QA PROVEN LIVE WITHOUT SPAWNING ANYTHING — probe trig_01Y1EeMzj8g7yQHxSeLs4MFF created 14:49:19Z, verified, deleted, rollback clean (list_triggers returns the two real routines only): a one-shot from a scheduled cycle auto-inherits env_01GuEzm2nCHbCB5SumvQVEQ1 and ALL FOUR MCP connections, so environment_id and connectors must NOT be passed (connectors can only narrow, so a partial list would REMOVE connections). NEGATIVE CONTROL is the predecessor's own double refusal an hour earlier on the same platform — one variable, the actuator — which is what makes this discriminating rather than merely complete: doing nothing is exactly what 72561db3 did, and it got refused. DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: the probe's session_context carried a DEFAULT allowed_tools preset and NO sources entry where the runner routine names both, so a rung-2 successor may come up without the clone (fails at step 1, recoverable — Gate A means a failed cycle fires nothing further) or without Artifact (can harvest, build, ship and write its row, but cannot republish the page); the first chained cycle owes that observation and nobody else can make it. Not a SES-019 route-around, and the ladder is shaped to make that plain: what the platform scoped is WHO MAY FIRE and WHICH CALLER MAY CREATE — mechanics, not the runner's authority, which John granted (SES-139 "Yes") and ruled on (SES-141). Gates A and B, exactly one successor, and drain creation staying John-only are all untouched. Also corrected from a live board read: exactly ONE open ticket concerns the drain chain (SES-140 itself) — SES-139/141/142/143 are all done, so John's "more than 5" are their undecided briefing CARDS, which calls for the opposite action from five open tickets. Doc-only; no src/api/lib change, no schema change, no site change. -->
 <!-- DeepBench v7.0.188 | runbooks/runner-cycle.md | SES-146 — step 1b's own instruction was FALSE, and the gate it describes had never once paced a cycle that obeyed it literally. FOUND LIVE 2026-08-23T13:44Z by cycle 72561db3 while executing this very step, not reasoned about. This step tells every cycle to pass "<your prompt's trigger: line, verbatim>" and the routine's line reads `trigger: scheduled`; scheduler_gate() tested `p_trigger = 'scheduled'` by EXACT EQUALITY, so the literal form fell through to "not a scheduled cycle" and skipped the pacing branch AND the scheduler_on=false branch beneath it — John's interval and his off switch, both inert, both failing OPEN so neither the ledger nor the page ever showed it. NEGATIVE CONTROL, one cycle id, one instant, one variable: 'trigger: scheduled' -> "not a scheduled cycle"; 'scheduled' -> "manual fire". The five paced rows to date all passed the BARE word — every prior cycle read the instruction loosely and got lucky, which is why the defect survived a ship whose whole purpose was to make the panel binding. SECOND, INDEPENDENT DEFECT, and it is the one that gets worse on its own: v_manual compared `p_started` (now() at the moment the cycle REACHES this step) against cron_minute with a hardcoded ±2, so the grid test drifts with how much work step 0 did first — this cycle fired at 13:40:52Z, reached the gate at 13:43:12Z, distance 3, and was exempted as a "manual fire" it was not. As this runbook grows, more cycles exempt themselves. Migration ses146_scheduler_gate_trigger_parse: normalise the trigger (strip leading `trigger:`, trim, lower), anchor the grid to the cycle row's OWN started_at (stamped at step 1, the earliest fire-time proxy reachable from SQL; an unresolvable id falls back to p_started rather than raising, so the unknown path still fails open), and make the tolerance the COLUMN runner_settings.grid_tolerance_min (default 10, CHECK 0..30) — SES-143's own "the minute as a column, not a literal" precedent applied one level further, so correcting it is one UPDATE. ALL FOUR SES-143 PROPERTIES PRESERVED AND RE-ASSERTED, the predecessor predicate byte-for-byte (arm G: p_started 11:00Z correctly skips the 10:41Z did_not_run row and returns the 09:42Z shipped one) — that is the property whose naive form wedges the runner shut permanently. QA was discriminating rather than merely complete: arms A (literal line), B (bare word reached 3 min late) and D (scheduler_on=false) each return a DIFFERENT verdict on the two builds against identical inputs — paced/paced/scheduler-off shipped, run/run/run retired — and the retired-build values are this cycle's own pre-migration measurements at 13:44Z, not a reconstruction. Arm H confirms the fix does not invalidate the cycle that shipped it (1.18h >= 1h -> run). The fixture arm rolled back clean (scheduler_on true, 0 stray before-images); signature UNCHANGED so no overload (asserted 1) per .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role true). DISCLOSED rather than left to be discovered: this cycle both FILED SES-146 and built it, because the buildable prefix of the queue was empty — SES-140/SES-121 needs-john, SES-117/SES-118 needs-desktop, SES-84 has no unattended build left (its remainder is John ratifying drip cards), SES-101's remainder is a .claude/ edit — and the first buildable ticket, SES-131, is a two-leg live-research epic that does not fit the tokens left under today's cap. Lane-top placement is John's own standing rule for a new automation ticket (q-lane-top, yes, 2026-08-21), and the change NARROWS runner autonomy rather than widening it: it makes his own off switch bind. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.185 | runbooks/runner-cycle.md | SES-119 (b) — the Language block gains the half of John's standing instruction this file never carried: a ticket named in anything he reads carries its TITLE, not just its ID. His scope is verbatim and total ("across every session, display or anything that references work you perform for the backlog"), and it is the SAME sentence as the priority-class clause one level out — he should not have to memorize the digits of a class, and he should not have to memorize what SES-140 IS. v7.0.184 shipped the briefing-page.md half of part (b) and closed `partial` on the 3-file cap, promising the exact replacement text on its card; READ LIVE THIS CYCLE, that text is NOT there — the only SES-119 card (8a8559a7) covers §8 and §10 and never mentions part (b) — so it is written here from the shipped briefing-page.md wording rather than passed on silently, which is what keeps the two files stating one rule instead of two. MEASURED, NOT QUOTED, and the measurement is what shapes the rule: 562 open numbered tickets, `title IS NULL` on 0, and 50 falling back — so on 50 tickets the STORED title is a retired declaration marker (38 literally `Post-beta`), which is why the paragraph names public.backlog_display_title(title, description) as the source instead of saying "use the title column". That shorter sentence is the one that renders `Post-beta` as a ticket's name on the page he reads. THE ONE THAT WOULD HAVE SHIPPED WRONG: writing "always show ID + title" and stopping. The immediately preceding member of this rule family did exactly that — step 9's "backlog ID + Type + named P-class" told cycles to compose a display string into runner_items.backlog_id, a JOIN KEY, and every card→ticket join returned nothing on 63 of 80 rows (SES-116, v7.0.174) — so the render-time boundary ships as a stated bound, not an inference, alongside the rule that a fallback is a signal about the ticket rather than a blank to hand-fill (SES-117's TITLE CHECK is that structural fix). The §8 predicate, the rejected length heuristic and the CHI-97 boundary are CITED to briefing-page.md, never restated, per the v7.0.114 drift lesson. Doc-only; no src/api/lib change, no schema change, no site change. SES-119 closes `done`: both halves of part (b) now exist and (a)/(c) shipped in v7.0.184. -->
@@ -1514,19 +1515,19 @@ stamp `briefed_at` on the §10 skip rows you just rendered, and ONLY after the r
 resolved_at IS NULL;` — `briefed_at IS NULL` *is* the NEW chip, so stamping before the publish
 lands silently eats the chip on rows John never saw, and stamping after means the worst case is
 one extra night marked new; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
-(holder-guarded statement in step 1); **(8)** fire one successor, if and only if both gates below
-pass. Then end the session cleanly. The tail should take
+(holder-guarded statement in step 1); **(8)** continue the drain **in-session**, if and only if
+both gates below pass — otherwise end the session cleanly. The tail should take
 seconds to low minutes — everything long-running happened before it, in parallel.
 
-**(8) A DRAINING CYCLE SPAWNS ITS OWN SUCCESSOR — TWO GATES, BOTH REQUIRED (`SES-139`,
-`v7.0.176`; actuator replaced by `SES-141`, `v7.0.180`).** Root-caused 2026-08-23 from John's *"find root cause why automation is stalling"*:
+**(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — TWO GATES, BOTH REQUIRED (`SES-139`,
+`v7.0.176`; actuator replaced by `SES-141` `v7.0.180`, replaced again and FINAL by `SES-140`
+`v7.0.195` — the platform refuses session-spawning, so the chain runs inside the session).**
+Root-caused 2026-08-23 from John's *"find root cause why automation is stalling"*:
 `SES-111` changed what a cycle **picks** and nothing anywhere fired the **next** one. `ARCHITECTURE.md`
-§19v's *Operations* paragraph has always specified the model — *"24×7 as **chained short sessions**:
-a scheduled cloud task fires; each firing runs one cycle"* — but only the 3-hour cron and John's
-masthead "▶ Run a cycle now" link ever existed, so the chained half was never built. The night of
-2026-08-22→23 ran back-to-back on **manual** fires; when his hands stopped, the cadence fell back to
-the cron. That gap is the stall. John authorised the widening explicitly (**"Yes"**, 2026-08-23, in
-chat, after it was stated to him plainly). Run this **after (6) and (7)** — never before your row is
+§19v's *Operations* paragraph specifies the model (successive one-ticket cycles, 24×7), and John
+ordered the working form directly (in chat, 2026-08-23, `successional-review` session, replacing
+his `SES-141` ruling): **one ticket per CYCLE ROW stays the law; a session runs successive cycles
+while a drain stands.** Run this **after (6) and (7)** — never before your row is
 closed and the lease released:
 
 | Gate | Test | Fail |
@@ -1534,73 +1535,46 @@ closed and the lease released:
 | **A — you actually ran a cycle** | your own `outcome` ∈ `shipped` / `gated_before_build` / `reverted` | fire nothing |
 | **B — a standing drain still has claimable work** | `SELECT * FROM public.drain_epic_next('<your cycle id>')` → `outcome = 'pick'` | fire nothing |
 
-Both pass → **spawn exactly one successor session**, via the ACTUATOR LADDER below. The spawned
-session carries the runner prompt **verbatim** — the AUTOMATED stamp included — with the trigger
-line reading `trigger: chained (drain continuation)` instead of `scheduled`; the successor echoes
-that marker into its own `runner_cycles` row, and one ticket per session stays the law in the chain
-exactly as on the cron. Then note `SUCCESSOR SPAWNED <session or trigger id>` — or the failure — in
-your cycle row. **A failed spawn is a note, never a wall:** the cron remains the fallback engine.
+Both pass → **do not end the session. Open your continuation cycle and re-enter the runbook:**
 
-**THE ACTUATOR LADDER — TWO RUNGS, AT MOST ONE SESSION (`SES-140`, `v7.0.190`).** Both of this
-step's previous actuators are refused by the platform, for two unrelated reasons, and **the chain
-has therefore never once run**. Measured live 2026-08-23T14:47Z, not recalled: across all **93**
-cycles in the runner's life `select distinct trigger from runner_cycles` returns
-`scheduled | supervised` — **zero** chained rows. §19v §Operations' *"24×7 as chained short
-sessions"* has been unbuilt in practice the whole time, which is the stall John reported five times
-in one hour (Rework on `SES-139`, `SES-142`, `SES-143`, the `SES-140` card and its follow-up:
-*"drain must work no matter what"*).
+1. **INSERT a new `runner_cycles` row** — your same stamp echoed, `trigger` =
+   `chained (drain continuation)`, fresh id. That row IS the chain: its existence is the evidence
+   `SES-140` waited 94 spawn-era cycles to observe.
+2. Note `CONTINUED IN-SESSION AS CYCLE <new id>` in the row you just closed at (6).
+3. **Re-enter at step 1** with the new cycle id and run every step exactly as a fresh cycle
+   would — step 1b (`chained (drain continuation)` is exempt from pacing, by spec), **step 3's
+   walls re-checked in full** (this is what bounds the loop — a wall-stop closes the continuation
+   cycle `did_not_run` and, per Gate A, ends the chain), selection at step 5 (the drain pick,
+   the atomic claim, all of it), build, QA, ship, and this tail again. One ticket per cycle row,
+   full ceremony per cycle — the second iteration earns no shortcut.
+4. **The chain ends where a fresh cycle would end:** Gate A fails (wall-stop, `failed`,
+   `gated_before_build`), Gate B fails (drain retired, or every remaining named member is
+   flagged or claimed), or the platform ends the session itself — and nothing is lost on that
+   last one: an open claim expires in 24h and the next scheduled fire resumes the drain. A
+   continuation that fails to open is a **note, never a wall**: the cron remains the fallback
+   engine.
 
-| Rung | Actuator | One attempt each; rung 2 runs ONLY if rung 1 was refused |
-|---|---|---|
-| **1** | `Claude_Code_Remote` → `create_session`, **passing `permission_mode` explicitly** | John's ruled actuator (`SES-141`). If the validator only lacked a mode it could not infer, naming one satisfies it. |
-| **2** | `Claude_Code_Remote` → `create_trigger`, `run_once_at` ≈ 2 min out, `create_new_session_on_fire = true` | The **scheduler** creates the session, exactly as the :40 cron does — so the parent-permission-mode check is never reached. |
+**THE SESSION-SPAWNING ACTUATORS ARE RETIRED, AND THE EVIDENCE IS WHY — do not rebuild them.**
+Three actuators tried to launch the next *session* from inside a cycle; all three are dead ends,
+measured live on 2026-08-23, not reasoned: **`fire_trigger`** — refused, *"this routine was
+created via http_api, not by an agent"* (`SES-140`'s original finding). **`create_session`** —
+refused **three times across two parents**, identical message (*"the parent session's permission
+mode is not yet available"*), including once with `permission_mode` passed explicitly, 25 minutes
+into the parent (cycles `72561db3` ×2, `03c19332`). **One-shot `create_trigger`** (the `v7.0.190`
+rung 2) — actually fired at `15:11:36Z` (`trig_015wHzkN7kiEBTdChhYaFVua`) and the launched
+session came up without the git source or a usable tool list (`create_trigger` exposes no
+`sources` / `allowed_tools` parameters) and **never wrote a row** — a silent dead spawn, worse
+than the loud refusal. Anthropic's Claude Code documentation (read 2026-08-23, attended session
+`successional-review`) confirms session-spawning is not a supported pattern; the supported
+pattern for *"work a queue until it is empty"* is one session that keeps working inside itself,
+restarted by the schedule. Which is exactly this step.
 
-- **Why rung 1 alone is not enough.** `create_session` was refused **twice** by cycle `72561db3` at
-  ~14:0xZ, identical message: *"the parent session's permission mode is not yet available (it is
-  recorded shortly after the parent session starts); retry, or run the parent in auto mode."* The
-  parent had been running **25 minutes**, so this is **not a warm-up race** — the value appears
-  never to be recorded for a trigger-started session. Neither remedy the message offers is reachable
-  from inside a cycle: the retry has already failed at 25 minutes, and *"run the parent in auto
-  mode"* is a property of the routine, which a cycle **cannot edit** — that is `SES-140`'s original
-  refusal, and `update_trigger` exposes no `permission_mode`. Try rung 1 anyway, once: it is one
-  call, and if it starts working the fallback simply stops being reached.
-- **`attempts-per-tier ≤ 1` is what keeps "exactly one successor" true.** One attempt per rung, and
-  rung 2 fires only on rung 1's *refusal* — a refusal creates no session — so at most one session
-  can ever exist. Never retry a rung, and never run rung 2 after a rung-1 success.
-- **Rung 2 needs no `environment_id` and no `connectors`.** Proven non-destructively before this
-  shipped (probe `trig_01Y1EeMzj8g7yQHxSeLs4MFF`, created 14:49:19Z, verified, deleted; rollback
-  clean): a one-shot created from a scheduled cycle **auto-inherits** the runner's own environment
-  `env_01GuEzm2nCHbCB5SumvQVEQ1` and **all four** MCP connections, `Supabase` and
-  `Claude_Code_Remote` among them. Do not pass either argument — `connectors` in particular can only
-  narrow the set, never widen it, so naming a partial list would *remove* connections.
-- **NOT PROVEN, and do not claim otherwise until a chained cycle has actually run.** The probe's
-  stored `session_context` carried a **default `allowed_tools` preset** and **no `sources` entry**,
-  where the runner routine names both (`Artifact`, `ToolSearch`, `Agent`; the `deepbench-frontend`
-  git source). So a rung-2 successor may come up **without the clone** (it fails at step 1 and
-  records that — recoverable, since Gate A means a failed cycle fires nothing further) or
-  **without `Artifact`** (it can harvest, build, ship and write its ledger row, but cannot
-  republish the briefing page). If you are the first chained cycle, **say which of these you
-  found** in your cycle row — that observation is owed and nobody else can make it.
-- **A one-shot self-disables after firing** (`ended_reason = run_once_fired`) and is hidden from
-  `list_triggers` unless `include_completed`. It is not a second recurring routine and must never be
-  created with a `cron_expression` — that would be a cycle giving itself a schedule, which is John's
-  alone.
-- **This is not a route-around of a refusal (`SES-019`'s rule stands, and it is the reason the ladder
-  is shaped this way).** `SES-019` forbids retrying *the same underlying action through a different
-  tool to defeat a gate*. Neither refusal here is a gate on the runner's authority: the chained
-  successor is authorised (`SES-139`, John's **"Yes"**), the actuator is his ruling to make and he
-  made it (`SES-141`), and he has since said *"drain must work no matter what"*. What the platform
-  scoped was **who may fire a routine** and **which caller may create a session** — mechanics, not
-  permission. Rung 2 asks the scheduler to do the thing the scheduler already does hourly. **The
-  bounds that ARE authority all survive untouched:** Gates A and B, exactly one successor, and drain
-  creation staying John-only (`drain_epic_next` property 5).
-
-**GATE A IS NOT IN THE TICKET AND IT IS THE ENTIRE SAFETY OF THIS STEP. Do not drop it.** The
+**GATE A IS THE ENTIRE SAFETY OF THIS STEP. Do not drop it.** The
 ticket's bound reads *"one successor per cycle, only from a cycle that ran its tail"* — and a
 wall-stop **does** run its tail (step 3, verbatim: *"A wall-stop still runs the step-9 serial tail
 (its record must be written), then ends"*). Implemented exactly as filed, a cycle that stops at the
-token wall fires a successor, which stops at the same wall, which fires another: an unbounded loop
-of `did_not_run` rows, each burning a session, with nothing to break it but John noticing. **That
+token wall opens a continuation cycle, which stops at the same wall, which opens another: an
+unbounded loop of `did_not_run` rows, with nothing to break it but John noticing. **That
 converts the budget wall from a brake into a metronome** — the precise inversion of what a wall is
 for. Measured at this ship rather than reasoned: 03:14Z the America/Chicago day stood at
 **20,851,000 estimated tokens across 27 cycles** against John's `budget_override` `43a9d4ae`
@@ -1632,16 +1606,17 @@ can add to. `SES-110`, named in the previous version of this paragraph, is `stat
 this cycle's live read and is no longer a blocker either. **The second is unchanged and still
 holds:** `drain_epic_next`'s pick predicate reads `queue` and claims, **never `design_status`** — so
 a `needs-desktop` or `needs-john` member still comes back as a `pick`, gets skipped procedurally at
-step 5 (`SES-114`), and the cycle falls through to the board and builds normally. `SES-140` is
-sitting in the named 18 carrying exactly that flag right now. So the chain **can** now terminate in
-principle, and in practice still keeps running on real board work, bounded by **Gate A plus the
-token wall**. A real bound, and now a nearer one than before.
+step 5 (`SES-114`), and the cycle falls through to the board and builds normally. So the chain
+terminates on the named list in principle, keeps running on real board work in practice, and is
+bounded by **Gate A plus the token wall**. Said plainly for John: when every remaining named member
+is flagged `needs-john` / `needs-desktop`, the drain's finish line is on his briefing page, not in
+any cycle's hands — no cadence mechanism changes that.
 
 **Untouched, and not negotiable:** drain **creation** stays John-only (`drain_epic_next` property 5 —
 *"Nothing creates a drain row but John… The runner may read one; it may never write one"*). This step
 continues a drain he wrote; it can never start one. Fleet size stays stable rather than exponential —
-one successor per cycle means N concurrent cycles stay N, each replacing itself, and the cron adds to
-that fleet without multiplying it.
+at most one continuation cycle at a time per session means N concurrent sessions stay N, and the
+cron adds workers on John's clock grid without multiplying them.
 
 ## Standing prohibitions (§19v — no step overrides these)
 
@@ -1656,9 +1631,11 @@ retired cycle lease); enter the serial tail without the publish lease, republish
 pre-lease harvest, or end a cycle without running the tail — and **never push or claim a
 counter without re-asserting the ticket claim first** (`v7.0.123`'s lesson, directive
 `c4d95dc7`, retargeted by B42: the coordination token must be re-proven before every
-irreversible act, whatever the token is); **fire a successor from a cycle that did not run one**
-(`SES-139` tail step (8), Gate A — a wall-stop, an abort or a `failed` close fires **nothing**, or
-the budget wall becomes a metronome), **fire more than one**, or **create a drain row** (only John
+irreversible act, whatever the token is); **continue the drain from a cycle that did not run one**
+(`SES-139` tail step (8), Gate A — a wall-stop, an abort or a `failed` close continues **nothing**,
+or the budget wall becomes a metronome), **open more than one continuation cycle at a time**,
+**spawn or attempt to spawn another session** (`SES-140`, `v7.0.195` — every session-spawning
+actuator is platform-refused or boots dead; the chain runs in-session only), or **create a drain row** (only John
 does that — `drain_epic_next` property 5); **skip the step-1b settings gate, or carry on past a
 non-`run` verdict** (`SES-143` — the panel is John's switch on his own runner, and a cycle that
 runs anyway has taken it back).

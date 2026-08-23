@@ -2647,11 +2647,16 @@ each. Answers from the page land in the queue the next cycle reads.
 
 ### Operations
 
-24×7 as **chained short sessions**: a scheduled cloud task fires; each firing runs one cycle —
-pick (directive queue first, else the P-list), design, build, QA, ship or file a
-gated-before-build item —
-under the full existing ceremony, ending at close-out, never at context exhaustion (the
-one-feature/3-file scope rule guarantees the margin). **Pushes batch to ship points** — a
+24×7 as **cron-started sessions running chained cycles** (`SES-140` FINAL, `v7.0.195`, John
+2026-08-23 — the platform refuses session-spawning, so the chain runs in-session): a scheduled
+cloud task fires on John's clock grid; each firing runs one cycle — pick (directive queue first,
+else the P-list), design, build, QA, ship or file a gated-before-build item — and **while a
+standing drain has claimable work, the session opens its next cycle itself** (a new
+`runner_cycles` row, trigger `chained (drain continuation)`, one ticket per cycle row, full
+ceremony and budget walls re-checked per cycle) instead of ending. The chain ends at
+`runner-cycle.md` tail step (8)'s Gates A/B or at the session's own end — the cron resumes it —
+and every cycle still ends at close-out, never at context exhaustion (the one-feature/3-file
+scope rule guarantees the margin per cycle). **Pushes batch to ship points** — a
 session pushes when there is something to deploy or hand off, never per artifact (the inflight
 marker rides the first push, no solo push). The runner is **cloud-hosted**: John's laptop can
 sleep; today's hooks (`C:/Projects/.claude/`), `.env.local`, and Supabase MCP auth exist only

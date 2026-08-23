@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.195 | GOVERNANCE-MODES.md | SES-140 FINAL (John's 6-requirement order, 2026-08-23, attended session successional-review) — chained sessions become chained CYCLES: the platform refuses every session-spawning actuator (3x create_session, 1x fire_trigger, 1 silent dead create_trigger spawn, all ledger-proven), so a draining cycle continues IN-SESSION via a new runner_cycles row carrying the chained (drain continuation) trigger. The Automated-mode row's cadence cell rewritten to the SES-151 clock-grid model: hourly cron + scheduler_gate() admitting only America/Chicago hours divisible by interval_hours (3 = 12/3/6/9 on John's clock, DST-proof). Authority boundaries unchanged: drain creation John-only, stamp required, one continuation cycle at a time. -->
 <!-- DeepBench v7.0.144 | GOVERNANCE-MODES.md | SES-100, directive 48ae1939 line 2 ("update governance rules that the new backlog status enables sessions from overwriting on top of each other") — the shared-invariants section gains the TICKET CLAIM as a named invariant covering manual and scheduled sessions alike, with what it does and does not protect spelled out (it serializes ticket selection; it does NOT serialize the dev branch or the briefing republish) and the 24h expiry stated as the reason a dead session cannot strand a ticket. Claim-on-pick shipped in SES-86 phase 1 (v7.0.127) and was documented only in runner-cycle.md step 5 and the session-setup skill; the governance docs still described worktree isolation as the whole coordination story, which is exactly the gap that let e36d4379 and 4da5a7bd both build ADM-1. Second drift corrected in passing, inside the same sentence: "FEATURES row" is retired — the close-out is a Supabase write on backlog_items (SES-83 (d) cycle 3, v7.0.114). -->
 <!-- DeepBench v7.0.99 | GOVERNANCE-MODES.md | SES-78 series -- governance-mode registry, created by discovery design-selfbuilding-0819 (2026-08-19). Extensible by rows, never rewrites. -->
 # Governance-Mode Registry
@@ -16,7 +17,7 @@ John's judgment is exercised** — during the work, the morning after on evidenc
 | Mode | Judgment point | Selection | Status |
 |---|---|---|---|
 | **Manual Design & Build** | During the work — design conversation, walkthrough gates, kickoff docs, John's approvals live | **Default.** A human in the chat *is* the selection; no session is ever asked "which mode?" | Active (today's process) |
-| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live, after two supervised cycles: one correct fail-closed, one full-path ship). Cadence: every 3h **on John's clock hours — 12, 3, 6, 9 AM/PM CST** (John, 2026-08-20; UTC cron `0 2,5,8,11,14,17,20,23 * * *` — the scheduler adds a few minutes' dispatch delay, and the UTC cron needs a one-hour re-align when DST ends in November); pause = disable the routine at claude.ai/code/routines |
+| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row — including every in-session `chained (drain continuation)` cycle that session opens. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live). Cadence (John, 2026-08-23, `SES-151` `v7.0.196`): the cron fires **hourly at :40** and cannot be edited by a cycle; `scheduler_gate()` admits scheduled fires only on John's clock grid — an **America/Chicago hour divisible by `interval_hours`** (3 → **12, 3, 6, 9 AM/PM on his clock**, DST-proof, no cron realign ever). Chained drain continuations are exempt — while a drain stands, the chain sets the pace. Pause = the §2b scheduler checkbox, or disable the routine at claude.ai/code/routines |
 | **"Open Workspace"** *(placeholder name — John's to set, Tier 3)* | None — non-DeepBench work (research, documents, anything John runs as Claude Desktop projects today) | John says so at session start | Defined, available |
 
 ## Shared invariants — identical in every DeepBench mode
@@ -94,13 +95,18 @@ and John approves it** — structurally enforced: the stamp that proves the mode
 before the runner does. John's manual sessions always take deploy-quota precedence over
 Automated cycles.
 
-**Chained sessions are runner-launched (`SES-141`, `v7.0.180`, John 2026-08-23).** A session
-spawned by a draining cycle under `runner-cycle.md` tail step (8) — carrying the runner prompt
-verbatim with its AUTOMATED stamp and the `chained (drain continuation)` trigger marker — IS a
-session "launched by the approved runner": Automated mode legitimately applies to it. The
-boundary that matters is unchanged: only John creates a drain, so every chained session traces
-its authority to a drain he declared; a cycle may spawn exactly one successor, only through that
-step's two gates, and `create_session` is sanctioned for that use alone.
+**Chained cycles are in-session continuations (`SES-140` FINAL, `v7.0.195`, John 2026-08-23 —
+supersedes the `SES-141`/`v7.0.180` session-spawning form).** A draining cycle does not spawn a
+new session — the platform refuses every actuator for that (three `create_session` refusals, one
+`fire_trigger` refusal, and one `create_trigger` one-shot whose launched session booted without
+repo or tools and never wrote a row; ledger-proven 2026-08-23). Instead the **same**
+runner-launched session opens its next `runner_cycles` row with the `chained (drain
+continuation)` trigger marker and runs the full ceremony again, one ticket per cycle row.
+Automated mode legitimately covers every such cycle: the session itself was launched by the
+approved runner, and its stamp rides every row it writes. The boundary that matters is
+unchanged: only John creates a drain, so every chained cycle traces its authority to a drain he
+declared; a cycle opens at most one continuation cycle, only through tail step (8)'s two gates,
+and the chain ends at Gate A, Gate B, or the session's own end — the cron resumes it.
 
 ## "Open Workspace" (placeholder name)
 
