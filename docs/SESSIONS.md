@@ -5,6 +5,22 @@
 
 ---
 
+## session/ses-117 (v7.0.192, 2026-08-23, attended design session, model Fable 5, no subagent) — the constraint half shipped days ago; this session makes the documentation stop contradicting the script it documents
+
+**Ticket:** `SES-117` — *Structural filing guarantees: title and type can no longer be skipped or polluted* (Tooling · `P10 - Tooling`, tier `now`, Automation epic). **Closed `done`** (was `partial` / `design_status = 'needs-desktop'`).
+
+**What was left.** The v7.0.178 runner cycle shipped both database constraints (`title` NOT NULL + `ck_backlog_title_not_class_string`, `ck_backlog_type_when_promoted`) and reworded the hygiene **script**'s 3c line — but the prose half lives in `.claude/skills/session-hygiene/SKILL.md`, which register B39 keeps off unattended cycles. Gated card `11451960` — *"One half of SES-117 needs a session you are attending — the hygiene skill's own wording"* — carried the exact replacement text. Until this edit the skill still read *"228 of 556 blank"* as if those rows were a shortfall; every one of them is a compliant `later`-tier row that owes nothing until promotion.
+
+**The edit.** Two spots in the same file, both stating the tier-scoped rule: (1) the check-3 **3c bullet**, replaced with the card's text; (2) the standalone **"3c. Type-tag coverage (added 2026-07-08)"** section further down, which the card did not name but which carried the identical bare-counting defect *and* implied every row owes a Type — aligned in the same pass, its Type list kept with "presence, not membership" made explicit. One deviation from the card, disclosed: it wrote *"Live: 228 of 608"*; the figure went in as **228 of 613**, re-measured this session (now 0/339, next 0/26, later 228/248 — all 228 in `later`).
+
+**Verified fresh before typing anything:** both constraints read live from `pg_constraint` (predicates match the kickoff's shipped forms, `title` `is_nullable = NO`), and the blank-Type census re-run per tier rather than recalled from the ticket or the kickoff.
+
+**Scope discipline.** The two "known, not papered over" residues from the v7.0.178 kickoff — `type` accepting a placeholder decoy (`MI-05`'s em-dash) and `title` accepting a bare class *name* — are John-call cards already on the briefing page, deliberately not folded in here. Card `11451960`'s Accept/Reverse decision stays John's.
+
+**Close-out.** Doc-only (no `src/`/`api/`/`lib/` change → no build gate). Board write: `SES-117` → `done` with claim held, `recompute_backlog_queue()` (560 rows), `BACKLOG-SNAPSHOT.md` regenerated (614 rows), claim re-asserted before push, released after.
+
+---
+
 ## session/ses118-gated (v7.0.189, 2026-08-23, attended design session, model Fable 5, no subagent) — the last line of the status rename, typed by the one kind of session allowed to type it
 
 **Ticket:** `SES-118` — *Rename backlog status value 'missing' to 'open'* (Tooling · `P10 - Tooling`, tier `now`). **Closed `done`** (was `partial` / `design_status = 'needs-desktop'`).
