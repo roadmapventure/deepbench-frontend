@@ -5,6 +5,18 @@
 
 ---
 
+## S-CHI-84-design / S-CHI-84 (v7.0.191, 2026-08-23, attended design session, model Fable 5, coding agent Opus 5, worktree `design-chi-84-mock`) — the step chip stops being a label and becomes the way you get there
+
+**Ticket:** `CHI-84` — *make the chat step chip tappable* (Feature · `P5 - Enhancements`, tier `now`). Deferred from `CHI-82` v1; closed `done` by this session.
+
+**Path:** John asked for a mock same-day (live demo is gated — a chip only exists mid-journey). Interactive mock built and approved first (artifact `21fb3bd1`, private): tap scrolls Steps & Evidence to the step's drawer and opens it; John's two locked calls — landing pulse IN (one-shot brass `borderPulse`), hover affordance minimal (brassDeep square + underlined label). Kickoff `docs/kickoffs/v7.0.191-CHI-84-chip-tap-to-step.md`; coding session (Opus 5) shipped `494b5863`, one file (`MarketIntelligenceScreen.jsx`), 21/21 self-test asserting against both the working tree and the pre-change baseline.
+
+**Mechanism:** CHI-71's scroll math hoisted to module-scope `scrollDrawerIntoView(container, key)` (hook + jump share it — reuse, not a copy); `stepRef` gains `key` on its exactly-three constructors; `stepJump {key, seq}` lifted to the top-level screen, consumed after each jump so the mobile `EvidenceColumn` remount can't re-fire; mobile switches tabs via the existing `selectTab("evidence")` first. The jump measures in `setTimeout(0)`, never rAF (hidden-pane freeze).
+
+**Live QA (design session, dev deployment `494b586` confirmed current):** discriminating desktop pass — Theories drawer manually closed pre-tap, tap opened it and applied `borderPulse 1.4s … 1` to the helper-returned element; repeat-tap after re-close reopened it (seq bump live); drawer-title chips carry no button role; qa drawer auto-open regression observed mid-run unchanged. Two accepts on documented indirect evidence: smooth-scroll completion (QA pane is `document.hidden`, scroll animation frozen — same CHI-71 code path already live-proven) and the mobile tab-switch line (viewport emulation refused in hidden pane; covered by the discriminating source test + approved mock; John can flick a phone at it for direct proof). Known pipeline notes hit en route: first QA question failed review honestly (no EMEA quarterly data in the Data Room — correct behavior, not a defect); the "theory-generation stall" I briefly suspected was actually the answer waiting on the user's "Have Priya generate theories →" — a false alarm on my side, no stall occurred.
+
+**New rows:** `CHI-102` — *the Analysis answer bubble carries no step chip* (Feature · `P5 - Enhancements`, `open`; the mock showed one, the app has chips only on the three theory-flow handoffs — John to decide). `CHI-103` — *global `button:hover` opacity dims the tappable chip on top of its own hover state* (Feature · `P5 - Enhancements`, `open`; coding session flagged it rather than overriding platform CSS unilaterally).
+
 ## session/design-briefing-colwrap (v7.0.193 + v7.0.194, 2026-08-23, attended design session, model Fable 5, coding subagents Sonnet 5) — the briefing's ID chip learns to give up space instead of stealing it
 
 **Ticket:** `SES-148` — *Briefing card heads: a long ID chip cannot shrink and crushes or clips the title on desktop* (Tooling · `P9 - Bug Fixes · FLAGGED`, tier `now`). Filed and closed `done` by this session (found live by John, screenshots of §5/§6 on desktop).
