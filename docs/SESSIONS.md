@@ -5,6 +5,92 @@
 
 ---
 
+## session/cycle-20260823-0940 (v7.0.185, 2026-08-23, Automated runner cycle `626d4f48`, model Opus 5, no subagent) — the display rule reaches the file that tells every cycle how to talk, and it ships with the bound that keeps it out of a key column
+
+**Ticket:** `SES-119` — *Briefing and displays show ticket ID + stored title everywhere; split the
+waiting-on-John list* (`P10 - Tooling`, tier `now`, epic Automation), **part (b) only**.
+**Closed `done`** — (a) and (c) shipped in `v7.0.184`, and with this both halves of (b) exist.
+
+**Selection.** Layer 1a had no queued one-off directive. Layer 1b's drain returned `pick SES-140`,
+which carries `design_status = 'needs-john'`; queue 2 (`SES-117`) and queue 3 (`SES-118`) are both
+`needs-desktop`. All three were recorded with `record_skip()` and stepped past (`SES-114`), taking
+`SES-140` to `skip_count` 6, and the cycle fell through to the board and claimed **queue 4**,
+`SES-119` — the half its own predecessor had left an hour earlier.
+
+**Premise revalidation, both halves read live rather than recalled.** Part (b) reads
+*"`runner-cycle.md` Language block **+** `briefing-page.md` updated to require title alongside ID +
+Type + named class."* `briefing-page.md` line 54 now requires `` `ID (Type · named P-class)` `` **+
+title**, and its §8 contract (lines 232–258) states John's standing instruction as the scope of the
+whole rule — that half shipped. `runner-cycle.md`'s Language block, lines 46–54, governed cycle
+outcomes and priority-class naming and **said nothing about a ticket's title**. The gap was exactly
+where the ticket said it was.
+
+**The promised card text is not there, and that is recorded rather than passed on.** `v7.0.184`
+closed `partial` on the 3-file scope cap, saying — as `SES-101`, `SES-106` and `SES-124` each did —
+that the exact replacement text would be on its card. It is not: the only `SES-119` card is the ship
+card `8a8559a7`, whose `before_after` covers §8 and §10 and never mentions part (b). So the
+paragraph was written this cycle **from the shipped `briefing-page.md` wording**, which is what keeps
+the two files stating one rule rather than two — the `v7.0.114` drift lesson applied deliberately
+rather than rediscovered. Worth carrying forward as a small procedural finding: *"carded with the
+exact replacement text"* is a claim a successor should verify, not inherit.
+
+**The measurement is what shapes the rule.** Taken live against `public.backlog_items` this cycle,
+not quoted from the predecessor (whose own three artifacts disagree — the kickoff says 44,
+`briefing-page.md` says 46, its cycle note says "46 exact markers, 50 fall back"):
+
+| Figure | Live value |
+|---|---|
+| Open numbered tickets | **562** |
+| `title IS NULL` | **0** |
+| Rows where `backlog_display_title()` falls back to the description | **50** |
+
+On 50 of 562 tickets the *stored* title is not a usable title — a retired declaration marker, 38 of
+them literally `` `Post-beta` ``. That is why the shipped paragraph names
+`public.backlog_display_title(title, description)` as the source instead of saying *"use the title
+column"*. The shorter sentence is the one that renders `` `Post-beta` `` as a ticket's name on the
+page John reads.
+
+**The one that would have shipped wrong: writing "always show ID + title" and stopping there.** The
+immediately preceding member of this rule family did exactly that. Step 9's card-filing line read
+*"backlog ID + Type + named P-class"*, so every cycle composed `'SES-115 (Tooling · P10 - Tooling)'`
+and stored it in `runner_items.backlog_id` — **a join key** — and every card→ticket join silently
+returned nothing on **63 of 80** non-NULL rows, seven of them undecided cards sitting on John's page
+(`SES-116`, `v7.0.174`). A display rule that does not say *where display formatting is allowed to
+happen* is that defect waiting to be re-made. The render-time boundary therefore ships as a **stated
+bound**, not an inference.
+
+**What shipped — three bounds, in the Language block, after the priority-class clause:**
+
+1. **The source is the function.** `public.backlog_display_title(title, description)`, never the raw
+   `title` column and never the `gist` extract. The §8 predicate, the rejected length heuristic and
+   the `CHI-97` boundary are **cited** to `briefing-page.md`, never restated.
+2. **Render-time only, never a key column.** `backlog_id` stays bare
+   (`ck_runner_items_backlog_id_bare` rejects anything else at INSERT), a non-ticket reference goes
+   in `display_ref`, and the title is looked up when the surface is drawn.
+3. **A fallback is a signal about the ticket, not a blank to hand-fill.** Inventing a title at render
+   time to make a row look finished gives one fact a second home and hides the population
+   `SES-117`'s TITLE CHECK is the structural fix for.
+
+The paragraph also notes that the step-5 session rename (`"<TICKET-ID> — <short name>"`) already has
+this shape and is the pattern, not an exception to it.
+
+**QA — a discriminating doc assertion with a negative control, labeled as such.** Twelve assertions
+**scoped to the Language block alone**, sliced between its own heading and the `Supervised-run notes`
+heading that follows it: asserting against the whole file would pass on any mention of a title
+anywhere in a 1,600-line runbook, which is the non-discriminating version of this test and would
+have passed before the change. Result: **12/12 on the shipped tree, 0/12 on the pre-change file
+reconstructed from `git HEAD`.** Build clean; regression **39/39 with credentials**; dev root **200**
+on both blocker sweeps. An incidental `package-lock.json` diff from `npm install` was reverted rather
+than widening the ship — the same call `v7.0.184` made.
+
+**Scope:** one file (`docs/runbooks/runner-cycle.md`) plus the standard close-out edits. Doc-only; no
+`src/`/`api/`/`lib/` change, no schema change, no site change. Kickoff
+`docs/kickoffs/v7.0.185-SES-119b-language-block-title.md`.
+
+**Model discipline (register B21):** no subagent. `P10 - Tooling`, doc-only, no `P1`–`P5` kickoff to
+design and no root cause to diagnose; the judgment added was vocabulary shape, the form B21 keeps on
+the orchestrator.
+
 ## session/cycle-20260823-0840 (v7.0.184, 2026-08-23, Automated runner cycle `95d18766`, model Opus 5 orchestrator, no subagent) — the ticket's dependency had cleared, and the obvious way to cash it in was the wrong one
 
 **Ticket:** `SES-119` — *Briefing and displays show ticket ID + stored title everywhere; split the
