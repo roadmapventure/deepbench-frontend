@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.204 | scripts/build-briefing.mjs | SES-162 — §2b's AUTOMATION object is now
+// DERIVED (see the splice at the foot of this file and scripts/lib/briefing-automation.mjs).
+// Until v7.0.204 this builder had no anchor for it at all, so every page it produced published
+// briefing-template.html's SAMPLE values: measured on the served artifact 2026-08-23T18:1xZ,
+// John's panel said his last run was "sample value — 12:41 AM CST · SES-143 · shipped" and his
+// standing drain had 17 tickets left against a live 11.
 // DeepBench v7.0.200 | scripts/build-briefing.mjs | SES-149
 // FEATURE: the briefing rebuild has a builder. It did not have one.
 //
@@ -41,6 +47,9 @@
 // text. Every substitution is anchored and asserted -- see must()/splice() below.
 
 import fs from 'fs';
+// SES-162 (v7.0.204) — §2b's cycle-written half. Pure helpers live in their own module so the
+// grid arithmetic can be tested without running this builder against live Supabase.
+import { deriveAutomation, automationLiteral } from './lib/briefing-automation.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, dflt) => {
@@ -259,6 +268,18 @@ splice("+ladderRow('P02'", `+'</table>'\n    +'<p class="tnote">No ladder row ex
 // §14 — production uses only. Supplied by the cycle: the Name column resolves through two label
 // tables and one live label is a 130-character paragraph, which is judgment, not a join.
 splice("+useRow('Aug 18, 1:02 PM'", `+'</table></div>'\n    +'<p class="tnote">Cost shows`, data.use_rows, '§14');
+
+// §2b — the AUTOMATION object (SES-162, v7.0.204). THIS BUILDER HAD NO ANCHOR FOR IT AT ALL, so
+// every page it built published the template's SAMPLE values: measured on the served artifact
+// 2026-08-23T18:1xZ, John's panel said his last run was "sample value — 12:41 AM CST · SES-143 ·
+// shipped" and his drain had 17 tickets left against a live 11. The template's own comment already
+// required this ("EVERY REBUILD REGENERATES IT from runner_settings / runner_directives /
+// runner_drain_scope / runner_cycles"); nothing performed it.
+//
+// Anchored between the object's opening and the PAGE_BUILT comment that follows it, so an edit
+// that moves either one fails LOUDLY at exit 2 rather than publishing sample text again.
+splice('var AUTOMATION = {', '// v7.0.172, directive 603f44ea',
+  automationLiteral(await deriveAutomation(sel, rpc)), '§2b AUTOMATION');
 
 fs.writeFileSync(OUT, t);
 console.log(`build-briefing: wrote ${OUT} (${t.length} bytes)`);
