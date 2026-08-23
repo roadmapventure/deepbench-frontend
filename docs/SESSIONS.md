@@ -5,6 +5,36 @@
 
 ---
 
+## session/ses118-gated (v7.0.189, 2026-08-23, attended design session, model Fable 5, no subagent) — the last line of the status rename, typed by the one kind of session allowed to type it
+
+**Ticket:** `SES-118` — *Rename backlog status value 'missing' to 'open'* (Tooling · `P10 - Tooling`, tier `now`). **Closed `done`** (was `partial` / `design_status = 'needs-desktop'`).
+
+**What was left.** The v7.0.183 cycle renamed the data (510 rows), replaced
+`backlog_items_status_check`, and swept every repo-doc literal the runner may touch — but the
+canonical "file a new ticket" INSERT in `.claude/skills/session-setup/SKILL.md` step 3c still
+wrote `'missing'`, and `.claude/` is a surface an unattended cycle may not edit (register B39).
+Until this edit, any **manual** session following the recipe verbatim got `23514` from the very
+constraint that ticket shipped. Gated card `76564dde` — *"One line of SES-118 is left, and only
+a session you are in can type it"* — carried the exact replacement; John opened this session
+from that card (briefing item 6.1).
+
+**The edit.** One token, `'missing',` → `'open',` (SKILL.md line 229). Verified fresh before
+typing it: `pg_get_constraintdef` on `backlog_items_status_check` returns exactly
+`('open','partial','done','removal proposed','removed')`, and a grep across the whole `.claude/`
+tree finds **zero** remaining `'missing'` literals after the edit (one before). Ticket claimed
+atomically first (1 row returned), per the claim discipline this very SKILL.md documents.
+
+**Scope discipline.** `docs/STANDARDS.md`'s markdown-era residue (the `❌ Missing` Status-column
+rule) is a **separate carded item** noted by `SES-120` — deliberately not swept into this
+session; this session types the card's one line and nothing else. Card `76564dde`'s
+Accept/Reverse decision stays John's, on the briefing page.
+
+**Close-out.** Doc-only (no `src/`/`api/`/`lib/` change → no build gate). Board write:
+`SES-118` → `done` with claim held, `recompute_backlog_queue()`, claim re-asserted before push,
+released after.
+
+---
+
 ## session/cycle-20260823-1341 (v7.0.188, 2026-08-23, Automated runner cycle `72561db3`, model Opus 5, no subagent) — the gate built to make John's panel binding had never once paced a cycle that obeyed its own instruction
 
 **Ticket:** `SES-146` — *The settings gate never sees a scheduled cycle — `scheduler_gate()`

@@ -226,7 +226,7 @@ SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>'
        '<named P-class — REQUIRED at filing, register B9>',
        '<one-line human title — never the class string>',
        '<description; convention opens with the bolded named class>',
-       'missing',
+       'open',
        (SELECT id FROM epics WHERE name = '<epic name>')::uuid,  -- or NULL for no epic
        'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
        coalesce(max(row_ordinal),0)+1
