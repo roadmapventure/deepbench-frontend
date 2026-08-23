@@ -5,6 +5,126 @@
 
 ---
 
+## session/cycle-20260823-1341 (v7.0.188, 2026-08-23, Automated runner cycle `72561db3`, model Opus 5, no subagent) — the gate built to make John's panel binding had never once paced a cycle that obeyed its own instruction
+
+**Ticket:** `SES-146` — *The settings gate never sees a scheduled cycle — `scheduler_gate()`
+misreads the trigger line the runbook tells every cycle to pass* (`P10 - Tooling`, tier `now`,
+epic Automation, automation lane top). **Closed `done`.**
+
+**Found live, not picked.** At 13:44Z this cycle ran step 1b exactly as written —
+`scheduler_gate('<cycle id>', '<your prompt's trigger: line, verbatim>', now())` — and got back
+`verdict = run` with the reason **"not a scheduled cycle — your scheduler setting governs
+scheduled fires only."** A scheduled cycle, classified as not scheduled. That reason is the
+fail-open branch, so the cycle was waved through and nothing anywhere recorded a problem.
+
+**Two independent defects, both failing open.**
+
+**(1) The contract mismatch.** Step 1b says, in prose and in its SQL template, to pass the
+prompt's `trigger:` line **verbatim**. That line reads `trigger: scheduled`. The function tested:
+
+```sql
+v_scheduled := (coalesce(p_trigger, '') = 'scheduled');
+```
+
+Exact equality against the bare word. So a cycle following the runbook literally — which the
+stored routine prompt commands (*"execute it EXACTLY"*) — never matched, and skipped **both** the
+pacing branch **and** the `scheduler_on = false` branch that sits beneath it. John's interval and
+his off switch were both inert on that path.
+
+*Negative control, one cycle id, one instant, one variable changed:*
+
+| `p_trigger` | reason returned (retired build) |
+|---|---|
+| `trigger: scheduled` | `not a scheduled cycle — your scheduler setting governs scheduled fires only` |
+| `scheduled` | `manual fire (started off the cron grid) — never paced` |
+
+The five paced rows to date (06:41Z, 07:41Z, 10:41Z and two earlier) **all passed the bare word**.
+Every prior cycle read the instruction loosely and got lucky, which is why a ship whose entire
+purpose was to make the §2b panel binding survived without the defect surfacing. This is the same
+failure family as `SES-101`'s revoke that reported success and changed nothing, and `SES-128`'s
+calibration that had never once been carried out: **a control that looks shipped, reports success,
+and never fires.**
+
+**(2) The grid test measured the wrong clock — and it degrades on its own.**
+
+```sql
+v_dist   := abs(extract(minute from p_started)::int - v_minute);
+v_manual := v_scheduled and v_dist > 2;
+```
+
+`p_started` is `now()` at the moment a cycle *reaches* step 1b, not when the routine fired. This
+cycle fired at `13:40:52Z` and reached the gate at `13:43:12Z` — distance 3 — so **even with the
+bare word it was exempted as a "manual fire" it was not.** The drift grows with how much work
+step 0 does first, so **the defect gets worse as this runbook grows**; predecessors reached the
+gate inside two minutes and were paced, this one did not because step 2 now reads a 65k-token file.
+
+**The fix** — migration `ses146_scheduler_gate_trigger_parse`, signature unchanged so no overload
+(`.claude/rules/supabase-function-signature.md`, asserted 1):
+
+1. Normalise the trigger — strip a leading `trigger:`, trim, lowercase, then match. Both forms
+   work, and the runbook's instruction becomes **true** rather than lucky.
+2. Anchor the grid to the **cycle row's own `started_at`** (stamped at step 1, the earliest
+   fire-time proxy reachable from SQL). An unresolvable cycle id falls back to `p_started` rather
+   than raising, so the unknown path still fails open.
+3. Make the tolerance the column `runner_settings.grid_tolerance_min` (default **10**,
+   `CHECK 0..30`) — `SES-143`'s own *"the minute as a column, not a literal"* precedent applied one
+   level further, so correcting it is one `UPDATE`.
+
+**All four `SES-143` properties preserved and re-asserted**, most importantly the predecessor
+predicate byte-for-byte — the property whose naive form (*"the most recent row"*) **wedges the
+runner shut permanently**.
+
+**QA — discriminating, not merely complete.** Arms A, B and D each return a *different verdict on
+the two builds against identical inputs*; the retired-build column is this cycle's own
+pre-migration measurement at 13:44Z, not a reconstruction.
+
+| Arm | Retired | Shipped |
+|---|---|---|
+| A — literal `trigger: scheduled`, predecessor 0.5h < 1h | `run` ("not a scheduled cycle") | **`paced`** |
+| B — bare `scheduled`, gate reached 3 min late | `run` ("manual fire") | **`paced`** |
+| C — `chained (drain continuation)` (`SES-141`) | `run` | `run` — chain still exempt |
+| D — `scheduler_on = false`, literal line | `run` | **`scheduler-off`** |
+| E — genuine manual, 25 min off grid | `run` (manual) | `run` (manual) |
+| F — NULL trigger / unknown cycle id | `run` | fails open, no raise |
+| G — predecessor skips `did_not_run` | correct | correct — 11:00Z returns the 09:42Z `shipped` row, not the 10:41Z `did_not_run` |
+| H — this cycle's real inputs | — | `run` (1.18h ≥ 1h) — the fix does not invalidate the cycle that shipped it |
+
+Fixture arm ran inside a deliberately rolled-back transaction: `scheduler_on` back to `true`,
+**0 stray before-images**. Grants asserted **both directions** per `SES-101` — `anon` and
+`authenticated` false, `service_role` true.
+
+**Selection, and the honest disclosure.** No queued one-off directive. `drain_epic_next()` returned
+`pick SES-140`, `open_now 15`. The buildable prefix of the board was **empty**, and six
+`record_skip()` rows say so: `SES-140` — *the successor fire is refused by the platform*
+(`needs-john`, `skip_count` → **9**), `SES-117` — *structural filing guarantees* (`needs-desktop`,
+→ 6), `SES-118` — *rename backlog status `missing` to `open`* (`needs-desktop`, → 5), `SES-121` —
+*shrink the `.claude/`-mutable surface* (`needs-john`), `SES-84` — *the vision corpus*
+(`needs-john`), `SES-101` — *automation tickets file to the lane top* (`needs-desktop`).
+
+Two of those were **corrected from their own descriptions, before-image first** (`SES-114`'s
+mechanism): `SES-84` → `needs-john`, because phases 1 and 2 shipped and everything left is John
+ratifying drip cards — **no unattended build exists in it**, and every cycle was re-reading a
+2,000-character description to rediscover that; `SES-101` → `needs-desktop` (it was mis-flagged
+`designed`), because its function and runbook half shipped in `v7.0.147` and the only piece left is
+the canonical INSERT under `.claude/`.
+
+The first genuinely buildable ticket is `SES-131` — *research the AI / multi-agent market and FAANG
+AI job openings* — a two-leg live-research epic that does not fit the **~1.2M estimated tokens**
+left under today's 10M cap (8,755,000 spent across 11 cycles). Starting it would be proceeding on
+hope, which step 3 forbids.
+
+**So this cycle both filed `SES-146` and built it, and that is recorded rather than left to be
+noticed.** Placing it at the lane top is John's own standing rule for a new automation ticket
+(`q-lane-top`, **yes**, 2026-08-21T20:47Z: *"if you create more automation tickets keep making them
+top of queue"*), not a priority the runner invented — and the change **narrows** runner autonomy
+rather than widening it, since it makes John's own off switch and interval actually bind. The
+circularity is real and is on the card as well as here.
+
+**Ship.** No `src/`/`api/`/`lib/` change, so the build gate does not apply. Dev **200**.
+Kickoff `docs/kickoffs/v7.0.188-SES-146-scheduler-gate-trigger-parse.md`.
+
+---
+
 ## session/cycle-20260823-1240 (v7.0.187, 2026-08-23, Automated runner cycle `363b5138`, model Opus 5 orchestrator, subagent Sonnet 5) — the directory everyone assumed was the problem turns out to be one file, and the part that looks most worth moving is the part that must not move
 
 **Ticket:** `SES-121` — *Shrink the `.claude/`-mutable surface so needs-desktop tickets become
