@@ -5,6 +5,50 @@
 
 ---
 
+## session/cycle-20260823-0343 (v7.0.178, 2026-08-23, model Opus 5 orchestrator, subagent Sonnet 5 for mechanical doc edits, register B21) — two structural CHECKs land on `backlog_items`, and the predicate that would have rejected a legitimate title never ships
+
+**`SES-117`** — *Two CHECKs on `backlog_items`, both John-confirmed 2026-08-22* — Type: Tooling,
+`P10 - Tooling`. Closed **`partial`**. Kickoff:
+`docs/kickoffs/v7.0.178-SES-117-backlog-structural-checks.md`.
+
+**What shipped.** Migration `ses117_backlog_structural_checks` on `public.backlog_items`:
+`title SET NOT NULL`, plus two VALID CHECK constraints — `ck_backlog_title_not_class_string`
+(rejects a blank title and a title that is entirely a priority-class string, e.g.
+`'P9 - Bug Fixes.'`) and `ck_backlog_type_when_promoted` (`tier = 'later' OR (type IS NOT NULL
+AND btrim(type) <> '')` — presence, not membership, so the taxonomy stays extensible).
+
+**Pre-flight repairs, before-image first.** Four now-tier rows (`SES-109`, `SES-130`, `SES-136`,
+`SES-137`) had drifted to a blank `type` in the single day since the ticket's own census said
+zero; repaired to `'Tooling'` from their own `priority_class` and description. `SES-136` also
+carried the title `'Tooling'` — a class-string tail the `SES-91` backfill left behind — replaced
+with its description's own first bolded clause.
+
+**The half that would have shipped wrong.** A naive title predicate of the form
+`title !~ '^P[0-9]+ - '` rejects `ADM-1`, whose real title legitimately BEGINS with a class
+string because it records a reclassification. The shipped predicate is anchored to the
+class-string-ONLY form instead, so `ADM-1`'s real title is still accepted.
+
+**Why VALID, not NOT VALID.** Both constraints ship VALID — the `SES-116` lesson: a NOT VALID
+CHECK is still enforced on UPDATE, which would make historical rows un-updatable until separately
+validated.
+
+**`scripts/check-session-docs.js`.** Hygiene check 3c now states the tier-scoped rule instead of
+bare-counting blank `type` values — the 228 blank-Type rows are `later`-tier tickets that owe no
+Type, and bare-counting read as 228 things to go fix.
+
+**QA — eight arms proven live on a fixture inside a deliberately rolled-back transaction, all
+PASS**, including three negative controls: a real `ADM-1`-shaped title still accepted; a blank
+`type` on a `later`-tier row still accepted; a live pre-existing row still UPDATEable. Build
+clean; regression **36/37**, the one failure (`CHI-31`) proven environmental — it passes once
+`SUPABASE_URL`/`SUPABASE_SERVICE_KEY` are supplied.
+
+**Not done, carded rather than attempted.** The `.claude/skills/session-hygiene/SKILL.md` prose
+half of check 3c (register B39 — needs a session John attends). Also carded: `type` still accepts
+a decoy em-dash `'—'` (one live row, `MI-05`) because widening presence-not-membership is John's
+call, not this cycle's.
+
+---
+
 ## session/cycle-20260823-0314 (v7.0.176, 2026-08-23, Automated runner cycle `b9201486`, model Opus 5 orchestrator, no subagent) — the runner learns to keep itself running, and the gate that stops that from becoming a metronome
 
 **`SES-139` — a draining cycle fires its own successor (Tooling · `P10 - Tooling`) CLOSED `done`.**

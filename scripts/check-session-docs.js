@@ -1,5 +1,12 @@
 #!/usr/bin/env node
-// DeepBench v7.0.173 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115
+// DeepBench v7.0.178 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117
+// FEATURE: SES-117 -- check 3c STATES the tier-scoped Type rule instead of bare-counting blanks.
+// Type is not owed while a ticket sits in `later`; it fills at the later -> now/next promotion,
+// and since this ticket that is structural, not remembered: ck_backlog_type_when_promoted on
+// public.backlog_items rejects a blank Type on any now/next row. The count is unchanged; what it
+// MEANS is the opposite of what the old wording read as (228 things to go fix vs. 228 rows that
+// owe nothing). The check deliberately does not split by tier -- the snapshot carries no Tier
+// column -- and says so rather than pretending otherwise.
 // FEATURE: SES-115 -- check 3 stops flagging every `done` row (37 of this report's 49 findings,
 // measured before the change) and flags only a history row that still holds live-board state,
 // read from the snapshot's new appended History residue column. Register B1 as revised: history
@@ -216,6 +223,11 @@ function parseSnapshotRows(text) {
 // Emitting 686 individual findings would bury the 8 that can be acted on today,
 // so those two report as one counted WARN line each. The 458 unclassed tickets
 // are not a defect -- that is SES-85's known scope, and the line says so.
+//
+// SES-117 (v7.0.178) corrects what 3c's aggregated line SAYS, not what it counts:
+// the 228 blank-Type rows are `later`-tier tickets that owe no Type under John's
+// tier-scoped rule, so reporting them as a flat shortfall was aggregating the
+// right rows behind the wrong sentence. See the 3c block below.
 function checkBacklogSnapshot(findings) {
   const p = path.join(WORKTREE, SNAPSHOT_REL);
   const text = readIfExists(p);
@@ -298,10 +310,29 @@ function checkBacklogSnapshot(findings) {
   }
 
   // Check 3c, ported and aggregated -- see this function's header comment.
+  //
+  // SES-117 (v7.0.178): this line STATES the tier-scoped rule instead of bare-counting
+  // blanks. The rule is John's, standing since 2026-07-08 and now structural rather than
+  // remembered -- `ck_backlog_type_when_promoted` on public.backlog_items enforces
+  // `tier = 'later' OR (type IS NOT NULL AND btrim(type) <> '')`. Type is not owed while a
+  // ticket sits in `later`; it fills at the later -> now/next promotion, and the constraint
+  // is what makes that self-enforcing.
+  //
+  // Why the wording mattered enough to change: bare-counting reported "228 of 556 have a
+  // blank Type" as a WARN, which reads as 228 things to go fix. Every one of them is a
+  // `later` row that owes nothing. The count is the same; what it MEANS is the opposite.
+  //
+  // The snapshot carries no Tier column (cells are #, ID, Type, Priority class, Title,
+  // Status, Session, Harvest, Description, Epic, Design status, Kickoff, History residue),
+  // so this check cannot split the count by tier itself -- and deliberately does not
+  // pretend to. It reports the count and names the rule that governs it. Since the
+  // constraint landed, a blank Type on a now/next row is not merely unlikely, it is
+  // rejected by the database, so a blank here is a `later` row or the snapshot predates
+  // the repair -- both worth one line, neither worth 228.
   const blankType = rows.filter(r => !r.type);
   if (blankType.length) {
     const examples = blankType.slice(0, 5).map(r => r.id).join(", ");
-    findings.push({ check: "3c", severity: "WARN", detail: `backlog_items: ${blankType.length} of ${rows.length} tickets have a blank Type cell (e.g. ${examples}) -- reported as one line rather than ${blankType.length} findings so it cannot bury the actionable flags above.` });
+    findings.push({ check: "3c", severity: "WARN", detail: `backlog_items: ${blankType.length} of ${rows.length} tickets carry a blank Type (e.g. ${examples}). Type is tier-scoped, not universal: a \`later\` ticket owes no Type, and since SES-117 the constraint ck_backlog_type_when_promoted REJECTS a blank Type on any now/next row -- so these are later-tier rows (compliant, nothing to do) unless the snapshot predates that repair. Type fills at the later -> now/next promotion. Reported as one line rather than ${blankType.length} findings so it cannot bury the actionable flags above.` });
   }
 
   const unclassed = rows.filter(r => !r.pclass);
