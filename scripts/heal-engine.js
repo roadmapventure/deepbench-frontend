@@ -369,7 +369,7 @@ async function fetchHealTicketDescriptions(base, key) {
 // claim_feature_ids function, and adding one would be a schema change this P10 - Tooling ticket
 // has no mandate for). So the engine does not claim ids at all. The runner cycle claims the
 // block through the Supabase connector, using the exact SQL in
-// .claude/skills/session-setup/SKILL.md §3b, and passes the result in via --backlog-ids.
+// docs/runbooks/session-setup.md §3b, and passes the result in via --backlog-ids.
 //
 // This keeps the atomic claim in the one place that can do it correctly, and keeps this script
 // honest: it never invents an id, and it files at most as many tickets as it was given ids for.

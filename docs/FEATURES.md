@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.198 | docs/FEATURES.md | SES-121 — one reference repointed: the ID-claim SQL pointer now names docs/runbooks/session-setup.md §3b (the session-setup skill body moved there verbatim; SKILL.md is a thin loader). Nothing else touched. -->
 <!-- DeepBench v7.0.113 | docs/FEATURES.md | SES-83 (d) cycle 2 — the trim: 285 ticket rows removed, authority is public.backlog_items (git copy: docs/backlog/BACKLOG-SNAPSHOT.md). Header, Feature ID Format, Type Taxonomy and the Priority Class legend are KEPT VERBATIM — they are cited by name and path across ~330 files. -->
 # DeepBench v5.2 — Feature Inventory — NOW
 
@@ -137,7 +138,7 @@ the old `FEATURES.md` and twice in the table.
 
 **Filing a new ticket.** Insert a row into `public.backlog_items` — do not add a row here; there
 is no table below to add it to. Claim the ID atomically from `feature_id_counter`
-(`.claude/skills/session-setup/SKILL.md` §3b), never by reading the highest existing number. The
+(`docs/runbooks/session-setup.md` §3b), never by reading the highest existing number. The
 Heal engine already files this way (`source_file = 'heal-engine'`). Wiring the remaining capture
 paths to the table is `SES-83` phase (e), the last of the five cycles.
 

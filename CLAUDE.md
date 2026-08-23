@@ -1,10 +1,11 @@
-<!-- DeepBench v6.3.129 | CLAUDE.md | SES-021 -- router + hard rules + pointers; procedures live in .claude/skills/session-setup/ -->
+<!-- DeepBench v7.0.198 | CLAUDE.md | SES-021 -- router + hard rules + pointers; procedures live in docs/runbooks/session-setup.md (SES-121: skill bodies moved to runbooks, .claude/skills/* are thin loaders) -->
 # DeepBench — Session Router
 
 **Every session, first action — before any orientation read, no matter the session type:**
 
-1. **Set up your worktree and inflight file.** Follow the **`session-setup` skill**
-   (`.claude/skills/session-setup/SKILL.md`) — worktree branched fresh from `origin/dev`,
+1. **Set up your worktree and inflight file.** Follow the **`session-setup` runbook**
+   (`docs/runbooks/session-setup.md`; the `.claude/skills/session-setup/` skill is a thin
+   loader pointing there since `SES-121`, v7.0.198) — worktree branched fresh from `origin/dev`,
    `.env.local` copied in, your `inflight/<short-session-name>.md` created (repo-root
    `inflight/` — moved out of `.claude/` 2026-08-21, John-approved, because `.claude/` paths
    fire a harness permission prompt that parks unattended cloud sessions; register B41). Do this
@@ -149,7 +150,7 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 
 | Need | Home |
 |---|---|
-| **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `.claude/skills/session-setup/SKILL.md` |
+| **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `docs/runbooks/session-setup.md` |
 | Rules & reference index (versioning, scope, tokens, roster, schema, patterns) | `CLAUDE-RULES.md` |
 | Design workflow (Automated Design→Code→Verify Loop) | `CLAUDE-DESIGN.md` |
 | Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `inflight/` (repo root; moved from `.claude/inflight/` 2026-08-21) |
@@ -160,7 +161,7 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 | Working with John — decision autonomy tiers, walkthrough gate | `docs/WORKING-WITH-JOHN.md` |
 | Session history + the "found live…" rationale behind these rules | `docs/SESSIONS.md` |
 | System invariants — **read** when touching the files they govern (tokens→`src/`, logging/capabilities→`api/`, library→`lib/`); don't rely on auto-scoping | `.claude/rules/` |
-| Doc-bloat tripwire | `.claude/skills/session-hygiene/` |
+| Doc-bloat tripwire | `docs/runbooks/session-hygiene.md` |
 | Architecture/scope not settled — run a discovery session (decisions + constraints, no kickoff doc) | `.claude/skills/discovery/SKILL.md` |
 | Session lost its frame (wrong architecture / going in circles / after a compaction) — inventory before proposing | `.claude/skills/reframe/SKILL.md` |
-| Surprise mid-session dependency ("can't do X until Y") — classify before investigating | `.claude/skills/triage/SKILL.md` |
+| Surprise mid-session dependency ("can't do X until Y") — classify before investigating | `docs/runbooks/triage.md` |

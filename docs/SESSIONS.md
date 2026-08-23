@@ -5,6 +5,26 @@
 
 ---
 
+## session/design-ses-121 (v7.0.198, 2026-08-23, attended design session, model Fable 5, no subagent, doc-only) — the three churning skill bodies leave `.claude/` so cycles can maintain them
+
+**Ticket:** `SES-121` — *Shrink the `.claude/`-mutable surface so needs-desktop tickets become rare* (Tooling · `P10 - Tooling`, tier `now`, Automation drain member) **closed `done`**.
+
+**What this session was.** Phase 2 of the ticket — the execution the design pass (`docs/harvests/SES-121.md`, v7.0.187, cycle `363b5138`) gated on John's approval. John approved the three moves exactly as proposed, in chat, this session.
+
+**The move.** The full bodies of `.claude/skills/session-setup/SKILL.md` (16,231 bytes), `.claude/skills/session-hygiene/SKILL.md` (21,615 bytes) and `.claude/skills/triage/SKILL.md` (2,485 bytes) moved **byte-verbatim** (verified programmatically by the extraction script, not eyeballed) to `docs/runbooks/session-setup.md`, `docs/runbooks/session-hygiene.md`, `docs/runbooks/triage.md`. Each `SKILL.md` keeps its YAML frontmatter (the harness discovers and triggers skills by that exact path + description — deleting it deletes the skill) and a one-paragraph loader pointing at its runbook. Step/§ numbering is unchanged, so every historical "step 3c" / "§3b" citation still resolves inside the runbook.
+
+**Repointed live referrers (historical records untouched by design):** `CLAUDE.md` (router step 1 + pointer table ×3 + header), `CLAUDE-DESIGN.md` (×5), `docs/FEATURES.md` (ID-claim pointer), `docs/GOVERNANCE-MODES.md` (step-2c pointer), `docs/runbooks/runner-cycle.md` (version-claim SQL + heal-engine §3b), `scripts/heal-engine.js` (header comment). `SESSIONS.md`, kickoffs, harvests, `FEATURES-ARCHIVE.md`, `BACKLOG-SNAPSHOT.md` and old version-header comments keep their original paths — they are records, not pointers.
+
+**Explicitly NOT moved, per the harvest's measured scope:** `.claude/rules/` (14 files, 23 live source-file referrers, zero blocked tickets — guarded by `tests/regression/SES-121-claude-surface-boundary.js`), `discovery`/`reframe` skills, both config files. §19v attended-only surfaces untouched.
+
+**QA:** extraction script asserted byte-equality of each moved body; repo-wide grep shows zero non-historical references into the old bodies; `SES-121-claude-surface-boundary.js` passes (assertion E = loaders exist); full regression **40/40** after `npm ci` in the worktree (the first run's 8 fails were all missing-node_modules noise on the fresh worktree, none real).
+
+**Board effects:** `SES-121` → `done`, `design_status` cleared; **`SES-101` — *New automation tickets file themselves into the automation lane* (Tooling · `P10 - Tooling`, `partial`) flipped `needs-desktop` → `designed`** (Tier-2 call, flagged to John: its only remaining edit is session-setup step 3c text, which now lives in `docs/runbooks/session-setup.md` — an unattended cycle can finish it). Queue recomputed (562). Skip rows deliberately not hand-resolved — §10 derives them from status (SES-127 lesson).
+
+**Honest bound (restated from the harvest):** this makes needs-desktop tickets *rarer*, not impossible — editing a loader itself is still a `.claude/` write, but the census says that is a once-per-lifetime edit against bodies that moved 7× in 14 days.
+
+---
+
 ## session/cycle-20260823-1640 (v7.0.197, 2026-08-23, runner cycle `c4148d2a-24ff-4041-98d9-148b8daab16b`, scheduled fire 16:40Z, model Opus 5 orchestrator + Fable 5 diagnosis subagent) — the briefing page's own rebuild was deleting John's typed threads from it
 
 **Mission:** selection layer **1a** — `runner_directives` `b8d5ea7e-8056-4f88-bc2e-248d500b1a3d`, with its **identical twin** `75b259a5-414c-4cb5-ac19-3a4359190c46` worked as ONE mission (the `v7.0.146` `dda69acb` + `6b6cdd71` precedent: one Rework line John typed on two cards). Three directives shared a `created_at` (15:01:43Z — the 14:42Z cycle's tail harvesting him at once), so the tie was broken on **John's own tap time inside each body**, the only honest "oldest first" available. The third (`16b3ff73`, 14:22Z) was left queued: later, and a different subject.
@@ -47,8 +67,6 @@ That rebuild landed **two hours inside the window John had announced at 13:57Z f
 - **The seed is still a call a cycle must make.** SQL cannot inject itself into a published artifact. What is structural is that forgetting is now *loud*, and that the data can no longer be *destroyed* — a bad rebuild hides history for one cycle instead of erasing it.
 
 **Kickoff:** `docs/kickoffs/v7.0.197-DIR-b8d5ea7e-briefing-state-seed.md`.
-
----
 
 ## session/successional-review (v7.0.195 + v7.0.196, 2026-08-23, attended design+build session on John's direct 6-requirement order, model Fable 5, no subagent) — the chain stops fighting the platform and the drain finally continues, in-session
 
