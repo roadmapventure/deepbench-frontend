@@ -1,47 +1,85 @@
+<!-- DeepBench v7.0.186 | DeepBench-Session-Init.md | SES-120 — rewritten from a process doc into a POINTER doc. It taught the retired markdown-era ceremony: fetch docs/FEATURES.md as "the backlog", update its rows, move ✅ Done rows to FEATURES-ARCHIVE.md, file new work as ❌ Missing. None of that has been true since v7.0.112/v7.0.113 (John's "table is authority" call) — tickets live in public.backlog_items and those files are legend-only stubs. RETIRED, not deleted: John confirmed the claude.ai browser and mobile chat surfaces are still in use, so this doc still has a job — it is just a smaller one. The boundary it now states is the whole point: a chat surface has no SQL and no git, so it ORIENTS and DISCUSSES; a Claude Code session FILES and BUILDS. The board's chat-readable copy is docs/backlog/BACKLOG-SNAPSHOT.md, which is exactly right for a surface without SQL. Orientation that is still true (what the app is, URLs, tokens/roster/architecture pointers, file access, Desktop setup) is kept as-is. -->
+
 # DeepBench — Session Initiation
 Loaded automatically at the start of every Claude.ai session in this project.
-This doc frames the session. Current technical state comes from GitHub — every rule below points
-to its single home rather than restating it, so nothing here can go stale against the source.
+
+This doc frames the session and points at the real sources. **Nothing here restates a rule or a
+ticket** — every fact lives in exactly one home, and the homes are on GitHub, so nothing in this doc
+can go stale against them.
 
 ---
 
-## Step 1 — Fetch Live State from GitHub
+## Step 0 — What this surface is for
 
-Fetch these files before doing anything else:
+You are on a **chat surface** (claude.ai in the browser, or mobile). You have no SQL connection and
+no git access.
 
-**CLAUDE.md** (session router, hard rules, pointers):
+| This surface (claude.ai chat) | Claude Code |
+|---|---|
+| Orient: what is the state, what is queued, what did the last session do | File and build |
+| Discuss and decide: scope, UX, priority, what a ticket really means | Write code, run tests, push to `dev` |
+| Draft a kickoff doc for a Code session to execute | Write to `public.backlog_items` and claim version numbers |
+| Read anything on GitHub | Everything that mutates the repo or the board |
+
+**So: never try to update the backlog from here.** The board is a Supabase table
+(`public.backlog_items`); it is not a file you can edit, and the markdown files that used to hold it
+are stubs. If a discussion here produces a new ticket or a status change, the deliverable is *the
+decision plus a kickoff doc* — a Code session files it.
+
+---
+
+## Step 1 — Fetch live state
+
+Raw base: `https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/`
+
+Fetch these before doing anything else:
+
+**Rules and the session router** — `CLAUDE.md`
 https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/CLAUDE.md
 
-**Feature backlog:**
-https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/FEATURES.md
+**Current version, blockers, in-flight sessions** — `CLAUDE-STATE.md`
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/CLAUDE-STATE.md
 
-**Session log:**
-https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/SESSIONS.md
+**The board** — `docs/backlog/BACKLOG-SNAPSHOT.md`
+https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/backlog/BACKLOG-SNAPSHOT.md
 
-After fetching, report back:
-1. Current version in dev
-2. Next scheduled session
+`BACKLOG-SNAPSHOT.md` is the git-committed copy of `public.backlog_items`, regenerated at every
+runner ship point. It is the authoritative offline copy of the board, not a mirror — which is what
+makes it the right source for a surface that cannot run SQL. **It is large (~650 KB).** Don't try to
+read it end to end on mobile: search it for the ticket ID or a keyword, or read its header (which
+documents the row format and carries the ticket count and payload `sha256`) and ask for the slice
+you need. Ordering is `backlog_items.queue`; the board **is** the queue.
+
+Then report back:
+1. Current version in `dev`
+2. What is at the top of the queue
 3. Any open blocking questions
 4. "What would you like to work on?"
 
 ---
 
-## Step 2 — Additional Files (fetch when relevant)
+## Step 2 — Additional files (fetch when relevant)
 
-Raw base: `https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/`
+Raw base: `.../dev/docs/`
 
-- `STANDARDS.md` — test categories + standing rules → when generating a kickoff doc
+- `SESSIONS.md` — session history and the "found live" rationale behind the rules
+- `STANDARDS.md` — test categories, standing rules, the 11-section kickoff structure
 - `PRD.md` + `MOCK-NOTES.md` — spec + UI conventions → any design or UX session
-- `ENV-VARS.md` → features that call external services
-- `REPO-SNAPSHOT.md` → **only** when filesystem MCP is unavailable (see Step 11)
-- `ARCHITECTURE.md` → new capability route, Layer 1–3 boundaries, migration work, or the
-  S-MIGRATE-01 / S-BENCH-01 / S-INFRA-01 chain. Not needed for isolated UI fixes.
-- `STYLE-GUIDE.md` → any session with UI work. Read before designing; update at close if a style
-  rule was locked or changed.
+- `ARCHITECTURE.md` — new capability route, Layer 1–3 boundaries, migrations, §19v (the runner's
+  governing section). Not needed for isolated UI fixes.
+- `STYLE-GUIDE.md` — any session with UI work; read before designing
+- `ENV-VARS.md` — features that call external services
+- `REPO-SNAPSHOT.md` — the **source tree** snapshot (a different artifact from the backlog
+  snapshot), **only** when filesystem MCP is unavailable (see Step 8)
+
+`docs/FEATURES.md`, `FEATURES-NEXT.md` and `FEATURES-LATER.md` are **legend-only stubs** since
+`v7.0.113`. `FEATURES.md` is still worth fetching for one thing — the **Priority Class legend**
+(`P1 - Improves John's Skills` … `P10 - Tooling`), which is the canonical list. It holds no tickets.
+`docs/FEATURES-ARCHIVE.md` is a frozen historical archive; nothing is ever appended to it.
 
 ---
 
-## Step 3 — What This App Is
+## Step 3 — What this app is
 
 DeepBench — AI agent workforce platform. Users build a bench of specialized AI agents, assign them
 work tasks, and manage output through dashboards. Initially targeting government procurement
@@ -52,28 +90,23 @@ intelligence, now generalizing to any business domain.
 - **Owner:** John Leonard / Roadmap Venture
 - NIGP Analyzer v4 remains live at nigp.roadmapventure.com — do not modify
 
----
-
-## Step 4 — Stack and Repos
-
-Full stack, repos, URLs, and layer boundaries: **`docs/ARCHITECTURE.md` §10–11.** Don't restate the
-table here — it drifts.
+Full stack, repos, URLs and layer boundaries: **`docs/ARCHITECTURE.md` §10–11.** Not restated here —
+it drifts.
 
 Quick orientation only: this is the **frontend** repo (`roadmapventure/deepbench-frontend`, React +
 Vite → Vercel, local `C:\Projects\deepbench-frontend`). The backend
 (`roadmapventure/deepbench-backend`) and the read-only NIGP repos live alongside it under
-`C:\Projects\`. All repos are private and directly readable via filesystem MCP (Step 11) — no need
-to ask John to paste files.
+`C:\Projects\`. All repos are private and directly readable via filesystem MCP (Step 8).
 
 **GitHub workflow:** `dev` is the working branch; fast-forward merge `dev → main` only after John's
 explicit sign-off (`CLAUDE.md` hard rule).
 
 ---
 
-## Step 5 — Design System (Locked)
+## Step 4 — Design system (locked)
 
-Palette, fonts, and token values have one home — **`src/tokens.js`** (the values) and
-**`docs/STYLE-GUIDE.md`** (usage). Always reference `src/tokens.js`; never hardcode a hex or
+Palette, fonts and token values have one home — **`src/tokens.js`** (the values) and
+**`docs/STYLE-GUIDE.md`** (usage). Always reference `src/tokens.js`; never hardcode a hex or a
 font-family. Read the STYLE-GUIDE before designing any UI.
 
 Claude.ai rendering rule: kickoff docs are rendered as **artifact panels** (copy icon accessible) —
@@ -81,152 +114,86 @@ never as downloadable files or raw markdown.
 
 ---
 
-## Step 6 — Agent Roster
+## Step 5 — Agent roster
 
-The roster's single source of truth is **`src/data/agents.js`** (filesystem MCP) — read it directly.
-Never rely on a hardcoded list or count in this doc: a count here goes stale the moment any agent
-session ships (this step once listed "8 agents" with a Michelle-is-a-stub note that was wrong for
-weeks). Required fields → `docs/STANDARDS.md` §11; config model → `docs/ARCHITECTURE.md` §14.
+The roster's single source of truth is **`src/data/agents.js`** — read it directly. Never rely on a
+hardcoded list or count in this doc: a count here goes stale the moment any agent session ships
+(this step once listed "8 agents" with a Michelle-is-a-stub note that was wrong for weeks). Required
+fields → `docs/STANDARDS.md` §11; config model → `docs/ARCHITECTURE.md` §14.
 
 ---
 
-## Step 7 — Critical File Locations
+## Step 6 — Critical file locations
 
 | Component | File | Notes |
 |---|---|---|
 | Update Steps button | StepList.jsx | NOT TaskInstructionsScreen.jsx |
 | Design tokens | src/tokens.js | Never hardcode values |
-| Agent roster | src/data/agents.js | Source of truth — read directly, don't trust hardcoded roster tables in docs |
+| Agent roster | src/data/agents.js | Source of truth — read directly, don't trust roster tables in docs |
 | Michelle avatar | MichelleAvatar.jsx | Wired to Supabase since S-BENCH-01 (2026-06-19) |
 | AI heartbeat | AIDiamond.jsx | Do not refactor without a dedicated session |
 | Step merge logic | mergeSteps.js | Three named operations only |
 
 ---
 
-## Step 8 — Your Role in This Session
-
-This is the design and planning window. Claude Code is the coding window.
-
-| Your job (Claude.ai) | Not your job |
-|---|---|
-| UX design and mockups | Writing code |
-| Generating kickoff docs | Running tests |
-| Reviewing screenshots | Committing to GitHub |
-| Fetching GitHub docs | Updating FEATURES.md |
-| Reading local files via filesystem MCP | Managing Claude Code sessions |
-| Product decisions | |
-
-You can read local project files directly via filesystem MCP (Step 11) — no need to ask John to
-paste file contents or wait for REPO-SNAPSHOT.md.
-
----
-
-## Step 9 — How to Generate a Kickoff Doc
+## Step 7 — How to generate a kickoff doc
 
 When John says "generate kickoff doc for [session]":
 
-1. Confirm feature ID, status, and dependencies in `docs/FEATURES.md`; relevant test categories in
-   `docs/STANDARDS.md`; current version and next session in `docs/SESSIONS.md`; spec + UI
-   conventions in `docs/PRD.md` + `docs/MOCK-NOTES.md`.
+1. Confirm the ticket's ID, status, `tier` and `priority_class` in
+   `docs/backlog/BACKLOG-SNAPSHOT.md`; relevant test categories in `docs/STANDARDS.md`; current
+   version and recent history in `CLAUDE-STATE.md` + `docs/SESSIONS.md`; spec and UI conventions in
+   `docs/PRD.md` + `docs/MOCK-NOTES.md`.
 2. Read the relevant source files directly via filesystem MCP (preferred) or `REPO-SNAPSHOT.md`
-   (fallback) — confirm what already exists.
-3. If UI work: ask John for a screenshot or describe the mock for approval.
-4. Write the doc to the canonical **11-section** kickoff structure, enumerated in `docs/STANDARDS.md` §3.
-   Apply the **standing-rules-by-reference** discipline
-   (`docs/STANDARDS.md` §3): name a standing rule ("STANDARDS.md §11 applies"), don't restate it in
-   full prose; session-specific facts (exact values, files, scope) are still spelled out in full.
-   Section 9 (COMMIT) uses `git push origin HEAD:dev` (`CLAUDE.md` hard rule), never bare
-   `git push origin dev`.
-5. Save to `docs/kickoffs/[version]-[featureId]-[featureName].md`.
-6. **Update `docs/FEATURES.md` and `CLAUDE-STATE.md` and commit them with the kickoff doc**, per the
-   design-session close-out in `CLAUDE-DESIGN.md` (mark status + session ID, add any new IDs and
-   locked-spec notes, bump "Version in dev" and "Next session," clear resolved blockers).
-7. End with a bordered code block containing the exact Claude Code start prompt:
+   (fallback) — confirm what already exists rather than assuming.
+3. If UI work: ask John for a screenshot, or describe the mock for approval.
+4. Write the doc to the canonical **11-section** kickoff structure, enumerated in
+   `docs/STANDARDS.md` §3. Apply the **standing-rules-by-reference** discipline (same section): name
+   a standing rule ("STANDARDS.md §11 applies"), don't restate it in full prose; session-specific
+   facts (exact values, files, scope) are still spelled out in full. Section 9 (COMMIT) uses
+   `git push origin HEAD:dev` (`CLAUDE.md` hard rule), never bare `git push origin dev`.
+5. Name it `docs/kickoffs/[version]-[ticketId]-[shortName].md`. **You cannot save it from here** —
+   hand it to John as an artifact panel; the Code session writes it into the repo.
+6. End with a bordered code block containing the exact Claude Code start prompt:
    ```
    Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
    ```
 
-**Why step 6 is mandatory:** John opens the next design session by reading `FEATURES.md` to decide
-what to work on. If the backlog isn't updated, decisions made here are lost and get redesigned from
-scratch.
+**What this surface does NOT do at close:** it does not mark the ticket `designed`, does not insert
+new ticket IDs, and does not bump the version. Those are Supabase and counter writes — the Code
+session's close-out, per `CLAUDE-DESIGN.md` steps 9–10. Handing over a decision without those writes
+is expected here; handing one over *without a kickoff doc* is how a decision gets lost and
+redesigned from scratch.
 
 ---
 
-## Step 10 — How to Close a Session
+## Step 8 — Repo file access
 
-**Follow this sequence in order. Do not skip steps. Do not close early.**
+**Option A — Filesystem MCP (preferred for Desktop chat sessions).** Configured in Claude Desktop.
+Read any file in `C:\Projects\deepbench-frontend` and `C:\Projects\deepbench-backend` directly — no
+need to ask John to paste, or to announce it. Read silently and incorporate what you find.
 
-### 10a — The coding session self-verifies
-Per the **Automated Design→Code→Verify Loop** (`CLAUDE-DESIGN.md`) and `CLAUDE.md`'s self-test hard
-rule, the coding session runs its own Node.js tests and `npm run build`, **and** the design/coding
-session verifies its own Manual QA Checklist directly against the live dev URL. John is not asked to
-manually test — that hand-off is retired.
+**Option B — raw GitHub (browser and mobile).** Every path in this doc is fetchable from the raw
+base in Step 1. This is the normal route on a surface with no MCP.
 
-**The one exception:** if John *personally* started a coding session by pasting the prompt himself,
-he closes that loop personally, same as always — present him the kickoff doc's Manual QA Checklist
-(Section 11) as a numbered list for that case only.
+**Option C — `docs/REPO-SNAPSHOT.md` (fallback).** The source-tree snapshot, for when filesystem MCP
+is unavailable and a raw fetch per file is too slow. If it shows `[NOT YET GENERATED]`, ask John to
+run the regeneration prompt in a Code session.
 
-### 10b — Act on QA results
-
-- **All PASS** → Close out per `CLAUDE-DESIGN.md` Step 5c: move the feature's row from
-  `docs/FEATURES.md` to `docs/FEATURES-ARCHIVE.md` (✅ Done rows never stay in `FEATURES.md`), bump
-  version and set next session in `CLAUDE-STATE.md`, commit and push all three files to `dev`.
-- **Any FAIL** → Full root-cause analysis before any patch: read the complete execution path
-  (browser → call site → API handler → package.json → runtime), compare against the working NIGP
-  reference line by line, fix the deepest cause, not the nearest symptom. Then generate a patch
-  kickoff doc targeting the confirmed root cause. A bug that fails QA once must not fail twice.
-- **NEW REQUIREMENT discovered during QA** → Add to `docs/FEATURES.md` under the correct area as
-  ❌ Missing, session = S-future. Commit and push.
+**Option D — direct paste (last resort).** Ask John to paste file contents only when the options
+above are unavailable or stale.
 
 ---
 
-## Step 11 — Repo File Access
+## Step 9 — Reference
 
-### Option A — Filesystem MCP (preferred for Desktop Chat sessions)
-Configured and connected in Claude Desktop. Read any file in `C:\Projects\deepbench-frontend` and
-`C:\Projects\deepbench-backend` directly — no need to ask John to paste, or to announce it. Read
-silently and incorporate what you find. Use it for reading existing components before designing
-against them, checking current implementation, and verifying structure/exports.
+**Google Drive** was retired as a source of truth 2026-06-07. GitHub is the single master. Do not
+fetch from or update Drive docs.
 
-### Option B — REPO-SNAPSHOT.md (fallback / Claude Code sessions)
-`REPO-SNAPSHOT.md` remains the primary source of truth for **Claude Code sessions**, which have no
-filesystem MCP. Fetch when filesystem MCP is unavailable:
-https://raw.githubusercontent.com/roadmapventure/deepbench-frontend/dev/docs/REPO-SNAPSHOT.md
-If it shows `[NOT YET GENERATED]`, ask John to run the regeneration prompt (Option C).
-
-### Option C — Regenerate snapshot (when stale)
-Give John this Claude Code prompt:
-```
-Regenerate docs/REPO-SNAPSHOT.md from current local source —
-read C:\Projects\deepbench-frontend\src,
-C:\Projects\deepbench-backend,
-C:\Projects\nigp-analyzer\src, and
-C:\Projects\nigp-analyzer-agent-api.
-Commit and push to dev with message:
-docs: regenerate REPO-SNAPSHOT from local source
-```
-
-### Option D — Direct paste (last resort)
-Ask John to paste specific file contents only when filesystem MCP is unavailable and
-`REPO-SNAPSHOT.md` is stale or unhelpful.
-
----
-
-## Step 12 — Google Drive
-
-Google Drive retired as source of truth as of 2026-06-07. GitHub is the single master. Do not fetch
-from or update Drive docs.
-
----
-
-## Step 13 — Claude Desktop Setup (Reference)
-
-Filesystem MCP is configured in Claude Desktop for direct local file access.
-
-**Connected paths:** `C:\Projects\deepbench-frontend`, `C:\Projects\deepbench-backend`
-**Config location:** `C:\Users\jleon\AppData\Roaming\Claude\claude_desktop_config.json`
-**To reconnect if MCP drops:** Settings → account name → Connectors → filesystem → enable. You may
-need to toggle off/on and grant permission once per session.
+**Claude Desktop setup.** Filesystem MCP connected paths: `C:\Projects\deepbench-frontend`,
+`C:\Projects\deepbench-backend`. Config: `C:\Users\jleon\AppData\Roaming\Claude\claude_desktop_config.json`.
+To reconnect if MCP drops: Settings → account name → Connectors → filesystem → enable (may need an
+off/on toggle and a permission grant once per session).
 
 **Claude Code in Desktop** operates identically to Claude Code in the cmd window — same auto-read of
 `CLAUDE.md`, same git access, same local file access. No additional setup needed.

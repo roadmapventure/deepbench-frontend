@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-// DeepBench v7.0.178 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117
+// DeepBench v7.0.186 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120
+// FEATURE: SES-120 -- check 3's stub size baselines are modernized off a live measurement.
+// The old { FEATURES.md: 40, FEATURES-LATER.md: 150 } were row-era caps that could not fire
+// against the v7.0.113 stubs (14.2 KB / 1.2 KB live), and FEATURES-NEXT.md had no cap at all.
+// See STUB_SIZE_BASELINES_KB below for the numbers and the ratchet rule.
 // FEATURE: SES-117 -- check 3c STATES the tier-scoped Type rule instead of bare-counting blanks.
 // Type is not owed while a ticket sits in `later`; it fills at the later -> now/next promotion,
 // and since this ticket that is structural, not remembered: ck_backlog_type_when_promoted on
@@ -116,8 +120,26 @@ function checkClaudeState(findings) {
 // the regression cycles 2 and 3 exist to prevent. Fires zero times today by
 // construction; it is meant to be silent until it matters.
 //
-// The size baselines are kept as-is -- they were never part of the row scan and
-// still catch runaway growth in a file that is supposed to stay small.
+// The size baselines are MODERNIZED as of SES-120 (v7.0.186). They used to read
+// { "FEATURES.md": 40, "FEATURES-LATER.md": 150 } -- row-era numbers, sized for
+// files that still held every ticket. Against the post-v7.0.113 stubs those caps
+// could not fire: measured live 2026-08-23, FEATURES.md is 14.2 KB against a
+// 40 KB cap and FEATURES-LATER.md is 1.2 KB against a 150 KB cap, so the latter
+// would have to grow 125x before saying anything. A cap that cannot fire is not
+// a guard, it is a comment -- and this check's whole job is to notice a stub
+// regrowing ticket rows. FEATURES-NEXT.md had no cap at all.
+//
+// The new numbers are each file's live size plus deliberate slack, so an edit to
+// the legend/taxonomy prose these stubs legitimately carry stays quiet while a
+// returning ticket table does not. This is a RATCHET, same discipline as
+// ROW_LENGTH_CAP below: tighten toward the measured size as the stubs settle,
+// never loosen to silence a real finding.
+const STUB_SIZE_BASELINES_KB = {
+  "FEATURES.md": 20,       // 14.2 KB live 2026-08-23 (Priority Class legend + Type taxonomy)
+  "FEATURES-NEXT.md": 4,   //  1.2 KB live 2026-08-23 (legend-only stub)
+  "FEATURES-LATER.md": 4,  //  1.2 KB live 2026-08-23 (legend-only stub)
+};
+
 function checkTrimmedStubs(findings) {
   for (const filename of BACKLOG_FILES) {
     const p = path.join(WORKTREE, "docs", filename);
@@ -128,9 +150,9 @@ function checkTrimmedStubs(findings) {
     }
 
     const bytes = Buffer.byteLength(text, "utf8");
-    const sizeBaselines = { "FEATURES.md": 40, "FEATURES-LATER.md": 150 };
-    if (sizeBaselines[filename] && bytes > sizeBaselines[filename] * 1024) {
-      findings.push({ check: "3", severity: "FLAG", detail: `${filename} is ${kb(bytes)} KB, over the ~${sizeBaselines[filename]} KB baseline` });
+    const baselineKb = STUB_SIZE_BASELINES_KB[filename];
+    if (baselineKb && bytes > baselineKb * 1024) {
+      findings.push({ check: "3", severity: "FLAG", detail: `docs/${filename} is ${kb(bytes)} KB, over the ~${baselineKb} KB stub baseline -- these files were trimmed to legend-only stubs (SES-83 (d), v7.0.113); growth here usually means ticket rows are being filed back into markdown instead of public.backlog_items` });
     }
 
     for (const line of text.split("\n")) {

@@ -5,6 +5,80 @@
 
 ---
 
+## session/cycle-20260823-1140 (v7.0.186, 2026-08-23, Automated runner cycle `3aad1299`, model Opus 5 orchestrator, subagent Sonnet 5) — the startup doc stops teaching a process that no longer exists, and a size cap that could not fire is made able to
+
+**Ticket:** `SES-120` — *Startup-doc modernization: Session-Init rewritten to snapshot pointers;
+stale markdown-era phrases removed* (`P10 - Tooling`, tier `now`, epic Automation). **Closed `done`.**
+
+**Selection.** Layer 1a had no queued one-off directive. Layer 1b's drain returned `pick SES-140`
+(`design_status = 'needs-john'`); queue 2 (`SES-117`) and queue 3 (`SES-118`) are both
+`needs-desktop`. All three were recorded with `record_skip()` — `skip_count` now **7 / 4 / 3** — and
+stepped past (`SES-114`), taking the cycle to board queue **4**. That is the fourth consecutive
+cycle to build queue 4 behind the same three-flag prefix, which is itself the finding underneath
+`SES-121` (queue 4 from this ship): the drain's top slots are waiting on John, not on the runner.
+
+**Premise revalidation (`SES-87`).** All three parts hold, read from the tree at `0d2810c` rather
+than recalled. `DeepBench-Session-Init.md` fetched `docs/FEATURES.md` as *"the backlog"* (line 16),
+made updating it mandatory (128 / 141 / 149), moved shipped rows to `FEATURES-ARCHIVE.md` (172) and
+filed new work as `❌ Missing` (178). `CLAUDE-DESIGN.md` carried the sub-agent archive stop-line (48)
+and the session-queue parenthetical (260); `grep -in "session queue" CLAUDE-STATE.md` returns **0
+hits**, so the section both lines point at is gone. `check-session-docs.js:131` held
+`{ "FEATURES.md": 40, "FEATURES-LATER.md": 150 }` against live sizes of **14.2 KB** and **1.2 KB**.
+
+**(a) A rewrite, not a retirement.** John confirmed the claude.ai browser and mobile chat surfaces
+are still in use, so the doc still has a job — a smaller one. It now opens by stating the boundary
+that *is* its job: a chat surface has no SQL and no git, so it **orients and discusses** while a
+Claude Code session **files and builds**. Step 1 points at raw `CLAUDE.md` (rules), raw
+`CLAUDE-STATE.md` (version, blockers) and raw `docs/backlog/BACKLOG-SNAPSHOT.md` (the board) —
+the snapshot being exactly right for a surface that cannot run SQL. Its **~650 KB size is named in
+the doc**, with the instruction to search it rather than read it end to end, because discovering
+that on a phone is the failure mode a pointer doc is supposed to prevent. Kickoff generation keeps
+its 11-section structure and gains an explicit statement of what this surface does *not* do at
+close: no `designed` mark, no ID insert, no version bump — those are Supabase and counter writes.
+
+**(c) The measurement that decided the design.** The retired caps **could not fire**:
+`FEATURES-LATER.md` would have had to grow **125×** its live size to trip 150 KB, and
+`FEATURES-NEXT.md` had no cap at all. A cap that cannot fire is not a guard, it is a comment.
+New baselines are live size plus deliberate slack — `FEATURES.md` 20 KB (14.2 live; it carries the
+Priority Class legend and Type taxonomy, which are legitimately edited), `FEATURES-NEXT.md` and
+`FEATURES-LATER.md` 4 KB each (1.2 live) — and are written as a **ratchet**, tighten toward the
+measurement, never loosen to silence a finding. The finding text now says what growth *means*:
+ticket rows being filed back into markdown instead of `public.backlog_items`.
+
+**QA — the negative control is what makes it QA.** Fixtures at 25 / 6 / 25 KB were chosen to sit
+above every new baseline and below every retired one. Shipped build → **three `check 3` FLAGs**, one
+per file. The *same* fixtures scored against the retired `{ 40, 150 }` table → **zero findings**. The
+shipped build against the real repo stubs → **zero findings**. A change that did nothing fails the
+middle arm. Build clean; regression **39/39 with credentials** — `CHI-31`'s bare-run failure is a
+missing-credential skip and was re-run green with env rather than assumed unrelated; dev root **200**
+with the bypass header.
+
+**The scope decision, disclosed rather than slipped in.** A Sonnet 5 sub-agent swept the
+orientation/process docs for retired vocabulary (register B21 — mechanical work, delegated). It
+found that `CLAUDE-DESIGN.md` instructs **three separate times** to insert a `backlog_items` ticket
+as `❌ Missing`. Read live from `pg_constraint`, `backlog_items_status_check` now allows only
+`('open','partial','done','removal proposed','removed')` — `SES-118` renamed the value in
+`v7.0.183` — so those three lines told a session to write a status the table **rejects** (`23514`).
+They were fixed here: same file, no file-cap cost, and leaving a known-broken instruction standing to
+respect a scope boundary would be the wrong trade. **`SES-118` is not closed by this** and stays
+`partial` / `needs-desktop` on its `.claude/` half.
+
+**Deliberately NOT taken.** `docs/STANDARDS.md` carries the same residue — *"If NEW REQUIREMENT: add
+to `docs/FEATURES.md`"* and the Status-column vocabulary rule governing `✅ Done` / `🔶 Partial` /
+`❌ Missing` cells in three files that no longer have rows. It is a **fourth** file, so taking it
+would have breached the 3-file cap; it is surfaced on the briefing to get its own ticket rather than
+being quietly absorbed. `.claude/skills/session-hygiene/SKILL.md` check 5c greps
+`FEATURES-ARCHIVE.md` as a live completion signal, which no longer holds — under `.claude/`, so
+`needs-desktop` by construction (register B39). And `CLAUDE-STATE.md` is 24.6 KB against check 1's
+~10 KB baseline: real, flagged every run by the tooling, and a content decision rather than a
+doc-vocabulary fix.
+
+**Files (3, at the cap):** `DeepBench-Session-Init.md`, `CLAUDE-DESIGN.md`,
+`scripts/check-session-docs.js`. Kickoff:
+`docs/kickoffs/v7.0.186-SES-120-startup-doc-modernization.md`.
+
+---
+
 ## session/cycle-20260823-0940 (v7.0.185, 2026-08-23, Automated runner cycle `626d4f48`, model Opus 5, no subagent) — the display rule reaches the file that tells every cycle how to talk, and it ships with the bound that keeps it out of a key column
 
 **Ticket:** `SES-119` — *Briefing and displays show ticket ID + stored title everywhere; split the
