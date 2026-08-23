@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.175 | runbooks/briefing-page.md | SES-138 — the regeneration contract gains the page's NAME, which it has never mentioned at all. Found live 2026-08-23 by cycle 702aa2db on the SERVED artifact, not reasoned about: after the v7.0.173 rebuild the page came back named "briefing-out" — the build file's filename — instead of "DeepBench Morning Briefing". John finds this page by its name in his gallery and by its browser tab. CAUSE, measured: the Artifact tool scans only the first 8192 BYTES for a title tag, and briefing-template.html opens with a provenance block that grows by one comment on every ship, so the tag was present, correct, and never seen — at byte 24,770. THE MEASUREMENT MOVED WHILE BEING TAKEN, which is what decided the fix: the offset was 24,537 when SES-138 was filed at 02:20Z and 24,770 when it was revalidated at 02:34Z — 233 bytes in fourteen minutes, from one ship. It is a ratchet, so the fix is structural (the tag now sits at byte 0 of the template, above the provenance block, with the invariant stated in place) rather than the ticket's option (a), "pass title: on every publish" — that alone is a rule every future cycle must REMEMBER, the exact class of forgetting SES-86 phase 3 / v7.0.146 / SES-101 / SES-111 / SES-127 / SES-128 / SES-129 each had to convert from prose into structure. Seven precedents is enough. title: is still passed, as belt-and-braces, and new step 5 asserts the name on the SERVED artifact afterwards — never on the publish result, which reported success on BOTH wrong-named publishes (the v7.0.166 lesson). NOT CHANGED because it was measured and is already right: doc()'s self-publish head emits its own title inside the first ~150 bytes, so John's own taps have never been able to rename the page; only a cycle publishing the template-derived file hits the window. THE FLAW THE QA CAUGHT IN THE FIX ITSELF, worth recording because it would have shipped a guard that guarded nothing: the first draft of the template's guard comment wrote the literal markup when explaining the rule, which put tag-shaped strings ahead of the real tag and collapsed the regression test's negative control from 24,770 to 262 bytes. The comment now says "title tag" in words, and the test fails if anyone writes the markup back. Guarded permanently by tests/regression/SES-138-briefing-title-window.js, whose negative control asserts the pre-change shape WOULD have failed — two of its four assertions fail on the pre-change tree, which is what makes it QA rather than a presence check. -->
 <!-- DeepBench v7.0.174 | runbooks/briefing-page.md | SES-116 — regeneration step 1 names the id chip's source, because the column it used to read is now enforced bare and two live undecided cards no longer have anything in it. `runner_items.backlog_id` is a JOIN KEY; it had been carrying the Language block's display string ('SES-115 (Tooling · P10 - Tooling)'), so every card→ticket join returned nothing. ses116_backlog_id_bare_check repaired 63 of 80 non-NULL rows and added a VALID CHECK, moving each raw string to the new `display_ref` rather than nulling it — 22 rows carry the ONLY copy of a real non-ticket reference (eleven a directive uuid), and §19v does not permit destroying that to satisfy a constraint. THE CONSEQUENCE FOR THIS FILE, which is the whole reason it is amended in the same commit rather than a later one: the chip must read coalesce(backlog_id, display_ref). Card 477454d7 (directive 603f44ea) and card 8a86d9d4 (the reading-card question) are UNDECIDED and now hold backlog_id = NULL, so a rebuild reading backlog_id alone renders two blank chips on cards awaiting John's tap — a user-visible regression caused by a tooling fix, shipped in the gap between two commits. Nothing in the template changes: card() already takes `tid`/`idLine` as composed arguments, so this is a contract the rebuilding cycle honours, not a code path. -->
 <!-- DeepBench v7.0.172 | runbooks/briefing-page.md | directive 603f44ea — the regeneration contract gains the masthead's last-action stamp, and names the ONE line of it a rebuild must write: `var PAGE_BUILT`, the UTC minute you published, in the #code script that survives John's self-publishes. Everything else on the stamp is derived from briefing-state (SES-124's countWaiting() rule), so the only way to get it wrong is to forget PAGE_BUILT — which ships a page claiming to be older than it is and tells him a run has not picked his tap up when one has. §1's row in the LOCKED SECTION ORDER updated with it. -->
 <!-- DeepBench v7.0.170 | runbooks/briefing-page.md | SES-132 — the ask contract gains the rule it could not follow, and the LOCKED SECTION ORDER gains §9.1. "Answer every open ask on its own card" has been the written rule since v7.0.145 and was structurally unfollowable for most asks: thread() is reachable from exactly two call sites, card() and question() (visionClaim() delegates to it), so a thread renders ONLY inside a still-live target — and the very act John performs removes that target from the next rebuild. MEASURED AGAINST THE PUBLISHED PAGE this cycle rather than quoted from the ticket, which said three of seven: SIX of EIGHT ask targets were orphaned, carrying ELEVEN of his thirteen entries, with only item-chi84-gate and q-adhoc-morning-standing still rendering. §9.1 is a sub-block under §9 like §4.1 and §7.1, so the locked order is EXTENDED, never renumbered — John approved these fourteen sections and a fifteenth is not this cycle's to add. The half a later editor will get wrong if it is not written down: the orphan set is computed AFTER the whole page is built, because §12 renders after §9.1's position and an in-place computation calls every vision thread an orphan and prints it twice; the substitution is a FUNCTION replacement because $&/$1 are special in String.replace and the text is John's prose. Rows carry no data-awaits (SES-127's §10 call, same reason). §9.1 is where a thread SURVIVES a decision, not a second place to hold a live conversation — a cycle still answers an open ask on its live card when there is one. -->
@@ -94,6 +95,31 @@ Store UTC internally as before; the conversion is display-only.
    a directive typed before `v7.0.172` has no stamp and contributes nothing rather than a guess.
 2. **Republish to the SAME URL** — pass the URL above as `url` to the Artifact tool (a publish
    without `url` from a new conversation creates a stray page; never do that). Same favicon.
+   **Also pass `title: "DeepBench Morning Briefing"` on every publish, and assert the name
+   afterwards — step 5 below (`SES-138`, `v7.0.175`).**
+2b. **THE PAGE'S NAME IS PART OF THE PUBLISH, AND IT HAS BEEN LOST ONCE (`SES-138`, `v7.0.175`;
+   found live 2026-08-23 by cycle `702aa2db` on the served artifact).** After the `v7.0.173`
+   rebuild the artifact came back named **"briefing-out"** — the build file's *filename* — instead
+   of "DeepBench Morning Briefing". John finds this page by its name in his gallery and by its
+   browser tab, so this is a real defect, not cosmetic. **Cause:** the Artifact tool scans only the
+   **first 8192 bytes** of a file for a `<title>`, and `briefing-template.html` opens with its
+   provenance comment block, which grows by one comment on every ship — so the tag was present,
+   correct, and never seen, at byte **24,770**. Three defences, and they are deliberately not
+   interchangeable:
+   - **Structural, and the one that actually fixes it:** `<title>` now sits at **byte 0** of
+     `briefing-template.html`, above the provenance block, with the invariant stated in place.
+     **Never prepend a comment above it** — new provenance comments go below that guard block.
+   - **Belt-and-braces:** pass `title:` on the publish call anyway (step 2). This alone was
+     rejected as the whole fix: it is a rule every future cycle must *remember*, which is the exact
+     class of forgetting `SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`
+     and `SES-129` each had to convert from prose into structure. Seven precedents is enough.
+   - **Assertion, in step 5.** A publish that reports success can still leave the thing John looks
+     at wrong — that is the `v7.0.166` lesson, and it is exactly what happened here: both
+     wrong-named publishes reported success.
+   **Not changed, because it was measured and is already right:** `doc()`'s self-publish head emits
+   its own `<title>` inside the first ~150 bytes, so John's own taps have never been able to rename
+   the page. Only a cycle publishing the template-derived file hits the window. Guarded permanently
+   by `tests/regression/SES-138-briefing-title-window.js`.
 3. **Before rebuilding, READ the current page first** (WebFetch the URL) and harvest John's
    state — rebuilding without harvesting destroys un-acted-on taps.
 4. **Never shell-process the fetched page's saved file (`SES-96`, 2026-08-21 — John captured the
@@ -107,6 +133,14 @@ Store UTC internally as before; the conversion is display-only.
    the `runner_` tables** (the contract below already says this) — never by slicing the previous
    page's HTML out of harness storage. The same rule generalizes: a cloud cycle runs **no Bash
    command against any `~/.claude/` path**, mirror of `runner-cycle.md` step 0's `.claude/` rule.
+5. **AFTER the republish returns, ASSERT THE NAME ON THE SERVED ARTIFACT (`SES-138`,
+   `v7.0.175`).** Call the Artifact `list` action and check that this URL's row reads
+   **`DeepBench Morning Briefing`**. Assert on what is **served**, never on the publish result:
+   both of the wrong-named publishes on 2026-08-23 reported success (the `v7.0.166` lesson — a
+   publish that reports success can still leave the thing John actually looks at wrong). A wrong
+   name is recoverable in one call — republish passing `title:` — so this check costs one read and
+   saves John looking for a page that has been renamed out from under him. If the name is wrong,
+   fix it in the same cycle and say so on the briefing rather than carding it.
 
 ## The locked section order (`SES-124`, `v7.0.159` — spec: `docs/BRIEFING-REDESIGN-0822.md`)
 

@@ -5,6 +5,76 @@
 
 ---
 
+## session/cycle-20260823-0230 (v7.0.175, 2026-08-23, Automated runner cycle `384f3933`, model Opus 5 orchestrator, no subagent) — the page's own name fell out of the scan window, and the defect was caught ratcheting in real time
+
+**Ticket:** `SES-138` — *Briefing republish loses the page title — the title tag sits past the
+artifact 8KB scan window* — Type: Tooling, `P10 - Tooling`. Closed **`done`** (was `missing`).
+Picked by **layer 1b**, John's standing Automation drain (`drain_epic_next` → `pick`, queue 1,
+18 open `now`-tier members). Kickoff: `docs/kickoffs/v7.0.175-SES-138-briefing-title-window.md`.
+
+**What was wrong, found on the served artifact rather than reasoned about.** Cycle `702aa2db`
+filed this at 02:20Z tonight after the `v7.0.173` rebuild came back named **"briefing-out"** — the
+build file's *filename* — instead of "DeepBench Morning Briefing". John finds this page by its name
+in his artifact gallery and by its browser tab, so a rebuild that silently renames it is a real
+defect, not cosmetic.
+
+**Root cause, measured.** The Artifact tool scans only the **first 8192 bytes** of a published file
+for a title tag. `docs/runbooks/briefing-template.html` opens with its provenance comment block —
+one comment per ship, eleven of them — so the tag was **present, correct, and never seen**.
+
+**The measurement moved while it was being taken, and that is what decided the fix.** Pick-time
+premise revalidation (`SES-87`, register B7) re-measured the offset rather than quoting the
+ticket's:
+
+| | byte offset of the first title tag | inside the 8192 window |
+|---|---|---|
+| `SES-138` as filed, 02:20Z | 24,537 | no |
+| revalidated this cycle, 02:34Z | **24,770** | no |
+
+**233 bytes in fourteen minutes**, from a single intervening ship. The ticket calls it a ratchet;
+this is the ratchet demonstrating itself inside one cycle, and it is the whole argument for the
+structural fix over the remembered one.
+
+**Why option (b), not option (a).** The ticket offered (a) pass `title:` on every publish, or
+(b) move the tag above the comment block, and recommended (b). That is right: (a) alone is *a rule
+every future cycle must remember*, which is the exact class of forgetting `SES-86` phase 3,
+`v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128` and `SES-129` each had to convert from prose
+into structure. **Seven precedents is enough.** The tag now sits at **byte 0** with the invariant
+stated in place, directly where the next author will prepend; `title:` is still passed as
+belt-and-braces; and `briefing-page.md` gains a step 5 asserting the name on the **served**
+artifact — never on the publish result, which reported success on **both** wrong-named publishes
+(the `v7.0.166` lesson).
+
+**Not changed, because it was measured and is already right.** `doc()`'s self-publish head emits
+its own title inside the first ~150 bytes, so John's own taps have never been able to rename the
+page — only a *cycle* publishing the template-derived file hits the window. Widening the fix to
+`doc()` would have been changing a path that works.
+
+**The flaw the QA caught in the fix itself, recorded because it would have shipped a guard that
+guarded nothing.** The first draft of the template's guard comment wrote the literal markup while
+explaining the rule. That put tag-shaped strings **ahead of the real tag**, and the new test's
+negative control collapsed from 24,770 bytes to **262** — i.e. the file would have looked fine to a
+naive check while a scanner could match a comment. The comment now says "title tag" in words, the
+file carries exactly **two** real tags (the page's and `doc()`'s), and the test fails if the markup
+is written back.
+
+**QA — discriminating, not a presence check.** Four assertions; **two fail on the pre-change tree**:
+the offset is inside the window (was 24,770), the name is exactly `DeepBench Morning Briefing`
+(passes before — the string was never wrong, and it is guarded because a future edit could move the
+tag *and* change the words), `doc()`'s head still carries its own title (a regression guard on the
+path that works, not the proof), and `briefing-page.md` still states the rule (the contract was
+silent before). The **negative control** reconstructs the pre-change shape and asserts it would have
+failed — 114,219 bytes against the 8,192 window. Test is **permanent, in `tests/regression/`, not
+scratchpad**, on John's rule the same night: *"you should never be throwing away tests."*
+
+**Evidence.** `npm install && npm run build` clean. Regression **37/37 with credentials**
+(`CHI-31` fails only for want of `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`; re-run with them exported →
+PASS). Dev **200** on both blocker sweeps. Kickoff-doc check: 11/11 sections.
+Files (3): `docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`,
+`tests/regression/SES-138-briefing-title-window.js`.
+
+---
+
 ## session/cycle-20260823-0206 (v7.0.174, 2026-08-23, Automated runner cycle `f6e50900`, model Opus 5 orchestrator, no subagent) — the join key that was really a caption, and the constraint that would have eaten John's next tap
 
 **Ticket:** `SES-116` — *`runner_items.backlog_id` holds display strings on 3 open cards — repair
