@@ -94,6 +94,14 @@ and John approves it** — structurally enforced: the stamp that proves the mode
 before the runner does. John's manual sessions always take deploy-quota precedence over
 Automated cycles.
 
+**Chained sessions are runner-launched (`SES-141`, `v7.0.180`, John 2026-08-23).** A session
+spawned by a draining cycle under `runner-cycle.md` tail step (8) — carrying the runner prompt
+verbatim with its AUTOMATED stamp and the `chained (drain continuation)` trigger marker — IS a
+session "launched by the approved runner": Automated mode legitimately applies to it. The
+boundary that matters is unchanged: only John creates a drain, so every chained session traces
+its authority to a drain he declared; a cycle may spawn exactly one successor, only through that
+step's two gates, and `create_session` is sanctioned for that use alone.
+
 ## "Open Workspace" (placeholder name)
 
 Non-DeepBench work done in Claude Code for its tooling (files, Artifacts, memory) — none of the
