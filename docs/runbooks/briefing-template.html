@@ -21,6 +21,7 @@
      NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
      its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
      the page. Only a cycle publishing this file hits the window. -->
+<!-- DeepBench v7.0.184 | runbooks/briefing-template.html | SES-119 — §8's Title column stops being a workaround, and §10 splits into the two lists John asked for. His standing instruction 2026-08-22, total scope: "across every session, display or anything that references work you perform for the backlog" — always ID + title, "he does not memorize IDs". PART (a): SES-126 wrote the standing rule "the Title column uses the `gist` extract, NOT `title`" because for imported tickets `title` held the CLASS STRING ('P9 - Bug Fixes.'). SES-91 repaired that — MEASURED 2026-08-23, not recalled: 0 of 562 open numbered tickets carry a class string and title IS NULL on 0 of 610 rows — so the workaround now guards a defect that is gone, while the gist it renders instead is the first 70 chars of the DESCRIPTION, which on this board is provenance (queue 1 rendered "FOUND LIVE 2026-08-23T03:31Z by cycle b9201486 while exercising the st"). THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE OBVIOUS FIX: a straight gist->title SWAP reads as the whole ticket and passes any check that asks "does Title come from title now?", but 46 open numbered tickets carry a bare RETIRED DECLARATION as their title (38 literally `Post-beta`) — and TWO OF THEM, LOG-134 and LAV-30, are in §8's live top 12, so the swap renders "`Post-beta`" as their title, strictly WORSE than what it replaced. So the rule is a FALLBACK, not a swap, and it lives in migration ses119_display_title as public.backlog_display_title(title, description) rather than in prose each cycle re-derives — the eighth precedent (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143). REJECTED deliberately: a length heuristic, which silently reclassifies rows as titles are edited and is wrong on real data ('Landing screen', 14 chars, is a terse title, not a marker). TWO BUGS THE QA CAUGHT IN THE FIX ITSELF, both recorded because either would have shipped a function that guarded nothing: (1) the first predicate used `\b` as a word boundary, but in Postgres ARE `\b` is BACKSPACE (the word-boundary escape is `\y`), so it demanded a literal backspace and matched none of the 46 rows — the migration reported success and every declaration leaked through; (2) the census check that said "0 leaked" reused the function's OWN regex, so a broken predicate marked its own victims as not-declarations — the replacement check strips backticks and compares the whole string, so it cannot agree with the function by construction. The predicate was then TIGHTENED after probing the one row it flagged: CHI-97's title OPENS with "Beta-gate (bucket 2) — " and continues into a real title, which the function kept only because that title contains backticks its `[^`]*` could not span — correct output by an accidental mechanism, so the marker set now means the WHOLE title is the marker plus an optional short parenthetical, and "Post-betamax support" and "Beta-gate (bucket 2) — a real title that continues" are both asserted kept. Final: 46 exact markers, 0 leaked, 512 of 562 use the stored title, 50 fall back, 0 render NULL. PART (c): §10 splits into 10.1 "Needs your decision" and 10.2 "Needs your desktop" — John's own cut, "because they trigger different actions (answer vs open an attended session)" — mapped on reason_kind, with `other` deliberately falling to DECISION so an unclassified row never invents a chore. Both lists always render even at zero, because an empty list is the good news and a vanished one is unreadable. A 10.2 row that already has a kickoff_link carries a "Kickoff ready" line: the difference between sitting down to work it out and sitting down to paste it. NOTE the asymmetry a sweeper must not "fix": queueRow() interpolates its title RAW (§8 call sites carry HTML entities by design) while skipRow() esc()s its own — entities in §8, raw text in §10. Guarded permanently by tests/regression/SES-119-display-title.js. THE PLACEMENT OF THIS COMMENT IS ITSELF THE SES-138 RULE — it sits BELOW the title-tag guard block, never above it. -->
 <!-- DeepBench v7.0.183 | runbooks/briefing-template.html | SES-118 — §8's queue matrix stops rendering a status value that no longer exists. John, 2026-08-22: 'missing' is markdown-audit-era vocabulary (a FEATURES.md row asked "does this capability exist in the product?" — X Missing); as a TICKET status it is opaque, and 'open' says what it means. Migration ses118_status_open renamed all 510 rows and REPLACED backlog_items_status_check, so the nine hard-coded queueRow() status arguments here would otherwise have shown John a word the board can no longer hold. THE EDIT THAT WOULD HAVE SHIPPED WRONG, and it is why this is written down rather than left to the next sweeper: this file uses the bare word `missing` for TWO unrelated things, and only one of them is the ticket status. `.missing` / `td.missing` / `class="missing"` (lines 187, 313, 490, 682, 764) are the page's RED DEFECT vocabulary — the thing that draws the line when a card ships without its plain-language summary (v7.0.145/v7.0.146) or a done directive carries a NULL outcome (SES-129) — and a find-and-replace over the file destroys that, turning every defect marker into dead CSS while looking like a clean rename. Only the 5th positional argument of queueRow(queue, id, epic, class, STATUS, designStatus, title) was changed; the two &ldquo;missing&rdquo; occurrences inside SES-118's OWN row title are deliberately untouched, because that title names the value being renamed and would be nonsense with it renamed too. Verified after the sweep: zero single-quoted 'missing' string literals remain in the file. THE PLACEMENT OF THIS COMMENT IS ITSELF THE SES-138 RULE — it sits BELOW the title-tag guard block, never above it. -->
 <!-- DeepBench v7.0.182 | runbooks/briefing-template.html | SES-143 — §2b, THE AUTOMATION PANEL: John's two switches, and the first controls on this page that change what the RUNNER does rather than what a ticket does. Locked spec docs/BRIEFING-REDESIGN-0822.md §2b (committed 840639e5), the addendum he added to the redesign on 2026-08-23. Three rows: scheduler checkbox + editable every-N-hours box, drain checkbox + epic box + an always-shown status label, and a status line carrying last run / next run / the "Run a cycle now" link. THE MECHANISM, because it is the whole reason this ticket has the shape it has: a cycle CANNOT edit the routine that fired it — the platform refused exactly that on 2026-08-23 (SES-140, verbatim: "fire_trigger: this routine was created via http_api, not by an agent") — so the panel cannot touch the cron and does not need to. The stored prompt already says "execute runner-cycle.md EXACTLY", so the gate lives in the runbook (new step 1b) and binds every future cycle with no trigger edit at all: the cron stays hourly PERMANENTLY and each cycle paces ITSELF down to John's N. That also retires SES-140's restore obligation — there is no interval left to restore. The arithmetic is migration ses143_runner_settings's scheduler_gate(), not prose a cycle re-derives, which is the eighth time this platform has made that correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129). THE ONE THAT WOULD HAVE SHIPPED WRONG lives in that function and is documented at its own migration: a predecessor read as "the most recent cycle row" wedges the runner shut FOREVER under an hourly cron (t=0 runs, t=1h paces, and every later fire's predecessor is the paced row an hour before it), so the predecessor is the last cycle whose outcome is not did_not_run — proven by a negative control that returns 'paced' from the identical fixtures the shipped predicate returns 'run' from. THE HALF THE SPEC DID NOT SETTLE, stated here rather than discovered later: it is silent on John's own manual fire, and the spec puts his "Run a cycle now" link ON THIS PANEL — so a paced-out manual tap is a dead button. A fire off the cron grid is therefore exempt, which is the same test step 1 of the runbook already uses to label a manual fire, with the minute as a COLUMN (cron_minute) rather than a literal; question q-manual-fire-pacing asks him to confirm. state.settings gets the same defensive default as answers/asks/unblocks/reading before it, and his un-harvested tap OUTRANKS the DB value in the render (settingsNow(), `undefined` and not falsy as the test, because scheduler_on:false is a real answer). NO data-awaits anywhere in the panel — a switch is a control, not a decision owed (SES-127's call for §10), and a counter that included it could never reach zero. The masthead's "Run a cycle now" link is REMOVED, not duplicated, on John's explicit instruction. Guarded permanently by tests/regression/SES-143-automation-panel.js. -->
 <!-- DeepBench v7.0.181 | runbooks/briefing-template.html | SES-144 — §8's queue matrix gains an EPIC column, third from the left (Queue · ID · Epic · Class · Status · Design status · Title), per John 2026-08-23 "on the queue, add a column epic" and the locked spec in docs/BRIEFING-REDESIGN-0822.md §8. Epic is epics.name resolved through backlog_items.epic_id — an FK, never prose in the ticket body, the same standing property SES-111 fixed the drain's epic under — and it renders BLANK for a ticket in no epic, never an em-dash, because this table already spends the dash on Design status where it means a real absence; a dash here would read as a value ("epic: —"). queueRow() takes the epic as its THIRD parameter so the call sites read in column order rather than requiring the reader to hold a mapping. The §8 regeneration SQL in the comment above the table is corrected to the LEFT JOIN form in the same commit: a cycle rebuilding from the old single-table SELECT renders an empty column and has nothing to tell it why — the same "the contract must move with the render" rule SES-124 wrote after step 5 and step 7 drifted. MEASURED, not reasoned: of §8's live top 12 at 05:34Z, TEN are Automation and two (SES-131, AGT-015) belong to no epic — a distinction the page rendered nowhere while John was running that very epic as a standing drain. Heading window refreshed to the live census, 564 numbered. THE PLACEMENT OF THIS COMMENT IS ITSELF THE SES-138 RULE: it sits BELOW the title-tag guard block, never above it. The kickoff doc's own instruction said "first line of the file" and was WRONG; the Sonnet 5 subagent that had the edit refused it and reported the conflict rather than complying, which is the behaviour that guard was written to produce. -->
@@ -203,6 +204,19 @@
        text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass-light);
        border-radius:3px;padding:1px 5px;margin-left:5px;white-space:nowrap}
   td.reason{font-size:12px;color:var(--muted-deep);min-width:200px}
+  /* SES-119 — §10 splits into two lists (John's own cut, 2026-08-22: they trigger different
+     actions). `.listhead` labels each one INSIDE the existing fold, so the split is a sub-label
+     rather than a second section — the LOCKED SECTION ORDER is not renumbered, exactly as SES-132
+     extended §9 with a sub-block instead of inserting one. `.kick` is the kickoff-ready line on a
+     needs-desktop row that is already `designed`: it is the difference between "sit down and work
+     this out" and "sit down and paste this", which is the whole reason John asked for it. */
+  .listhead{font-family:var(--display);font-size:14px;font-weight:600;margin:14px 2px 4px;
+       color:var(--navy-text)}
+  .listhead:first-of-type{margin-top:4px}
+  .listhead .n{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);
+       margin-right:6px}
+  .kick{display:block;margin-top:3px;font-family:var(--mono);font-size:10.5px;
+       color:var(--brass-deep)}
   .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
           padding:13px 14px;margin-bottom:14px}
   .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
@@ -387,7 +401,11 @@
   // halves disagreeing with each other — or with the rows — is the exact class of small
   // wrongness that makes the whole page read as unmaintained (SES-124's countWaiting() rule,
   // applied to the one counter that cannot be derived from the DOM).
-  var SKIPS = { n:2, nnew:2 };
+  // SES-119 — `n`/`nnew` stay the TOTAL across both lists, deliberately. The chip sits on the
+  // §10 heading, which still names one section; splitting the count into two chips would make the
+  // heading disagree with itself the moment one list emptied. Each list's own size is legible
+  // from its rows.
+  var SKIPS = { n:3, nnew:1 };
 
   // SES-143 — §2b's cycle-written half. Everything here is a fact the PAGE cannot know: the DB's
   // current settings, the standing drain's real progress, the last cycle's line and the next fire
@@ -802,10 +820,17 @@
   //   ref    the card id a 'card' row points at (rendered as its short id, John taps the card
   //          itself in §5/§6 — the page deliberately does not try to scroll him there)
   //   isNew  briefed_at IS NULL, i.e. skipped since his last brief
+  //   kick   SES-119 — the ticket's `kickoff_link`, passed ONLY for a needs-desktop row whose
+  //          design_status is already 'designed'. SES-112's CHECK guarantees a 'designed' row has
+  //          one, so this is never a guess. It renders as a second line in the reason cell because
+  //          that is the cell that answers "why is this waiting on me", and for these rows the
+  //          honest answer includes "and the design is already written" — the difference between
+  //          sitting down to work it out and sitting down to paste it. Omit or pass '' otherwise;
+  //          it is the LAST parameter so every existing 12-argument call site is unchanged.
   // A row carries NO `data-awaits`: a skipped ticket is information, not a decision John owes,
   // and inflating §1's counter with rows that need no tap is exactly the masthead-disagrees-with
   // -the-page failure SES-124 built countWaiting() to prevent.
-  function skipRow(sid, id, cls, q, design, status, title, reason, when, unb, ref, isNew){
+  function skipRow(sid, id, cls, q, design, status, title, reason, when, unb, ref, isNew, kick){
     var taken = state.unblocks[sid];
     var label = unb==='question' ? 'Answer as a question'
               : unb==='prep'     ? 'Prep our session'
@@ -819,7 +844,9 @@
       +'<td class="mono">'+esc(id)+'</td><td class="mono dim">'+esc(cls)+'</td>'
       +'<td class="num">'+esc(q)+'</td><td class="dim">'+esc(design)+'</td>'
       +'<td class="dim">'+esc(status)+'</td><td class="ttl2">'+esc(title)+'</td>'
-      +'<td class="reason">'+esc(reason)+'</td><td class="mono dim">'+esc(when)+'</td></tr>';
+      +'<td class="reason">'+esc(reason)
+        +(kick ? '<span class="kick">Kickoff ready &mdash; '+esc(kick)+'</span>' : '')
+      +'</td><td class="mono dim">'+esc(when)+'</td></tr>';
   }
   function useRow(t, ip, loc, name, did, cost){
     return '<tr><td class="mono">'+esc(t)+'</td><td class="mono">'+esc(ip)+'</td>'
@@ -1122,16 +1149,27 @@
     //
     //   SELECT b.queue, b.backlog_id, coalesce(e.name,'') AS epic, b.priority_class, b.status,
     //          coalesce(b.design_status,'—'),
-    //          left(regexp_replace(coalesce(b.description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70)
+    //          left(public.backlog_display_title(b.title, b.description), 70)
     //     FROM public.backlog_items b
     //     LEFT JOIN public.epics e ON e.id = b.epic_id
     //    WHERE b.queue IS NOT NULL ORDER BY b.queue LIMIT 12;
     //
-    // TWO THINGS THAT ARE NOT STYLE. (1) The Title column uses that `gist` extract, NOT
-    // `title`: for imported tickets `backlog_items.title` holds the CLASS STRING
-    // ('P9 - Bug Fixes.'), so a matrix keyed on `title` renders a column of class names and no
-    // titles at all — the runbook's standing rule for anything that DISPLAYS the queue, true
-    // until SES-91 repairs the column. (2) The heading states the scope (top N of the numbered
+    // TWO THINGS THAT ARE NOT STYLE. (1) THE TITLE COLUMN IS backlog_display_title(), NOT the raw
+    // `gist` extract AND NOT a straight `title` (SES-119, v7.0.184; John, 2026-08-22: always
+    // ID + title, "he does not memorize IDs"). This line used to read "use the `gist` extract,
+    // NOT `title`", written by SES-126 because for imported tickets `title` held the CLASS STRING
+    // ('P9 - Bug Fixes.'). SES-91 repaired that — measured 2026-08-23, 0 of 562 open numbered
+    // tickets carry a class string — so the workaround now guards a defect that is gone, and the
+    // gist it renders instead is the first 70 chars of the DESCRIPTION, which on this board is
+    // provenance: queue 1 rendered "FOUND LIVE 2026-08-23T03:31Z by cycle b9201486 while
+    // exercising the st". THE SWAP IS WHAT WOULD HAVE SHIPPED WRONG, and the census is why: 46
+    // open numbered tickets carry a bare RETIRED DECLARATION as their title (38 of them literally
+    // `Post-beta`), and TWO OF THEM — LOG-134 and LAV-30 — are in this very top 12, so a swap
+    // renders "`Post-beta`" as their title, strictly worse than what it replaced. The function is
+    // a FALLBACK, not a swap, and it lives in SQL rather than here because a rule each cycle
+    // re-derives is one that gets re-derived differently (the eighth precedent: SES-86 phase 3,
+    // v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143).
+    // (2) The heading states the scope (top N of the numbered
     // board) because a 12-row window onto 564 tickets that does not say so reads as the whole
     // board. Rows below are this cycle's real values.
     // (3) THE EPIC COLUMN RENDERS BLANK, NEVER A DASH (SES-144, v7.0.181; John, 2026-08-23:
@@ -1140,22 +1178,26 @@
     // property). A ticket in no epic gets '' and not '—', because this table already spends
     // the dash on Design status, where it means a real absence: an em-dash here would read as
     // a value, "epic: —", rather than as "belongs to no epic".
-    +'<h2><span class="secnum">8</span>The queue — top 12 of 564 numbered</h2>'
+    +'<h2><span class="secnum">8</span>The queue — top 12 of 562 numbered</h2>'
     +'<div class="tscroll"><table>'
     +'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'
     +'<th>Design status</th><th>Title</th></tr>'
-    +queueRow(1,'SES-144','Automation','P10 - Tooling','open','—','Briefing queue matrix gains an Epic column')
-    +queueRow(2,'SES-143','Automation','P10 - Tooling','open','—','Briefing §2b — the Automation panel: scheduler + drain controls')
-    +queueRow(3,'SES-140','Automation','P10 - Tooling','open','needs-john','The successor fire is refused — an agent cannot fire a routine it did not create')
-    +queueRow(4,'SES-117','Automation','P10 - Tooling','partial','needs-desktop','Structural filing guarantees: title and type can no longer be skipped')
-    +queueRow(5,'SES-118','Automation','P10 - Tooling','open','—','Rename backlog status value &ldquo;missing&rdquo; to &ldquo;open&rdquo;')
-    +queueRow(6,'SES-119','Automation','P10 - Tooling','open','—','Displays show ticket ID + stored title everywhere')
-    +queueRow(7,'SES-120','Automation','P10 - Tooling','open','—','Startup-doc modernization: Session-Init rewritten to snapshot pointers')
-    +queueRow(8,'SES-121','Automation','P10 - Tooling','open','—','Shrink the .claude/-mutable surface so needs-desktop tickets become rare')
-    +queueRow(9,'SES-84','Automation','P10 - Tooling','partial','—','The vision corpus: nine docs that ground Claude&rsquo;s P1&ndash;P4 calls')
-    +queueRow(10,'SES-101','Automation','P10 - Tooling','partial','designed','New automation tickets file themselves into the automation lane')
-    +queueRow(11,'SES-131','','P1 - Improves John&rsquo;s Skills','open','—','Research the AI / multi-agent market and FAANG AI job openings')
-    +queueRow(12,'AGT-015','','P1 - Improves John&rsquo;s Skills','open','—','Agent model/feature tied to MarketIntelligenceScreen&rsquo;s own onCommit')
+    // Titles below are backlog_display_title() trimmed to ~70 at a WORD boundary with an ellipsis
+    // when cut — the projection is the contract's; fitting the column is this render's. Note that
+    // queueRow() does NOT esc() its title (§8 call sites carry HTML entities by design), which is
+    // the opposite of skipRow() in §10 — pass entities here, raw text there.
+    +queueRow(1,'SES-140','Automation','P10 - Tooling','open','needs-john','The successor fire is refused by the platform &mdash; an agent cannot fire&hellip;')
+    +queueRow(2,'SES-117','Automation','P10 - Tooling','partial','needs-desktop','Structural filing guarantees: title and type can no longer be skipped&hellip;')
+    +queueRow(3,'SES-118','Automation','P10 - Tooling','partial','needs-desktop','Rename backlog status value &lsquo;missing&rsquo; to &lsquo;open&rsquo;')
+    +queueRow(4,'SES-119','Automation','P10 - Tooling','open','—','Briefing and displays show ticket ID + stored title everywhere&hellip;')
+    +queueRow(5,'SES-120','Automation','P10 - Tooling','open','—','Startup-doc modernization: Session-Init rewritten to snapshot pointers&hellip;')
+    +queueRow(6,'SES-121','Automation','P10 - Tooling','open','—','Shrink the .claude/-mutable surface so needs-desktop tickets become rare')
+    +queueRow(7,'SES-84','Automation','P10 - Tooling','partial','—','The vision corpus: nine docs under docs/vision that ground Claude&rsquo;s&hellip;')
+    +queueRow(8,'SES-101','Automation','P10 - Tooling','partial','designed','New automation tickets file themselves into the automation lane&hellip;')
+    +queueRow(9,'SES-131','','P1 - Improves John&rsquo;s Skills','open','—','Research the AI / multi-agent market and FAANG AI job openings&hellip;')
+    +queueRow(10,'AGT-015','','P1 - Improves John&rsquo;s Skills','open','—','Promoted from `FEATURES-NEXT.md` 2026-07-17 (now/next re-check &mdash;&hellip;')
+    +queueRow(11,'LOG-134','','P5 - Enhancements','open','—','**`Post-beta`** (dormant rows render nothing &mdash; invisible, not&hellip;')
+    +queueRow(12,'LAV-30','','P5 - Enhancements','open','—','**`Post-beta`** (receipt copy quality on the Agent Console + CHI&hellip;')
     +'</table></div>'
     // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
@@ -1195,28 +1237,70 @@
     // ('done','removed') rather than reading a maintained resolved flag, so a ticket that ships
     // leaves this section with no write at all.
     //
+    // THAT DERIVED FILTER PROVED ITSELF AT THIS SHIP, which is worth recording because it is the
+    // kind of design that is only ever tested by time (SES-119, v7.0.184): the six unresolved
+    // runner_skips rows include SES-106 and SES-110 (now `done`) and CHI-89 (now `removed`), and
+    // all three dropped out of this section with NO write from any cycle and no rule anyone had to
+    // remember. Three of six rows retired themselves. Do not "tidy" resolved_at to match.
+    //
     // SORT: question-unblockable first, then newest skip. That is not cosmetic either — it puts
     // the rows John can clear with one thumb above the rows that need him at a keyboard.
     +'<h2 class="clickable" data-toggle="skipsec"><span class="secnum">10</span>'
     +'Skipped &mdash; waiting on your input <span class="countchip">'+SKIPS.n+' &middot; '
     +SKIPS.nnew+' new</span> <span class="chev">&#9656;</span></h2>'
     +'<div class="secwrap" id="skipsec">'
-    +'<p class="strip-def">Sorted: what you can unblock with a Yes/No first, then everything '
-    +'else, newest skip on top. Rows added since your last brief carry the NEW chip.</p>'
+    // ===== SES-119 · THE SPLIT, AND THE RULE THAT DECIDES IT ================================
+    // John's own cut, 2026-08-22: "needs your decision" vs "needs your desktop" — TWO lists,
+    // "because they trigger different actions (answer vs open an attended session)". One list
+    // mixing them makes him re-sort it by hand every morning, which is the work this section was
+    // built to save. Measured live at this ship: the mixed list held 3 rows, 1 answerable from
+    // his phone and 2 needing a keyboard.
+    //
+    // THE MAPPING IS reason_kind, AND THE DEFAULT IS NOT ARBITRARY:
+    //   needs-desktop, permission-gate            -> Needs your desktop
+    //   needs-john, removal-proposed, gated, other -> Needs your decision
+    // `other` deliberately falls to DECISION, not desktop. The fallback must be the list he can
+    // clear with a thumb; defaulting an unclassified row into "open a session" invents a chore
+    // out of a row nobody classified. Same fail-toward-the-cheaper-action call SES-127 made when
+    // it kept 'claimed-by-peer' out of the vocabulary entirely.
+    //
+    // BOTH LISTS ALWAYS RENDER, even at zero, and that is deliberate: an empty
+    // "Needs your desktop" is the good news that nothing is waiting on him at a keyboard, and a
+    // list that vanishes when empty makes its absence unreadable — he cannot tell "none" from
+    // "the section broke". Same rule §11 applies in reverse for a class with no now-tier tickets.
+    +'<p class="strip-def">Split by what it needs from you. Within each list: what you can '
+    +'unblock with a Yes/No first, then everything else, newest skip on top. Rows added since '
+    +'your last brief carry the NEW chip.</p>'
+    +'<div class="listhead"><span class="n">10.1</span>Needs your decision '
+    +'&mdash; answerable from here</div>'
     +'<div class="tscroll"><table>'
     +'<tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th>'
     +'<th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>'
-    // Rows below are this cycle's REAL runner_skips rows, not samples.
-    +skipRow('cc4ac066-3760-4bf9-87ee-7f8a2247c1c5','CHI-89','P5 - Enhancements',25,'—',
-       'removal proposed','Third mobile footer kind',
-       'Its premise is argued dead and the removal card is waiting on your verdict, so it keeps '
-       +'its queue number and is stepped past.','Aug 22','card',
-       'e1c7a940-3d52-4f8b-a6d1-9b04c2f75e83',true)
-    +skipRow('5c244929-88a2-49cd-9d09-0d2708a35645','SES-110','P10 - Tooling',4,'designed',
-       'partial','Epics table — the one half left',
-       'Its one open half is a .claude/ edit, which an unattended run may not make. The text is '
-       +'written and waiting on the card.','Aug 22','card',
-       '9e7d8bf2-46e3-489e-95d1-9fcfc603c201',true)
+    // Rows below are this cycle's REAL runner_skips rows, not samples. Titles come from
+    // public.backlog_display_title() (SES-119) — skipRow() esc()s them, so they are passed RAW,
+    // never as HTML entities.
+    +skipRow('39cd8616-cccd-4968-8ea9-78dd3ffb7fba','SES-140','P10 - Tooling',1,'needs-john',
+       'open','The successor fire is refused by the platform — an agent cannot fire a routine '
+       +'it did not create',
+       'Waiting on your decision on its gated card: the runner cannot fire its own successor, '
+       +'because the platform refuses fire_trigger on a routine an agent did not create. Skipped '
+       +'5 times.','Aug 23','question',null,false)
+    +'</table></div>'
+    +'<div class="listhead"><span class="n">10.2</span>Needs your desktop '
+    +'&mdash; a session you attend</div>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th>'
+    +'<th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>'
+    +skipRow('f32e05ce-2a65-462f-a199-deb17127d4be','SES-117','P10 - Tooling',2,'needs-desktop',
+       'partial','Structural filing guarantees: title and type can no longer be skipped or '
+       +'polluted',
+       'The remaining half is on a surface an unattended run may not touch, so it needs a '
+       +'session you attend. Skipped twice.','Aug 23','prep',null,false,
+       'docs/kickoffs/v7.0.178-SES-117-backlog-structural-checks.md')
+    +skipRow('d292f62e-e57c-456d-a57e-8afb12455452','SES-118','P10 - Tooling',3,'needs-desktop',
+       'partial','Rename backlog status value \'missing\' to \'open\'',
+       'The shipped half landed this morning (v7.0.183); what is left is on a surface an '
+       +'unattended run may not touch.','Aug 23','prep',null,true)
     +'</table></div>'
     +'<p class="strip-def"><b>Unblock buttons:</b> &ldquo;Answer as a question&rdquo; puts the '
     +'blocking decision into section 9 as a Yes/No on the next rebuild &mdash; answer it and the '
@@ -1224,7 +1308,8 @@
     +'run to package everything (kickoff-ready prompt, branch, context) so the ticket is one '
     +'paste away when you sit down &mdash; this page can record the ask, but it cannot start a '
     +'session by itself. A row whose blocker is already a card above says so instead, and you '
-    +'decide it there.</p>'
+    +'decide it there. A row in <b>10.2</b> marked <i>Kickoff ready</i> already has its design '
+    +'written &mdash; that one is a paste, not a design session.</p>'
     +'</div>'
     // ===== §11 · NOW-TIER BY CLASS (SES-126) ================================================
     // THE ONE THING THAT WILL BE GOT WRONG IF IT IS NOT WRITTEN DOWN: group on the class

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.184 | runbooks/briefing-page.md | SES-119 — §8's Title column stops being a workaround and §10 becomes John's two lists. His standing instruction 2026-08-22, total scope: "across every session, display or anything that references work you perform for the backlog" — always ID + title, "he does not memorize IDs". §8's contract bullet used to read "its Title column is the `gist` extract, not `title`", written by SES-126 because imported tickets held the CLASS STRING in `title`. SES-91 repaired that — MEASURED 2026-08-23, not recalled: 0 of 562 open numbered tickets carry a class string, title IS NULL on 0 of 610 — so the rule now guards a defect that is gone while rendering description PROVENANCE in its place (queue 1 read "FOUND LIVE 2026-08-23T03:31Z by cycle b9201486 while exercising the st"). THE OBVIOUS FIX IS THE ONE THAT WOULD HAVE SHIPPED WRONG: a straight gist->title swap passes any check that asks "does Title come from title now?", but 46 open numbered tickets carry a bare retired declaration as their title (38 literally `Post-beta`) and TWO — LOG-134, LAV-30 — are in §8's live top 12, so the swap renders "`Post-beta`" as their title, strictly worse than the workaround. The rule is a FALLBACK, not a swap, and it lives in SQL (public.backlog_display_title, migration ses119_display_title) rather than in prose each cycle re-derives — the eighth precedent. A length heuristic was REJECTED ('Landing screen', 14 chars, is a terse title, not a marker) and the predicate matches only when the WHOLE title is the marker, so CHI-97 ("Beta-gate (bucket 2) — a red console error…") is kept. §10 splits into 10.1 Needs your decision / 10.2 Needs your desktop on John's own cut ("because they trigger different actions"), mapped on reason_kind with `other` falling to DECISION so an unclassified row never invents a chore, both lists rendering even at zero, and a 10.2 row with a kickoff_link carrying a "Kickoff ready" line. THE HALF THE TICKET'S WORDING DID NOT SETTLE: it says kickoff_link shows on entries "already designed", but design_status holds ONE value and for these rows it holds needs-desktop, so it can never also read `designed` — the observable fact is the presence of kickoff_link, and that is what the render keys on. Guarded permanently by tests/regression/SES-119-display-title.js. -->
 <!-- DeepBench v7.0.182 | runbooks/briefing-page.md | SES-143 — the LOCKED SECTION ORDER gains §2b, the Automation panel, and its data contract. EXTENDED, never renumbered: §3–§14 keep their numbers exactly as §4.1/§7.1/§9.1 already work, because a renumber silently invalidates every §-reference in this file, in runner-cycle.md and in the spec. Three rules written down here rather than left to each rebuild: the panel carries NO data-awaits (a switch is a control, not a decision owed — SES-127's call for §10, and §1's counter must be able to reach zero); the drain status label renders ALWAYS, running or not, per the spec verbatim; and the "Run a cycle now" link now lives on §2b and is REMOVED from the masthead on John's explicit instruction — do not reinstate the second copy. The AUTOMATION object's five sources are tabulated because two of them are wrong in a way that looks fine: drain_named is John's NAMED list (SES-142), never the epic's live now tier, so a ticket filed after naming counts in neither number; and runner_settings must be read AFTER the tail's settings harvest, since the render deliberately shows his un-harvested tap over the stored value and the acknowledgement line is the only thing telling him the tap was picked up. -->
 <!-- DeepBench v7.0.181 | runbooks/briefing-page.md | SES-144 — §8's data contract gains the Epic column rule: epics.name resolved through backlog_items.epic_id, blank (never an em-dash) for a ticket in no epic, third from the left per docs/BRIEFING-REDESIGN-0822.md §8. The scroll paragraph is corrected with it — §8 is a SEVEN-column matrix now, §14 is still six. -->
 <!-- DeepBench v7.0.176 | runbooks/briefing-page.md | SES-139 — new regeneration step 6: the republish is no longer the last thing a cycle does. A cycle that actually ran one (outcome shipped/gated_before_build/reverted) and whose standing drain still returns `pick` fires exactly one successor after the lease release; runner-cycle.md's tail step (8) owns the gates and the reasoning, and nothing about the rebuild changes. Recorded HERE because two of its effects land on this page and would otherwise read as defects: John's "page rebuilt" stamp can move again in minutes rather than on the 3h cron (a suspiciously fresh masthead is the chain working, not a double-publish), and #lastact's "Not picked up by a run yet" clears far sooner after a tap. The third is the one that matters most for not re-root-causing a solved problem: a WALL-STOPPED cycle fires nothing, so a page that stops refreshing overnight is the budget wall doing its job. -->
@@ -178,6 +179,8 @@ shown:
 | 8 | The queue (matrix) | `SES-126` ✔ |
 | 9 | Questions + `9.1` Answered — your past questions, closed | `SES-125` ✔ questions · `SES-132` ✔ kept threads |
 | 10 | Skipped — waiting on your input | `SES-127` ✔ |
+| 10.1 | ↳ Needs your decision — answerable from here | `SES-119` ✔ |
+| 10.2 | ↳ Needs your desktop — a session you attend | `SES-119` ✔ |
 | 11 | Now-tier by class | `SES-126` ✔ |
 | 12 | Vision claims | `SES-125` ✔ |
 | 13 | Trust ladder | `SES-126` ✔ class column |
@@ -224,12 +227,41 @@ measured against the live board/log when this shipped rather than reasoned about
 re-derives any of them will get it wrong in a way that looks fine:
 
 - **§8's Queue column is `backlog_items.queue`** — the DB's own stored number (`SES-86` phase 2),
-  never a position the render counted out. **Its Title column is the `gist` extract, not
-  `title`:** for imported tickets `title` holds the class string (`'P9 - Bug Fixes.'`), so a
-  matrix keyed on it renders a column of class names and no titles. True until `SES-91` repairs
-  the column, and it is the same rule the runbook already applies to anything that *displays* the
-  queue. The heading states the window ("top N of M numbered") because a 12-row view of 564
-  tickets that does not say so reads as the whole board.
+  never a position the render counted out. The heading states the window ("top N of M numbered")
+  because a 12-row view of 562 tickets that does not say so reads as the whole board.
+- **§8's Title column is `public.backlog_display_title(b.title, b.description)` — NOT the raw
+  `title` and NOT the `gist` extract (`SES-119`, `v7.0.184`, migration `ses119_display_title`).**
+  This bullet used to read *"its Title column is the `gist` extract, not `title`"*, which `SES-126`
+  wrote because for imported tickets `title` held the class string (`'P9 - Bug Fixes.'`).
+  **`SES-91` repaired that** — measured 2026-08-23: **0** of the 562 open numbered tickets carry a
+  class string, and `title IS NULL` on 0 of 610 rows — so that rule now guards a defect that no
+  longer exists, while the `gist` it renders instead is the first 70 characters of the
+  *description*, which on this board is provenance (queue 1 rendered *"FOUND LIVE
+  2026-08-23T03:31Z by cycle b9201486 while exercising the st"*).
+  **The obvious fix is the one that would have shipped wrong.** A straight `gist` → `title` swap
+  reads as the whole change and passes any check that merely asks "does Title come from `title`
+  now?" — but **46** open numbered tickets carry a bare *retired declaration* as their title (38
+  of them literally `` `Post-beta` ``), and **two of them, `LOG-134` and `LAV-30`, are in §8's live
+  top 12**, so the swap renders `` `Post-beta` `` as their title: strictly worse than the
+  workaround it replaced. The rule is therefore a **fallback, not a swap** — prefer the stored
+  title, fall back to the gist when the stored title is a marker rather than a title — and it
+  lives **in SQL**, because a rule each cycle re-derives is one that gets re-derived differently
+  (the eighth precedent: `SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`,
+  `SES-129`, `SES-143`). Two boundaries worth knowing before you edit the function: a **length
+  heuristic was rejected** (it silently reclassifies rows as titles are edited, and `Landing
+  screen` at 14 characters is a terse title, not a marker), and the predicate matches only when the
+  **whole** title is the marker plus an optional short parenthetical — `CHI-97`, whose title opens
+  *"Beta-gate (bucket 2) — a red console error…"* and continues into a real title, is kept.
+  **Everything that displays a ticket uses this**, not just §8: §10's rows, the help-me ticket, and
+  any future surface. John's standing instruction, 2026-08-22, is the whole scope — *"across every
+  session, display or anything that references work you perform for the backlog"*: always **ID +
+  title**, because he does not memorize IDs.
+- **Fitting the column is the render's job, not the projection's.** Trim to ~70 at a **word
+  boundary** with an ellipsis when cut; the contract's `left(…, 70)` is the canonical projection.
+  And note the asymmetry between the two row helpers, which a sweeper will want to "harmonise" and
+  must not: `queueRow()` interpolates its title **raw** because §8's call sites carry HTML entities
+  (`&rsquo;`, `&mdash;`), while `skipRow()` **`esc()`s** its own because §10's call sites pass raw
+  ticket prose. Entities in §8, plain text in §10.
 - **§8's Epic column is `epics.name` resolved through `backlog_items.epic_id`, and it renders
   BLANK when the ticket belongs to no epic** (`SES-144`, `v7.0.181`; John, 2026-08-23: *"on the
   queue, add a column epic"*). Two things about it. It resolves through the **FK, never prose in
@@ -440,18 +472,46 @@ see `runner-cycle.md` step 5. Regenerate §10 on every rebuild from this query, 
 ```sql
 SELECT s.id, s.backlog_id, b.priority_class, b.queue,
        coalesce(b.design_status,'—') AS design_status, b.status,
-       left(regexp_replace(coalesce(b.description,''),'^\*\*P[0-9]+[^*]*\*\*\s*',''),70) AS gist,
+       left(public.backlog_display_title(b.title, b.description),70) AS title,
        s.reason, s.unblock_kind, s.unblock_ref, (s.briefed_at IS NULL) AS is_new,
        to_char(s.last_skipped_at AT TIME ZONE 'America/Chicago','Mon DD') AS skipped_cst,
-       s.skip_count
+       s.skip_count,
+       -- SES-119: which of John's two lists this row belongs in, and the kickoff for 10.2.
+       CASE WHEN s.reason_kind IN ('needs-desktop','permission-gate')
+            THEN 'desktop' ELSE 'decision' END AS which_list,
+       b.kickoff_link
   FROM public.runner_skips s
   JOIN LATERAL (SELECT bi.* FROM public.backlog_items bi
                  WHERE bi.backlog_id = s.backlog_id ORDER BY bi.id LIMIT 1) b ON true
  WHERE s.resolved_at IS NULL AND b.status NOT IN ('done','removed')
- ORDER BY (s.unblock_kind = 'question') DESC, s.last_skipped_at DESC;
+ ORDER BY which_list, (s.unblock_kind = 'question') DESC, s.last_skipped_at DESC;
 ```
 
-Five things in it are not style, and each is wrong in a way that looks fine:
+**§10 RENDERS AS TWO LISTS, NOT ONE (`SES-119`, `v7.0.184`).** John's own cut, 2026-08-22:
+*"needs your decision"* vs *"needs your desktop"* — **two** lists, in his words *"because they
+trigger different actions (answer vs open an attended session)"*. They are sub-blocks **10.1** and
+**10.2** inside §10's existing fold, so the LOCKED SECTION ORDER is *extended*, never renumbered —
+the same call `SES-132` made for §9.1. Four rules:
+
+- **The mapping is on `reason_kind`, and the default is not arbitrary.** `needs-desktop` and
+  `permission-gate` → **10.2 Needs your desktop**; `needs-john`, `removal-proposed`, `gated` and
+  **`other`** → **10.1 Needs your decision**. `other` falls to *decision* deliberately: the
+  fallback must be the list John can clear with a thumb, and defaulting an unclassified row into
+  "open a session" invents a chore out of a row nobody classified.
+- **Both lists render even when empty.** An empty *Needs your desktop* is the good news that
+  nothing is waiting on him at a keyboard; a list that disappears when empty makes its own absence
+  unreadable — he cannot tell "none" from "the section broke".
+- **A 10.2 row with a `kickoff_link` carries a "Kickoff ready" line** naming the path. That is the
+  difference between sitting down to design and sitting down to *paste*, which is why the ticket
+  asked for it. Note what the test for it actually is: the ticket says *"already designed"*, but
+  `design_status` holds **one** value and for these rows it holds `needs-desktop`, so it can never
+  also read `designed` — the observable fact is the **presence of `kickoff_link`**, and that is
+  what the render keys on.
+- **The count chip stays a single total across both lists.** It sits on the §10 heading, which
+  still names one section; two chips would let the heading disagree with itself the moment one
+  list emptied. Each list's own size is legible from its rows.
+
+Five things in the query are not style, and each is wrong in a way that looks fine:
 
 - **The join is `LATERAL … LIMIT 1`, not a plain join.** `backlog_id` carries no unique
   constraint and **`CHI-48` occupies two rows** (found by `SES-86` phase 2's own QA), so a plain
@@ -461,9 +521,15 @@ Five things in it are not style, and each is wrong in a way that looks fine:
   ticket that ships leaves this section with no write at all and no rule for a cycle to
   remember; `resolved_at` covers only the other case (ticket still open, blocker gone). This is
   the `SES-86` phase 3 / `SES-101` / `SES-111` prose→code correction applied by *deleting* a rule
-  rather than writing one.
-- **The sort puts `unblock_kind = 'question'` first**, then newest skip. It is the difference
-  between rows John clears with one thumb and rows that need him at a keyboard.
+  rather than writing one. **It proved itself live at `v7.0.184`**, which is worth recording
+  because this is the kind of design only time can test: of the six unresolved `runner_skips` rows,
+  `SES-106` and `SES-110` had gone `done` and `CHI-89` `removed`, and all three dropped out of the
+  section with **no write from any cycle**. Three of six retired themselves. Do not "tidy"
+  `resolved_at` to match them.
+- **The sort is `which_list` first, then `unblock_kind = 'question'`, then newest skip.** Within a
+  list, question-unblockable first is still the difference between rows John clears with one thumb
+  and rows that need him at a keyboard; `which_list` leads only so both renders can be sliced from
+  one query rather than run twice.
 - **The count chip is `N · M new`, both halves from this same query** — `N` is the row count,
   `M` is `is_new`. They are written into the template's one `SKIPS` object so the chip cannot
   disagree with the rows beneath it.

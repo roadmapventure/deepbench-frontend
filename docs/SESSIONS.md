@@ -5,6 +5,103 @@
 
 ---
 
+## session/cycle-20260823-0840 (v7.0.184, 2026-08-23, Automated runner cycle `95d18766`, model Opus 5 orchestrator, no subagent) — the ticket's dependency had cleared, and the obvious way to cash it in was the wrong one
+
+**Ticket:** `SES-119` — *Briefing and displays show ticket ID + stored title everywhere; split the
+waiting-on-John list* (`P10 - Tooling`, tier `now`, epic Automation). **Closed `partial`.**
+
+**Selection.** Layer 1a: no one-off directives queued. Layer 1b: the standing Automation drain
+(`b74009ea`) returned `pick SES-140`, which carries `design_status = 'needs-john'`; queue 2
+(`SES-117`) and queue 3 (`SES-118`) are both `needs-desktop`. All three were recorded with
+`record_skip()` — never as prose (`SES-127`) — and stepped past (`SES-114`), so the cycle fell
+through to the board and built **queue 4**. Worth noting against this runbook's own text: it says
+`SES-140` is `needs-desktop`; read live, it is **`needs-john`**. Verified, not recalled.
+
+**The premise, and the half of it nobody had measured.** John's standing instruction, 2026-08-22:
+*"across every session, display or anything that references work you perform for the backlog"* —
+always **ID + title**, because he does not memorize IDs. Part (a) was explicitly gated on `SES-91`
+making `backlog_items.title` trustworthy, and **that dependency has cleared**: 0 of 562 open
+numbered tickets carry a class string, `title IS NULL` on 0 of 610 rows.
+
+**But the obvious way to cash that in is the edit that would have shipped wrong.** A straight
+`gist` → `title` swap reads as the whole ticket and passes any check that asks *"does Title come
+from `title` now?"* The census says otherwise: **46** open numbered tickets carry a **bare retired
+declaration** as their title — **38** of them literally `` `Post-beta` `` — and **two of those,
+`LOG-134` and `LAV-30`, sit in §8's live top 12 right now**. The swap renders `` `Post-beta` `` as
+their title: strictly *worse* than the `gist` workaround it replaces. So the shipped rule is a
+**fallback, not a swap** (prefer the stored title; fall back to the gist when the stored title is a
+marker), and it lives in SQL — migration `ses119_display_title`,
+`public.backlog_display_title(title, description)` — rather than in a comment each cycle
+re-derives. That is the **eighth** time this platform has had to make that conversion (`SES-86`
+phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`, `SES-129`, `SES-143`).
+A **length heuristic was rejected**: it silently reclassifies rows as titles are edited, and
+`Landing screen` (14 chars) is a terse title, not a marker.
+
+**Two bugs the QA caught inside the fix itself.** Both are recorded because either would have
+shipped a guard that guarded nothing:
+
+1. **`\b` is BACKSPACE in a Postgres ARE** — the word-boundary escape is `\y`. The first predicate
+   demanded a literal backspace after "post-beta", so it matched **none** of the 46 rows. The
+   migration reported success and every declaration leaked through.
+2. **The leak check reused the function's own regex**, so a broken predicate marked its own victims
+   as not-declarations and reported a confident `0 leaked` while rows were visibly leaking. The
+   replacement strips backticks and compares the whole string — it cannot agree with the function
+   by construction.
+
+**Then the predicate was tightened, from probing rather than from the count.** The one row the
+corrected check flagged was `CHI-97`, whose title *opens* "Beta-gate (bucket 2) — a red console
+error…" and continues into a real title. The function was already keeping it — but **only because
+that title contains backticks its `[^`]*` could not span**: correct output by an accidental
+mechanism, and the same title without backticks would have been discarded. The marker set now means
+the **whole** title is the marker plus an optional short parenthetical, with
+`Post-betamax support` and `Beta-gate (bucket 2) — a real title that continues` both asserted kept.
+
+**Final QA, all live:** 46 exact markers, **0 leaked**; 512 of 562 use the stored title, 50 fall
+back, 0 render NULL; grants asserted **both directions** (`anon`/`authenticated` false,
+`service_role` true, revoked from `PUBLIC` per `SES-101`'s function-level twin of the column-grants
+rule); exactly **1** overload (`.claude/rules/supabase-function-signature.md`).
+
+**Part (c) — §10 splits.** John's own cut, 2026-08-22: *"needs your decision"* vs *"needs your
+desktop"*, **two** lists *"because they trigger different actions (answer vs open an attended
+session)"*. They ship as sub-blocks **10.1** and **10.2** inside §10's existing fold, so the LOCKED
+SECTION ORDER is extended, never renumbered (`SES-132`'s rule). Mapped on `reason_kind`, with
+**`other` falling to DECISION** — the fallback must be the list John can clear with a thumb, and
+defaulting an unclassified row into "open a session" invents a chore out of a row nobody
+classified. **Both lists render even at zero:** an empty *Needs your desktop* is the good news, and
+a list that vanishes when empty makes its own absence unreadable. A 10.2 row with a `kickoff_link`
+carries a **"Kickoff ready"** line — the difference between sitting down to design and sitting down
+to paste.
+
+**The half the ticket's wording did not settle.** It asks for the kickoff link on entries *"already
+designed"* — but `design_status` holds **one** value, and for these rows it holds `needs-desktop`,
+so it can never also read `designed`. The observable fact is the **presence of `kickoff_link`**, and
+that is what the render keys on. Written down rather than left to be rediscovered.
+
+**`SES-127`'s derived resolution proved itself, which only time could test.** Of the six unresolved
+`runner_skips` rows, `SES-106` and `SES-110` had gone `done` and `CHI-89` `removed` — and all three
+dropped out of §10 with **no write from any cycle** and no rule anyone had to remember. Three of six
+retired themselves.
+
+**QA bar.** `npm run build` clean. Regression **39/39 with credentials** — `CHI-31` fails on a bare
+run for want of `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` and was **re-run green with env rather than
+assumed unrelated**, since "could not run" is never a pass. New
+`tests/regression/SES-119-display-title.js`, 10 assertions, with a **real negative control**: run
+against the pre-change tree reconstructed from `git HEAD` it exits **1**, and on the shipped tree
+**0**; both files restored and verified with `git status`. Dev probe **200**.
+
+**Closed `partial`, and the cap was respected rather than widened.** Part (b) is *"`runner-cycle.md`
+Language block **+** `briefing-page.md`"*; the `briefing-page.md` half shipped, the
+`runner-cycle.md` half did not, because the ticket was already at the 3-file scope cap.
+
+**Observed, not fixed, and named rather than silently carried:** `queueRow()` interpolates its title
+**raw** while `skipRow()` `esc()`s its own — §8's call sites pass HTML entities by design, §10's pass
+raw prose. Both are correct; they are simply opposite contracts, and the regression test now asserts
+both so a sweeper cannot "harmonise" them into a double-escape or an un-escape.
+
+Kickoff: `docs/kickoffs/v7.0.184-SES-119-display-title.md`.
+
+---
+
 ## session/cycle-20260823-0649 (v7.0.183, 2026-08-23, Automated runner cycle `ecc04087`, model Opus 5 orchestrator, subagent Sonnet 5 for the mechanical template sweep) — the board's open status stops being an audit verdict, and the rename's real blast radius turns out to be somewhere the ticket never looked
 
 **`SES-118` — rename backlog status `missing` → `open` (Tooling · `P10 - Tooling`) CLOSED
