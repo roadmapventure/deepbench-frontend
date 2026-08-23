@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.168 | runbooks/briefing-page.md | directive bee71cf4 — §4a, the DAILY OUTPUT card: a default-closed card under the reading card showing what John's meter moved between the first and last reading of each CST day, beside what the runner alone estimates it spent inside that same window. His line is quoted in the section. HE ASKED WHETHER THE DATA EVEN EXISTS AND IT DOES, measured rather than recalled: all 8 runner_usage_readings rows carry a real taken_at across three CST days (8/20 → 3 readings, 8/21 → 4, 8/22 → 1). THE ROW THAT WOULD HAVE SHIPPED A LIE: 8/22 has exactly ONE reading, and the obvious implementation renders its delta 0 — which says the day produced nothing, when the truth is there is nothing to measure from. It renders an em dash; the function returns NULL. Four rules live in public.daily_reading_output() (migration dirbee71cf4_daily_reading_output) rather than in the render, for the seventh time this platform has made the prose→code correction: the CST day boundary (B35), the one-reading NULL, a negative delta being a weekly meter RESET rather than negative work, and window-scoped rather than day-scoped token counting (9 cycles in 8/21's window against 12 in the day). Stated in the section so no cycle infers otherwise: this card CALIBRATES NOTHING — derive_token_allowance() still reads a night→morning bracket only, and a first→last window inside one day is precisely the mixed window SES-128 refuses to calibrate from. -->
 <!-- DeepBench v7.0.166 | runbooks/briefing-page.md | John's directive 2026-08-22, verbatim: "The last recording for today's reading should be used and shown on the card as this mornings reading for 8/22". §4's rebuild rules gain the ONE thing that may move a reading out of `adhoc` — his own declaration — stated so that it cannot be read as softening SES-128's ban on inferring a slot from the clock. MEASURED BEFORE A LINE CHANGED, not recalled: all 8 rows in runner_usage_readings carried slot='adhoc', and the §4 card renders EXACTLY TWO rows, readingSlot('night') and readingSlot('morning') — there is no adhoc row — so John's 13:50Z reading was invisible on the card except for the derived "(adhoc)" tag in the acknowledgement line. He typed a number and the card showed him nothing; that is the defect, and his directive is the authorisation SES-128 said only he could give (its own header: slotting it "would manufacture a bracketing pair John never declared"). THE HALF THAT WOULD HAVE SHIPPED INVISIBLE: the slot lives in TWO homes — the ledger column and briefing-state.reading, which is what readingSlot() actually reads (it never queries Supabase) — so a DB-only update passes every SQL assertion and leaves the Morning row empty, i.e. passes QA while failing the only thing he asked for. Both homes moved, adhoc entry DELETED not copied, `at` preserved at 13:50Z rather than restamped. THE OTHER HALF THAT WOULD HAVE SHIPPED WRONG is a claim, not a line of code: this changes NOTHING about today's allowance. derive_token_allowance() still returns guard='no bracketing pair: no night reading' (asserted after the move), and tonight's night reading cannot pair with 8/22's morning either — the function takes the latest night then the earliest morning AFTER it, so the bracket runs forward. QA was discriminating rather than merely complete: a fixture night reading at 04:00Z inside a deliberately rolled-back transaction makes the real function return guard='ok' against morning_id=a7d31f60 (9.83h, delta 6, 2,540,000 tokens, 423,333.33 per pct) — a result that is IMPOSSIBLE if the reslot did nothing, since an adhoc row returns 'night reading has no morning after it'. Fixture rolled back, 8 readings restored, tokens_per_pct still NULL. The standing-rule half is NOT assumed and NOT built: filed as q-adhoc-morning-standing, because a Yes re-authorises the clock-time inference SES-128 refused. -->
 <!-- DeepBench v7.0.164 | runbooks/briefing-page.md | SES-129 — §7 gains its data contract and the LOCKED SECTION ORDER marks the LAST unbuilt section built: every one of the fourteen is now live and the briefing redesign epic closes. The contract's hard parts are all in the split between STORED and DERIVED, and each is wrong in a way that looks fine. A consumed directive's verdict is READ from the new runner_directives.outcome/.outcome_note because it cannot be derived — measured live, runner_cycles.item_id holds a runner_items uuid, the directive's own id, and free prose across the 24 closed rows, the same backlog_items.title trap SES-91 tracks, and item_ref covers 3 of 24. Every LIVE state is DERIVED from type+status+expires_at instead, and the one that carries the ticket is `standing`: SES-111 property (2) makes a drain-epic sit at status='queued' forever BY DESIGN, so the natural render tells John the standing order currently serving him is "waiting to be picked up". The word under the textarea is "recorded", not the spec's "saved", and the reason is stated on the page as well as here — briefing-state's `directive` carries no timestamp where `reading` carries an `at`, so created_at is the HARVEST time and can lag his typing by a full cycle; the fix is named on the card rather than guessed. NULL outcome on a done row is a defect that renders red in `td.missing` (the page's existing vocabulary, not a second class), derived from stateOf() returning null so the flag cannot drift from the fact. And the to_char format is HH12:MI, never h:MI — a bare `h` is a literal and renders "Aug 22, h:23 PM", caught in this ticket's QA before it reached the page. -->
 <!-- DeepBench v7.0.163 | runbooks/briefing-page.md | SES-128 — §4 gains its data contract and the LOCKED SECTION ORDER marks its readings half built. The card asks for TWO readings now, Night and Morning, each with its own Save, and the reason is the one thing a rebuilding cycle must not re-derive: John's meter is spent by his own manual sessions AND the runner, so a rate measured over any mixed window is confidently wrong, and only a night→morning bracket is runner-only by construction. The derivation, its four guards and the precedence of John's own budget_override over any derived number live in runner-cycle.md step 3 and are CITED here rather than restated — this file has already had to be resynchronised with that runbook twice (v7.0.118, SES-107) after a one-line summary drifted. Four rebuild rules ride with it: briefing-state.reading is slot-keyed and a legacy flat object migrates to `adhoc` rather than being dropped (John typed those numbers) but NEVER to a slot inferred from its clock time; the harvest stores slot on the row; an unslotted reading still feeds the rest and staleness walls and is not "ignored", it just cannot calibrate; and the card's "✓ latest reading" line is DERIVED from whichever slot holds the newest timestamp, never from a stored latest field — the same derive-don't-maintain rule as §1's counter and §10's resolution, for the same reason. -->
@@ -86,7 +87,7 @@ shown:
 | 1 | Masthead + `N decisions waiting` | `SES-124` ✔ |
 | 2 | Daily activity (CST day) | `SES-124` ✔ |
 | 3 | Today's findings | `SES-124` ✔ |
-| 4 | Budget & usage (3 cards) | `SES-124` ✔ frame · `SES-128` ✔ readings |
+| 4 | Budget & usage (3 cards) + `4.1` Daily output, closed | `SES-124` ✔ frame · `SES-128` ✔ readings · dir `bee71cf4` ✔ daily output |
 | 5 | Shipped | `SES-125` ✔ |
 | 6 | Gated before build | `SES-125` ✔ |
 | 7 | Directive queue | `SES-124` ✔ position · `SES-129` ✔ follow-through card |
@@ -206,6 +207,48 @@ Four rules for the rebuild:
   Morning — is **his call and is not assumed here**; asked as a yes/no in `runner_questions`
   (`q-adhoc-morning-standing`), and a Yes would re-authorise exactly the clock-time inference
   `SES-128` refused, which is why it goes to him rather than being read into his line.
+
+### §4a — the daily-output card (`v7.0.168`, directive `bee71cf4`)
+
+A **default-closed** card numbered `4.1`, sitting directly under the reading card — John's ask,
+verbatim: *"Create a card underneath readings that showcase daily out based on the first and last
+readings of the day. Have the card collapsed by default."* One row per CST day that has at least
+one reading, newest first. Regenerate it on every rebuild from **one call**:
+
+```sql
+SELECT * FROM public.daily_reading_output();   -- migration dirbee71cf4_daily_reading_output
+```
+
+**His first question was whether the data was even there, and it is** — measured before a line
+changed: all 8 rows of `public.runner_usage_readings` carry a real `taken_at`, spanning three CST
+days (8/20 → 3 readings, 8/21 → 4, 8/22 → 1). Nothing was reconstructed and nothing was lost.
+
+Five rules for the rebuild. The first four are **inside the function on purpose** — a per-day
+window each cycle re-derives by hand is a window that gets re-derived differently, which is the
+same correction `SES-127`/`SES-128`/`SES-129` each made:
+
+- **The day is an America/Chicago day** (register B35). The CST day begins at `05:00Z`, so a UTC
+  grouping files most of a night's cycles under the wrong date.
+- **A day with ONE reading renders an em dash, never `0`.** This is the rule that would have been
+  got wrong, and 8/22 is the live row that would have carried the error: a zero says the day
+  produced nothing, when the truth is there is nothing to measure *from*. Same vocabulary as a
+  `NULL` `plain_*` drawing a red defect line and §14's `NULL` `cost_usd` never printing `$0.00`.
+- **A negative all-models delta is a weekly meter RESET inside the window, not negative work.**
+  `delta_all_pct` comes back `NULL` with `guard = 'meter reset in window'`; render the word, never
+  the number. No such day exists in the eight readings that predate this card — the guard is there
+  because a weekly meter resets by construction, not because one was observed.
+- **`est_tokens_in_window` counts only cycles that STARTED inside the window**, which is not the
+  whole CST day. Measured 2026-08-21: **9** cycles in-window against **12** in the day, so the
+  scoping is not cosmetic.
+- **The two figures on a row measure different things, and the headings must keep saying so.** The
+  meter delta is John's whole account — his own manual sessions included; the token figure is the
+  runner's own estimate. Presenting them as one number would be the confounding `SES-128` built
+  the night→morning bracket to avoid, arriving through the back door.
+
+**This card does not calibrate anything and must not be read as doing so.** `derive_token_allowance()`
+still reads a night→morning bracket and nothing else (`runner-cycle.md` step 3); this card is a
+report on what a day looked like, and a first→last window inside one day is exactly the mixed
+window that function refuses to calibrate from.
 
 ### §7 — the directive follow-through card (`SES-129`, `v7.0.164`)
 

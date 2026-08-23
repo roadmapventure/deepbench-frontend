@@ -5,6 +5,96 @@
 
 ---
 
+## session/cycle-20260823-0037 (v7.0.168, 2026-08-23, runner cycle `2e8b0fab`, model Opus 5 orchestrator + a Fable 5 subagent) — his readings were all there; nothing had ever shown them back to him
+
+**Mission:** selection layer **1a** — `runner_directives` `bee71cf4`, two paragraphs John typed
+into the briefing page's directive box between `00:18Z` (the prior cycle's rebuild) and `00:37Z`.
+This cycle's fire origin is `force_run_trigger`: he tapped "Run a cycle now" himself, so he was at
+the page when he wrote it. A directive outranks the standing Automation-epic drain (layer 1b).
+
+**Paragraph 1, verbatim:** *"I have been entering readings since this page started. have you kept
+those data entry, and do they have times? If so, you should be able to look a the first entered for
+that day and the last by looking at the times in CST. Then you should be able to show how much work
+was done per day. Create a card underneath readings that showcase daily out based on the first and
+last readings of the day. Have the card collapsed by default."*
+
+**His first clause is a question, and it is answered by measurement rather than reassurance.**
+Yes — every reading is kept and every one has a time. All 8 rows of
+`public.runner_usage_readings` carry a real `taken_at`, spanning three America/Chicago days: 8/20
+(3 readings), 8/21 (4), 8/22 (1). Nothing was dropped and nothing needed reconstructing. What did
+not exist was any way to **see** it: §4 renders two slot rows and a calibration sentence, so the
+eight numbers he has typed since the page began had never once been shown back to him as a history.
+
+**What shipped.** A **default-closed** card `4.1` under the reading card — his words, "collapsed by
+default" — with one row per CST day: the window in CST, his all-models meter delta across it, and
+the runner's own estimated spend for cycles that started inside that window. Three files
+(`docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md` §4a + the LOCKED SECTION
+ORDER row, `docs/kickoffs/v7.0.168-dir-bee71cf4-daily-output-card.md`) plus migration
+`dirbee71cf4_daily_reading_output`.
+
+**THE ROW THAT WOULD HAVE SHIPPED A LIE.** 2026-08-22 has exactly **one** reading. Every obvious
+implementation renders its delta as `0` — a number that says the day produced nothing, when the
+truth is there is nothing to measure *from*. It renders an em dash and the words "one reading
+only"; the function returns NULL. That is the same vocabulary as a NULL `plain_*` drawing a red
+defect line and §14's NULL `cost_usd` never printing `$0.00`.
+
+**Four rules live in the function, not the render** — the seventh time this platform has made the
+prose→code correction (`SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-127`, `SES-128`,
+`SES-129`): the day is an America/Chicago day (register B35 — the CST day starts `05:00Z`, so a UTC
+grouping files most of a night's cycles under the wrong date); the one-reading NULL above; a
+**negative** all-models delta is John's weekly meter **resetting** inside the window, not negative
+work, so it returns `guard='meter reset in window'` with a NULL delta; and `est_tokens_in_window`
+counts only cycles that **started** inside the window his two readings bracket — measured
+2026-08-21, **9** cycles in-window against **12** in the whole CST day, so the scoping is not
+cosmetic.
+
+**The two figures on a row measure different things and the headings keep saying so.** The meter
+delta is his whole account, his own manual sessions included; the token figure is the runner's
+estimate alone. Collapsing them into one number would be exactly the confounding `SES-128` built
+the night→morning bracket to avoid, arriving through the back door. For the same reason the
+contract states plainly that **this card calibrates nothing**: `derive_token_allowance()` still
+reads a night→morning bracket and nothing else, and a first→last window inside one day is precisely
+the mixed window that function refuses to calibrate from.
+
+**QA was discriminating rather than merely complete.** The three live days were computed by a
+standalone `row_number()` query that never calls the function, and the function matched it exactly
+(8/21 `+12`/`+18`/`5,320,000`/`9`; 8/20 `+9`/`+11`/`9,685,000`/`9`). Then two fixtures inside
+deliberately rolled-back transactions: a second reading on 8/22 flips that day from
+`guard='one reading only'` with NULL everything to `readings=2`, `+7%`, `11,805,000` est, 16
+cycles; a reset-shaped reading returns `guard='meter reset in window'` with a NULL delta while the
+token figure **stays populated** — which is correct, because the runner's own spend is measurable
+even when the meter's is not. Both results are impossible if the NULLs were hardcoded. Fixtures
+rolled back: 8 readings still stored, newest still `2026-08-22 13:50Z`. Grants asserted **both**
+directions per `SES-101`'s rule (`anon` false, `authenticated` false, `service_role` true,
+`postgres` true) — a one-directional check passes on a function nobody can call at all.
+
+**Paragraph 2 is diagnosed, filed as `SES-132`, and deliberately not built.** His words: *"I could
+swear i have wrote comments in the gated questions, and most are not showing. shouldn't the thread
+show each page refresh and what your answers are?"* He is right. Diagnosis delegated to a Fable 5
+subagent (register B21 — root-cause diagnosis is on the delegate list) and returned with
+`file:line` evidence: `thread(targetId)` is called from exactly two places,
+`briefing-template.html:501` inside `card()` and `:554` inside `question()` (which `visionClaim()`
+delegates to), so a thread renders **only** inside a still-live target — but the very act John
+performs on a target removes that target from the next rebuild (§§5/6 rebuild from
+`runner_items WHERE decision IS NULL`, §9 from `runner_questions WHERE status='open'` capped at 5,
+§12 drops a decided claim). So every comment he attaches to something he then answers disappears,
+together with the runner's written reply, which goes on sitting in `public.runner_card_asks`
+displayed nowhere. **Measured, not reasoned:** of the seven ask targets live in `briefing-state`
+tonight, three vanish on the next rebuild because he answered them (`q-briefing-dom-fixture`,
+`q-desktop-remainder-keeps-slot`, `q-ladder-executable`) and four still render — and it has already
+happened at least once before, since `q-ladder-streak-reset` holds an answered `runner_card_asks`
+row and is absent from `briefing-state` entirely. "Most are not showing" is exactly what that looks
+like from his side, because the ones that vanish are the ones he engaged with most. Not built here
+because one build per cycle is the rule; the split is stated on his own card so he can see what
+became of each half of what he wrote.
+
+**Checks.** `npm install && npm run build` green. Regression **34/34 with credentials** — the
+single FAIL without them is `CHI-31` reporting missing Supabase env, unrelated to this change (the
+same known result `v7.0.165` recorded). Dev root probed **200** with the bypass header on both
+sweeps. No `src/`/`api/`/`lib/` file touched.
+
+---
+
 ## session/attended-ses110-epic-insert (v7.0.167, 2026-08-22, Manual Design & Build — John in chat, model Fable 5) — the card's paste text was applied, and the card itself carried two SQL defects
 
 **Ticket:** `SES-110` — *Epics: projects table + epic_id on backlog_items, seed the Automation
