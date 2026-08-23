@@ -207,13 +207,15 @@ every column below is load-bearing:
 
 ```sql
 INSERT INTO backlog_items
-  (backlog_id, tier, type, priority_class, title, description, status,
+  (backlog_id, tier, type, priority_class, title, description, status, epic_id,
    source_file, session_ref, row_ordinal)
 SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>',
        '<named P-class — REQUIRED at filing, register B9>',
        '<one-line human title — never the class string>',
        '<description; convention opens with the bolded named class>',
-       'missing', 'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
+       'missing',
+       (SELECT id FROM epics WHERE name = '<epic name>')::uuid,  -- or NULL for no epic
+       'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
        coalesce(max(row_ordinal),0)+1
   FROM backlog_items
 RETURNING backlog_id, priority_class;
@@ -229,6 +231,10 @@ RETURNING backlog_id, priority_class;
 - **Then run `SELECT public.recompute_backlog_queue();`** — a new classed ticket is a queue
   recompute event (register B4), and without it the ticket has no queue number and is invisible
   to "Next up".
+- **`epic_id` is optional and defaults to no epic.** Look it up by NAME (`epics.name` is
+  UNIQUE), never by pasting a uuid. Epic creation is ask-first (John, 2026-08-22) — only
+  `Automation` is pre-authorized, so a session that wants a NEW epic asks first rather than
+  inserting one.
 
 ### 4. Fetch, rebase, then push `HEAD:dev`
 

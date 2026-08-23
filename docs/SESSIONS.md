@@ -5,6 +5,51 @@
 
 ---
 
+## session/attended-ses110-epic-insert (v7.0.167, 2026-08-22, Manual Design & Build — John in chat, model Fable 5) — the card's paste text was applied, and the card itself carried two SQL defects
+
+**Ticket:** `SES-110` — *Epics: projects table + epic_id on backlog_items, seed the Automation
+epic* — Type: Tooling, `P10 - Tooling`. Closed **`done`** (was `partial`). One file:
+`.claude/skills/session-setup/SKILL.md`. This is the attended half card `9e7d8bf2`
+(`gated_before_build`, cycle `c6387c5e`) asked for — the `.claude/` edit register B39 forbids an
+unattended cycle. John approved in chat ("go ahead and make the edit"); card decision stamped
+`accept` with the reason recorded.
+
+**What shipped.** Step 3c's canonical INSERT gains optional `epic_id`: appended after `status` in
+the column list, its value — `(SELECT id FROM epics WHERE name = '<epic name>')::uuid,  -- or NULL
+for no epic` — placed directly after `'missing',`, plus the new bullet (epic looked up by NAME,
+never a pasted uuid; epic creation stays ask-first, only `Automation` pre-authorized).
+
+**The card's paste text was NOT applied verbatim, and that is the finding.** Taken literally it
+produces a broken template, twice over: (1) it appends `epic_id` at column position 8 but places
+the value "before the row_ordinal line" — position 10 — so the uuid column would be fed the
+`source_file` string; (2) its value line ends `-- or NULL for no epic,` — the separating comma
+sits *inside* the comment, a guaranteed `42601`. **Proven, not argued:** the verbatim text run
+live fails with `ERROR 42601 syntax error at or near "("` (the negative control), while the
+corrected template passes both arms live in rolled-back `DO` blocks — epic arm inserts with
+`epic_id = 19a234f6…` matching `epics.name='Automation'` by independent lookup, NULL arm inserts
+with `epic_id IS NULL`. No probe write persisted, so no before-image owed (the `SES-112`
+precedent). This is the `ID Decoys` lesson's sibling: prose that *describes* an edit is not the
+edit, and card text bound for a future paste needs the same discriminating QA as code.
+
+**Board writes (manual-session close-out, claim held throughout):** `SES-110` → `done`;
+`recompute_backlog_queue()` moved 561 rows; measured queue top after: 1 `SES-106` (`partial`,
+`needs-desktop`), 2 `SES-115`, 3 `SES-116`, 4 `SES-91`, 5 `SES-117`. Snapshot regenerated from
+the live table (597 tickets, sha `04cfdd09…`). Mirror check first: exactly one copy of the
+canonical INSERT exists in the repo — no sibling constructor to drift (`SES-57` lesson).
+
+**Consequence for the drain:** `SES-110` was one of the two tickets John's standing Automation
+drain looped past forever. **`SES-106` — *Step 7 tells a cycle to release its ticket claim and to
+still hold it — John answered which order wins* — Type: Tooling, `P10 - Tooling` — is now the
+sole remaining `.claude/`-blocked ticket** (queue 1, `needs-desktop`), and the only thing between
+the Automation epic and a drain that can actually retire. Same shape as this session: needs a
+session John attends.
+
+**Not done, said plainly:** build/regression not applicable — no `src/`/`api/`/`lib/` file
+touched; nothing executable changed. The session-hygiene auto-check at worktree creation errored
+(`spawnSync node ETIMEDOUT`) — noted, not chased.
+
+---
+
 ## cycle-20260822-2351 / directive-morning-reading-8-22 (v7.0.166, 2026-08-22, Automated runner cycle `9c2d19d7`, model Opus 5 orchestrator **+ one Fable 5 subagent**) — John typed a reading and the card showed him nothing
 
 **Mission:** selection **layer 1a** — a one-off directive John typed into the briefing page's
