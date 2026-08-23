@@ -29,6 +29,36 @@ read `plain_*` from the row, silence never decides anything).
 | 13 | Trust ladder | + **Class column, sorted by zero-padded class id** (P02 Inventive, P05 Enhancements, P07 Agent Creation, P08 Determinism Removal, P09 Bug Fixes, P10 Tooling). Note: no ladder row exists for P6 - Agent Enhancement (see SES-122, next bucket, for making rungs actually unlock autonomy). |
 | 14 | Who used DeepBench | **Last 5 production uses**: Time (CST) · IP · Location · Name · What they did · Cost. Source: activity log + visitor ledger, same rules as the standing usage report (`reference-deepbench-usage-report`). |
 
+## §2b — Automation panel (added by John 2026-08-23; ticket SES-143)
+
+New section directly AFTER Daily activity: how automation is running, and the controls. Three rows:
+
+1. **Scheduler** — checkbox (currently ON) + editable hours box: "Scheduler on — runs every
+   [N] hours" (default 3; platform floor is 1). The trigger's cron stays at hourly permanently;
+   the cycle itself honors N: a scheduled cycle whose predecessor started less than N hours ago
+   closes immediately as "did not run — paced by your scheduler setting". Scheduler OFF → every
+   scheduled cycle closes immediately as "did not run — scheduler off". This cycle-side gate is
+   what makes the panel binding without touching the trigger (cycles cannot edit a routine they
+   did not create — SES-140), and it retires SES-140's restore obligation: hourly cron is now
+   permanent by design, paced down to N by this gate.
+2. **Drain** — checkbox: "Complete epic [epic box, current: Automation] until done." Checking it
+   IS John naming a drain (runbook already recognizes a briefing tap as drain creation): the
+   harvest writes the drain-epic directive and captures the named scope per SES-142. Unchecking
+   cancels the standing drain (status cancelled). Status label underneath, always: while running
+   "X of <named> tickets left"; when complete the box shows done with "✓ <epic> completed —
+   <N> tickets at <time CST>", and completed drains keep one history line each.
+3. **Status line** (addition, per John's "add what's needed"): last cycle — time, ticket, outcome;
+   next scheduled fire time; and the "▶ Run a cycle now" link (SES-102's masthead link lives
+   here now).
+
+State: taps ride `briefing-state` and harvest into a new `runner_settings` row (scheduler_on,
+interval_hours, drain lifecycle read from `runner_directives`). **Honoring needs no trigger-prompt
+edit**: the prompt already says "execute runner-cycle.md EXACTLY", so the runbook gains a step-0
+settings gate and every future cycle honors the panel automatically. Semantics locked: the
+scheduler toggle/interval governs SCHEDULED cycles only; a standing drain's chained sessions
+(SES-141) run regardless of interval; scheduler OFF + drain ON = the chain still runs; both off =
+nothing runs, and the panel says so plainly.
+
 **Removed** (John, explicit): the need-you stat pair, the footer note, the standalone
 "Needs your call" budget-override section (an override renders as a §9 question), the "Next 3"
 line, "Next up — top 5", and stray narrative paragraphs outside §3.
