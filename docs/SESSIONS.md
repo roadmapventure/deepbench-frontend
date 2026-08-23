@@ -5,6 +5,62 @@
 
 ---
 
+## session/cycle-20260823-0132 (v7.0.172, 2026-08-23, runner cycle `88833cc2`, model Opus 5) — the masthead learns what time John last touched the page, and whether a run has picked it up
+
+**Mission:** selection layer **1a** — the oldest `queued` one-off directive, `runner_directives`
+`603f44ea`, filed 00:57Z by cycle `2e8b0fab`'s self-healing tail re-fetch. **His line, verbatim:**
+
+> "Need a timestamp of the last action on this page at the very top next to the count of
+> decisions. I can't tell what time my last action was compared to if the page has refreshed yet."
+
+**That is two requirements, and shipping only the first would miss the point.** A timestamp is the
+first. *"compared to if the page has refreshed yet"* is the second: he is asking whether the run
+that should have picked his tap up has happened. One time cannot answer that — it needs the page's
+own rebuild time beside it, and the comparison **stated**, not left for him to do in his head at
+midnight. `#lastact` therefore carries three things: his newest action, this page's rebuild time,
+and — only when his action is strictly newer — **"Not picked up by a run yet"**.
+
+**Measured before a line changed, not recalled.** The masthead's date block (`briefing-template.html`
+line 691) held the date, the version and `#waiting`, and **no timestamp of any kind**.
+
+**The one that would have shipped wrong: a cycle-typed stamp.** It is the exact failure
+`SES-124`'s `countWaiting()` exists to prevent — the masthead is the half John reads first and must
+never be able to disagree with the state under it — and it could not be right even in principle,
+because the page **self-publishes on every tap** (`save()` → `doc()`), so his state moves many
+times between two rebuilds while no cycle is running to re-type anything. The action time is
+therefore **derived from `briefing-state` in `stampLastAction()`**, on every render. `PAGE_BUILT`
+is the opposite case and is the one value the state genuinely cannot know, so it is cycle-written —
+and it lives in the `#code` script because `doc()` carries that script's `textContent` through a
+self-publish verbatim, which is what makes it immune to his taps. That asymmetry is the design.
+
+**The trap, and the red control that proves the fix is real.** An ask thread holds **both** John's
+questions and the runner's replies, and both carry an `at`. A cycle-written entry's `q` begins
+`[runner,` — the live convention, read off the page's own state this cycle. Without that filter the
+stamp reports the **runner's** last reply as "your last action": measured on the fixture, **8:50 PM
+instead of his 8:13 PM tap**, and it draws the "not picked up yet" line about the runner's own
+words. The negative control restores the unfiltered form and the rendered stamp changes — which is
+what makes this QA discriminating rather than merely present.
+
+**`state.directive_at` ships with it.** Typing a directive is the action John is most likely to have
+taken last, and it was the **one** action the page could not date: `directive` is a bare string where
+every other tap carries an `at` — the gap `SES-129` named on its own card. The blur handler now
+stamps it. **Forward only:** a directive typed before this ship has no stamp and contributes nothing
+rather than a guessed time, and §7's line still says *recorded* for the same reason.
+
+**Not thrown away.** `tests/regression/DIR-603f44ea-last-action-stamp.js` is permanent, per John's
+rule on `q-briefing-dom-fixture` the same night (*"you should never be throwing away tests"*). It
+reads the functions **out of the template** rather than copying them, so a later rebuild that
+replaces the derivation with a literal fails here instead of shipping.
+
+**QA:** build clean; regression **35/35 with credentials** (`CHI-31` needs `SUPABASE_*` and fails
+only without them — unrelated to this change, proven by re-running it green with the env exported);
+dev root **200**. Six fixtures: empty state, John-only taps, the runner-reply red control, the
+strictly-newer comparison in both directions, `directive_at`, and an unparseable `at` that must be
+skipped rather than rendered as `Invalid Date`.
+
+**Files:** `docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`,
+`tests/regression/DIR-603f44ea-last-action-stamp.js`. Kickoff:
+`docs/kickoffs/v7.0.172-dir-603f44ea-last-action-stamp.md`.
 ## session/cycle-20260823-0127 (v7.0.171, 2026-08-23, runner cycle `76fa8b54`, Automated mode, model Opus 5 orchestrator + a Sonnet 5 subagent) — three of John's vision taps finally reach the corpus, and the reason they were late is not fixed here
 
 **Ticket:** `SES-133` — *Three of John's vision-claim taps have not reached `docs/vision/*.md`,
