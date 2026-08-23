@@ -5,6 +5,82 @@
 
 ---
 
+## session/cycle-20260823-2213 (v7.0.207, 2026-08-23, runner cycle `9fc7e4d2-c66c-48ca-a1cf-f23665f8965d`, `trigger = scheduled` — a FORCED off-grid fire, model Opus 5, no subagent) — the briefing rebuild needs five sentences, not thirty-three fields
+
+**`SES-163` DELIVERED** (Tooling · `P10 - Tooling`, queue 7), awaiting John's Accept. Three files
++ kickoff, two migrations. Numbered **below** `v7.0.208`/`v7.0.209` but shipped after them: parallel
+cycles claim `dev_version_counter` atomically, so version order and merge order legitimately differ.
+
+### The premise, revalidated live — and the ticket under-counted it by half
+
+`SES-163` was filed at "~15 hand-authored fields". Measured against the builder before a line
+changed: **21** distinct `--data` fields plus **12 more inside `data.stats`** = **33 authored
+values**, several of them raw HTML fragments. The consequence, measured on the served artifact and
+matching the ticket exactly: `PAGE_BUILT` 17:57Z, **17 undecided cards, 6 filed after that build** —
+on no surface John could tap. **Two consecutive cycles had already declined the republish for this
+reason** (`SES-162`/v7.0.204, then `199e67b5`), which is what makes it a standing blocker rather
+than one cycle's judgment call. And since `SES-154` (v7.0.205) made John's Accept the *only* writer
+of `done`, an un-republished page **converts every delivery into permanently unfinished work.**
+
+### The decision the ticket turns on
+
+`runner_card_asks.target_id` is keyed on a card's **DOM id**, and the builder read that map from
+`data.fixed_dom_ids || {}` — **a silent empty default**. A cycle that omitted it re-keyed the card
+and orphaned John's recorded thread **invisibly**, because `SES-132`'s §9.1 orphan renderer still
+displays the text; the thread simply leaves the card it belongs to. Not hypothetical: card
+`c4f8b217` (`CHI-84`, **still undecided**) is keyed `item-chi84-gate` while its derived id is
+`item-c4f8b217`. The map is `public.briefing_dom_ids` now, and an ask target that no row claims is
+**exit 2, never a warning** — with the boundary stated as a property so it cannot wedge future
+rebuilds: a target whose card is simply *not rendered* (decided, or self-retired) is **not** an
+error, because that is the orphan renderer doing its ordinary job.
+
+### QA — discriminating, not merely complete
+
+**The negative control is live, one variable, two outcomes:** with the `briefing_dom_ids` row
+present the build returns **exit 0** and a 201,633-byte page carrying `item-chi84-gate` and **zero**
+occurrences of `item-c4f8b217`; with the row deleted it returns **exit 2 and writes no file**. The
+fixture wrote its before-image first and was restored. The ticket's own bar — "a `--data` file of at
+most a few authored sentences" — was proven end-to-end: the page built from a **1,247-byte,
+five-field** file (3 shipped, 3 gated, 11 retired cards; §8 top 12 of 573; §11 6 classes; §13 6
+rungs). Build green; regression **47/47** with credentials.
+
+`CHI-31`'s failure in the no-credential run is **pre-existing and proven so**, not this diff: it
+references none of these files, it fails on absent Supabase credentials rather than an assertion,
+and it fails **identically with the diff stashed**. That is exactly `SES-92` (queue 260).
+
+### Two defects this ticket's own QA caught before they shipped
+
+Both found by **calling** the new code, and both would have shipped looking fine:
+
+1. **§14's "first clause" rule, wrong twice.** Splitting on the comma alone left a **95-character
+   provenance paragraph** as a visitor's Name — precisely the defect `briefing-page.md` §14's rule
+   exists to prevent, reproduced by the fix for it — and mangled `David (Austin, TX)` into
+   `David (Austin`. Correcting to a strong separator then exposed a second shape: stripping *inside*
+   a parenthetical leaves an unbalanced fragment (`Mom (Adrian, Missouri`). Final live output:
+   `Private Relay egress`, `Matt Chester`, `David`, `John`, `Mom`.
+2. **The masthead version must not come from `dev_version_counter`.** Deriving it looks obviously
+   right and is wrong under parallel cycles (register B42): the counter is a **claim register**
+   shared by concurrent sessions, not "the current version". This cycle claimed **v7.0.207** and the
+   counter already read **209** at build time, so the first live build stamped a version the page was
+   not. It is `--version` now, with **no default** — a guessed version on the masthead is
+   unfalsifiable from the page.
+
+### Disclosed rather than left to be discovered
+
+- **`briefing-page.md` names `visitor_labels` as §14's first Name rung, and that rung is
+  unreachable** — `ai_activity_log` carries no `visitor_id`. The two reachable rungs are
+  implemented; the unreachable one is **not faked**.
+- **Five now-untrue "sample values" comments remain in `briefing-template.html`.** They are
+  comments, not rendered content (the built page contains no sample text), and the template is a
+  **fourth file** over CLAUDE.md's ≤3 cap — left for a follow-up rather than quietly exceeding scope.
+- **Register B21 delegation was not exercised.** This environment's harness instructs that the
+  `Agent` tool not be used unless requested while the routine prompt requests delegation; the
+  runbook's own escape hatch ("if the Agent tool is unavailable, note it in the cycle row and
+  continue on Opus 5") was followed and the conflict named rather than resolved unilaterally.
+
+No `src/`, `api/` or `lib/` change; no site change.
+
+---
 ## session/design-ses-101 (v7.0.208, 2026-08-23, attended design session, model Fable 5, coding sub-session on Opus 5) — ship cards stop asking for a verdict on tickets that are already done
 
 **`SES-165` — "Ship cards keep asking for a verdict on tickets that are already done" (Tooling · `P10 - Tooling`), Automation epic, DELIVERED (commit `f5f2d0fe`), awaiting John's Accept in chat.**
