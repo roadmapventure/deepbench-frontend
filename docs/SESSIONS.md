@@ -5,6 +5,42 @@
 
 ---
 
+## session/cycle-20260823-1907 (v7.0.205, 2026-08-23, runner cycle `199e67b5-2151-4f14-b237-698b856192fd`, `trigger = scheduled` — a FORCED fire, model Opus 5, one Sonnet 5 subagent) — acceptance-gated completion: a ship stops meaning "done"
+
+**Ticket:** `SES-154` — *Acceptance-gated completion: runner ships write 'delivered'; only John's Accept writes 'done'* (Tooling · `P10 - Tooling`), queue 1, a named member of John's standing Automation drain `b74009ea`. Chain A 1 of 3. Spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, approved by John 2026-08-23 (*"yes"*). Closed **`delivered`** — the first ticket in this platform's life to close under its own new rule, and it therefore sits on John's briefing awaiting his Accept rather than closing itself `done`.
+
+**How this fire happened, recorded because the ledger would otherwise read oddly.** The cycle started 19:08Z = **2:08 PM CST**, an hour not divisible by 3, so on `SES-151`'s 12/3/6/9 clock grid a scheduled fire would have been **paced**. It ran because `scheduler_gate()` classified it a **manual fire** — started off the `:40` cron grid (minute 08, tolerance 10). That classification was independently corroborated rather than trusted: the session's own `origin` reads **`force_run_trigger`**, i.e. John tapped "Run a cycle now". The gate's manual-fire exemption did exactly the job `q-manual-fire-pacing` describes — it kept his button from being dead — so there is **no defect here**, and the earlier reading that a scheduled routine was slipping its grid is withdrawn.
+
+**Premise revalidated live before a line changed** (`SES-87`): `backlog_items_status_check` held exactly `('open','partial','done','removal proposed','removed')` — no `delivered` — and the spec's decision 1 matched the ticket verbatim. Board census: 518 open, 61 done, 50 partial, 1 removed.
+
+**What shipped.** Migration `ses154_delivered_status`: `delivered` added to the status check; `drain_epic_next()`'s **pick** predicate gains `AND b.status <> 'delivered'`; `backlog_mode()`'s `in review` arm gains `delivered`. Step 7 of `runner-cycle.md` now writes `delivered` and no longer strips the ticket's queue number; step 2's harvest gains the rule that John's Accept on a `shipped` card writes `done`, before-image first, and runs the recompute there.
+
+**THE DISTINCTION THE WHOLE TICKET TURNS ON, and the one a later editor will be tempted to collapse.** `drain_epic_next()` holds **two** predicates over the same named scope, and `delivered` belongs in exactly **one** of them:
+
+- The **pick** predicate must exclude it — otherwise the drain hands the same delivered ticket back every cycle and can never advance to its other named members.
+- The **retirement** predicate must **not** — a drain retires on John's **acceptance**, never on the runner's own say-so. Adding `delivered` here would close his standing directive the moment the runner declared itself finished, which is precisely the authorisation defect `SES-142` was filed to end, rebuilt.
+
+**QA was discriminating rather than merely complete — one fixture, one instant, one variable.**
+
+- **Arm B (pick advances).** With queue-1 `SES-154` set `delivered` **and unclaimed** (so the only possible reason to skip it is the new status clause, not this cycle's claim): shipped build picks **`SES-155`**; the retired `ses142` body, installed as a separate function inside the same transaction, picks **`SES-154`**. Discriminating.
+- **Arm C (the drain does NOT retire), the arm that matters most.** With **all 18** workable named members set `delivered`: shipped build returns `open_now=18`, outcome **`blocked`**, directive still **`queued`**, **0** before-images written. The wrong build — `delivered` added to the retirement predicate — returns `open_now=0` and **`retired`**, closing John's standing order.
+- **Arm D (`backlog_mode`).** `delivered` + undecided ship card → **`in review`**; `delivered` + no card → `delivered`; `done` + no card → `done`.
+- **Arm E (the number is kept).** `SES-155` at queue **2** before, still queue **2** after being set `delivered` and recomputed; **0 rows moved**. `recompute_backlog_queue()` is unchanged by this ticket on purpose — a delivered ticket awaits John's verdict exactly as a `removal proposed` one does (`SES-113`), so it keeps its slot, stays visible in the §8 matrix, and his Accept is zero-motion re-entry.
+- **Structure.** 1 overload of each changed function; grants asserted **both** directions (`anon`/`authenticated` false, `service_role`/`postgres` true). **Rollback verified clean**: 0 rows with status `delivered`, 0 stray before-images, 0 stray `runner_items`, the control function gone, `SES-154` still `open` and still claimed by this cycle.
+
+**Deliberately NOT changed, each a decision rather than an omission.**
+
+- `briefing_open_cards()` — its render predicate retires a **gated** card whose ticket reached `done`/`removed` *by another route*. `delivered` is **not terminal**: if John Rejects, the ticket reopens and that gated question has to come back. The predicate keys on terminality, so `delivered` must stay out of it.
+- `scripts/export-backlog-snapshot.js` and `scripts/check-session-docs.js` — both filter *history* on `done`/`removed`. A delivered ticket is not history until John accepts it.
+- `recompute_backlog_queue()` — see arm E.
+- The **Reverse** button. Its existing rule (revert forward, restore before-images, reopen the backlog row carrying John's line) already does exactly what decision 1 asks of a rejection, so it needed no edit. Decision 2 renames it to "Reject" and **has not shipped**; no rule was written against a button that does not exist yet.
+
+**THE FINDING THIS SHIP IS MOST HONEST ABOUT.** The ticket asked to *"re-key the scoreboard (daily shipped)"* on acceptance. Surveyed by a Sonnet 5 subagent across `briefing-template.html`, `briefing-page.md`, `tests/` and `scripts/`: **there was no key to re-key.** The "Shipped today" stat is a **hardcoded sample value** (`<b>1</b>`) under a comment telling a rebuild to regenerate it, and **no file in the repo defines the query**. So this ticket ships a data **contract** for §2 — count tickets John **accepted** in the CST day, never cycles that pushed, never delivered-but-unaccepted, and `delivered` gets its own box rather than a share of this one — instead of a changed predicate. Reporting a completed re-key would have been false. The **other** scoreboard figure needed nothing: §2b's `drain_left` already counts members "not yet `done`/`removed`", so leaving the retirement predicate alone re-keys X-of-N on acceptance **for free** — verified, not assumed, and a warning against "fixing" it ships alongside.
+
+**Forward only.** The 61 existing `done` rows are untouched; there is no backfill. Never retroactively reopen work John already holds as done.
+
+**Files:** `docs/runbooks/runner-cycle.md`, `docs/runbooks/briefing-page.md` (+ close-out: `CLAUDE-STATE.md`, this file, `docs/backlog/BACKLOG-SNAPSHOT.md`), one migration. No `src/`/`api/`/`lib/` change, no site change.
+
 ## session/cycle-20260823-1808 (v7.0.204, 2026-08-23, runner cycle `0be0f203-c1dc-431a-803d-ac64ed61a843`, `trigger = chained (drain continuation)`, model Opus 5, no subagent) — the Automation panel stops showing sample text
 
 **Ticket:** `SES-162` — The briefing builder never regenerates §2b, so your Automation panel shows sample text (Tooling · `P10 - Tooling`, tier `now`, queue 1, automation lane −15) → filed and `done` in the same session that found it.

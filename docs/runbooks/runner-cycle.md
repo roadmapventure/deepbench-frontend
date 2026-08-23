@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.205 | runbooks/runner-cycle.md | SES-154 — ACCEPTANCE-GATED COMPLETION: a runner ship writes `delivered`, and only John's Accept ever writes `done`. Spec docs/design/BRIEFING-COMMENTS-0823-DRAFT.md decision 1, approved by John 2026-08-23 ("yes"); Chain A 1 of 3. Migration ses154_delivered_status adds 'delivered' to backlog_items_status_check. THE DISTINCTION THE WHOLE TICKET TURNS ON, and the one a later editor will be tempted to collapse: drain_epic_next() holds TWO predicates over the same named scope and 'delivered' belongs in exactly ONE. The PICK predicate excludes it (else the drain hands the same delivered ticket back every cycle and never advances); the RETIREMENT predicate must NOT (the drain retires on John's ACCEPTANCE, never on the runner's own say-so). QA was discriminating rather than merely complete, one fixture, one instant, one variable: with queue-1 SES-154 set delivered AND unclaimed, the shipped build picks SES-155 where the retired ses142 body picks SES-154; with ALL 18 workable named members set delivered, the shipped build returns open_now=18 / 'blocked' / directive still queued / 0 before-images, where the wrong build (delivered added to the retirement predicate) returns open_now=0 and RETIRES — closing John's standing directive on the runner's own word, which is the exact authorisation defect SES-142 was filed to end, rebuilt. recompute_backlog_queue() is deliberately UNCHANGED: a delivered ticket KEEPS its queue number, the same rule SES-113 established for `removal proposed`, because both are tickets awaiting his verdict — proven, not assumed (queue 2 before, queue 2 after, 0 rows moved), which makes his Accept zero-motion re-entry and keeps the ticket in the §8 matrix while he decides. Step 7 therefore no longer strips the number; the tail's Accept harvest does. backlog_mode() gains 'delivered' in its 'in review' arm so John's page keeps ONE word for "pushed, awaiting your verdict" instead of two (asserted: delivered+undecided ship card -> 'in review', delivered+no card -> 'delivered'). briefing_open_cards() is deliberately UNCHANGED and that is a decision, not an omission: its render predicate retires a GATED card whose ticket reached done/removed BY ANOTHER ROUTE, and 'delivered' is not terminal — a Reject reopens the ticket, so retiring the gated question at delivery would destroy a card that has to come back. DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: (1) the ticket's "re-key the scoreboard (daily shipped)" has NO code to re-key — briefing-template.html's "Shipped today" box is a HARDCODED SAMPLE VALUE (1) with no SQL behind it anywhere in the repo, so the contract is written in briefing-page.md for the next rebuild instead of a predicate being changed, and saying so beats reporting a re-key that did not happen; (2) the drain X-of-N figure (drain_left) already counts "not yet done/removed", so leaving the retirement predicate alone re-keys it on acceptance for free — no edit needed, verified not assumed; (3) scripts/export-backlog-snapshot.js and scripts/check-session-docs.js filter history on done/removed and are deliberately untouched, because a delivered ticket is NOT history until John accepts it; (4) the spec's decision 2 renames Reverse to "Reject" and has NOT shipped, so no rule here is written against a button that does not exist. A delivered ticket is stepped past at step 5 as a fourth blocked-prefix row but is deliberately NOT a record_skip() call — its undecided ship card already carries that ask, and a second home for it is how §10 stops being read. Forward only: the 61 existing `done` rows are untouched, no backfill. 1 overload per .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role/postgres true). All fixtures rolled back clean (0 delivered rows, 0 stray before-images, 0 stray runner_items, control function gone). Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.201 | runbooks/runner-cycle.md | SES-147 — step 3's token track stops being five ranked rules a cycle applies by hand and becomes ONE CALL, and John's standing DAILY MAX joins the ladder. His words 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. Migration ses147_daily_max_tokens adds runner_settings.daily_max_tokens_millions (nullable, CHECK 1..1000) and public.resolve_day_token_cap(uuid): override > 48h stale floor > the box > SES-128 calibration > the 10M default, returning cap_source and cap_reason so a cycle's ledger note traces to a RUNG rather than to its own reading of a paragraph. TENTH prose→code correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143, dir 16b3ff73) — adding a sixth rank to the prose would have been the tenth repetition of the mistake instead. THE RUNG MOST LIKELY TO BE GOT WRONG, and the reason this ticket has a negative control rather than a checklist: the 48h STALE FLOOR SITS ABOVE THE BOX. The obvious reading of "the box is THE day cap" puts it at rung 1, which hands a runner with no idea how much of John's meter is left a 25M budget; his spec says it in one clause — "a standing number must not defeat the staleness brake" — and on identical fixtures the shipped build returns 3,000,000/stale-floor where the box-above-the-brake build returns 4,000,000. A one-day override still beats the standing box (later, more specific word — the same reasoning that puts a pin above the automation lane). Blank box = rungs 1/2/4/5 EXACTLY as before, which is what makes this additive; NULL must never be coerced to 0, in the column, the harvest, or the render. THE DEFECT THIS TICKET'S OWN QA CAUGHT BEFORE IT SHIPPED, recorded because a completeness check passed on the broken build: the first build declared rest_pct/meter_pct numeric while runner_budget.weekly_rest_pct is integer, so EVERY RETURN QUERY raised 42804 — on rung 1, the rung today takes — and a budget check that errors is a cycle that cannot run at all. Only CALLING each rung found it. All seven arms proved live on fixtures inside a deliberately rolled-back transaction (override-beats-box, box-is-the-cap, stale-beats-box, no-reading-beats-box, blank-box = pre-SES-147 exactly, the CHECK rejecting 0 and 1001, the rest wall REPORTED and not enforced), rollback verified clean (box back to NULL, override still queued, 10 readings intact, max pct 37). Grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role true, revoked from PUBLIC); 1 overload per .claude/rules/supabase-function-signature.md. Step 2's settings harvest gains the daily-max half; the page contract is briefing-page.md §2b, CITED not restated. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.196 | runbooks/runner-cycle.md | SES-151 — step 1b's pacing becomes JOHN'S CLOCK GRID: a scheduled fire runs iff its cycle row's started_at falls in an America/Chicago hour divisible by interval_hours (3 → 12/3/6/9 AM/PM his clock, DST-proof; John's order 2026-08-23 "change the scheduler back to 3 hours, and it runs at 12,3,6,9"). Kills the mixed-clock elapsed-hours test that wrongly paced 3 of 9 hourly fires (cycle 6177c7aa, q-hourly-interval-boundary) and the boundary coin-flip an interval equal to the cron period created. Migration ses151_scheduler_clock_grid_chained_trigger also WIDENED runner_cycles_trigger_check to admit 'chained (drain continuation)' — found live this session: the marker required since SES-141 (v7.0.180) and named as SES-140's proof criterion was never insertable (23514 on the first real attempt, 16:47:12Z; the identical INSERT succeeded post-migration and is cycle a11c94d2, the first chained row in the runner's life). QA: six gate arms discriminating (next cron 17:40Z=12:00 Chicago → run where the retired build paced it; 13:00 → paced; chained exempt; off-grid-minute manual exempt; off switch binds; the killed 15:41Z fire correctly paced under 3h), 1 overload, grants both directions. -->
 <!-- DeepBench v7.0.195 | runbooks/runner-cycle.md | SES-140 FINAL — tail step (8) stops spawning sessions and CONTINUES THE DRAIN IN-SESSION. John's order 2026-08-23 (attended session successional-review, 6-requirement directive), replacing his SES-141 ruling: one ticket per CYCLE ROW stays the law; a session runs successive cycles while a drain stands. Why the spawn era is over, all measured live: fire_trigger refused (routine created via http_api); create_session refused 3x across two parents incl. with permission_mode explicit at 25 min ("parent session's permission mode is not yet available"); the v7.0.190 rung-2 one-shot create_trigger actually FIRED at 15:11:36Z (trig_015wHzkN7kiEBTdChhYaFVua) and the launched session booted without the git source or a usable tool list (create_trigger exposes no sources/allowed_tools) and never wrote a row — a silent dead spawn, checked again 16:19Z, still nothing. Anthropic's Claude Code docs (read this session) confirm session-spawning is not a supported pattern; the supported "work a queue until empty" pattern is one session looping internally with the schedule as the restart net. Gates A/B, one-ticket-per-cycle-row, full ceremony per iteration, walls re-checked every iteration, and drain creation staying John-only are ALL unchanged. The ACTUATOR LADDER block is deleted; its evidence is preserved in step (8)'s retirement paragraph so nobody rebuilds it. Companion ship v7.0.196 (SES-151) puts the scheduler on John's 12/3/6/9 CST clock grid. -->
@@ -507,6 +508,29 @@ card only — see the gated-card rule below**;
 restore its before-images, reopen its backlog row carrying John's line, ladder streak → 0 and
 rung −1; **Rework** → John's line becomes a new `runner_directives` row, queued first.
 
+**AN ACCEPT ON A `shipped` CARD NOW WRITES THE TICKET `done` — IT IS THE ONLY THING THAT EVER DOES
+(`SES-154`, `v7.0.205`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1).** Step 7's
+close-out writes `delivered`; this harvest is where completion is actually conferred. Before-image
+first, like every Supabase write, then set `status = 'done'` and run
+`SELECT public.recompute_backlog_queue();` — **this is the call site that releases the ticket's
+queue number**, which step 7 deliberately no longer does. Two boundaries so this cannot be
+re-derived differently:
+
+- **It applies to a `shipped` card only.** An Accept on a `gated_before_build` card is permission to
+  build, not a verdict on work — it has no `delivered` ticket behind it, touches no ladder (B34),
+  and must never write `done`.
+- **Reverse is the reject, and it already did the right thing.** Its existing rule — revert forward,
+  restore before-images, reopen the backlog row carrying John's line — is unchanged and needs no
+  edit: reopening a `delivered` ticket restores the prior open state, which is exactly what decision
+  1 asks of a rejection. Note plainly rather than inventing it: **the spec's decision 2 renames this
+  button to "Reject"; that rename is not this ticket and has not shipped**, so the page still says
+  Reverse and so does this runbook. Do not write a rule against a button that does not exist yet.
+
+**What this changes about waiting, which is the point of the ticket:** nothing. The runner never
+blocks on an Accept. A delivered ticket is stepped past at step 5 and is unpickable by a drain in
+SQL, so it cannot be built twice while it waits, and a cycle that finds nothing but delivered work
+falls through to the board exactly as it does for any other blocked prefix.
+
 **THE STREAK IS NEVER RESET ON PROMOTION — the count keeps running, and a rung is earned on every
 5th Accept (John, 2026-08-21, question `q-ladder-streak-reset` answered **no** at 22:04Z; `SES-107`,
 `v7.0.148`).** The written rule used to be *"Accept → streak +1 (5 consecutive → rung +1)"*, which
@@ -926,6 +950,7 @@ any of them:
 | What you see at the queue top | What it means | Who clears it |
 |---|---|---|
 | `status = 'removal proposed'` | The runner argued the premise is dead; John's verdict is pending (`SES-113`) | John, on the removal card |
+| `status = 'delivered'` | Built and pushed by a cycle; John's Accept is pending (`SES-154`) | John, on the ship card |
 | `design_status = 'needs-john'` | A decision is owed on a filed `gated_before_build` card | John, on that card |
 | `design_status = 'needs-desktop'` | The remaining work is on a surface an unattended cycle may not touch (`.claude/`, register B39) | A session John attends |
 | `design_status = 'designed'` | **Not a skip** — the design already exists; see step 6's fast path | — |
@@ -934,6 +959,18 @@ Each one is a `record_skip()` call before you drop (`reason_kind` `removal-propo
 `needs-john` / `needs-desktop` — or `permission-gate` when the block is the `.claude/` gate
 specifically). **A contested claim is still NOT a skip** — it clears itself in 24h and John can
 do nothing about it.
+
+**`delivered` is the one row in that table that is NOT a `record_skip()` call (`SES-154`,
+`v7.0.205`), and the reason is SES-127's own boundary rather than an exception to it.** A skip row
+exists to put an ask on John's page that nothing else is carrying. A `delivered` ticket already has
+one — its undecided `ship` card, which asks him for the very tap that clears the status — so
+recording a skip as well gives one ask two homes and puts the same ticket in front of him twice,
+which is precisely how §10 stops being read. Step past it silently and let the card do its work.
+It also needs no `resolved_at`: §10 derives "still skipped" from the ticket's status, and John's
+Accept moves it to `done` with no write from you. Note where this skip does and does not bite: the
+drain's pick predicate excludes `delivered` **in SQL** (migration `ses154_delivered_status`), so a
+delivered member can never be handed to you as a drain pick — this procedural skip is for layer 3's
+class-sorted board read, which filters on `queue` and claims but never on `status`.
 
 **Measured before this shipped, because the waste was real and this cycle paid it too.** The
 step-5 query projected `status` and nothing else, so a `needs-desktop` ticket looked exactly like
@@ -1301,16 +1338,32 @@ the paths under test after every step, so a hang still leaves evidence of exactl
 - Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
 - Close-out ticket update — **a Supabase write, not a file edit** (`SES-83` (d) cycle 3,
   `v7.0.114`): set the ticket's `backlog_items.status` (and `priority_class` if it changed) with a
-  `runner_before_images` row first — **and LEAVE THE CLAIM ALONE here: it is released after the
+  `runner_before_images` row first. **THE STATUS YOU WRITE IS `delivered`, NEVER `done` (`SES-154`,
+  `v7.0.205`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, John "yes"
+  2026-08-23).** A ship is the runner saying it finished; `done` is John saying he accepts it, and
+  only the step-9 harvest of his Accept writes that. This is the whole of acceptance-gated
+  completion, and the bit that makes it more than a rename: **you do not wait.** The card goes on
+  his page, the ticket sits `delivered`, and the cycle moves on to other work — a delivered ticket
+  is stepped past at step 5 (the blocked-prefix table) and is excluded from drain picks in SQL, so
+  it can never be re-picked while it waits. Use `partial` exactly as before for work that genuinely
+  stopped half-done; `delivered` means *finished and awaiting his verdict* — **and LEAVE THE CLAIM ALONE here: it is released after the
   push, in its own statement below (`SES-106`, `v7.0.150`).** This bullet used to read *"and
   clear the claim in the same UPDATE (`claimed_by = NULL, claimed_at = NULL`)"*, which
   contradicted the re-assertion gate two bullets down — a cycle cannot treat the claim as a hard
   gate on the push after its own close-out has already dropped it. John settled the order
   himself (`q-claim-release-order`, **yes**, 2026-08-21T22:05Z): release after the push. **Then run
   `SELECT public.recompute_backlog_queue();`** — completed/removed is one of B4's recompute
-  events, and a ticket that just went `done` must lose its number before John sees the board
-  (`SES-86` phase 2, `v7.0.130`). It is idempotent and returns 0 when nothing moved, so running
-  it is never wrong. This line used to read "`FEATURES*.md` row (status + P-class)"
+  events (`SES-86` phase 2, `v7.0.130`). It is idempotent and returns 0 when nothing moved, so
+  running it is never wrong. **What it will NOT do any more, and that is deliberate: your ship no
+  longer strips the ticket's number (`SES-154`, `v7.0.205`).** This clause used to read *"and a
+  ticket that just went `done` must lose its number before John sees the board"* — true of `done`,
+  and exactly wrong for `delivered`. A delivered ticket is awaiting his verdict, so it **keeps its
+  queue slot**, for the same reason a `removal proposed` one does (`SES-113`): he can still see it
+  in the §8 matrix while he decides, and his Accept becomes zero-motion re-entry rather than a
+  renumber. So `recompute_backlog_queue()` is **unchanged** by `SES-154` — measured on a fixture
+  rather than assumed: a delivered ticket sitting at queue 2 was still at queue 2 after a recompute
+  that moved 0 rows. The number is released when the tail's Accept harvest writes `done` and runs
+  the recompute there. This line used to read "`FEATURES*.md` row (status + P-class)"
   and was left behind by cycle 2's trim — those files hold no ticket rows to edit, so it
   contradicted this same runbook's step-5 selection query. A cycle that still edits a
   `FEATURES*.md` row is writing to a stub.
@@ -1328,7 +1381,7 @@ the paths under test after every step, so a hang still leaves evidence of exactl
   export cannot run, say so in the cycle row rather than shipping a silently stale snapshot.
   `--check` (exit 1 = drift) is the read-only form for a cycle that wants to know whether the
   snapshot is current without writing it. **This step-7 export captures the board through your
-  own close-out (the ticket you just set `done`, its recompute) but NOT John's harvest — those
+  own close-out (the ticket you just set `delivered`, its recompute) but NOT John's harvest — those
   writes land in the step-9 serial tail, AFTER this push — so a step-7-only snapshot is
   systematically one harvest stale (`SES-109`, `v7.0.149`, found live by cycle `ff23297c`). The
   tail re-exports it once the harvest has landed; see the tail's snapshot sub-step below. Do NOT
