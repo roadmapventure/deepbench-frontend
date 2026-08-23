@@ -63,6 +63,32 @@ Total live output today (2026-08-21): **9 flagged, 3 warning** — 3s: 0; 3: 5 d
 
 **5d. Phantom bullet check (added 2026-07-21, `SES-010`).** Check 5 only catches a *worktree* with no bullet. The inverse gap is just as real: a bullet naming a worktree that was already cleaned up (rule 7 ran) without its bullet being deleted (rule 8 skipped) — the bullet outlives the worktree it describes. Found live 2026-07-21, twice independently in the same day: `design-loo-013-broker-fallback-0721` had an active "In flight now" bullet with no matching directory and no `git worktree list` entry at all. To catch this: for every worktree name mentioned in an "In flight now" bullet, confirm it actually appears in `git -C "C:/Projects/deepbench-frontend" worktree list`'s output. Flag any bullet whose named worktree is absent from that list — that's a session that ran rule 7 (cleanup) but skipped rule 8 (bullet removal). Report first, same as every other check here; removing a confirmed-phantom bullet is safe once flagged, but don't auto-edit `CLAUDE-STATE.md` without asking.
 
+**6. Runbook header-stamp cap (added 2026-08-23, `SES-164`).** The version-stamp comment every ship
+prepends to a runbook is a good convention with no upper bound, and it had quietly become the single
+most expensive thing an Automated cycle reads. **Measured before the fix, not estimated:**
+`docs/runbooks/runner-cycle.md` carried **45 stamps — 69,918 of its 205,135 characters, 34.1% of the
+file — ahead of the first instruction at line 46**, re-read in full by every cycle and past the size
+a single `Read` call returns. The stamp convention **stays**; what it now has is a ceiling.
+
+For each file in `docs/runbooks/`, count the leading `<!-- DeepBench v… -->` comment lines. **Flag any
+runbook carrying more than ~5**, and report the count plus what share of the file it is — the share
+is the number that makes the case, since a long runbook can carry more stamps than a short one before
+it matters. The trim is the `SES-164` shape and it is not a judgement call:
+
+1. Keep the **newest** stamp, plus one stamp recording the trim.
+2. **Before moving anything, check each retired stamp for an editor warning that exists nowhere
+   else.** This is the step that makes the trim safe and it is the one that will be skipped: on
+   `runner-cycle.md`, nine of ten spot-checked warnings were already restated in the body, and the
+   tenth (`SES-154`'s pick-vs-retirement predicate warning) appeared **zero** times outside its
+   stamp. Relocate that kind into the body **next to the step it protects** — never delete it.
+3. Move the rest **verbatim** to `docs/SESSIONS.md` under a clearly-named appendix. They are in git
+   history too, but git history is not where anyone looks.
+4. **Prove the body is otherwise byte-identical** — `sha256` over everything below the header,
+   before and after, differing only by the deliberate insertions from (2). A restructure that
+   cannot show this is not content-preserving, whatever the diff looks like by eye.
+
+Report first, like every other check here — don't trim a runbook without being asked.
+
 ## Reporting the result
 
 **If everything's within bounds:** say so briefly — a one- or two-line "all clear," not a report. Don't elaborate on checks that passed. This should read like a quick status ping, not a deliverable.
