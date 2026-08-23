@@ -4,6 +4,22 @@
 // kind once its ticket goes terminal, the strip can no longer say the card was "asking permission
 // to build" — most retired cards are ship cards whose verdict already happened. No other builder
 // logic changes: `rendered`/`retired` already split on `c.render`.
+// DeepBench v7.0.207 | scripts/build-briefing.mjs | SES-163 — the rebuild stops needing a cycle to
+// hand-author the page. MEASURED against this file at 22:2xZ, and the ticket under-counted it by
+// half: 21 distinct `--data` fields plus 12 more inside `data.stats` = 33 authored values, several
+// of them raw HTML fragments. TWO consecutive cycles declined the republish rather than author
+// them (SES-162/v7.0.204, then 199e67b5), which is what made it a standing blocker rather than one
+// cycle's judgment call — and since SES-154 (v7.0.205) made John's Accept the ONLY writer of
+// `done`, an un-republished page converts EVERY delivery into permanently unfinished work.
+// Now derived here: §2/§4 stats, §4 model rows, §4.1 daily output, §7/§7.1 directives, §9
+// questions, §10 skips, §14 uses, the masthead date and version. STILL the cycle's, because a
+// builder that guessed them would be writing John's briefing for him: §3's findings and §4's
+// calibration sentence — five authored values, all prose.
+// AND the fixed DOM-id map is a TABLE (public.briefing_dom_ids), not `data.fixed_dom_ids || {}`.
+// That silent empty default was the hazard: runner_card_asks.target_id is keyed on a card's DOM
+// id, so a cycle that omitted the map re-keyed the card and ORPHANED John's thread — invisibly,
+// because SES-132's §9.1 orphan renderer still shows the text. An ask target naming a card that no
+// briefing_dom_ids row claims is now exit 2, never a warning.
 // DeepBench v7.0.204 | scripts/build-briefing.mjs | SES-162 — §2b's AUTOMATION object is now
 // DERIVED (see the splice at the foot of this file and scripts/lib/briefing-automation.mjs).
 // Until v7.0.204 this builder had no anchor for it at all, so every page it produced published
@@ -34,13 +50,25 @@
 //     - section 13 trust ladder               (runner_ladder)
 //     - section 14 who used DeepBench         (ai_activity_log, production host only)
 //
+//   ALSO DERIVED SINCE SES-163 (v7.0.207) -- these were in the list below until this ship, and the
+//   reason they moved is that none of them needed judgment; they only needed SQL somebody had not
+//   written yet:
+//     - section 2/4 the stat chips and budget bars  (runner_cycles + resolve_day_token_cap's RUNG)
+//     - section 4   the model table                 (runner_cycles grouped by model)
+//     - section 4.1 daily output rows               (public.daily_reading_output())
+//     - section 7/7.1 directive lines               (runner_directives; verdict via stateOf())
+//     - section 9   the question list               (runner_questions, open only, max 5)
+//     - section 10  skip rows + count chips         (runner_skips joined to its ticket)
+//     - section 14  who used DeepBench              (public.briefing_use_rows())
+//     - the masthead date                           (the CST clock; the VERSION is --version, and
+//                                                    deliberately NOT dev_version_counter -- see
+//                                                    the note at its assignment below)
+//
 //   NOT DERIVED -- supplied by the cycle in --data, because these need judgment and a builder that
-//   guessed them would be writing John's briefing for him:
-//     - section 3  today's findings           (what the run actually found, in his register)
-//     - section 4  the calibration sentence   (which number is governing today, and why)
-//     - section 4.1 daily output rows         (public.daily_reading_output() -- pass-through prose)
-//     - section 7/7.1 directive lines         (his own words + what became of them)
-//     - section 9  questions, section 12 vision claims (both are asks, not data)
+//   guessed them would be writing John's briefing for him. FIVE values, all prose:
+//     - section 3  today's findings           (finding_text, finding_time, earlier_title,
+//                                              earlier_html -- what the run actually found)
+//     - section 4  the calibration sentence   (calib_line -- which number governs today, and why)
 //
 // Usage:
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/build-briefing.mjs \
@@ -55,6 +83,13 @@ import fs from 'fs';
 // SES-162 (v7.0.204) — §2b's cycle-written half. Pure helpers live in their own module so the
 // grid arithmetic can be tested without running this builder against live Supabase.
 import { deriveAutomation, automationLiteral } from './lib/briefing-automation.mjs';
+// SES-163 (v7.0.207) — everything mechanically derivable. Pure string builders live in their own
+// module for the same reason briefing-automation.mjs does: a helper only exercisable by running
+// the whole builder against live Supabase is a helper nobody tests.
+import {
+  cstDay, cstStamp, cstDayStartISO, deriveStats, modelRowsHtml, dirRowsJs,
+  questionRowsJs, skipRowsJs, useRowsJs, droRowsHtml, unregisteredAskTargets,
+} from './lib/briefing-derive.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, dflt) => {
@@ -91,6 +126,16 @@ const J = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 const M = n => (Number(n) / 1e6).toFixed(1);
 
 const data = JSON.parse(fs.readFileSync(DATA, 'utf8'));
+
+// SES-163 — the bar the ticket set: "a --data file of at most a few authored sentences". These five
+// are what is left, and a missing one is exit 2 rather than a silently blank section. It is the same
+// rule as a NULL plain_* drawing a red defect line: absent must look absent, never look fine.
+const AUTHORED = ['finding_text', 'finding_time', 'earlier_title', 'earlier_html', 'calib_line'];
+const missing = AUTHORED.filter(k => data[k] == null || data[k] === '');
+if (missing.length) {
+  die(`--data is missing the authored field(s): ${missing.join(', ')}. Everything else is derived; `
+    + `these five are yours because a builder that guessed them would be writing John's briefing.`);
+}
 let t = fs.readFileSync(TPL, 'utf8');
 
 function must(find, repl, label) {
@@ -113,9 +158,19 @@ const retired = cards.filter(c => !c.render);
 
 // `item-chi84-gate` and any other id John's ask threads are keyed on MUST survive a rebuild:
 // runner_card_asks.target_id is looked up by the card's DOM id, so renaming one orphans his thread.
-// The map is data, not code — a cycle adds to it, the builder never invents one.
-const FIXED_IDS = data.fixed_dom_ids || {};
+// SES-163: the map is a TABLE now. It used to be `data.fixed_dom_ids || {}` — a silent empty
+// default, so forgetting it looked exactly like having none, and the orphan renderer hid the
+// consequence. A cycle adds a row; the builder still never invents one.
+const domRows = await sel('briefing_dom_ids?select=item_id,dom_id');
+const FIXED_IDS = Object.fromEntries(domRows.map(r => [r.item_id, r.dom_id]));
 const domIdFor = it => FIXED_IDS[it.id] || 'item-' + it.id.slice(0, 8);
+
+// SES-119's display title, RAW and uncut — §10's renderer esc()s its own title and §8's does not.
+// That asymmetry is deliberate and a sweeper must not "fix" it: entities in §8, raw text in §10.
+const displayTitleRaw = async (b) => {
+  const r = await rpc('backlog_display_title', { p_title: b.title, p_description: b.description });
+  return typeof r === 'string' ? r : (b.title || '');
+};
 const tidFor = it => it.backlog_id || (data.tid_override || {})[it.id] || '—';
 const idLineFor = it => it.display_ref
   || `${it.backlog_id} (${it.ticket_type || 'Tooling'} · ${it.ticket_class || 'P10 - Tooling'})`;
@@ -135,6 +190,90 @@ const cardCall = (num, it, cls, txt) =>
   `+card(${J(num)},${J(domIdFor(it))},${J(cls)},${J(txt)},${J(tidFor(it))},\n      ${J(idLineFor(it))},\n      ${J(it.title)},\n      ${J(techHtml(it))},\n      { cant: ${J(it.plain_cant)},\n        after: ${J(it.plain_after)},\n        worth: ${J(it.plain_worth)} })\n    `;
 
 // ---------------------------------------------------------------------------
+// SES-163 — the derived half. Every value below used to arrive hand-authored in --data.
+// ---------------------------------------------------------------------------
+const NOW = new Date();
+const dayStart = cstDayStartISO(NOW);
+const monthStart = `${NOW.toISOString().slice(0, 7)}-01T00:00:00Z`;
+
+// THE GUARD. Exit 2, never a warning: SES-132's §9.1 orphan renderer means a re-keyed card still
+// shows its text, so this failure is silent by construction and here is the only place to catch it.
+const askTargets = [...new Set((await sel('runner_card_asks?select=target_id')).map(r => r.target_id))];
+const unregistered = unregisteredAskTargets(askTargets, rendered.map(domIdFor), Object.values(FIXED_IDS));
+if (unregistered.length) {
+  die(`UNREGISTERED ASK TARGET(S): ${unregistered.join(', ')} — each names a card DOM id that no `
+    + `public.briefing_dom_ids row claims, so this rebuild would re-key the card and orphan John's `
+    + `recorded thread. INSERT the item_id -> dom_id row, then re-run.`);
+}
+
+// §2 / §4 — the day's cycles. The governing cap is resolve_day_token_cap()'s RUNG, never
+// runner_budget's static default: rendering the default would tell John the runner is budgeted
+// against a number it is not using. NULL is the read-only form — the builder must never write.
+const cyclesToday = await sel(`runner_cycles?started_at=gte.${dayStart}`
+  + '&select=outcome,model,est_tokens_dev,est_tokens_qa,api_cost_dev_usd,api_cost_qa_usd');
+const monthCycles = await sel(`runner_cycles?started_at=gte.${monthStart}&select=api_cost_dev_usd,api_cost_qa_usd`);
+const apiMonthUsd = monthCycles.reduce((a, c) =>
+  a + Number(c.api_cost_dev_usd || 0) + Number(c.api_cost_qa_usd || 0), 0);
+const [cap] = await rpc('resolve_day_token_cap', { p_cycle_id: null });
+const st = deriveStats(cyclesToday, { apiMonthUsd, dayCap: cap.day_cap });
+
+const [reading] = await sel('runner_usage_readings?select=all_models_pct&order=taken_at.desc&limit=1');
+const modelRows = modelRowsHtml(cyclesToday, reading ? reading.all_models_pct : null);
+const droRows = droRowsHtml(await rpc('daily_reading_output'));
+
+// §7 / §7.1 — his own words, newest first.
+const dirs = await sel('runner_directives?select=id,created_at,type,body,status,outcome,outcome_note,acted_cycle,expires_at&order=created_at.desc&limit=12');
+const dirRows = dirRowsJs(dirs, NOW);
+const newest = dirs[0];
+const lastDirectiveCst = newest ? cstStamp(new Date(newest.created_at)) : '—';
+const lastDirectiveTail = !newest ? '&mdash; none recorded yet.'
+  : newest.status === 'queued' ? '&mdash; not picked up yet; the next cycle takes it first.'
+  : newest.outcome ? `&mdash; ${newest.outcome}.`
+  : '&mdash; closed with no outcome recorded.';
+
+// §9 — open questions only, max 5, newest first (the SES-99 contract).
+const questionRows = questionRowsJs(
+  await sel('runner_questions?answer=is.null&select=qid,question,context&order=created_at.desc&limit=5'));
+
+// §10 — skips, joined to their ticket. "Still skipped" is DERIVED from the ticket's status, never a
+// maintained flag: building the ticket later clears the row with no write from anyone (SES-127).
+// The join takes the FIRST row per backlog_id ordered by queue because backlog_id is NOT unique
+// (CHI-48 holds two rows, SES-97) — the JS twin of SES-127's LATERAL … LIMIT 1.
+const skips = await sel('runner_skips?resolved_at=is.null&select=*&order=last_skipped_at.desc');
+const skipIds = [...new Set(skips.map(s => s.backlog_id))];
+const tickets = skipIds.length
+  ? await sel(`backlog_items?backlog_id=in.(${skipIds.join(',')})`
+    + '&select=backlog_id,status,design_status,queue,priority_class,title,description,kickoff_link&order=queue.asc')
+  : [];
+const ticketFor = {};
+for (const b of tickets) if (!ticketFor[b.backlog_id]) ticketFor[b.backlog_id] = b;
+const liveSkips = [];
+for (const s of skips) {
+  const b = ticketFor[s.backlog_id];
+  if (!b || ['done', 'removed'].includes(b.status)) continue;   // derived resolution
+  liveSkips.push({ ...s, ...b, title: await displayTitleRaw(b) });
+}
+const skipRows1 = skipRowsJs(liveSkips, 'decision');
+const skipRows2 = skipRowsJs(liveSkips, 'desktop');
+
+// §14 — production uses. The whole §14 contract (production host only, one use = one trace_id,
+// calls FILTER model IS NOT NULL, the first-clause Name, cost as an em-dash) is SQL now:
+// public.briefing_use_rows(). It was the last raw-HTML field a cycle had to author.
+const useRows = useRowsJs(await rpc('briefing_use_rows', { p_limit: 12 }));
+
+// THE VERSION IS THE CYCLE'S, NOT THE COUNTER'S — caught by this ticket's own QA, on the first
+// live build. Deriving it from dev_version_counter looks obviously right and is wrong under
+// parallel cycles (register B42): the counter is a CLAIM REGISTER shared by every concurrent
+// session, not "the current version". This cycle claimed v7.0.207 and the counter already read
+// 209 by the time the page was built, so the masthead stamped a version this page is not. The
+// number is passed in, like --page-built, and there is deliberately no default: a guessed version
+// on the masthead is worse than a refusal, because it is unfalsifiable from the page.
+const todayCst = cstDay(NOW);
+const versionStr = arg('version');
+if (!versionStr) die('--version <vX.Y.Z> is required: it is the version THIS cycle claimed, and it '
+  + 'cannot be read from dev_version_counter, which a concurrent cycle may have moved since.');
+
+// ---------------------------------------------------------------------------
 // Substitutions
 // ---------------------------------------------------------------------------
 // THE SEED (v7.0.197). The template ships a sentinel, never a valid empty state.
@@ -146,10 +285,9 @@ t = t.replace(/var PAGE_BUILT = '[^']*'/, `var PAGE_BUILT = '${PAGE_BUILT}'`);
 if (!t.includes(`var PAGE_BUILT = '${PAGE_BUILT}'`)) die('ANCHOR MISSING: PAGE_BUILT');
 
 must(`+'<div class="date">Aug 19, 2026 CST<br>v7.0.94<br><b id="waiting"></b>'`,
-  `+'<div class="date">${data.today_cst}<br>${data.version}<br><b id="waiting"></b>'`, 'masthead');
+  `+'<div class="date">${todayCst}<br>${versionStr}<br><b id="waiting"></b>'`, 'masthead');
 
-// §2 — derived from runner_cycles over the CST day
-const st = data.stats;
+// §2 — derived from runner_cycles over the CST day (SES-163: `st` is computed above, not supplied)
 must(`+'<div class="stat"><b>1</b><span>Shipped today</span></div>'`, `+'<div class="stat"><b>${st.shipped}</b><span>Shipped today</span></div>'`, '§2 shipped');
 must(`+'<div class="stat"><b>0</b><span>Gated before build</span></div>'`, `+'<div class="stat"><b>${st.gated}</b><span>Gated before build</span></div>'`, '§2 gated');
 must(`+'<div class="stat"><b>0</b><span>Cycles: did not run</span></div>'`, `+'<div class="stat"><b>${st.dnr}</b><span>Cycles: did not run</span></div>'`, '§2 dnr');
@@ -183,14 +321,14 @@ must(`+'<div class="legend"><span><span class="sw" style="background:var(--navy)
 must(`+'<tr><td>Fable 5</td><td class="num">0</td><td class="num">—</td></tr>'
     +'<tr><td>Opus 5</td><td class="num">0</td><td class="num">all models —</td></tr>'
     +'<tr><td>Sonnet 5</td><td class="num">0</td><td class="num"></td></tr></table>'`,
-  `+${J(data.model_rows)}+'</table>'`, '§4 models');
+  `+${J(modelRows)}+'</table>'`, '§4 models');
 must(`+'<p class="calib">Guardrails: rest at 85% weekly · 50% share · 10M/day uncalibrated · 3M/day if the reading is over 48h old.</p></div>'`,
   `+${J(data.calib_line)}+'</div>'`, '§4 calib');
 must(`+'<tr><td class="mono">Aug 21</td><td class="mono">7:59 AM &rarr; 3:39 PM</td>'
       +'<td class="num">+12%</td><td class="num">~5.3M</td><td class="num">9</td></tr>'
       +'<tr><td class="mono">Aug 22</td><td class="mono">8:50 AM</td>'
       +'<td class="dim">— one reading only</td><td class="dim">—</td><td class="dim">—</td></tr>'`,
-  `+${J(data.dro_rows)}`, '§4.1');
+  `+${J(droRows)}`, '§4.1');
 
 // §5 / §6 — FROM the DB's undecided set (register B18), gated cards self-retiring (v7.0.199)
 const ships = rendered.filter(i => i.kind === 'ship' || i.kind === 'test');
@@ -209,9 +347,9 @@ splice("+card('5.1'", `// SES-124 · REMOVED, on John's explicit instruction: th
 // §7 / §7.1 — his own words
 must(`+'<p class="strip-def">&#10003; Last directive <b>recorded Aug 22, 04:23 PM CST</b> '
     +'&mdash; not picked up yet; the next cycle takes it first. '`,
-  `+'<p class="strip-def">&#10003; Last directive <b>recorded ${data.last_directive_cst} CST</b> '
-    +${J(data.last_directive_tail)}+' '`, '§7 ack');
-splice("+dirRow('43a9d4ae'", `+'</table></div>'\n      +'<p class="strip-def">The 24 directives`, data.dir_rows, '§7.1');
+  `+'<p class="strip-def">&#10003; Last directive <b>recorded ${lastDirectiveCst} CST</b> '
+    +${J(lastDirectiveTail)}+' '`, '§7 ack');
+splice("+dirRow('43a9d4ae'", `+'</table></div>'\n      +'<p class="strip-def">The 24 directives`, dirRows, '§7.1');
 
 // §8 — the queue matrix, derived
 const board = await sel('backlog_items?queue=not.is.null&select=queue,backlog_id,priority_class,status,design_status,epic_id,title,description&order=queue.asc&limit=12');
@@ -237,13 +375,13 @@ splice('+queueRow(1,', `+'</table></div>'\n    // SES-99 — the question list.`
   board.map(b => `+queueRow(${b.queue},${J(b.backlog_id)},${J(epics[b.epic_id] || '')},${J(H(b.priority_class).replace(/'/g, '&rsquo;'))},${J(b.status)},${J(b.design_status || '—')},${J(titles[b.backlog_id] || cut(b.title))})\n    `).join(''), '§8 rows');
 
 // §9 / §12 — asks, supplied by the cycle
-splice(`+question('9.1',`, '// ===== §9.1 · ANSWERED', data.question_rows, '§9');
+splice(`+question('9.1',`, '// ===== §9.1 · ANSWERED', questionRows, '§9');
 
 // §10 — skips, derived; "still skipped" comes from the ticket's status, never a maintained flag
-must(`+SKIPS.n+' &middot; '`, `+${data.skips_n}+' &middot; '`, '§10 n');
-must(`+SKIPS.nnew+' new</span>`, `+${data.skips_new}+' new</span>`, '§10 nnew');
-splice("+skipRow('39cd8616", `+'</table></div>'\n    +'<div class="listhead"><span class="n">10.2</span>`, data.skip_rows_1, '§10.1');
-splice("+skipRow('f32e05ce", `+'</table></div>'\n    +'<p class="strip-def"><b>Unblock buttons:</b>`, data.skip_rows_2, '§10.2');
+must(`+SKIPS.n+' &middot; '`, `+${liveSkips.length}+' &middot; '`, '§10 n');
+must(`+SKIPS.nnew+' new</span>`, `+${liveSkips.lengthew}+' new</span>`, '§10 nnew');
+splice("+skipRow('39cd8616", `+'</table></div>'\n    +'<div class="listhead"><span class="n">10.2</span>`, skipRows1, '§10.1');
+splice("+skipRow('f32e05ce", `+'</table></div>'\n    +'<p class="strip-def"><b>Unblock buttons:</b>`, skipRows2, '§10.2');
 
 // §11 — grouped on the class DIGIT, never the string ('P9 · FLAGGED' is a different string)
 const nowRows = await sel('backlog_items?queue=not.is.null&tier=eq.now&select=priority_class');
@@ -272,7 +410,7 @@ splice("+ladderRow('P02'", `+'</table>'\n    +'<p class="tnote">No ladder row ex
 
 // §14 — production uses only. Supplied by the cycle: the Name column resolves through two label
 // tables and one live label is a 130-character paragraph, which is judgment, not a join.
-splice("+useRow('Aug 18, 1:02 PM'", `+'</table></div>'\n    +'<p class="tnote">Cost shows`, data.use_rows, '§14');
+splice("+useRow('Aug 18, 1:02 PM'", `+'</table></div>'\n    +'<p class="tnote">Cost shows`, useRows, '§14');
 
 // §2b — the AUTOMATION object (SES-162, v7.0.204). THIS BUILDER HAD NO ANCHOR FOR IT AT ALL, so
 // every page it built published the template's SAMPLE values: measured on the served artifact
