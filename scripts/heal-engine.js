@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.183 | scripts/heal-engine.js | SES-118 -- the filed ticket's status literal
+// tracks the renamed CHECK: 'missing' -> 'open'. This file was NOT on SES-118's own blast-radius
+// list (which named recompute_backlog_queue(), the step-5 selection query and check-session-docs.js,
+// all of which match done/removed/removal-proposed and never 'missing'); it was found by grepping
+// the tree fresh. It is the one place that WRITES the value, so replacing the CHECK without this
+// line would have made step 8b's heal sweep raise 23514 on the next recurring failure it detected
+// -- a break that only shows up when something else has already gone wrong.
 // DeepBench v7.0.108 | scripts/heal-engine.js | SES-89
 // FEATURE: SES-89 -- the Heal engine (ARCHITECTURE.md §19v's third engine). Reads the platform's
 // own failure ledger, groups failures into recurring signatures, and auto-files evidenced
@@ -266,10 +273,13 @@ export function buildTicketDraft(group, backlogId, opts = {}) {
     priority_class: "P9 - Bug Fixes",
     title,
     description,
-    // 'missing' is the only open status the live CHECK constraint allows
-    // (done/partial/missing). Register B6's filed/queued lifecycle vocabulary is not live yet;
+    // 'open' is the only open status the live CHECK constraint allows
+    // (open/partial/done/removal proposed/removed). SES-118 (v7.0.183) renamed it from
+    // 'missing' -- markdown-audit-era vocabulary -- and replaced the CHECK in the same
+    // migration, so this literal is load-bearing: the old value now raises 23514 on every
+    // heal filing. Register B6's filed/queued lifecycle vocabulary is still not live;
     // widening the constraint here would preempt SES-83 (d)/(e)'s gated design.
-    status: "missing",
+    status: "open",
     source_file: HEAL_SOURCE_FILE,
     row_ordinal: ordinal,
     session_ref: `S-${backlogId} (auto-filed by SES-89 Heal engine)`,

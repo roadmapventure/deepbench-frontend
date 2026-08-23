@@ -1,3 +1,7 @@
+// DeepBench v7.0.183 | tests/regression/SES-89-heal-detector.js | SES-118 -- the status assertion
+// tracks the renamed CHECK ('missing' -> 'open'). Kept as an assertion on the exact literal rather
+// than loosened to "some open status": this test is what would catch heal-engine.js drifting back
+// to a value the constraint rejects, and a vaguer assertion would pass while the engine 23514s.
 // DeepBench v7.0.108 | tests/regression/SES-89-heal-detector.js | SES-89
 // FEATURE: SES-89 -- the Heal engine's detector. Guards the three properties that decide whether
 // an unattended 3-hour loop files useful tickets or floods the backlog with noise:
@@ -194,7 +198,7 @@ function ticketCarriesItsEvidence() {
 
   assert.strictEqual(draft.backlog_id, "LOO-99");
   assert.strictEqual(draft.priority_class, "P9 - Bug Fixes", "named form, never a bare digit (register B9)");
-  assert.strictEqual(draft.status, "missing", "the only open status the live CHECK constraint allows");
+  assert.strictEqual(draft.status, "open", "the only open status the live CHECK constraint allows (SES-118 renamed it from 'missing'; the old value now raises 23514)");
   assert.strictEqual(draft.tier, "now");
   assert.strictEqual(draft.source_file, "heal-engine", "the sentinel the dedup query and any future reconciliation key on");
   assert.strictEqual(draft.row_ordinal, 99, "row_ordinal derives from the id, satisfying UNIQUE(source_file,row_ordinal)");

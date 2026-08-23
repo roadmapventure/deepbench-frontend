@@ -5,6 +5,96 @@
 
 ---
 
+## session/cycle-20260823-0649 (v7.0.183, 2026-08-23, Automated runner cycle `ecc04087`, model Opus 5 orchestrator, subagent Sonnet 5 for the mechanical template sweep) — the board's open status stops being an audit verdict, and the rename's real blast radius turns out to be somewhere the ticket never looked
+
+**`SES-118` — rename backlog status `missing` → `open` (Tooling · `P10 - Tooling`) CLOSED
+`partial`.** One migration + three files + one kickoff. No `src/`/`api/` change, no site change.
+
+**John's line, 2026-08-22:** `'missing'` is markdown-audit-era vocabulary. A `FEATURES.md` row
+asked *"does this capability exist in the product?"* and answered `❌ Missing`. As a **ticket**
+status it is opaque — it names an audit verdict, not a state of work. `'open'` says what it means.
+
+**Selection.** Layer 1b's standing Automation drain returned `pick SES-140`, which carries
+`design_status = 'needs-john'`; board queue 2, `SES-117`, carries `needs-desktop`. Both are
+`SES-114` blocked-prefix skips — recorded with `record_skip()` (SES-140 `skip_count` 3 → 4,
+SES-117 a new row), queue numbers left alone — so the cycle fell through and built **queue 3**.
+
+**Migration `ses118_status_open`.** 510 rows `missing` → `open`; `backlog_items_status_check`
+replaced with `('open','partial','done','removal proposed','removed')`; before-image per row
+first (§19v — 512 rows for this cycle, 510 of them new).
+
+### The ticket's own blast-radius survey was incomplete, and the gap was a live hazard
+
+`SES-118` named `recompute_backlog_queue()`, the step-5 selection query and `check-session-docs.js`,
+and was **right** that all three match `done`/`removed`/`removal proposed` and never `'missing'`.
+Re-measured live rather than taken on trust, that list misses **the one place that writes the
+value**:
+
+- `scripts/heal-engine.js` sets `status: "missing"` on every ticket the Heal engine files
+- `tests/regression/SES-89-heal-detector.js` asserts exactly that string
+
+Replacing the CHECK without them would have made **step 8b's Heal sweep raise `23514` on the next
+recurring failure it detected** — a break that only surfaces once something else has already gone
+wrong, which is the worst possible time to find it. Both ship in this commit. Verified nothing else
+touches the value: no `pg_proc.prosrc`, no `pg_get_viewdef`, no other `pg_get_constraintdef` match.
+
+### `updated_at` is deliberately NOT stamped, and that is the decision most likely to be undone later
+
+The obvious form of this migration bumps `updated_at` on all 510 rows. That **silently disables
+step 8c's background revalidation sweep for thirty days**: its predicate is
+`updated_at < now() - INTERVAL '30 days'`, so stamping every row hides the entire sinking tail
+until 2026-09-22. Same reasoning `recompute_backlog_queue()` already uses for not stamping on a
+renumber (`SES-86` phase 2, `v7.0.130`) — a bulk vocabulary change is not a per-ticket edit and
+must not look like one. **Proven rather than asserted:** the `md5` fingerprint over
+`(id, updated_at)` for the affected rows is byte-identical either side —
+`9e8f827523a4fa3385351d1c4a6745bc` — as is the queue fingerprint
+(`3181b93aa13b9788b0d10ade70b08dcc`, 562 numbered both sides).
+
+### The template edit that would have shipped wrong
+
+`briefing-template.html` uses the bare word `missing` for **two unrelated things**. Nine
+`queueRow()` calls pass it as the Status column; separately, `.missing` / `td.missing` /
+`class="missing"` is the page's **red defect vocabulary** — what draws the line when a card ships
+without its plain-language summary (`v7.0.145`/`v7.0.146`) or a `done` directive carries a NULL
+outcome (`SES-129`). A find-and-replace over the file destroys those markers **while looking like a
+clean rename**. Only the 5th positional argument of
+`queueRow(queue, id, epic, class, STATUS, designStatus, title)` was changed; SES-118's own row title
+keeps its two `&ldquo;missing&rdquo;` occurrences, because that title names the value being renamed.
+Post-sweep verification: zero single-quoted `'missing'` literals remain in the file.
+
+### Two of the ticket's sweep targets were deliberately declined, with reasons
+
+- **`runner-cycle.md` and `GOVERNANCE-MODES.md`** carry **no** status literal. Every `missing` in
+  the runbook is the ordinary English word (`missing env`, `raise-on-missing`, `a missing position`).
+- **`FEATURES.md:30`'s `❌ Missing` legend** describes **that file's own markdown markers on its own
+  historical rows**, not `backlog_items.status`. Those `❌` markers are still in the file, so
+  renaming the legend would make it *misdescribe* them. The `FEATURES*.md` files hold no ticket rows
+  (`v7.0.114`), so nothing there feeds the board.
+
+### QA — discriminating, both directions
+
+A bare `UPDATE … SET status='missing'` raises **`ERROR 23514`**, naming
+`backlog_items_status_check` with the failing row in `DETAIL`; `'open'`, `'partial'` and
+`'removal proposed'` all still land, which is what proves the denial failed for the *right* reason
+rather than because the row was unwritable. Data: `missing` 510 → **0**, `open` 0 → **510**.
+Fixtures ran inside a deliberately rolled-back `DO` block and SES-118 was verified back at `open`
+afterwards. Build clean (`npm install && npm run build`, exit 0); regression **38/38**, including
+`SES-89-heal-detector`, `SES-138-briefing-title-window` and `SES-143-automation-panel`; dev root
+**200**.
+
+### Not done — carded, not attempted
+
+`.claude/skills/session-setup/SKILL.md` step 3c's canonical filing INSERT still writes `'missing'`.
+`.claude/` is a surface an unattended cycle may not touch (register B39), so this is the
+**`needs-desktop`** half and the ticket closes `partial`. Until an attended session makes the edit,
+a manual session filing a ticket through that INSERT gets `23514` — a window SES-118's own text
+accepts ("one attended edit long"). The card carries the exact replacement: the line reading
+`'missing',` becomes `'open',`, and nothing else in step 3c changes.
+
+Kickoff: `docs/kickoffs/v7.0.183-SES-118-status-open.md`.
+
+---
+
 ## session/cycle-20260823-0528 (v7.0.181, 2026-08-23, Automated runner cycle `3ebeadbc`, model Opus 5 orchestrator, subagent Sonnet 5 for the mechanical template/contract edits) — the queue's forward view can finally say which epic a row belongs to
 
 **`SES-144` — the briefing's §8 queue matrix gains an Epic column (Tooling · `P10 - Tooling`)
