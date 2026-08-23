@@ -49,6 +49,141 @@ Accept/Reverse decision stays John's, on the briefing page.
 `SES-118` → `done` with claim held, `recompute_backlog_queue()`, claim re-asserted before push,
 released after.
 
+## session/cycle-20260823-1441 (v7.0.190, 2026-08-23, Automated runner cycle `03c19332`, model Opus 5, no subagent) — the chain has never once run, and it took John saying so five times in an hour
+
+**Ticket:** `SES-140` — *The successor fire is refused by the platform — an agent cannot fire a
+routine it did not create* (`P10 - Tooling`, tier `now`, epic Automation, automation lane
+`automation_rank` -7, queue 2). **Closed `done`.**
+
+**This cycle is John's word, not its own idea.** Harvested from `briefing-state` at 14:44Z — five
+Rework taps between 14:04Z and 14:26Z, four of them saying the same thing in different words:
+
+| Card | Ticket | His line, verbatim |
+|---|---|---|
+| `6f459dcc` | `SES-139` | *"still don't see the drain starting the next session on its own."* |
+| `8c10bb9f` | `SES-142` | *"still can not get drain to run until completion of list of tickets"* |
+| `4bee7514` | `SES-143` | *"still have not seen drain run according to the rules that are displayed"* |
+| `caf309b3` | `SES-140` | Rework on the gated card that asks him to choose an actuator |
+| `01f75978` | — | *"drain must work no matter what - according to the screen display and is not interupted. this ticket and others can not be closed. Review all open tickets related to drain. there are more than 5."* |
+
+A `Rework` becomes a directive queued first (step 2), and selection layer 1a puts a directive above
+the whole board. **So `SES-147` — the first buildable ticket, at queue 1 — was stepped past on
+precedence, not on a block, and deliberately with no `record_skip()` row:** a precedence step-past
+is not something John has to clear, and §10 is titled *waiting on your input*. Filling it with rows
+he cannot action is how an actionable section stops being read (`SES-127`).
+
+`SES-140` carried `design_status = 'needs-john'`, which means *a decision is owed on a filed gated
+card*. **He decided** — on that card and on its follow-up. The flag was cleared before-image first,
+on the strength of his taps, never on this cycle's opinion. The runbook's rule that a cycle never
+clears the flag itself is intact: it is cleared by *the thing that unblocks the ticket — John's tap*.
+
+### Premise revalidation — PASS, and it is the hardest measurement in this log
+
+Read live this session, not carried forward from the predecessor's note:
+
+```sql
+select count(*) from runner_cycles where trigger ilike '%chain%';   -- 0
+select string_agg(distinct trigger,' | ') from runner_cycles;        -- scheduled | supervised
+select count(*) from runner_cycles;                                  -- 93
+```
+
+**Across all 93 cycles in the runner's life, not one has ever carried a chained trigger.**
+`ARCHITECTURE.md` §19v §Operations has specified *"24×7 as chained short sessions"* since
+2026-08-19, and `SES-139` shipped the step that was supposed to build it. It has never executed.
+The real cadence is, and always has been, the hourly cron alone. John is describing something true,
+and the ledger had no way to show it because a failed spawn is written as a note.
+
+### Root cause — two actuators, two unrelated refusals
+
+1. **`fire_trigger`** (`SES-139`, `v7.0.176`) — *"this routine was created via http_api, not by an
+   agent."* An agent may not fire a routine it did not create. That refusal **is** `SES-140`.
+2. **`create_session`** (`SES-141`, `v7.0.180`, John's explicit ruling *"just have the prompt kick
+   off another session"*) — refused **twice** by predecessor cycle `72561db3` at ~14:0xZ, identical
+   message: *"the parent session's permission mode is not yet available (it is recorded shortly
+   after the parent session starts); retry, or run the parent in auto mode."*
+
+**The second refusal is the one that matters, and the predecessor's own note is what disproves the
+obvious reading of it.** That parent had been running **25 minutes** when it tried. So *"not yet
+available"* is **not a warm-up race** — the value appears never to be recorded at all for a session
+started by a scheduled trigger. And neither remedy the message offers is reachable from inside a
+cycle: the retry has already failed at 25 minutes, and *"run the parent in auto mode"* is a property
+of the **routine**, which a cycle cannot edit — that is `SES-140`'s original refusal, and
+`update_trigger` exposes no `permission_mode`.
+
+### The fix — a ladder, so the authorised actuator still gets first refusal
+
+Tail step (8) keeps Gates A and B, keeps *exactly one* successor, and keeps drain creation
+John-only. Only the actuator changes, and only by gaining a fallback:
+
+- **Rung 1 — `create_session`, one attempt, `permission_mode` now passed explicitly.** Still John's
+  ruled actuator. If the validator only lacked a mode it could not infer, naming one satisfies it
+  and rung 2 is never reached.
+- **Rung 2 — a one-shot Routine, only on rung 1's refusal.** `create_trigger` with `run_once_at`
+  ≈ 2 minutes out and `create_new_session_on_fire = true`. **The scheduler** creates the session —
+  exactly what it already does twelve times a day on the :40 cron — so the parent-permission-mode
+  check is never reached.
+
+`attempts-per-tier ≤ 1` is what keeps *exactly one successor* true: a refusal creates no session, so
+at most one can ever exist. Never retry a rung; never run rung 2 after a rung-1 success.
+
+### QA — proven live, without spawning anything
+
+The creation path was probed **non-destructively**: a one-shot created far in the future, verified,
+deleted.
+
+| Arm | Result |
+|---|---|
+| `create_trigger` one-shot + `create_new_session_on_fire`, from this scheduled cycle | **created** — `trig_01Y1EeMzj8g7yQHxSeLs4MFF`, 14:49:19Z. No permission-mode refusal. |
+| Environment inheritance, nothing passed | **auto** — `env_01GuEzm2nCHbCB5SumvQVEQ1`, the runner's own |
+| MCP connection inheritance, nothing passed | **auto, all four** — `Supabase`, `Claude_Code_Remote`, `Supabase-ef5dea6e`, `Google_Drive` |
+| Rollback | **clean** — deleted; `list_triggers` returns the two real routines only |
+
+**The negative control is not a fixture — it is the predecessor's own double refusal an hour
+earlier**, same account, same environment, same class of caller, one variable changed: the actuator.
+That is what makes this discriminating rather than merely complete. *Would it still pass if the
+change did nothing?* No — doing nothing is exactly what `72561db3` did, and it was refused twice.
+
+**Do not pass `environment_id` or `connectors` on rung 2.** `connectors` can only narrow the
+inherited set, never widen it, so naming a partial list would silently *remove* connections the
+successor needs.
+
+### Disclosed rather than left to be discovered
+
+**A rung-2 successor is not proven equivalent to a cron-fired one.** The probe's stored
+`session_context` carried a **default `allowed_tools` preset** and **no `sources` entry**, where the
+runner routine names both (`Artifact`, `ToolSearch`, `Agent`; the `deepbench-frontend` git source).
+Two consequences, stated as unknowns rather than reasoned away:
+
+- **No clone** → the successor fails at step 1 and records it. Recoverable, and bounded: Gate A
+  means a failed cycle fires nothing further, and the :40 cron is untouched.
+- **No `Artifact`** → it can harvest, build, ship and write its ledger row, but cannot republish the
+  briefing page.
+
+Neither is knowable without a real fire. The runbook now tells the first chained cycle to **say
+which it found** — that observation is owed and nobody else can make it.
+
+**`SES-019` is not being routed around, and the ladder's shape is the argument.** `SES-019` forbids
+retrying the same underlying action through a different tool *to defeat a gate*. Neither refusal
+here is a gate on the runner's authority: the chained successor is authorised (`SES-139`, John's
+**"Yes"**), the actuator was his ruling and he made it (`SES-141`), and he has since said *drain must
+work no matter what*. What the platform scoped is **who may fire a routine** and **which caller may
+create a session** — mechanics. Rung 2 asks the scheduler to do the thing the scheduler already does
+hourly. Every bound that **is** authority survives untouched: Gates A and B, exactly one successor,
+drain creation John-only (`drain_epic_next` property 5).
+
+### One open drain ticket, not five — a correction John should have
+
+He wrote *"Review all open tickets related to drain. there are more than 5."* Measured on the board:
+**exactly one** open ticket concerns the drain chain — `SES-140`, this one. `SES-139`, `SES-141`,
+`SES-142` and `SES-143` are all `done`. The "more than 5" are their **briefing cards**, which sit
+undecided on the page until he taps them, and which he has now Reworked. The distinction matters
+because five open tickets and five undecided cards about already-shipped work call for opposite
+actions.
+
+**Scope:** doc-only — `docs/runbooks/runner-cycle.md`, `CLAUDE-STATE.md`, `docs/SESSIONS.md`. No
+`src/`/`api/`/`lib/` change, no schema change, no site change. Dev **200** on both sweeps.
+Kickoff `docs/kickoffs/v7.0.190-SES-140-successor-actuator-ladder.md`.
+
 ---
 
 ## session/cycle-20260823-1341 (v7.0.188, 2026-08-23, Automated runner cycle `72561db3`, model Opus 5, no subagent) — the gate built to make John's panel binding had never once paced a cycle that obeyed its own instruction
