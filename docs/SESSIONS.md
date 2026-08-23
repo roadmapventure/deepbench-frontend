@@ -5,6 +5,112 @@
 
 ---
 
+## session/cycle-20260823-1240 (v7.0.187, 2026-08-23, Automated runner cycle `363b5138`, model Opus 5 orchestrator, subagent Sonnet 5) — the directory everyone assumed was the problem turns out to be one file, and the part that looks most worth moving is the part that must not move
+
+**Ticket:** `SES-121` — *Shrink the `.claude/`-mutable surface so needs-desktop tickets become
+rare* (`P10 - Tooling`, tier `now`, epic Automation, drain member of directive `b74009ea`).
+**Closed `partial`**, `design_status = 'needs-john'` — the ticket asks for a design pass first
+and says the moves themselves need John's approval.
+
+**Selection.** No queued one-off directive. `drain_epic_next()` returned `pick SES-140`,
+`open_now 15`. The board's top three are all flagged and were stepped past per `SES-114`, each
+with a `record_skip()` row first: `SES-140` — *the successor fire is refused by the platform*
+(`needs-john`, `skip_count` → 8), `SES-117` — *structural filing guarantees* (`needs-desktop`,
+→ 5), `SES-118` — *rename backlog status `missing` to `open`* (`needs-desktop`, → 4). So the
+cycle fell through to **board queue 4** for the fifth consecutive time — and this time the
+fourth slot is the ticket whose whole purpose is to unblock slots 2 and 3.
+
+**Premise revalidated live, and it had grown.** Read from `public.runner_skips` at 12:45Z rather
+than recalled: the ticket says *"three times in the week of 2026-08-17"*, and the live count is
+**four** distinct tickets — `SES-106` and `SES-110` (since closed by attended sessions) plus
+`SES-117` and `SES-118`, both blocked **right now**, first skipped 06:55Z and 08:46Z the same
+morning. One of the two live ones is a **single-token** edit — `'missing',` → `'open',` in
+`.claude/skills/session-setup/SKILL.md` step 3c — that has waited since `v7.0.183` while the
+value it writes is rejected by `backlog_items_status_check` with `23514`. A one-token fix no
+cycle may make is the cleanest available statement of the problem.
+
+**Correction 1 — a per-file commit table cannot answer "how much does this directory churn", and
+this cycle's own first draft summed one.** Commits touch several files at once, so the per-file
+column double-counts, and the raw directory total counts files that no longer exist. Re-measured
+directly with `:(exclude)` pathspecs:
+
+| Window | `.claude/` | less `inflight/` | of which the 3 `SKILL.md` candidates | residue |
+|---|---:|---:|---:|---:|
+| All time (the repo is 16 days old, 261 commits) | 78 | **13** | 8 | 5 |
+| Last 14 days | 39 | **10** | **7** | **3** |
+
+**65 of the 78 all-time `.claude/` commits — 83% — were `.claude/inflight/*.md`**, the
+per-session marker files John moved to repo-root `inflight/` (register B41, John-approved
+2026-08-21; last such commit 2026-08-21, root `inflight/` now carries 9 of its own). The
+precedent this ticket cites did not merely work — **it had already removed five-sixths of the
+problem before the ticket was picked.** What is left is one file: of the 10 real `.claude/`
+commits in the last 14 days, `session-setup/SKILL.md` is in **6**, and the three `SKILL.md`
+candidates together in **7**, leaving a residue of **3** across the 14 `rules/` files, both
+config files and `discovery`/`reframe` combined. Thirteen of the twenty-one tracked files have
+been touched once, at creation, and not since.
+
+**Correction 2 — the inbound-reference grep matched full paths only, and `CLAUDE.md`'s own
+pointer table uses the directory form.** The literal-path totals were misleading in *both*
+directions: they over-count, because the large majority are `docs/kickoffs/*`,
+`docs/SESSIONS.md`, `FEATURES-ARCHIVE.md` and the snapshot — historical records, not pointers
+that break (and rewriting them would be falsifying history, §19v) — and they under-count, by
+missing every directory-form reference. Re-measured on the directory form, excluding the
+historical set: `session-setup` **7** live referrers, `session-hygiene` **1**, `triage` **1** —
+all outside `.claude/`, so a cloud cycle can repoint every one of the nine.
+
+**THE ONE THAT WOULD HAVE SHIPPED WRONG.** The obvious way to shrink a directory is to move its
+biggest subdirectory, and `.claude/rules/` **is** the biggest — 14 of the 21 tracked files. It is
+also the one part that must not move: **23 live source files** under `src/`/`api/`/`lib/`/
+`scripts/` name those paths in `**Read first:**` header comments (`api/capabilities/execute.js`,
+`api/prompt/db-assembly.js`, `src/AppShell.jsx`, `lib/rag.js` and nineteen more), 12 of the 14
+rule files carry a single creation commit, and **zero** blocked tickets trace to them. Moving it
+is a 23-file source edit with no benefit at all. Two independent measured reasons, and a
+proposal reasoned from the churn numbers alone would have got it exactly backwards.
+
+**The proposal, filed as card `b7639b59` rather than performed.** Extract the *body* of
+`session-setup`, `session-hygiene` and `triage` to `docs/runbooks/<name>.md`, leaving each
+`SKILL.md` as its YAML frontmatter plus a one-line pointer, repointing the nine live referrers in
+the same commit. The frontmatter must stay in `.claude/` because the harness discovers skills by
+that exact path and triggers them from the `description` — and the split is load-bearing in the
+right direction, since the census says the churn is in the body while the description has barely
+changed. Out of scope, each for two measured reasons: `.claude/rules/*`, `discovery`/`reframe`
+(1 commit each, 1 referrer each), and the two config files. §19v protections are untouched.
+
+**The honest caveat, stated on the card as well as in the audit.** This does not unblock the four
+items already waiting and *cannot* — performing the extraction is itself a `.claude/` write, so
+no unattended cycle can execute phase 2 either. It needs one session John attends, and the right
+ask is that the same sitting also lands the carded one-liners already blocked. And the claim is
+bounded rather than oversold: this makes needs-desktop tickets *rarer*, not impossible — changing
+which runbook a loader points at is still a `.claude/` write, a once-in-a-lifetime edit against a
+body that moved six times in fourteen days.
+
+**QA — discriminating in three directions, each proven by running it, not argued.** New
+`tests/regression/SES-121-claude-surface-boundary.js` converts the "do not move `.claude/rules/`"
+boundary from prose into a check, which is this platform's own recurring lesson applied a tenth
+time (`SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`, `SES-116`, `SES-127`, `SES-128`,
+`SES-129`, `SES-143`). It fails when a live source file names a `.claude/rules/` path that is not
+on disk, and fails when a `SKILL.md` **loader** is deleted — the specific wrong way to execute
+phase 2, which silently removes a skill. Proven: exit **1** with the harvest doc absent (the
+pre-change tree), exit **1** with `triage/SKILL.md` hidden, exit **0** on the shipped tree, plus
+an in-test negative control that hides one rule file and requires it to surface *with its
+referrers* — without which the no-dangling assertion is indistinguishable from a checker that
+returns empty unconditionally. `npm run build` clean; regression **40/40 with credentials**; dev
+probe **200**. An incidental `package-lock.json` diff from `npm install` was reverted rather than
+widening the ship.
+
+**Scope.** One item, one substantive doc (`docs/harvests/SES-121.md`) plus one test, and the
+ceremony set. No `src/`, `api/` or `lib/` change; no schema change; no site change.
+
+**Model discipline (register B21).** Opus 5 orchestrator; the `git log`/`grep` census delegated to
+a **Sonnet 5** subagent — the mechanical shape. The judgment stayed on the orchestrator, and it
+was the load-bearing half: deciding that the biggest subdirectory is the one to leave alone, and
+catching that both of the subagent's headline denominators needed re-deriving.
+
+**Deliverable:** `docs/harvests/SES-121.md`. **Kickoff:**
+`docs/kickoffs/v7.0.187-SES-121-claude-mutable-surface-audit.md`.
+
+---
+
 ## session/cycle-20260823-1140 (v7.0.186, 2026-08-23, Automated runner cycle `3aad1299`, model Opus 5 orchestrator, subagent Sonnet 5) — the startup doc stops teaching a process that no longer exists, and a size cap that could not fire is made able to
 
 **Ticket:** `SES-120` — *Startup-doc modernization: Session-Init rewritten to snapshot pointers;
