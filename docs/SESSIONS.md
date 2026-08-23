@@ -5,6 +5,119 @@
 
 ---
 
+## cycle-20260822-2351 / directive-morning-reading-8-22 (v7.0.166, 2026-08-22, Automated runner cycle `9c2d19d7`, model Opus 5 orchestrator **+ one Fable 5 subagent**) — John typed a reading and the card showed him nothing
+
+**Mission:** selection **layer 1a** — a one-off directive John typed into the briefing page's
+directive box, read at step 2 and stored in the step-9 tail (register B42). It outranks the
+standing `drain-epic` directive `b74009ea` (layer 1b), because his latest specific word beats a
+standing build order. No backlog ticket and therefore no ticket claim; see *Coordination* below.
+
+**His line, verbatim:** *"The last recording for today's reading should be used and shown on the
+card as this mornings reading for 8/22"*
+
+### The premise, measured this session rather than recalled
+
+- `public.runner_usage_readings`: **8 rows, all `slot='adhoc'`**, all `tokens_per_pct = NULL`. The
+  newest, and the only 8/22 reading, is `a7d31f60-52b8-4c19-9e04-6f1b8d3a2c75`, `taken_at
+  2026-08-22 13:50:00+00` (8:50 AM America/Chicago) — Fable 20 / All models 18 / 5-hour 5.
+- Live `briefing-state`: `"reading":{"adhoc":{"fable":"20","all":"18","h5":"5","at":"2026-08-22T13:50Z"}}`.
+- `docs/runbooks/briefing-template.html` renders **exactly two** reading rows —
+  `readingSlot('night', …)` and `readingSlot('morning', …)`. **There is no `adhoc` row at all.**
+
+So the reading was stored, and the card showed an empty Morning slot. Its only trace was the
+`(adhoc)` tag inside the derived "✓ Your latest reading was recorded" line. **Premise holds.**
+
+### Why this needed John and could not have been a cycle's own call
+
+`SES-128` (`v7.0.163`) shipped the two slots two hours earlier and deliberately left all eight
+readings `adhoc`, writing the reason into its own header: `13:50Z` "is 8:50 AM in Chicago and reads
+exactly like a *morning*", and slotting it on that resemblance "would manufacture a bracketing pair
+John never declared." The missing ingredient was never evidence — it was **his declaration**. This
+directive supplies it, for one row on one day, and the rule is now written into
+`briefing-page.md` §4 so the next cycle neither reverts it as an inferred slot nor reads it as
+licence to infer.
+
+### What shipped
+
+1. **Ledger.** `runner_usage_readings.slot` `adhoc → morning` on `a7d31f60`, **before-image first**
+   (§19v), `taken_at` **not** restamped, provenance appended to `note`.
+2. **Page.** Republished with `briefing-state.reading = {"morning":{…,"at":"2026-08-22T13:50Z"}}`,
+   the `adhoc` entry **deleted** — moved, not copied.
+3. **Doc.** `docs/runbooks/briefing-page.md` §4 gains a fifth rebuild rule: a reading leaves
+   `adhoc` **only** on John's explicit declaration, with its three boundaries (both homes or it is
+   invisible; move never copy and never restamp `at`; the other rows stay `adhoc`).
+
+### The two halves that would have shipped wrong
+
+**(a) A ledger-only fix passes QA and leaves the card blank.** The slot has **two homes** — the
+column, and `briefing-state.reading`, which is what `readingSlot()` actually reads (it never
+queries Supabase). Update only the row and every SQL assertion goes green while the Morning row
+stays empty: QA passing while the one thing he asked for — "**shown on the card**" — did not
+happen. This is the single most likely looks-fine failure and is now named in the doc.
+
+**(b) Claiming this turns calibration on.** It does not. `derive_token_allowance()` needs a
+night→morning pair; there is still **no night reading**, so it returns `guard = 'no bracketing
+pair: no night reading'` — asserted **after** the move. Nor will tonight's night reading pair with
+this one: the function takes the latest `night`, then the earliest `morning` **after** it
+(`WHERE slot='morning' AND taken_at > v_night.taken_at`), so the bracket runs forward and 8/22's
+morning sits before tonight's night. Today's allowance is unchanged and remains John's unexpired
+`budget_override` `43a9d4ae` (25,000,000 tokens, expires `2026-08-23T05:00Z`). What actually turns
+calibration on is a **Night** reading tonight and a **Morning** reading tomorrow within 24h of it.
+
+### QA — discriminating, both directions
+
+| # | Test | Result |
+|---|---|---|
+| A | No-invention control: `derive_token_allowance(NULL)` after the move | `guard='no bracketing pair: no night reading'`, `tokens_per_pct` NULL, `day_allowance` NULL ✓ |
+| B | **The test that counts.** Fixture `night` reading at `2026-08-22 04:00Z` inside a deliberately rolled-back transaction, then the **real** function | `guard='ok'`, `morning_id=a7d31f60`, 9.83h, delta 6, 2,540,000 tokens, **423,333.33** per pct, allowance 2,479,523 ✓ |
+| C | Cleanup | 8 readings, 0 fixtures, 1 `morning` / 7 `adhoc` / 0 `night`, `tokens_per_pct` still NULL ✓ |
+| D | Served page after republish | `briefing-state.reading.morning.at === "2026-08-22T13:50Z"`, no `adhoc` entry with that `at` ✓ |
+
+**Would B still pass if the change did nothing? No.** With the row still `adhoc` the same fixture
+returns `'no bracketing pair: night reading has no morning after it'`. The `ok` verdict is only
+reachable through the row this cycle moved. `423,333.33` independently reproduces `SES-128`'s own
+documented expectation for the same fixture shape.
+
+**Build/regression:** not applicable and **not claimed** — no `src/`, `api/` or `lib/` file was
+touched. Blocker sweeps: dev root **HTTP 200**, 2,580 bytes, `#root` present, via curl with the
+`x-vercel-protection-bypass` header. Worth recording against `c1aff11a`'s note that dev was
+unreachable: that block was **`WebFetch`-specific** — curl reaches the dev host from this
+container fine.
+
+### Coordination, stated because it is a real gap and not this cycle's to close
+
+A directive mission has no `backlog_items` row, so there is **no ticket claim** to re-assert before
+the counter claim and the push (step 0's gate). Layer 1a's serialisation is the directive's
+`in_progress` status — and under B42 the directive row is not written until the step-9 tail, so an
+unharvested directive is momentarily unserialised. Mitigating facts, measured not assumed: step
+0b's sweep found no live peer (the one open row, `db8b9eee`, has been silent 30.4h with
+`item_id` NULL and was already stall-notified at 2026-08-21T20:11Z), and the next scheduled fire is
+`02:05Z`, after this cycle's tail stores and closes the directive and republishes with the box
+cleared. Named here rather than papered over.
+
+### Deliberately not done
+
+- **The other seven `adhoc` readings.** He spoke about 8/22; extending his sentence to rows he did
+  not mention is the inference `SES-128` banned, wearing a permission slip.
+- **The standing rule.** Filed as `q-adhoc-morning-standing`, not assumed — a **Yes** re-authorises
+  exactly the clock-time inference `SES-128` refused (an 11 PM reading slotted "morning"). Note the
+  page's 5-question render cap means this pushes the oldest open question off the rendered list.
+- **Regenerating `briefing-state.reading` FROM the ledger** so the two homes cannot disagree.
+  Filed as `gated_before_build` card `8a86d9d4`, not built. The page is the **input buffer** — data
+  flows page → ledger at harvest — so a ledger-seeded rebuild running before, or instead of, a
+  successful harvest silently eats a reading John just typed, which is precisely the "rebuilding
+  without harvesting destroys un-acted-on taps" failure the regeneration contract exists to
+  prevent. It also reverses the authority direction `SES-128` shipped two hours earlier.
+
+### Note on the step-1 push
+
+`get_session` reports `origin = force_run_trigger` and the start sits off the 3-hour grid, so this
+was a **manual fire** (John pressed Run). The step-1 push said "scheduled". Corrected in the ledger
+and on the briefing rather than by sending a second notification — step 1 allows exactly one push
+per cycle open.
+
+---
+
 ## cycle-20260822-2306 / SES-114-skip-blocked-at-a-glance (v7.0.165, 2026-08-22, Automated runner cycle `693ad2fe`, model Opus 5 orchestrator, no subagent) — the blocked prefix stops being re-derived every cycle
 
 **Ticket:** `SES-114` (Tooling · `P10 - Tooling`), queue position 4 at pick, tier `now`, epic **Automation**.
