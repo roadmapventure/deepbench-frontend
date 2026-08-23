@@ -12847,3 +12847,125 @@ because "no subagent" should be a decision, not an omission.
 **Environment note worth keeping:** outbound `curl` from this cloud session needs `--cacert /root/.ccr/ca-bundle.crt`. Without it the dev probe fails TLS (exit 35) and reads exactly like an outage; with it the dev root returned **200** on both blocker sweeps.
 
 Build clean; regression **38/38** with credentials (the single failure without them, `CHI-31`, is environmental and passes once `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` are supplied). Kickoff `docs/kickoffs/v7.0.182-SES-143-automation-panel.md`.
+
+## 2026-08-23 — `session/cycle-20260823-2040` (v7.0.206, Automated runner cycle `12ef7728`)
+
+**`SES-157` — Vision claims move to Supabase, seeded with the P1–P4 class purposes as root claims**
+(`P10 - Tooling`, tier `now`, queue 4, Chain B 1 of 4) — **DELIVERED, awaiting John's Accept.**
+Spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decisions 5–7, John-approved 2026-08-23.
+Kickoff `docs/kickoffs/v7.0.206-SES-157-vision-claims-to-supabase.md`.
+
+**Fire and gate.** Scheduled 20:40Z fire; `scheduler_gate()` returned `run` — *"scheduler on — this
+fire is on your 3h clock grid (15:00 America/Chicago); the last cycle that ran started 1.11h ago"*.
+Walls clear: $0 of $100 month, $0 of $5 CST day, meter 37% against a rest wall of 85, day cap
+25,000,000 (`cap_source = override`, `ed642325`, expiring midnight CST) against 22,490,000 estimated
+already spent over 27 cycles — clear on entry, and the tight one. `resolve_day_token_cap()` reported
+`calibration_guard = 'ok'` with a `calibrated_allowance` of 10,000,000 off the 03:36Z→13:51Z
+night→morning bracket; the override outranks it at rung 1.
+
+**Selection.** No queued one-off directives. `drain_epic_next()` returned `pick` → `SES-155`, which
+carries `design_status = 'needs-john'` — skipped (`runner_skips` `7c7d680a`). Fell through to the
+board. Queue 1 `SES-154` is `delivered` and was stepped past **silently and deliberately** (its
+undecided ship card already carries that ask — `SES-154`'s own rule, and a second home for one ask is
+how §10 stops being read). Queue 3 `SES-156` declares *"Depends on SES-155"* and its threads render
+from `public.briefing_comments`, which **`to_regclass` returns `null` for** — verified live, not
+inferred — so it was skipped (`runner_skips` `0c0de5cd`). Queue 4 `SES-157` claimed atomically.
+
+**Premise revalidation.** `to_regclass('public.vision_claims')` → `null`; nine essays, 100,002 bytes of
+prose, no table behind any of it. Premise holds.
+
+### What shipped
+
+Migration `ses157_vision_claims` creates `public.vision_claims`. Two constraints carry decisions rather
+than tidiness, both the `SES-112` precedent (*a status may not claim an artifact it does not carry*):
+`ck_vision_claim_decided` — anything not `proposed` **must** carry a `provenance`, so no cycle can
+record a verdict without saying what decided it; and `ck_vision_claim_rewritten` — a `rewritten` row
+must name its `superseded_by`. `ck_vision_claim_class` admits only the four **named** class forms,
+never a bare `P1`: John's language rule made structural rather than remembered.
+
+**306 rows live** — 4 roots + **262** imported verbatim from the nine `docs/vision/` essays + **40**
+distilled from `docs/JOHN-DECISION-PATTERNS.md`. Per-doc counts match the source files exactly
+(thesis 30 · current-mission 30 · positioning-invariants 37 · evidence-sources 28 · exit-thesis 28 ·
+market-map 27 · customer 26 · decision-criteria 5 · rejected-paths 51). Confidence came from each
+claim's own `(HIGH)`/`(MED)`/`(LOW)` marker rather than a re-judgement: 229 high, 70 medium, 7 low.
+
+### THE HALF THAT WOULD HAVE SHIPPED WRONG, and it was caught by measuring
+
+This cycle first delegated the extraction to a **Fable 5** subagent, on the assumption that the essays
+were prose a model had to tease claims out of, and briefed it for *"roughly 8-15 per doc, ~90-120 rows
+total"*. **That assumption was false.** `SES-84` phase 1 had already written every claim as an id'd,
+confidence-marked bullet with a `*grounds:*` tail — **262 of them, 262 of 262 carrying both**, measured
+across all nine docs before a row was written. So the delegated brief could only **lose** rows: roughly
+**140 real claims dropped**, and the survivors paraphrased where the docs state the wording exactly —
+including `C-thesis-2`, the **LOCKED** investor pitch, 451 characters that have to survive the move
+byte-for-byte.
+
+The subagent was stopped mid-run and the import re-run **one tier up** as a deterministic parser
+(register B21's attempts-per-tier ≤ 1 satisfied: one Fable attempt, then Opus — never a second attempt
+at the same tier). The `JOHN-DECISION-PATTERNS.md` half is genuinely a distillation and stayed with its
+**Sonnet 5** subagent, which returned 40 rows.
+
+**The faithfulness check ran against the LIVE TABLE, not the intermediate file:** every `[C-…]` bullet
+in the nine docs was re-parsed and matched to its shipped row by `claim_ref` — **262 checked, 0 missing,
+0 text differences, 0 wrong statuses, 0 wrong confidences**, against 306 rows in the table. A
+count-only check would have passed on a paraphrasing import; this one does not.
+
+### A Reverse no longer deletes anything
+
+John's ruling, verbatim: *"a rejected claim is a kept row, since rejections teach what not to build."*
+The drip card's Reverse used to delete the claim from its essay and append to `rejected-paths.md`. It
+now writes `status = 'rejected'` — a deleted claim is re-invented; a rejected row is what the invention
+pass can actually check itself against. `docs/vision/rejected-paths.md` is **retired to a pointer stub**
+in the same ship (its 51 claims are `VC-REJECTED-001..051`, imported with their grounds as provenance
+and verified before the file was replaced; the prior revision is in git history at `e1ffa65`). A typed
+line INSERTs a new ratified row in John's words and points the old one at it via `superseded_by`, so
+his wording **replaces** a claim without destroying what it replaced.
+
+### The roots are questions, and deliberately not `runner_questions` rows
+
+`VC-ROOT-001..004`, `is_root = true`, `confidence = 'high'`, quoted from `ARCHITECTURE.md` §19v
+including the two bars John added 2026-08-21 (P2's *hard-to-replicate uniqueness*, P4's *buy-pull*),
+seeded `proposed` so §12 serves them like any other unratified claim — which **is** decision 7's
+"simultaneously asked". They are not `runner_questions` rows because §9 caps the page at **5 open
+questions**: four roots filed there would have evicted John's live operational questions in order to
+ask him something §12 already asks better, with a class chip and with his own wording accepted as the
+answer rather than a yes/no. One ask, one home.
+
+### QA
+
+Seven constraint arms on fixtures inside a transaction rolled back by a terminal `RAISE`: A a bad
+`claim_ref` shape, B a bad `status`, C the bare-digit `'P1'` class form, D `rewritten` with no
+`superseded_by`, E a verdict with no `provenance`, F a duplicate `claim_ref` — all six correctly
+refused — and **G, the positive control: a legitimate ratified row and a legitimate proposed row, both
+inserted.** G is why this is a test rather than a checklist: A–F are all *refusals*, and every one of
+them would also pass on a table nobody can write to at all, which is precisely the failure
+`.claude/rules/supabase-column-grants.md` records (a lockdown asserted in one direction only, reporting
+success and changing nothing). Rollback verified clean afterwards: 4 rows, 0 stray fixtures, all four
+roots present. Grants asserted **both directions** per `SES-101`/`DAT-18`, all four DML verbs —
+`anon`/`authenticated` false on every one, `service_role`/`postgres` true. RLS enabled with no policies
+as a second gate. No function created or changed, so the overload rule has nothing to assert.
+
+Build green; regression **46/46** with credentials.
+
+### Disclosed rather than left to be discovered
+
+- **`judgment_class` is deliberately NULL on all 302 imported rows.** The essays carry no per-claim
+  P-class, so assigning 302 of them would have been this cycle inventing 302 classifications in one
+  pass and storing them as if the corpus had said so. The four roots carry theirs because §19v states
+  it. Thickening class criteria is what `SES-159`/`SES-160` exist to do, one ratified answer at a time.
+- **`decided_at` is NULL on the 51 rejected rows.** Stamping the import minute onto a path John
+  rejected months ago asserts a date nobody observed; the historical reason lives in `provenance`,
+  which the CHECK already requires. Only a tap sets `decided_at`.
+- **No `vision_drip_next()` function**, and it is the one candidate consciously declined. Writing §12's
+  selection as SQL in `briefing-page.md` is the *"a rule each cycle re-derives gets re-derived
+  differently"* shape this platform has corrected ten times. It is not folded in here because it is the
+  same edit as deriving the §12 builder field, and doing half of `SES-163`'s job inside `SES-157` would
+  leave two partial fixes instead of one.
+- **No regression test file.** The three shipped surfaces are a schema, a seed and a doc contract; the
+  §12 renderer in `briefing-template.html` is unchanged (it already draws vision rows through
+  `question()` — only the row's *source* moved), so a network-free template test would have had no
+  delta to assert. The QA above is live and reproducible from the kickoff.
+- **Nothing in a browser reads this table**, by design: the briefing is built server-side with the
+  service key. A future client-side reader will get a **403, not a blank**, until an explicit
+  column-list grant lands in the migration that adds it — the fail-closed direction the column-grants
+  rule asks for, presenting as *"my new section returns nothing"*.

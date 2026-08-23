@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.206 | runbooks/briefing-page.md | SES-157 — the vision drip's SOURCE moves from docs/vision/*.md to public.vision_claims (migration ses157_vision_claims). Spec docs/design/BRIEFING-COMMENTS-0823-DRAFT.md decision 5, John-approved 2026-08-23: "Claims live in a Supabase table (single source); vision md essays keep prose only." 306 rows live -- 4 roots + 262 imported verbatim from the nine essays + 40 distilled from JOHN-DECISION-PATTERNS.md. THE TAP TABLE IS THE POINT: Accept ratifies a row, a typed line INSERTS a new ratified row in John's words and points the old one at it via superseded_by (his wording REPLACES the claim without destroying what it replaced), and REVERSE NO LONGER DELETES ANYTHING -- it writes status='rejected', because his ruling is that "a rejected claim is a kept row, since rejections teach what not to build"; a deleted claim is re-invented, a rejected row is what the invention pass can check itself against. docs/vision/rejected-paths.md is retired to a pointer stub in the same ship and must not be appended to. THE HALF THAT WOULD HAVE SHIPPED WRONG, and it was caught by measuring rather than reasoning: this cycle first delegated the extraction to a Fable 5 subagent briefed for "8-15 claims per doc, ~90-120 total", on the assumption the essays were prose -- SES-84 phase 1 had ALREADY written all 262 as id'd, confidence-marked bullets with grounds, so that brief would have silently dropped ~140 real claims and paraphrased text the docs state exactly, including C-thesis-2, the LOCKED 451-character investor pitch. Re-run one tier up as a deterministic parser (register B21 attempts-per-tier <= 1 satisfied). Faithfulness asserted against the LIVE TABLE, not the intermediate file: 262 doc claims re-parsed and matched by claim_ref -- 0 missing, 0 text differences, 0 wrong statuses, 0 wrong confidences; a count-only check would have passed on a paraphrasing import. The four ARCHITECTURE.md §19v class purposes are seeded proposed + is_root so §12 ASKS him to ratify or restate them (decision 7) -- deliberately NOT runner_questions rows, because §9 caps the page at 5 open questions and four roots there would have evicted his live operational questions to ask something §12 already asks better. judgment_class is deliberately NULL on all 302 imported rows: the essays carry no per-claim P-class and inventing 302 of them in one pass would store this cycle's guesses as if the corpus had said so; SES-159/160 thicken them one ratified answer at a time. Row-id form becomes vision-<claim_ref>; the `vision-` PREFIX RULE IS UNCHANGED and still the only discriminator between a claim tap and a runner_questions tap under the shared answers key -- what changed is that the suffix is a unique table key rather than a doc-plus-line coordinate, so harvest by claim_ref and NEVER by matching the claim's text (John's typed line rewrites that text, which is exactly when a text match would silently stop finding its row). 7 constraint arms proved on fixtures inside a deliberately rolled-back transaction, arm G the POSITIVE CONTROL (A-F are all refusals and would every one pass on a table nobody can write to at all -- the failure .claude/rules/supabase-column-grants.md records); rollback verified clean. Grants asserted BOTH directions per SES-101/DAT-18, all four DML verbs: anon/authenticated false, service_role/postgres true. Doc + schema; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.205 | runbooks/briefing-page.md | SES-154 — ACCEPTANCE-GATED COMPLETION, the page half. A cycle's ship writes backlog_items.status='delivered'; John's Accept on a `shipped` card is now the ONLY thing that writes `done`, and it is the call site that releases the ticket's queue number (the ship deliberately no longer does). Spec docs/design/BRIEFING-COMMENTS-0823-DRAFT.md decision 1, approved by John 2026-08-23; Chain A 1 of 3; migration ses154_delivered_status. Reverse is UNCHANGED and was already correct — reopening the backlog row restores the prior open state, which is what decision 1 asks of a rejection — so no edit was made to it; decision 2's rename of Reverse to "Reject" has NOT shipped and no rule here is written against a button that does not exist. THE FINDING THIS SHIP IS MOST HONEST ABOUT, recorded because reporting a completed re-key would have been false: the ticket's "re-key the scoreboard (daily shipped)" had NO KEY TO RE-KEY — surveyed across briefing-template.html, this file, tests/ and scripts/, the "Shipped today" stat is a HARDCODED SAMPLE VALUE (1) under a comment telling a rebuild to regenerate it, and no file defines the query. So §2 gains a data CONTRACT (count tickets John ACCEPTED in the CST day, never cycles that pushed, never delivered-but-unaccepted; delivered needs its own box rather than a share of this one) instead of a predicate being edited. The OTHER scoreboard figure needed no edit at all and that was verified rather than assumed: §2b's drain_left already counts members "not yet done/removed", and SES-154 deliberately keeps 'delivered' OUT of drain_epic_next()'s retirement predicate, so X-of-N now falls only on John's tap — for free. A warning against "fixing" that by adding delivered ships with it, because doing so would report a drain finished on the runner's own say-so, which is the authorisation defect SES-142 was filed to end. Doc-only in this file; the schema and the runbook halves are v7.0.205's other two artifacts. -->
 <!-- DeepBench v7.0.201 | runbooks/briefing-page.md | SES-147 — §2b's data contract gains John's DAILY MAX box (his words 2026-08-23: "Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it"; locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3). TWO keys, not one, and the second is the whole point: `daily_max_millions` is the STORED number and `daily_max_effective` is what the next run will actually spend, read from migration ses147_daily_max_tokens's public.resolve_day_token_cap(). A row that showed only the box, or that computed box × 1,000,000 locally, is wrong on EXACTLY the days a higher rung fires — which are the days John is looking at this panel. The ladder is override > 48h stale floor > this box > SES-128 calibration > the 10M default, and the two rungs ABOVE the box are the counter-intuitive half: a standing number must not defeat the staleness brake (spec, verbatim), so with the box at 4 and every reading aged past 48h the shipped function returns 3,000,000 / stale-floor while the obvious "the box IS the cap" build returns 4,000,000. All seven arms proved on fixtures inside a deliberately rolled-back transaction (override-beats-box 25,000,000; box-is-the-cap 4,000,000; stale-beats-box and no-reading-beats-box 3,000,000; blank-box 10,000,000 = pre-SES-147 EXACTLY; the CHECK rejecting 0 and 1001; the rest wall reported and NOT enforced), rollback verified clean. NULL IS NOT ZERO, stated as a rule because it has four expressions that must agree: the DB null, settingsNow()'s `undefined`-not-falsy test, the empty-string render, and the empty-box commit that stores null — a blank box means "no standing cap, budget as before", and a 0 would read as "no tokens allowed today". Tenth prose→code correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143, dir 16b3ff73). Grants asserted both directions per SES-101; 1 overload per .claude/rules/supabase-function-signature.md. Guarded by tests/regression/SES-147-daily-max-box.js. -->
 <!-- DeepBench v7.0.199 | runbooks/briefing-page.md | directive 16b3ff73 — new regeneration step 1c: the §5/§6 card set is `SELECT * FROM public.briefing_open_cards()` (migration dir_16b3ff73_gated_card_retire), and a GATED card retires itself the moment its ticket reaches done/removed. JOHN FOUND THIS AND REPORTED IT BY PASTING A §6 ROW BACK AT US, verbatim: "6.6 Gated CHI-84 Tapping a step chip in chat jumps you to that step — built, but it needs a session you are in" — a card asking his permission to build something that had already shipped (CHI-84 closed done at 15:18Z in an attended session while its gated card sat undecided). MEASURED BEFORE A LINE CHANGED and it was not one card: of the 8 undecided cards carrying a ticket id, SEVEN had a ticket already done, and FOUR of the FIVE gated cards were dead questions (SES-121, SES-118, SES-117, CHI-84) — only AGT-015 was a live ask. Four of the five things §6 asked him to decide were moot, which is how an actionable section stops being read. THE ONE THAT WOULD HAVE SHIPPED WRONG IS THE TIDIER-LOOKING ONE: hiding every undecided card whose ticket is done. Run live on identical rows that renders 3 where the shipped rule renders 6 and kills ALL THREE of the night's ship cards — hiding the work from John and starving the trust ladder, whose only input is his verdict on shipped work. A gated card asks "may I build this?" (permission, moot once built); a ship card asks "was this good?" (a rating, meaningful forever). Only the first retires. NOTHING VANISHES SILENTLY: the call LABELS rather than hides — `render` is the filter, `retired_reason` says why — and the retired count is reported on the page. A retired card is NOT SHOWN, never ANSWERED: `decision` stays NULL and stays John's (§19v). "Still needed" is DERIVED from backlog_items.status, never a maintained flag — the same self-retiring shape as §10's skip filter (SES-127), so a ticket that ships drops its dead card with no write from any cycle. Ninth prose→code correction. LATERAL … LIMIT 1 because backlog_id is not unique (CHI-48, SES-97). Grants asserted both directions; 1 overload. Guarded by tests/regression/DIR-16b3ff73-gated-card-retire.js, whose assertion 1 fails on the pre-change tree. -->
@@ -746,16 +747,60 @@ stray narrative outside §3.
 
 ## Vision-corpus drip cards (every rebuild — `SES-84` phase 2, register B13, `v7.0.134`)
 
-Each rebuild includes **1–3 vision claim cards** (~15 min/day of John's time max, his rule) drawn
-from `docs/vision/*.md`: pick the highest-value unratified claims — `LOW` confidence first, then
-`MED`, then each doc's "Open questions for John" — never more than 3, never zero while unratified
-claims remain. Card face: the claim sentence phrased as "X because Y — true?", its doc + claim id
-(`C-thesis-4`), and the three buttons. **Accept** ratifies: the cycle edits that claim line to
-`HIGH` with `(ratified <date>)`. **Rework** replaces the claim text with John's line verbatim,
-marked `HIGH (John's words, <date>)`. **Reverse** deletes the claim and records it in
-`vision/rejected-paths.md` if it asserts a path. Decisions ride the same `briefing-state`
-harvest as every other card; the corpus edit lands in the cycle's normal ship commit. On-demand
-bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.
+**THE SOURCE IS `public.vision_claims`, NOT THE MARKDOWN (`SES-157`, `v7.0.206`, migration
+`ses157_vision_claims`).** Spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 5, John-approved
+2026-08-23: *"Claims live in a Supabase table (single source); vision md essays keep prose only."* The
+nine essays under `docs/vision/` are still the corpus a cycle **reads for context**; they are no longer
+where a claim's **state** lives, and a cycle must never again edit a claim line to record a decision.
+
+Each rebuild includes **1–3 vision claim cards** (~15 min/day of John's time max, his rule), selected
+from the table by one read:
+
+```sql
+SELECT claim_ref, source_doc, claim_text, judgment_class, confidence, is_root
+  FROM public.vision_claims
+ WHERE status = 'proposed'
+ ORDER BY is_root DESC,                                   -- the four root claims first (decision 7)
+          array_position(ARRAY['low','medium','high'], confidence),
+          claim_ref
+ LIMIT 3;
+```
+
+`is_root DESC` leads because the four roots are the `ARCHITECTURE.md` §19v judgment-class purposes and
+**every later claim is scored against them** — a corpus whose roots are still the doc's paraphrase is
+one John never actually ratified. `LOW` confidence before `MED` before `HIGH` is register B13's
+existing rule, unchanged; each doc's *"Open questions for John"* imported as `low`-confidence rows and
+needs no separate pass. Never more than 3, never zero while `proposed` rows remain.
+
+Card face: the claim sentence phrased as *"X because Y — true?"*, its `claim_ref` (`VC-THESIS-004`) and
+`source_doc`, the class chip, and the three taps. **Every tap is a row write; none of them edits a
+markdown file:**
+
+| Tap | What it writes | Why |
+|---|---|---|
+| **Accept** | `status='ratified'`, `confidence='high'`, `decided_at=now()`, `provenance` = his tap | ratification is a state, and it now has one home |
+| **Reverse** | `status='rejected'`, `decided_at`, `provenance` = his tap | **a rejected claim is a KEPT ROW, never a deletion** — see below |
+| **typed line** | INSERT a new `ratified`/`high` row carrying his words verbatim, then set the old row `status='rewritten'`, `superseded_by` = the new row's id | his wording **replaces** the claim; the old text stays readable, so the corpus gets richer rather than overwritten |
+
+**A Reverse no longer deletes anything, and that is decision 5, not a softening.** John's reason,
+verbatim: *"`vision/rejected-paths.md` retires — a rejected claim is a kept row, since rejections teach
+what not to build."* A deleted claim is re-invented; a `rejected` row is what stops the invention pass
+proposing it again. `ck_vision_claim_decided` enforces the discipline structurally — a row that is not
+`proposed` **must** carry a `provenance`, so no cycle can record a verdict without saying what decided
+it. `docs/vision/rejected-paths.md` is retired to a pointer stub in the same ship; do not append to it.
+
+Every write is `runner_before_images`-first like any other Supabase write (§19v); an INSERT writes
+`row_data = NULL`, the `SES-142` precedent. Decisions ride the same `briefing-state` harvest as every
+other card. On-demand bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.
+
+**The four ROOT claims are simultaneously questions, and that is the whole of decision 7.** John's
+ruling: *"The four §19v purpose statements are seeded as root claims AND simultaneously presented as
+§12 questions for him to clarify, correct, or restate in his own words — his answer is the ratified
+root, not the doc's paraphrase."* They are seeded `status='proposed'`, `is_root=true`, so §12 serves
+them like any other unratified claim and his tap ratifies or rewrites them in place. **They are
+deliberately NOT `runner_questions` rows** — §9 caps the page at 5 open questions, so four roots filed
+there would have evicted John's live operational questions to ask him something §12 already asks
+better, with a class chip and his own wording accepted as the answer. One ask, one home.
 
 **§12's SHAPE, since `SES-125` (`v7.0.160`) — a claim is a question row, not a card.** John's
 spec word is *"formatted exactly like Questions"*, so the template renders §12 through the **same
@@ -771,10 +816,15 @@ resolves it.
 **The one new rule, and it is load-bearing: a vision row's id MUST start `vision-`.** Claims and
 questions both land in `briefing-state` under the **same `answers` key**, so at harvest time the
 id prefix is the *only* thing that says whether an answer belongs to `public.runner_questions` or
-to a claim in `docs/vision/*.md`. A vision row published with a bare slug would be harvested as a
+to a claim in `public.vision_claims`. A vision row published with a bare slug would be harvested as a
 question against a `qid` that does not exist — a silent no-op on John's tap, which is the one
-failure a decision surface may never have. Use `vision-<doc>-<claim id>`
-(e.g. `vision-thesis-C-thesis-30`).
+failure a decision surface may never have. **Since `SES-157` (`v7.0.206`) the form is
+`vision-<claim_ref>`** (e.g. `vision-VC-THESIS-030`), replacing the retired `vision-<doc>-<claim id>`
+form (`vision-thesis-C-thesis-30`) — the prefix rule is unchanged and still the discriminator; what
+changed is that the suffix is now a **unique key into a table** (`uniq_vision_claim_ref`) rather than a
+doc-plus-line coordinate that only a text search could resolve. Harvest by `claim_ref`, never by
+matching the claim's text: John's typed line rewrites that text, which is exactly when a text match
+would silently stop finding the row it is meant to update.
 
 ## The question list (every rebuild — SES-99)
 
