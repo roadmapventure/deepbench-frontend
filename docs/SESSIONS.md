@@ -5,6 +5,115 @@
 
 ---
 
+## session/cycle-20260823-0206 (v7.0.174, 2026-08-23, Automated runner cycle `f6e50900`, model Opus 5 orchestrator, no subagent) — the join key that was really a caption, and the constraint that would have eaten John's next tap
+
+**Ticket:** `SES-116` — *`runner_items.backlog_id` holds display strings on 3 open cards — repair
++ bare-ID CHECK* — Type: Tooling, `P10 - Tooling`. Closed **`done`** (was `missing`). Picked by
+**selection layer 1b**, John's standing Automation drain (`drain_epic_next` → `pick`, queue 1,
+`open_now = 18`). Kickoff: `docs/kickoffs/v7.0.174-SES-116-backlog-id-bare-check.md`.
+
+**The root cause is a sentence in our own runbook, and that is why the fix is two things.**
+`runner-cycle.md` step 9 told every cycle to file its card with *"backlog ID + Type + named
+P-class per the Language block above"*. The Language block (John, 2026-08-20) governs what **John
+reads** — `P10 - Tooling`, never a bare digit — and it never governed a key column. Followed
+literally it produces `'SES-115 (Tooling · P10 - Tooling)'` **inside `runner_items.backlog_id`**,
+which joins to `backlog_items.backlog_id`. Every card→ticket join therefore returned nothing,
+silently: the help-me ticket, the pending-on-John views, `SES-112`'s `needs-john` backfill.
+**Without rewording step 9 in the same commit, the very next cycle to file a card would have had
+its INSERT rejected by the new CHECK** — so the doc edit is not documentation of the fix, it is
+half of it.
+
+**Measured before a line changed, and the ticket under-counted the problem 20×.** `SES-116` says
+*"3 of 4 open `gated_before_build` cards"*. Live census at 02:1xZ: **80** rows carry a non-NULL
+`backlog_id`, 17 are already bare, **63 violate** — 41 resolving to a real board ticket, 22
+naming none — and **7 of the 63 are undecided**, i.e. sitting on John's page right now. Two of
+those seven are `CHI-84` (queue 20) and `AGT-015` (queue 11): real tickets, real gated cards,
+mis-joining while awaiting his tap.
+
+**It was already costing real work, which is the part worth keeping.** One cycle earlier,
+`v7.0.173` (`SES-115`) could not join its own new `backlog_active` view to the ticket table and
+had to reach it through `substring(ri.backlog_id from '^[A-Za-z]+-[0-9]+')`. Its kickoff doc says
+so in as many words: *"The natural join `ri.backlog_id = b.backlog_id` matches **zero rows**."*
+A workaround written the cycle before, for exactly this defect, and nobody had yet filed the
+cause — `SES-116` had been sitting at queue 1.
+
+**The pattern was surveyed, not chosen.** The ticket made that its own precondition, and it
+passed as written: `'^[A-Z]+-[0-9]+[a-z]?$'` matches **all 603** rows of
+`backlog_items.backlog_id`, **zero exceptions**, so the CHECK cannot reject a legitimate ticket
+reference.
+
+**The half the ticket did not anticipate — why `display_ref` exists rather than `NULL`.** The
+ticket says *"NULL stays allowed for non-ticket cards (e.g. invention proposals)"*, which is right
+for a card that never had a reference. But of the 22 unresolvable rows, most carry **the only copy
+of a real one**: eleven name a directive by uuid (`directive 603f44ea`), two a governance register
+(`B17 BACKFILL`, `B31`), two an `ARCHITECTURE.md` clause, one an invention proposal, and four name
+`SES-78`/`78a`/`78d` — pre-board cards whose tickets never existed in `backlog_items`. Nulling
+those destroys the reference (§19v) **and blanks the id chip on two cards John has not yet
+decided** (`477454d7`, `8a86d9d4`). So the raw string **moves** to a new nullable `display_ref`,
+the repair is lossless for all 63 rows by construction, and `briefing-page.md`'s regeneration
+step 1 gains the chip contract — `coalesce(backlog_id, display_ref)` — in the **same** commit,
+because the gap between two commits is exactly where that regression would have lived.
+
+**THE ONE THAT WOULD HAVE SHIPPED A LIVE HAZARD, and it is the inverse of the obvious call.**
+`NOT VALID` is the standard way to add a constraint without rewriting history, and here it is the
+**opposite** of safe: a `NOT VALID` CHECK **is still enforced on UPDATE**. The 22 unrepairable
+legacy rows would have become un-updatable — and the step-9 tail **UPDATEs `runner_items` to
+record John's taps**. The failure lands on a card he has just tapped, losing his decision on the
+one table whose entire job is to hold his decisions. Repairing every row first is what makes a
+fully **`VALID`** constraint the safe option rather than the ambitious one. That arm is **proved**
+below, not reasoned about.
+
+**QA — five arms live on fixtures inside a deliberately rolled-back transaction** (the block ends
+in `RAISE EXCEPTION`, so the report *is* the error text and nothing persists), both directions per
+`SES-101`:
+
+- **A = PASS** — a display-string INSERT is rejected **by the constraint's own name**
+  (`ck_runner_items_backlog_id_bare`), not by some unrelated error.
+- **B = PASS** — a bare-id INSERT succeeds. *(A gate nobody can pass would satisfy A alone.)*
+- **C = PASS** — `NULL` still accepted.
+- **D = PASS** — the harvest UPDATE (`SET decision='accept' … WHERE decision IS NULL`) on
+  `477454d7`, a `display_ref`-only row, **succeeds**. This is the `NOT VALID` hazard, tested.
+- **E = PASS** — re-polluting an existing row via **UPDATE** is rejected too, not just INSERT.
+
+Read-only assertions: violating rows **63 → 0**; repaired rows that now join **0 → 41**; raw
+strings preserved **63**; before-images written **63**; `convalidated` **true**. **Would it pass
+if the change did nothing?** No — before the migration all 63 violated and **0 of the 7 undecided
+cards joined**; A and E need the constraint to exist, D needs the repair to have happened.
+Cleanup proved rather than assumed: **0** fixtures remain, `477454d7` is **still undecided**, and
+`8c8deaae` still reads `SES-133`.
+
+**Regression on the one existing reader.** `SES-115`'s `backlog_active` view reads this column
+through `substring()`; after the repair its census is unchanged (`in review` 1, `in development`
+1, `partial` 50, `missing` 511) and `substring` vs. direct now agree exactly (**3 = 3**), so the
+workaround is redundant but harmless. Deliberately **not** removed — that is an edit to a view
+this ticket does not own, and it is named in the kickoff's "not done" section rather than left to
+be discovered. `grep -rn "runner_items" --include=*.js` over the clone returns one comment line
+and nothing else, so no application code reads this table and the change cannot reach the product
+surface. Build clean; regression **36/36 with credentials**; dev **200**.
+
+**Model discipline (register B21), stated plainly.** Opus 5 end-to-end, **no subagent**. B21
+routes judgment-dense `P1`–`P5` steps to Fable 5 and mechanical sweeps to Sonnet 5; this is
+`P10 - Tooling`, no `P1`–`P4` classification or root-cause diagnosis arose that a second model
+would sharpen, and the two doc edits carry measured figures and John-facing wording — the shape
+B21 does not delegate, and where a hand-off is how a paraphrase gets introduced. Recorded as a
+decision, not left as an omission.
+
+**Ledger.** Cycle `f6e50900`, stamp `DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH`,
+trigger scheduled (02:06Z fire, on the 3-hour grid). Step-0 stamp match **OK** — compared verbatim
+against `list_triggers`' stored prompt for `trig_017TZ3JZcLBK6AYH6DKURqMH`; no cycle lease (B42).
+Step 0b: two open peers (`702aa2db`, `88833cc2`), **both heartbeating fresh** (9s and 6.5m stale
+against the 20-minute tripwire) and both inside the 24h evidence bar — concurrency is the design,
+so **no silence push and no row of theirs touched**. 0 stale ticket claims. Walls at cycle start:
+**$0.00** month / **$0.00** day against $100/$5; **16.92M** estimated tokens in the CST day against
+John's **unexpired 25M `budget_override`** (directive `43a9d4ae`, expires 2026-08-23T05:00Z —
+precedence rank (1), which is why the 10M uncalibrated cap did not bind); latest meter reading
+2026-08-22T13:50Z (12.3h fresh), all-models **18%**, well under the 85% rest wall.
+`derive_token_allowance('f6e50900…')` returned `guard = 'no bracketing pair: no night reading'`
+→ `tokens_per_pct` **NULL** for a ninth reading, which is the function working, not failing.
+Step 4b's invention pass **skipped**: cycles earlier in this CST day already carry `INVENTION
+PASS`. Step 4 dev probe **200**. **Order note, stated rather than hidden:** the dev probe (step 4)
+was run after selection rather than before it; nothing in this cycle depended on the probe's
+result, and it passed.
 ## session/cycle-20260823-0134 (v7.0.173, 2026-08-23, runner cycle `702aa2db`, model Opus 5) — history stops being drift, and two id-shaped columns that are really prose
 
 **Ticket:** `SES-115` — *`backlog_active` view + computed lifecycle mode; keep-and-filter replaces
