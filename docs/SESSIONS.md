@@ -5,6 +5,51 @@
 
 ---
 
+## session/cycle-20260823-1640 (v7.0.197, 2026-08-23, runner cycle `c4148d2a-24ff-4041-98d9-148b8daab16b`, scheduled fire 16:40Z, model Opus 5 orchestrator + Fable 5 diagnosis subagent) — the briefing page's own rebuild was deleting John's typed threads from it
+
+**Mission:** selection layer **1a** — `runner_directives` `b8d5ea7e-8056-4f88-bc2e-248d500b1a3d`, with its **identical twin** `75b259a5-414c-4cb5-ac19-3a4359190c46` worked as ONE mission (the `v7.0.146` `dda69acb` + `6b6cdd71` precedent: one Rework line John typed on two cards). Three directives shared a `created_at` (15:01:43Z — the 14:42Z cycle's tail harvesting him at once), so the tie was broken on **John's own tap time inside each body**, the only honest "oldest first" available. The third (`16b3ff73`, 14:22Z) was left queued: later, and a different subject.
+
+**John's line, verbatim** (Rework 13:57Z on card `9eacb4d5`/`SES-132`, repeated 13:59Z on `8c8deaae`/`SES-133`): *"Let's test this within the next 2 hours i will be entering text in shipped, gated, questions, and vision, and the thread and any tickets must stay within their cards along with ticket id's it creates"*.
+
+**A directive outranks the board, so the standing drain was stepped past on PRECEDENCE.** `drain_epic_next()` returned `pick` `SES-121` (queue 4, `open_now` 13); layer 1a sits above layer 1b, so that is a precedence step-past and **not** something John has to clear — deliberately **no `record_skip` row**, exactly as `SES-140` established.
+
+**Premise revalidated live at pick time, and it decided the whole ticket.** `thread()`, `orphanThreads()`, `readingSlot()` and `readingRecordedLine()` read `state` and **only** `state` — **not one of them queries Supabase** — while `briefing-template.html` shipped a hardcoded **empty** `briefing-state` block. So a cycle rebuilding the page structurally from the template published that blank block and **John's entire ask history and every meter reading left the page, while the page still looked finished.** His own taps were never the problem: `doc()`, the self-publish, serialises the **live** state, so a tap preserves its own thread. Only a **rebuild** wiped.
+
+Measured on the **served artifact**, not recalled:
+
+| Fact | Value |
+|---|---|
+| `PAGE_BUILT` on the live page | `2026-08-23T15:57Z` |
+| `briefing-state` as served | `{"items":{},"directive":"","reading":{},"answers":{},"asks":{},"unblocks":{}}` |
+| `runner_card_asks` | **8** rows, **8** distinct targets, **all 8 answered** |
+| …including | `item-chi84-gate` — a card **still undecided**, awaiting John |
+| `runner_usage_readings` | **10** rows, latest 13:51Z (`morning`, all-models 37%) |
+| Threads rendered anywhere on the page | **0** |
+
+That rebuild landed **two hours inside the window John had announced at 13:57Z for testing this exact behaviour**. And `SES-132` — which shipped §9.1's orphan-thread renderer precisely so a thread would survive its target being decided — was **inert**, because the wipe happens **upstream of the renderer it added**.
+
+**The contract had a hole the shape of this fix.** Reading all 835 lines of `briefing-page.md`: step 3 says READ and harvest, step 1 says build from the `runner_` tables, and **nothing anywhere** said write the stored asks *back* into the rebuilt page. Its one related sentence — *"the page keeps every ask in `briefing-state` forever"* — **asserts** that as a fact it relies on for insert idempotency while nothing made it true. A cycle following the file literally published the template's empty block.
+
+**Fix — 3 files and one migration.** New `public.briefing_state_seed()` (migration `dir_b8d5ea7e_briefing_state_seed`) returns the complete block: `asks` grouped by `target_id` oldest-first (with `a` **omitted rather than null** when unanswered, because `thread()` tests `t.a` and a null would read as an answered thread with a blank answer), `reading` keyed by slot (newest row per slot), and `items`/`directive`/`answers`/`unblocks`/`settings` blank **by design** — each of those re-derives from its own durable table, and seeding them would give one fact two homes. The template's empty default becomes the **sentinel** `{"__unseeded":true}`, and an unseeded rebuild draws a red banner at the top of the page naming the call that fixes it. **The sentinel is the point:** valid empty JSON is indistinguishable from a correct state once published *and* is the most natural thing for a later editor to "restore" while tidying — so the default is now something that cannot be mistaken for a state, and forgetting the seed is **loud** (the page's existing red-defect vocabulary, the same choice as the line a NULL `plain_*` draws) rather than silent.
+
+**THE ONE THAT WOULD HAVE SHIPPED A SILENT CORRUPTION.** The seed *manufactures* the `at` strings the ask harvest parses back, and that harvest stays idempotent **only** through `uniq_card_ask (target_id, asked_at, question)` (definition read live from `pg_constraint`). They are emitted **UTC, minute precision, literal `Z`**. QA was discriminating rather than merely complete: the shipped form round-trips **8 of 8** against the unique key; the **CST** form — which this very file's display-times rule actively tempts — matches **0 of 8**; a **seconds-precision** form matches **0 of 8**. Either would have **doubled every ask on every rebuild**, with nothing raising. The test writes nothing.
+
+**Other QA:** exactly **1** overload of `briefing_state_seed` in `pg_proc` (`.claude/rules/supabase-function-signature.md`); grants asserted **both directions** — `anon` false, `authenticated` false, `service_role` true, `postgres` true — after revoking from `PUBLIC, anon, authenticated`, since revoking from the two roles alone provably does nothing (`SES-101`). Seed output asserted against live data (8 ask targets, the CHI-84 thread present with its answer, 3 reading slots, `morning.at = 2026-08-23T13:51Z`, `morning.all = 37`). Build green. Regression **41/41** with Supabase credentials in env — the single failure without them (`CHI-31`) is a credentials gap and was **proven** so by re-running with them, not assumed. New guard `tests/regression/DIR-b8d5ea7e-briefing-state-seed.js`, whose **negative control was actually run**: `git stash` of the two changed files makes it FAIL on assertion 1, and it passes again on restore.
+
+**A VERSION COLLISION WAS FOUND AT THE SHIP POINT AND ABSORBED — filed as `SES-153`.** This cycle claimed **v7.0.196** atomically at 16:54:14Z; `dev_version_counter` still carries `patch = 196` and `updated_by_session = 'cycle-20260823-1640'` as the proof. Meanwhile the attended session `successional-review` pushed **two** ships, v7.0.195 (`ae811db`) and v7.0.196 (`aff1925`). Had it claimed both atomically the counter would read 197 and name that session; it read 196 and named this cycle — so the second ship took its number by **hand-count**, the thing `CLAUDE.md`'s atomic-counter rule forbids and `SES-18` records as the mechanism behind every recorded ID collision. **The detection is the real defect:** the counter cannot notice (it was never called), the push cannot notice (a version number is prose in `CLAUDE-STATE.md`, not a key), and this surfaced **only** because both sessions happened to edit the same three files and git raised a content conflict. With disjoint file sets, both ships would sit on `dev` carrying v7.0.196 with nothing anywhere saying so. This cycle **renumbered its own work to v7.0.197** rather than contest a number already pushed, and re-verified before doing so that the attended session's commits had **not** touched either of its two runbook files (so nothing of theirs was clobbered by the re-apply).
+
+**Disclosed rather than left to be found:**
+
+- **John's 2-hour test window closed with zero asks captured.** He used the Rework button, not the ask box, so nothing of his was lost — but the defect would have bitten on his first typed line.
+- **Part (b) is filed, not built:** **`SES-152`** — *An ask that files a ticket does not carry that ticket's ID back to its card* (Tooling · `P10 - Tooling`, `open`). `runner_card_asks` has no column linking an ask to a ticket it caused, and the **write** half lives in `runner-cycle.md`'s filing step — a 4th file, and as prose exactly the remember-rule class this platform has now paid for nine times. A zero-schema bridge is live **today** and this ship activates it: `answer` is free text rendered verbatim by `thread()` once seeded, so an answer that files a ticket can name the ID in its text now — a convention, not a guarantee, which is what `SES-152` is for.
+- **`SES-152`'s before-image was written AFTER its INSERT, not before.** The intended before-image-first call failed on a missing `row_ordinal` and the connector rolled **both** statements back; the row was then inserted alone and the before-image (`row_data = NULL`, the INSERT convention) written immediately after. The reversal information is identical either way, but the §19v ordering was not honoured and saying so is cheaper than having it found.
+- **`runner_settings` changed underneath this cycle.** At 16:48:02Z — seven minutes after this cycle's step-1b gate passed under `interval_hours = 1` — the attended session set it to **3h on John's clock grid (12/3/6/9 America/Chicago)**. The gate is a start-time gate and was passed legitimately before that write existed, so this cycle continued; the **next** scheduled fire is the first one his new order governs.
+- **The seed is still a call a cycle must make.** SQL cannot inject itself into a published artifact. What is structural is that forgetting is now *loud*, and that the data can no longer be *destroyed* — a bad rebuild hides history for one cycle instead of erasing it.
+
+**Kickoff:** `docs/kickoffs/v7.0.197-DIR-b8d5ea7e-briefing-state-seed.md`.
+
+---
+
 ## session/successional-review (v7.0.195 + v7.0.196, 2026-08-23, attended design+build session on John's direct 6-requirement order, model Fable 5, no subagent) — the chain stops fighting the platform and the drain finally continues, in-session
 
 **Tickets:** `SES-140` — *The successor fire is refused by the platform* (Tooling · `P10 - Tooling`) **closed `done`**; `SES-151` — *The scheduler runs on John's clock grid (12/3/6/9 CST) and the pacing test compares like clocks* (Tooling · `P10 - Tooling`) **filed and closed `done`**.

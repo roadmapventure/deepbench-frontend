@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.197 | runbooks/briefing-page.md | directive b8d5ea7e — new regeneration step 1b: the `briefing-state` block is the VERBATIM output of `SELECT public.briefing_state_seed()`, never the template's sentinel and never hand-composed. THE CONTRACT HAD A HOLE THE SHAPE OF THIS STEP, found by reading all 835 lines: step 3 says READ and harvest, step 1 says build from the runner_ tables, and NOTHING anywhere said write the stored asks back into the rebuilt page. The one sentence that touches it — "the page keeps every ask in briefing-state forever" — ASSERTS that as a fact it relies on for insert idempotency while nothing made it true, so a cycle following this file literally published the template's empty block. MEASURED: thread(), orphanThreads(), readingSlot() and readingRecordedLine() read `state` and ONLY `state`; the served artifact carried PAGE_BUILT='2026-08-23T15:57Z' with asks:{} and reading:{} against 8 answered threads (one on item-chi84-gate, a card still awaiting John's decision) and 10 readings — two hours INSIDE the test window he announced at 13:57Z. SES-132's §9.1 orphan renderer shipped and was INERT: the wipe is upstream of it. THE HALF MOST LIKELY TO BE GOT WRONG LATER, so it is stated as a rule rather than left to inference: the seed MANUFACTURES the `at` strings the harvest parses back, and that harvest is idempotent only through uniq_card_ask (target_id, asked_at, question) — so they are UTC, minute precision, literal Z. Emit CST (this file's own display-times rule tempts exactly that) or seconds and every rebuild+harvest silently DOUBLES every ask; proven at ship, shipped form 8/8 round-trips, CST and seconds controls 0/8. Only `asks` and `reading` are seeded: the page is their only render home, while items/directive/answers/unblocks/settings are blank BY DESIGN because each re-derives from its durable table and seeding them would give one fact two homes. Guarded by tests/regression/DIR-b8d5ea7e-briefing-state-seed.js. -->
 <!-- DeepBench v7.0.184 | runbooks/briefing-page.md | SES-119 — §8's Title column stops being a workaround and §10 becomes John's two lists. His standing instruction 2026-08-22, total scope: "across every session, display or anything that references work you perform for the backlog" — always ID + title, "he does not memorize IDs". §8's contract bullet used to read "its Title column is the `gist` extract, not `title`", written by SES-126 because imported tickets held the CLASS STRING in `title`. SES-91 repaired that — MEASURED 2026-08-23, not recalled: 0 of 562 open numbered tickets carry a class string, title IS NULL on 0 of 610 — so the rule now guards a defect that is gone while rendering description PROVENANCE in its place (queue 1 read "FOUND LIVE 2026-08-23T03:31Z by cycle b9201486 while exercising the st"). THE OBVIOUS FIX IS THE ONE THAT WOULD HAVE SHIPPED WRONG: a straight gist->title swap passes any check that asks "does Title come from title now?", but 46 open numbered tickets carry a bare retired declaration as their title (38 literally `Post-beta`) and TWO — LOG-134, LAV-30 — are in §8's live top 12, so the swap renders "`Post-beta`" as their title, strictly worse than the workaround. The rule is a FALLBACK, not a swap, and it lives in SQL (public.backlog_display_title, migration ses119_display_title) rather than in prose each cycle re-derives — the eighth precedent. A length heuristic was REJECTED ('Landing screen', 14 chars, is a terse title, not a marker) and the predicate matches only when the WHOLE title is the marker, so CHI-97 ("Beta-gate (bucket 2) — a red console error…") is kept. §10 splits into 10.1 Needs your decision / 10.2 Needs your desktop on John's own cut ("because they trigger different actions"), mapped on reason_kind with `other` falling to DECISION so an unclassified row never invents a chore, both lists rendering even at zero, and a 10.2 row with a kickoff_link carrying a "Kickoff ready" line. THE HALF THE TICKET'S WORDING DID NOT SETTLE: it says kickoff_link shows on entries "already designed", but design_status holds ONE value and for these rows it holds needs-desktop, so it can never also read `designed` — the observable fact is the presence of kickoff_link, and that is what the render keys on. Guarded permanently by tests/regression/SES-119-display-title.js. -->
 <!-- DeepBench v7.0.182 | runbooks/briefing-page.md | SES-143 — the LOCKED SECTION ORDER gains §2b, the Automation panel, and its data contract. EXTENDED, never renumbered: §3–§14 keep their numbers exactly as §4.1/§7.1/§9.1 already work, because a renumber silently invalidates every §-reference in this file, in runner-cycle.md and in the spec. Three rules written down here rather than left to each rebuild: the panel carries NO data-awaits (a switch is a control, not a decision owed — SES-127's call for §10, and §1's counter must be able to reach zero); the drain status label renders ALWAYS, running or not, per the spec verbatim; and the "Run a cycle now" link now lives on §2b and is REMOVED from the masthead on John's explicit instruction — do not reinstate the second copy. The AUTOMATION object's five sources are tabulated because two of them are wrong in a way that looks fine: drain_named is John's NAMED list (SES-142), never the epic's live now tier, so a ticket filed after naming counts in neither number; and runner_settings must be read AFTER the tail's settings harvest, since the render deliberately shows his un-harvested tap over the stored value and the acknowledgement line is the only thing telling him the tap was picked up. -->
 <!-- DeepBench v7.0.181 | runbooks/briefing-page.md | SES-144 — §8's data contract gains the Epic column rule: epics.name resolved through backlog_items.epic_id, blank (never an em-dash) for a ticket in no epic, third from the left per docs/BRIEFING-REDESIGN-0822.md §8. The scroll paragraph is corrected with it — §8 is a SEVEN-column matrix now, §14 is still six. -->
@@ -97,6 +98,56 @@ Store UTC internally as before; the conversion is display-only.
    with a literal. `state.directive_at` (stamped by the directive box's blur handler, same ship)
    is what finally lets the box he most often uses last count as an action — **forward only**:
    a directive typed before `v7.0.172` has no stamp and contributes nothing rather than a guess.
+1b. **SEED THE `briefing-state` BLOCK — it is the verbatim output of one call, never the
+   template's sentinel and never hand-composed (`v7.0.197`, directive `b8d5ea7e`; John's Rework
+   2026-08-23T13:57Z on card `9eacb4d5`/`SES-132`, repeated 13:59Z on `8c8deaae`/`SES-133`).**
+
+   ```sql
+   SELECT public.briefing_state_seed();
+   ```
+
+   Paste that jsonb verbatim between the `<script type="application/json" id="briefing-state">`
+   tags. **`briefing-template.html` ships `{"__unseeded":true}` — a sentinel, deliberately not a
+   valid empty state.** Publish it unseeded and the page draws a red banner at the very top saying
+   so; that is by design and is the loud half of this fix.
+
+   **Why this step exists, measured rather than reasoned about.** `thread()`, `orphanThreads()`,
+   `readingSlot()` and `readingRecordedLine()` read `state` and **only** `state` — not one of them
+   queries Supabase. The template used to ship a hardcoded *empty* state, so a cycle rebuilding
+   structurally from it published that blank block and **John's entire ask history and every meter
+   reading left the page**, while the page still looked finished. His own taps were never the
+   problem: `doc()` serialises the live state, so a tap preserves its own thread; only a **rebuild**
+   wiped. The served artifact carried `PAGE_BUILT = '2026-08-23T15:57Z'` with `asks:{}` and
+   `reading:{}` against a ledger holding **8 answered threads across 8 targets** — one on
+   `item-chi84-gate`, a card **still awaiting his decision** — and **10 readings**, latest 13:51Z.
+   That rebuild landed **two hours inside the window he had announced for testing this**. `SES-132`
+   had already shipped §9.1's orphan renderer and was **inert**, because the wipe is upstream of it.
+
+   Four things about the call, each of which prevents a real failure:
+
+   - **Only `asks` and `reading` are seeded with data.** `items` / `directive` / `answers` /
+     `unblocks` / `settings` come back blank **by design** — each is harvested to a durable table
+     and its section re-derives from the DB (a decided card drops off `WHERE decision IS NULL`, an
+     answer lands in `runner_questions`, an unblock in `runner_skips`). Seeding those would give one
+     fact two homes. The page is the **only** render home for the other two, which is exactly why a
+     blank state damages them and nothing else.
+   - **THE TIMESTAMP FORMAT IS LOAD-BEARING AND FAILS SILENTLY.** The seed *manufactures* the `at`
+     strings the ask harvest parses back, and that harvest stays idempotent **only** through
+     `uniq_card_ask (target_id, asked_at, question)`. They are emitted in **UTC, at minute
+     precision, with a literal `Z`** — the page's own shape. Emit CST (the display-times rule below
+     tempts precisely this), or seconds, or drop the `Z`, and **every rebuild + harvest silently
+     doubles every ask**. Proven at ship: the shipped form round-trips **8 of 8**; the CST and
+     seconds forms each match **0 of 8**. Display-CST conversion happens in the render, never in
+     state.
+   - **A never-answered ask omits `a` entirely rather than carrying `null`** — `thread()` tests
+     `t.a` and renders its *"Not answered yet"* line on a falsy value, so a `null` would read as an
+     answered thread with a blank answer.
+   - **John's un-landed tap outranks the seed.** The `sessionStorage` stash recovery runs *after*
+     the block is parsed and deliberately wins, so a tap that was mid-publish is never overwritten
+     by a rebuild's seed.
+
+   Guarded permanently by `tests/regression/DIR-b8d5ea7e-briefing-state-seed.js`, whose assertions
+   1, 2 and 4 fail on the pre-change tree.
 2. **Republish to the SAME URL** — pass the URL above as `url` to the Artifact tool (a publish
    without `url` from a new conversation creates a stray page; never do that). Same favicon.
    **Also pass `title: "DeepBench Morning Briefing"` on every publish, and assert the name
