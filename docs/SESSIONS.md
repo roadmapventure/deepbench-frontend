@@ -5,6 +5,63 @@
 
 ---
 
+## session/cycle-20260824-1440 (v7.0.225, 2026-08-24, runner cycle `c618136d-58ce-4c46-bb5b-911076a7d497`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-155: `public.briefing_comments`, the one comments table
+
+**`SES-155` set `delivered`** (`P10 - Tooling`, Chain A member 2 of 3). Kickoff
+`docs/kickoffs/v7.0.225-SES-155-briefing-comments.md`. **1 additive migration**
+(`ses155_briefing_comments`) + kickoff + close-out. No `src`/`api`/`lib`/`.claude` edit, no site change.
+
+**Third cycle of this session** (`587a5591` → `fb7bfd0c` → this). Gate A passed (predecessor
+`shipped`), Gate B passed. Walls re-checked in full: day cap 45,000,000, 12,625,000 spent on the CST
+day at open, month $0.00, rest wall false.
+
+**JOHN DECIDED THE ORDER, NOT JUST THE DESIGN.** Gated card `869e76ca`, Accepted 2026-08-24:
+**option A** — build the table **additively now** and migrate the `runner_card_asks` rows in, but
+**do NOT retire `runner_card_asks`** and **do NOT repoint `briefing_state_seed()`** in this build;
+that is a deliberately separate later step, once the page can be rebuilt so threads are verified
+end-to-end. This migration therefore **copies** — it removes nothing and repoints nothing, and both
+halves are asserted rather than intended.
+
+**OUT OF STRICT QUEUE ORDER, AND DISCLOSED.** Queue 1 (`SES-188`) and 2 (`SES-187`) are `delivered`
+and were stepped past silently. **Queue 3 is `SES-156`**, whose whole design is *"threads render
+from `briefing_comments`"* — and that table did not exist (`to_regclass` → NULL, measured), so the
+queue top was unbuildable while its dependency sat at queue 264. Building the dependency is what
+unblocks it. It is also the substrate the **M1 gate review filed 40 minutes earlier this session**
+named as the priority area: `SES-188`'s durable fix (candidate 2, John's choice) is a Supabase-side
+tap buffer *"designed jointly with `SES-155` and `SES-156`"*.
+
+**What shipped.** `public.briefing_comments` — `target_kind` (ticket|question|vision|invention) ·
+`target_ref` · `author` (john|runner) · `kind` (question|answer|requirement|routing|note) · `body` ·
+`harvested_cycle` · `routed_to`. Two properties a later editor must not simplify:
+**`kind` DEFAULTS to `'question'`** (decision 3's cheap failure direction — a Question changes no
+state, a Requirement sends a ticket back for rework, so defaulting the other way turns an unlabelled
+comment into work); and **`uniq_briefing_comment (target_kind, target_ref, created_at, md5(body))`
+is the harvest idempotence**, mirroring `uniq_card_ask`, because the page carries every comment in
+`briefing-state` forever and every cycle re-reads comments it already stored. `md5(body)` rather
+than `body`: a btree entry is capped and a comment is prose.
+
+**8 ask rows → 16 comments** (8 John questions + 8 runner answers), each with its own
+`runner_before_images` row carrying `row_data = NULL` — the INSERT convention, meaning *"this row
+did not exist; Reverse is a DELETE of this pk."* Before-images and comments are written in **one
+atomic statement**, so neither can land without the other. `target_kind = 'item'` maps to the new
+vocabulary's `'ticket'`.
+
+**QA — discriminating rather than merely complete.** (1) **Grants asserted BOTH directions**, never
+one and never the migration's own success flag: `anon`/`authenticated` SELECT+INSERT **false**,
+`service_role`/`postgres` **true** — `REVOKE … FROM PUBLIC` is the load-bearing half
+(`.claude/rules/supabase-column-grants.md`; `SES-101`'s function-level twin), since a narrower
+revoke reports success and changes nothing. (2) **The discriminating test: re-running the entire
+migration inserts 0 rows.** Without the unique index it inserts 16 duplicates and the log doubles on
+every rebuild — a test that merely counted 16 rows after the first run would pass on a table with no
+constraint at all. (3) **Negative control**, so (2) does not merely prove the table rejects
+everything: inside a deliberately rolled-back transaction a genuinely novel comment **does** insert
+(16 → 17), and the rollback left **16**. (4) **John's two "do NOT"s asserted:** `runner_card_asks`
+still present with its 8 rows, and `pg_get_functiondef(briefing_state_seed())` does not mention
+`briefing_comments`. (5) Ledger clean — 16 before-images for 16 rows, no fixture strays.
+
+**`SES-156` is now unblocked** — its table exists. The retire-and-repoint half stays queued as John
+scoped it.
+
 ## session/cycle-20260824-1508 (v7.0.224, 2026-08-24, runner cycle `0830f6ee-bffa-49da-9f7c-e75ffeccb06f`, **`trigger = scheduled`** (fire 15:07:43Z, off the 3h clock grid — gate treats it as manual), model Opus 5, 1 subagent (Sonnet 5, close-out docs)) — SES-180 (b): the regression suite can say "I could not run this here"
 
 **`SES-180` set `partial`** (`P10 - Tooling`, tier `next`, epic **Selfbuild M2 - Truth
