@@ -115,9 +115,13 @@ GROUP BY e.name ORDER BY e.name;
    files what it finds.
 6. **Watch the watchers** — verifier block-rate and audit findings on the briefing; block-rate
    at zero while drift persists = rubber-stamp flag.
-7. **Milestone gate reviews (SES-179)** — PM lens + Chief Architect lens re-evaluate the plan at
-   every epic retirement, verdict as a briefing card. Governance-lane roles, never product
-   roster agents.
+7. **Milestone gate reviews (SES-179)** — PM lens + Chief Architect lens at every epic
+   retirement, verdict as a briefing card. Three directions, all mandatory: **backward** — walk
+   the retired milestone's shipped work against the charter sections it claimed to satisfy and
+   verify it actually does (charter-conformance audit of completed work, John 2026-08-23);
+   **present** — every rule retired this milestone has its replacement live and green, net
+   burndown reported; **forward** — the next milestone's design still fits measured reality.
+   Governance-lane roles, never product roster agents.
 
 ## Definition of success — project-end acceptance (John, 2026-08-23)
 
