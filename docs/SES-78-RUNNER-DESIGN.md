@@ -39,6 +39,9 @@
    every data write. *(evidence)* 8 blocker sweep #2 — auto-revert own mess, counts as a
    Reverse; 9 finish the cycle row, write `runner_items`, redeploy the briefing to the same
    URL, die.
+   *(Exception note, added 2026-08-23 `SES-93`: gated-lane cards are decided by John on the
+   briefing — the ladder governs build autonomy only and no rung ever unlocks the gated lane;
+   operative statement: `docs/GOVERNANCE-MODES.md` / `docs/runbooks/runner-cycle.md`.)*
 5. **Budget overrides (John's addition):** a cycle that projects an overrun never proceeds —
    it parks the item, sends a mobile push notification, and dies. John's tapped approval
    (with his max cost) lands as a one-time `runner_directives` row (`type='budget_override'`,
@@ -53,9 +56,9 @@
 | Phase | Deliverable | Test that proves it | Status |
 |---|---|---|---|
 | `SES-78a` | The six tables + 2026-08 budget row ($100 / $3.30), zero public grants | Fail-closed query; before-image → restore round-trip byte-equal | ✅ Done v7.0.93 (SQL-only via MCP; log: `docs/SES-78a-migration-log.md`) |
-| `SES-78b` | The briefing Artifact (`artifact` capability): items, three buttons, override tap, rework text box | John taps on his phone; the session reads the taps back | ❌ Missing |
-| `SES-78c` | The nine-step standing prompt as `docs/runbooks/runner-cycle.md` + cloud env provisioning (secrets, Supabase MCP, repo access) | **One supervised cycle, John watching, full ceremony, against a trivial P9 item** | ❌ Missing |
-| `SES-78d` | Create the routine (3h cadence); stamp becomes real; `GOVERNANCE-MODES.md` flips Automated to live | **John's explicit sign-off — §19v's gate; nothing unattended before it** | ❌ Missing |
+| `SES-78b` | The briefing Artifact (`artifact` capability): items, three buttons, override tap, rework text box | John taps on his phone; the session reads the taps back | ✅ Done (shipped v7.0.97) |
+| `SES-78c` | The nine-step standing prompt as `docs/runbooks/runner-cycle.md` + cloud env provisioning (secrets, Supabase MCP, repo access) | **One supervised cycle, John watching, full ceremony, against a trivial P9 item** | ✅ Done (shipped v7.0.97) |
+| `SES-78d` | Create the routine (3h cadence); stamp becomes real; `GOVERNANCE-MODES.md` flips Automated to live | **John's explicit sign-off — §19v's gate; nothing unattended before it** | ✅ Done (shipped v7.0.97, go-live approved 2026-08-20) |
 
 Models: design done here (Fable 5); 78b/78c coding on Opus 5; 78c's proof runs the real cycle.
 

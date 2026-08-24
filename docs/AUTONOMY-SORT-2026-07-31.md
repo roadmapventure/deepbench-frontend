@@ -1,5 +1,12 @@
 # Autonomy Pre-Sort — 2026-07-31 (worktree `design-scaling-arch-0731`)
 
+> ## ⛔ RETIRED 2026-08-23 (Selfbuild sweep — `docs/SELFBUILD-RETIREMENT-LEDGER.md`) — historical record only
+>
+> Superseded three times over: the beta axis it classifies against was retired 2026-08-19; the
+> `docs/FEATURES.md` rows it sorts moved to `public.backlog_items` (v7.0.113); and the live
+> autonomy axes are register B27's (auto vs. gated lane + trust ladder, §19v). Zero inbound
+> references. Kept as the record of the 2026-07-31 sort; governs nothing.
+
 Every active row in `docs/FEATURES.md` (226 rows as of `dev` v6.3.237) classified for whether an
 unattended overnight session could take it, or it needs John first. Produced by 4 parallel
 classifier agents, each bootstrapped on `CLAUDE.md`, `docs/WORKING-WITH-JOHN.md` (Decision

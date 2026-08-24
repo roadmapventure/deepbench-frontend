@@ -1,7 +1,7 @@
-# DeepBench v5.1 — Session Standards & Testing
+# DeepBench — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Last updated: 2026-07-15 | Section 7 corrected — self-verify flow (was stale since 2026-07-02's Automated Design→Code→Verify Loop)
+> (Header de-versioned 2026-08-23 — a hardcoded version/date in a title is the stale-version-in-prose pattern; the current version lives in `CLAUDE-STATE.md`. Change history: git log on this file.)
 
 ---
 
@@ -29,7 +29,10 @@ Design sessions carry the same version tag as the coding session whose kickoff d
 
 **Every session gets a version strictly greater than `CLAUDE-STATE.md`'s current "Version in dev" — never reuse it, even for sessions within the same major-version architecture track.** Enforced by `CLAUDE-DESIGN.md` Step 4 (explicit version-assignment step) and Step 5c (close-out bump, unchanged instruction but now backstopped by the assignment-time check). History: `docs/SESSIONS.md`.
 
-Branch: commit directly to `dev`. No feature branches.
+Branch: every session works on its own `session/<name>` worktree branch (branched from
+`origin/dev`) and lands work with `git push origin HEAD:dev` — see `CLAUDE.md`'s hard rules.
+*(Corrected 2026-08-23: the old "commit directly to `dev`, no feature branches" wording
+predates the 2026-07-07 worktree discipline.)*
 `dev → main` only when John explicitly confirms.
 
 ---
@@ -356,7 +359,7 @@ Do not patch the call site before checking the server. Do not check the server b
 A bug that fails QA once should not fail QA twice. If it does, the root cause analysis was not deep enough.
 
 If FAIL: write a patch kickoff doc targeting the confirmed root cause only.
-If NEW REQUIREMENT: add to `docs/FEATURES.md`.
+If NEW REQUIREMENT: file it as a `public.backlog_items` row per `docs/runbooks/session-setup.md` step 3c (never a `docs/FEATURES*.md` edit — those are legend-only stubs).
 
 **Feature inventory Status column vocabulary (added 2026-07-16).** The `Status` column in `docs/FEATURES.md`, `docs/FEATURES-NEXT.md`, and `docs/FEATURES-LATER.md` must be exactly one of `✅ Done`, `🔶 Partial`, or `❌ Missing` — no other text in that cell. Any elaboration (what shipped, what's still open, measured results, caveats) goes in the Feature cell's own prose, which is already the norm for how these rows are written — every row in these files already carries full narrative detail there. Do not append descriptive text to the Status cell itself (e.g. `✅ Fixed and verified`, `✅ Closed`, `✅ Root cause fixed and measured`, `🔶 Partial (visual redesign needed)`). It exists because free-texted phrasing evaded the `session-hygiene` skill's Done-row archival check — history: `docs/SESSIONS.md`. When archiving a row to `docs/FEATURES-ARCHIVE.md`, normalize its Status cell to exactly `✅ Done` regardless of what completion phrasing the source row used.
 

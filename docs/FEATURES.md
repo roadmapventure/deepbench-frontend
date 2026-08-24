@@ -33,7 +33,7 @@
 >
 > **Split 2026-07-07 into 3 files by priority (John's criterion, updated 2026-07-17 — same CI/MI scope, criterion re-worded/expanded): "Any enhancement for the CI page to work before showing to Apple, to keep from an architect's scrutiny or enduser frustration: from backend to frontend, that is task success rate, end-end q&a, speed, loop, harness, agent model, AI auditing/log, UX/UI, db data model cleanup or seeding, goes to Now. Anything for the CI page outside of the previous is Next, and anything not related to making CI successful goes to Later."** This file holds only **now** — read this one by default at design-session Step 1. `docs/FEATURES-NEXT.md` (other CI backlog) and `docs/FEATURES-LATER.md` (everything else) are read only when scoping work in those areas.
 >
-> **Beta definition + beta-gate execution queue** → `docs/BETA.md` (added 2026-07-28). When filing any new row, declare `Beta-gate (<bucket>)` or `Post-beta` in the row per that file's maintenance rules.
+> **Beta retired 2026-08-19** — `docs/BETA.md` is historical and governs nothing. Filing any new ticket requires a **named P1–P10 `priority_class`** (register B9) on the `public.backlog_items` row — e.g. `P10 - Tooling`, never a bare digit; see the Priority Class legend below. *(This line previously mandated declaring `Beta-gate (<bucket>)` or `Post-beta` per `docs/BETA.md` — superseded, see `docs/SELFBUILD-RETIREMENT-LEDGER.md`.)*
 > **AI Services catalog** (14 services, 10 patterns, AI Audit sections, MCP surfaces, table schema) → `docs/AI-SERVICES.md`
 > **Deliverable composition registry** (AI Services × Deliverables, sharing patterns, feedback loops, build order) → `docs/CAPABILITIES.md`
 > **✅ Done rows archived:** if a feature isn't listed in any of the 3 files, check `docs/FEATURES-ARCHIVE.md` before assuming it's missing.
@@ -99,7 +99,7 @@ Accept / Reverse / Rework (§19v).
 | `**P9 - Bug Fixes.**` | Non-blocking bug fixes. Ships live. |
 | `**P9 - Bug Fixes · FLAGGED.**` | A bug fix whose correction **moves pixels on an approved surface** — §19v routes that to a default-off flag, never a bare live ship. All `UI`-typed rows are born this way. |
 | `**P10 - Tooling.**` | Session / governance / tooling work. Ships live. |
-| `**P-GATED**` | The gated lane — terminology, LOCKED sections, schema-destructive migrations, §19e-owned writes, active-agent edits, the four harness files. **Deliberately not a digit**, so no cycle can read it as "the backlog ordered me to pick this." No trust rung ever unlocks it. |
+| `**P-GATED**` | **RETIRED as a class marker — legend-only (register B15: the gated lane is a boolean flag on the row now, not a priority-class value).** Historically: the gated lane — terminology, LOCKED sections, schema-destructive migrations, §19e-owned writes, active-agent edits, the four harness files. Deliberately not a digit, so no cycle can read it as "the backlog ordered me to pick this." No trust rung ever unlocks it. |
 
 **Assignment provenance (updated 2026-08-20).** The original mechanical mapping (approved as a
 table, applied by script) is, in renumbered form: `Tooling→P10 - Tooling`,
@@ -142,4 +142,6 @@ is no table below to add it to. Claim the ID atomically from `feature_id_counter
 Heal engine already files this way (`source_file = 'heal-engine'`). Wiring the remaining capture
 paths to the table is `SES-83` phase (e), the last of the five cycles.
 
-**`✅ Done` rows** are still archived in `docs/FEATURES-ARCHIVE.md`, which this trim did not touch.
+**`✅ Done` rows:** `docs/FEATURES-ARCHIVE.md` is frozen as of 2026-08-19 — nothing is archived
+there any more. Done tickets remain in `public.backlog_items` with `status = 'done'` and are
+filtered in queries, never moved (`SES-115` keep-and-filter).

@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 6. -->
+<!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 7 (the stamp cap — renumbered from a duplicate "6" 2026-08-23). -->
 <!-- DeepBench v7.0.205 | runbooks/runner-cycle.md | SES-154 — ACCEPTANCE-GATED COMPLETION: a runner ship writes `delivered`, and only John's Accept ever writes `done`. Spec docs/design/BRIEFING-COMMENTS-0823-DRAFT.md decision 1, approved by John 2026-08-23 ("yes"); Chain A 1 of 3. Migration ses154_delivered_status adds 'delivered' to backlog_items_status_check. THE DISTINCTION THE WHOLE TICKET TURNS ON, and the one a later editor will be tempted to collapse: drain_epic_next() holds TWO predicates over the same named scope and 'delivered' belongs in exactly ONE. The PICK predicate excludes it (else the drain hands the same delivered ticket back every cycle and never advances); the RETIREMENT predicate must NOT (the drain retires on John's ACCEPTANCE, never on the runner's own say-so). QA was discriminating rather than merely complete, one fixture, one instant, one variable: with queue-1 SES-154 set delivered AND unclaimed, the shipped build picks SES-155 where the retired ses142 body picks SES-154; with ALL 18 workable named members set delivered, the shipped build returns open_now=18 / 'blocked' / directive still queued / 0 before-images, where the wrong build (delivered added to the retirement predicate) returns open_now=0 and RETIRES — closing John's standing directive on the runner's own word, which is the exact authorisation defect SES-142 was filed to end, rebuilt. recompute_backlog_queue() is deliberately UNCHANGED: a delivered ticket KEEPS its queue number, the same rule SES-113 established for `removal proposed`, because both are tickets awaiting his verdict — proven, not assumed (queue 2 before, queue 2 after, 0 rows moved), which makes his Accept zero-motion re-entry and keeps the ticket in the §8 matrix while he decides. Step 7 therefore no longer strips the number; the tail's Accept harvest does. backlog_mode() gains 'delivered' in its 'in review' arm so John's page keeps ONE word for "pushed, awaiting your verdict" instead of two (asserted: delivered+undecided ship card -> 'in review', delivered+no card -> 'delivered'). briefing_open_cards() is deliberately UNCHANGED and that is a decision, not an omission: its render predicate retires a GATED card whose ticket reached done/removed BY ANOTHER ROUTE, and 'delivered' is not terminal — a Reject reopens the ticket, so retiring the gated question at delivery would destroy a card that has to come back. DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: (1) the ticket's "re-key the scoreboard (daily shipped)" has NO code to re-key — briefing-template.html's "Shipped today" box is a HARDCODED SAMPLE VALUE (1) with no SQL behind it anywhere in the repo, so the contract is written in briefing-page.md for the next rebuild instead of a predicate being changed, and saying so beats reporting a re-key that did not happen; (2) the drain X-of-N figure (drain_left) already counts "not yet done/removed", so leaving the retirement predicate alone re-keys it on acceptance for free — no edit needed, verified not assumed; (3) scripts/export-backlog-snapshot.js and scripts/check-session-docs.js filter history on done/removed and are deliberately untouched, because a delivered ticket is NOT history until John accepts it; (4) the spec's decision 2 renames Reverse to "Reject" and has NOT shipped, so no rule here is written against a button that does not exist. A delivered ticket is stepped past at step 5 as a fourth blocked-prefix row but is deliberately NOT a record_skip() call — its undecided ship card already carries that ask, and a second home for it is how §10 stops being read. Forward only: the 61 existing `done` rows are untouched, no backfill. 1 overload per .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role/postgres true). All fixtures rolled back clean (0 delivered rows, 0 stray before-images, 0 stray runner_items, control function gone). Doc + schema; no src/api/lib change, no site change. -->
 # Runner Cycle — Standing Prompt (§19v)
 
@@ -161,8 +161,9 @@ Three properties worth knowing before you edit any of this:
   with that id in the next statement (step 1). Splitting it into claim-then-bind inside one
   statement does not work: Postgres silently drops a second UPDATE of the same row in the same
   statement, which would leave `holder` NULL and the lease effectively open.
-- **The 45-minute TTL is the anti-deadlock — but a steal means the holder is SILENT, not dead
-  (corrected `v7.0.123`, directive `c4d95dc7`).** A cloud session that goes quiet mid-cycle never
+- **The 10-minute TTL (register B42 — the repurposed `runner_lease`; B31's 45-minute
+  cycle-level lease is retired) is the anti-deadlock — but a steal means the holder is SILENT,
+  not dead (corrected `v7.0.123`, directive `c4d95dc7`).** A cloud session that goes quiet mid-cycle never
   releases; without a TTL the routine would be wedged until a human noticed, so the TTL has to
   exist and is unchanged. What was wrong is the sentence that used to sit here: *"Longest real
   cycle to date is ~18 minutes against a 3-hour cadence, so a stolen lease means the holder is
@@ -230,7 +231,7 @@ the *only* thing that noticed when `ba8f2ce3` and `633fe486` went quiet on 2026-
 out from a briefing card the next morning. The signal was dying in the ledger. It no longer may.
 
 **Read this before you write anything about a predecessor, because the obvious version of this
-rule is wrong and was disproved live.** An open `runner_cycles` row past the 45-minute TTL means
+rule is wrong and was disproved live.** An open `runner_cycles` row past the 10-minute TTL (B42) means
 the cycle is **silent**. It does **not** mean the cycle is dead. Measured 2026-08-21: cycles
 `ba8f2ce3` (started 03:52Z) and `633fe486` (05:07Z) were closed `outcome='failed'` by a successor
 at 08:24Z on exactly that reasoning — and both were **still executing**. They resumed, finished
@@ -825,7 +826,9 @@ proposals instead of one, self-limiting and harmless, never a double build). The
 5. **File the surviving proposal as a `gated_before_build` `runner_items` card** — value case,
    the corpus claims it scores against (cite claim ids), cost guess, and the exact first build.
    **No backlog ticket yet:** John's Accept turns the card into a queued ticket (B17/B23).
-   Reverse kills it and records the rejection in `vision/rejected-paths.md`.
+   Reverse kills it and records the rejection as a `vision_claims` row with
+   `status='rejected'` (`SES-157` — `vision/rejected-paths.md` is a retired stub, never
+   appended).
 6. Write `INVENTION PASS: ran, N proposals, card <id>` (or `: no survivor` — an honest zero
    beats a forced proposal) in `notes`, then **continue to step 5 normally** — the pass is
    bookkeeping plus research, not this cycle's build (B24 logic; the cycle still delivers one).
@@ -899,10 +902,10 @@ immediately below, which is where `SES-114` stopped them being three separate ru
 to remember.
 
 **THE BLOCKED PREFIX IS READ AT A GLANCE, NOT RE-DERIVED EVERY CYCLE (`SES-114`, `v7.0.165`).**
-Three different flags mean *this ticket keeps its number and you step past it*, and until this
-ticket they lived in three places with only `status` visible to the selection query. Read them
-off the two columns the query now projects, in this order, and drop to the next ticket (B24) on
-any of them:
+Five different flags mean *this ticket keeps its number and you step past it* (the table's
+sixth row, `designed`, is not a skip), and until this ticket they lived in separate places with
+only `status` visible to the selection query. Read them off the two columns the query now
+projects, in this order, and drop to the next ticket (B24) on any of them:
 
 | What you see at the queue top | What it means | Who clears it |
 |---|---|---|
@@ -913,10 +916,12 @@ any of them:
 | `design_status = 'john-paced'` | The remaining work is John ratifying cards **already on the page** (`SES-166`, `v7.0.209` — today only `SES-84`, whose ask is §12's vision claim cards) | John, on those cards, at his own pace |
 | `design_status = 'designed'` | **Not a skip** — the design already exists; see step 6's fast path | — |
 
-Each one is a `record_skip()` call before you drop (`reason_kind` `removal-proposed` /
-`needs-john` / `needs-desktop` — or `permission-gate` when the block is the `.claude/` gate
-specifically). **A contested claim is still NOT a skip** — it clears itself in 24h and John can
-do nothing about it.
+Three of the five — `removal proposed`, `needs-john`, `needs-desktop` — are a `record_skip()`
+call before you drop (`reason_kind` `removal-proposed` / `needs-john` / `needs-desktop` — or
+`permission-gate` when the block is the `.claude/` gate specifically); `delivered` and
+`john-paced` are stepped past **silently, with no `record_skip()`**, because their ask already
+lives on a card John's page carries (the two paragraphs below say why). **A contested claim is
+still NOT a skip** — it clears itself in 24h and John can do nothing about it.
 
 **`delivered` and `john-paced` are the two rows in that table that are NOT `record_skip()` calls,
 and both for SES-127's own boundary rather than as exceptions to it (`SES-154`, `v7.0.205`;
@@ -1540,10 +1545,10 @@ every rebuild. **The page's shape is now the LOCKED SECTION ORDER in `briefing-p
 (`SES-124`, `v7.0.159`) — read it there rather than re-deriving it from this paragraph.** Two
 requirements this step used to carry are **struck by John's explicit removal**: the **"Next up"
 top-five section** and the compact **"Next 3"** line at the page top (registers B25/B26). Their
-replacement is **§8's queue matrix and §11's now-tier census, shipping in `SES-126`** — which
-means that between `SES-124` and `SES-126` the page carries **no forward view of the queue at
-all**. That gap is the spec's own sequencing, it is disclosed on `SES-124`'s card, and a cycle
-in between must not quietly reinstate the old sections to paper over it. Still required: the
+replacement is **§8's queue matrix and §11's now-tier census (`SES-126`, shipped
+`v7.0.161`)** — the forward view of the queue lives there now. (Historical: between `SES-124`
+and `SES-126` the page briefly carried no forward view at all; that window closed at
+`v7.0.161`.) Do not reinstate the struck B25/B26 sections to change that. Still required: the
 **exposure-rate line** — cards
 that needed John this week vs. last (register B28) — and the **daily "help me" ticket**: the
 top pending-on-John ticket by the standard ordering, its specific questions on the card,

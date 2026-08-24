@@ -1,5 +1,13 @@
 # DeepBench Beta — Triage Detail
 
+> ## ⛔ RETIRED 2026-08-19 (with `docs/BETA.md` — see its banner) — historical record only
+>
+> Beta was retired by John 2026-08-19 (`design-selfbuilding-0819`). This file is kept as
+> history; it governs nothing. The working-triage language below ("execution queue", "what
+> should be executed next", per-bucket queues) is historical — the live prioritization axis is
+> the named `P1`–`P10` priority classes (`docs/ARCHITECTURE.md` §19v) on `public.backlog_items`.
+> *(Banner added 2026-08-23, Selfbuild sweep — `docs/SELFBUILD-RETIREMENT-LEDGER.md`.)*
+
 > Split out of docs/BETA.md 2026-08-01 (SES-68, John-approved). The canonical bar (§1/§2/§4)
 > stays in docs/BETA.md — read that first; this file is the working triage detail.
 

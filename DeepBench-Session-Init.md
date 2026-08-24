@@ -82,8 +82,8 @@ Raw base: `.../dev/docs/`
 ## Step 3 — What this app is
 
 DeepBench — AI agent workforce platform. Users build a bench of specialized AI agents, assign them
-work tasks, and manage output through dashboards. Initially targeting government procurement
-intelligence, now generalizing to any business domain.
+work tasks, and manage output through dashboards. Scope/positioning: **`docs/ARCHITECTURE.md` §0** —
+not restated here (restated facts drift, per this doc's own rule).
 
 - **Live:** https://deepbench.roadmapventure.com
 - **Dev:** https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app
@@ -130,7 +130,6 @@ fields → `docs/STANDARDS.md` §11; config model → `docs/ARCHITECTURE.md` §1
 | Update Steps button | StepList.jsx | NOT TaskInstructionsScreen.jsx |
 | Design tokens | src/tokens.js | Never hardcode values |
 | Agent roster | src/data/agents.js | Source of truth — read directly, don't trust roster tables in docs |
-| Michelle avatar | MichelleAvatar.jsx | Wired to Supabase since S-BENCH-01 (2026-06-19) |
 | AI heartbeat | AIDiamond.jsx | Do not refactor without a dedicated session |
 | Step merge logic | mergeSteps.js | Three named operations only |
 
@@ -154,9 +153,12 @@ When John says "generate kickoff doc for [session]":
    `git push origin HEAD:dev` (`CLAUDE.md` hard rule), never bare `git push origin dev`.
 5. Name it `docs/kickoffs/[version]-[ticketId]-[shortName].md`. **You cannot save it from here** —
    hand it to John as an artifact panel; the Code session writes it into the repo.
-6. End with a bordered code block containing the exact Claude Code start prompt:
+6. End with a bordered code block containing the exact Claude Code start prompt — including the
+   model line (`CLAUDE-DESIGN.md` standing rule: a prompt without a model line is incomplete,
+   2026-07-28; also tell John the model in chat):
    ```
    Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute it.
+   Model: [the model the kickoff doc names — default Opus 5 for coding]
    ```
 
 **What this surface does NOT do at close:** it does not mark the ticket `designed`, does not insert

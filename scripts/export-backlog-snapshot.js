@@ -24,11 +24,13 @@
 // restorable commit -- the same durability guarantee the markdown backlog files already had,
 // applied to their database mirror.
 //
-// The markdown backlog files remain AUTHORITATIVE. This snapshot is generated FROM the table,
-// not the other way around, and stays a read-only mirror-of-a-mirror until SES-83 phases (d) and
-// (e) land and flip authority to the table itself. Until then: never hand-edit the generated
-// file, never treat it as a second source of truth, and never let its content diverge from what
-// `--check` would report.
+// public.backlog_items IS AUTHORITATIVE (SES-83 phases (d)/(e) landed, v7.0.113+; the markdown
+// backlog files are legend-only stubs). This snapshot is generated FROM the table, not the
+// other way around -- it is the table's git-committed offline/point-in-time copy, exactly as
+// the emitted file's own header says. Never hand-edit the generated file, never treat it as a
+// second source of truth, and never let its content diverge from what `--check` would report.
+// (Header corrected 2026-08-23 -- it previously said the markdown files "remain AUTHORITATIVE
+// until SES-83 (d)/(e) land"; they landed. See docs/SELFBUILD-RETIREMENT-LEDGER.md.)
 //
 // Losslessness is the actual point of this file existing: a snapshot that cannot be parsed back
 // into exactly the table's contents is not a backup, it's a lossy summary. See the cell-escaping

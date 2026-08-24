@@ -90,11 +90,15 @@ John is present and directing; it is the default absent any explicit selection, 
 
 The three-engine 24×7 pipeline (Execute / Heal / Invent) governed by §19v: lane routing
 (auto vs. gated), the P1–P10 priority order, feature-flag exposure rules, the budget governor,
-the trust ladder, and the daily briefing. Appropriate for unattended work only. **Nothing runs
-under this mode until a follow-up design session builds the runner against §19v's constraints
-and John approves it** — structurally enforced: the stamp that proves the mode cannot exist
-before the runner does. John's manual sessions always take deploy-quota precedence over
-Automated cycles.
+the trust ladder, and the daily briefing. Appropriate for unattended work only. **LIVE since
+2026-08-20** (`S-SES-78d` go-live, approved by John) — the mode remains structurally enforced:
+the runner's stamp, echoed into each cycle's `runner_cycles` row, is the only thing that proves
+it; no stamp, no Automated. Cadence (`SES-151`, `v7.0.196`): the cron fires **hourly at :40**
+and `scheduler_gate()` admits scheduled fires only on John's America/Chicago clock grid — an
+hour divisible by `interval_hours` (3 → 12/3/6/9 AM/PM on his clock, DST-proof). A draining
+cycle continues **in-session** via a `chained (drain continuation)` `runner_cycles` row
+(`SES-140` FINAL — the session-spawning form is retired and platform-refused). John's manual
+sessions always take deploy-quota precedence over Automated cycles.
 
 **Chained cycles are in-session continuations (`SES-140` FINAL, `v7.0.195`, John 2026-08-23 —
 supersedes the `SES-141`/`v7.0.180` session-spawning form).** A draining cycle does not spawn a

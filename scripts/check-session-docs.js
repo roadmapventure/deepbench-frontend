@@ -653,6 +653,24 @@ function checkBulletStaleness(findings, stateText, archiveText) {
   }
 }
 
+
+// ---- Check 8 (SES-172, Selfbuild M1): SESSIONS.md rotation tripwire ----
+// SESSIONS.md hit 2.88 MB growing ~190 KB/day once Automated cycles began appending
+// entries (measured 2026-08-23). SES-172 rotated pre-August entries to
+// docs/SESSIONS-ARCHIVE-2026-0607.md and set the standing rule: the live file holds
+// the current + previous month; older entries rotate VERBATIM (never summarized) to a
+// dated sibling archive. This check is the tripwire that keeps the rotation happening.
+function checkSessionsLogSize(findings) {
+  const p8 = path.join(WORKTREE, 'docs', 'SESSIONS.md');
+  const t = readIfExists(p8);
+  if (t === null) return;
+  const bytes = Buffer.byteLength(t, 'utf8');
+  if (bytes > 1.5 * 1024 * 1024) {
+    findings.push({ check: '8', severity: 'FLAG',
+      detail: `docs/SESSIONS.md is ${kb(bytes)} KB, over the ~1.5 MB rotation threshold -- rotate entries older than the previous month VERBATIM into a dated docs/SESSIONS-ARCHIVE-*.md (SES-172 shape: byte-accounted move, pointer note left behind, stamp appendices stay in the live file)` });
+  }
+}
+
 function main() {
   const findings = [];
   const stateText = checkClaudeState(findings);
@@ -660,6 +678,7 @@ function main() {
   checkTrimmedStubs(findings);
   checkBacklogSnapshot(findings);
   checkStandardsDrift(findings);
+  checkSessionsLogSize(findings);
 
   // Worktree cross-reference checks need the freshest possible CLAUDE-STATE.md/
   // FEATURES-ARCHIVE.md -- see freshDevText()'s comment for why the local

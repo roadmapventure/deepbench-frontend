@@ -19,8 +19,11 @@
 - **A1. Language (John):** outcomes `did_not_run` / `gated_before_build` (constraints + data +
   docs + routine prompt); displayed as plain words. Classes always written NAMED, never bare
   digits. Everything is a **"backlog ticket," never "row."**
-- **A2. Schedule (John):** fires 12/3/6/9 AM/PM CST (UTC cron `0 2,5,8,11,14,17,20,23 * * *`;
-  re-align one hour when DST ends in November).
+- ~~A2. Schedule~~ — **SUPERSEDED 2026-08-23 by `SES-151` (`v7.0.196`): the cron fires hourly
+  at :40 permanently, and `scheduler_gate()` paces by John's America/Chicago clock grid (an
+  hour divisible by `interval_hours`; 3 → 12/3/6/9 AM/PM on his clock) — DST-proof, no cron
+  realign ever.** As originally shipped: fires 12/3/6/9 AM/PM CST (UTC cron
+  `0 2,5,8,11,14,17,20,23 * * *`; re-align one hour when DST ends in November).
 - **A3. Two-track budget (John):** API dollars only (dev/QA split) against $5 day / $100 month
   hard walls; subscription tokens estimated (dev/QA split), governed by John's typed-in meter
   readings — rest at weekly ≥85%, 50% runner share, 10M/day uncalibrated, 3M/day stale-reading

@@ -131,7 +131,22 @@ function loadBypassSecret() {
   process.exit(1);
 }
 const BYPASS_SECRET = loadBypassSecret();
-const HDRS = { "Content-Type": "application/json", "x-vercel-protection-bypass": BYPASS_SECRET, "x-db-call-source": "regression" };
+// HAR-33 (2026-08-08): live API calls from a non-`unlimited` IP also need the x-db-gate-bypass
+// header (value = GATE_BYPASS_SECRET, retrieved via `vercel env pull` into .env.local) or they
+// 403 at the edge (middleware.js). Non-fatal when absent: an `unlimited` IP row is the other
+// legitimate path -- but a 403 storm on a run without it means this is what's missing.
+function loadGateBypassSecret() {
+  if (process.env.GATE_BYPASS_SECRET) return process.env.GATE_BYPASS_SECRET;
+  const envPath = path.join(REPO_ROOT, ".env.local");
+  if (existsSync(envPath)) {
+    const line = readFileSync(envPath, "utf8").split("\n").find(l => l.startsWith("GATE_BYPASS_SECRET="));
+    if (line) return line.slice(line.indexOf("=") + 1).trim();
+  }
+  console.warn("WARN: GATE_BYPASS_SECRET not found (env or .env.local) -- x-db-gate-bypass header omitted; run will 403 unless this machine's IP has an `unlimited` row (HAR-33).");
+  return null;
+}
+const GATE_BYPASS = loadGateBypassSecret();
+const HDRS = { "Content-Type": "application/json", "x-vercel-protection-bypass": BYPASS_SECRET, "x-db-call-source": "regression", ...(GATE_BYPASS ? { "x-db-gate-bypass": GATE_BYPASS } : {}) };
 
 // ---- CLI flags ----
 const argv = process.argv.slice(2);

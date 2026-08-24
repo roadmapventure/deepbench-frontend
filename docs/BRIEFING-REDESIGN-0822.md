@@ -62,8 +62,9 @@ State: taps ride `briefing-state` and harvest into a new `runner_settings` row (
 interval_hours, drain lifecycle read from `runner_directives`). **Honoring needs no trigger-prompt
 edit**: the prompt already says "execute runner-cycle.md EXACTLY", so the runbook gains a step-0
 settings gate and every future cycle honors the panel automatically. Semantics locked: the
-scheduler toggle/interval governs SCHEDULED cycles only; a standing drain's chained sessions
-(SES-141) run regardless of interval; scheduler OFF + drain ON = the chain still runs; both off =
+scheduler toggle/interval governs SCHEDULED cycles only; a standing drain's chained continuation
+cycles (`SES-140` FINAL — supersedes the `SES-141` session-spawning form) run regardless of
+interval; scheduler OFF + drain ON = the chain still runs; both off =
 nothing runs, and the panel says so plainly.
 
 **Removed** (John, explicit): the need-you stat pair, the footer note, the standalone
