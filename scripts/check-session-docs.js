@@ -1,5 +1,16 @@
 #!/usr/bin/env node
-// DeepBench v7.0.186 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120
+// DeepBench v7.0.218 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120, SES-176
+// FEATURE: SES-176 -- checks 9/10/11, the TRUTH TRIPWIRE. Checks 1-8 ask "is this file too big /
+// is this row shaped right?"; these ask "do two files still tell the same story?", reading the
+// SES-174 rule registry through docs/governance/RULES-SNAPSHOT.md. Three design points a later
+// editor is most likely to undo, each of which was wrong in a first implementation and is now
+// covered by tests/regression/SES-176-truth-tripwire.js: check 9 is ID-anchored, never
+// statement-anchored (the registry's `statement` is a paraphrase, so matching it against prose
+// ships a check that can never fire); its window is the enclosing BLOCK with no character-count
+// fallback (the fallback reaches into the previous register entry and clears a mention on a
+// neighbouring rule's retirement vocabulary -- a silent false negative); and headingSlug() does
+// NOT collapse consecutive spaces, because GitHub maps each space to its own hyphen and the live
+// anchor `section-1-session-naming--versioning` depends on it.
 // FEATURE: SES-120 -- check 3's stub size baselines are modernized off a live measurement.
 // The old { FEATURES.md: 40, FEATURES-LATER.md: 150 } were row-era caps that could not fire
 // against the v7.0.113 stubs (14.2 KB / 1.2 KB live), and FEATURES-NEXT.md had no cap at all.
@@ -43,6 +54,7 @@
 import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
+import { pathToFileURL } from "url";
 
 const SHARED_CHECKOUT = "C:/Projects/deepbench-frontend";
 
@@ -671,6 +683,303 @@ function checkSessionsLogSize(findings) {
   }
 }
 
+// ===========================================================================
+// Checks 9, 10, 11 (SES-176, Selfbuild M2): THE TRUTH TRIPWIRE
+// ===========================================================================
+// Checks 1-8 ask "is this file too big / is this row shaped right?". These three ask a
+// different question: "do two files still tell the same story?" They read the rule registry
+// SES-174 built (public.governance_rules) through its repo-side snapshot.
+//
+// WHY THE SNAPSHOT AND NOT SUPABASE -- the same reason checks 3/3c/3d read BACKLOG-SNAPSHOT.md,
+// stated at the top of this file: a network round trip does not belong in a session-start
+// tripwire, and a checker that silently no-ops without credentials is a false all-clear.
+// governance_rules is additionally service_role-only (SES-174 locked anon/authenticated to zero
+// privileges), so a live read could not work here even in principle. A MISSING snapshot is
+// therefore a loud FLAG naming the regeneration command -- never a silent skip.
+const RULES_SNAPSHOT_REL = "docs/governance/RULES-SNAPSHOT.md";
+
+// Vocabulary that marks a mention as retirement-aware. A mention of a retired rule that sits
+// inside a window carrying any of these is a doc correctly RECORDING the retirement; one with
+// none is the doc still asserting the rule.
+const RETIREMENT_VOCAB = [
+  "retire", "retired", "retires", "retiring",
+  "supersede", "superseded", "supersedes", "superseding",
+  "struck", "strike", "removed", "removal",
+  "replaced", "replaces", "replacement",
+  "no longer", "not any more", "no more",
+  "do not reinstate", "deprecat", "obsolete", "former", "formerly", "used to",
+];
+
+// Floor for the window read around each mention, used only when the enclosing block is smaller.
+// The real unit is the enclosing block (see enclosingBlock) -- a fixed character count was the
+// FIRST implementation of this check and it was wrong in both directions on live data, which is
+// recorded here because the obvious version is the one a later editor will reach for again:
+//   - FALSE POSITIVE at 280 chars: docs/runbooks/runner-cycle.md's paragraph opens "the
+//     cycle-level lease is RETIRED (register B42)" and mentions B31 some 430 characters later, so
+//     the marker fell outside the window and a correctly-retired passage was flagged.
+//   - The block unit fixes that, because the marker and the mention are one paragraph.
+const RETIREMENT_WINDOW = 280;
+
+// ---- Rules-snapshot table reader. Reuses decodeCell() above, which is why the exporter writes
+// ---- BACKLOG-SNAPSHOT.md's exact escaping: one format, one decoder.
+const RULE_FIELDS = ["id", "status", "enforcement", "source_group", "canonical_doc", "superseded_by", "statement"];
+
+function parseRulesSnapshot(text) {
+  const rules = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("|")) continue;
+    // Split on UNESCAPED pipes only -- the same negative lookbehind parseSnapshotRows() above
+    // uses, and for the same reason. A rule statement may legitimately contain a `|` (stored as
+    // `\|`), and a plain split("|") over-produces cells, fails the length guard below, and drops
+    // the rule from the registry SILENTLY -- a check that quietly stops covering a rule is the
+    // precise failure mode this whole file's header warns about.
+    const cells = line.split(/(?<!\\)\|/).slice(1, -1);
+    if (cells.length !== RULE_FIELDS.length) continue;
+    const decoded = cells.map(decodeCell);
+    if (decoded[0] === "Rule" || /^-+$/.test(decoded[0])) continue; // header / separator
+    const row = {};
+    RULE_FIELDS.forEach((f, i) => { row[f] = decoded[i]; });
+    if (!row.id) continue;
+    rules.push(row);
+  }
+  return rules;
+}
+
+// A rule id is matched as a whole token so `B2` cannot match inside `B25` and `B25` cannot match
+// inside `B250`. Ids are alphanumeric-with-hyphens, so the guard is "not adjacent to a word
+// character", applied on both sides.
+function ruleIdOccurrences(text, id) {
+  const out = [];
+  const needle = id;
+  let from = 0;
+  for (;;) {
+    const at = text.indexOf(needle, from);
+    if (at === -1) return out;
+    const before = at === 0 ? "" : text[at - 1];
+    const after = text[at + needle.length] ?? "";
+    const bad = /[A-Za-z0-9_]/;
+    if (!bad.test(before) && !bad.test(after)) out.push(at);
+    from = at + needle.length;
+  }
+}
+
+function lineOf(text, index) {
+  return text.slice(0, index).split("\n").length;
+}
+
+// The semantic unit these register docs are written in: one bullet, or one paragraph. Expands
+// from a hit to the nearest enclosing block boundary on each side -- a blank line, a new list
+// item (`- ` / `* `), a heading, or a bold lead-in (`**`), which is how RUNNER-GOV and the
+// runbooks start every register entry. Falls back to +/-RETIREMENT_WINDOW characters when the
+// block resolves smaller than that, so a one-line entry still gets a sentence of context.
+// The leading `[ \t]*` on each alternative is load-bearing and was added after a live miss:
+// RUNNER-GOV indents its sub-entries ("  **Second half of his line NOT actioned…"), so a pattern
+// anchored at `\n**` skipped those boundaries entirely, the block ran back into the PREVIOUS
+// register entry, and a live-voice mention of B31 cleared on retirement vocabulary that belonged
+// to a different rule. A too-greedy block is a silent false NEGATIVE, which is the worse
+// direction for a tripwire.
+const BLOCK_START_RE = /\n[ \t]*\n|\n[ \t]*[-*]\s|\n[ \t]*#{1,6}\s|\n[ \t]*\*\*/g;
+
+function enclosingBlock(text, index) {
+  let start = 0;
+  let end = text.length;
+  BLOCK_START_RE.lastIndex = 0;
+  for (const m of text.matchAll(BLOCK_START_RE)) {
+    if (m.index < index) {
+      start = m.index;
+    } else {
+      end = m.index;
+      break;
+    }
+  }
+  // NO character-count fallback for a short block, deliberately. The first version of this
+  // function widened any block under 2*RETIREMENT_WINDOW back out to a fixed character window
+  // "for context", and its own regression control caught what that does: on a two-line register
+  // entry the widened window reaches into the PREVIOUS entry and clears the mention on that
+  // rule's retirement vocabulary. A short block asserting a withdrawn rule with no marker is
+  // exactly what this check is for -- it must flag, not borrow an alibi from its neighbour.
+  return text.slice(start, end);
+}
+
+// HTML comments in these docs are the provenance/changelog chain (every ship prepends one), not
+// live voice. They quote retired rule ids constantly -- RUNNER-GOV's header block alone names B1,
+// B30, B31, B38 and B39 -- so scanning them produces findings about a file's HISTORY rather than
+// what it currently asserts. Blanked to spaces rather than removed so every offset, and therefore
+// every reported line number, stays exact.
+function stripHtmlComments(text) {
+  return text.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, " "));
+}
+
+// GitHub-style heading slug: lowercase, drop anything but word chars/spaces/hyphens, spaces to
+// hyphens. Used to resolve a `#anchor` against a markdown heading.
+// CONSECUTIVE SPACES ARE NOT COLLAPSED, and that is the whole correctness of this function.
+// GitHub maps each space to its own hyphen after dropping punctuation, so removing an `&` or an
+// em-dash leaves the spaces that flanked it and yields a DOUBLE hyphen. Live proof, which a
+// `\s+` collapse gets wrong: docs/STANDARDS.md's "## Section 1: Session Naming & Versioning"
+// slugs to `section-1-session-naming--versioning`, which is byte-for-byte the anchor
+// CAP-VERSION-STRICT-INCREMENT stores. Collapsing produced a single hyphen, failed to resolve a
+// perfectly good pointer, and reported a WARN about a section that is right there.
+function headingSlug(heading) {
+  return heading
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s/g, "-");
+}
+
+function anchorResolves(docText, anchor) {
+  if (!anchor) return true; // no anchor to resolve
+  // (a) a markdown heading whose slug matches
+  for (const m of docText.matchAll(/^#{1,6}\s+(.+?)\s*$/gm)) {
+    if (headingSlug(m[1]) === anchor.toLowerCase()) return true;
+  }
+  // (b) an explicit anchor: <a name="x">, <a id="x">, or a {#x} attribute
+  if (new RegExp(`<a\\s+(?:name|id)=["']${escapeRe(anchor)}["']`, "i").test(docText)) return true;
+  if (docText.includes(`{#${anchor}}`)) return true;
+  // (c) the register-entry form these docs actually use for rule ids: `- **B1. …` / `**B1:` /
+  //     `**B1 —`. This is how RUNNER-GOV-0820-REQUIREMENTS.md writes all 40 of its B-rules.
+  if (new RegExp(`\\*\\*${escapeRe(anchor)}[.:)\\s—-]`, "").test(docText)) return true;
+  return false;
+}
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function loadRules(findings) {
+  const p = path.join(WORKTREE, RULES_SNAPSHOT_REL);
+  const text = readIfExists(p);
+  if (text === null) {
+    findings.push({ check: "9", severity: "FLAG", detail: `${RULES_SNAPSHOT_REL} not found -- the truth checks (9/10/11) could not run at all. Regenerate it with: SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/export-governance-snapshot.js` });
+    return null;
+  }
+  const rules = parseRulesSnapshot(text);
+  if (!rules.length) {
+    findings.push({ check: "9", severity: "FLAG", detail: `${RULES_SNAPSHOT_REL} parsed to zero rule rows -- the truth checks (9/10/11) could not run. The file is present but unreadable in the expected format; regenerate it with: node scripts/export-governance-snapshot.js` });
+    return null;
+  }
+  return rules;
+}
+
+// ---- Check 9: a retired or superseded rule still stated in LIVE VOICE ----
+// ID-anchored, deliberately, and this is the design decision most likely to be "simplified" into
+// something that cannot fire. The registry's `statement` column is SES-174's PARAPHRASE of the
+// rule, not the doc's literal sentence, so searching prose for the statement verbatim finds
+// nothing and ships a check that passes forever. The rule ID is the one string that genuinely
+// appears in both places.
+function checkRetiredRulesInLiveVoice(findings, rules, docCache) {
+  const dead = rules.filter(r => r.status && r.status !== "live");
+  for (const rule of dead) {
+    for (const [rel, raw] of docCache) {
+      const text = stripHtmlComments(raw);
+      const hits = ruleIdOccurrences(text, rule.id);
+      if (!hits.length) continue;
+      const bare = [];
+      for (const at of hits) {
+        const win = enclosingBlock(text, at).toLowerCase();
+        if (!RETIREMENT_VOCAB.some(v => win.includes(v))) bare.push(lineOf(text, at));
+      }
+      if (bare.length) {
+        const succ = rule.superseded_by ? ` (superseded by ${rule.superseded_by})` : "";
+        findings.push({
+          check: "9",
+          severity: "FLAG",
+          detail: `rule ${rule.id} is \`${rule.status}\`${succ} in the registry, but ${rel} states it in live voice at line${bare.length > 1 ? "s" : ""} ${bare.join(", ")} with no retirement marker in the surrounding text -- a session reading that doc would treat a withdrawn rule as current. Either mark the passage retired or flip the registry row back to live; the two must not disagree.`,
+        });
+      }
+    }
+  }
+}
+
+// ---- Check 10: every canonical_doc pointer resolves ----
+// A rule whose canonical home does not exist is a rule with no authoritative text at all, which
+// is the failure the registry was built to end.
+function checkRulePointers(findings, rules, docCache) {
+  const missingFile = new Map();   // docpath -> [ids]
+  const missingAnchor = new Map(); // "docpath#anchor" -> [ids]
+  for (const rule of rules) {
+    const raw = (rule.canonical_doc || "").trim();
+    if (!raw) {
+      findings.push({ check: "10", severity: "FLAG", detail: `rule ${rule.id} has no canonical_doc -- it has no authoritative home. Set one on the governance_rules row and re-export the snapshot.` });
+      continue;
+    }
+    const [docPath, anchor] = raw.split("#");
+    const text = docCache.has(docPath) ? docCache.get(docPath) : readIfExists(path.join(WORKTREE, docPath));
+    if (text === null) {
+      if (!missingFile.has(docPath)) missingFile.set(docPath, []);
+      missingFile.get(docPath).push(rule.id);
+      continue;
+    }
+    if (!anchorResolves(text, anchor)) {
+      const key = raw;
+      if (!missingAnchor.has(key)) missingAnchor.set(key, []);
+      missingAnchor.get(key).push(rule.id);
+    }
+  }
+  // Aggregated: 40 rules pointing at one deleted file is one problem, not 40 findings.
+  for (const [docPath, ids] of missingFile) {
+    findings.push({ check: "10", severity: "FLAG", detail: `canonical_doc "${docPath}" does not exist, and ${ids.length} rule${ids.length > 1 ? "s" : ""} point at it (${ids.slice(0, 6).join(", ")}${ids.length > 6 ? ", …" : ""}) -- those rules have no authoritative text. Fix the path on the governance_rules rows or restore the file.` });
+  }
+  for (const [ref, ids] of missingAnchor) {
+    findings.push({ check: "10", severity: "WARN", detail: `canonical_doc "${ref}" names a section that could not be located in that file (rule${ids.length > 1 ? "s" : ""} ${ids.slice(0, 6).join(", ")}${ids.length > 6 ? ", …" : ""}). The file exists, so this is a stale anchor rather than a missing home -- WARN, not FLAG.` });
+  }
+}
+
+// ---- Check 11: every {{rule:ID}} marker resolves to a registry row ----
+// FORWARD GUARD, stated as one rather than dressed up as a live catch. SES-175 introduces these
+// markers and is `needs-john` at the time of writing, so a clean run today means "there are no
+// markers yet", not "the markers are all fine". Measured before shipping: zero real markers exist
+// (the only `{{rule:` strings in the repo are inside BACKLOG-SNAPSHOT.md TICKET TEXT describing
+// SES-175 -- which is data, and is why the generated snapshots are excluded from the scan).
+function checkRuleMarkers(findings, rules, docCache) {
+  const known = new Set(rules.map(r => r.id));
+  for (const [rel, text] of docCache) {
+    for (const m of text.matchAll(/\{\{rule:([^}]*)\}\}/g)) {
+      const id = m[1].trim();
+      if (known.has(id)) continue;
+      findings.push({ check: "11", severity: "FLAG", detail: `${rel} line ${lineOf(text, m.index)} carries the marker {{rule:${id}}}, which is not a rule id in ${RULES_SNAPSHOT_REL} -- it would render as nothing. Fix the id, or add the rule to public.governance_rules and re-export.` });
+    }
+  }
+}
+
+// The scan set is DERIVED from the registry (the distinct canonical_doc files) plus the runbooks
+// directory, never hardcoded -- so adding a rule whose home is a new file extends the scan with
+// no edit here. Generated data files are excluded: BACKLOG-SNAPSHOT.md carries ticket PROSE that
+// quotes rule ids and marker syntax, and RULES-SNAPSHOT.md is the input itself.
+const TRUTH_SCAN_EXCLUDE = new Set([RULES_SNAPSHOT_REL, "docs/backlog/BACKLOG-SNAPSHOT.md"]);
+
+function buildDocCache(rules) {
+  const rels = new Set();
+  for (const r of rules) {
+    const p = (r.canonical_doc || "").split("#")[0].trim();
+    if (p) rels.add(p);
+  }
+  const runbookDir = path.join(WORKTREE, "docs", "runbooks");
+  try {
+    for (const f of fs.readdirSync(runbookDir)) {
+      if (f.endsWith(".md")) rels.add(`docs/runbooks/${f}`);
+    }
+  } catch {
+    // no runbooks directory in this checkout -- the registry-derived set still stands
+  }
+  const cache = new Map();
+  for (const rel of [...rels].sort()) {
+    if (TRUTH_SCAN_EXCLUDE.has(rel)) continue;
+    const text = readIfExists(path.join(WORKTREE, rel));
+    if (text !== null) cache.set(rel, text);
+  }
+  return cache;
+}
+
+function checkTruthTripwire(findings) {
+  const rules = loadRules(findings);
+  if (!rules) return;
+  const docCache = buildDocCache(rules);
+  checkRetiredRulesInLiveVoice(findings, rules, docCache);
+  checkRulePointers(findings, rules, docCache);
+  checkRuleMarkers(findings, rules, docCache);
+}
+
 function main() {
   const findings = [];
   const stateText = checkClaudeState(findings);
@@ -679,6 +988,7 @@ function main() {
   checkBacklogSnapshot(findings);
   checkStandardsDrift(findings);
   checkSessionsLogSize(findings);
+  checkTruthTripwire(findings);
 
   // Worktree cross-reference checks need the freshest possible CLAUDE-STATE.md/
   // FEATURES-ARCHIVE.md -- see freshDevText()'s comment for why the local
@@ -704,4 +1014,22 @@ function main() {
   process.exit(0);
 }
 
-main();
+// SES-176: the truth-check helpers are pure (findings array in, findings array out -- no network,
+// no disk, no process.exit) so tests/regression/SES-176-truth-tripwire.js can drive them against
+// fixtures. Same contract heal-engine.js and export-backlog-snapshot.js already use, including the
+// guard below: importing this module for its exports must never run the CLI report.
+export {
+  parseRulesSnapshot,
+  ruleIdOccurrences,
+  anchorResolves,
+  headingSlug,
+  checkRetiredRulesInLiveVoice,
+  checkRulePointers,
+  checkRuleMarkers,
+  RETIREMENT_VOCAB,
+  RETIREMENT_WINDOW,
+};
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
+}

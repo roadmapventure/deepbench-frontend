@@ -5,6 +5,110 @@
 
 ---
 
+## session/cycle-20260824-0840 (v7.0.218, 2026-08-24, runner cycle `3914fba3-25b9-4a13-b83f-de26a082626c`, `trigger = scheduled` (gate: *run* — on the 3h clock grid, 03:00 America/Chicago), model Opus 5, no subagent)
+
+**`SES-176` set `partial`** (`P10 - Tooling`, tier `next`, queue 11, epic **Selfbuild M2 - Truth
+Infrastructure** fe7bc066). Kickoff `docs/kickoffs/v7.0.218-SES-176-truth-tripwire.md`. **No
+`src`/`api`/`lib`/`.claude` edit.**
+
+**Selection.** The standing drain `9abb6451` returned `SES-175` as its `pick`, which carries
+`design_status = 'needs-john'` — the drain's pick predicate never reads `design_status`, exactly as
+`runner-cycle.md`'s tail note warns — so it was skipped procedurally and the cycle fell through to the
+class-sorted board. Queue 1/4/6 (`SES-154`, `SES-157`, `SES-189`) are `delivered` and stepped past
+silently; queue 2 (`SES-155`) is `needs-john`; **queue 3 (`SES-156`) and queue 5 (`SES-158`) are blocked
+on `public.briefing_comments`, which does not exist — verified live, not inferred from their ticket
+text**; queue 7 (`SES-188`) gated. `SES-176` at queue 11 is the first buildable row. Five `record_skip()`
+rows written.
+
+**What shipped.** Checks 1–8 of `scripts/check-session-docs.js` ask *is this file too big, is this row
+shaped right*. Checks **9/10/11** ask the question the M2 epic exists for: **do two files still tell the
+same story?** They read `SES-174`'s `public.governance_rules` (84 rows: 81 live, 2 retired, 1 superseded)
+through a **new in-repo snapshot**, `docs/governance/RULES-SNAPSHOT.md`, written by the new
+`scripts/export-governance-snapshot.js`.
+
+**Why a snapshot rather than the obvious live read** — the constraint is quoted, not re-derived. The
+checks live in a *session-start* tripwire, and that script's own header already ruled a network read out:
+*"A network round trip does not belong in this path, and a checker that silently no-ops when credentials
+are absent would reintroduce exactly the false all-clear being fixed here."* `governance_rules` is
+additionally `service_role`-only (`SES-174` locked `anon`/`authenticated` to zero privileges), so a
+session-start read could not work without credentials even in principle. The exporter therefore ships in
+the same ticket — the checks are unbuildable without it — mirroring `export-backlog-snapshot.js`'s
+determinism, escaping and exit codes (0 / 1 drift / **2 cannot run, never a pass**). Two runs against an
+unchanged registry are byte-identical: the second prints `unchanged` and writes nothing.
+
+**IT CAUGHT REAL DRIFT ON ITS FIRST LIVE RUN, which is the ticket's own justification.** `B25`
+(`retired`) and `B31` (`superseded by B42`) are **both still stated in present tense** in
+`docs/RUNNER-GOV-0820-REQUIREMENTS.md` — line 201, *"the briefing **shows** the queue's **top five**"*;
+line 280, *"collides with the `runner_lease` (B31), the single-runner control"* — with no retirement
+marker in their entries, while `runner-cycle.md` line 1587 records both as *"struck by John's explicit
+removal"* and says **"Do not reinstate the struck B25/B26 sections."** The canonical register and the
+runbook disagree, and a session reading only the register would rebuild two sections John removed.
+**Reported, never auto-fixed:** a governance register is not something an unattended cycle edits.
+Two stale `#B31`/`#B32` anchors in `runner-cycle.md` are reported as WARNs.
+
+**THREE FIRST IMPLEMENTATIONS WERE WRONG, and each control is kept as a regression test** — recorded
+because every one of them is the obvious version a later editor will reach for again:
+
+1. **Statement-anchored matching can never fire.** The registry's `statement` is `SES-174`'s
+   *paraphrase*, not the doc's literal sentence, so searching prose for it finds nothing and ships a
+   check that passes forever. Check 9 is **ID-anchored** instead.
+2. **A fixed ±280-character window is wrong in both directions.** It produced a **false positive** on
+   `runner-cycle.md:113` (the paragraph opens *"the cycle-level lease is RETIRED"* ~430 characters
+   earlier, outside the window) and, once widened, a **false negative** — the widened window reached
+   into the *previous* register entry and cleared a live-voice `B31` mention on `B30`'s retirement
+   vocabulary. The unit is now the **enclosing block, with no character fallback**; the greedy-block
+   control in the test is what caught the second bug.
+3. **A slug that collapses consecutive spaces fails a valid anchor.** GitHub maps each space to its own
+   hyphen, so `## Section 1: Session Naming & Versioning` slugs to
+   `section-1-session-naming--versioning` — byte-for-byte the anchor `CAP-VERSION-STRICT-INCREMENT`
+   stores. The collapse reported a WARN about a section that is right there.
+
+A fourth bug was caught by the test suite rather than by review: `parseRulesSnapshot` split on every
+`|`, so a rule statement containing an escaped pipe over-produced cells and the row was **silently
+dropped** from the registry. It now uses the same negative-lookbehind split `parseSnapshotRows()`
+already uses — one format, one decoder.
+
+**`partial`, and what is deliberately not in it.** The ticket names four checks. Two ship in full
+(*every `{{rule:ID}}` and doc pointer resolves*) and check 9 covers *no retired rule's distinctive phrase
+in live voice* in its ID-anchored form. The remaining two — *no rule text outside its canonical home* and
+*no duplicate procedure homes* — both need a definition of **"distinctive phrase"** the ticket does not
+give, and matching a paraphrase against prose is confidently wrong in both directions. The ticket's *"a
+hit files a ticket heal-engine-style"* is likewise deferred (an atomic id-block claim plus an `--apply`
+path is a second feature, and would break the scope cap). Named here rather than shipped as theatre.
+
+**Known bound, stated rather than left to be found:** check 9 decides on vocabulary within a block, so a
+block carrying retirement vocabulary about a *different* subject masks a live-voice assertion. Measured:
+`B26`'s entry ends *"until `SES-85` retires it"* — about the unclassed remainder, not about B26 — so
+**B26 does not flag though it is as retired as B25.** A tripwire, not a proof.
+
+**Check 11 is a forward guard and is reported as one.** `SES-175` introduces `{{rule:ID}}` markers and is
+`needs-john`, so **zero real markers exist today** (the only two `{{rule:` strings in the repo are inside
+`BACKLOG-SNAPSHOT.md` *ticket text*, which is data — hence the generated snapshots are excluded from the
+scan). A clean run today means "there are none yet", not "they are all fine".
+
+**QA.** 16 assertions in `tests/regression/SES-176-truth-tripwire.js`, each paired with a negative
+control, importing the checks from the shipped script rather than reimplementing them (John's rule
+2026-08-23: *"you should never be throwing away tests"*). Suite **50/50 green** with credentials
+(`49/50` without — `CHI-31` needs `.env.local`); `npm install && npm run build` green. The 19 failures
+seen before `npm install` were proven pre-existing by running the suite against an untouched `origin/dev`
+worktree: **30/49 there vs 31/50 here — the same 19, plus this ticket's new test passing.**
+
+**Briefing: read UNVERIFIED, republish DECLINED — and this time BOTH read paths failed, which is new.**
+`WebFetch` cleared the head and the title-guard block and died inside the provenance-comment chain;
+`Artifact` `read` stopped even shorter, inside the frame-runtime script. The served page is now **250 KB**,
+against the **198.3 KB** at which `SES-188` measured the `WebFetch` arm *reaching* the block six hours
+earlier — consistent with that ticket's threshold finding, and the first time neither arm has worked.
+Per `briefing-page.md`'s read-back contract the republish was declined. **Cost, stated rather than
+hidden: 25 undecided cards (14 gated, 11 ship) and this is the third consecutive declined republish.**
+A `gated_before_build` card was filed on `SES-188` carrying a **fourth** candidate fix, measured this
+cycle: `docs/runbooks/briefing-template.html` is 171,061 bytes of which **21 HTML comment blocks hold
+42,050 chars — 24.8% of the file — and every one sits above the `briefing-state` block** (comment offsets
+6,471–35,586; block at 66,229), so the `SES-164` header-trim treatment would buy roughly 35 KB of head.
+Its honest bound is on the card: it only moves the ceiling, exactly the objection the ticket already
+makes of its own candidate 1. **Not chosen — the runner may not pick between these unattended.**
+
+---
+
 ## session/cycle-20260824-0541 (v7.0.217, 2026-08-24, runner cycle `747b7239-3475-40b1-9601-12aba76538e3`, `trigger = scheduled` (gate: *run* — on the 3h clock grid, 00:00 America/Chicago), model Opus 5, 1 Sonnet 5 subagent) — SES-174: the governance_rules registry (M2 Truth Infrastructure, member 1 of 10)
 
 **`SES-174` set `delivered`** (`P10 - Tooling`, tier `next`, queue 9, epic **Selfbuild M2 - Truth
