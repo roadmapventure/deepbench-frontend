@@ -1,3 +1,7 @@
+// DeepBench v7.0.224 | tests/regression/CHI-31-source-simulation-consistency.js | SES-180 (b) --
+// the credential-absence path DECLARES its not-run half via notRun() instead of a console.log the
+// harness could not see. Same text, same placement, same early return; what changes is that the
+// suite now reports the gap instead of counting this partial run toward "50/50 passed".
 // DeepBench v7.0.221 | tests/regression/CHI-31-source-simulation-consistency.js | SES-92 -- the
 // credential-absence path SKIPs loudly instead of FAILing, mirroring AGT-44/DAT-003/DAT-11/DAT-12.
 // DeepBench v6.3.208 | tests/regression/CHI-31-source-simulation-consistency.js | CHI-31
@@ -22,7 +26,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { T } from "../../src/tokens.js";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../../.env.local") });
@@ -89,7 +93,12 @@ export default async function run() {
   // below, a real content mismatch still FAILS, which is the behaviour being preserved, not
   // traded away. FAIL is reserved for an actual mismatch.
   if (!supabaseUrl || !supabaseKey) {
-    console.log("  [CHI-31] Skill Profile half SKIPPED -- no SUPABASE_URL / SUPABASE_SERVICE_KEY in env " +
+    // SES-180 (b), v7.0.224: this was a bare console.log, which the harness could not see -- so
+    // the suite counted this partial run as a full PASS. notRun() is the DECLARATION run-all.js
+    // reads; the text is unchanged and so is the early return. The test still PASSES, because the
+    // describeDataType() halves above genuinely did.
+    notRun("Skill Profile half",
+      "no SUPABASE_URL / SUPABASE_SERVICE_KEY in env " +
       "(run with `node --env-file=.env.local tests/regression/run-all.js` to include it). " +
       "The describeDataType() halves above DID run, but this half is unverified: a green suite " +
       "without it does NOT prove ci-answer-intent and qg-review-intent still carry their CHI-31 " +

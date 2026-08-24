@@ -1,4 +1,21 @@
 #!/usr/bin/env node
+// DeepBench v7.0.224 | tests/regression/run-all.js | SES-180 (b) -- the suite reports parts it
+// could not run, instead of counting them as passes. SES-180's own ship notes name this as the
+// first of three things still owed and the only one that is the runner's to do.
+//
+// WHAT CHANGED AND WHAT DID NOT. The pass/fail semantics are untouched: exit 1 iff something
+// FAILED. A declared not-run part is information, never a failure -- gating on it would paint CI
+// permanently red wherever credentials are absent, which is the exact outcome SES-180 shipped the
+// regression job `continue-on-error` to avoid. What changes is that the run now SAYS it was
+// partial. Measured in this clone before the edit: with no credentials the suite printed
+// "50/50 passed" and nothing else, while five tests (AGT-44, CHI-31, DAT-003, DAT-11, DAT-12) had
+// each skipped a credentialed half and announced it only through a console.log this file could not
+// see. That 50/50 is the number SES-180 says it cannot yet gate on.
+//
+// THE DRAIN RUNS ON BOTH ARMS, and that is not defensive tidying: takeNotRun() empties a
+// module-level buffer, so a declaration left behind by a test that THREW would be attributed to
+// the next test in the sorted order. Pass and fail both drain, immediately, before the next import.
+//
 // DeepBench v6.3.208 | tests/regression/run-all.js | SES-009a
 //
 // Persistent regression suite runner. Unlike scripts/check-session-docs.js
@@ -20,6 +37,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
+import { takeNotRun, renderNotRun } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,6 +60,9 @@ async function main() {
   }
 
   let failCount = 0;
+  let notRunParts = 0;
+  const partialTests = [];
+
   for (const file of files) {
     const fullPath = path.join(DIR, file);
     try {
@@ -55,9 +76,27 @@ async function main() {
       failCount++;
       console.log(`  [FAIL] ${file} -- ${e.message}`);
     }
+    // Drained on BOTH arms -- see the header. A throw must not hand its declaration to the
+    // next file, and a test that declared a part and then failed still owns that declaration.
+    const declared = takeNotRun();
+    if (declared.length) {
+      notRunParts += declared.length;
+      partialTests.push(file);
+      console.log(renderNotRun(declared));
+    }
   }
 
   console.log(`\nregression suite: ${files.length - failCount}/${files.length} passed`);
+  if (notRunParts > 0) {
+    // Deliberately loud, and deliberately not an error. The pass count above is true; it is just
+    // not the whole story, and "50/50" read alone is what SES-180 could not gate on.
+    const p = notRunParts === 1 ? "part" : "parts";
+    const t = partialTests.length === 1 ? "test" : "tests";
+    console.log(
+      `NOT A FULL RUN: ${notRunParts} ${p} declared not-run across ${partialTests.length} ${t} ` +
+      `(${partialTests.join(", ")}). Those parts are UNVERIFIED -- a green suite does not cover them.`
+    );
+  }
   process.exit(failCount > 0 ? 1 : 0);
 }
 

@@ -5,6 +5,52 @@
 
 ---
 
+## session/cycle-20260824-1508 (v7.0.224, 2026-08-24, runner cycle `0830f6ee-bffa-49da-9f7c-e75ffeccb06f`, **`trigger = scheduled`** (fire 15:07:43Z, off the 3h clock grid — gate treats it as manual), model Opus 5, 1 subagent (Sonnet 5, close-out docs)) — SES-180 (b): the regression suite can say "I could not run this here"
+
+**`SES-180` set `partial`** (`P10 - Tooling`, tier `next`, epic **Selfbuild M2 - Truth
+Infrastructure**). Kickoff `docs/kickoffs/v7.0.224-SES-180-skip-vs-fail.md`.
+**3 source files** (`tests/regression/_lib/self-run.js`, `tests/regression/run-all.js`,
+`tests/regression/CHI-31-source-simulation-consistency.js`) + close-out. No schema, no
+`src`/`api`/`lib`/`.claude` edit.
+
+**Why, revalidated live this cycle rather than quoted from the ticket.** `SES-180`'s own ship
+notes (`v7.0.219`) named three things still owed and called the first the runner's to do: a test
+declaring "I cannot run here" must be counted as neither passed nor failed. Read live this cycle:
+`tests/regression/run-all.js` had **no skip concept at all** — its loop resolved to exactly two
+outcomes, `[PASS]` or `[FAIL]`. **Five** tests already detect the missing-credential gap and
+announce it with a `console.log` the harness cannot see — `AGT-44`, `CHI-31`, `DAT-003`, `DAT-11`,
+`DAT-12` — so all five were counted **PASS**. CI had run five times, every one reporting `50/50
+passed` on a partial run.
+
+**The design decision an editor will be tempted to undo: the unit is the PART, not the test.** All
+five of those tests skip a **half**, and their other half genuinely runs and passes — marking the
+whole file `[SKIP]` would discard real passing assertions, and marking it plain `[PASS]` discards
+the gap, which is the bug this ticket exists to fix. And the declaration is made **by the test**:
+the harness never parses output and never reads `process.env` on a test's behalf, because a harness
+that infers skips swallows real failures along with the honest gaps.
+
+**What shipped.** `notRun(part, reason)` and `takeNotRun()` in `tests/regression/_lib/self-run.js` —
+the test's declaration and the harness's drain. `tests/regression/run-all.js` drains the
+declaration after **every** module, on both the pass and fail arms (a buffer that survived a throw
+would attribute one test's declaration to the next module), renders `[NOT RUN]` lines, and adds a
+`NOT A FULL RUN` summary line whenever any part was declared. `CHI-31`'s existing `console.log`
+became `notRun(...)` — same text, same placement, same `return` — as the first real caller.
+
+**QA — discriminating, one variable.** A 4-module fixture directory run through the harness's
+existing `--dir`, against the pre-change harness taken from `origin/dev` as a negative control: the
+control prints `3/4` and **zero** not-run lines; the shipped harness prints the same `3/4` and the
+same exit `1`, plus 2 declarations attributed to the right modules. **Leak arm proven:** a module
+that declares a part and then throws kept its declaration and did not hand it to the next module.
+Real suite without credentials: **50/50** plus the `NOT A FULL RUN` banner naming `CHI-31`. Real
+suite **with** credentials: **50/50** and **no** banner — proving the banner is conditional on the
+real gap, not a permanent fixture. `npm run build` green (vite, 8.65s). Fixtures lived in the
+scratchpad and were deleted.
+
+**Disclosed rather than left to be found.** The other four declaring tests — `AGT-44`, `DAT-003`,
+`DAT-11`, `DAT-12` — are **not** converted: one line each, but four files past the 3-file scope cap.
+A permanent regression guard on the harness itself is also owed and not built here — this QA is a
+fixture run, not a committed test. `SES-180` stays `partial`: its remaining two items — repository
+secrets and branch protection — are John's, not the runner's.
 ## session/cycle-20260824-1440 (v7.0.223, 2026-08-24, runner cycle `fb7bfd0c-6592-41ab-952d-418740e5d356`, **`trigger = chained (drain continuation)`**, model Opus 5, 1 Sonnet 5 subagent) — SES-188: the briefing template's provenance chain is trimmed (candidate 4)
 
 **`SES-188` set `delivered`** (`P9 - Bug Fixes`, tier `now`, queue 2). Kickoff
