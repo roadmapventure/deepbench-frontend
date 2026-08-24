@@ -5,6 +5,97 @@
 
 ---
 
+## session/cycle-20260824-0321 (v7.0.216, 2026-08-24, runner cycle `50592275-20ac-431b-b161-517f8dc35add`, `trigger = scheduled` (gate: *manual fire, off the cron grid*), model Opus 5, no subagent) — SES-188: the briefing harvest is truncation-dependent, not blind
+
+**`SES-188` set `partial`** (`P9 - Bug Fixes`, tier `now`, queue 7 at pick) — *not* `delivered`,
+because the durable fix is deliberately still open. Two files
+(`docs/runbooks/briefing-page.md`, `docs/runbooks/runner-cycle.md`) + the kickoff
+`docs/kickoffs/v7.0.216-SES-188-verified-harvest.md` + the standard close-out set. No schema, no
+migration, no `src`/`api`/`lib`/`.claude` edit.
+
+### The premise was half right, and the expensive half was wrong
+
+`SES-188` was filed at 02:5xZ the same night by cycle `e42f8d4e`, stating that **both** documented
+read paths return only the artifact's head and **never** the `briefing-state` block, so "John's taps
+cannot be picked up". Revalidation measured both paths against the live 198.3 KB page, four seconds
+apart:
+
+| Read path | Where it stopped | Reached `briefing-state`? |
+|---|---|---|
+| `Artifact` action `read` | inside the frame-runtime script | **No** |
+| `WebFetch`, same URL | past `</style></head><body>`, through the **complete** block, on into `<script id="code">` | **Yes** |
+
+They are not two independent readers that both fail. `WebFetch` on a `claude.ai/code/artifact/…`
+URL returns the *identical* `[Artifact … full HTML saved to /root/.claude/…]` wrapper the `Artifact`
+read action does — **one interception, two size budgets.** The block sits immediately after
+`<body><div id="page"></div>`, early enough that the longer read clears it.
+
+**The consequential claim is disproven by doing the thing it calls impossible:** this cycle harvested
+John's night meter reading **typed at 03:19Z, three minutes before the cycle opened** (all-models 60,
+Fable 67, 5-hour 0) — newer than the latest stored `runner_usage_readings` row (2026-08-23T13:51Z).
+
+### Why it mattered enough to ship
+
+The false half was live and costing. Cycles `598a9b81` (01:41Z) and `e42f8d4e` (02:5xZ) both declined
+to republish rather than destroy un-harvested taps — **the right call on their evidence** — leaving
+the page stale with **18 undecided cards** behind it and John's last harvested decision at
+2026-08-23T22:10Z. Every later cycle reaching for the short read would re-derive the same wrong
+conclusion, the repeated-re-derivation waste `SES-114` measured at three times in one day.
+
+### What was deliberately NOT shipped
+
+**"Use WebFetch, it works" is not written anywhere in this change.** That is one observation against a
+same-night cycle reporting the opposite; the cut-off is a **size budget**, the page is 198.3 KB and
+grows every rebuild, and nothing establishes where the threshold sits. Shipping it as doctrine would
+replace one unverified belief with another, and the next page growth would make it false *silently* —
+a cycle would rebuild from a short read it believed complete and **destroy John's taps**, which is
+exactly the failure `v7.0.197`'s seed sentinel exists to prevent.
+
+So the contract now tests **the result, not the tool**: block present, parses as JSON, **and** carries
+a value provably live (cheapest: a `reading` newer than the latest stored row). Verified → rebuild.
+Unverified → **decline the republish**, still mandatory. `runner-cycle.md` step 2 cites that contract
+in one sentence rather than restating it, so the two files cannot drift the way step 5 and step 7 did
+before `v7.0.114`.
+
+**Still open, hence `partial`:** none of the ticket's three candidate durable fixes (a size-bounded
+read returning a named block; a Supabase-side buffer the page writes taps into directly, retiring the
+page-as-buffer design; a sanctioned exception to the `~/.claude/` rule) is chosen here. The third
+needs a §19v change.
+
+### QA
+
+Discriminating, with a negative control: the harvested block was parsed, all seven harvest keys
+asserted present, and the live-value test run (night reading 03:19Z **newer than** the stored
+13:51Z row → *verified*). The control truncates the same block to 60% and re-parses — it **throws**,
+proving the test distinguishes a short read from a real one rather than passing on anything
+JSON-shaped. Build green (`npm run build`, exit 0).
+
+### Two findings filed rather than fixed here
+
+- **`SES-97` — gated before build.** Its premise is half dead: `CHI-48` is now **one row** and a
+  whole-board census returns **zero** duplicate IDs (the other row was renumbered to `CHI-104` on
+  2026-08-23; `SES-173` reached the same finding and proposed `SES-30` for removal as a duplicate of
+  `SES-97`). What remains is the ticket's own closing ask — a unique constraint on `backlog_id` —
+  and there is still no unique constraint or index on that column. That is **gated**: it would
+  supersede a documented invariant (the runbook states `backlog_id` is not unique, and
+  `recompute_backlog_queue()`'s sixth `ORDER BY` clause on `id` exists *because* two rows could share
+  an ID), on the one table every parallel cycle claims and files into. §19v: *"Uncertain
+  classification → gated, always."* Card filed, `design_status = 'needs-john'`, skip recorded.
+- **`SES-190` — filed, then superseded within the same cycle. Recorded rather than quietly
+  dropped.** It captured the regression suite **red on `dev` at 47/49**:
+  `SES-187-title-gate.js` (landed in `2e908f6`, `v7.0.214`) ran its seven assertions at module top
+  level and printed its own `[PASS]` line but never `export default run` nor
+  `selfRun(import.meta.url, run)`, so the harness reported PASS **and** FAIL for one file, with
+  `SES-28`'s self-run guard failing on the same root cause. **Proven pre-existing, not inherited:**
+  this cycle touched zero `.js`, stashed its docs-only changes and re-ran against untouched
+  `origin/dev` — identical 47/49, identical two failures. It was filed with a paste-ready ~4-line
+  patch rather than fixed, per one-build-per-cycle. **Then the rebase revealed a peer cycle had
+  shipped exactly that fix as `v7.0.215` (`SES-189`) while this cycle was building** — "assertions
+  byte-identical, wrapper only" — and the suite re-run on the merged tree returns **49/49 green**.
+  `SES-190` is therefore set `removal proposed` carrying this evidence; it is not removed
+  unattended. **The filing was still correct when made** (measured twice, both arms), and this is
+  what parallel cycles look like from inside one: the board is the coordination point, and the
+  ticket is the thing that let the duplicate be *seen* rather than shipped twice.
 ## session/cycle-20260824-0322 (v7.0.215, 2026-08-24, runner cycle `c9d32e9a-9c96-428f-ba7a-68d16c9ef7d5`, `trigger = scheduled` — fired manually, model Opus 5, no subagent) — SES-189: a retired drain directive no longer eats the cycle's whole drain call
 
 **`SES-189` DELIVERED** (Tooling · `P10 - Tooling`, tier `now`, queue 6 at pick, automation lane

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.216 | runbooks/briefing-page.md | SES-188 — the decision read-back contract gains the TRUNCATION TEST. The harvest is not blind, it is truncation-dependent: both documented read paths are the SAME artifact-reader interception (WebFetch on a claude.ai/code/artifact URL returns the identical wrapper the Artifact read action does) and differ only in how much head each returns. Measured live 2026-08-24 03:22–03:23Z on the 198.3 KB served page, four seconds apart: Artifact read stopped inside the frame-runtime script and never reached briefing-state; WebFetch cleared the head, the COMPLETE briefing-state block, and ran on into <script id="code">. THE THING A LATER EDITOR WILL BE TEMPTED TO WRITE HERE AND MUST NOT: "use WebFetch, it works". That is one observation against a same-night cycle reporting the opposite; the cut-off is a SIZE BUDGET and this page grows every rebuild, so a cycle that trusted the tool and rebuilt from a short read would publish the empty skeleton and destroy John's un-harvested taps — the exact failure v7.0.197's seed sentinel exists to prevent. Hence a test on the RESULT (block present, parseable, and carrying a value provably live) with two branches: verified → rebuild; unverified → decline the republish, still mandatory and still what 598a9b81 and e42f8d4e correctly did. Cost of declining is stated rather than hidden (18 undecided cards by 03:2xZ). SES-188 stays OPEN for the durable fix; none of its three candidates is chosen here. -->
 <!-- DeepBench v7.0.213 | runbooks/briefing-page.md | SES-171 (Selfbuild M1) -- the 30-stamp header pile is TRIMMED to the newest stamp, the SES-164 shape applied verbatim: 29 stamps (40,843 bytes, 32.5% of the file) moved VERBATIM to docs/SESSIONS.md 'Appendix -- retired briefing-page.md header stamps'; every stamp probed for stamp-only warnings (none found -- all restated in body); body sha256-identical across the trim (20445487a5c91162). Three stale contracts fixed same pass: step 1 masthead run-now link (SES-143 owns it in 2b), 12's SES-125 rejected-paths paragraph (SES-157 form), step 6 successor-run wording (SES-140 in-session chain). Cap: session-hygiene stamp-cap check. -->
 <!-- DeepBench v7.0.208 | runbooks/briefing-page.md | SES-165 (2026-08-23) — step 1c's boundary rule is REWRITTEN and the v7.0.199 / directive 16b3ff73 gated-only carve-out is SUPERSEDED: a card now retires when its ticket is TERMINAL (done/removed), whatever its kind, and `delivered` always renders. The old rule was right for exactly one day. It reasoned that a gated card asks PERMISSION (moot once built) while a ship card asks for a RATING (the trust ladder's only input, "meaningful forever") — sound while a ship wrote `done` itself. SES-154 (v7.0.205) moved the rating one stage earlier: a ship now writes `delivered` and ONLY John's Accept writes `done`, so a rating-in-waiting sits on a `delivered` ticket and never on a `done` one. A ship card on a `done` ticket therefore means the verdict already happened — retiring it starves nothing. MEASURED LIVE BEFORE A LINE CHANGED: of the 10 undecided non-gated cards, 7 sat on tickets already `done` (SES-101 9cdf840b, SES-121 8c421bf3, SES-140 bfd7598b, SES-146 b1ca9305, SES-147 6ce64ed2, SES-149 9a5e922b, SES-162 c1af750f); the 3 live rows were 5c220f71 (SES-154, `delivered`), 1f68482a (SES-157, `delivered`) and edb78e0c (no backlog_id). John approved 2026-08-23 with the trade stated aloud: those 7 straggler ships leave his page unrated and never feed the trust ladder, because a pre-SES-154 cycle already closed them under the old rule. Migration ses165_ship_card_retire; the other three rules of step 1c are unchanged. -->
 # Runbook — The Morning Briefing Page (`SES-78b`)
@@ -1010,6 +1011,45 @@ and the page degrades to read-only). Canonical implementation:
 
 Read-back is therefore trivial: **WebFetch the URL and parse the `briefing-state` JSON block**
 from the served document —
+**but the read can come back TRUNCATED, and you must TEST that yours reached the block rather
+than assume it from which tool you used (`SES-188`, `v7.0.216`).** Both documented read paths
+are the *same* artifact-reader interception — `WebFetch` on a `claude.ai/code/artifact/…` URL
+returns the identical `[Artifact … full HTML saved to /root/.claude/…]` wrapper the `Artifact`
+`read` action does — and they differ only in **how much head each returns**. Measured live
+2026-08-24 03:22–03:23Z against the 198.3 KB served page: the `Artifact` `read` arm stopped
+inside the frame-runtime script and **never reached** `briefing-state`; `WebFetch` returned a
+longer head that cleared `</style></head><body>`, the **complete** `briefing-state` block, and
+ran on into `<script id="code">`. The block sits immediately after `<body><div id="page"></div>`,
+which is what makes the longer read clear it.
+
+**Do not turn that into "use WebFetch, it works."** That is one observation, and `SES-188` was
+filed at 02:5xZ the same night by a cycle reporting the opposite. Both can be true: the cut-off
+is a **size budget**, this page is 198.3 KB and **grows every rebuild**, and nothing has
+established where the threshold sits or that it is stable. Replacing one unverified belief with
+another is worse than the bug — a cycle that trusted the tool and rebuilt from a short read
+would publish the empty skeleton and **destroy John's un-harvested taps**, which is the exact
+failure the seed sentinel (`v7.0.197`) exists to prevent.
+
+**So branch on the test, every harvest:**
+
+- **Verified** — the `briefing-state` block is present, parses as JSON, **and** carries a value
+  you can point at as live (the cheapest is a `reading` newer than the latest stored
+  `runner_usage_readings` row; a decision, ask or directive you have not yet harvested does just
+  as well). Proceed to the rebuild normally.
+- **Unverified** — the block is absent, unparseable, or indistinguishable from an empty seed.
+  **Decline the republish** and say so in the cycle row. That is already the correct behaviour
+  and it stays mandatory; cycles `598a9b81` and `e42f8d4e` did exactly this on 2026-08-24 and
+  were right to. Note the cost honestly rather than hiding it: declining leaves the page stale
+  while John's decisions pile up behind it (18 undecided cards by 03:2xZ that night), so a
+  cycle that declines twice in a row should say so on the next page it *does* publish.
+
+**A truncated read is never evidence that the harvest is impossible** — only that *this* read
+was short. `SES-188` stays open for the durable fix (a size-bounded read returning a named
+block; a Supabase-side buffer the page writes taps into directly, retiring the page-as-buffer
+design; or a sanctioned exception to the `~/.claude/` rule for this one read — the third needs a
+§19v change). None of those is chosen here, and this test is not a substitute for choosing one.
+
+The block's shape —
 `{"items": {"item-<ID>": {"decision": "accept|reverse|rework", "reason": "...", "at": "<iso>Z"}},
 "directive": "...", "reading": {"fable": "41", "all": "38", "h5": "12", "at": "<iso>Z"} | null}`
 — a non-null `reading` newer than the last `runner_usage_readings` row becomes a new row there
