@@ -68,6 +68,16 @@ they never become ticket IDs before they're settled.
 **Sequencing invariant:** scaffolding comes down only as its replacement goes up — no cap is
 retired and no gate collapsed until the metric that replaces it is live and green.
 
+**Execution substrate — sessions are disposable, state is durable (John, 2026-08-23):** the
+project's memory is the board, the charter, and git — never any session's context. One cycle ≈
+one ticket in a fresh session reading its self-contained spec; chains are bounded by the budget
+wall (a wall-stopped cycle continues nothing; the next fire resumes the drain automatically). A
+cycle nearing its budget finishes the current ticket or aborts cleanly (claim released, nothing
+partial pushed) — it never starts what it can't finish and never relies on context compression
+for correctness; a compacted session re-anchors from the durable record (reframe discipline),
+which always outranks summarized memory. Operative wording lands in `runner-cycle.md` via
+`SES-170`.
+
 **Transition rule — no governance vacuum (John, 2026-08-23):** existing governance is never
 suspended while this project runs. Every Selfbuild cycle executes under the full current
 rulebook; a rule changes only via a shipped ticket whose own commit lands the replacement,
