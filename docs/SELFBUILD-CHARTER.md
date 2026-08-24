@@ -110,6 +110,20 @@ GROUP BY e.name ORDER BY e.name;
    every epic retirement, verdict as a briefing card. Governance-lane roles, never product
    roster agents.
 
+## Closure discipline — the project ends (John, 2026-08-23)
+
+1. **Fixed finish lines.** Each milestone drain is declared with a fixed member list (the
+   `SES-142` drain-scope mechanism); a ticket filed after the naming never joins it. Project end
+   state: all 8 epics retired and the final SES-179 gate review returns "no successor members."
+2. **Finish, don't file.** Residue discovered while closing a ticket that fits the closing
+   cycle's scope gets completed, not ticketed. A new ticket requires a genuine discovery with
+   evidence (the heal-engine bar), never a "worth noting."
+3. **New filings default outside the project.** Mid-milestone discoveries queue to the general
+   board. Only a gate review (SES-179) can add members to a later milestone — batched and
+   visible to John, never a cycle's solo close-out call.
+4. **Net burndown is watched.** The Project panel (SES-178) shows closed vs. filed per
+   milestone; filing faster than closing is a flag on John's page.
+
 ## Escalation policy — when John hears from us
 
 Only for: **(a)** Tier-3 calls (superseding his decisions, terminology, retiring his files);
