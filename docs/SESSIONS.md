@@ -5,7 +5,59 @@
 
 ---
 
-## session/cycle-20260824-0321 (v7.0.216, 2026-08-24, runner cycle `50592275-20ac-431b-b161-517f8dc35add`, `trigger = scheduled` (gate: *manual fire, off the cron grid*), model Opus 5, no subagent) — SES-188: the briefing harvest is truncation-dependent, not blind
+## session/cycle-20260824-0541 (v7.0.217, 2026-08-24, runner cycle `747b7239-3475-40b1-9601-12aba76538e3`, `trigger = scheduled` (gate: *run* — on the 3h clock grid, 00:00 America/Chicago), model Opus 5, 1 Sonnet 5 subagent) — SES-174: the governance_rules registry (M2 Truth Infrastructure, member 1 of 10)
+
+**`SES-174` set `delivered`** (`P10 - Tooling`, tier `next`, queue 9, epic **Selfbuild M2 - Truth
+Infrastructure** fe7bc066) — *not* `done`; John's Accept confers that (`SES-154`). Picked by the standing
+`drain-epic` directive 9abb6451 (`drain_epic_next` → `pick`, `open_now = 10`). One new Supabase table +
+seed (migration `ses174_governance_rules`) + kickoff `docs/kickoffs/v7.0.217-SES-174-governance-rules-registry.md`
++ the standard close-out set. **No `src`/`api`/`lib`/`.claude` edit**; no repo migration files are tracked in
+this project, so the schema+seed live in Supabase and the repo commit is close-out docs only.
+
+### What shipped
+`public.governance_rules` — the canonical registry the M2 epic is built around: `id` (PK), `statement`
+(one imperative sentence), `canonical_doc`, `enforcement` (`hook`/`script`/`reviewer`/`prose`), `status`
+(`live`/`retired`/`superseded`), `superseded_by` (self-FK, required iff `status='superseded'` via
+`ck_governance_superseded`), and `source_group` (provenance). Retiring a rule is now literally one row's
+status flip; SES-176's truth tripwire and SES-181's reviewer lane are specified to check prose citations
+against this table.
+
+**Seeded 84 rows**, extracted by a Sonnet 5 doc-sweep subagent (model discipline B21) and reviewed before
+insert (subagent output is data, not trusted verbatim):
+- **12** CLAUDE.md hard rules (`HR-*`).
+- **42** RUNNER-GOV registers — the subagent extracted B1–B30 and B33–B42 (40); the two it flagged, **B31**
+  and **B32**, are *referenced but have no dedicated entry* in `RUNNER-GOV-0820-REQUIREMENTS.md` (verified by
+  grep), so they were added from their canonical home `runner-cycle.md`: **B31** (the retired single-runner
+  lease) `status='superseded' → B42`, per both docs' explicit "supersedes B31"; **B32** (the budget-override
+  ceiling) `live`. All 42 now present (`missing_registers: []`).
+- **30** STANDARDS caps (`CAP-*`).
+- **B25/B26** set `retired` — explicitly struck by John (recorded in `runner-cycle.md`), so the registry
+  reflects current reality rather than the as-written requirement.
+
+### QA — discriminating, green
+A `DO` block proved the constraints *reject* bad input (each would persist on a constraint-less table): CHECK
+rejects `superseded`+NULL `superseded_by`, `live`+non-NULL, and an out-of-enum `enforcement`; the FK rejects a
+`superseded_by` pointing at no rule. Census: 84 rows (12/42/30 by source), all B1–B42 present, 0 HTML-entity
+leaks (decoded on insert), enforcement enum fully covered, 81 live / 2 retired / 1 superseded. **Grants locked
+both directions** (`has_table_privilege`): anon SELECT=false, authenticated INSERT=false, service_role
+INSERT=true — a runner-internal registry, never browser-read, fail-closed under DAT-18. Build + regression run
+as the baseline gate (docs-only change).
+
+### Briefing NOT republished this cycle — read UNVERIFIED (`SES-188`)
+Both documented read paths truncated **before** the `briefing-state` block on the now-250 KB served page
+(Artifact `read` stopped in the frame-runtime; WebFetch reached the provenance-comment pile but still cut off
+short of the block), and the full copy lands under `~/.claude/.../tool-results/`, which `SES-96` forbids an
+unattended cycle from shell-processing. Per `SES-188`'s read-back contract the branch is **decline the
+republish** — so John's un-harvested taps are preserved, this cycle's card/ledger are written to the DB, and
+the next cycle that *can* read the page rebuilds it. This is the documented, sanctioned fallback, not a failure.
+
+### Ledger
+Cycle `747b7239`: walls clear (API $0/$5 day, $0/$100 month; token cap 45M/day `daily-max-box`, 0 spent this
+CST day; rest wall 60% < 85%). Invention pass ran — egress OK (C3), invention ladder rung 0 → 0 proposals.
+Version v7.0.217 claimed atomically (re-assertion gate held). Standing M2 drain is **not** consumed; it stays
+queued for its next member.
+
+
 
 **`SES-188` set `partial`** (`P9 - Bug Fixes`, tier `now`, queue 7 at pick) — *not* `delivered`,
 because the durable fix is deliberately still open. Two files
