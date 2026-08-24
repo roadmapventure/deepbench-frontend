@@ -5,6 +5,79 @@
 
 ---
 
+## session/cycle-20260824-1955 (v7.0.232, 2026-08-24, runner cycle `90b34320-aa27-4754-82c7-19355d6dc208`, `trigger = scheduled` — fired off-grid, so `scheduler_gate` exempted it as a manual fire — model Opus 5, one Sonnet 5 sweep subagent) — SES-188 (option D): the state block moves to the top of the page
+
+**`SES-188` — The briefing harvest is blind: reading the page returns only its first bytes, so
+John's taps cannot be picked up** — built and left `delivered` (`P9 - Bug Fixes`, tier `now`,
+queue 1). Kickoff `docs/kickoffs/v7.0.232-SES-188-briefing-state-offset.md`. **3 files** —
+`docs/runbooks/briefing-template.html`, `docs/runbooks/briefing-page.md`, and the new
+`tests/regression/SES-188-briefing-state-offset.js`. No `src`/`api`/`lib` change, no schema change,
+no site change.
+
+**Authority: John's directive `ceb5cf0b`, layer 1a**, relayed from his attended architect session
+and answering gated card `18b8fdd8`. Three parts, all three carried out. **Part 1** — option A (the
+artifact `mcp` capability, i.e. his own database connector running inside the page) **rejected**,
+his words: *"no credentials or connector channel in the page, ever."* **Part 2** — build option D.
+**Part 3** — file `ADM-4` to the general board, explicitly held.
+
+**THE PREMISE WAS REVALIDATED BY MEASUREMENT, AND IT HAD GOT WORSE.** Both documented read paths
+were run against the live artifact at 19:57Z on the 262.3 KB served page: `WebFetch` stopped inside
+`<style id="s">`, the `Artifact` `read` arm stopped inside the frame-runtime script. **Neither
+reached the block**, so this cycle harvested nothing and correctly declined to republish from an
+unverified read — the fourth such decline in a day. Third data point in a trend that was the whole
+argument: reached at 198.3 KB (03:2xZ), missed at 235.7 KB (15:41/15:57Z, `SES-178`'s own cycle),
+missed on **both** arms at 262.3 KB.
+
+**WHY THIS IS NOT ANOTHER TRIM.** `v7.0.223` cut 42,025 chars of provenance out of the template and
+said on its own stamp that it *"ONLY MOVES THE CEILING… the trim buys head room, it does not stop
+the growth."* Three ships later the ceiling was re-crossed, exactly on schedule. The block sat at
+byte **33,767** — *downstream* of the provenance chain, the fonts link, the whole stylesheet and the
+page div, i.e. of every surface that grows on every ship. It now sits at byte **2,610**, directly
+under the `SES-138` title guard and above all of them, so its offset is a constant plus the
+platform's fixed injected preamble instead of a number that climbs. Built page measured: block spans
+bytes **2,610–10,732** of 260,664, seeded (11 ask targets, not the sentinel).
+
+**THE HALF THAT WOULD HAVE LOOKED DONE AND NOT BEEN.** There are **two writers** of the served page,
+and the second is the one that usually serves a harvest: `doc()` republishes the whole document on
+every one of John's taps. It emitted `#f`/`#s` into `<head>` with the state after
+`<body><div id="page"></div>` — putting the block behind ~24.3 KB of CSS, at roughly byte **49,600**
+served, over John's 40,000 ceiling *on its own*, and matching the ~49 K `SES-188` measured live. A
+template-only fix would have left the defect fully intact on the document he actually taps. `doc()`
+now emits the block first in the body with the link and stylesheet after it, matching the template's
+own structure. The title stays in `doc()`'s head, ~150 bytes in, because `SES-138` depends on it.
+
+**QA was discriminating, and the control ran against the real pre-change tree** rather than a
+fixture: the new guard **fails** on `HEAD` (block at byte 33,767, past the 10,000-byte file budget
+that remains once a generous 30,000-byte allowance for the injected preamble is taken off John's
+40,000 served ceiling) and **passes** on the fix; files restored via a `trap`. Full suite 55/55,
+`npm run build` green, builder exit 0. The guard asserts the ceiling **and** the layout order on
+**both** writers, with a reconstructed pre-`v7.0.232` `doc()` ordering as its second control.
+
+**FOUND BY THE SWEEP AND FILED RATHER THAN FOLDED IN.** A Sonnet 5 dependency sweep run *before* the
+edit found that `session-hygiene.md` check 12 — *"count the comment blocks sitting **above** the
+briefing-state line; flag more than ~4"* — becomes **structurally zero forever** the moment this
+fix ships, i.e. vacuous rather than protective. Correcting it would have been a 4th file against
+`HR-SCOPE`'s cap, so it is **`SES-195`**, named in the template's own `v7.0.232` stamp so the next
+reader meets the finding where the change is. The sweep also confirmed what did **not** break, by
+reading rather than assuming: `build-briefing.mjs` needs no change (its sentinel anchor is a unique
+literal, position-independent), `run-all.js` auto-discovers the new test, and no test asserted
+`#f`/`#s` live in the head. Two stale rationales that the move **inverted** were corrected in place
+rather than left to mislead — `briefing-page.md`'s "the block sits immediately after
+`<body><div id="page"></div>`" (now false of both writers) and `SES-178`'s "no new CSS *because*
+`#s` sits above the block" (the rule survives as size discipline; the reason expired).
+
+**A CHEAP TELL, RECORDED BECAUSE IT DE-RISKED THIS SHIP.** `doc()` emits no HTML comments; the
+template-built page carries the whole provenance chain. The served page still showed those comments,
+so it had **not** been republished by a tap since the last cycle rebuild — meaning this republish,
+made on an unverified harvest, could not destroy un-harvested taps. Evidence about *that* read, not
+a standing licence, and written into `briefing-page.md` as such.
+
+**WHAT THIS CYCLE DID NOT DO.** The directive says *"this closes `SES-188` (partial → done)"*. Only
+John's Accept writes `done` (`SES-154`), so the ticket stays `delivered` and his tap on the ship card
+confers completion. Said on the card rather than quietly resolved either way. And the honest bound,
+which is `ADM-4`'s reason for existing: this fixes the **offset**, not the **mechanism** — the page
+is still a buffer read back out of its own bytes, under a size budget nobody has documented.
+
 ## session/cycle-20260824-1740 (v7.0.231, 2026-08-24, runner cycle `d5ad743e-200c-43c1-89a6-80b5d68237e2`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-178: the briefing gets a Project panel, and it says what it does not know
 
 **`SES-178` — Briefing Project panel: milestone burn-down, activity counts, overall completion**

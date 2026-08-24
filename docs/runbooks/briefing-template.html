@@ -21,6 +21,51 @@
      NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
      its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
      the page. Only a cycle publishing this file hits the window. -->
+
+<!-- THE SEED SENTINEL (v7.0.197, directive b8d5ea7e) — READ BEFORE YOU "TIDY" THIS LINE.
+     This is deliberately NOT a valid empty state, and it must never be replaced by one. A cycle
+     rebuilding this page substitutes the VERBATIM output of `SELECT public.briefing_state_seed()`
+     here. Anything else — above all a plausible-looking `{"items":{},"asks":{},…}` — publishes a
+     page with John's ask threads and meter readings missing, and nothing on it says so. Restoring
+     the "empty" default re-opens exactly that defect. Contract: briefing-page.md regeneration 1b. -->
+<script type="application/json" id="briefing-state">{"__unseeded":true}</script>
+
+<!-- ^^ THE STATE BLOCK STAYS DIRECTLY BELOW THE TITLE GUARD. DO NOT PUSH IT DOWN. ^^
+     Provenance chain starts HERE, below the block. New stamps go at the top of THIS chain — which
+     is what makes them harmless. NOTE: no tag markup in these comments, deliberately (same reason
+     the title guard keeps the words "title tag" rather than the markup — a tag-shaped string in a
+     comment is matched by scanners that look for the real thing, and it skewed this very cycle's
+     first offset measurement before it was caught).
+
+     DeepBench v7.0.232 | runbooks/briefing-template.html | SES-188 (option D) — the state block is
+     PINNED ABOVE EVERY GROWTH SURFACE WE CONTROL, which is the whole fix and the thing an editor
+     will undo by habit. A cycle harvests John's taps by reading the PUBLISHED page and parsing this
+     block, and that read is served head-first under a size budget nobody has documented. Until this
+     ship the block sat at byte 33,767 — BELOW the provenance chain, below the fonts link, below the
+     whole of the stylesheet, and below the page div — i.e. downstream of the three things that grow
+     on every ship. MEASURED, NOT REASONED: the block was reached at 198.3 KB (2026-08-24 03:2xZ),
+     missed at 235.7 KB (15:41/15:57Z — SES-178's own cycle had to decline its republish), and
+     missed on BOTH documented read arms at 262.3 KB (19:57Z, cycle 90b34320: WebFetch stopped
+     inside the stylesheet, the Artifact read stopped inside the frame-runtime).
+     v7.0.223 trimmed 42,025 chars of provenance out of this file and said on its own stamp that it
+     "ONLY MOVES THE CEILING"; three ships later the ceiling was re-crossed, exactly as predicted.
+     So the fix is not another trim: it is putting the block UPSTREAM of everything that accumulates,
+     which turns its offset from "grows without bound" into "a constant plus a fixed platform
+     preamble". New provenance comments now land BELOW the block and can never push it again.
+     THE ONE THING THAT MAY NOT MOVE ABOVE IT: the title tag (SES-138 — the Artifact publisher
+     scans only the first 8192 bytes for a title, and this block is ~10 KB once seeded, so putting
+     it first would cost the page its name). Title, then this block, then everything else.
+     THE SECOND WRITER IS THE ONE THAT ACTUALLY SERVES JOHN'S TAPS, and a template-only fix would
+     look done and not be: doc() (in the code script) rebuilds the whole document on every tap via
+     claude.use('artifact').publish(doc()), and it emitted the fonts link and the stylesheet into
+     the head with the state after the page div — offset ~49.6 K served, over John's 40 K ceiling
+     on its own, which is the ~49 K SES-188 measured live. doc() therefore emits this block FIRST
+     in the body, with the link and stylesheet after it, matching this file's own structure.
+     Guarded by tests/regression/SES-188-briefing-state-offset.js, which asserts the ceiling on
+     BOTH writers and whose negative control is the pre-change file.
+     SUPERSEDES session-hygiene check 12 (count the comment blocks above the state line): after this
+     ship that count is structurally zero forever, so the check is vacuous rather than protective.
+     Re-pointing it is filed as SES-195 and named on this cycle's ship card, not silently dropped. -->
 <!-- DeepBench v7.0.231 | runbooks/briefing-template.html | SES-178 — NEW §15, Project — Selfbuild milestones, appended at the END of the locked section order (John, gated card a8eaee1d: extend the list, never renumber it). Renders docs/SELFBUILD-CHARTER.md's canonical progress query per milestone plus an overall bar. THE PANEL ADDS NO NEW CSS AND THAT IS DELIBERATE, NOT THRIFT: every rule added to #s sits ABOVE the briefing-state block in the served document and pushes it further out of a size-bounded read, which is the live SES-188 defect — the cycle that shipped this had its own harvest truncate inside briefing-state on the 235.7 KB served page and had to decline the republish. msRow() is built from table / td.num / td.dim, and the bar from .bar/.dev/.barlbl, all of which §8/§11/§13 already ship; the guard asserts structurally that §15 opens no <style> and uses no class the stylesheet does not define. TWO HONESTY CLAUSES IN THE FOOTNOTE, both mandatory: a retired milestone can read below 100% here and that is CORRECT (a drain finishes on the members John NAMED — runner_drain_scope, SES-142 — and tickets filed into the epic afterwards never join it; M0 and M1 are both retired while M1 reads 46.7%), and the charter's keystone metrics are NAMED ABSENT rather than rendered as zero, because none is online yet — they wait on SES-181's verifier lane, and a zero would claim the verifier caught nothing rather than that it does not exist. Sample rows are this cycle's real values and the builder splices over them; if it ever cannot find the anchor it dies at exit 2 rather than publishing them, proven live this cycle. -->
 <!-- DeepBench v7.0.223 | runbooks/briefing-template.html | SES-188 — THE 21-COMMENT PROVENANCE CHAIN IS TRIMMED, and this file is the one where that pile had a second, worse consequence than cost. A cycle harvests John’s taps by reading the PUBLISHED page and parsing its briefing-state block, and that read is served head-first under a size budget — so every comment above the block pushes the block further out of reach. MEASURED before the cut, not estimated: 20 comment blocks holding 42,025 chars, 24.7% of this file, ALL of them above the block (which sat at offset 66,229). Live consequence: the served page reached the block at 198.3 KB and missed it at 250 KB, 25 minutes apart, the variable being a republish — and THREE CONSECUTIVE CYCLES correctly declined to republish because they could not verify their harvest, while John’s decisions piled up behind a stale page. John’s call on gated card f6c7c54a: candidate 4 FIRST (this trim, in the SES-164 shape), then candidate 2 as the DURABLE fix — a Supabase-side buffer the page writes taps into directly, designed JOINTLY with SES-155’s briefing_comments table and SES-156’s unified card. Candidates 1 and 3 he rejected. THE HONEST BOUND, stated because the next editor deserves it and because the ticket itself makes this objection of candidate 1: THIS ONLY MOVES THE CEILING. The page still grows on every rebuild; the trim buys head room, it does not stop the growth. Capped going forward by docs/runbooks/session-hygiene.md check 12. THE THREE BLOCKS THAT ARE NOT PROVENANCE AND MUST SURVIVE ANY FUTURE TRIM: the title guard above (the Artifact publisher scans only the FIRST 8192 BYTES for a title tag — new comments go BELOW it, never above, and tests/regression/SES-138-briefing-title-window.js fails if the tag leaves the window); this stamp and the newest one; and the SEED SENTINEL immediately above the briefing-state line, which is deliberately NOT a valid empty state. CHECKED RATHER THAN ASSUMED before moving anything (SES-164 step 2, the step that makes a trim safe and the one that gets skipped): all 17 retiring comments were swept for an editor warning existing nowhere else. Sixteen were already restated in this file’s body or in briefing-page.md. The seventeenth — v7.0.193’s note that .idchip max-width is 35% because QA measured 45% letting the chip out-weigh the title — appeared NOWHERE else, and was relocated into the CSS next to the rule it protects rather than archived. The 17 are preserved verbatim in docs/SESSIONS.md under ‘Appendix — retired briefing-template.html provenance comments’, and all of them remain in git history. Body below the header proven byte-identical by sha256 before and after the cut, differing only by that one deliberate relocation. -->
 <!-- DeepBench v7.0.201 | runbooks/briefing-template.html | SES-147 — §2b gains John's DAILY MAX box, the third control on this page that changes what the RUNNER does. His words, 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. THE BOX IS NOT THE CAP, and the page says so rather than implying it: the cap is one of FIVE rungs resolved by migration ses147_daily_max_tokens's public.resolve_day_token_cap() — override > 48h stale floor > this box > SES-128 calibration > the 10M default — so the row renders BOTH the stored number and a cycle-written "In force now" line (AUTOMATION.daily_max_effective) carrying what the next run will actually use and why. A row that multiplied the box out locally would be confidently wrong on exactly the days a rung above it fires, which are the days John is looking. THE RUNG MOST LIKELY TO BE GOT WRONG, stated here because the page's own copy is where he will read it: a standing number does NOT defeat the staleness brake (spec, verbatim) — with the box set to 4 and every reading aged past 48h the shipped function returns 3,000,000 / stale-floor, while the obvious "the box is THE day cap" build returns 4,000,000. Proven on fixtures inside a deliberately rolled-back transaction, alongside override-beats-box (25,000,000 / override with the box set to 4) and blank-box = pre-SES-147 exactly (10,000,000 / calibrated). NULL IS NOT ZERO ANYWHERE IN THIS ROW: the DB null, settingsNow()'s `undefined`-not-falsy test, the empty-string render and the empty-box commit path are four expressions of one rule — an empty box means "no standing cap, budget as before", and rendering or storing it as 0 would read as "no tokens allowed today" and would be a number John never typed. Committed on Enter/blur only, never per keystroke ("2" on the way to "25" is a real number this page would otherwise record), and out-of-range is put back rather than stored, both the same calls sch-n already makes. Guarded by tests/regression/SES-147-daily-max-box.js. -->
@@ -348,13 +393,9 @@
 
 <div id="page"></div>
 
-<!-- THE SEED SENTINEL (v7.0.197, directive b8d5ea7e) — READ BEFORE YOU "TIDY" THIS LINE.
-     This is deliberately NOT a valid empty state, and it must never be replaced by one. A cycle
-     rebuilding this page substitutes the VERBATIM output of `SELECT public.briefing_state_seed()`
-     here. Anything else — above all a plausible-looking `{"items":{},"asks":{},…}` — publishes a
-     page with John's ask threads and meter readings missing, and nothing on it says so. Restoring
-     the "empty" default re-opens exactly that defect. Contract: briefing-page.md regeneration 1b. -->
-<script type="application/json" id="briefing-state">{"__unseeded":true}</script>
+<!-- The state block used to sit HERE, below the stylesheet and the page div. It is now pinned
+     directly under the title guard at the top of this file — see the v7.0.232 stamp there for why
+     (SES-188 option D). Do not move it back; the offset is the fix. -->
 
 <script id="code">
 // SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
@@ -790,10 +831,13 @@
     return '<tr><td class="mono dim">'+cid+'</td><td>'+work+'</td>'
       +'<td class="num">'+rung+'</td><td class="num">'+streak+'</td></tr>';
   }
-  // SES-178 — one Selfbuild milestone row (§15). NO NEW CSS, and that is a decision rather than
-  // thrift: every rule added to `#s` sits ABOVE the briefing-state block in the served document
-  // and pushes it further out of a size-bounded read, which is the live SES-188 defect. This row
-  // is built from `table`, `td.num` and `td.dim`, all of which §8/§11/§13 already ship.
+  // SES-178 — one Selfbuild milestone row (§15). NO NEW CSS. The ORIGINAL reason no longer holds
+  // and is corrected here rather than left to mislead: CSS added to `#s` used to sit ABOVE the
+  // briefing-state block and push it out of a size-bounded read, which was the live SES-188 defect.
+  // Since v7.0.232 the block is pinned above `#s` in BOTH writers, so stylesheet growth no longer
+  // moves it at all. The rule survives as plain size discipline — the page is read on a phone every
+  // morning and still grows on every rebuild — not as protection for the harvest. This row is built
+  // from `table`, `td.num` and `td.dim`, all of which §8/§11/§13 already ship.
   function msRow(name, done, total, pct){
     return '<tr><td>'+esc(name)+'</td><td class="num">'+done+'</td>'
       +'<td class="num dim">'+total+'</td><td class="num">'+pct+'%</td></tr>';
@@ -1568,16 +1612,31 @@
   }
 
   // Full replacement document, rendered from state — the page's own source as a function.
+  //
+  // SES-188 (v7.0.232) — THE ORDER BELOW IS THE FIX, NOT A STYLE CHOICE. This function produces
+  // the document that John's own taps publish, which is the document a cycle usually harvests —
+  // so its layout, not the template's, is what decides whether his decisions can be read back.
+  // It used to emit `#f` and `#s` into <head> with the state after `<body><div id="page"></div>`,
+  // which put the block behind the ENTIRE stylesheet: ~24.3 KB of CSS plus the platform's injected
+  // frame-runtime put it at roughly byte 49,600 of the served page, over John's 40,000 ceiling on
+  // its own and matching the ~49 K offset SES-188 measured live. The state block now goes FIRST in
+  // the body and `#f`/`#s` follow it — which is also exactly how this template itself is laid out,
+  // so the two writers agree instead of one quietly undoing the other.
+  // `<title>` STAYS IN THE HEAD, ~150 bytes in: SES-138 (the publisher scans only the first 8192
+  // bytes for a title) and its regression test both depend on that, and the state block is ~10 KB.
+  // A <link>/<style> in the body is deliberate and proven — it is where this template already
+  // carries them, and that is the file being served today.
   function doc(){
     return '<!doctype html>\n<html><head><meta charset="utf-8">'
       +'<meta name="viewport" content="width=device-width,initial-scale=1">'
       +'<title>DeepBench Morning Briefing</title>'
-      +document.getElementById('f').outerHTML
-      +document.getElementById('s').outerHTML
-      +'</head><body><div id="page"></div>'
+      +'</head><body>'
       +'<script type="application/json" id="briefing-state">'
       +JSON.stringify(state).replace(/</g,'\\u003c')
       +'<\/script>'
+      +document.getElementById('f').outerHTML
+      +document.getElementById('s').outerHTML
+      +'<div id="page"></div>'
       +'<script id="code">'+document.getElementById('code').textContent+'<\/script>'
       +'</body></html>';
   }

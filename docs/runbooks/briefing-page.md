@@ -375,10 +375,13 @@ Four rules, each of which is how this panel gets rendered wrong:
   claim about performance where the truth is absence. Same rule as §14's cost showing "—" and a
   `NULL` `plain_*` drawing a red defect line.
 - **No new CSS.** The panel is built from `table` / `td.num` / `td.dim` / `.bar` / `.barlbl` /
-  `.tnote`, all already shipped. This is not thrift: every rule added to `#s` sits **above** the
+  `.tnote`, all already shipped. **The original reason has expired and is corrected rather than
+  left to mislead:** this bullet used to read *"every rule added to `#s` sits above the
   `briefing-state` block in the served document and pushes it further out of a size-bounded read —
-  the live `SES-188` defect, which was truncating the harvest again on the 235.7 KB page the day
-  this shipped.
+  the live `SES-188` defect"*, which was true when `SES-178` shipped and stopped being true at
+  `v7.0.232`, when the block was pinned above `#s` in both writers. Stylesheet growth no longer
+  moves the block at all. The rule stands as plain size discipline — this page is read on a phone
+  every morning and still grows on every rebuild — not as protection for the harvest.
 
 **Known debt, disclosed rather than smuggled:** the builder derives these numbers from two flat
 PostgREST selects because PostgREST cannot run the charter's `GROUP BY` join and this builder has
@@ -1065,8 +1068,37 @@ returns the identical `[Artifact … full HTML saved to /root/.claude/…]` wrap
 2026-08-24 03:22–03:23Z against the 198.3 KB served page: the `Artifact` `read` arm stopped
 inside the frame-runtime script and **never reached** `briefing-state`; `WebFetch` returned a
 longer head that cleared `</style></head><body>`, the **complete** `briefing-state` block, and
-ran on into `<script id="code">`. The block sits immediately after `<body><div id="page"></div>`,
-which is what makes the longer read clear it.
+ran on into `<script id="code">`.
+
+**Since `v7.0.232` the block no longer depends on how long a head the reader returns, and that is
+the fix `SES-188` option D shipped (John, directive `ceb5cf0b`).** The sentence that used to sit
+here — *"the block sits immediately after `<body><div id="page"></div>`, which is what makes the
+longer read clear it"* — described the layout that made the harvest a race against the page's own
+growth, and it is no longer true of either writer. **The block is now pinned directly below the
+title guard, above the provenance chain, the fonts link, the stylesheet and the page div**, in the
+template *and* in `doc()`. Its offset in the **served** page must stay under **40,000 bytes** —
+John's number — and because everything that grows now sits below it, that is a constant plus the
+platform's fixed injected preamble rather than a figure that climbs on every ship.
+
+Three things this contract now binds, so the old layout cannot come back by habit:
+
+- **Nothing goes above the block except the `<title>` tag.** The tag stays first for `SES-138`
+  (the publisher scans only the first 8192 bytes for a title) and the block is ~10 KB once seeded,
+  so it can never be the first thing in the file.
+- **Both writers, always.** The template is what a *cycle* republishes; `doc()` is what *John's
+  taps* republish, and the second is the document a harvest usually reads. Fixing one writer looks
+  like a fix and is not — before `v7.0.232`, `doc()` alone put the block at ~49.6 K served.
+- **Enforced by `tests/regression/SES-188-briefing-state-offset.js`**, which asserts the ceiling
+  and the layout order on both writers, with the pre-change shape as its negative control. It is a
+  test rather than a rule here because the defect is a ratchet driven by the single most routine
+  edit anyone makes to the template — adding a provenance comment.
+
+**A cheap tell worth knowing when you are deciding whether a republish is safe.** `doc()` emits no
+HTML comments at all; the template-built page carries the whole provenance chain. So a served page
+that still shows those comments has **not** been republished by a tap since the last cycle rebuild
+— i.e. there are no un-harvested taps on it to destroy. Cycle `90b34320` used exactly that check on
+2026-08-24 to establish that its republish, made on an unverified harvest, could not cost John
+anything. It is evidence about *this* read, never a standing licence to republish blind.
 
 **Do not turn that into "use WebFetch, it works."** That is one observation, and `SES-188` was
 filed at 02:5xZ the same night by a cycle reporting the opposite. Both can be true: the cut-off
