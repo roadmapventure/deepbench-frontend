@@ -1,4 +1,5 @@
-// DeepBench v7.0.218 | tests/regression/SES-176-truth-tripwire.js | SES-176 (M2 Truth Infrastructure)
+// DeepBench v7.0.219 | tests/regression/SES-176-truth-tripwire.js | SES-176 (M2 Truth Infrastructure)
+// v7.0.219: + documentationPlaceholderIsNotAMarker() -- check 11 flagged its own docs on first run.
 //
 // Guards checks 9, 10 and 11 -- the truth tripwire -- in scripts/check-session-docs.js.
 //
@@ -180,6 +181,22 @@ function knownMarkerIsClean() {
   assert.strictEqual(flags(findings, "11").length, 0, "a marker resolving to a real rule must not flag");
 }
 
+// Found live the first time check 11 ran against a doc that DOCUMENTS the marker syntax: prose
+// writing `{{rule:ID}}` to explain the feature was reported as a broken marker. `ID` is the
+// universal placeholder and is not a name any rule may have.
+function documentationPlaceholderIsNotAMarker() {
+  const doc = "Check 11 verifies that every {{rule:ID}} marker resolves to a registry row.\n";
+  const findings = [];
+  checkRuleMarkers(findings, [LIVE_B42], new Map([["docs/runbooks/session-hygiene.md", doc]]));
+  assert.strictEqual(flags(findings, "11").length, 0, "prose documenting the {{rule:ID}} syntax must not be read as a marker");
+
+  // NEGATIVE CONTROL: a real-looking id that is genuinely absent must still flag, or the
+  // placeholder exemption has been widened into "check 11 never fires".
+  const real = [];
+  checkRuleMarkers(real, [LIVE_B42], new Map([["docs/runbooks/session-hygiene.md", "See {{rule:B99}}.\n"]]));
+  assert.strictEqual(flags(real, "11").length, 1, "an absent but real-shaped rule id must still flag");
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot reader
 // ---------------------------------------------------------------------------
@@ -224,6 +241,7 @@ async function run() {
   anchorFormsThisRepoActuallyUses();
   pointerFailuresAreAggregatedNotRepeated();
   unknownMarkerIsFlagged();
+  documentationPlaceholderIsNotAMarker();
   knownMarkerIsClean();
   snapshotRoundTrips();
   escapedCellsSurvive();

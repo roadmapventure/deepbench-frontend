@@ -1,0 +1,100 @@
+# DeepBench v7.0.219 | .github/workflows/ci.yml | SES-180 (M2 Truth Infrastructure) — PARTIAL
+#
+# The first check on this repository that does not live on John's machine.
+#
+# WHY THIS EXISTS. Six of the platform's hard rules are enforced by PreToolUse/PostToolUse hooks
+# in C:/Projects/.claude/ — outside this repo, not git-tracked, present on exactly one machine
+# (CLAUDE.md says so in as many words: "the hooks are a backstop, not a replacement"). The
+# regression suite runs only where credentials happen to exist. So a push from a cloud cycle, a
+# fresh clone, or any other contributor is checked by nothing at all. This workflow is the floor.
+#
+# WHAT GATES AND WHAT DOES NOT — stated here rather than left to be inferred from the YAML,
+# because a check that looks blocking and is not is worse than no check:
+#
+#   BLOCKING   build      `npm ci && npm run build`. Needs no credentials. A src/api/lib change
+#                         that fails the build can no longer reach dev unnoticed.
+#   REPORTING  tripwire   `node scripts/check-session-docs.js` — the hygiene + truth checks
+#                         (SES-176). Deliberately NON-blocking: that script is report-only by
+#                         contract and always exits 0 (its own header: "a report-only tripwire,
+#                         always exit 0"), so making it gate here would mean changing what the
+#                         script promises everywhere else it runs. Its findings are in the log.
+#   REPORTING  regression  The suite, without credentials. Deliberately NON-blocking TODAY, and
+#                         this is the honest half of the ticket: measured 2026-08-24, the suite is
+#                         50/50 with credentials and 49/50 without — CHI-31 fails with
+#                         "SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured (.env.local)".
+#                         A test that CANNOT RUN is not a test that FAILED, and marking this
+#                         blocking before that distinction exists would paint CI permanently red
+#                         and train everyone to ignore it.
+#
+# WHAT SES-180 STILL OWES, and neither half is the runner's to do:
+#   1. The skip-vs-fail distinction (the ticket calls it "the SES-92 skip-vs-fail fix"): a test
+#      declares "I cannot run here" and the harness counts it as skipped, never as passed and
+#      never as failed. It must be DECLARED by the test, never guessed by the harness — a harness
+#      that infers skips will swallow real failures.
+#   2. Repository secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY) so the credentialed tests and the
+#      grants assertions can run here. Only John can add those; a runner must never print a
+#      secret, let alone install one.
+#   3. Branch protection — the ticket's "Red = no merge, regardless of author" is a repository
+#      setting, not a file. This workflow makes the signal; only John can make it binding.
+#
+# Until (1) and (2) land, treat a red `build` as authoritative and the other two as information.
+
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json have drifted, which is itself a check worth having.
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  checks:
+    name: Tripwire + regression (reporting only)
+    runs-on: ubuntu-latest
+    # Never blocks the ref. See the header: these two cannot honestly gate yet.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Hygiene checks 1-8 plus SES-176's truth checks 9/10/11. The truth checks read
+      # docs/governance/RULES-SNAPSHOT.md, which is committed, so they need no credentials here —
+      # that was the whole reason SES-176 exported a snapshot instead of reading Supabase live.
+      - name: Session-docs tripwire
+        run: node scripts/check-session-docs.js
+
+      - name: Regression suite (no credentials)
+        run: node tests/regression/run-all.js

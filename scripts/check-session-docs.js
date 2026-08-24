@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// DeepBench v7.0.218 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120, SES-176
+// DeepBench v7.0.219 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120, SES-176
+// FIX v7.0.219 (SES-180's cycle, feature-owns-its-bugs): check 11 flagged its OWN documentation --
+// prose writing `{{rule:ID}}` to explain the syntax was read as a broken marker. `ID` and its
+// siblings are documentation placeholders, not rule names; see MARKER_PLACEHOLDERS.
 // FEATURE: SES-176 -- checks 9/10/11, the TRUTH TRIPWIRE. Checks 1-8 ask "is this file too big /
 // is this row shaped right?"; these ask "do two files still tell the same story?", reading the
 // SES-174 rule registry through docs/governance/RULES-SNAPSHOT.md. Three design points a later
@@ -931,12 +934,19 @@ function checkRulePointers(findings, rules, docCache) {
 // markers yet", not "the markers are all fine". Measured before shipping: zero real markers exist
 // (the only `{{rule:` strings in the repo are inside BACKLOG-SNAPSHOT.md TICKET TEXT describing
 // SES-175 -- which is data, and is why the generated snapshots are excluded from the scan).
+// The DOCUMENTATION PLACEHOLDER is not a marker. `{{rule:ID}}` is how SES-175's ticket text, this
+// runbook family and session-hygiene.md all WRITE ABOUT the syntax, and `ID` is not a name any rule
+// may have. Found immediately: the first run of check 11 after session-hygiene.md documented it
+// flagged that documentation, which is the "a section fills with noise and stops being read"
+// failure SES-127 warns about, arriving via a check meant to prevent drift.
+const MARKER_PLACEHOLDERS = new Set(["ID", "<ID>", "RULE-ID", "<RULE-ID>", "rule-id"]);
+
 function checkRuleMarkers(findings, rules, docCache) {
   const known = new Set(rules.map(r => r.id));
   for (const [rel, text] of docCache) {
     for (const m of text.matchAll(/\{\{rule:([^}]*)\}\}/g)) {
       const id = m[1].trim();
-      if (known.has(id)) continue;
+      if (known.has(id) || MARKER_PLACEHOLDERS.has(id)) continue;
       findings.push({ check: "11", severity: "FLAG", detail: `${rel} line ${lineOf(text, m.index)} carries the marker {{rule:${id}}}, which is not a rule id in ${RULES_SNAPSHOT_REL} -- it would render as nothing. Fix the id, or add the rule to public.governance_rules and re-export.` });
     }
   }

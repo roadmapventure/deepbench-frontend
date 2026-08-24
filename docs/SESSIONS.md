@@ -5,6 +5,96 @@
 
 ---
 
+## session/cycle-20260824-0840 (v7.0.219, 2026-08-24, runner cycle `7030c8f0-9bde-457a-a17a-b668335cd217`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent)
+
+**`SES-180` set `partial`** (`P10 - Tooling`, tier `next`, queue 15, epic **Selfbuild M2 - Truth
+Infrastructure**). Kickoff `docs/kickoffs/v7.0.219-SES-180-portable-ci.md`. **1 source file**
+(`.github/workflows/ci.yml`) + close-out. No schema, no `src`/`api`/`lib`/`.claude` edit.
+
+**This is the runner's first in-session chained cycle of the night.** Gate A passed (predecessor
+`3914fba3` closed `shipped`), Gate B passed (`drain_epic_next` → `pick`), so the continuation opened
+per `runner-cycle.md` tail step (8) and re-entered at step 1: settings gate `run`, walls re-checked
+in full (day cap 45,000,000; 3,250,000 spent on the CST day; month $0.00; rest wall false).
+
+**Selection — five tickets examined, four gated, and that pattern is itself the finding.** The drain
+returned `SES-175` (`needs-john`) again; `SES-176` had just been set `needs-john` by its own ship;
+then, in queue order:
+
+- **`SES-177` — generate CLAUDE-STATE.md from tables. GATED, on a measurement.** The ticket names
+  three sources (`dev_version_counter`, inflight files, `runner_cycles` + a session log row). Byte
+  census of the live file: 14,761 chars total — version paragraph 1,969 (13%), prior 1,289 (8%),
+  session bullets 3,353 (22%), **all derivable**. The standing *"Next session"* paragraph is **7,644
+  chars, 51% of the file, and no table holds it** — it carries the board census, drain state,
+  automation-lane rules, scheduler settings and standing filing rules every session reads at start.
+  A renderer built to the ticket's letter regenerates from sources covering 43% and **destroys the
+  rest** — the same shape as the `v7.0.197` briefing failure, where a rebuild from an incomplete
+  source published the skeleton and wiped what was not in it. The premise is good; what is owed
+  first is John's decision on where that prose lives.
+- **`SES-178` — briefing Project panel. GATED on placement, not design.** Verified: the charter
+  already holds the *"Canonical progress query"* at `docs/SELFBUILD-CHARTER.md` line 102, so the
+  ticket's *"the canonical progress SQL lives in the charter from day one"* is already satisfied and
+  the panel is a render. But it is a **new section**, and `briefing-page.md`'s LOCKED SECTION ORDER
+  is a John-approved 1..14 list that `runner-cycle.md`'s standing prohibitions name as the gated
+  lane outright. It needs a number from him.
+- **`SES-179` — milestone gate reviews. GATED as an authority change.** Every other M2 member
+  changes what the runner *builds*; this one defines **who may pass verdict on it** and makes gate
+  reviews the only path for adding members to a later milestone. A runner writing its own reviewer's
+  terms of reference is the one thing it should never do unattended.
+- **`SES-180` — portable CI. BUILT.**
+
+**The blocker `SES-180` was filed around has LIFTED, and it was tested before anything was designed
+against it.** The ticket says to *"resolve the PAT workflow-scope blocker properly or equivalent"*.
+A commit carrying `.github/workflows/ci.yml` was pushed to a throwaway branch and **succeeded**
+(`* [new branch] probe/ses180-workflow-scope`, exit 0). This session's credential carries workflow
+scope. Recorded so a later cycle does not re-plan around a constraint that is gone.
+
+**Residue, disclosed rather than left to be found:** that probe branch **could not be deleted**.
+`git push origin --delete` fails with *"the remote end hung up unexpectedly"* across three retries
+with backoff, and this environment exposes no branch-delete tool (the GitHub MCP has
+`create_branch`, not a delete) — ref deletion appears blocked by the proxy. The branch is harmless
+(its single commit is the same `ci.yml` that shipped to `dev`) but it is John's to remove.
+
+**What shipped.** `.github/workflows/ci.yml` — `.github/` did not exist in this repository at all
+before this commit, and `git log -- .github` was empty. Two jobs, and the split is written into the
+file's own header because **a check that looks blocking and is not is worse than no check**:
+
+- **`build` — BLOCKING.** `npm ci && npm run build`, no credentials needed. A `src`/`api`/`lib`
+  change that fails the build can no longer reach `dev` unnoticed. `npm ci` rather than
+  `npm install` deliberately: it installs exactly the lockfile and fails on `package.json` ↔
+  `package-lock.json` drift.
+- **`checks` — REPORTING (`continue-on-error: true`).** The hygiene + truth tripwire and the
+  regression suite. Neither can honestly gate yet: `check-session-docs.js` is **report-only by
+  contract and always exits 0** (its own header), so gating on it here would change what it promises
+  everywhere else; and the suite is **50/50 with credentials, 49/50 without** — `CHI-31` fails with
+  *"SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured"*. **A test that cannot run is not a test
+  that failed**, and marking this blocking before that distinction exists would paint CI permanently
+  red and train everyone to ignore it.
+
+Worth noting the two tickets meeting here: `SES-176`'s truth checks read a **committed** snapshot
+rather than Supabase, which is exactly why they run in CI with **zero secrets**. The snapshot
+decision made an hour earlier is what makes the tripwire portable at all.
+
+**`partial`, and none of the remainder is the runner's to do:** (1) the skip-vs-fail distinction —
+a test must **declare** it cannot run and the harness count it as skipped, never guessed, or the
+harness swallows real failures; that is a change to the contract every regression test shares, and
+doing it in the same unattended cycle that introduces CI would change what "green" means and what
+enforces it in one move. (2) Repository secrets — only John can add them; a runner must never print
+a secret, let alone install one. (3) Branch protection — *"red = no merge, regardless of author"* is
+a repository setting, not a file.
+
+**QA.** The YAML parses (`yaml.safe_load`) with the asserted shape: two jobs, `build` with 4 steps,
+`checks` carrying `continue-on-error: true`, triggers on push and PR to `dev`/`main`. The push probe
+is the end-to-end proof the file can reach GitHub. Build green; suite 50/50 with credentials.
+**Deliberately NOT claimed: that a CI run has gone green.** At ship time no run had executed — the
+workflow triggers on the push carrying it, and this cycle cannot observe its own result without
+inventing one. The first run's outcome belongs to whoever looks next.
+
+**Briefing: still not republished.** The harvest was re-tested under the publish lease in the
+predecessor's tail and truncated again; nothing changed here, so no second attempt was made and no
+`briefed_at` was stamped.
+
+---
+
 ## session/cycle-20260824-0840 (v7.0.218, 2026-08-24, runner cycle `3914fba3-25b9-4a13-b83f-de26a082626c`, `trigger = scheduled` (gate: *run* — on the 3h clock grid, 03:00 America/Chicago), model Opus 5, no subagent)
 
 **`SES-176` set `partial`** (`P10 - Tooling`, tier `next`, queue 11, epic **Selfbuild M2 - Truth
