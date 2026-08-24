@@ -5,6 +5,76 @@
 
 ---
 
+## session/cycle-20260824-2315 (v7.0.236, 2026-08-24, runner cycle `29dbb108-cd65-48ad-be81-8579e29f17c9`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5, no subagent) — SES-177 (b): the standing brief's derivable half becomes a generated block
+
+**`SES-177` — Generate CLAUDE-STATE.md and session narratives from tables — no hand-written state**
+— part (b) built and left `delivered` (`P10 - Tooling`, tier `next`, queue 1, Selfbuild M2 — the
+drain's pick). Kickoff `docs/kickoffs/v7.0.236-SES-177b-standing-brief-generated-block.md`. **3
+files** — the new `scripts/render-standing-brief.js`, `docs/runbooks/standing-brief.md` and the new
+`tests/regression/SES-177b-standing-brief-block.js` — plus the standard close-out set. No
+`src`/`api`/`lib` change, no schema change, no migration, no site change.
+
+**THE PREMISE DID NOT MERELY HOLD, IT HAD DECAYED FURTHER — measured live, not carried forward.**
+Part (a) (`v7.0.228`) generated `CLAUDE-STATE.md` and moved the standing judgment paragraph
+byte-for-byte into `docs/runbooks/standing-brief.md`, then named its own remainder and **refused**
+it, correctly: the paragraph interleaves table facts with judgment sentence by sentence, and a
+surgical extraction is the destroy-what-you-cannot-see risk the renderer exists to refuse. Read
+live at 23:2xZ, **every derivable number in that paragraph was wrong**: open tickets 561 → 581,
+numbered 561 → 591, rows 611 → 670, `designed` 16 → 15, `needs-desktop` **0 → 2**, `needs-john`
+**1 → 9**, NULL 546 → 549, the drain 11-of-18 open → 3-of-10. One of them was not merely stale but
+**operationally wrong**: the paragraph says the scheduler runs every 3 hours (12/3/6/9 on John's
+clock) and `runner_settings.interval_hours` had been **1** since 22:03Z that day, set by his own
+attended session. Every session reads that sentence at start, so a quiet night was being read from
+a false premise.
+
+**JOHN HAD ALREADY DECIDED THE SHAPE — EIGHT MINUTES BEFORE THIS CYCLE OPENED, AND IT OVERRODE THIS
+CYCLE'S OWN DESIGN.** Gated card `8c0f2bf9`, Accepted 2026-08-24T23:08:29Z in his attended architect
+session, is the operative build spec: *"option RENDER-FROM-TABLES — board census from
+`backlog_items`, drain state from `runner_directives`/`runner_drain_scope`, scheduler line from
+`runner_settings`, all generated at build time; judgment prose in `docs/runbooks/standing-brief.md`
+stays byte-for-byte untouched; **every generated line carries an 'as of <timestamp>'**."* This
+cycle's first build satisfied all of that **except the stamp**, which it omitted deliberately,
+borrowing `export-backlog-snapshot.js`'s determinism convention (no clock in the body) so `--check`
+stayed meaningful. That reasoning was sound and it was **not the decision**. The stamp ships. What
+keeps `--check` meaningful anyway is the split the card did not have to specify: **`--check`
+compares the embedded payload `sha256`, never the stamp** — the stamp says *when this was last
+read*, the sha says *whether it still matches the tables*, and a refreshed stamp over identical
+facts is reported as exactly that rather than as drift. `renderBlock()` takes the clock as an
+**argument** rather than reading it, which is the only reason any of it is assertable.
+
+**THE DESIGN IS ADDITIVE, AND THE GUARANTEE IS STRUCTURAL RATHER THAN CAREFUL.** Nothing is
+extracted from the judgment paragraph; a renderer-owned block is added **above** it, between two
+markers. `spliceBlock()` re-splits its own output and compares head and tail byte-for-byte with what
+it read — a block that would disturb either is refused, exit 2, nothing written. The `v7.0.197`
+briefing wipe is therefore *unreachable* here, not merely guarded against. **Proven, not asserted:
+the judgment paragraph's `sha256` is `cdb02d90cfa8e216076cd2b9a4c536e3c67fa515ed4dd3d5691aaa48d07acc88`
+on `origin/dev` and identical after three renders.**
+
+**FOUND WHILE BUILDING IT, AND FIXED RATHER THAN SHIPPED PAST.** The fail-closed predicate's first
+form was `text.includes("**Next session:**")` — and the script's own header comment **quotes** that
+sentinel while explaining the rule, so the check was satisfied by its own documentation and would
+have returned true for a brief whose judgment paragraph had been deleted outright. It is now
+line-anchored, with a control asserting that a mention inside a comment does **not** satisfy it.
+That is the `SES-180` self-flagging class in a second costume, and it was caught by the guard's
+own ordering assertion failing on the shipped file.
+
+**QA.** `npm run build` green; regression suite **59/59** (5 declared not-run parts across 5 other
+tests, pre-existing and unrelated). File-level negative control: the guard **fails** on the
+pre-change `standing-brief.md` (no markers) and passes on this one. `check-version-claim.js`
+returned **verified** — `v7.0.236` was issued to `cycle-20260824-2315`, not merely `≤` the counter.
+Idempotence and the two `--check` arms exercised live. **One pre-existing failure was inherited and
+is named rather than absorbed:** `SES-177-claude-state-renderer.js` was red on `origin/dev` at
+pick time because `CLAUDE-STATE.md` still recorded `v7.0.234` while `v7.0.235` had shipped at
+21:10Z; step 7's own close-out render fixed it, and it was **not** caused by this change (the file
+is untouched by this session's diff).
+
+**Deliberately NOT done, and filed rather than done quietly.** Pruning the now-duplicated stale
+numbers **out of** the judgment paragraph is exactly option (A) on John's card, which he did not
+choose — he chose (B), additive, on the reasoning that (A) *"is the only one of the three that can
+lose something, and it cannot be undone by a tap."* So the three facts have two homes for now, the
+older one wrong, and the generated block says out loud which one to believe. The prune is his, in
+an attended session.
+
 ## session/cycle-20260824-2040 (v7.0.235, 2026-08-24, runner cycle `b5c3b1d5-773c-44ae-93c3-1e300ce4cd0d`, **`trigger = chained (drain continuation)`** — the second cycle of this session, model Opus 5, no subagent) — SES-136: the rebuild contract stops offering a hand rebuild of a sample-carrying template
 
 **`SES-136` — The briefing rebuild contract tells a cycle to rebuild from a template that carries
