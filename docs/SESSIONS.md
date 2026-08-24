@@ -5,6 +5,69 @@
 
 ---
 
+## session/cycle-20260824-0241 (v7.0.214, 2026-08-24, runner cycle `e42f8d4e-ee71-49db-a472-96470d3fe7d2`, `trigger = scheduled`, model Opus 5, 1 Fable 5 subagent) — SES-187: the board's broken titles become real titles
+
+**`SES-187` DELIVERED** (Tooling · `P9 - Bug Fixes`, tier `now`, queue 6 at pick), awaiting John's
+Accept. Three files (`scripts/apply-title-regeneration.js` new,
+`tests/regression/SES-187-title-gate.js` new, this kickoff `docs/kickoffs/v7.0.214-SES-187-title-regeneration.md`)
++ the standard close-out set. No schema, no migration, no `src`/`api`/`lib`/`.claude` edit.
+
+**Step 1b.** `scheduler_gate('e42f8d4e…','trigger: scheduled', now())` → `run`, *"scheduler on —
+this fire is on your 3h clock grid (21:00 America/Chicago); the last cycle that ran started 2.44h
+ago"*. Fired 02:42Z on the `:40` cron grid. Walls: API $0 today / $0 month (caps $5 / $100); token
+cap 35,000,000 (`cap_source = override`, John's `c6fad365` for today, standing box also 35); day
+spend 31,735,000 est across 37 cycles at pick — under the cap. Rest wall not hit (meter 37%).
+
+**Premise revalidated live at pick.** Census over 592 open numbered rows: **53** titles a retired
+declaration marker (`` `Post-beta` ``, `Beta-gate (bucket N)`), **102** a provenance sentence
+(`New, found 2026-07-27 (…)`), `title IS NULL` on 0. 155 broken. The import wrote `title` from the
+description's leading bolded clause, which on these rows is the marker or provenance, not the
+subject. `backlog_display_title()` masks only 50 of them (the marker shape); the 102 provenance rows
+render the dated note to John as the ticket's name.
+
+**The ticket's "one mechanical pass" was measured false before anything shipped.** A regex extract
+(strip leading bold marker + optional caveat, take first clause, cut at 110 chars) over all 155
+returned: `Post-beta` again on LOG-126; the caveat `latent, not live: nothing reads the_reasoning…`
+on DAT-15; provenance one clause deeper on LAV-17; and mid-clause cuts on CHI-70/CHI-47. Roughly
+half wrong — strictly worse than the visible breakage, because a plausible-but-wrong title hides the
+defect `backlog_display_title()`'s fallback exists to keep visible. So the derivation is judgment (a
+Fable 5 subagent reading each row's own description, register B21) and what ships is the part that
+must stay mechanical: a deterministic gate every candidate passes, plus the §19v before-image on
+each write.
+
+**Result: 152 of 155 written, 0 still broken among them.** The gate rejected 3 — AA-180, AI-52,
+LOG-06, whose derived titles end in "Q&A"/"each"/"it" and tripped the dangling-tail guard — and left
+them with their broken titles, the fail-closed direction (`SES-117`'s TITLE CHECK still counts them
+outstanding). The gate was NOT loosened to accept them: raising the accept rate on a quality gate by
+the runner's own initiative is the failure this method exists to avoid.
+
+**QA discriminates in both directions.** Post-write census over the 152 written rows: 0 match either
+broken predicate. Before-image count for the cycle's `backlog_items` writes: 153 (152 titles + 1
+SES-187 full-row image). Whole-board negative control after the write returns exactly the 3
+gate-rejected rows — proving the write was surgical, not a blanket UPDATE. The gate itself is guarded
+by `tests/regression/SES-187-title-gate.js` (7 assertions, imports `validate()`, no DB), which
+asserts the accept case AND rejects the marker/provenance/caveat/mid-clause/identical shapes — three
+of them the mechanical extract's own wrong outputs. Build green; regression 48/48 with credentials
+(47/48 without — `CHI-31` is the `SES-92` credential gap, confirmed by re-running it WITH env).
+
+**Out of scope, disclosed rather than left to be found:** the ticket also names 5 mid-sentence
+fragments (AA-85, AA-90, AA-93, MI-03, SE-06) that match neither predicate and are untouched — this
+pass's mechanism (strip a leading marker) does not apply to them. SES-187 is `delivered`, not `done`:
+John's Accept closes the pass; his Reject/Rework reopens it for the 3 rejects + 5 fragments.
+
+**Also filed `SES-188`** (`P9 - Bug Fixes`, automation lane top via `claim_automation_lane_top`,
+rank −38): the briefing harvest is blind. Both documented read paths — the `Artifact read` action and
+`WebFetch` on the briefing URL — now return only the artifact HEAD (frame-runtime + template
+provenance comments), never the `briefing-state` block, with a note that the full 239.8 KB is saved
+under `~/.claude/…/tool-results/…` — a path `briefing-page.md` step 4 (`SES-96`) forbids a cloud cycle
+from touching. So John's taps cannot be harvested, and rebuilding without harvesting would publish
+the empty skeleton and destroy every un-acted tap (the v7.0.197 lesson). **This cycle therefore did
+NOT republish the briefing** — same "harvest blocked, no republish" as cycle `598a9b81` (01:41Z).
+Measured: 18 undecided `runner_items` cards, last decision harvested 2026-08-23T22:10Z; the break is
+recent (cycles `0bd5b00f` 23:41Z and `ae3a590e` 00:41Z both closed "tail complete"). Observed: the
+truncated return from both tools. NOT observed and not assumed: the cause — a new WebFetch intercept
+for artifact URLs, or the page outgrowing a size threshold.
+
 ## session/design-automation-governance-0823 (v7.0.213, 2026-08-23, attended discovery→execution session with John, model Fable 5, 6 subagents) — Selfbuild M0 + M1 executed: backup proven, governance consolidated, board revalidated
 
 John gave the execution mark for the Selfbuild project (docs/SELFBUILD-CHARTER.md, chartered earlier this same session — see that entry below). **M0 — Backup & Rollback (2/2 done):** `SES-81` fixed structurally (dynamic `_backup_inventory` + rebuilt `_backup_schema_ddl`, migration `ses81_backup_inventory_and_schema_ddl`, grants revoked+asserted; the hardcoded 28-table list had drifted 25 tables behind — every runner_ table unbacked, and schema.sql silently absent from every backup since 2026-08-08); `SES-169` snapshot `selfbuild-step0-2026-08-23`: 52/52 tables verified (51,717 rows, 152.5 MB), schema 443 objects + 116 migrations, machine-local hooks copied, integrity green, live restore proven (`runner_ladder`, 6 rows), repo tag `governance-pre-selfbuild-0823` pushed at pre-project dev `47000427`, RESTORE-PROCEDURE.md written. Disclosed: `ai_call_patterns` view data 500s server-side (derived; rebuilds from schema).
