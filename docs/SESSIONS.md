@@ -5,6 +5,68 @@
 
 ---
 
+## session/cycle-20260824-1140 (v7.0.221, 2026-08-24, runner cycle `4c89b6f3-55ae-46fe-97e3-d7d812b3709d`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent)
+
+**`SES-92` set `delivered`** (`P10 - Tooling`, tier `now`, queue 280, epic **Selfbuild M3 -
+Independent Verification**). Kickoff `docs/kickoffs/v7.0.221-SES-92-chi31-skip-vs-fail.md`.
+**1 source file** (`tests/regression/CHI-31-source-simulation-consistency.js`) + close-out. No
+schema, no `src`/`api`/`lib`/`.claude` edit.
+
+**The in-session continuation of cycle `9a6b5f38`** (which shipped `SES-179`). Gate A passed
+(predecessor `shipped`), Gate B passed (`drain_epic_next` → `pick`), so the chain opened per tail
+step (8) and re-entered at step 1: settings gate `run` (chained is exempt from pacing by spec),
+walls re-checked in full — day cap 45,000,000, 6,705,000 spent on the CST day, month $0.00, rest
+wall false.
+
+**SELECTION — THE PICK WAS OUT OF STRICT QUEUE ORDER, AND THAT IS DISCLOSED RATHER THAN QUIET.**
+The drain returned `SES-175` (`needs-john`) again — skip recorded. The board was then walked ticket
+by ticket, queues 1 through 43, and **every one of them was unavailable**: `delivered` (9 of them,
+stepped past silently — their ship cards already carry the ask); flagged `needs-john` /
+`needs-desktop` / `john-paced`; `removal proposed`; blocked behind `SES-155` (`SES-156`, `SES-158`,
+and through them `SES-159` and `SES-160` — one pending decision gating four tickets); or carrying an
+explicit "John decides" clause in its own text (`LAV-31` *"design decision required before
+building"*, `LOG-134` *"John prioritizes when"* plus an active-agent `amend` path, `LOG-126`'s
+standing hold, `LOG-123`'s consent-banner question). `SES-180`'s remaining scope reduced to two repo
+settings only John can change **plus this very ticket, which it names by id**.
+
+Below 43 the board is the pre-Selfbuild `P5 - Enhancements` product backlog. Rather than **claim** a
+240-ticket walk this cycle did not perform, it took `SES-92` — the one open ticket unambiguously
+inside an unattended cycle's authority (a test-harness contract: no `src/` surface, no agent
+configuration, no schema) and the one the top-of-board blocker is explicitly waiting on. Recorded
+here, in the kickoff and on the ship card as a deliberate deviation, not as a re-derivation of the
+selection rule.
+
+**Premise revalidation — measured live in this clone, not quoted from the ticket.** Ran the suite
+with the credentials removed from the environment (`env -u SUPABASE_URL -u SUPABASE_SERVICE_KEY`),
+which is the state every cloud cycle and every CI run begins in: **49/50, `CHI-31` the sole FAIL**,
+message *"SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured (.env.local)…"*, while `AGT-44`,
+`DAT-003`, `DAT-11` and `DAT-12` all skipped loudly in the same run. With the runner secrets
+exported: **50/50**. The ticket, filed 2026-08-21, was exactly right and is unchanged.
+
+**Why it mattered more than its queue position:** `SES-180` shipped this repo's first CI two cycles
+earlier (`v7.0.219`) and had to leave the regression job **non-blocking in writing** for this precise
+reason — a suite that is permanently one-red cannot gate anything. The real cost was never the red
+itself but what a red-that-means-nothing teaches: wave it through, and the next genuine regression
+goes with it.
+
+**The fix** is the early-return skip its four siblings already use — a `console.log` naming what went
+unverified and how to include it, then `return` — placed **below every source-parsed assertion and
+above the first credentialed one**, with a comment in the file saying that placement is the whole
+contract. Deliberately NOT copied from `DAT-11`: its `VITE_SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` fallbacks, which are a second unrelated behaviour change.
+
+**QA — three states, and the third is the one that matters.** (1) Without credentials: **50/50**
+with `CHI-31` printing its skip line, where the same clone reported 49/50 minutes earlier. (2) With
+credentials: **50/50** and no skip line, so the credentialed half genuinely ran. (3) **The
+discriminating control:** with credentials present, one asserted clause was deliberately broken and
+the suite went to **49/50 with `CHI-31` FAILing on that clause** — proving the skip did not swallow a
+real mismatch, which is the one failure mode that would make this change worse than the bug. The
+control string was then removed and its absence verified by grep (0 occurrences) before the suite was
+re-run green. `npm run build` green.
+
+**The briefing page was NOT republished** (`SES-188`, unchanged from the parent cycle — both read
+paths truncated before `briefing-state`). John's un-harvested taps are preserved.
+
 ## session/cycle-20260824-1140 (v7.0.220, 2026-08-24, runner cycle `9a6b5f38-6e82-47a2-aedf-7043dde9dc19`, **`trigger = scheduled`**, model Opus 5, no subagent)
 
 **`SES-179` set `delivered`** (`P10 - Tooling`, tier `next`, queue 14, epic **Selfbuild M2 - Truth
