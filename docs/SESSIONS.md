@@ -5,6 +5,55 @@
 
 ---
 
+## session/cycle-20260824-2040 (v7.0.235, 2026-08-24, runner cycle `b5c3b1d5-773c-44ae-93c3-1e300ce4cd0d`, **`trigger = chained (drain continuation)`** — the second cycle of this session, model Opus 5, no subagent) — SES-136: the rebuild contract stops offering a hand rebuild of a sample-carrying template
+
+**`SES-136` — The briefing rebuild contract tells a cycle to rebuild from a template that carries
+sample data — followed literally it wipes the live page; followed sensibly it breaks the written
+rule** — built and left `delivered` (`P10 - Tooling`, tier `now`, queue 271, Selfbuild M2). Kickoff
+`docs/kickoffs/v7.0.235-SES-136-rebuild-contract-pointer.md`. **2 files** —
+`docs/runbooks/briefing-page.md` and the new
+`tests/regression/SES-136-rebuild-contract-pointer.js` — plus `docs/harvests/SES-136.md` at
+close-out. No `src`/`api`/`lib` change, no schema change, no migration, no site change.
+
+**Selection was three skips deep, all recorded as rows.** The M2 drain returned `SES-177` and
+`SES-176` (both `needs-john`), then `SES-137` — which peer cycle `b764fe6b` had set
+`removal proposed` eleven minutes earlier, so John's verdict is pending on it. All three
+`record_skip`-ed, claims released. `SES-136` was the only claimable named member left.
+
+**THE PREMISE WAS REVALIDATED BY MEASUREMENT, AND THE MEASUREMENT CHANGED THE SHAPE OF THE FIX.**
+The ticket asks John to choose between **(a)** deriving every section from queries and **(b)**
+sanctioning an Artifact-read of the previous page. **(a) shipped while the ticket waited** — under
+`SES-149` (`v7.0.200`, the builder) and `SES-163` (`v7.0.207`, the derived half), neither of which
+closed this ticket. Measured, not recalled: `briefing-template.html` carries three sample markers
+(`item-ses78a`, `v7.0.94`, `Aug 19, 2026`) and the page **this same session built and published at
+`v7.0.234`** carries **zero** of the three; a moved builder anchor is `exit 2`, never a sample
+publish. So no decision was owed, and **(b)'s permission-gate exposure never has to be granted.**
+
+**What WAS owed is a pointer, and the location is the whole point.** Step 4 is the step a cycle
+reaches while it is being told what **not** to do — *never shell-process the fetched page out of
+`~/.claude/`* (`SES-96`) — and it then offered *"rebuild structurally from the template + the
+`runner_` tables"*, a sentence with no executable in it. Cycle `f0acf9ab` self-filed this ticket
+after taking the other branch: it read the published page with Bash instead, which that same step
+forbids. Step 4 now names `scripts/build-briefing.mjs` and step 1a, and records why.
+
+**Three things deliberately not touched, named so a later cycle does not "finish the job":** the
+`~/.claude/` prohibition itself (unchanged — the builder needs no such read, which *removes* the
+exposure rather than sanctioning it, the opposite of (b)); the two other *"structurally from"*
+sentences, which are about the seed sentinel and the self-publish path; and **step 1a, which must
+not be deleted as redundant now that step 4 points at it** — the pointer is one-way on purpose and
+the guard fails if 1a goes.
+
+**QA.** Four clauses read out of step 4, never restated in the test, each with a negative control;
+the `SES-158` meta-assertion proving the control-checker can itself fail; a step-1a-still-exists
+guard (`SES-176`'s dangling-pointer class); and a guard that the template still carries the three
+markers, so the justification stays a measurement rather than drifting into a story. **File-level
+negative control:** the test **FAILS** on `origin/dev`'s own `briefing-page.md`, on
+`points-at-the-builder` — the clause it exists for. One clause, `the-prohibition-survives`, passes
+on both sides **by design**: it asserts the fix did not weaken what step 4 already protected. Suite
+**58/58**, build green.
+
+---
+
 ## session/cycle-20260824-2040 (v7.0.234, 2026-08-24, runner cycle `3a3f1f95-eba2-4ee2-a450-1ffd04e04ed0`, `trigger = scheduled` — on-grid 15:40 CST fire, `scheduler_gate` verdict `run` — model Opus 5, one Sonnet 5 sweep subagent) — SES-150: an attended session can finally record a board before-image
 
 **`SES-150` — Attended sessions cannot record a board before-image — `runner_before_images` is
