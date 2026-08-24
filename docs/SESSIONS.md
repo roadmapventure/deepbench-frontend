@@ -5,6 +5,148 @@
 
 ---
 
+## session/cycle-20260823-2341 (v7.0.212, 2026-08-23, runner cycle `0bd5b00f-cfb4-4f6a-acfd-475084f54121`, `trigger = scheduled`, model Opus 5, no subagent) — Evidence cards name the records retrieved
+
+**`LAV-17` DELIVERED** (Enhancements · `P5 - Enhancements`, queue 20), awaiting John's Accept. Three
+files (`api/prompt/ai-enrichment.js`, `src/components/RunTasks.jsx`,
+`tests/regression/LAV-17-evidence-record-titles.js`) + kickoff. No schema, no migration, no flag.
+
+**Step 1b.** `scheduler_gate('0bd5b00f…','trigger: scheduled', now())` returned `run` — *"scheduler on
+— this fire is on your 3h clock grid (18:00 America/Chicago); the last cycle that ran started 0.89h
+ago"*. Fired 23:40:51Z on the `:40` cron grid.
+
+**Walls.** `resolve_day_token_cap()` → `day_cap` **35,000,000**, `cap_source` **`override`**,
+`cap_reason` *"your budget override for today (35,000,000 tokens, expires 12:00 AM CST) outranks the
+standing box"* (override `c6fad365`, box 35, calibration guard `ok`, meter 37 vs rest 85,
+`rest_wall_hit` false). CST day at entry: **33 cycles, 28,375,000 est tokens**, API **$0.00** of
+$5/day and $100/month. Passed on both tracks with ~6.6M of the day's token allowance left.
+
+### Selection — the drain's front is blocked and a manual session is working the board
+
+`runner_directives` held **no** queued `type='directive'` row, so layer 1a was empty.
+`drain_epic_next()` returned **`pick` `SES-155`** (queue 2, `open_now` 78) — stepped past per
+`SES-114`, `design_status = 'needs-john'`, `record_skip` (`skip_count` 3 → 4). `SES-156` and
+`SES-158` both depend on it, and the dependency was **verified rather than assumed**:
+`to_regclass('public.briefing_comments')` returned **NULL**, so the table `SES-156` renders threads
+from does not exist yet. `SES-154`/`SES-157`/`SES-165`/`SES-164`/`SES-163` were stepped past
+silently as `delivered` (`SES-154`'s rule — their ship cards already carry the ask), `SES-84`
+silently as `john-paced` (`SES-166`), `SES-168` with a `removal-proposed` skip.
+
+**Worth recording for the next cycle that reads this file:** `SES-131` (queue 15) was claimed at
+`23:52:35Z` by **`drain-automation-0823`** — a *manual* session claiming by session name, exactly the
+shared-board mechanism `SES-86` phase 1 built. The contested claim returned 0 rows and this cycle
+took the next ticket, per John's own rule. **A contested claim is NOT a `record_skip`** — it clears
+itself and there is nothing for him to do.
+
+### `SES-167` — premise revalidated and found DEAD (`SES-87`/B7)
+
+`SES-167` — *Briefing §10 skip rows are pasted from cycle-supplied data, so a done ticket keeps
+asking John for input* was filed **22:29Z**. `SES-163` (commit `b1daed7`, `v7.0.207`) shipped
+**22:46Z** — seventeen minutes later — and did exactly what it asks. Read out of the shipped source,
+not inferred: `build-briefing.mjs:242` reads `runner_skips?resolved_at=is.null`, joins
+`backlog_items` first-row-per-id, and drops any row whose ticket is `done`/`removed`; `skipRowsJs()`
+splits 10.1/10.2 on `reason_kind`; the NEW chip is `briefed_at == null`; the title comes from
+`public.backlog_display_title()`. A grep for `skip_rows_1`, `skip_rows_2`, `skips_n`, `skips_new`
+across `build-briefing.mjs`, `lib/briefing-derive.mjs` and `briefing-page.md` returns **nothing**.
+Live control on the same data: of the 7 unresolved `runner_skips` rows, **five** (`SES-101`,
+`SES-121`, `SES-110`, `SES-106`, `CHI-89`) sit on tickets already `done`/`removed` — precisely the
+rows the ticket was filed about — and the shipped builder's derived-resolution filter drops all five.
+
+Status → `removal proposed`, before-image first, recompute run (**0 rows moved** — `SES-113`: a
+removal-proposed ticket keeps its number). Card `9c2e5df1`. **The residual is disclosed on the card
+rather than buried:** `SES-167` also asked for the §10 sort to put question-unblockable rows first,
+and the shipped builder sorts only by `last_skipped_at desc`. A Rework brings the ticket back scoped
+to just that.
+
+### Two gated cards, both carrying a measurement rather than an opinion
+
+- **`SES-161`** — *The token wall governs the runner on a number nobody has ever checked*. The
+  ticket's own candidate first step is *"have one cycle read `get_session` at open and at close"*.
+  **Measured twice this cycle, 23:47Z and 23:51Z: `get_session` on a cloud runner session returns no
+  usage block at all** — `external_metadata` carries container version, branch, last served model and
+  a rate-limit status, and no token or cost figure. So the named method is inoperable here. Stated as
+  a limit, not a conclusion: this says the figure is absent from *this* environment, not that the
+  platform never exposes it — the 17:28Z reading the ticket quotes came from a different session.
+  `design_status = 'needs-john'`, `record_skip`, claim released.
+- **`AGT-015`** — *Apply reasoning to theories and agent wisdom*. A three-part programme (schema
+  field, reuse-path activation, a Knowledge Skill that reads `the_reasoning` back into prompts)
+  across schema, `api/` and Skill content, with no kickoff doc — past the one-item/≤3-file/≤4-task
+  cap, and one of only two `P1 - Improves John's Skills` tickets in the top twenty.
+  `design_status = 'needs-john'`, `record_skip`.
+
+**Deliberately NOT carded, and the reason is a rule rather than laziness:** `LOG-134`, `LAV-30` and
+`LAV-31` (queue 17–19) each carry a John-decision clause **inside their own ticket text** and are
+long-standing `Post-beta` deferrals. A card repeating what the ticket already says is one ask with
+two homes — the failure `SES-154` and `SES-166` both closed — so they were stepped past and recorded
+here instead of being pushed onto §10.
+
+### `LAV-17` — the build
+
+**The premise needed revalidating and the obvious reading was wrong.** `LAV-30`'s own item (c) reads
+*"CLOSED as moot 2026-08-07 by `LAV-32`: the fetch/detail lines were removed from every user-facing
+surface"*. That is true of the **sub-entry** fetch lines — `AssemblyView.jsx` marks them
+`detail: true` and `SubEntry()` returns `null` (line 633) — and **false** of the Evidence **section**
+line: the third exit of the same branch calls `open({ stage: "evidence", ghost: false, filled: true,
+did, … })` with no marker, and `StageSection()` renders `{section.did && …}` (line 684). Taking
+`LAV-32` as closing `LAV-17` too would have retired a live defect on a user-facing surface.
+
+**The titles were already in scope and being discarded.** `lib/vector-search.js`'s `embedAndSearch()`
+returns `chunks: matches.map(m => ({ id: m.id, title: m.title || null, similarity, data_room_tag }))`
+(line 107); `lib/rag.js` (94) and `lib/project-manager.js` (166) carry a `title` too. `fetchSection()`
+kept `matchCount` and `chunks.map(c => c.id)` and dropped the names — the same shape `LOG-37` fixed
+for ids in `v6.3.132`, one field later.
+
+**Shipped.** `_rag_titles` beside `_rag_chunk_ids`, under the identical
+`ragMethod === 'similarity-search'` gate (a direct lookup's rows are agent/catalog rows, not
+records), blank-filtered and capped at `EVIDENCE_TITLE_CAP = 3`. **The cap lives in `api/`, not at
+render, on purpose:** it travels with the frame, so a stored trace replays the sentence the live run
+showed. The `assembly_work_complete` fetch emit gains `titles`. `deriveDid()` composes
+`Fetched 3 records from the_library — "A", "B" and 1 more.`, computing the held-back count from
+`matchCount` against the names actually shown.
+
+**The count deliberately stays.** It is the measured fact; the titles are a capped sample. A build
+that replaced `matchCount` would make a three-name list read as the whole result set.
+
+**QA discriminates in BOTH directions, which is the whole point for a fall-through.** Both controls
+were run, not described:
+
+| Control | Change | Result |
+|---|---|---|
+| A | new branch disabled (`if (false && …)`) — the pre-change function | **FAIL** on the named-records assertion (`Fetched 3 chunks from the_library.`) |
+| B | branch always taken (`if (d.matchCount != null)`) | **FAIL** on `Fetched 12 chunks from roster.` |
+| shipped | — | **PASS** |
+
+Control B is the production-critical one: `roster` and `queryRAG` fetches carry no titles, and
+**neither does any frame emitted before `v7.0.212`** — which is every frame in a stored trace
+replayed today. A one-sided test would have passed a build that broke all of them.
+
+`npm run build` green. Regression **48/48** with credentials exported; **47/48** without, and that
+one failure was proven environmental rather than assumed — `CHI-31-source-simulation-consistency.js`
+reports *"SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured"* and **passes** when the same run is
+repeated with the env set. `check-version-headers.js` and `check-kickoff-doc.js` (11/11) green.
+
+**Display only, stated so a later reader does not re-derive it wrongly:** titles are never written to
+`call_facts`, never joined on, never used to key anything — `_rag_chunk_ids` remains the identity
+carrier (`SES-116`'s rule one level out). No conditional keyed to an agent or capability was added
+(`.claude/rules/capabilities-are-data.md`); nothing about `logActivity()` or `patterns_used` changes.
+
+### Tail — the briefing page, and the read-back limit measured rather than guessed
+
+`briefing-state` was **again** not parseable in context: both `Artifact action:"read"` and `WebFetch`
+on the artifact URL return only the page head and save the full 215.3 KB to
+`/root/.claude/projects/…/tool-results/`, a permission-gated path an unattended cycle may not
+shell-process (`SES-96`) and may not enter at all (register B39). Cycle `51d1005c` recorded the same
+thing at 22:47Z.
+
+**What made a blind republish safe this time, and it is a measurement any later cycle can repeat:**
+the served artifact's frame version stamp is a unix timestamp in its `<base href="/_f/…">` —
+`1787525839` = **2026-08-23T22:57:19Z**, which is cycle `837a0387`'s own rebuild. The page
+self-publishes on every tap, so a stamp equal to the last cycle's rebuild proves **no un-harvested
+tap exists**. That is the difference between "nothing to harvest" and "silence treated as an
+Accept", and it was checked again inside the publish lease before republishing.
+
+---
+
 ## session/cycle-20260823-2213 (v7.0.207, 2026-08-23, runner cycle `9fc7e4d2-c66c-48ca-a1cf-f23665f8965d`, `trigger = scheduled` — a FORCED off-grid fire, model Opus 5, no subagent) — the briefing rebuild needs five sentences, not thirty-three fields
 
 **`SES-163` DELIVERED** (Tooling · `P10 - Tooling`, queue 7), awaiting John's Accept. Three files

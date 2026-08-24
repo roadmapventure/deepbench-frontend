@@ -1,3 +1,12 @@
+// DeepBench v7.0.212 | api/prompt/ai-enrichment.js | LAV-17 -- fetchSection() stops dropping the
+// retrieved record TITLES on the floor. `_rag_titles` is a sibling of LOG-37's `_rag_chunk_ids`,
+// under the same `ragMethod === 'similarity-search'` gate and for the same reason (a direct
+// lookup's rows are agent/catalog rows, not records), capped at EVIDENCE_TITLE_CAP so the cap
+// travels with the frame and a stored trace replays the sentence the live run showed. The
+// assembly_work_complete fetch emit carries them as `titles`. DISPLAY ONLY: never a key, never a
+// call_facts field, never joined on -- _rag_chunk_ids stays the identity carrier (SES-116's rule
+// one level out). No conditional keyed to an agent or capability was added
+// (.claude/rules/capabilities-are-data.md); nothing about logging or patterns_used changes.
 // DeepBench v7.0.34 | api/prompt/ai-enrichment.js | LOG-121 -- handler wrapped in
 // withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
 // site in this file changes
@@ -59,6 +68,12 @@ const DIRECT_LOOKUP_SOURCES = new Set(['roster', 'the_library_catalog']);
 // (.claude/rules/capabilities-are-data.md). Sources absent here are the requesting agent's own
 // work (§19f Content-Owner Access) and attribute to requestingAgentId.
 const ASSEMBLY_ATTRIBUTION = { the_library: "eleanor", the_library_catalog: "eleanor", roster: "michelle" };
+
+// FEATURE: LAV-17 -- how many retrieved record titles an Evidence card may name. Three, because
+// matchCount is routinely 74 on the_library_catalog and the card's sibling lines are one short
+// sentence each; the render says "and N more" for the remainder rather than truncating silently.
+// A generic cap, keyed to no source and no agent (.claude/rules/capabilities-are-data.md).
+const EVIDENCE_TITLE_CAP = 3;
 
 // FEATURE: LOG-37a-patch -- derived from the same generic fi.source trait fetchSection() already
 // branches on, never from who the agent is or which capability is running
@@ -149,6 +164,19 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
         // they are discarded rather than renamed, because they have no Layer A home here.
         _rag_chunk_ids: ragMethod === 'similarity-search'
           ? (result.chunks || []).map(c => c && c.id).filter(Boolean)
+          : [],
+        // FEATURE: LAV-17 -- the record TITLES this section retrieved, for the Evidence card's
+        // one rendered line. Same gate as the ids one field up, and for the same reason: only a
+        // similarity search returns rows whose `title` is a record's own name (a direct lookup's
+        // rows are agent/catalog rows). Capped here rather than at render, so the cap travels with
+        // the frame and a stored trace replays the same sentence the live run showed. Display
+        // only -- never a key, never a call_facts field, never joined on (SES-116's rule, one
+        // level out): `_rag_chunk_ids` above stays the identity carrier.
+        _rag_titles: ragMethod === 'similarity-search'
+          ? (result.chunks || [])
+              .map(c => (c && typeof c.title === 'string' ? c.title.trim() : ''))
+              .filter(Boolean)
+              .slice(0, EVIDENCE_TITLE_CAP)
           : [],
         _rag_scope_effective: fi.source === "roster" ? "roster" : (fi.source === "the_library" || fi.source === "the_reasoning" || fi.source === "the_library_catalog") ? fi.source : ((fi.scope === "agent" && fi.agent_id) ? "agent" : "platform"),
         _librarian_tier: result._librarian?.tier || result._access?.tier || null,
@@ -270,6 +298,11 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
           agentId: ASSEMBLY_ATTRIBUTION[source] ?? effectiveAgentId ?? null,
           forAgentId: effectiveAgentId ?? null, toCapabilitySlug: effectiveCapabilitySlug ?? null,
           source, matchCount: fetched._rag_chunks || 0,
+          // FEATURE: LAV-17 -- the record names behind the count, so the Evidence card can say
+          // WHAT came back and not only how much. Additive and always an array: a path that
+          // returns no usable title sends `[]` and the client falls through to the sentence it
+          // has always composed, which is what keeps a replayed pre-v7.0.212 trace identical.
+          titles: fetched._rag_titles || [],
           trace_id, span_id, parent_span_id });
       }
       return fetched;
