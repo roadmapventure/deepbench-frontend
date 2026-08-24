@@ -68,6 +68,15 @@ they never become ticket IDs before they're settled.
 **Sequencing invariant:** scaffolding comes down only as its replacement goes up — no cap is
 retired and no gate collapsed until the metric that replaces it is live and green.
 
+**Transition rule — no governance vacuum (John, 2026-08-23):** existing governance is never
+suspended while this project runs. Every Selfbuild cycle executes under the full current
+rulebook; a rule changes only via a shipped ticket whose own commit lands the replacement,
+retires the old rule (retirement-ledger entry, same push), and leaves no commit where neither is
+in force. The one active pre-agreed change is the interim auto-accept bar (Decisions log #2).
+Each SES-179 gate review verifies "every rule retired this milestone has its replacement live
+and green." John's standing powers — human-in-chat outranks the queue, §2b switches, Reverse,
+hooks never routed around — are permanent and outside this project's authority to modify.
+
 ## Measures
 
 | Goal | Measure | Test |
