@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.220 | runbooks/runner-cycle.md | SES-179 — NEW STEP 8d: the milestone gate review finally has a trigger. John's directive 2026-08-23 (PM lens + Chief Architect lens at each epic retirement, joint verdict as a card) was named NINE times in docs/SELFBUILD-CHARTER.md — including as the project's own exit exam and, in §Closure discipline item 3, as the ONLY path for adding members to a later milestone — and implemented nowhere: `grep -rniE "gate review" docs/runbooks/` returned zero lines. FOUND LIVE while building it, which is why this is a gap and not a mechanism built ahead of need: TWO milestone drains had ALREADY retired ungated — 01758f26 (Selfbuild M0, retired by cycle e42f8d4e) and 69e61a6c (Selfbuild M1, 4b874066), both 2026-08-24 — and M2's drain was queued to do the same. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO UNDO: the trigger is a SWEEP over evidence, never a branch on drain_epic_next() returning `retired`. That call has TWO sites (step 5 and step 9's tail Gate B, SES-139) and since SES-189 one call may retire MORE than one directive while returning only the last one's ids — so a call-site branch misses retirements by construction, and could not have caught M0/M1 at all, since they retired before the step existed. The sweep asks the standing question instead and is bounded at ONE review per cycle (LIMIT 1, oldest first), the same self-limiting shape as step 4b's invention pass. `status='cancelled'` is excluded deliberately: that is John withdrawing a standing order (b74009ea, Automation), not a milestone finishing. Migration ses179_runner_items_epic_id adds the join key the sweep reads (runner_items.epic_id, nullable, additive, no backfill) rather than matching a display string in title/display_ref — the defect SES-116 shipped a CHECK to end. The card reuses kind='gated_before_build' because runner_items_kind_check admits exactly two values and the gated semantics are the correct ones anyway (an Accept there is permission, not a rating — register B34). Procedure lives in docs/runbooks/gate-review.md, CITED HERE AND NOT RESTATED. Body otherwise unchanged. -->
 <!-- DeepBench v7.0.216 | runbooks/runner-cycle.md | SES-188 — step 2's harvest gains one sentence: the read can come back truncated, so TEST the harvest rather than concluding from which tool was used. Measured live 2026-08-24, Artifact read stopped short of briefing-state and WebFetch returned it complete on the same page four seconds apart — so one tool's short read is never evidence the block is unreachable. The test, the two branches (verified → rebuild; unverified → decline the republish) and the reason this must not become "use WebFetch, it works" live in briefing-page.md's decision read-back contract, CITED HERE AND NOT RESTATED so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Body otherwise unchanged. -->
 <!-- DeepBench v7.0.215 | runbooks/runner-cycle.md | SES-189 — a retired drain directive no longer eats the cycle's whole drain call. Migration ses189_drain_advance_past_retired turns drain_epic_next()'s single ORDER BY created_at LIMIT 1 scan into a bounded loop that keeps advancing while directives retire and acts on the first pick/blocked/unscoped/none. THE ONE THING AN EDITOR MUST NOT COLLAPSE: this changes WHEN the next directive is read, never WHO decides — no predicate moved, retirement still needs every NAMED member done/removed with 'delivered' still absent from that side (SES-154), the pick predicate is byte-identical, and property 5 stands (nothing here creates a drain row). Each retirement still writes its own before-image, so N retirements write N rows. DISCLOSED RATHER THAN LEFT TO BE FOUND: the ticket's Fix: line said to loop the call HERE, in step 5, and its own QA line said "old body … fixed body" — the function. Shipped in the function, for two reasons: this file says six times over (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129) that a rule each cycle must remember gets silently forgotten, and drain_epic_next has TWO call sites — step 5 AND step 9's tail Gate B (SES-139) — which a step-5-only loop would leave broken while a real pick sat behind a completed directive. QA was discriminating, one fixture, one transaction, one variable: two retire-ready fixture directives ahead of a pickable one, run against a control function carrying the RETIRED body and then against the shipped one — control returns retired/no pick/1 retirement, shipped returns pick=SES-93/2 retirements, both with a before-image each. The fixture was built and exercised inside a ROLLED-BACK transaction rather than cleaned up afterwards, because a runner may never create a drain row (property 5) and a committed fixture drain is visible to the peer cycles running concurrently (register B42) — uncommitted rows are invisible under read-committed, so nothing was ever exposed and nothing was left to clean. Verified after: 0 stray fixture rows, 0 stray before-images from this cycle, control function gone, exactly 1 drain_epic_next overload (.claude/rules/supabase-function-signature.md), John's two live drains untouched and still queued. Doc + function; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 7 (the stamp cap — renumbered from a duplicate "6" 2026-08-23). -->
@@ -1517,6 +1518,48 @@ from nowhere and landed wherever the renumber happened to put it. **Accept is un
 terminal** — `removed` leaves the eligible set, so that recompute genuinely does release the
 slot. The recompute at filing time still runs: it no longer strips the ticket, but it is what
 settles the rest of the board around it.
+
+**8d. Milestone gate-review sweep (`SES-179`, `v7.0.220`) — one review per cycle, never instead of
+the build.** At every epic retirement the charter requires a review by two governance-lane lenses
+(§Multi-agent verification item 7), and it is the **only** sanctioned path for adding members to a
+later milestone (§Closure discipline item 3). Run this after 8b/8c:
+
+```sql
+-- The oldest RETIRED drain whose epic has no gate-review card yet. 0 rows = nothing owed.
+SELECT d.id AS directive_id, e.id AS epic_id, e.name AS epic_name, d.acted_cycle, d.created_at
+  FROM public.runner_directives d
+  JOIN public.epics e ON e.id = d.epic_id
+ WHERE d.type = 'drain-epic'
+   AND d.status = 'done'
+   AND NOT EXISTS (SELECT 1 FROM public.runner_items ri WHERE ri.epic_id = e.id)
+ ORDER BY d.created_at
+ LIMIT 1;
+```
+
+1 row → run the review per **`docs/runbooks/gate-review.md`** (the three mandatory directions, the
+two lenses, the burndown query, the card's shape and the four prohibitions live there — **cited
+here, not restated**, so these two files cannot drift the way step 5 and step 7 did before
+`v7.0.114`). File its card in the step-9 tail with the rest. 0 rows → nothing owed; say nothing.
+
+Four properties, each of which is how this gets built wrong:
+
+- **It is a SWEEP over evidence, not a branch on `drain_epic_next()` returning `retired`.** That
+  call has **two** sites (step 5 and step 9's Gate B, `SES-139`) and since `SES-189` one call may
+  retire **more than one** directive while returning only the last one's ids — so a call-site
+  branch misses retirements by construction. Measured, not reasoned: **M0 and M1 both retired
+  ungated** (`01758f26` by cycle `e42f8d4e`, `69e61a6c` by `4b874066`, 2026-08-24) before this step
+  existed, and a sweep catches them where a branch never could.
+- **`NOT EXISTS … ri.epic_id = e.id` is the whole idempotence**, and it works because
+  `runner_items.epic_id` is set on gate-review cards and on **nothing else** (migration
+  `ses179_runner_items_epic_id`, the column's own contract). A card filed without it is invisible
+  here and the same review is filed every cycle, forever.
+- **`cancelled` is excluded on purpose.** A cancelled drain is John withdrawing a standing order
+  (`b74009ea`, the Automation epic) — not a milestone finishing. Writing the predicate as
+  `status <> 'queued'` hands him a verdict on work he had just called off.
+- **The review PROPOSES successor members; John's Accept FILES them.** No `backlog_items` row, no
+  `runner_drain_scope` row, and never a drain (`drain_epic_next()` property 5 — nothing creates a
+  drain row but John). A review that filed its own successors would turn a check on the runner into
+  a widening of it.
 
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, **`backlog_id` as a BARE ticket id — see the rule immediately below**,

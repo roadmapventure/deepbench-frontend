@@ -5,6 +5,87 @@
 
 ---
 
+## session/cycle-20260824-1140 (v7.0.220, 2026-08-24, runner cycle `9a6b5f38-6e82-47a2-aedf-7043dde9dc19`, **`trigger = scheduled`**, model Opus 5, no subagent)
+
+**`SES-179` set `delivered`** (`P10 - Tooling`, tier `next`, queue 14, epic **Selfbuild M2 - Truth
+Infrastructure**). Kickoff `docs/kickoffs/v7.0.220-SES-179-milestone-gate-reviews.md`. **2 source
+files** (`docs/runbooks/gate-review.md` new, `docs/runbooks/runner-cycle.md` step 8d) + 1 additive
+migration (`ses179_runner_items_epic_id`) + close-out. No `src`/`api`/`lib`/`.claude` edit, no site
+change.
+
+**Selection.** Settings gate `run` (6:40 AM CST, on the 3h grid). Walls clear: API $0.00 month /
+$0.00 day; token track 4,655,000 estimated on the CST day against a 45,000,000 `day_cap`
+(`cap_source = daily-max-box`, John's standing 45M), rest wall false at meter 60% vs 85%. No queued
+one-off directive. `drain_epic_next()` → `pick SES-175`, which carries `design_status = 'needs-john'`
+— stepped past with a `record_skip()` (`SES-114`). Board read then: `SES-154` `delivered` (silent
+step-past), `SES-155` `needs-john` (skip recorded), **`SES-156` and `SES-158` both blocked by
+`SES-155`** — verified rather than inferred, `to_regclass('public.briefing_comments')` returns
+`NULL`, so the table both depend on does not exist — `SES-157`/`SES-189` `delivered`, `SES-188`
+`needs-john`, `SES-175`–`SES-178` flagged. First buildable: **`SES-179` at queue 14.**
+
+**The premise revalidation is the finding.** `docs/SELFBUILD-CHARTER.md` cites `SES-179` gate
+reviews in **nine** places — §Multi-agent verification item 7, §Closure discipline item 3 (*"Only a
+gate review can add members to a later milestone… never a cycle's solo close-out call"*), and
+§Definition of success, where the final gate review is the project's **exit exam** — while
+`grep -rniE "gate review" docs/runbooks/` returned **zero** lines. And it had already cost
+something: **two milestone drains retired ungated**, `01758f26` (Selfbuild M0 - Backup & Rollback,
+`done`, retired by cycle `e42f8d4e`) and `69e61a6c` (Selfbuild M1 - Consolidation, `done`,
+`4b874066`), both 2026-08-24, with M2's drain (`9abb6451`) queued to do the same.
+
+**The one real design decision: a sweep, not a branch.** The obvious build catches
+`drain_epic_next()` returning `retired` at the call site. It is wrong twice — that function has
+**two** call sites (step 5 and step 9's tail Gate B, `SES-139`) and since `SES-189` a single call
+may retire **more than one** directive while returning only the last one's ids, so a branch misses
+retirements by construction; and it could never have caught M0/M1, which retired before the step
+existed. Step 8d therefore asks the standing question — *is there a retired drain whose epic has no
+gate-review card?* — bounded at **one review per cycle** (`ORDER BY created_at LIMIT 1`), the same
+self-limiting shape as step 4b's invention pass. **Consequence stated rather than left to be
+found: the next cycle to reach 8d files M0's review, the one after it M1's, then the sweep goes
+quiet until M2 retires.**
+
+**`status = 'cancelled'` is excluded deliberately**, and that is the discriminating control: the
+Automation drain `b74009ea` is `cancelled` (John's untick), which is him withdrawing a standing
+order, not a milestone finishing. The wrong build — `status <> 'queued'` — returns it **first**,
+handing him a verdict on work he had just called off.
+
+**Two decisions forced by measurement rather than chosen.** (1) The card reuses
+`kind = 'gated_before_build'` because `runner_items_kind_check` admits exactly `'ship'` and
+`'gated_before_build'`; a third kind needs a constraint change plus harvest semantics everywhere a
+card is read, and an unhandled `kind` lands on a card John has already tapped. The gated semantics
+are also the correct ones — an Accept there is **permission, not a rating**, touching no ladder rung
+(register B34). (2) The "has this epic been reviewed?" test is a **column**, not a string match:
+migration `ses179_runner_items_epic_id` adds `runner_items.epic_id` (nullable, additive, no
+backfill, FK to `epics`), whose contract — *set on gate-review cards and on nothing else* — lives in
+the migration comment. Matching a display string in `title`/`display_ref` is the defect `SES-116`
+shipped `ck_runner_items_backlog_id_bare` to end, where it silently returned nothing on 63 of 80
+rows.
+
+**QA — discriminating, one variable, fixtures never committed.** Baseline: the shipped predicate on
+the live board returns **M0**, the oldest retired unreviewed drain. Fixture, inside a
+**rolled-back** transaction (a committed `runner_items` row is a card John would see, and peers run
+concurrently — register B42): with a gate-review card present for M0 the shipped predicate returns
+**M1**, while the control without the `NOT EXISTS` clause still returns **M0** — so the clause is
+provably what changes the answer, and the insert itself proves the card's shape passes every CHECK
+(`kind='gated_before_build'`, `backlog_id` NULL, `epic_id` set). Cancelled control as above.
+Rollback verified after: **0 fixture rows, 130 `runner_items`, 0 carrying `epic_id`.**
+`npm run build` green; regression suite **50/50** with credentials.
+
+**Disclosed rather than absorbed:** both retired drain directives carry `status='done'` with
+`outcome IS NULL`, because `drain_epic_next()` retires by writing `status` directly instead of
+through `close_directive()`. Per `SES-129` that combination renders **red** on §7 of the briefing,
+which is correct — the function *was* bypassed. It is a real defect in `drain_epic_next()`, it is
+not this ticket, and per the charter's closure discipline (*"new filings default outside the
+project… never a cycle's solo close-out call"*) it is named on the ship card and here rather than
+turned into a board row by this cycle.
+
+**The briefing page was NOT republished — third consecutive cycle** (`SES-188`). Both documented
+read paths truncated before `briefing-state`: `WebFetch` stopped inside the provenance-comment pile
+and the `Artifact` `read` arm stopped even earlier, inside the frame-runtime script, on a page the
+tool now reports as **250 KB** (198.3 KB when `SES-188` was filed). Per `briefing-page.md`'s
+decision read-back contract that is an **unverified** harvest, so the republish is declined and
+John's un-harvested taps are preserved. The cost is stated rather than hidden: his decisions
+continue to pile up behind a stale page.
+
 ## session/cycle-20260824-0840 (v7.0.219, 2026-08-24, runner cycle `7030c8f0-9bde-457a-a17a-b668335cd217`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent)
 
 **`SES-180` set `partial`** (`P10 - Tooling`, tier `next`, queue 15, epic **Selfbuild M2 - Truth
