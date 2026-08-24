@@ -5,6 +5,68 @@
 
 ---
 
+## session/cycle-20260824-1623 (v7.0.228, 2026-08-24, runner cycle `c1c3e658-4477-498c-a2da-a1061cd37ca3`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-177: CLAUDE-STATE.md is generated; the standing prose moves out
+
+**`SES-177` set `partial`** (`P10 - Tooling`, tier `next`, queue 9, epic Selfbuild M2). Kickoff
+`docs/kickoffs/v7.0.228-SES-177-claude-state-renderer.md`. **3 new files** —
+`docs/runbooks/standing-brief.md`, `scripts/render-claude-state.js`,
+`tests/regression/SES-177-claude-state-renderer.js` — plus a corrected step-7 contract in
+`docs/runbooks/runner-cycle.md`, the regenerated `CLAUDE-STATE.md`, kickoff and close-out. No schema
+change, no `src`/`api`/`lib`/`.claude` edit, no site change.
+
+**Third cycle of this session** (`13ee5508` → `d16fa1bc` → this). Gate B returned `pick` for
+`SES-176` for the second consecutive cycle; skipped `needs-john` again (`skip_count` 6), board
+fall-through past five `delivered` tickets and the freshly-gated `SES-156` to queue 9.
+
+**Authority.** John's Accept on gated card `37b22393` (attended decision-drain, 2026-08-24) is the
+spec, and it is a SPLIT: derivable facts generated from tables, the standing "Next session" judgment
+prose moved **verbatim** to a new `docs/runbooks/standing-brief.md`, the generated file linking to
+it, and — his words — *"the renderer must fail rather than regenerate a file that would lose the
+standing-brief link."*
+
+**MEASURED THIS CYCLE, not quoted from the card:** `CLAUDE-STATE.md` was **14,355 chars** and the
+standing paragraph alone was **7,643 — 53.2%** — held in no table. **Moved byte-for-byte, proven by
+sha256 either side of the move: `eaec16bac76c13a1fefd73559de0e2eb81f689080ff12aee65d3716476861273`.**
+Result: 14,355 → **2,701** chars, with nothing dropped.
+
+**THE FAIL-CLOSED CONDITION IS THE FEATURE.** A renderer built to the ticket's *original* letter
+regenerates from sources covering 47% and destroys the rest — the `v7.0.197` briefing wipe in a
+second costume. So the script checks for the standing brief **before it checks credentials**, and
+exits 2 writing nothing. The guard exercises that **end-to-end**: it moves the brief aside, spawns
+the real script, asserts exit 2 **and** a byte-identical `CLAUDE-STATE.md`, and restores in a
+`finally`. It runs with no credentials on purpose, and declares its one credentialed part with
+`notRun()` (`SES-180` (b)) rather than passing silently over it.
+
+**THE DISTINCTION AN EDITOR WILL COLLAPSE:** the version lines skip cycles that claimed no version;
+the session bullets do not. Taking `cycles[0]` renders `(no version claimed)` as the current version
+**of dev** — the wrong question answered, not a gap surfaced honestly. Asserted on a fixture whose
+newest shipped cycle is version-less.
+
+**FOUND WHILE BUILDING IT, and fixed rather than rendered as fiction.**
+`runner_cycles.version` is inconsistently populated: three of the six most recent shipped cycles
+carried NULL, **including two of this session's own**, so the renderer's first run put
+`(no version claimed)` on John's start-of-session file. This cycle's own rows were corrected
+(`d16fa1bc` → `v7.0.227`/`f4b4004`), and `c618136d` was backfilled to `v7.0.225` on independent
+attestation — commit `d9e5c76` ("v7.0.225 SES-155") and the pre-split file, which named that cycle
+against that version. Before-image first, and **not** an outcome adjudication: only the factual
+version/SHA were written, never `outcome` or `ended_at` on another cycle's row.
+
+**Step 7's close-out contract was corrected in the same commit**, because leaving it would have had
+the next cycle hand-edit a generated file and lose the work to the following render. The new bullet
+also names, rather than papers over, a real consequence: the renderer reads cycles already
+`shipped`, and a cycle's row closes in the step-9 tail *after* its push — so the committed file is
+**one ship behind**, exactly like the snapshot's one-harvest staleness (`SES-109`), and the next run
+closes it. It explicitly forbids "fixing" that by writing `outcome='shipped'` early.
+
+**`SES-177` STAYS `partial`, and the remainder is named:** extracting the board census, drain state
+and scheduler settings back *out* of the standing paragraph and generating them. That paragraph
+interleaves those facts with judgment, and a surgical extraction is the same
+destroy-what-you-cannot-see risk this script exists to refuse.
+
+**Stamp count held at 5** per `session-hygiene.md` check 7: `v7.0.215` moved verbatim to this file's
+appendix, checked first — its editor warning ("changes WHEN the next directive is read, never WHO
+decides") is already restated twice in step 5's body.
+
 ## session/cycle-20260824-1623 (v7.0.227, 2026-08-24, runner cycle `d16fa1bc-4c12-4a71-873d-ce9d421b92e8`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-158: vision comment routing
 
 **`SES-158` set `delivered`** (`P10 - Tooling`, tier `now`, queue 5). Kickoff
@@ -6146,6 +6208,13 @@ across this change, proven by `sha256` before and after with only that insertion
 
 ```
 <!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 7 (the stamp cap — renumbered from a duplicate "6" 2026-08-23). -->
+```
+
+
+**Retired by `SES-177` (v7.0.228, 2026-08-24) — stamp count held at 5 per session-hygiene check 7. Checked before moving: its editor warning ("this changes WHEN the next directive is read, never WHO decides") is already restated in step 5's drain block.**
+
+```
+<!-- DeepBench v7.0.215 | runbooks/runner-cycle.md | SES-189 — a retired drain directive no longer eats the cycle's whole drain call. Migration ses189_drain_advance_past_retired turns drain_epic_next()'s single ORDER BY created_at LIMIT 1 scan into a bounded loop that keeps advancing while directives retire and acts on the first pick/blocked/unscoped/none. THE ONE THING AN EDITOR MUST NOT COLLAPSE: this changes WHEN the next directive is read, never WHO decides — no predicate moved, retirement still needs every NAMED member done/removed with 'delivered' still absent from that side (SES-154), the pick predicate is byte-identical, and property 5 stands (nothing here creates a drain row). Each retirement still writes its own before-image, so N retirements write N rows. DISCLOSED RATHER THAN LEFT TO BE FOUND: the ticket's Fix: line said to loop the call HERE, in step 5, and its own QA line said "old body … fixed body" — the function. Shipped in the function, for two reasons: this file says six times over (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129) that a rule each cycle must remember gets silently forgotten, and drain_epic_next has TWO call sites — step 5 AND step 9's tail Gate B (SES-139) — which a step-5-only loop would leave broken while a real pick sat behind a completed directive. QA was discriminating, one fixture, one transaction, one variable: two retire-ready fixture directives ahead of a pickable one, run against a control function carrying the RETIRED body and then against the shipped one — control returns retired/no pick/1 retirement, shipped returns pick=SES-93/2 retirements, both with a before-image each. The fixture was built and exercised inside a ROLLED-BACK transaction rather than cleaned up afterwards, because a runner may never create a drain row (property 5) and a committed fixture drain is visible to the peer cycles running concurrently (register B42) — uncommitted rows are invisible under read-committed, so nothing was ever exposed and nothing was left to clean. Verified after: 0 stray fixture rows, 0 stray before-images from this cycle, control function gone, exactly 1 drain_epic_next overload (.claude/rules/supabase-function-signature.md), John's two live drains untouched and still queued. Doc + function; no src/api/lib change, no site change. -->
 ```
 
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
