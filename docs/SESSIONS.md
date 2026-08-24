@@ -5,6 +5,73 @@
 
 ---
 
+## session/cycle-20260824-1740 (v7.0.230, 2026-08-24, runner cycle `518abab4-cb3a-4ab9-bde6-69be2db756d5`, **`trigger = scheduled`**, model Opus 5, no subagent) — SES-194: the stall watchdog closes frozen rows, and the heartbeat learns to notice it was closed
+
+**`SES-194` — Stall watchdog: close frozen cycle rows and release their claims** set `delivered`
+(`P10 - Tooling`, tier `now`, queue 2). Kickoff
+`docs/kickoffs/v7.0.230-SES-194-stall-watchdog.md`. **2 repo files** —
+`docs/runbooks/runner-cycle.md` and the new `tests/regression/SES-194-stall-watchdog.js` — plus
+migration `ses194_stall_watchdog` (+ a wording follow-up), the regenerated `CLAUDE-STATE.md`,
+snapshot, kickoff and close-out. No `src`/`api`/`lib`/`.claude` edit, no site change.
+
+**SELECTION, three layers deep and recorded because the first pick was NOT built.** Drain `9abb6451`
+(Selfbuild M2 — Truth Infrastructure) returned `pick` = `SES-177`, which cycle `c1c3e658` had shipped
+**partial** 37 minutes earlier, naming the remainder on the ticket as needing *"John's call, not a
+cycle's guess"*. Re-deciding that unattended would have been the runner widening its own autonomy on
+its own reasoning, so it was **gated, not built**: card `8c0f2bf9` carries three concrete shapes for
+where the board census / drain state / scheduler settings should live, with a recommendation and the
+fail-direction stated; `design_status` set `needs-john` (before-image first), `record_skip(gated)`,
+claim released. Fell through to the class-sorted board — queue 2, `SES-194`.
+
+**THE GAP, measured live at 17:45Z rather than quoted from the ticket.** `SES-103`'s tripwire has
+detected stalls since `v7.0.143` and **nothing has ever closed one**: `e4074c97` (frozen 124 min at
+*"step 5 — pick"*) and `039d1477` (108 min at *"step 3/4"*) were both still open, both stall-notified
+at 16:25Z, and a claim on `SES-141` had been stranded 2,238 minutes.
+
+**THE NUMBER A LATER CYCLE WILL WANT TO TUNE, and the reason it must not.** The threshold is **24
+hours** because that is register B37's evidence bar — implemented here, not widened. The 20-minute
+tripwire **notifies**; the 24-hour bar **closes**; the gap between them is the design. This cycle
+watched two peers sit visibly frozen for two hours and correctly closed neither, which is exactly the
+frustration that motivates the wrong edit. B37 is written from `ba8f2ce3` and `633fe486`, pronounced
+dead at ~3h and back **nine hours later** having finished their missions. A shorter bar does not
+catch stalls sooner; it manufactures duplicate builds.
+
+**THE TWO HALVES ARE ONE DESIGN.** A watchdog without a resume path does not fix a bug, it trades one
+for a worse one — a returning cycle heartbeats into a closed row and pushes work whose ticket claim
+was already released. So the heartbeat statement now carries `AND ended_at IS NULL … RETURNING id`,
+checked at **every** step boundary because a resume can land anywhere, and 0 rows means abort cleanly:
+no push, no counter claim, and **never re-open your own row** — the mirror image of what B37 forbids a
+successor doing to you. `B37 is intact` is stated in the body rather than left to inference, because a
+sanctioned exception is how a prohibition gets read as lifted.
+
+**QA WAS DISCRIMINATING AND THE CONTROL RAN FIRST**, which is what makes it a control rather than a
+rationalisation: on the live board the call returned **0 rows** with both genuinely-frozen ~2h peers
+untouched (a tripwire-threshold watchdog would have closed both). Then fixtures at 30h and 26h closed
+with all four arms firing — claims released, lease released, prior note preserved, empty-claims case
+clean — a second call returned 0, and the resume guard was proven by a closed row's `last_step`
+surviving a *"resumed"* heartbeat. Suite **53/53**, `npm run build` exit 0, `render-rule-blocks` clean,
+`check-session-docs` no new findings. Both fixtures deleted, the cycle's own claim restored,
+before-images kept as the audit trail.
+
+**FOUND WHILE BUILDING IT, fixed rather than shipped past:** the first generated note carried B37's
+*never say died* rule correctly in meaning — *"it is NOT a statement that it died"* — but contained the
+word inside its own negation, so the guard could not assert the rule's absence without matching the
+disclaimer. Reworded so `notes !~* '\m(died|dead)\M'` is a real assertion. **A prose invariant a test
+cannot check is one that drifts.**
+
+**DECLARED, NOT FAKED (`SES-180 (b)`):** the function body lives in the database, not this repo, and
+the suite reaches Supabase only over PostgREST — which cannot read `pg_get_functiondef` and could
+reach the function only by invoking it, which mutates the live ledger. The behavioural half is
+`notRun()` with the live QA named as its evidence. File-level negative control: the checker fails
+**13 of 13** clauses on `origin/dev`'s runbook and passes 13 of 13 on the shipped one.
+
+Stamp count held at 5 per session-hygiene check 7: `v7.0.216` moved **verbatim** to this file's
+retired-stamps appendix, checked first — its *"use WebFetch, it works"* warning is already restated in
+`runner-cycle.md`'s step 2 body and in `briefing-page.md`'s read-back contract. Runbook body proven
+unchanged by the rotation: `sha256` `6676d88a…` either side.
+
+---
+
 ## session/selfbuild-m4-backups (v7.0.229, 2026-08-24, **attended AUDIT/OPS session**, model Fable 5, no subagent) — SES-192 + SES-193: the restore path is no longer one machine deep
 
 **`SES-192` — offsite backups and `SES-193` — restore procedure into git (both `P10 - Tooling`, epic Selfbuild M4 - Infrastructure Floor) are `done`**, pulled forward from M4 on John's word after the M0 gate review (card `a458c50a`) found the dump set, the hooks copy, and the restore instructions all lived only on John's machine — the machine that crashed the same day.
@@ -6228,6 +6295,8 @@ across this change, proven by `sha256` before and after with only that insertion
 ```
 <!-- DeepBench v7.0.215 | runbooks/runner-cycle.md | SES-189 — a retired drain directive no longer eats the cycle's whole drain call. Migration ses189_drain_advance_past_retired turns drain_epic_next()'s single ORDER BY created_at LIMIT 1 scan into a bounded loop that keeps advancing while directives retire and acts on the first pick/blocked/unscoped/none. THE ONE THING AN EDITOR MUST NOT COLLAPSE: this changes WHEN the next directive is read, never WHO decides — no predicate moved, retirement still needs every NAMED member done/removed with 'delivered' still absent from that side (SES-154), the pick predicate is byte-identical, and property 5 stands (nothing here creates a drain row). Each retirement still writes its own before-image, so N retirements write N rows. DISCLOSED RATHER THAN LEFT TO BE FOUND: the ticket's Fix: line said to loop the call HERE, in step 5, and its own QA line said "old body … fixed body" — the function. Shipped in the function, for two reasons: this file says six times over (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129) that a rule each cycle must remember gets silently forgotten, and drain_epic_next has TWO call sites — step 5 AND step 9's tail Gate B (SES-139) — which a step-5-only loop would leave broken while a real pick sat behind a completed directive. QA was discriminating, one fixture, one transaction, one variable: two retire-ready fixture directives ahead of a pickable one, run against a control function carrying the RETIRED body and then against the shipped one — control returns retired/no pick/1 retirement, shipped returns pick=SES-93/2 retirements, both with a before-image each. The fixture was built and exercised inside a ROLLED-BACK transaction rather than cleaned up afterwards, because a runner may never create a drain row (property 5) and a committed fixture drain is visible to the peer cycles running concurrently (register B42) — uncommitted rows are invisible under read-committed, so nothing was ever exposed and nothing was left to clean. Verified after: 0 stray fixture rows, 0 stray before-images from this cycle, control function gone, exactly 1 drain_epic_next overload (.claude/rules/supabase-function-signature.md), John's two live drains untouched and still queued. Doc + function; no src/api/lib change, no site change. -->
 ```
+
+<!-- DeepBench v7.0.216 | runbooks/runner-cycle.md | SES-188 — step 2's harvest gains one sentence: the read can come back truncated, so TEST the harvest rather than concluding from which tool was used. Measured live 2026-08-24, Artifact read stopped short of briefing-state and WebFetch returned it complete on the same page four seconds apart — so one tool's short read is never evidence the block is unreachable. The test, the two branches (verified → rebuild; unverified → decline the republish) and the reason this must not become "use WebFetch, it works" live in briefing-page.md's decision read-back contract, CITED HERE AND NOT RESTATED so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Body otherwise unchanged. -->
 
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
 
