@@ -144,6 +144,34 @@ the served artifact's frame version stamp is a unix timestamp in its `<base href
 self-publishes on every tap, so a stamp equal to the last cycle's rebuild proves **no un-harvested
 tap exists**. That is the difference between "nothing to harvest" and "silence treated as an
 Accept", and it was checked again inside the publish lease before republishing.
+## session/design-automation-governance-0823 (v7.0.213, 2026-08-23, attended discovery session with John, model Fable 5, 5 parallel audit subagents) — the governance audit, and the Selfbuild project chartered
+
+John opened asking for a discovery-mode audit of every governance and tooling file, then iterated
+the findings into a full project charter. **Audit (5 parallel subagents over 82 files — root
+session files, runbooks, docs governance, `.claude/rules`+skills, scripts):** ~30 confirmed stale
+statements (worst: `CLAUDE.md` still says the runner is "not yet built"; beta retirement
+unpropagated in `WORKING-WITH-JOHN.md`/`FEATURES.md`/`BETA-TRIAGE.md`), 3 hard contradictions
+(masthead run-now link mandated and banned inside `briefing-page.md`; `rejected-paths.md` retired
+and still prescribed; three-way liveness-signal drift), 5 orphans, 4 unfollowable rules (both
+regression runbooks 403 without the HAR-33 header; repo settings allowlist the banned `cd &&`
+pattern), `briefing-page.md` carrying the pre-SES-164 stamp disease (30 stamps, 33.8%),
+`SESSIONS.md` growing ~190 KB/day. Live runner record pulled as evidence: 114 cycles in 4 days,
+80 shipped, John's verdicts 85 Accept / 11 Rework / 3 Reverse. Maturity called at **5/10**; root
+cause named **propagation debt** — facts restated in prose with no single home and no truth check.
+
+**Decisions (John, in-session):** "I want out of the loop" — target is John-audited (sampling +
+Reverse), never John-paced; auto-accept approved for the project's own `P10 - Tooling` deliveries
+with interim bar = build + regression + hygiene all green; M4 budget deferred to its gate; charter
+name approved. **Deliverables:** `docs/SELFBUILD-CHARTER.md` (purpose, goals, measures incl. the
+keystone verifier-catch-rate metric, multi-agent verification design, escalation policy, decisions
+log, rollback plan); 8 epics `Selfbuild M0 - Backup & Rollback` … `Selfbuild M7 - The Inventor`;
+18 new tickets **`SES-169`–`SES-186`** (block-claimed, lane-topped in milestone order per John's
+standing lane rule) with rolling-wave discipline — M4–M7 hold design-gate tickets only; 20
+existing open tickets absorbed into the epics via `epic_id` (incl. `SES-81`→M0, `SES-92`/`SES-135`→M3,
+`SES-122`/`SES-134`→M6, `SES-159`/`SES-160`→M7). Epic creation flagged Tier-2: prompted by John's
+project-plan directive. Snapshot regenerated (659 tickets). **Execution awaits John's explicit
+mark; `SES-169` (Step 0 backup, verified restorable) runs before anything else.** Session open at
+this entry's write.
 
 ---
 

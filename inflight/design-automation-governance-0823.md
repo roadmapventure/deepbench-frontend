@@ -1,0 +1,1 @@
+design-automation-governance-0823 — attended discovery with John (v7.0.213): governance/tooling audit (5-agent sweep, 82 files) → docs/SELFBUILD-CHARTER.md committed; 8 Selfbuild epics + SES-169..186 filed, 20 open tickets absorbed into them. Execution awaits John's mark (SES-169 Step 0 first). Session still open.
