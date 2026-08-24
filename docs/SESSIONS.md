@@ -5,6 +5,76 @@
 
 ---
 
+## session/cycle-20260824-2040 (v7.0.234, 2026-08-24, runner cycle `3a3f1f95-eba2-4ee2-a450-1ffd04e04ed0`, `trigger = scheduled` — on-grid 15:40 CST fire, `scheduler_gate` verdict `run` — model Opus 5, one Sonnet 5 sweep subagent) — SES-150: an attended session can finally record a board before-image
+
+**`SES-150` — Attended sessions cannot record a board before-image — `runner_before_images` is
+FK-locked to `runner_cycles`** — built and left `delivered` (`P10 - Tooling`, tier `now`, queue
+269). Kickoff `docs/kickoffs/v7.0.234-SES-150-before-image-attended-attribution.md`. **2 repo
+files** — `CLAUDE-DESIGN.md` and the new `tests/regression/SES-150-before-image-attribution.js` —
+plus migration `ses150_before_image_attended_sessions`, which lives in the database. No
+`src`/`api`/`lib` change, no site change.
+
+**THE PREMISE WAS READ LIVE, NOT RECALLED.** `runner_before_images.cycle_id` was `uuid NOT NULL`
+with an FK to `runner_cycles(id)`, while `CLAUDE-DESIGN.md` tells *every* session to record a
+before-image for each `backlog_items` UPDATE. An attended session has no cycle row, so it had
+nothing to put in the column and **structurally could not comply**. Found live three times and
+**disclosed every time rather than skipped** — `SESSIONS.md:1819` (`SES-148`, the filing),
+`:1514` (`SES-165`), `:1526` (`SES-166`) — each writing its before-values into this file's prose
+instead. Three honest disclosures are not an audit trail: a before-value in prose is a fact with a
+second home and is **not restorable by a Reverse**, which is the one property §19v exists to
+guarantee.
+
+**THE MECHANISM, of the three the ticket named.** `cycle_id` nullable + a `session_name` column,
+pinned by `ck_before_image_attribution` — **exactly one** of the two is set (plus a non-empty check
+so `''` cannot pose as attribution). The other two were rejected for stated reasons: **a parallel
+table** gives one fact two homes, so the first reader that forgets to union them reads a partial
+ledger as a complete one; **scoping the doc rule to Automated mode** resolves the contradiction by
+giving up the audit trail for exactly the writes John's own attended sessions make — on a milestone
+named *Truth Infrastructure*.
+
+**THE CHECK IS THE HALF A LATER EDITOR WILL READ AS REDUNDANT TIDYING.** It is not. Dropping
+`NOT NULL` **alone** lets an Automated cycle insert an **unattributed** before-image — a row that
+satisfies §19v's *"no before-image, no write"* while naming nobody, which is a worse ledger than
+the gap being closed. The XOR is load-bearing in both directions: a row carrying **both** columns
+makes *"which session wrote this"* ambiguous at the moment a Reverse needs the answer.
+
+**QA was discriminating and its negative control was taken BEFORE the change** — the pre-migration
+schema read `cycle_id is_nullable = NO`, which is precisely why the attended arm could not have
+passed on the old build. Six arms, live: attended insert (`cycle_id` NULL) **ACCEPTED**; the
+Automated control ACCEPTED; unattributed, both-set, blank-name and bogus-FK all **REJECTED** — the
+last proving the FK survived rather than being loosened along with the NOT NULL. Both fixture rows
+deleted and re-asserted at 0. A before-image of a before-image insert is an infinite regress, so
+the fixtures' contents are recorded in the kickoff and on the ship card instead — named, not
+quietly skipped. The regression test's **file-level negative control** is `origin/dev`'s own
+`CLAUDE-DESIGN.md`: the test FAILS on it and passes here. Its live half is non-mutating by
+construction (it asserts a refusal, so a pass writes nothing) and discriminating by *which* error
+it demands — a `NOT NULL` violation there means the migration did not land.
+
+**`ARCHITECTURE.md` §19v was deliberately NOT edited.** Architecture supersessions are the gated
+lane, and §19v's own sentence — *"every **Automated-mode** write records the prior row state
+first"* — stays true; what changed is that `CLAUDE-DESIGN.md` stops citing it as authority for an
+obligation it never placed on attended sessions. **Whether §19v should be widened to state the
+attended obligation outright is named on the ship card as John's call**, not taken here.
+
+**The instruction surface was swept before anything was edited** (Sonnet 5 subagent, whole repo,
+all file types): **five sites in two files** — `CLAUDE-DESIGN.md` 135/255/282 and §19v's two.
+Root `CLAUDE.md`, everything under `.claude/`, and `docs/STANDARDS.md` carry **none**, so there is
+no `needs-desktop` remainder and the whole fix was reachable by an unattended cycle.
+
+**Two skips before the build, both recorded as rows.** The M2 drain returned `SES-176 — Truth
+tripwire: cross-file consistency checks on every commit` and then `SES-177 — Generate
+CLAUDE-STATE.md and session narratives from tables`; both carry `design_status='needs-john'` and
+both were `record_skip`-ed with their claims released, per step 5's blocked-prefix table. B24's
+rule held: only walls and blockers end a cycle build-less.
+
+**Suite and build.** `npm install && npm run build` green; regression **55/56**, three parts
+declared not-run across three tests. The single failure — `SES-177-claude-state-renderer.js`,
+committed `CLAUDE-STATE.md` drifting from what the ledger renders — was **proven pre-existing on a
+clean `origin/dev` worktree**, not assumed; it is `SES-177`'s own named one-ship lag and this
+cycle's close-out render resolves it.
+
+---
+
 ## session/cycle-20260824-2033 (v7.0.233, 2026-08-24, runner cycle `50e6823a-0a63-4793-bf1f-a3d3b53a1c88`, `trigger = scheduled` — on the 3h clock grid, 15:00 America/Chicago — model Opus 5 orchestrator + one Fable 5 design subagent) — SES-153: a shipped version number is now provably one the counter issued to you
 
 **`SES-153` — A session can ship a version number it never claimed, and the collision only surfaces
@@ -56,6 +126,8 @@ no version number was burned. Suite 56/56, build green.
 the counter forgets, and the runner's own push now runs the gate while nothing compels an attended
 push through it. Both, plus the untouched `session-setup.md` §3 home and the open `SES-150`, are
 named on the ship card rather than left to be discovered.
+
+---
 
 ## session/cycle-20260824-1955 (v7.0.232, 2026-08-24, runner cycle `90b34320-aa27-4754-82c7-19355d6dc208`, `trigger = scheduled` — fired off-grid, so `scheduler_gate` exempted it as a manual fire — model Opus 5, one Sonnet 5 sweep subagent) — SES-188 (option D): the state block moves to the top of the page
 
