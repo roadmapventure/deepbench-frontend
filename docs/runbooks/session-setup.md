@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.222 | docs/runbooks/session-setup.md | SES-175 — §2c's claim SQL gains a rendered rule block: a `{{rule:B40}}` marker comment above the committed text of rule B40, generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John's call on gated card `a4e0254a` 2026-08-24: "Accept with C" — expand-in-place, so this file still carries the real sentence a session reads mid-run and the script is what stops that copy drifting from the registry. The text under the marker is NOT hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`. Full rationale, the three options John chose between, and the QA: `docs/runbooks/runner-cycle.md`'s v7.0.222 stamp and `docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md` — cited here, not restated. -->
 <!-- DeepBench v7.0.198 | docs/runbooks/session-setup.md | SES-121 — body moved verbatim from .claude/skills/session-setup/SKILL.md (which remains as a thin loader); .claude/ is not writable by unattended cycles (register B39), this runbook is. This file is the canonical copy. -->
 
 # Session Setup — Worktree, Counters, Inflight, Push
@@ -109,6 +110,11 @@ Manual sessions and scheduled runner cycles share one board, so the ticket itsel
 coordination point. As soon as this session commits to working a specific `backlog_items` ticket
 (John names it, or you pick it), claim it — one atomic write, same never-read-then-increment
 principle as the counters below:
+
+<!-- {{rule:B40}} · rendered from public.governance_rules — do not hand-edit the quoted line(s)
+     below. Edit the registry row, re-export docs/governance/RULES-SNAPSHOT.md, then run
+     `node scripts/render-rule-blocks.js --write`. Checked by that script's default mode (SES-175). -->
+> **Rule B40** — Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 24h so a dead session can't strand a ticket.
 
 ```sql
 UPDATE public.backlog_items

@@ -5,6 +5,68 @@
 
 ---
 
+## session/cycle-20260824-1440 (v7.0.222, 2026-08-24, runner cycle `587a5591-49c5-44fd-90fb-1da65de1c986`, **`trigger = scheduled`** (gate: *run* — on the 3h clock grid, 09:00 America/Chicago), model Opus 5, no subagent) — SES-175: rendered rule blocks, expand-in-place (M2 Truth Infrastructure, member 2 of 10)
+
+**`SES-175` set `delivered`** (`P10 - Tooling`, tier `next`, queue 1, epic **Selfbuild M2 - Truth
+Infrastructure**). Kickoff `docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md`.
+**3 source files** (`scripts/render-rule-blocks.js` new, `docs/runbooks/runner-cycle.md`,
+`docs/runbooks/session-setup.md`) + close-out. No schema, no `src`/`api`/`lib`/`.claude` edit.
+
+**BUILT ON JOHN'S TAP, WITH HIS OPTION NAMED IN IT.** The gated card `a4e0254a` (filed 06:23Z by
+cycle `2953b5c3`) carded three ways to reconcile `{{rule:ID}}` markers with runbooks that cycles read
+directly. John Accepted at **14:31:41Z**, in the attended decision-drain session `528bd734`, writing
+**"Accept with C"** — expand-in-place. That Accept is permission, not a rating (register B34: it
+touches no ladder rung) and it re-entered the ticket at queue #1 (B23). Eleven minutes later this
+cycle's drain returned it as the pick, which is the mechanism working exactly as designed.
+
+**WHAT (C) BUYS, AND WHY (A) WAS THE TRAP.** (A) — markers in source, a build step emitting rendered
+runbooks — is the obvious "single source of truth" shape and it is the wrong one here: it splits
+every runbook into source+rendered and changes which file a cycle opens mid-run, so a cycle landing
+on an unrendered checkout reads `{{rule:B40}}` where the claim SQL should be. (C) inverts it: the
+expanded text is **committed**, the marker is a **checked comment above it**, and drift is caught by
+a script rather than prevented by indirection. Cycles keep reading prose. Nothing about what a
+runbook *is* changed.
+
+**NOT THE SAME CHECK AS `SES-176`, AND THE TWO ARE EASY TO CONFLATE** — they shipped five hours
+apart into the same file family. Check 11 (`scripts/check-session-docs.js`) asserts a marker's **id
+resolves** to a registry row. `render-rule-blocks.js` asserts the committed **text still equals** that
+row's `statement`. A doc passes check 11 for a month with a rule statement that is out of date; that
+gap is this ticket.
+
+**FOUND LIVE WHILE BUILDING IT, AND FIXED RATHER THAN WORKED AROUND.** The scanner's first run
+flagged the kickoff doc's own fenced **example** as a drifted block — the `SES-180` self-flagging
+failure in a second costume, slipping past the marker-at-head-of-comment guard written for the
+first. Fenced code blocks are now excluded: a doc must be able to *show* the format without the
+checker trying to maintain the illustration. Recorded because the temptation was to edit the
+example instead, which would have left the trap armed for the next doc that documents the syntax.
+
+**QA — DISCRIMINATING, ONE FIXTURE, ONE VARIABLE.** A clean `--check` over the repo proves nothing
+on its own: it passes trivially on a repo with no blocks, which is the state check 11 shipped into.
+So: a copy of `session-setup.md` with **one word** changed inside the rendered line (`24h` → `48h`)
+**FLAGS**, naming both texts; the byte-identical control comes back **clean**. `--write` on the
+corrupted copy restores the registry text **byte-exact** (`diff` identical), and a second `--write`
+reports unchanged. The unknown-id and missing-block arms both flag; inline prose writing
+`{{rule:B40}}` outside a comment head stays inert. `check-session-docs.js` clean on check 11 — and
+since these are the **first real markers in the repo**, that is check 11's first live exercise
+rather than another clean pass over zero markers. Build green, regression **50/50**.
+
+**DISCLOSED RATHER THAN LEFT TO BE FOUND.** (1) `docs/GOVERNANCE-MODES.md` is a **third** live home
+of the claim SQL and is **not** converted — a 4th file breaks `HR-SCOPE`, and John's card scoped the
+proof at *"the claim SQL's ~2 homes"*; it is named on the ship card, not quietly omitted.
+(2) `.claude/skills/session-setup/SKILL.md` carries the same SQL and is untouchable by an unattended
+cycle (register B39). (3) The snapshot reader is a deliberate **second copy** of
+`check-session-docs.js`'s parser — extracting `scripts/lib/` would have been a 4th file; consolidating
+them is worth doing and is named here rather than smuggled in. (4) The registry's `statement` is
+prose, so a rule block renders the **statement** above the SQL fence it governs; the SQL itself is
+untouched, and storing executable SQL in `governance_rules.statement` is a semantics change nobody
+asked for.
+
+**Stamp cap honoured in the same commit** (session-hygiene check 7): adding this ship's stamp would
+have put `runner-cycle.md` at 6, so the oldest (`v7.0.205`, `SES-154`) moved **verbatim** to this
+file's retired-stamps appendix (count 44 → 45). Its one unique editor warning — the
+pick-vs-retirement predicate — was already relocated into step 5's drain property list by `SES-164`,
+checked before moving rather than assumed.
+
 ## session/cycle-20260824-1140 (v7.0.221, 2026-08-24, runner cycle `4c89b6f3-55ae-46fe-97e3-d7d812b3709d`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent)
 
 **`SES-92` set `delivered`** (`P10 - Tooling`, tier `now`, queue 280, epic **Selfbuild M3 -
@@ -5710,7 +5772,7 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
 
-These are the **44** version-stamp comments that sat at the top of `docs/runbooks/runner-cycle.md`
+These are the **45** version-stamp comments that sat at the top of `docs/runbooks/runner-cycle.md`
 until `SES-164`. They are preserved here **verbatim**, newest-first in their original order, and
 they also remain in git history. Nothing here is procedure: the runbook's body is the procedure,
 and every rule these stamps announce is stated there.
@@ -5726,6 +5788,8 @@ were already restated in the runbook's body. The tenth — `SES-154`'s pick-vs-r
 warning — appeared **zero** times outside its stamp, so it was relocated into step 5's drain
 property list, next to the call it protects. The runbook's body is otherwise **byte-identical**
 across this change, proven by `sha256` before and after with only that insertion differing.
+
+<!-- DeepBench v7.0.205 | runbooks/runner-cycle.md | SES-154 — ACCEPTANCE-GATED COMPLETION: a runner ship writes `delivered`, and only John's Accept ever writes `done`. Spec docs/design/BRIEFING-COMMENTS-0823-DRAFT.md decision 1, approved by John 2026-08-23 ("yes"); Chain A 1 of 3. Migration ses154_delivered_status adds 'delivered' to backlog_items_status_check. THE DISTINCTION THE WHOLE TICKET TURNS ON, and the one a later editor will be tempted to collapse: drain_epic_next() holds TWO predicates over the same named scope and 'delivered' belongs in exactly ONE. The PICK predicate excludes it (else the drain hands the same delivered ticket back every cycle and never advances); the RETIREMENT predicate must NOT (the drain retires on John's ACCEPTANCE, never on the runner's own say-so). QA was discriminating rather than merely complete, one fixture, one instant, one variable: with queue-1 SES-154 set delivered AND unclaimed, the shipped build picks SES-155 where the retired ses142 body picks SES-154; with ALL 18 workable named members set delivered, the shipped build returns open_now=18 / 'blocked' / directive still queued / 0 before-images, where the wrong build (delivered added to the retirement predicate) returns open_now=0 and RETIRES — closing John's standing directive on the runner's own word, which is the exact authorisation defect SES-142 was filed to end, rebuilt. recompute_backlog_queue() is deliberately UNCHANGED: a delivered ticket KEEPS its queue number, the same rule SES-113 established for `removal proposed`, because both are tickets awaiting his verdict — proven, not assumed (queue 2 before, queue 2 after, 0 rows moved), which makes his Accept zero-motion re-entry and keeps the ticket in the §8 matrix while he decides. Step 7 therefore no longer strips the number; the tail's Accept harvest does. backlog_mode() gains 'delivered' in its 'in review' arm so John's page keeps ONE word for "pushed, awaiting your verdict" instead of two (asserted: delivered+undecided ship card -> 'in review', delivered+no card -> 'delivered'). briefing_open_cards() is deliberately UNCHANGED and that is a decision, not an omission: its render predicate retires a GATED card whose ticket reached done/removed BY ANOTHER ROUTE, and 'delivered' is not terminal — a Reject reopens the ticket, so retiring the gated question at delivery would destroy a card that has to come back. DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: (1) the ticket's "re-key the scoreboard (daily shipped)" has NO code to re-key — briefing-template.html's "Shipped today" box is a HARDCODED SAMPLE VALUE (1) with no SQL behind it anywhere in the repo, so the contract is written in briefing-page.md for the next rebuild instead of a predicate being changed, and saying so beats reporting a re-key that did not happen; (2) the drain X-of-N figure (drain_left) already counts "not yet done/removed", so leaving the retirement predicate alone re-keys it on acceptance for free — no edit needed, verified not assumed; (3) scripts/export-backlog-snapshot.js and scripts/check-session-docs.js filter history on done/removed and are deliberately untouched, because a delivered ticket is NOT history until John accepts it; (4) the spec's decision 2 renames Reverse to "Reject" and has NOT shipped, so no rule here is written against a button that does not exist. A delivered ticket is stepped past at step 5 as a fourth blocked-prefix row but is deliberately NOT a record_skip() call — its undecided ship card already carries that ask, and a second home for it is how §10 stops being read. Forward only: the 61 existing `done` rows are untouched, no backfill. 1 overload per .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role/postgres true). All fixtures rolled back clean (0 delivered rows, 0 stray before-images, 0 stray runner_items, control function gone). Doc + schema; no src/api/lib change, no site change. -->
 
 <!-- DeepBench v7.0.201 | runbooks/runner-cycle.md | SES-147 — step 3's token track stops being five ranked rules a cycle applies by hand and becomes ONE CALL, and John's standing DAILY MAX joins the ladder. His words 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. Migration ses147_daily_max_tokens adds runner_settings.daily_max_tokens_millions (nullable, CHECK 1..1000) and public.resolve_day_token_cap(uuid): override > 48h stale floor > the box > SES-128 calibration > the 10M default, returning cap_source and cap_reason so a cycle's ledger note traces to a RUNG rather than to its own reading of a paragraph. TENTH prose→code correction (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143, dir 16b3ff73) — adding a sixth rank to the prose would have been the tenth repetition of the mistake instead. THE RUNG MOST LIKELY TO BE GOT WRONG, and the reason this ticket has a negative control rather than a checklist: the 48h STALE FLOOR SITS ABOVE THE BOX. The obvious reading of "the box is THE day cap" puts it at rung 1, which hands a runner with no idea how much of John's meter is left a 25M budget; his spec says it in one clause — "a standing number must not defeat the staleness brake" — and on identical fixtures the shipped build returns 3,000,000/stale-floor where the box-above-the-brake build returns 4,000,000. A one-day override still beats the standing box (later, more specific word — the same reasoning that puts a pin above the automation lane). Blank box = rungs 1/2/4/5 EXACTLY as before, which is what makes this additive; NULL must never be coerced to 0, in the column, the harvest, or the render. THE DEFECT THIS TICKET'S OWN QA CAUGHT BEFORE IT SHIPPED, recorded because a completeness check passed on the broken build: the first build declared rest_pct/meter_pct numeric while runner_budget.weekly_rest_pct is integer, so EVERY RETURN QUERY raised 42804 — on rung 1, the rung today takes — and a budget check that errors is a cycle that cannot run at all. Only CALLING each rung found it. All seven arms proved live on fixtures inside a deliberately rolled-back transaction (override-beats-box, box-is-the-cap, stale-beats-box, no-reading-beats-box, blank-box = pre-SES-147 exactly, the CHECK rejecting 0 and 1001, the rest wall REPORTED and not enforced), rollback verified clean (box back to NULL, override still queued, 10 readings intact, max pct 37). Grants asserted BOTH directions per SES-101 (anon/authenticated false, service_role true, revoked from PUBLIC); 1 overload per .claude/rules/supabase-function-signature.md. Step 2's settings harvest gains the daily-max half; the page contract is briefing-page.md §2b, CITED not restated. Doc + schema; no src/api/lib change, no site change. -->
 
