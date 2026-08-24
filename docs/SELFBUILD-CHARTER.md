@@ -124,6 +124,18 @@ GROUP BY e.name ORDER BY e.name;
 4. **Net burndown is watched.** The Project panel (SES-178) shows closed vs. filed per
    milestone; filing faster than closing is a flag on John's page.
 
+## Retirement ledger — nothing removed without a record (John, 2026-08-23)
+
+Every rule, statement, file, or script removed or not carried forward by this project gets an
+entry in `docs/SELFBUILD-RETIREMENT-LEDGER.md` (append-only; created as the M1 sweep's first
+deliverable): what it was (verbatim or git-blob pointer), where it lived, **why it was retired**
+(superseded-by / premise-dead / duplicate-of, with the surviving home named), and the restore
+path. Removal without a ledger entry fails review. Proof bar per removal: content shown
+relocated verbatim or superseded by something named — the `SES-164` trim discipline,
+generalized. From M2, retired *rules* live as `governance_rules` rows
+(`status = retired`, `superseded-by`); the ledger remains the narrative index. The Step 0
+snapshot (`SES-169`) stays the independent wholesale-recovery net beneath all of it.
+
 ## Escalation policy — when John hears from us
 
 Only for: **(a)** Tier-3 calls (superseding his decisions, terminology, retiring his files);
