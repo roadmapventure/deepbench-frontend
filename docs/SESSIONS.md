@@ -5,6 +5,18 @@
 
 ---
 
+## session/selfbuild-m4-backups (v7.0.229, 2026-08-24, **attended AUDIT/OPS session**, model Fable 5, no subagent) — SES-192 + SES-193: the restore path is no longer one machine deep
+
+**`SES-192` — offsite backups and `SES-193` — restore procedure into git (both `P10 - Tooling`, epic Selfbuild M4 - Infrastructure Floor) are `done`**, pulled forward from M4 on John's word after the M0 gate review (card `a458c50a`) found the dump set, the hooks copy, and the restore instructions all lived only on John's machine — the machine that crashed the same day.
+
+- **Hook integrity (checked first):** all 7 `C:/Projects/.claude/hooks/*.js` + `settings.json` byte-identical to the 2026-08-23 backup; all parse; deny hooks proven firing live (two of this session's own commands were denied mid-check). The setup hook's `ETIMEDOUT` was its 15s child budget vs `check-session-docs.js` now taking ~33s — fail-open by design, not corruption. `settings.local.json` differs from backup only by being newer. **No repair performed.**
+- **`SES-193`:** `docs/runbooks/restore-from-backup.md` (new, canonical) generalizes the backup set's RESTORE-PROCEDURE.md — no machine assumptions; credentials via env vars or `DEEPBENCH_ENV_FILE` (both dump/restore scripts patched off the hardcoded `.env.local` path, backward compatible, `--verify-only` re-run green).
+- **`SES-192`:** offsite copy is the **private GitHub repo `roadmapventure/deepbench-backups-offsite`** (commit `8d608a6`) — John switched from the Drive candidate in-session after all three automatable Drive upload paths dead-ended (MCP inline-content limit, extension 10 MB cap + no file input, synthetic drop unreadable by Drive). Full `selfbuild-step0-2026-08-23` set + tooling. **Secrets redacted and leak-scan proven** — the scan caught the Vercel bypass secret hiding inside `settings.local.json` permission strings, which no name-pattern grep found; `runner_secrets` values nulled; manifest re-hashed so `--verify-only` passes offsite; `.gitattributes` `* -text` pins checksum fidelity across OSes. **Read-back verified from GitHub** (3 files hash-identical; all 5 secret values null). Riders per John: point-in-time warning + automated-refresh-deferred-to-M4-gate, both in §7.
+- **`SES-194` — stall watchdog (Tooling · `P10 - Tooling`) filed** at automation lane top (rank −39): cycles `e4074c97` and `039d1477` died 2026-08-24 without closing their rows or releasing claims (`SES-103`'s tripwire notified at 16:25Z but nothing closes/releases); the 16:38Z continuation row `d16fa1bc` was verified to be the *recovery*, not a third casualty. Key design constraint recorded: a permission-stalled cycle can resume (v7.0.121), so closure threshold and resume path must be designed together.
+- **Close-out convention note (post-`SES-177`):** CLAUDE-STATE.md's generated sections deliberately untouched — they render from `runner_cycles`, and a manual session writes no cycle row (`runner_items.cycle_id` is NOT NULL, so no ship cards either; the stamp rule makes inventing a cycle row a governance violation). This entry + the board rows are the session's record.
+
+---
+
 ## session/cycle-20260824-1623 (v7.0.228, 2026-08-24, runner cycle `c1c3e658-4477-498c-a2da-a1061cd37ca3`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-177: CLAUDE-STATE.md is generated; the standing prose moves out
 
 **`SES-177` set `partial`** (`P10 - Tooling`, tier `next`, queue 9, epic Selfbuild M2). Kickoff
