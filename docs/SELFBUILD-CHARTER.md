@@ -237,6 +237,12 @@ always outranks the queue, and the machine yields.
    directive; epic ask-first rule satisfied.
 7. **Revalidation on architecture change** — every thesis-level decision triggers a board
    revalidation cycle (first: SES-173).
+8. **Selfbuild preempts the standing Automation drain (John, 2026-08-23: "wait - selfbuild goes
+   first").** Of the Automation drain's 25 open members, 18 are absorbed into Selfbuild epics
+   and get built there in milestone order; the 7 non-Selfbuild members (`ADM-2`, `SES-80`,
+   `SES-105`, `SES-152`, `SES-155`, `SES-156`, `SES-158`) wait until the project ends. At the
+   execution mark, the drain directive swaps from the Automation scope to the Selfbuild epic
+   sequence.
 
 ## Rollback plan
 
