@@ -5,6 +5,58 @@
 
 ---
 
+## session/cycle-20260824-2033 (v7.0.233, 2026-08-24, runner cycle `50e6823a-0a63-4793-bf1f-a3d3b53a1c88`, `trigger = scheduled` — on the 3h clock grid, 15:00 America/Chicago — model Opus 5 orchestrator + one Fable 5 design subagent) — SES-153: a shipped version number is now provably one the counter issued to you
+
+**`SES-153` — A session can ship a version number it never claimed, and the collision only surfaces
+as a git conflict** — built and left `delivered` (`P10 - Tooling`, tier `now`, member of the
+**Selfbuild M2 — Truth Infrastructure** drain). Kickoff
+`docs/kickoffs/v7.0.233-SES-153-version-claim-ledger.md`. **3 files** —
+the new `scripts/check-version-claim.js`, the new `tests/regression/SES-153-version-claim.js`, and
+`docs/runbooks/runner-cycle.md` (step 7's second hard gate on the push). Additive schema
+(`ses153_issued_versions` + `ses153_issued_versions_numeric_unique`); no `src`/`api`/`lib` change,
+no site change.
+
+**Selection.** The M2 drain returned `SES-176 — Truth tripwire: cross-file consistency checks on
+every commit` as its pick; it is flagged `needs-john`, so it was stepped past with a `record_skip()`
+(its 10th), as was `SES-177 — Generate CLAUDE-STATE.md and session narratives from tables` (its 4th).
+`SES-153` is the next claimable named member.
+
+**The defect, and the cheaper fix that does not work.** Found live 2026-08-23T17:1xZ by cycle
+`c4148d2a` at its own ship point: the attended session `successional-review` pushed `v7.0.195` **and**
+`v7.0.196` having claimed neither, while `dev_version_counter` carried `patch=196` /
+`updated_by_session='cycle-20260823-1640'` as proof the number belonged to the cycle. Nothing
+noticed — the counter could not (never called), the push could not (a version is prose, not a key),
+and the collision surfaced only because the two sessions happened to edit the same three files and
+git raised a content conflict. **The obvious check — "is my version ≤ the counter?" — passes both
+colliding ships**, because both were ≤ 196. The counter is one row that remembers only its last
+claimant, so only a ledger can answer *issued to whom*.
+
+**Why a trigger rather than a close-out write.** `public.issued_versions` is fed by
+`trg_dev_version_counter_issue` on the counter itself, so issuance is recorded by the **claim**, with
+no protocol change and nothing for a session to remember. A close-out write would have ledgered only
+the sessions that follow the procedure — and the sessions that cause this defect are by definition
+the ones that do not. The Fable 5 subagent's verdict confirmed the ledger shape and corrected the key
+to `UNIQUE (major, minor, patch)` (both `v7.0.231` and `7.0.232` spellings occur live), and named the
+collapse the migration avoids: FK-ing the claimant to `runner_cycles`, which is `SES-150` verbatim and
+would exclude attended sessions — the only population that has caused this bug. Its close-out-write
+proposal was the one part not taken, for the reason above.
+
+**QA was a replay of the incident, and the arms that matter are the failures.** Identical inputs with
+one variable changed — the session string — flip `issued-to-you` (exit 0) to `issued-to-another`
+(exit 1). A never-issued version at or above the floor fails closed; one below the floor passes as
+`predates-ledger`, and lowering the floor turns that same input into a finding, which is what proves
+the floor is doing the work rather than decorating the output. Both collision arms fire with
+*different* constraint names (`issued_versions_pkey` for the same spelling,
+`uq_issued_versions_numeric` for `v07.0.233`), so the numeric key is demonstrably not redundant. The
+whole regression test fails against the pre-change runbook and passes on restore. All fixtures ran
+inside a rolled-back transaction: the counter still reads 233 and the ledger still holds one row, so
+no version number was burned. Suite 56/56, build green.
+
+**Not backfilled, and not enforced on attended sessions** — the ledger starts at `v7.0.233` because
+the counter forgets, and the runner's own push now runs the gate while nothing compels an attended
+push through it. Both, plus the untouched `session-setup.md` §3 home and the open `SES-150`, are
+named on the ship card rather than left to be discovered.
+
 ## session/cycle-20260824-1955 (v7.0.232, 2026-08-24, runner cycle `90b34320-aa27-4754-82c7-19355d6dc208`, `trigger = scheduled` — fired off-grid, so `scheduler_gate` exempted it as a manual fire — model Opus 5, one Sonnet 5 sweep subagent) — SES-188 (option D): the state block moves to the top of the page
 
 **`SES-188` — The briefing harvest is blind: reading the page returns only its first bytes, so
@@ -6430,6 +6482,8 @@ across this change, proven by `sha256` before and after with only that insertion
 ```
 
 <!-- DeepBench v7.0.216 | runbooks/runner-cycle.md | SES-188 — step 2's harvest gains one sentence: the read can come back truncated, so TEST the harvest rather than concluding from which tool was used. Measured live 2026-08-24, Artifact read stopped short of briefing-state and WebFetch returned it complete on the same page four seconds apart — so one tool's short read is never evidence the block is unreachable. The test, the two branches (verified → rebuild; unverified → decline the republish) and the reason this must not become "use WebFetch, it works" live in briefing-page.md's decision read-back contract, CITED HERE AND NOT RESTATED so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Body otherwise unchanged. -->
+
+<!-- DeepBench v7.0.220 | runbooks/runner-cycle.md | SES-179 — NEW STEP 8d: the milestone gate review finally has a trigger. John's directive 2026-08-23 (PM lens + Chief Architect lens at each epic retirement, joint verdict as a card) was named NINE times in docs/SELFBUILD-CHARTER.md — including as the project's own exit exam and, in §Closure discipline item 3, as the ONLY path for adding members to a later milestone — and implemented nowhere: `grep -rniE "gate review" docs/runbooks/` returned zero lines. FOUND LIVE while building it, which is why this is a gap and not a mechanism built ahead of need: TWO milestone drains had ALREADY retired ungated — 01758f26 (Selfbuild M0, retired by cycle e42f8d4e) and 69e61a6c (Selfbuild M1, 4b874066), both 2026-08-24 — and M2's drain was queued to do the same. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO UNDO: the trigger is a SWEEP over evidence, never a branch on drain_epic_next() returning `retired`. That call has TWO sites (step 5 and step 9's tail Gate B, SES-139) and since SES-189 one call may retire MORE than one directive while returning only the last one's ids — so a call-site branch misses retirements by construction, and could not have caught M0/M1 at all, since they retired before the step existed. The sweep asks the standing question instead and is bounded at ONE review per cycle (LIMIT 1, oldest first), the same self-limiting shape as step 4b's invention pass. `status='cancelled'` is excluded deliberately: that is John withdrawing a standing order (b74009ea, Automation), not a milestone finishing. Migration ses179_runner_items_epic_id adds the join key the sweep reads (runner_items.epic_id, nullable, additive, no backfill) rather than matching a display string in title/display_ref — the defect SES-116 shipped a CHECK to end. The card reuses kind='gated_before_build' because runner_items_kind_check admits exactly two values and the gated semantics are the correct ones anyway (an Accept there is permission, not a rating — register B34). Procedure lives in docs/runbooks/gate-review.md, CITED HERE AND NOT RESTATED. Body otherwise unchanged. -->
 
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
 
