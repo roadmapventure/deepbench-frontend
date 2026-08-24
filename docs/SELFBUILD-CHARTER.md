@@ -110,6 +110,58 @@ GROUP BY e.name ORDER BY e.name;
    every epic retirement, verdict as a briefing card. Governance-lane roles, never product
    roster agents.
 
+## Definition of success — project-end acceptance (John, 2026-08-23)
+
+The project is judged against the statements below at the final SES-179 gate review — the **exit
+exam**. Each criterion must be *demonstrated with evidence links*, never asserted; the review
+issues pass/fail per criterion, and John gives the project's single final Accept. Numeric
+targets marked * are defaults set 2026-08-23; they are reviewed (and may be tightened) at the
+M6 gate before they bind.
+
+**Baseline (recorded at charter time, 2026-08-23, so "better" is measured, not remembered):**
+maturity 5/10; 114 cycles / 80 shipped in 4 days (one lane); John verdicts 85 Accept / 11 Rework /
+3 Reverse with **100% of deliveries requiring his tap**; board 569 open (290 in `now`);
+~30 stale governance statements + 3 contradictions live; `SESSIONS.md` +190 KB/day; QA
+self-certified by the builder; enforcement on one machine; no DB backups.
+
+1. **The unattended-run test.** The platform runs **14 consecutive days*** with zero human action
+   on the happy path — designing, building, verifying, shipping, healing — with ≥ **90%*** of
+   deliveries zero-touch and John under **30 minutes/day***, measured on the Project panel, while
+   John's machine plays no required role on any day.
+2. **Verification proves itself.** Over a rolling 30 deliveries: the verifier's catch rate ≥
+   John's baseline Rework+Reverse rate; reversal rate on auto-`done` work ≤ **5%***; zero
+   deliveries shipped with an ungrounded claim (grounding gate green throughout).
+3. **Truth stays true.** The truth tripwire reports ~0 drift findings for **4 consecutive
+   weeks***, and **re-running this project's own founding governance audit** (the
+   design-automation-governance-0823 five-auditor sweep, same method) returns no stale
+   statements, no contradictions, no unfollowable rules. The audit that started the project is
+   its exit exam.
+4. **Healing closes its loop.** A production failure (real or deliberately seeded) travels
+   failure → evidenced ticket → fix → **confirmed-fixed in production** with no human touch; a
+   recurrence of a previously-fixed signature is re-detected and re-filed.
+5. **Resilience is drilled, not assumed.** One full restore-from-backup drill and one
+   auto-rollback drill (red push reverted to green) have each been executed successfully and
+   their evidence linked.
+6. **The backlog is healthier, not just smaller.** Net burndown over the project is positive;
+   ticket→`done` lead time is below baseline; the `now` tier reflects real priority (the
+   290-ticket inflation resolved by the SES-173 revalidation); every open ticket carries a class
+   and a design status.
+7. **Invention is proven end-to-end, once.** At least one platform-originated feature has
+   completed the full path — researched with cited evidence, proposed, ratified by John, built,
+   shipped — **and is measurably used by real visitors** (usage telemetry, not existence). The
+   John-model's verdict-prediction accuracy is reported with its trend.
+8. **The machine outlives the project.** The success measures above don't retire with the exit
+   exam — the Project panel's metrics (drift/week, catch rate, reversal rate, zero-touch %,
+   John-minutes, cost per delivery, invention acceptance, visitor usage of shipped work) remain
+   standing instrumentation, because the definition of continued success is the same as the
+   definition of project success, applied forever.
+
+**How we know we built the right thing, not just finished the list:** criteria 1–5 prove the
+factory works without John; 6 proves it works *on the real backlog*; 7 proves it can grow the
+product, not just maintain it; 8 makes success a permanent property instead of a graduation-day
+snapshot. If every activity closed but any criterion fails, the project is NOT done — the gap
+becomes the final milestone's work, per the closure discipline's gate-review path.
+
 ## Closure discipline — the project ends (John, 2026-08-23)
 
 1. **Fixed finish lines.** Each milestone drain is declared with a fixed member list (the
