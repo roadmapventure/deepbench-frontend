@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// DeepBench v7.0.231 | scripts/build-briefing.mjs | SES-178 — §15 Project is DERIVED, never published
+// as the template's sample rows. Three anchors: the milestone rows (splice), the overall bar and the
+// overall count (must). All three are literal-value anchors on purpose — if the template's samples
+// change without this builder, it dies at exit 2 rather than serving a real table under a sample total,
+// which looks derived and is the worst of the three outcomes. Proven live at this ship: breaking the
+// anchor produced 'ANCHOR MISSING: §15 rows'; poisoning only the sample VALUES produced output carrying
+// the live numbers with zero poison surviving. Zero Selfbuild epics is die(), not an empty panel.
+// KNOWN DEBT, NAMED HERE TOO SO IT TRAVELS WITH THE CODE: the aggregation below is a SECOND EXPRESSION
+// of docs/SELFBUILD-CHARTER.md's canonical query, not a second source of truth — PostgREST cannot run
+// its GROUP BY join and this script has no generic exec by design. One executable home (a
+// selfbuild_progress() function the charter cites) is SES-178's named remainder.
 // DeepBench v7.0.208 | scripts/build-briefing.mjs | SES-165 — the retired-strip sentence
 // GENERALIZES (John-approved 2026-08-23). Since briefing_open_cards() now retires a card of ANY
 // kind once its ticket goes terminal, the strip can no longer say the card was "asking permission
@@ -412,6 +423,39 @@ splice("+ladderRow('P02'", `+'</table>'\n    +'<p class="tnote">No ladder row ex
 // tables and one live label is a 130-character paragraph, which is judgment, not a join.
 splice("+useRow('Aug 18, 1:02 PM'", `+'</table></div>'\n    +'<p class="tnote">Cost shows`, useRows, '§14');
 
+// §15 — PROJECT, the Selfbuild milestone burn-down (SES-178). Renders docs/SELFBUILD-CHARTER.md's
+// canonical progress query, which the charter itself introduces as "answers 'how close are we' any
+// time, BEFORE SES-178 renders it".
+//
+// DISCLOSED RATHER THAN SMUGGLED: this is a SECOND expression of that query, not a second source of
+// truth, and it exists because PostgREST cannot run the charter's GROUP BY join and this builder has
+// no generic exec by design. The right end state is one executable home — a `selfbuild_progress()`
+// function the charter cites and this builder calls — and it is NOT done here because the migration
+// plus the charter edit would put SES-178 at five files against CLAUDE.md's ≤3 cap. Filed as the
+// ticket's remainder. The predicate is kept byte-comparable to the charter's on purpose: `done` is
+// `status = 'done'` and NOTHING else — `delivered` is deliberately not counted, for the same reason
+// §2's "Shipped today" keys on John's Accept rather than on a push (SES-154).
+const spEpics = await sel('epics?select=id,name&name=like.Selfbuild*');
+const spItems = await sel('backlog_items?select=epic_id,status&epic_id=not.is.null');
+const spBy = new Map(spEpics.map(e => [e.id, { name: e.name, done: 0, total: 0 }]));
+for (const it of spItems) {
+  const row = spBy.get(it.epic_id);
+  if (!row) continue;
+  row.total++;
+  if (it.status === 'done') row.done++;
+}
+const spRows = [...spBy.values()].filter(r => r.total > 0).sort((a, b) => a.name.localeCompare(b.name));
+const spDone = spRows.reduce((n, r) => n + r.done, 0);
+const spTotal = spRows.reduce((n, r) => n + r.total, 0);
+const spPct = spTotal ? (100 * spDone / spTotal).toFixed(1) : '0.0';
+if (!spRows.length) die('§15: no Selfbuild epics carry tickets — refusing to publish an empty Project panel over the template\'s sample rows');
+splice("+msRow('Selfbuild M0", `+'</table>'\n    +'<div class="bar">`,
+  spRows.map(r => `+msRow(${J(H(r.name))},${r.done},${r.total},'${r.total ? (100 * r.done / r.total).toFixed(1) : '0.0'}')\n    `).join(''), '§15 rows');
+must(`+'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'`,
+  `+'<div class="bar"><div class="dev" style="width:${spPct}%"></div></div>'`, '§15 bar');
+must(`+'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '\n    +'(<b>20.6%</b>)</p>'`,
+  `+'<p class="barlbl">Overall &mdash; <b>${spDone}</b> of <b>${spTotal}</b> Selfbuild tickets done '\n    +'(<b>${spPct}%</b>)</p>'`, '§15 overall');
+
 // §2b — the AUTOMATION object (SES-162, v7.0.204). THIS BUILDER HAD NO ANCHOR FOR IT AT ALL, so
 // every page it built published the template's SAMPLE values: measured on the served artifact
 // 2026-08-23T18:1xZ, John's panel said his last run was "sample value — 12:41 AM CST · SES-143 ·
@@ -429,3 +473,4 @@ console.log(`build-briefing: wrote ${OUT} (${t.length} bytes)`);
 console.log(`  seeded ${Object.keys(seed.asks || {}).length} ask targets, ${Object.keys(seed.reading || {}).length} reading slots`);
 console.log(`  cards: ${ships.length} shipped, ${gates.length} gated, ${retired.length} retired`);
 console.log(`  derived: §8 top ${board.length} of ${total}, §11 ${Object.keys(byClass).length} classes, §13 ${ladder.length} rungs`);
+console.log(`  §15 Project: ${spRows.length} Selfbuild milestones, ${spDone}/${spTotal} done (${spPct}%)`);

@@ -5,6 +5,66 @@
 
 ---
 
+## session/cycle-20260824-1740 (v7.0.231, 2026-08-24, runner cycle `d5ad743e-200c-43c1-89a6-80b5d68237e2`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-178: the briefing gets a Project panel, and it says what it does not know
+
+**`SES-178` — Briefing Project panel: milestone burn-down, activity counts, overall completion**
+set `delivered` (`P10 - Tooling`, tier `next`, queue 10). Kickoff
+`docs/kickoffs/v7.0.231-SES-178-project-panel.md`. **4 files** —
+`docs/runbooks/briefing-page.md`, `docs/runbooks/briefing-template.html`,
+`scripts/build-briefing.mjs`, and the new `tests/regression/SES-178-project-panel.js`. No
+`src`/`api`/`lib` change, no schema change.
+
+**Second cycle of this session** (`518abab4` → this), opened in-session per tail step (8) with both
+gates passing. Gate B returned `pick` = `SES-177` again — gated `needs-john` by the predecessor an
+hour earlier — so it was skipped procedurally along with `SES-156` and `SES-176`, five `delivered`
+tickets were stepped past silently, and the build came from queue 10. **Worth recording as board
+state rather than as a complaint: the top NINE queue slots are now entirely blocked or delivered.**
+
+**Authority.** John's Accept on gated card `a8eaee1d`: build it as a render of the charter's
+canonical progress query, *"appended as the NEXT section number at the END of the locked section
+order — extend the list, never renumber it."* Premise revalidated live, not recalled: `grep` for a
+Project panel across the template, the builder and `briefing-page.md` returned **0 hits in all
+three**, while `docs/SELFBUILD-CHARTER.md` has been introducing its own query as the thing that
+answers *"how close are we"* — *"before `SES-178` renders it."*
+
+**THE FOUR RULES, and the two an editor is most likely to collapse.** (1) `done` is
+`status = 'done'` and **not** `delivered` — the same boundary §2's "Shipped today" keeps
+(`SES-154`); folding it in reports the project further along than John has agreed it is, the one
+direction this number must never err. (2) **An epic's completion is not its drain's completion, and
+the footnote saying so is mandatory** — a drain retires on the members John **named**
+(`runner_drain_scope`, `SES-142`) and a ticket filed into the epic afterwards never joins it.
+Measured at this ship: **M0's and M1's drains are both retired while M1 reads 46.7%.** That is
+correct rather than a gap, and without the footnote a reader infers *retired = 100%* and the
+charter's own finish line becomes unreadable. (3) The charter's keystone metrics — verifier catch
+rate vs John's Rework rate, John-minutes/week, drift findings/week — are **named absent, never
+rendered as zero**: none is online, all three wait on `SES-181` — *reviewer lane*, and a zero would
+claim the verifier caught nothing where the truth is that it does not exist. (4) **No new CSS**, and
+that is not thrift — every rule added to `#s` sits *above* `briefing-state` in the served document
+and pushes it out of a size-bounded read, which is the live `SES-188` defect that truncated this
+very session's earlier harvest on the 235.7 KB page.
+
+**QA WAS DISCRIMINATING BECAUSE THE OBVIOUS TEST WOULD HAVE BEEN VACUOUS.** The template's sample
+values *equal* the live values at this ship — they were copied from the live query — so asserting
+"the output contains 46.7%" proves nothing at all. The builder was therefore run against a template
+copy whose §15 sample values were **poisoned**: zero poison survived, all 8 milestones rendered
+live, overall `14`/`68` present. **A second negative control fired unplanned:** an earlier poison
+broke the anchor *string*, and the builder died `exit 2 — ANCHOR MISSING: §15 rows` rather than
+publishing the changed template — the `SES-162` defect (a section with no anchor serving sample
+text for a day) proven closed by observation. File-level control: the guard fails **12 of 12**
+clauses on `origin/dev`'s three files and passes 12 of 12 on these; `panelAddsNoNewCss()` is
+structural rather than trusting the author. Suite **54/54**, build exit 0, rule blocks clean.
+
+**TWO THINGS DISCLOSED RATHER THAN ABSORBED.** *Scope:* 4 implementation files against
+`CLAUDE.md`'s ≤3 cap — the panel cannot be both rendered and contracted in fewer (template renders,
+builder feeds, `briefing-page.md` is the canonical section-order home John's own Accept named, and a
+guard is never optional). Recorded for John to rule on. *Debt:* the builder derives the three
+numbers from two flat PostgREST selects, because PostgREST cannot run the charter's `GROUP BY` join
+and this builder has no generic exec by design — a **second expression** of the query, not a second
+source of truth. One executable home, a `selfbuild_progress()` function the charter cites, is the
+ticket's named remainder and would have taken this ship to five files.
+
+---
+
 ## session/cycle-20260824-1740 (v7.0.230, 2026-08-24, runner cycle `518abab4-cb3a-4ab9-bde6-69be2db756d5`, **`trigger = scheduled`**, model Opus 5, no subagent) — SES-194: the stall watchdog closes frozen rows, and the heartbeat learns to notice it was closed
 
 **`SES-194` — Stall watchdog: close frozen cycle rows and release their claims** set `delivered`

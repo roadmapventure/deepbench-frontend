@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.231 | runbooks/briefing-page.md | SES-178 — NEW §15, the Project panel: the locked section order gains its first new top-level section since §2b, APPENDED and never a renumber (John's placement call on gated card a8eaee1d, the SES-132/§2b precedent — renumbering silently invalidates every §-reference in this file, runner-cycle.md and the spec). It renders docs/SELFBUILD-CHARTER.md's CANONICAL progress query, which the charter itself introduces as ‘answers how close are we any time, BEFORE SES-178 renders it’. FOUR RULES AN EDITOR WILL BE TEMPTED TO COLLAPSE, all in §15's data contract below: (1) done is status='done' and NOT delivered — the same boundary §2's Shipped-today keeps (SES-154); folding delivered in reports the project further along than John has agreed it is, the one direction this number must never err. (2) AN EPIC'S COMPLETION IS NOT ITS DRAIN'S COMPLETION and the footnote saying so is mandatory — a drain retires on the members John NAMED (runner_drain_scope, SES-142) and a ticket filed into the epic afterwards never joins it; MEASURED at this ship, M0's and M1's drains are BOTH retired while M1 reads 46.7%, which is correct rather than a gap, and without the footnote a reader infers retired=100% and the charter's own finish line becomes unreadable. (3) The charter's keystone metrics (verifier catch rate vs John's Rework rate, John-minutes/week, drift findings/week) are NAMED ABSENT, never rendered as zero — none is online, they wait on SES-181's verifier lane, and a zero would be a claim about performance where the truth is absence; same rule as §14's cost showing ‘—’. (4) NO NEW CSS, which is not thrift: every rule added to #s sits ABOVE the briefing-state block in the served document and pushes it further out of a size-bounded read — the live SES-188 defect, which truncated this very cycle's harvest on the 235.7 KB page. DISCLOSED RATHER THAN SMUGGLED: the builder derives the three numbers from two flat PostgREST selects because PostgREST cannot run the charter's GROUP BY join and this builder has no generic exec by design; that is a SECOND EXPRESSION of the query, not a second source of truth, and the one-executable-home fix (a selfbuild_progress() function the charter cites) is the ticket's named remainder, not done here because the migration plus the charter edit would put SES-178 at five files against CLAUDE.md's ≤3 cap. QA was discriminating rather than merely complete: the builder was run against a template copy whose §15 sample values were POISONED, and the output carried the live values with zero poison surviving; separately the anchor-missing arm fired for real (exit 2, ‘ANCHOR MISSING: §15 rows’) when the anchor itself was broken, proving the builder refuses rather than publishing a changed template — the SES-162 defect it exists to prevent. Guarded by tests/regression/SES-178-project-panel.js: 12 of 12 clauses fail on origin/dev's files, 12 of 12 pass on these. -->
 <!-- DeepBench v7.0.216 | runbooks/briefing-page.md | SES-188 — the decision read-back contract gains the TRUNCATION TEST. The harvest is not blind, it is truncation-dependent: both documented read paths are the SAME artifact-reader interception (WebFetch on a claude.ai/code/artifact URL returns the identical wrapper the Artifact read action does) and differ only in how much head each returns. Measured live 2026-08-24 03:22–03:23Z on the 198.3 KB served page, four seconds apart: Artifact read stopped inside the frame-runtime script and never reached briefing-state; WebFetch cleared the head, the COMPLETE briefing-state block, and ran on into <script id="code">. THE THING A LATER EDITOR WILL BE TEMPTED TO WRITE HERE AND MUST NOT: "use WebFetch, it works". That is one observation against a same-night cycle reporting the opposite; the cut-off is a SIZE BUDGET and this page grows every rebuild, so a cycle that trusted the tool and rebuilt from a short read would publish the empty skeleton and destroy John's un-harvested taps — the exact failure v7.0.197's seed sentinel exists to prevent. Hence a test on the RESULT (block present, parseable, and carrying a value provably live) with two branches: verified → rebuild; unverified → decline the republish, still mandatory and still what 598a9b81 and e42f8d4e correctly did. Cost of declining is stated rather than hidden (18 undecided cards by 03:2xZ). SES-188 stays OPEN for the durable fix; none of its three candidates is chosen here. -->
 <!-- DeepBench v7.0.213 | runbooks/briefing-page.md | SES-171 (Selfbuild M1) -- the 30-stamp header pile is TRIMMED to the newest stamp, the SES-164 shape applied verbatim: 29 stamps (40,843 bytes, 32.5% of the file) moved VERBATIM to docs/SESSIONS.md 'Appendix -- retired briefing-page.md header stamps'; every stamp probed for stamp-only warnings (none found -- all restated in body); body sha256-identical across the trim (20445487a5c91162). Three stale contracts fixed same pass: step 1 masthead run-now link (SES-143 owns it in 2b), 12's SES-125 rejected-paths paragraph (SES-157 form), step 6 successor-run wording (SES-140 in-session chain). Cap: session-hygiene stamp-cap check. -->
 <!-- DeepBench v7.0.208 | runbooks/briefing-page.md | SES-165 (2026-08-23) — step 1c's boundary rule is REWRITTEN and the v7.0.199 / directive 16b3ff73 gated-only carve-out is SUPERSEDED: a card now retires when its ticket is TERMINAL (done/removed), whatever its kind, and `delivered` always renders. The old rule was right for exactly one day. It reasoned that a gated card asks PERMISSION (moot once built) while a ship card asks for a RATING (the trust ladder's only input, "meaningful forever") — sound while a ship wrote `done` itself. SES-154 (v7.0.205) moved the rating one stage earlier: a ship now writes `delivered` and ONLY John's Accept writes `done`, so a rating-in-waiting sits on a `delivered` ticket and never on a `done` one. A ship card on a `done` ticket therefore means the verdict already happened — retiring it starves nothing. MEASURED LIVE BEFORE A LINE CHANGED: of the 10 undecided non-gated cards, 7 sat on tickets already `done` (SES-101 9cdf840b, SES-121 8c421bf3, SES-140 bfd7598b, SES-146 b1ca9305, SES-147 6ce64ed2, SES-149 9a5e922b, SES-162 c1af750f); the 3 live rows were 5c220f71 (SES-154, `delivered`), 1f68482a (SES-157, `delivered`) and edb78e0c (no backlog_id). John approved 2026-08-23 with the trade stated aloud: those 7 straggler ships leave his page unrated and never feed the trust ladder, because a pre-SES-154 cycle already closed them under the old rule. Migration ses165_ship_card_retire; the other three rules of step 1c are unchanged. -->
@@ -313,6 +314,7 @@ shown:
 | 12 | Vision claims | `SES-125` ✔ |
 | 13 | Trust ladder | `SES-126` ✔ class column |
 | 14 | Who used DeepBench | `SES-126` ✔ |
+| 15 | **Project — Selfbuild milestones** | `SES-178` ✔ |
 
 **The forward view of the queue is BACK (`SES-126`, `v7.0.161`).** `SES-124` struck "Next up —
 top 5" and the "Next 3" line and disclosed, on its own card, that the page would carry no forward
@@ -341,6 +343,50 @@ The rule for whoever builds that query:
   queue this ticket exists to make visible — work finished and waiting on him. Until that box
   exists, a rebuild must not quietly fold delivered tickets into "Shipped today".
 - The CST-day window is register B35's, unchanged, and is the same boundary step 3 uses.
+
+### §15's data contract (`SES-178`, `v7.0.231`)
+
+**§15 is APPENDED, never a renumber** — John's own placement call on gated card `a8eaee1d`
+(Accept, attended decision-drain 2026-08-24): *"appended as the NEXT section number at the END of
+the locked section order — extend the list, never renumber it"*, the same rule that gave us §2b,
+§4.1, §7.1 and §9.1.
+
+It renders **`docs/SELFBUILD-CHARTER.md`'s canonical progress query**, which the charter itself
+introduces as *"answers 'how close are we' any time, before `SES-178` renders it"*. Per milestone:
+name, `done`, `total`, `%`; then an overall bar and count.
+
+Four rules, each of which is how this panel gets rendered wrong:
+
+- **`done` is `status = 'done'` and nothing else.** `delivered` is deliberately **not** counted —
+  the same boundary §2's "Shipped today" keeps (`SES-154`): work the runner finished and John has
+  not looked at is not progress on his scoreboard. A panel that folded `delivered` in would report
+  the project further along than John has agreed it is, which is the one direction this number
+  must never err.
+- **AN EPIC'S COMPLETION IS NOT ITS DRAIN'S COMPLETION, and the footnote saying so is mandatory.**
+  A drain retires on the members John **named** (`runner_drain_scope`, `SES-142`); a ticket filed
+  into the epic *after* that naming never joins it. Measured at this ship: **M0's and M1's drains
+  are both retired** while M1 reads **46.7%** here. That is correct, not a gap — the difference is
+  work added since he named the scope. Without the footnote a reader infers "retired = 100%" and
+  the charter's own finish line becomes unreadable.
+- **The keystone metrics are NAMED ABSENT, never rendered as zero.** The charter's measurement
+  table points verifier catch rate vs John's Rework rate, John-minutes/week and drift findings/week
+  at this panel, and the ticket scopes them *"as they come online"*. None is: the verifier lane is
+  `SES-181` — *reviewer lane*, still open. A zero would read as "the verifier caught nothing" — a
+  claim about performance where the truth is absence. Same rule as §14's cost showing "—" and a
+  `NULL` `plain_*` drawing a red defect line.
+- **No new CSS.** The panel is built from `table` / `td.num` / `td.dim` / `.bar` / `.barlbl` /
+  `.tnote`, all already shipped. This is not thrift: every rule added to `#s` sits **above** the
+  `briefing-state` block in the served document and pushes it further out of a size-bounded read —
+  the live `SES-188` defect, which was truncating the harvest again on the 235.7 KB page the day
+  this shipped.
+
+**Known debt, disclosed rather than smuggled:** the builder derives these numbers from two flat
+PostgREST selects because PostgREST cannot run the charter's `GROUP BY` join and this builder has
+no generic exec by design. That is a **second expression** of the charter's query, not a second
+source of truth, and the right end state is one executable home — a `selfbuild_progress()` function
+the charter cites and the builder calls. It is not done here because the migration plus the charter
+edit would put `SES-178` at five files against `CLAUDE.md`'s ≤3 cap; it is the ticket's named
+remainder.
 
 ### §2b's data contract (`SES-143`, `v7.0.182`)
 

@@ -21,6 +21,7 @@
      NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
      its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
      the page. Only a cycle publishing this file hits the window. -->
+<!-- DeepBench v7.0.231 | runbooks/briefing-template.html | SES-178 — NEW §15, Project — Selfbuild milestones, appended at the END of the locked section order (John, gated card a8eaee1d: extend the list, never renumber it). Renders docs/SELFBUILD-CHARTER.md's canonical progress query per milestone plus an overall bar. THE PANEL ADDS NO NEW CSS AND THAT IS DELIBERATE, NOT THRIFT: every rule added to #s sits ABOVE the briefing-state block in the served document and pushes it further out of a size-bounded read, which is the live SES-188 defect — the cycle that shipped this had its own harvest truncate inside briefing-state on the 235.7 KB served page and had to decline the republish. msRow() is built from table / td.num / td.dim, and the bar from .bar/.dev/.barlbl, all of which §8/§11/§13 already ship; the guard asserts structurally that §15 opens no <style> and uses no class the stylesheet does not define. TWO HONESTY CLAUSES IN THE FOOTNOTE, both mandatory: a retired milestone can read below 100% here and that is CORRECT (a drain finishes on the members John NAMED — runner_drain_scope, SES-142 — and tickets filed into the epic afterwards never join it; M0 and M1 are both retired while M1 reads 46.7%), and the charter's keystone metrics are NAMED ABSENT rather than rendered as zero, because none is online yet — they wait on SES-181's verifier lane, and a zero would claim the verifier caught nothing rather than that it does not exist. Sample rows are this cycle's real values and the builder splices over them; if it ever cannot find the anchor it dies at exit 2 rather than publishing them, proven live this cycle. -->
 <!-- DeepBench v7.0.223 | runbooks/briefing-template.html | SES-188 — THE 21-COMMENT PROVENANCE CHAIN IS TRIMMED, and this file is the one where that pile had a second, worse consequence than cost. A cycle harvests John’s taps by reading the PUBLISHED page and parsing its briefing-state block, and that read is served head-first under a size budget — so every comment above the block pushes the block further out of reach. MEASURED before the cut, not estimated: 20 comment blocks holding 42,025 chars, 24.7% of this file, ALL of them above the block (which sat at offset 66,229). Live consequence: the served page reached the block at 198.3 KB and missed it at 250 KB, 25 minutes apart, the variable being a republish — and THREE CONSECUTIVE CYCLES correctly declined to republish because they could not verify their harvest, while John’s decisions piled up behind a stale page. John’s call on gated card f6c7c54a: candidate 4 FIRST (this trim, in the SES-164 shape), then candidate 2 as the DURABLE fix — a Supabase-side buffer the page writes taps into directly, designed JOINTLY with SES-155’s briefing_comments table and SES-156’s unified card. Candidates 1 and 3 he rejected. THE HONEST BOUND, stated because the next editor deserves it and because the ticket itself makes this objection of candidate 1: THIS ONLY MOVES THE CEILING. The page still grows on every rebuild; the trim buys head room, it does not stop the growth. Capped going forward by docs/runbooks/session-hygiene.md check 12. THE THREE BLOCKS THAT ARE NOT PROVENANCE AND MUST SURVIVE ANY FUTURE TRIM: the title guard above (the Artifact publisher scans only the FIRST 8192 BYTES for a title tag — new comments go BELOW it, never above, and tests/regression/SES-138-briefing-title-window.js fails if the tag leaves the window); this stamp and the newest one; and the SEED SENTINEL immediately above the briefing-state line, which is deliberately NOT a valid empty state. CHECKED RATHER THAN ASSUMED before moving anything (SES-164 step 2, the step that makes a trim safe and the one that gets skipped): all 17 retiring comments were swept for an editor warning existing nowhere else. Sixteen were already restated in this file’s body or in briefing-page.md. The seventeenth — v7.0.193’s note that .idchip max-width is 35% because QA measured 45% letting the chip out-weigh the title — appeared NOWHERE else, and was relocated into the CSS next to the rule it protects rather than archived. The 17 are preserved verbatim in docs/SESSIONS.md under ‘Appendix — retired briefing-template.html provenance comments’, and all of them remain in git history. Body below the header proven byte-identical by sha256 before and after the cut, differing only by that one deliberate relocation. -->
 <!-- DeepBench v7.0.201 | runbooks/briefing-template.html | SES-147 — §2b gains John's DAILY MAX box, the third control on this page that changes what the RUNNER does. His words, 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. THE BOX IS NOT THE CAP, and the page says so rather than implying it: the cap is one of FIVE rungs resolved by migration ses147_daily_max_tokens's public.resolve_day_token_cap() — override > 48h stale floor > this box > SES-128 calibration > the 10M default — so the row renders BOTH the stored number and a cycle-written "In force now" line (AUTOMATION.daily_max_effective) carrying what the next run will actually use and why. A row that multiplied the box out locally would be confidently wrong on exactly the days a rung above it fires, which are the days John is looking. THE RUNG MOST LIKELY TO BE GOT WRONG, stated here because the page's own copy is where he will read it: a standing number does NOT defeat the staleness brake (spec, verbatim) — with the box set to 4 and every reading aged past 48h the shipped function returns 3,000,000 / stale-floor, while the obvious "the box is THE day cap" build returns 4,000,000. Proven on fixtures inside a deliberately rolled-back transaction, alongside override-beats-box (25,000,000 / override with the box set to 4) and blank-box = pre-SES-147 exactly (10,000,000 / calibrated). NULL IS NOT ZERO ANYWHERE IN THIS ROW: the DB null, settingsNow()'s `undefined`-not-falsy test, the empty-string render and the empty-box commit path are four expressions of one rule — an empty box means "no standing cap, budget as before", and rendering or storing it as 0 would read as "no tokens allowed today" and would be a number John never typed. Committed on Enter/blur only, never per keystroke ("2" on the way to "25" is a real number this page would otherwise record), and out-of-range is put back rather than stored, both the same calls sch-n already makes. Guarded by tests/regression/SES-147-daily-max-box.js. -->
 
@@ -789,6 +790,14 @@
     return '<tr><td class="mono dim">'+cid+'</td><td>'+work+'</td>'
       +'<td class="num">'+rung+'</td><td class="num">'+streak+'</td></tr>';
   }
+  // SES-178 — one Selfbuild milestone row (§15). NO NEW CSS, and that is a decision rather than
+  // thrift: every rule added to `#s` sits ABOVE the briefing-state block in the served document
+  // and pushes it further out of a size-bounded read, which is the live SES-188 defect. This row
+  // is built from `table`, `td.num` and `td.dim`, all of which §8/§11/§13 already ship.
+  function msRow(name, done, total, pct){
+    return '<tr><td>'+esc(name)+'</td><td class="num">'+done+'</td>'
+      +'<td class="num dim">'+total+'</td><td class="num">'+pct+'%</td></tr>';
+  }
   // SES-129 — ONE §7 ROW: what became of one directive, in plain words.
   //   id8      the directive's short id — John's handle on it, and what the ledger calls it
   //   when    'Mon DD, HH12:MI AM' CST, the time the RUNNER RECORDED it (see the render below —
@@ -1502,6 +1511,50 @@
     +'</table></div>'
     +'<p class="tnote">Cost shows &ldquo;&mdash;&rdquo; because these runs carry no recorded '
     +'per-call cost &mdash; not because they were free.</p>'
+
+    // ===== §15 · PROJECT — SELFBUILD MILESTONES (SES-178) ====================================
+    // John's Accept on gated card a8eaee1d: build the Project panel as a render of the charter's
+    // CANONICAL progress query, and APPEND it as the next section number at the END of the locked
+    // order — extend the list, never renumber it (the SES-132 / §2b precedent; renumbering would
+    // silently invalidate every §-reference in briefing-page.md, runner-cycle.md and the spec).
+    //
+    // The query is docs/SELFBUILD-CHARTER.md's, verbatim, and the charter says so of itself:
+    // "answers 'how close are we' any time, before SES-178 renders it". The panel RENDERS it; it
+    // does not define a second copy. Figures below are this cycle's real values (v7.0.231).
+    //
+    // THE THING THIS PANEL MUST NOT IMPLY, and the reason the footnote is not optional: an epic's
+    // completion is NOT its drain's completion. A drain retires on the members John NAMED
+    // (runner_drain_scope, SES-142); a ticket filed into the epic AFTER that naming never joins
+    // it. So M1's drain is retired while M1 reads 46.7% here, and that is CORRECT rather than a
+    // gap — the difference is work added since he named the scope. A panel that let a reader
+    // infer "retired = 100%" would make the charter's own finish line unreadable.
+    //
+    // THE KEYSTONE METRICS ARE NAMED ABSENT, NEVER RENDERED AS ZERO. The charter's measurement
+    // table points verifier-catch-rate, John-minutes/week and drift-findings/week at this panel,
+    // and the ticket says "as they come online". None is online: the verifier lane is SES-181,
+    // still open. A zero here would read as "the verifier caught nothing", which is a claim about
+    // performance rather than about absence — the same rule as §14's cost showing "—" and a NULL
+    // plain_* drawing a red defect line.
+    +'<h2><span class="secnum">15</span>Project — Selfbuild milestones</h2>'
+    +'<table><tr><th>Milestone</th><th>Done</th><th>Total</th><th>%</th></tr>'
+    +msRow('Selfbuild M0 - Backup &amp; Rollback',2,2,'100.0')
+    +msRow('Selfbuild M1 - Consolidation',7,15,'46.7')
+    +msRow('Selfbuild M2 - Truth Infrastructure',2,13,'15.4')
+    +msRow('Selfbuild M3 - Independent Verification',1,18,'5.6')
+    +msRow('Selfbuild M4 - Infrastructure Floor',2,6,'33.3')
+    +msRow('Selfbuild M5 - Closed-Loop Healing',0,5,'0.0')
+    +msRow('Selfbuild M6 - Autonomy Graduation',0,3,'0.0')
+    +msRow('Selfbuild M7 - The Inventor',0,6,'0.0')
+    +'</table>'
+    +'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'
+    +'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '
+    +'(<b>20.6%</b>)</p>'
+    +'<p class="tnote">A retired milestone can sit below 100% here, and that is correct rather '
+    +'than a gap: a drain finishes on the members you <b>named</b>, and tickets filed into the '
+    +'epic afterwards never join it &mdash; so this column counts work added since. '
+    +'Not shown, because they do not exist yet rather than because they are zero: verifier catch '
+    +'rate vs your Rework rate, John-minutes/week, and drift findings/week &mdash; all three wait '
+    +'on the verifier lane (<b>SES-181</b> &mdash; reviewer lane), which is still open.</p>'
     // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
     // read-only rule that the savebar already states in place, at the moment it matters, and
     // then closed the page on housekeeping instead of on his board. The read-only signal is
