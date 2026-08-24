@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.223 | docs/runbooks/session-hygiene.md | SES-188 — NEW CHECK 12: the briefing-template provenance-chain cap, and check 11's own text corrected. John's Accept on gated card f6c7c54a chose candidate 4 FIRST (trim the chain the way SES-164 trimmed runner-cycle.md's stamps) with candidate 2 — a Supabase-side tap buffer, designed jointly with SES-155/SES-156 — as the DURABLE fix; candidates 1 and 3 he rejected. Check 12 is the tripwire that keeps the trim from silently regrowing, and its honest bound is stated in the check itself: a trim only MOVES THE CEILING, because the page grows on every rebuild. THE TWO THINGS AN EDITOR MUST NOT TREAT AS PROVENANCE AND DELETE: the title-guard block (the Artifact publisher scans only the first 8192 bytes for a title tag, guarded by tests/regression/SES-138-briefing-title-window.js) and the seed sentinel above the briefing-state line (v7.0.197 — it is deliberately not a valid empty state). Check 11's text is corrected in the same edit under feature-owns-its-bugs: it said zero real {{rule:ID}} markers exist, which SES-175 made false ~40 minutes earlier in this same session. It now states the narrow boundary — check 11 asserts a marker's ID resolves, scripts/render-rule-blocks.js asserts the text under it still matches — and names marker coverage (2 of 84) as the number to watch. -->
 <!-- DeepBench v7.0.218 | docs/runbooks/session-hygiene.md | SES-176 — checks 9/10/11, the truth tripwire, documented alongside checks 1-8. They read the SES-174 rule registry through its repo-side snapshot docs/governance/RULES-SNAPSHOT.md (a live read is refused for the reason check-session-docs.js's own header gives: a checker that silently no-ops without credentials is a false all-clear). Recorded here because a tripwire's first catch is its justification: B25 (retired) and B31 (superseded by B42) are BOTH still stated in present tense in docs/RUNNER-GOV-0820-REQUIREMENTS.md while runner-cycle.md says B25/B26 were struck by John's explicit removal — reported, never auto-fixed, because a governance register is not something an unattended cycle edits. The known bound is stated in the check body rather than left to be found: check 9 decides on vocabulary within a block, so B26 does NOT flag (its entry ends "until SES-85 retires it", about the unclassed remainder, not about B26). -->
 <!-- DeepBench v7.0.198 | docs/runbooks/session-hygiene.md | SES-121 — body moved verbatim from .claude/skills/session-hygiene/SKILL.md (which remains as a thin loader); .claude/ is not writable by unattended cycles (register B39), this runbook is. This file is the canonical copy. -->
 
@@ -121,9 +122,14 @@ principle. A **missing** snapshot is therefore a loud FLAG naming the regenerati
   have no authoritative text at all); a file that exists whose `#anchor` cannot be located is a
   **WARN** (a stale anchor, not a missing home). Findings are aggregated per target, so forty rules
   pointing at one deleted file is one finding, not forty.
-- **Check 11 — every `{{rule:ID}}` marker resolves** to a registry row. **A forward guard, and
-  reported as one**: `SES-175` introduces these markers and is `needs-john`, so **zero real markers
-  exist today** and a clean run means "there are none yet", not "they are all fine".
+- **Check 11 — every `{{rule:ID}}` marker resolves** to a registry row. **It stopped being a
+  forward guard on 2026-08-24** (`SES-175`, `v7.0.222`): the first real markers now exist — `B40`
+  above the claim SQL in `runner-cycle.md` and `session-setup.md` — so a clean run finally means
+  something. It remains a **narrow** check, and the boundary matters: it asserts a marker's **id
+  resolves**, never that the text under it still matches the registry. That second check is
+  `scripts/render-rule-blocks.js`, run separately. **Marker coverage is the number to watch** —
+  2 of 84 rules at the time of writing, so for the other 82 the doc prose and the registry's
+  paraphrase remain two unreconciled homes of the same rule.
 
 **What they found on the first live run, recorded because a tripwire's first catch is its
 justification:** `B25` (`retired`) and `B31` (`superseded by B42`) are both still stated in present
@@ -139,6 +145,41 @@ so a block containing retirement vocabulary about a *different* subject can mask
 assertion. Measured live: `B26`'s entry ends *"until `SES-85` retires it"* — about the unclassed
 remainder, not about B26 — and B26 therefore does **not** flag, though it is as retired as B25. The
 check is a tripwire, not a proof.
+
+**12. `briefing-template.html` provenance-chain cap (added 2026-08-24, `SES-188`, John's Accept on
+gated card `f6c7c54a`).** The same unbounded-growth shape check 7 caps on the runbooks, on the one
+file where it had a second, worse consequence. Count the HTML comment blocks sitting **above** the
+`<script type="application/json" id="briefing-state">` line in `docs/runbooks/briefing-template.html`.
+**Flag more than ~4**, and report the count plus what share of the file they are.
+
+**Why this one is not cosmetic, measured rather than argued.** A cycle harvests John's taps by
+reading the *published* page and parsing that `briefing-state` block, and the read is served
+head-first under a size budget. Every comment above the block pushes it further down. Measured
+2026-08-24: **20 comment blocks holding 42,025 chars — 24.7% of the file — all of them above the
+block**, while the served page crossed the threshold where the block stops being returned at all
+(reached at 198.3 KB, missed at 250 KB, 25 minutes apart, the variable being a republish). A cycle
+that cannot verify its harvest must decline to republish, so the page goes stale and John's
+decisions pile up behind it — three consecutive cycles did exactly that.
+
+The trim is check 7's shape with one addition, and **the addition is not optional**:
+
+1. Keep the **newest** stamp, plus one stamp recording the trim.
+2. **Keep the title-guard block at the top of the file and the seed sentinel above the
+   `briefing-state` line — neither is a provenance stamp.** The title guard exists because the
+   Artifact publisher scans only the **first 8192 bytes** for a title tag
+   (`tests/regression/SES-138-briefing-title-window.js` fails if it leaves the window); the seed
+   sentinel is what stops a rebuild publishing a plausible-looking empty state (`v7.0.197`).
+   New comments go **below** the title-guard block, never above it.
+3. Check each retired comment for an editor warning that exists nowhere else, and relocate that
+   kind into the body next to what it protects — never delete it. This is the step that makes the
+   trim safe and the one that will be skipped.
+4. Move the rest **verbatim** to `docs/SESSIONS.md` under a named appendix.
+5. Prove the body below the header is otherwise byte-identical (`sha256` before and after).
+
+**Honest bound, and it is the reason this is a tripwire and not the fix:** trimming only **moves
+the ceiling**. The page still grows on every rebuild. The durable fix John chose is a Supabase-side
+buffer the page writes taps into directly, designed jointly with `SES-155`/`SES-156` — this check
+is what keeps the harvest working until that lands.
 
 ## Reporting the result
 
