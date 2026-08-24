@@ -5,6 +5,93 @@
 
 ---
 
+## session/cycle-20260824-1623 (v7.0.227, 2026-08-24, runner cycle `d16fa1bc-4c12-4a71-873d-ce9d421b92e8`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-158: vision comment routing
+
+**`SES-158` set `delivered`** (`P10 - Tooling`, tier `now`, queue 5). Kickoff
+`docs/kickoffs/v7.0.227-SES-158-vision-comment-routing.md`. **2 source files** —
+`docs/runbooks/runner-cycle.md` (new step 2b + stamp rotation) and
+`tests/regression/SES-158-vision-routing.js` (new) — plus kickoff and close-out. No schema change,
+no `src`/`api`/`lib`/`.claude` edit, no site change.
+
+**Second cycle of this session** (`13ee5508` → this). Gate A passed (predecessor `shipped`), Gate B
+returned `pick` for `SES-176` on John's Selfbuild M2 drain — but `SES-176` carries
+`design_status = 'needs-john'`, so it was skipped procedurally per `SES-114`'s blocked-prefix table
+(skip recorded, `skip_count` 5) and the cycle fell through to the class-sorted board, exactly as the
+drain's own documented behaviour requires. Board queue 1/2/4 are `delivered` (stepped past silently,
+`SES-154`), queue 3 `SES-156` was **gated** (below), so the pick was queue 5.
+
+**Premise revalidated live rather than recalled.** `SES-155` shipped `public.briefing_comments` at
+`v7.0.225` — forty minutes before this cycle picked this ticket — and shipped it as a table with **no
+procedure attached**:
+
+```
+grep -rniE "briefing_comments" docs/runbooks/*.md scripts/*.mjs scripts/*.js          -> 0 hits
+grep -niE "routed_to|routing comment|corpus update|research ticket" runner-cycle.md   -> 0 hits
+grep -niE "routed_to|routing comment|corpus update" briefing-page.md                  -> 0 hits
+```
+
+The column `routed_to` existed and the CHECK already admitted `kind = 'routing'`; nothing anywhere
+said what to put in either.
+
+**THE DESIGN CALL, and it is the one an editor will collapse.** Decision 5 of
+`docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` carries two sentences that read like one: *"routes a
+vision comment into corpus update / research ticket / feature ticket"* and *"**every** interaction
+must leave the corpus richer … never just a status flip."* Read as a single rule, `corpus-update`
+becomes merely one of three routes — and a comment routed to `feature-ticket` then leaves the corpus
+**no richer**, contradicting the second sentence outright. So the rule states them as two
+obligations: the **route** names the artifact the comment became (exactly one, never zero, never
+two, stored in `routed_to`), and the **corpus write is unconditional** across all three.
+`corpus-update` as a *route* means *"the artifact is the claim itself"*, never *"the one path where
+the corpus gets written."*
+
+**Written against columns read live**, not a hypothetical shape: `briefing_comments`
+(`target_kind ∈ ticket|question|vision|invention`, `author ∈ john|runner`,
+`kind ∈ question|answer|requirement|routing|note` defaulting to `question`, `harvested_cycle`,
+`routed_to`) and `vision_claims` (`claim_ref ~ '^VC-[A-Z0-9]+-[0-9]{3}$'`, `status`, `confidence`,
+`judgment_class`, `ck_vision_claim_decided`). That is what stops the rule needing a rewrite the
+first time it fires.
+
+**Fail-directions stated rather than left to taste:** uncertain between `research-ticket` and
+`feature-ticket` → `research-ticket` (the cheaper error — research that turns out obvious becomes a
+feature ticket next cycle, while a feature ticket on an unresearched premise spends build capacity
+and lands on John's page as work he has to reject); uncertain whether it is a requirement at all →
+it is a Question, route nothing. Four boundaries carried: `harvested_cycle IS NULL` as the
+idempotence guard (the parallel-cycle trap — two peers can read the same requirement and only the
+one whose UPDATE returns a row may comment), `author = 'john'` in the trigger (a routing comment is
+itself a `briefing_comments` row, so a predicate that forgot the author would route its own output
+forever), atomic `feature_id_counter` block claims, and a rejection being a kept row rather than a
+deletion.
+
+**SHIPPED BEFORE ITS INPUTS, deliberately.** No page-side surface exists — the comment box and the
+Question/Requirement toggle are `SES-156`, filed this cycle as `gated_before_build` card
+`e9315bb5`. This is the ninth instance of this file's own lesson (`SES-86` phase 3, `v7.0.146`,
+`SES-101`, `SES-111`, `SES-127`, `SES-128`, `SES-129`, `SES-143`): a rule that arrives after the
+first case gets improvised once, and the improvisation becomes the precedent.
+
+**QA, discriminating rather than merely complete.** `tests/regression/SES-158-vision-routing.js`
+reads the rule **out of the runbook** (John's rule 2026-08-23, "you should never be throwing away
+tests"; the `DIR-603f44ea` / `SES-176` precedent) — eleven load-bearing clauses as data, each with a
+mutation control asserting that deleting it flags, and a guard that a vacuous mutation fails the
+control itself. That guard fired for real during the build: the `exactly-one-route` mutation was
+case-sensitive against prose reading "Never zero, never two" and changed nothing, and the test
+refused to pass rather than reporting a control it had not actually run. **The file-level negative
+control is the pre-change file itself:** `checkVisionRoutingRule()` over
+`git show origin/dev:docs/runbooks/runner-cycle.md` returns `["step-missing"]`, over the shipped
+file `[]`. Suite **51/51**, `npm run build` green.
+
+**Stamp count held at 5** per `session-hygiene.md` check 7: the `v7.0.210` stamp moved **verbatim**
+to this file's retired-stamps appendix, checked first for an editor warning existing nowhere else —
+it has none, its one such warning (`SES-154`'s pick-vs-retirement predicate) having already been
+relocated by `SES-164` into step 5's drain property list, live at `runner-cycle.md:1075`.
+
+**Also this cycle, before the pick:** `SES-176` skipped (`needs-john`) and `SES-156` gated —
+card `e9315bb5`, `design_status = 'needs-john'`, because it retires §9.1 from the LOCKED section
+order and repoints the page's threads, which John's `SES-155` Accept held *"until the briefing page
+can be rebuilt and the threads verified end-to-end"*. **That condition was met by this session's
+first cycle** (`13ee5508`), which republished the page at 16:35Z with all 8 ask threads seeded from
+the ledger and read back on the live served page — so the card tells him his own precondition is
+now satisfied and his go-ahead is the only thing left.
+
 ## session/cycle-20260824-1440 (v7.0.225, 2026-08-24, runner cycle `c618136d-58ce-4c46-bb5b-911076a7d497`, **`trigger = chained (drain continuation)`**, model Opus 5, no subagent) — SES-155: `public.briefing_comments`, the one comments table
 
 **`SES-155` set `delivered`** (`P10 - Tooling`, Chain A member 2 of 3). Kickoff
@@ -6053,6 +6140,13 @@ across this change, proven by `sha256` before and after with only that insertion
 
 
 ---
+
+
+**Retired by `SES-158` (v7.0.227, 2026-08-24) — stamp count held at 5 per session-hygiene check 7. Checked for an editor warning existing nowhere else before moving: none (its one such warning, `SES-154`'s pick-vs-retirement predicate, was already relocated into step 5's drain property list by `SES-164` and is live at `runner-cycle.md:1075`).**
+
+```
+<!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 7 (the stamp cap — renumbered from a duplicate "6" 2026-08-23). -->
+```
 
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
 

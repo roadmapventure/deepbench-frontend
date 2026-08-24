@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.227 | runbooks/runner-cycle.md | SES-158 — NEW STEP 2b: vision comment routing finally has a rule. SES-155 shipped public.briefing_comments at v7.0.225 — forty minutes before this cycle picked this ticket — and shipped it as a table with NO PROCEDURE ATTACHED: measured, not assumed, `grep -rniE "briefing_comments" docs/runbooks/*.md scripts/*.mjs scripts/*.js` returned ZERO hits, and so did every search for routed_to / routing comment / corpus update across this file and briefing-page.md. The column routed_to existed and the CHECK already admitted kind='routing'; nothing anywhere said what to put in either. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO COLLAPSE: decision 5 carries TWO obligations that read like one — "routes into corpus update / research ticket / feature ticket" and "EVERY interaction must leave the corpus richer". Read as a single rule, corpus-update is merely one of three routes, and a comment routed to feature-ticket then leaves the corpus no richer, contradicting the second sentence outright. So the ROUTE names the artifact the comment BECAME (exactly one, stored in routed_to) and the CORPUS WRITE is UNCONDITIONAL on all three; corpus-update as a route means "the artifact is the claim itself", never "the one path where the corpus gets written". Written against columns READ LIVE (briefing_comments target_kind/author/kind/harvested_cycle/routed_to; vision_claims claim_ref shape, status, confidence, judgment_class, ck_vision_claim_decided) rather than against a hypothetical shape, which is what stops it needing a rewrite the first time it fires. Fail-direction stated rather than left to taste: uncertain between research and feature -> research (the cheaper error); uncertain whether it is a requirement at all -> it is a question, route nothing. The routing comment is MANDATORY and is named as the half most likely to be skipped, because corpus-update produces no ticket id to report and therefore feels like nothing happened. SHIPPED BEFORE ITS INPUTS DELIBERATELY: the page-side comment box is SES-156, filed this cycle as gated card e9315bb5 (it retires §9.1 from the LOCKED section order), so no vision Requirement can arrive yet — the ninth instance of this file's own lesson that a rule arriving after the first case gets improvised once and the improvisation becomes the precedent. Guarded by tests/regression/SES-158-vision-routing.js. Stamp count held at 5 per session-hygiene check 7: the v7.0.210 stamp moved VERBATIM to docs/SESSIONS.md's appendix, checked first for an editor warning existing nowhere else — it has none, its one such warning (SES-154's pick-vs-retirement predicate) having already been relocated by SES-164 into step 5's drain property list, live at runner-cycle.md:1075. Doc + test; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.222 | runbooks/runner-cycle.md | SES-175 — RENDERED RULE BLOCKS, EXPAND-IN-PLACE: step 5’s ticket-claim SQL now sits under a `{{rule:B40}}` marker comment whose quoted text is generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John’s call, typed on gated card `a4e0254a` 2026-08-24T14:31:41Z: **“Accept with C”** — of the three options carded, (C) is the one that changes NOTHING about what a cycle reads. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO UNDO: the expanded text is COMMITTED, not a placeholder resolved at build time. Option (A) — markers in source, a build step emitting rendered runbooks — is the obvious “single source” shape and it would have split every runbook into source+rendered and changed which file a cycle opens mid-run; a cycle that hit an unrendered checkout would read `{{rule:B40}}` where the claim SQL should be. So the marker is a CHECKED COMMENT above real text: cycles read prose, and drift is caught by a script rather than prevented by indirection. Distinct from `SES-176`’s check 11, which the two are easy to conflate: check 11 asserts a marker’s ID RESOLVES to a registry row; this asserts the committed TEXT still EQUALS that row’s `statement`. A doc passes check 11 with a rule statement a month out of date — that gap is this ticket. FOUND LIVE while building it, and fixed rather than worked around: the scanner read the kickoff doc’s own fenced EXAMPLE as a live marker and flagged it as drifted — the `SES-180` self-flagging failure in a second costume, past the marker-at-head-of-comment guard written for the first — so fenced code blocks are excluded, because a doc must be able to SHOW the format without the checker maintaining the illustration. QA was discriminating rather than merely complete, one fixture, one variable: a copy of `session-setup.md` with ONE word changed inside the rendered line (24h→48h) FLAGS, the byte-identical control comes back clean, `--write` restores the registry text byte-exact and a second `--write` reports unchanged. Also proven: unknown-id and missing-block arms both flag, and inline prose writing the marker stays inert. `check-session-docs.js` clean on check 11 — these are the FIRST real markers in the repo, so that run is check 11’s first live exercise rather than another clean pass over zero markers. DISCLOSED RATHER THAN LEFT TO BE FOUND: `docs/GOVERNANCE-MODES.md` is a THIRD live home of the claim SQL and is NOT converted — doing so would be a 4th file against HR-SCOPE’s cap, and John’s card scoped the proof at “the claim SQL’s ~2 homes”; `.claude/skills/session-setup/SKILL.md` carries it too and is untouchable by an unattended cycle (register B39). The snapshot reader is a deliberate second copy of `check-session-docs.js`’s parser for the same cap reason, named here rather than smuggled. Stamp count held at 5 per session-hygiene check 7: the `v7.0.205` stamp moved VERBATIM to `docs/SESSIONS.md`’s appendix, its one unique editor warning already relocated into step 5’s drain property list by `SES-164`. Doc + script; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.220 | runbooks/runner-cycle.md | SES-179 — NEW STEP 8d: the milestone gate review finally has a trigger. John's directive 2026-08-23 (PM lens + Chief Architect lens at each epic retirement, joint verdict as a card) was named NINE times in docs/SELFBUILD-CHARTER.md — including as the project's own exit exam and, in §Closure discipline item 3, as the ONLY path for adding members to a later milestone — and implemented nowhere: `grep -rniE "gate review" docs/runbooks/` returned zero lines. FOUND LIVE while building it, which is why this is a gap and not a mechanism built ahead of need: TWO milestone drains had ALREADY retired ungated — 01758f26 (Selfbuild M0, retired by cycle e42f8d4e) and 69e61a6c (Selfbuild M1, 4b874066), both 2026-08-24 — and M2's drain was queued to do the same. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO UNDO: the trigger is a SWEEP over evidence, never a branch on drain_epic_next() returning `retired`. That call has TWO sites (step 5 and step 9's tail Gate B, SES-139) and since SES-189 one call may retire MORE than one directive while returning only the last one's ids — so a call-site branch misses retirements by construction, and could not have caught M0/M1 at all, since they retired before the step existed. The sweep asks the standing question instead and is bounded at ONE review per cycle (LIMIT 1, oldest first), the same self-limiting shape as step 4b's invention pass. `status='cancelled'` is excluded deliberately: that is John withdrawing a standing order (b74009ea, Automation), not a milestone finishing. Migration ses179_runner_items_epic_id adds the join key the sweep reads (runner_items.epic_id, nullable, additive, no backfill) rather than matching a display string in title/display_ref — the defect SES-116 shipped a CHECK to end. The card reuses kind='gated_before_build' because runner_items_kind_check admits exactly two values and the gated semantics are the correct ones anyway (an Accept there is permission, not a rating — register B34). Procedure lives in docs/runbooks/gate-review.md, CITED HERE AND NOT RESTATED. Body otherwise unchanged. -->
 <!-- DeepBench v7.0.216 | runbooks/runner-cycle.md | SES-188 — step 2's harvest gains one sentence: the read can come back truncated, so TEST the harvest rather than concluding from which tool was used. Measured live 2026-08-24, Artifact read stopped short of briefing-state and WebFetch returned it complete on the same page four seconds apart — so one tool's short read is never evidence the block is unreachable. The test, the two branches (verified → rebuild; unverified → decline the republish) and the reason this must not become "use WebFetch, it works" live in briefing-page.md's decision read-back contract, CITED HERE AND NOT RESTATED so the two files cannot drift the way step 5 and step 7 did before v7.0.114. Body otherwise unchanged. -->
 <!-- DeepBench v7.0.215 | runbooks/runner-cycle.md | SES-189 — a retired drain directive no longer eats the cycle's whole drain call. Migration ses189_drain_advance_past_retired turns drain_epic_next()'s single ORDER BY created_at LIMIT 1 scan into a bounded loop that keeps advancing while directives retire and acts on the first pick/blocked/unscoped/none. THE ONE THING AN EDITOR MUST NOT COLLAPSE: this changes WHEN the next directive is read, never WHO decides — no predicate moved, retirement still needs every NAMED member done/removed with 'delivered' still absent from that side (SES-154), the pick predicate is byte-identical, and property 5 stands (nothing here creates a drain row). Each retirement still writes its own before-image, so N retirements write N rows. DISCLOSED RATHER THAN LEFT TO BE FOUND: the ticket's Fix: line said to loop the call HERE, in step 5, and its own QA line said "old body … fixed body" — the function. Shipped in the function, for two reasons: this file says six times over (SES-86 phase 3, v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129) that a rule each cycle must remember gets silently forgotten, and drain_epic_next has TWO call sites — step 5 AND step 9's tail Gate B (SES-139) — which a step-5-only loop would leave broken while a real pick sat behind a completed directive. QA was discriminating, one fixture, one transaction, one variable: two retire-ready fixture directives ahead of a pickable one, run against a control function carrying the RETIRED body and then against the shipped one — control returns retired/no pick/1 retirement, shipped returns pick=SES-93/2 retirements, both with a before-image each. The fixture was built and exercised inside a ROLLED-BACK transaction rather than cleaned up afterwards, because a runner may never create a drain row (property 5) and a committed fixture drain is visible to the peer cycles running concurrently (register B42) — uncommitted rows are invisible under read-committed, so nothing was ever exposed and nothing was left to clean. Verified after: 0 stray fixture rows, 0 stray before-images from this cycle, control function gone, exactly 1 drain_epic_next overload (.claude/rules/supabase-function-signature.md), John's two live drains untouched and still queued. Doc + function; no src/api/lib change, no site change. -->
-<!-- DeepBench v7.0.210 | runbooks/runner-cycle.md | SES-164 — the 45-stamp header pile is TRIMMED to the newest stamp. MEASURED before the edit: 45 stamps, 69,918 of 205,135 chars — 34.1% of this file — which every Automated cycle re-read in full, and which had grown past what a single Read call returns. The stamp convention itself STAYS (one stamp per ship, newest at top); what changes is that it no longer accumulates without bound. The 44 retired stamps are preserved VERBATIM in docs/SESSIONS.md under 'Appendix — retired runner-cycle.md header stamps', and all 45 remain in git history. THE ONE THING A TRIM LIKE THIS CAN DESTROY, checked rather than assumed: nine of ten spot-checked editor warnings were already restated in the body below; the tenth — SES-154's pick-vs-retirement predicate warning — appeared ZERO times outside its stamp, so it was relocated into step 5's drain property list, next to the call it protects. Body otherwise byte-identical: proven by sha256 over everything below this header, before and after, with only that insertion differing. Cap going forward: docs/runbooks/session-hygiene.md check 7 (the stamp cap — renumbered from a duplicate "6" 2026-08-23). -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -639,6 +639,106 @@ page carries every ask in `briefing-state` forever, so **every** cycle re-reads 
 stored, and only the `uniq_card_ask (target_id, asked_at, question)` constraint stops the log
 duplicating on every rebuild. Full contract, including the required More-info panel fields and
 the required Yes/No consequence lines: `briefing-page.md`'s More-info section.
+
+**2b. VISION COMMENT ROUTING — every Requirement becomes exactly ONE artifact, and John is told
+which one (`SES-158`, `v7.0.227`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 5,
+John 2026-08-23).** Runs in the step-9 serial tail with the rest of the harvest, under the publish
+lease. His framing, verbatim: *"a misroute costs John one correcting comment"* — and **he does not
+pre-label the route.** That is the whole design constraint: the runner decides, and the only thing
+that makes a wrong decision cheap is that the card says out loud what the comment became.
+
+```sql
+-- The trigger. 0 rows = nothing owed; this is the normal case and says nothing on the page.
+SELECT id, target_ref, body, created_at
+  FROM public.briefing_comments
+ WHERE target_kind = 'vision' AND author = 'john'
+   AND kind = 'requirement' AND harvested_cycle IS NULL
+ ORDER BY created_at;
+```
+
+**Read the WHOLE thread before routing, never the flagged comment alone (decision 4).** A question,
+its answer, and *"do that"* are **one** requirement, and the flagged row is usually only the last
+third of it:
+
+```sql
+SELECT author, kind, body, created_at
+  FROM public.briefing_comments
+ WHERE target_kind = 'vision' AND target_ref = '<the row''s target_ref>'
+ ORDER BY created_at;
+```
+
+**THE TWO OBLIGATIONS ARE SEPARATE, AND COLLAPSING THEM IS THE DEFECT THIS RULE EXISTS TO PREVENT.**
+Decision 5 carries two sentences that read like one — *"routes … into corpus update / research
+ticket / feature ticket"* and *"**every** interaction must leave the corpus richer … never just a
+status flip."* Read as a single rule, `corpus-update` becomes merely one of three routes, and a
+comment routed to `feature-ticket` then leaves the corpus **no richer** — flatly contradicting the
+second sentence. So:
+
+- **The ROUTE names the artifact the comment BECAME.** Exactly one of `corpus-update` /
+  `research-ticket` / `feature-ticket`. Never zero, never two. It is stored in
+  `briefing_comments.routed_to` on the requirement row.
+- **The CORPUS WRITE is UNCONDITIONAL** — it runs on all three routes, `feature-ticket` included.
+  `corpus-update` as a *route* means *"the artifact is the claim itself"*, never *"this is the one
+  path on which the corpus gets written."*
+
+**Choosing the route, with the fail-direction stated rather than left to taste:**
+
+| Route | The thread is… | Artifact |
+|---|---|---|
+| `corpus-update` | teaching what to build or not build — a belief, a constraint, a rejection | a `public.vision_claims` row |
+| `research-ticket` | asking something the corpus cannot answer yet | a backlog ticket to go find out |
+| `feature-ticket` | naming a thing to build | a backlog ticket to build it |
+
+**Uncertain between `research-ticket` and `feature-ticket` → `research-ticket`.** It is the cheaper
+error: research that finds the answer obvious becomes a feature ticket next cycle, while a feature
+ticket filed on an unresearched premise spends build capacity and lands on John's page as work he
+has to reject. Uncertain whether it is a requirement at all → **it is a question** (decision 3's
+cheap failure direction) — leave it, answer it on the card, and route nothing.
+
+**THE ROUTING COMMENT IS MANDATORY AND IS THE HALF MOST LIKELY TO BE SKIPPED.** It is what makes a
+misroute cost one comment instead of going unnoticed, and the route it is easiest to skip it on is
+`corpus-update`, which produces no ticket id to report and therefore feels like nothing happened.
+Write it in John's register, naming what the comment became — **ID + title**, never a bare id, per
+the ticket-title rule at the head of this file. Order, before-image first on every write (§19v):
+
+```sql
+-- 1. the corpus write (unconditional, whatever the route) — a vision_claims row.
+-- 2. then stamp the requirement row.
+UPDATE public.briefing_comments
+   SET routed_to = '<corpus-update|research-ticket|feature-ticket>',
+       harvested_cycle = '<your cycle id>'
+ WHERE id = '<the requirement row''s id>' AND harvested_cycle IS NULL
+RETURNING id, routed_to;          -- 0 rows = a peer harvested it; leave it alone
+
+-- 3. then the routing comment, back on the SAME target.
+INSERT INTO public.briefing_comments (target_kind, target_ref, author, kind, body)
+VALUES ('vision', '<the same target_ref>', 'runner', 'routing',
+        '<what it became, ID + title, one sentence in John''s register>');
+```
+
+Four boundaries, each of which is how this gets built wrong:
+
+- **`harvested_cycle IS NULL` in the UPDATE's `WHERE` is the idempotence**, the same shape as the
+  decision harvest's `AND decision IS NULL`. Under parallel cycles two peers can read the same
+  requirement; only the one whose UPDATE returns a row may write the routing comment, or John gets
+  the same routing told to him twice.
+- **Never route a comment the runner itself authored.** The trigger filters `author = 'john'` for
+  exactly this reason — a routing comment is itself a `briefing_comments` row, and a predicate that
+  forgot the author would route its own output forever.
+- **Filing the ticket claims its id atomically**, one `feature_id_counter` block call, never a
+  hand-count (`CLAUDE.md`; `SES-18` is the collision that rule is written from). Same boundary
+  `heal-engine.js` keeps at step 8b.
+- **A rejection is a KEPT ROW, never a deletion** — decision 5, and `SES-157`'s ruling that
+  `vision/rejected-paths.md` is a retired stub. A rejected claim is `status = 'rejected'` with its
+  `provenance` set (`ck_vision_claim_decided` enforces that), because rejections teach what not to
+  build.
+
+**No page-side surface exists for this yet, and that is deliberate.** The comment box and the
+Question/Requirement toggle are `SES-156`, gated on John's Accept. This rule ships **before** its
+inputs for the reason this file has already paid for eight times (`SES-86` phase 3, `v7.0.146`,
+`SES-101`, `SES-111`, `SES-127`, `SES-128`, `SES-129`, `SES-143`): a rule that arrives after the
+first comment gets improvised once, and the improvisation becomes the precedent. Guarded by
+`tests/regression/SES-158-vision-routing.js`.
 
 **3. Check the walls (two-track budget — John, 2026-08-20, `design-runner-gov-0820`).** A
 wall-stop still runs the step-9 serial tail (its record must be written), then ends. **Known
