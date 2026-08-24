@@ -198,7 +198,11 @@
   available queued ticket and runs it on the same schedule. Still exactly ONE build per cycle;
   carded tickets go pending immediately so no cycle re-trips on them. Only walls and blockers
   legitimately end a cycle build-less.
-- **B25. "Next up" visibility + run-early (John, 2026-08-20):** the briefing shows the queue's
+- **B25. "Next up" visibility + run-early (John, 2026-08-20) — RETIRED (recorded 2026-08-24,
+  attended decision-drain, on John's SES-176 Accept): the "Next up" top-five section was struck
+  by John's explicit removal (`SES-124`/`SES-126`; runner-cycle.md step 7: "Do not reinstate the
+  struck B25/B26 sections"). Its replacement is §8's queue matrix and §11's now-tier census
+  (`v7.0.161`). Historical text follows:** the briefing shows the queue's
   **top five** (queue #, ticket ID, named class, short title, gated flag) so John can see what
   upcoming cycles will do and choose to run the schedule early. Run-now (mobile app /
   claude.ai/code/routines) consumes queue #1 **without shifting the fixed clock schedule**;
@@ -277,9 +281,11 @@
   **Not yet built, and named so it is not assumed:** B23's pins. When they land, a pin sorts
   **above** `automation_rank` — John's live tap outranks a standing build order.
   **Second half of his line NOT actioned, carded instead:** "run as many in parallel as possible"
-  collides with the `runner_lease` (B31), the single-runner control added *after* two cycles built
-  `ADM-1` v1 simultaneously. That is his call, not a cycle's — `gated_before_build` card, per B27
-  outcome 3.
+  collides with the `runner_lease` (B31 — since SUPERSEDED by B42, recorded 2026-08-24, attended
+  decision-drain, on John's SES-176 Accept: the one-runner mutex is retired, parallel cycles are
+  the design, and the lease survives only as the serial tail's publish lock), the single-runner
+  control added *after* two cycles built `ADM-1` v1 simultaneously. That call was John's and he
+  made it (2026-08-21, register B42): run in parallel — the question this card carried is settled.
 - **B33. Heal engine v1 shipped, as built (SES-89, v7.0.108, 2026-08-20):** groups failed
   `public.durable_hops` rows into `(capability_slug, error_class)` signatures, fires at ≥3
   occurrences in a 14-day window, dedups forever on a 12-hex `sig_hash` written into the filed
