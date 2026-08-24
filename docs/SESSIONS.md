@@ -5,6 +5,61 @@
 
 ---
 
+## session/cycle-20260824-2340 (v7.0.237, 2026-08-24, runner cycle `edd2471d-4114-40ad-9bf0-870f031f1980`, `trigger = scheduled`, verdict `run` on John's 1h clock grid — model Opus 5, kickoff design delegated to Fable 5) — LAV-30 (partial): gate 6 stops reporting the platform's own early-credit frames as missing receipts
+
+**`LAV-30` — Receipt copy polish: failing jargon and number-truth gates on agent accounts** —
+clause (b)'s exemption tail built, ticket left `partial` (`P5 - Enhancements`, tier `now`, queue 23
+— the first buildable ticket on the board; see the blocked prefix below). Kickoff
+`docs/kickoffs/v7.0.237-LAV-30-early-credit-presence-exemption.md`. **1 file** —
+`tests/regression/lav-28-receipt-gates.js` — plus the standard close-out set. No `src`/`api`/`lib`
+change, no schema change, no migration, no site change.
+
+**THE DEFECT, MEASURED ON THE FILE BEFORE A LINE CHANGED.** `api/capabilities/execute.js` emits six
+`delegation_complete` frames. Four credit a completed nested call and harvest `account` from its
+result, so a null account there is a real missing receipt. **Two do not**: the `request_help` +
+`delegationRequired` self-credit (`:853`, `S-LOO-015`) and the `delegate_to_agent` originator
+self-credit (`:999`, `LOO-011`/`LOO-014`) hardcode `account: null` and say so in their own `LAV-28`
+comments — they fire **before** the nested dispatch resolves, so no completed result exists to
+account for. Gate 6 read both as defects (`completion carries no account`) and, worse, spent the
+`SCHEMA_LESS_INTENT_COUNT` coverage budget on them, so a genuine coverage regression could hide
+behind frames the platform never had an account for. Proven with a scratchpad probe carrying the
+emitter's exact field shape: **5 of 6 gates before, 6 of 6 after**, the predicate the only variable.
+
+**THE DISTINCTION THE NEXT EDITOR WILL BE TEMPTED TO COLLAPSE, and the reason the predicate is
+structural.** The obvious form — *exempt a frame whose `account` is null* — exempts **every failure
+gate 6 exists to catch** and leaves a vacuous gate behind. A self-credit has no counterpart, so
+those two sites, and only those two, pass `fromAgentId`, `fromCapabilitySlug` and `from_span_id` as
+**null literals**; all four genuine sites carry a real `fromAgentId` and a real `from_span_id`. That
+triple is read from the emitter, not inferred from a capture, and `isEarlyCreditFrame()` matches it
+in full — a partial-signature control asserts that matching one field is not enough.
+
+**QA was discriminating rather than merely green, and both mutations were run and restored.**
+Replace the predicate's body with `(f.account ?? null) === null` → the **pre-existing** group-2
+gate-6 case fails (a genuine accountless completion sails through). Replace it with `false` → the
+new positive fixture fails (a change that does nothing must be visible). Coverage-budget arms are
+paired on one variable: 8 genuine gaps plus an early credit must report **8**, never 9; 7 genuine
+gaps plus an early credit must not trip the line at all. Regression suite **59/59**, `npm run build`
+green. Both mutations are now written into the file's own re-runnable mutation list.
+
+**WHAT DID NOT SHIP, AND WHY IT IS A CARD RATHER THAN A QUIET OMISSION.** `LAV-30`'s other halves
+are John's calls, not gate mechanics. **(a)** Michelle Manning's `agent-selection-intent` accounts
+say "capability" and one names the recipient — a Skill-content fix on the Trainer path; read live
+this cycle, that Skill's `method` is **empty**, so it is authoring rather than a copy edit, and only
+a live captured run could prove it. **(b) head** is the number-truth policy decision — may accounts
+cite only platform-measured counts, or does gate 5 gain a spoken-but-unmeasurable tier? Gate 5 is
+byte-identical this session, deliberately, ahead of that call. **(c)** was already moot via
+`LAV-32`.
+
+**THE BOARD'S TOP IS DECISION-STARVED, and that is this cycle's other finding.** The M2 drain
+returned `SES-176 — Truth tripwire: cross-file consistency checks on every commit` as its pick for
+the **17th** recorded skip: it carries `design_status = 'needs-john'` while the only card it has is
+its **ship** card, which John Accepted at 14:47Z — so the flag names an ask nothing on the page is
+currently carrying. Below it, `SES-177` and `SES-136` are `delivered` (awaiting his verdict),
+`SES-156`/`SES-161`/`SES-159`/`AGT-015` are `needs-john`, `SES-180` is `needs-desktop`,
+`SES-167`/`SES-168` are `removal proposed`, and `SES-182`/`SES-160` name unbuilt dependencies
+(`SES-191`, `SES-159`). The first ticket an unattended cycle could build was queue **23**. No
+`design_status` was rewritten — re-flagging is his call, made in an attended session.
+
 ## session/cycle-20260824-2315 (v7.0.236, 2026-08-24, runner cycle `29dbb108-cd65-48ad-be81-8579e29f17c9`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5, no subagent) — SES-177 (b): the standing brief's derivable half becomes a generated block
 
 **`SES-177` — Generate CLAUDE-STATE.md and session narratives from tables — no hand-written state**
