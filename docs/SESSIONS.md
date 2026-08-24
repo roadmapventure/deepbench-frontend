@@ -5,6 +5,108 @@
 
 ---
 
+## session/cycle-20260824-0322 (v7.0.215, 2026-08-24, runner cycle `c9d32e9a-9c96-428f-ba7a-68d16c9ef7d5`, `trigger = scheduled` — fired manually, model Opus 5, no subagent) — SES-189: a retired drain directive no longer eats the cycle's whole drain call
+
+**`SES-189` DELIVERED** (Tooling · `P10 - Tooling`, tier `now`, queue 6 at pick, automation lane
+rank −39), awaiting John's Accept. Two files (`docs/runbooks/runner-cycle.md`, kickoff
+`docs/kickoffs/v7.0.215-SES-189-drain-directive-advance.md`), one migration
+(`ses189_drain_advance_past_retired`), plus one repair to a test file this cycle did not write
+(below).
+
+**THE FIRE.** Off the cron grid (:21 against `runner_settings.cron_minute` = 40) and
+`get_session` reports `origin = force_run_trigger`, so `scheduler_gate()` returned
+`run` — *"manual fire (started off the cron grid) — never paced"*. John had typed a fresh meter
+reading into the briefing at `03:19Z` and tapped Run a cycle now two minutes later. A peer cycle
+(`50592275`) opened 40 seconds ahead of this one; parallel cycles are the design (register B42) and
+the claim is what kept the two apart.
+
+**THE PREMISE, REVALIDATED AT PICK TIME AND HELD.** Read live from
+`pg_get_functiondef(public.drain_epic_next)`, not recalled: the body selected exactly one queued
+directive (`WHERE type='drain-epic' AND status='queued' ORDER BY created_at LIMIT 1`) and, on
+`open_now = 0`, wrote the before-image, closed the directive and **RETURNED** `retired`. It never
+read the next one. So a cycle whose call landed on a completed directive spent its whole drain call
+on bookkeeping and fell through to the class-sorted board, and John's *next* standing drain waited
+for the following fire — which is what he watched happen on 2026-08-23 with M0/M1/M2 queued in
+sequence: one retirement per cycle, one stale directive each, M2's first pick two grid slots out.
+
+**THE FIX.** `ses189_drain_advance_past_retired` turns that single scan into a bounded loop
+(guard 32, a runaway backstop only — a retired row leaves the `status='queued'` predicate, so the
+loop advances by construction). It keeps advancing while directives retire and acts on the first
+`pick` / `blocked` / `unscoped` / `none`. **Every outcome word keeps its existing meaning**, so
+nothing downstream learns a new vocabulary: `retired` now means *this call closed at least one
+drain and found nothing else actionable*, carrying the last directive it closed and possibly having
+closed more than one; `none` stays reserved for *no queued drain-epic row at all*.
+
+**WHAT DID NOT MOVE, which is the whole boundary of the ticket.** *It changes WHEN in a cycle the
+next directive is read, never WHO decides.* No predicate changed: retirement still requires every
+**named** member (`runner_drain_scope`, `SES-142`) `done`/`removed`, with `delivered` still
+deliberately absent from that side (`SES-154` — a drain retires on John's acceptance, never on the
+runner's own say-so); the pick predicate is byte-identical; property 5 stands — nothing here
+creates a drain row. Each retirement still writes its own `runner_before_images` row before its
+UPDATE, so N retirements in one call write N before-images.
+
+**THE ONE DEPARTURE FROM THE TICKET, DISCLOSED RATHER THAN QUIET.** The ticket carries two
+statements of where the fix goes and they disagree: its **Fix:** line says
+*"runner-cycle.md step 5 loops `drain_epic_next(cycle_id)`"* (a runbook loop each cycle applies by
+hand); its **QA** line says *"old **body** … fixed **body**"*, which on this platform means a
+function body. This cycle shipped the function-side loop, for two reasons: (1) `runner-cycle.md`
+says in its own words six times over (`SES-86` phase 3, `v7.0.146`, `SES-101`, `SES-111`,
+`SES-127`, `SES-128`, `SES-129`) that a rule each cycle must remember is a rule that gets silently
+forgotten, and a runbook loop would be the seventh instance of the pattern those tickets each paid
+to remove; (2) `drain_epic_next` has **two** call sites — step 5's selection and step 9's tail
+Gate B (`SES-139`'s in-session drain continuation) — and a step-5-only loop leaves the chain
+declining to continue while a real pick sits behind a completed directive. If John meant the
+runbook form, his Reject reopens it on the record.
+
+**QA — DISCRIMINATING, ONE FIXTURE, ONE TRANSACTION, ONE VARIABLE.** Two retire-ready fixture
+directives ahead of one pickable, all dated 2000 so they sort ahead of John's live M1/M2. Arm A
+called a control function carrying the **retired** body; arm A's mutation was then undone inside
+the same transaction and arm B called the shipped body against the identical fixture.
+
+| Arm | outcome | pick | directives retired | before-images |
+|---|---|---|---|---|
+| A · control (retired body) | `retired` | — | 1 | 1 |
+| B · shipped (`SES-189` body) | `pick` | `SES-93` | **2** | **2** |
+
+Would it still pass if the change did nothing? No — arm B would equal arm A. **The fixture was
+built and exercised inside a transaction that was ROLLED BACK rather than cleaned up afterwards,
+and that is a rule being obeyed rather than dodged:** a runner may never create a drain row
+(`drain_epic_next` property 5), and a *committed* fixture drain is visible to the peer cycles
+running concurrently, which could pick from it. Uncommitted rows are invisible under
+read-committed, so nothing was ever exposed and there was nothing to clean. Verified after the
+rollback: 0 stray fixture directives, 0 stray scope rows, 0 stray before-images attributable to
+this cycle, the control function gone, exactly **1** `drain_epic_next` overload
+(`.claude/rules/supabase-function-signature.md`), and John's two live drains still `queued` and
+untouched. A live call on the real board returned `pick` before and after the migration —
+unchanged behaviour where nothing was meant to change.
+
+**A REPAIR THIS CYCLE DID NOT OWE, AND THE LEDGER CLAIM IT CORRECTS.**
+`tests/regression/SES-187-title-gate.js`, shipped one hour earlier at `v7.0.214`, ran its seven
+assertions at module top level and printed its own `[PASS]` line but exported no default async
+function and did not import `_lib/self-run.js`. `run-all.js` therefore failed it twice — once
+directly, once through `SES-28-self-run-guard.js` — and the suite stood at **47/49**. The
+`v7.0.214` cycle's ledger records *"regression 48/48 with credentials"*; that did not hold. The
+seven assertions are byte-identical in content and order; only the wrapper changed. Suite now
+**49/49**, `npm run build` green.
+
+**ALSO OBSERVED, AND IT CONTRADICTS A TICKET FILED AN HOUR AGO.** `SES-188` says *"both documented
+read paths … return only the artifact HEAD, never the `briefing-state` block"*, and two cycles
+declined to republish the briefing on that basis. Measured this cycle: `Artifact` action `read`
+**is** truncated to the head, as the ticket says — but `WebFetch` on the same URL returned the
+complete `briefing-state` JSON block, from which this cycle read John's `03:19Z` night reading
+(`all` 60, `fable` 67, `h5` 0) at step 2, before this file was written. Half the ticket's premise is
+dead; the other half is real. It was left open rather than removal-proposed on that split, with the
+measurement recorded here and on the cycle row for whichever cycle picks it. Whether the *republish*
+half also works is settled in this cycle's serial tail, after this commit — the cycle row carries
+that result, not this paragraph.
+
+**SKIPS RECORDED (`SES-127`).** `SES-155`, `SES-156`, `SES-158` — all three wait on John's decision
+on `SES-155`; `public.briefing_comments` does not exist (checked live), so the two dependants would
+render threads from a table that is not there. `SES-154` and `SES-157` are `delivered` and were
+stepped past silently, their ship cards already carrying the ask (`SES-154`'s own rule).
+
+---
+
 ## session/cycle-20260824-0241 (v7.0.214, 2026-08-24, runner cycle `e42f8d4e-ee71-49db-a472-96470d3fe7d2`, `trigger = scheduled`, model Opus 5, 1 Fable 5 subagent) — SES-187: the board's broken titles become real titles
 
 **`SES-187` DELIVERED** (Tooling · `P9 - Bug Fixes`, tier `now`, queue 6 at pick), awaiting John's
