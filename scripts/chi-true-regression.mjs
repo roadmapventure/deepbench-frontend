@@ -1,3 +1,25 @@
+// DeepBench v7.0.251 | scripts/chi-true-regression.mjs | SES-71 -- AN ACCOUNT-LEVEL FAILURE IS
+// UNMEASURED, NEVER FAIL, and the run stops instead of grinding through a dead account. Measured
+// live 2026-08-01 (S-HAR-02b QA): when the Anthropic account exhausted its usage on 2026-07-31
+// ~23:00 UTC (SES-66's class, reset at the month boundary), every thrown error became
+// `terminal: "infra_death"` / `case_pass: false`, so ONE cap window turned 15 cases nobody ran into
+// a 9-FAIL gate read. A gate that reports FAIL having measured nothing is worse than one that
+// reports nothing: it sends the next session hunting a regression that does not exist, and it buries
+// the only fact that mattered.
+// THE THREE-VALUE RULE, and the one-liner an editor will substitute for it: `case_pass` now has
+// THREE values and `null` IS NOT `false`. The expression that caused this bug is
+// `record.case_pass ? "PASS" : "FAIL"` -- correct-looking, and it prints FAIL over null because null
+// is falsy. Every verdict site therefore tests `=== true` / `=== null` explicitly, and the run
+// verdict is derived by summarizeRun() in scripts/lib/regression-outcome.mjs rather than by an
+// inline `every(r => r.case_pass)`. That reducer is in a separate, I/O-free module for a reason that
+// is not tidiness: this file calls loadBypassSecret() at module scope and process.exit(1)s without
+// credentials, so a guard importing THIS file could never run in CI and would have to re-implement
+// the logic it guards -- the defect SES-45 is filed about.
+// THE DISTINCTION THAT DOES THE WORK: `err.upstreamStatus`, never `err.status`. A 400 from OUR api
+// is a malformed request and must still FAIL; a 400 from UPSTREAM on a request our own API accepted
+// is the usage-cap signature. Keying it on `status` would reclassify genuine request-shape bugs as
+// "unmeasured" and leave the suite unable to fail at all -- this bug with the sign flipped.
+// Guarded by tests/regression/SES-71-unmeasured-outcome-class.js.
 // DeepBench v7.0.34 | scripts/chi-true-regression.mjs | LOG-121 -- every request this driver makes
 // now carries the x-db-call-source: regression header, so a regression run's rows are attributable
 // instead of landing in the same undifferentiated pile as John's CHI clicking and live QA.
@@ -102,6 +124,11 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { resolveNewsCardContext } from "../src/lib/newsCardContext.js"; // FEATURE: SES-57
+// FEATURE: SES-71 -- account-level failures are UNMEASURED, never FAIL. The logic lives in its own
+// pure module so tests/regression/SES-71-unmeasured-outcome-class.js can import the real functions:
+// this file calls loadBypassSecret() at module scope and process.exit(1)s without credentials, so a
+// guard that imported THIS file could never run in CI and would have to re-implement what it guards.
+import { classifyInfraError, summarizeRun, ACCOUNT_DEATH_ABORT_N } from "./lib/regression-outcome.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -681,9 +708,13 @@ function executeCaseJourney(caseObj, ctx, judgeVerdicts) {
 // Task 3 -- the report.
 // ================================================================================================
 
-function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError, card_headline, card_url, article_source, article_degraded, article_unavailable_reason }) {
+function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_ms, flagged, resolution_applied, ctx, probe, judgeVerdicts, rejectionOccurred, infraDeath, infraError, accountDeath, unmeasuredReason, card_headline, card_url, article_source, article_degraded, article_unavailable_reason }) {
   const fail_causes = [];
-  if (infraDeath) fail_causes.push(`infra_death: ${infraError || "unrecovered transient failure"}`);
+  // FEATURE: SES-71 -- an account-level death produces NO fail cause. It is not a finding about the
+  // platform, so it must not be dressed as one; the reason it was not measured is recorded in its
+  // own field instead. Every other branch below is already gated on !infraDeath, so this one line
+  // plus the case_pass override is the whole of the behaviour change here.
+  if (infraDeath && !accountDeath) fail_causes.push(`infra_death: ${infraError || "unrecovered transient failure"}`);
   if (rejectionOccurred) fail_causes.push("rejection");
   const bucket = actual_journey ? actual_journey.split("+")[0] : null;
   if (!infraDeath && bucket !== expected_journey) fail_causes.push(`journey_deviation (expected ${expected_journey}, got ${actual_journey})`);
@@ -704,7 +735,12 @@ function finalizeCase({ n, id, expected_journey, actual_journey, terminal, wall_
     // FEATURE: AGT-36 -- runbook §5b's class on the record itself, so a reader of REPORT_JSON can
     // see which bar this case was scored against without re-deriving it from the question id.
     outcome_class: ctx?.outcome_class || "rich-answer",
-    probe, judge_verdicts: judgeVerdicts, case_pass: fail_causes.length === 0, fail_causes,
+    // FEATURE: SES-71 -- `case_pass: null` is the UNMEASURED marker, and it is a third value rather
+    // than a flavour of false. summarizeRun() and every downstream reader test `=== true`, so an
+    // unmeasured case can never be counted as a pass; and because it is not `false` either, it can
+    // never be counted as a regression the platform caused.
+    probe, judge_verdicts: judgeVerdicts, case_pass: accountDeath ? null : fail_causes.length === 0, fail_causes,
+    ...(unmeasuredReason !== undefined ? { unmeasured_reason: unmeasuredReason } : {}),
     // FEATURE: SES-31 (Task 3) -- case 24's news-door identity/degradation fields, dropped by the
     // previous version of this function (S-SES-29 finding, a runbook §7 "report the degradation
     // prominently" breach). Present only on case 24's record; every other case's outcome never sets
@@ -733,6 +769,12 @@ async function runOneCase(caseObj) {
   // FEATURE: AGT-36 -- the class is on BOTH ctx objects, so an infra-death record carries it too.
   let lastCtx = { recoveries: [], trace_ids: [], outcome_class: caseObj.outcome_class || "rich-answer" };
   let lastJudge = [];
+  // FEATURE: SES-71 -- one class per thrown attempt. A case counts as account-dead only when EVERY
+  // attempt died account-level; a mixed case (a real case error on one attempt, a cap error on the
+  // other) stays a FAIL. That is the conservative direction on purpose -- the cost of calling a
+  // real failure "unmeasured" is a regression that ships, while the cost of the reverse is one
+  // wasted investigation.
+  const errorClasses = [];
   // Transient-death handling (runbook §4 tail note): one fresh full re-run of the whole case on any
   // thrown error; a second death is an infra-class FAIL, no probe.
   while (attempt < 2 && !outcome) {
@@ -746,9 +788,12 @@ async function runOneCase(caseObj) {
       outcome = { ...result, ctx, judgeVerdicts };
     } catch (e) {
       lastError = e;
+      errorClasses.push(classifyInfraError(e)); // FEATURE: SES-71
     }
   }
   const wall_ms = Date.now() - t0;
+  // FEATURE: SES-71
+  const accountDeath = !outcome && errorClasses.length > 0 && errorClasses.every(c => c === "account");
   const record = outcome
     ? finalizeCase({
         n: caseObj.n, id: caseObj.id, expected_journey: caseObj.expected_journey,
@@ -762,17 +807,41 @@ async function runOneCase(caseObj) {
       })
     : finalizeCase({
         n: caseObj.n, id: caseObj.id, expected_journey: caseObj.expected_journey,
-        actual_journey: null, terminal: "infra_death", wall_ms, flagged: false,
+        // FEATURE: SES-71 -- the terminal names WHICH kind of death this was. `infra_death` stays
+        // exactly what it always meant (this case died and that is a finding); `unmeasured` is the
+        // new, distinct class the ticket asks for.
+        actual_journey: null, terminal: accountDeath ? "unmeasured" : "infra_death", wall_ms, flagged: false,
         resolution_applied: caseObj.resolution || null, ctx: lastCtx,
         probe: null, judgeVerdicts: lastJudge, rejectionOccurred: false, infraDeath: true, infraError: lastError?.message,
+        accountDeath,
+        unmeasuredReason: accountDeath ? `account_error: ${lastError?.message || "account-level failure"}` : undefined,
       });
   // FEATURE: SES-31 (Task 3) -- loud degradation marker on the per-case progress line (runbook §7
   // "report the degradation prominently").
   const degradedMarker = record.article_degraded ? " *** ARTICLE DEGRADED ***" : "";
   // FEATURE: AGT-36 -- so a reader can see why a pass:false verdict from Owen did not fail the case.
   const classMarker = record.outcome_class === "honest-gap" ? " [honest-gap]" : "";
-  console.log(`[${caseObj.n}/24] ${caseObj.id}${classMarker} -- ${record.case_pass ? "PASS" : "FAIL"} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${degradedMarker}`);
+  // FEATURE: SES-71 -- three words on this line, not two. `record.case_pass ? "PASS" : "FAIL"` is
+  // the exact expression that printed FAIL over 15 cases nobody ran, because null is falsy.
+  const verdictWord = record.case_pass === null ? "UNMEASURED" : record.case_pass ? "PASS" : "FAIL";
+  const unmeasuredMarker = record.unmeasured_reason ? ` ${record.unmeasured_reason}` : "";
+  console.log(`[${caseObj.n}/24] ${caseObj.id}${classMarker} -- ${verdictWord} (${record.terminal}, ${wall_ms}ms)${record.fail_causes.length ? " causes=" + record.fail_causes.join(",") : ""}${unmeasuredMarker}${degradedMarker}`);
   return record;
+}
+
+// FEATURE: SES-71 -- the record for a case the run never reached, after the account-death abort.
+// It carries the same shape as every other record (`case_pass: null`, `terminal: "unmeasured"`) so
+// a reader of REPORT_JSON needs no second code path, and it says plainly that it was not run rather
+// than leaving a hole in the case list for someone to interpret.
+function notRunRecord(caseObj, abortedAfterCase) {
+  return {
+    n: caseObj.n, id: caseObj.id, expected_journey: caseObj.expected_journey, actual_journey: null,
+    terminal: "unmeasured", wall_ms: 0, flagged: false,
+    resolution_applied: caseObj.resolution || null, recoveries: [], trace_ids: [],
+    outcome_class: caseObj.outcome_class || "rich-answer",
+    probe: null, judge_verdicts: [], case_pass: null, fail_causes: [],
+    unmeasured_reason: `not_run: run aborted after ${ACCOUNT_DEATH_ABORT_N} consecutive account-level failures (last case run: #${abortedAfterCase})`,
+  };
 }
 
 async function main() {
@@ -799,19 +868,56 @@ async function main() {
 
   const run_start = new Date().toISOString();
   const results = [];
-  for (const c of selected) results.push(await runOneCase(c));
+  // FEATURE: SES-71 -- fail fast once the ACCOUNT is dead. Before this the loop ran all 24 cases
+  // into an exhausted account and recorded each as a FAIL; the incident turned 15 unmeasured cases
+  // into a 9-fail gate read. The counter resets on any measured case, so a lone transient death
+  // mid-run cannot accumulate toward the abort.
+  let consecutiveAccountDeaths = 0;
+  let aborted_after_case = null;
+  for (let i = 0; i < selected.length; i++) {
+    const record = await runOneCase(selected[i]);
+    results.push(record);
+    const isAccountDeath = record.terminal === "unmeasured"
+      && typeof record.unmeasured_reason === "string"
+      && record.unmeasured_reason.startsWith("account_error");
+    consecutiveAccountDeaths = isAccountDeath ? consecutiveAccountDeaths + 1 : 0;
+    if (consecutiveAccountDeaths >= ACCOUNT_DEATH_ABORT_N) {
+      aborted_after_case = selected[i].n;
+      console.log(`ABORTING: ${consecutiveAccountDeaths} consecutive account-level failures -- the account or network is down, not the platform. Remaining cases are recorded UNMEASURED, not FAIL.`);
+      for (const c of selected.slice(i + 1)) results.push(notRunRecord(c, aborted_after_case));
+      break;
+    }
+  }
   const run_end = new Date().toISOString();
 
-  const run_pass_server_side = results.length === 0 ? null : results.every(r => r.case_pass);
+  // FEATURE: SES-71 -- the verdict is derived by the shared pure reducer, not by an inline
+  // `every(r => r.case_pass)` that reads null as false.
+  const summary = summarizeRun(results);
+  const run_pass_server_side = summary.run_pass_server_side;
+  if (summary.unmeasured > 0) {
+    console.log("########################################");
+    console.log(`# NOT A COMPLETE REGRESSION RUN         #`);
+    console.log(`# ${summary.unmeasured} of ${summary.total} cases UNMEASURED -- verdict is null, not FAIL`);
+    console.log("########################################");
+  }
   const report = {
     run_start, run_end,
     cases: results,
     run_pass_server_side, // browser leg (runbook §6) is outside this script and outside this field
-    banner: SKIP_JUDGE ? "NOT A VALID REGRESSION RUN — --skip-judge active, no content judged" : null,
+    // FEATURE: SES-71 -- the case number the abort fired after, or null on a complete run.
+    aborted_after_case,
+    banner: SKIP_JUDGE
+      ? "NOT A VALID REGRESSION RUN — --skip-judge active, no content judged"
+      : summary.unmeasured > 0
+        ? `NOT A COMPLETE REGRESSION RUN — ${summary.unmeasured} of ${summary.total} cases unmeasured (account-level failure); run_pass_server_side is null, not false`
+        : null,
     // FEATURE: DAT-12 -- recorded so a reader of REPORT_JSON can tell a scoped run from an unscoped
     // one. A run whose retrieval_scope is absent read whatever the previous run left behind and is
     // not comparable to a scoped run.
-    totals: { baseline_cases: 24, extracted: extractedCount, cases_run: results.length, retrieval_scope: RETRIEVAL_SCOPE },
+    // FEATURE: SES-71 -- cases_run has always counted records, which after this ship includes the
+    // ones that were never exercised. cases_measured is the number any conclusion may be drawn
+    // from, and it is recorded next to it so no reader has to re-derive the distinction.
+    totals: { baseline_cases: 24, extracted: extractedCount, cases_run: results.length, cases_measured: summary.measured, cases_unmeasured: summary.unmeasured, retrieval_scope: RETRIEVAL_SCOPE },
   };
 
   console.log("REPORT_JSON_START");

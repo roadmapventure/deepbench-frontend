@@ -5,6 +5,77 @@
 
 ---
 
+## session/cycle-20260825-0441 (v7.0.251, 2026-08-25, runner cycle `b9b1e4a1-bbc7-4203-80d4-19d6a770fecf`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (23:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-71: an account-level failure is UNMEASURED, never FAIL
+
+**THE BUG IS A FALSY `null`, AND THE ONE-LINER AN EDITOR WILL SUBSTITUTE IS THE ONE THAT CAUSED IT.**
+`chi-true-regression.mjs` turned every thrown error into `terminal: "infra_death"` / `case_pass: false`,
+and the run verdict was `results.every(r => r.case_pass)`. So when the Anthropic account exhausted its
+usage on 2026-07-31 (~23:00 UTC, `SES-66`'s class, reset at the month boundary), **one cap window recorded
+15 cases nobody ran as failures**. `case_pass` now has **three** values and `null` is not `false`; every
+verdict site tests `=== true` / `=== null` explicitly, because `record.case_pass ? "PASS" : "FAIL"` is
+correct-looking and prints FAIL over `null`. Adding an `UNMEASURED` branch *beside* that expression would
+have changed nothing, which is why the guard asserts the two-value form is **gone** as well as the
+three-value form present.
+
+**THE DISTINCTION THAT DOES THE WORK: `err.upstreamStatus`, NEVER `err.status`.** `postJSON()` attaches
+both — `status` is *our* API's, `upstreamStatus` is the model provider's. A 400 from our own
+`api/capabilities/execute` is a malformed request and must still FAIL; a 400 from upstream on a request our
+API already accepted is the usage-cap signature. Keying this on `status` is the obvious simplification and
+it would reclassify genuine request-shape bugs as "unmeasured", leaving the suite **structurally unable to
+fail** — this bug with the sign flipped. Both directions are pinned.
+
+**THE REDUCER IS ITS OWN MODULE, AND THAT IS NOT TIDINESS.** The driver calls `loadBypassSecret()` at
+module scope and `process.exit(1)`s without credentials, so a guard importing it could never run in CI and
+would have had to re-implement what it guards — the defect `SES-45` is filed about, on this very suite.
+`scripts/lib/regression-outcome.mjs` holds the pure logic; the guard imports the **real** functions and
+source-asserts only the half that cannot be imported (the driver's wiring), the `SES-64` precedent.
+
+**`ACCOUNT_DEATH_ABORT_N = 2` IS DERIVED, NOT FELT.** The incident ran 15 consecutive cases into a dead
+account, so any `N >= 1` would have caught it; the binding constraint is the other direction — `N = 1`
+aborts a whole run on one unlucky case. 2 is the smallest value that cannot fire on a single case, and
+because a case is only account-dead when **both** its attempts died account-level, `N = 2` already means
+four consecutive account-level errors. The streak **resets** on any measured case, so unrelated transients
+cannot accumulate. A **mixed** case (one case error, one account error) stays a FAIL: calling a real
+failure "unmeasured" ships a regression, while the reverse costs one wasted investigation.
+
+**MEASURED, WITH THE CONTROLS RUN ON THE REAL FILE.** The guard's eleven source clauses score **0/11 on
+the pre-change driver** (`git show origin/dev:…`) and **11/11 on the shipped one**. Behaviourally, over
+`[pass, pass, unmeasured]` the shipped `summarizeRun()` returns `null` where the pre-change expression
+returns `false`, and the test asserts that **difference** rather than the new value alone. Seam proof
+(labelled): the error was built by `postJSON()`'s own constructor and classified by the shipped function —
+upstream-400 → `account`, our-own-400 → `case`, `fetch failed` → `account`; replaying the incident's shape
+at 24 cases with 15 account deaths gives `{measured: 9, unmeasured: 15, run_pass_server_side: null}`.
+**Not run and declared:** no live 24-case run — it costs real money and a usage cap cannot be provoked on
+demand.
+
+**THE VERIFIER BLOCKED THIS SHIP FIRST, AND THE BLOCK WAS RIGHT.** `scripts/verifier.js` returned
+**block** (`runner_verdicts a40a08c1`) on a red regression suite. The red was **not** this diff: it was
+`SES-177`'s pre-existing `CLAUDE-STATE.md` drift, the documented one-ship-behind lag. Close-out regenerates
+that file anyway; after `render-claude-state.js` the suite went **67/67** and a second run returned
+**approve** with `auto_done_eligible` (`dc16f21e`), so the ticket closed **`done`** under the charter's
+interim auto-accept bar rather than `delivered`. Both verdict rows are kept — the first is a true record of
+a gate that was genuinely red at the moment it ran.
+
+**WHAT THIS CYCLE FOUND ON THE BOARD, and it is worth more than the ship.** Nine of the queue's top
+tickets are decisions John owes, so nine `record_skip()` rows were written before a buildable item was
+reached: `SES-191`/`SES-180`/`SES-77` (`needs-desktop`), `SES-181`/`SES-182`/`SES-203`/`SES-156`
+(`needs-john`), the `SES-183`–`SES-186` M4–M7 design-gate block, and `SES-160`/`LOG-126`/`LOG-123`/`DAT-15`/
+`LOO-24`. **`SES-181` carried an undecided gated card (`a00e3a38`) with `design_status` left NULL** — the
+`SES-114` write its filing cycle owed — so the block was invisible to the step-5 queue read and had to be
+re-derived from prose; corrected here, before-image first, from the card's own existence.
+
+**The M3 drain cannot advance on its own, and this is the `SES-197` Gate C shape one level down.**
+`drain_epic_next()` returns the lowest-queue claimable named member and never reads `design_status`, so it
+returns `SES-191` — flagged `needs-desktop` — **every cycle, forever**, while 13 buildable named members
+sit at queue 234+. The chain terminator stops the *chain*; nothing advances the *pick*. This cycle reached
+`SES-71` by walking the drain's own scope past the flagged prefix. Named here rather than fixed: the
+tempting one-liner (a `design_status` clause in the pick predicate) is the edit `SES-197` explicitly
+forbids, because step 5 needs the flagged member returned in order to `record_skip()` it.
+
+Files: `scripts/lib/regression-outcome.mjs` (new), `scripts/chi-true-regression.mjs`,
+`tests/regression/SES-71-unmeasured-outcome-class.js` (new). No `src/`/`api/`/`lib/` change, no site change.
+
+---
 ## session/cycle-20260825-0426 (v7.0.250, 2026-08-25, runner cycle `a122842f-f984-4f43-8118-b3c079a22801`, **`trigger = chained (drain continuation)`** of `0f44f8da` — model Opus 5, no subagent) — SES-191 (still partial): the drill ran into a real project, and the recovery net did not rebuild
 
 **THE DRILL FINALLY EXECUTED, AND IT FAILED — WHICH IS THE POINT OF RUNNING ONE.** John granted the
