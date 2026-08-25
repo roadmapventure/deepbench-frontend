@@ -104,6 +104,45 @@ Every session must include a Node.js test file:
 - Deleted before committing
 - Must show `ALL TESTS PASS` to proceed
 
+### The rule that outranks every category below (`SES-45`, `v7.0.257`)
+
+**A test must assert against the REAL implementation. Logic recreated inside the test file is not a
+test — it is a second implementation agreeing with itself.**
+
+**Found live 2026-07-28 (`S-LOG-91-design`), and the specced test would have passed against the very
+bug it existed to prevent:** `LOG-91`'s Section 8 test rebuilt the merge rules as plain JS in the
+test file and asserted against its own recreation. It went green while the shipped `logAgentTurn()`
+did something different — the `SES-44` defect — which was caught by diff review, not by the suite.
+This is the adjacent hole to `SES-28`: that one fixed tests that *run* nothing; this one is a test
+that runs something that isn't the subject.
+
+**The tension with the line above is real, and resolving it by ignoring one half is the mistake.**
+Section 4's *"Pure Node.js only — no app imports"* governs the **throwaway session test**
+(`test-[session-id].mjs`, deleted before committing), where importing app modules is often genuinely
+impractical. It has never licensed **recreating** the subject. When you cannot import the real
+implementation, you assert against the real artifact some other way and **label which**:
+
+- **Import it** — the default, and the only option that needs no label. Persisted
+  `tests/regression/` files should do this.
+- **Read the shipped file** — parse or slice the real source and exercise *that* text. Two of
+  tonight's own tests do this: `SES-208-briefing-escaping.js` slices `esc`/`question`/`plainBlock`
+  out of the shipped template by brace-matching and runs them; `SES-135-briefing-render.js` builds
+  the real page with the shipped builder rather than reading a snapshot.
+- **Seam proof** — drive the real code path and intercept its edge (the `LOG-91` session's own
+  `globalThis.fetch` interception asserting the actual `ai_activity_log` POST body). **Label it a
+  seam proof in the evidence**, per Section 2 rule 7's QA bar.
+
+**The question that decides it, and it is one sentence:** *if the shipped implementation changed
+tomorrow, would this test notice?* A test that would keep passing is asserting about its own copy.
+
+**A `NOT RUN` declaration beats a recreation.** A test that cannot reach its subject should declare
+the part not-run (`tests/regression/_lib/self-run.js`'s `notRun(part, reason)`) and say so loudly,
+which `run-all.js` reports. An honest gap is information; a recreation is a false green.
+
+**Not done here, and named rather than implied:** `SES-45` also floats a `check-session-docs.js`
+lint that would flag a kickoff Section 8 block defining the function it claims to verify. That is a
+*"consider"* in the ticket, not a scoped decision, and it is left open.
+
 ### Test Categories
 
 **A. Data Shape Tests**

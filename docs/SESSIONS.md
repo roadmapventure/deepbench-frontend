@@ -5,6 +5,51 @@
 
 ---
 
+## session/cycle-20260825-0511 (v7.0.257, 2026-08-25, runner cycle `952a665d-ac77-4778-92fe-ed83d5d92645`, **`trigger = chained (drain continuation)`** — model Opus 5, no subagent) — SES-45: a test that recreates its subject is not a test
+
+**THE RULE, and it is attributed rather than left as taste.** `STANDARDS.md` Section 4 now opens
+with it: a test must assert against the REAL implementation; logic recreated inside the test file is
+a second implementation agreeing with itself. `LOG-91`'s Section 8 test rebuilt the merge rules as
+plain JS and went green while the shipped `logAgentTurn()` did something different — the `SES-44`
+defect, caught by diff review rather than by the suite. `SES-28` fixed tests that *run* nothing;
+this is the adjacent hole, a test that runs something that is not the subject.
+
+**IT HAD TO RESOLVE A TENSION, NOT IGNORE ONE.** Section 4 already opened with *"Pure Node.js only —
+no app imports"*, which reads as the opposite of this rule. It is not: that line governs the
+**throwaway session test**, and has never licensed recreating the subject. A version that does not
+say so gets "resolved" by the next reader deleting whichever half they met second, so the guard pins
+that sentence specifically. Three sanctioned shapes are named for the cannot-import case — import
+it, read the shipped file, or a labelled seam proof — because a rule that only forbids sends the
+reader straight back to a copy. And a **`NOT RUN` declaration beats a recreation**: an honest gap is
+information, a recreation is a false green.
+
+**THE GUARD OBEYS ITS OWN RULE.** It does not restate the rule and check its restatement: it reads
+`STANDARDS.md` and asserts the shipped text, **and** reads two of tonight's own regression files to
+assert they really reach their subjects — `SES-208`'s must still slice the shipped template and run
+what it sliced (and must not define its own `esc()`), `SES-135`'s must still build the page with the
+shipped builder rather than read a snapshot.
+
+**THE CONTROLS ARE THEMSELVES ASSERTED, AND IT CAUGHT A DEFECT IN THIS VERY FILE.** The
+`names-the-three-legitimate-shapes` control replaced only the FIRST "Seam proof" while the block
+names it twice, so the clause still passed with its subject removed. Fixed to replace all
+occurrences. That is the **third** time in this session that checking the controls found a fault in
+a guard rather than in its subject — the other two were `SES-208`'s control mutating a string the
+template does not contain, and `SES-135`'s first `notRun()` call passing one argument where the
+helper demands two.
+
+**Negative control:** 5 of 5 doc clauses fail on `origin/dev`'s pre-change `STANDARDS.md`.
+
+**THIS CYCLE ALSO CLEARED TWO TICKETS WITHOUT BUILDING THEM, both correctly.** `SES-130` was handed
+over by the chain gate ninety seconds after a peer set it `removal proposed` — `record_skip` and
+step past, never re-card. `SES-51` (the no-agent-names sweep) says in its own text that it needs
+John's design call, so this cycle **measured the population instead of guessing**: 22 candidate hits
+across 17 of 65 `skill_profiles`, of which **3 are lowercase agent-ID hits** (the `agent_id "alex"`
+shape `LOO-013` was) and 19 are first-name-only. Gated card filed with that split, `design_status`
+set `needs-john`. `SES-45` is `partial`: its `check-session-docs.js` lint is a *"consider"* in the
+ticket, not a scoped decision. Two files; no `src`/`api`/`lib` change, no schema change.
+
+---
+
 ## session/cycle-20260825-0511 (v7.0.256, 2026-08-25, runner cycle `1fc7dc0b-1830-4f90-b29b-63e18d1d8cbe`, **`trigger = chained (drain continuation)`** — model Opus 5, no subagent) — SES-135 (part 1 of 2): the briefing render test is kept, not thrown away
 
 **JOHN ASKED FOR TWO THINGS AND ONLY ONE OF THEM IS THE RUNNER'S.** He answered **yes** to
