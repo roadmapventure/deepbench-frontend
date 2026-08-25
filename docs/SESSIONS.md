@@ -5,6 +5,59 @@
 
 ---
 
+## session/cycle-20260825-0240 (v7.0.245, 2026-08-25, runner cycle `c8c2d547-2697-4693-95ea-b464c7b4b5b4`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (21:00 America/Chicago) — model Opus 5, no subagent) — SES-191 (partial): the drill ran off John's machine for the first time, and the recovery net does not open there
+
+**`SES-201` skipped, `SES-191` picked.** The M3 drain's lowest-queue named member is `SES-201` —
+*Rule-block coverage sweep* — flagged `needs-john` since `v7.0.244` carded it. `SES-197`'s boundary
+is that `drain_epic_next()`'s pick predicate deliberately does **not** filter `design_status`, so a
+flagged member returns forever and the cycle's job is to `record_skip()` it (`skip_count` 3) and drop
+to the next named member. That is `SES-191`, queue 7.
+
+**THE DRILL WAS RUN THE WAY THE DISASTER WOULD BE RUN, and that is the only reason it found
+anything.** `SES-191`'s premise is that M0 proved "restorable" on one 6-row table. The obvious way to
+discharge it is to restore something bigger. Instead this cycle started where the real case starts —
+**a Linux cloud container that has never held this platform**, repo access and nothing else — because
+that is precisely the scenario `SES-192`'s offsite copy exists for and the gap gate-review card
+`a458c50a` named (*"the whole restore path was one machine deep"*). Step 1 of the runbook is
+`restore-supabase.mjs --verify-only`. **It failed on all 52 tables, and the restore path then aborts
+with `Refusing to restore from an altered backup.`**
+
+**NOTHING IS ALTERED, AND THE MISLEADING MESSAGE IS THE EXPENSIVE PART.** Measured both directions
+rather than reasoned about: **0 of 52** manifest entries resolve as stored; **52 of 52** resolve after
+normalizing one path separator, with **0 checksum mismatches** across **50,841 rows**.
+`verify-backup.mjs` then returned `PASS — snapshot is complete and internally consistent` over 62
+files and 51,718 lines, and a full `--all` dry run planned every table. The set is byte-perfect.
+Root cause is one writer line-pair: `dump-supabase.mjs:159/204` build each entry with
+`path.relative()`, which emits `data\<table>.ndjson` on Windows, and both readers
+(`restore-supabase.mjs:68`, `verify-backup.mjs:28`) `path.join()` it — on POSIX that is one filename
+containing a backslash. It went unseen because **the only machine that takes dumps is the only
+machine on which both separators resolve.** Mid-outage the message sends the person restoring to
+distrust their last backup instead of a separator, which is the most expensive place to send them —
+so the workaround went into §4 of the runbook, tested verbatim before it was written down
+(`normalized 62 entries` → `Integrity: all 52 files match their checksums.` → exit 0), not into a
+ticket reference.
+
+**WHAT DELIBERATELY DID NOT SHIP, and why neither omission is timidity.** The tooling fix lives in
+`roadmapventure/deepbench-backups-offsite` — a different repo, default branch `main`, and *it is the
+recovery net*; an unattended cycle does not modify the thing the platform falls back to, and a second
+tooling copy at `C:/Projects/deepbench-backups` would diverge if only one were patched. The exact two
+edits are written into §9 so the fix is a transcription. The restore *into a target* — the half that
+would actually score charter exit criterion 5 — needs a clean Supabase project: measured, org
+`roadmapventure` is on the **free** plan, a new project is **$0/month**, a branch is
+**$0.01344/hour** and needs a paid plan, and exactly one project exists. So it would spend John's last
+free slot, stand up a second full copy of platform data, and leave behind something the runner's tools
+cannot delete (`pause_project` exists; delete does not). Uncertain classification → gated, always.
+**`SES-191` therefore closes `partial`, not `delivered`** — recording it delivered would score an exit
+criterion this cycle did not meet, which is the one thing an independent-verification milestone must
+never do to itself.
+
+**Guarded by `tests/regression/SES-191-backup-path-portability.js`**, which gates on *"resolves after
+normalization"* and never on *"resolves as stored"* — the latter is what the tooling fix will make
+true, and gating on it today would paint the suite red over a defect this repo cannot fix. Its
+negative control is the naive join itself: neuter the normalization and it fails. Also removed §7's
+automated-refresh bullet, pasted twice, found while in the file. Doc + test; no `src/`/`api/`/`lib/`
+change, no site change.
+
 ## session/cycle-20260825-0140 (v7.0.244, 2026-08-25, runner cycle `776d43c9-119a-40a5-873d-bf2ca43130e1`, `trigger = chained (drain continuation)` — model Opus 5, no subagent) — SES-201 carded, SES-202 shipped: the truth registry stops failing its own contract
 
 **Two tickets touched, which is B24 working rather than scope creep:** the drain's third pick,
