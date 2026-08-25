@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.249 | docs/runbooks/restore-from-backup.md | SES-191 — THE SEPARATOR DEFECT IS FIXED IN THE TOOLING, AND §4'S MANUAL WORKAROUND IS RETIRED. John granted both authorizations on card a9278eca (2026-08-25, attended architect session, verbatim: "BOTH AUTHORIZATIONS GRANTED — the $0 scratch-restore slot and rebuilding the offsite archive so it opens machine-free"); this ship takes only the second. Three files on branch `ses191/backup-path-portability` of roadmapventure/deepbench-backups-offsite: dump-supabase.mjs gains relPosix() so manifests store POSIX separators always (future sets clean), and BOTH readers gain entryPath() so either separator resolves (the half that repairs sets ALREADY TAKEN — including the one standing as the live recovery net, which cannot be retaken retroactively). THE SITE THE TICKET DID NOT NAME, and the reason a source-level fix list was not enough: restore-supabase.mjs resolves rec.file at TWO sites, the integrity check (was :68) and the data read (was :102). Fixing only the first produces a run that reports "Integrity: all 52 files match their checksums" and then fails the actual restore — a later failure with more confidence behind it, mid-outage. MEASURED against the real stored set, both directions: verify-backup.mjs files 0 / bad checksums 62 / FAIL exit 1 -> files 62 / lines 51718 / bad checksums 0 / PASS exit 0; --verify-only "52 problem(s)" exit 1 -> "all 52 files match" exit 0; --all dry run exit 0 with every data file read and planned (that last is what exercises the :102 site — --verify-only never touches it). The writer half is a NO-OP ON LINUX, so it is proven against the Windows path flavour and labelled as a proof of the expression rather than a Windows run: path.win32.relative(...) -> "data\agents.ndjson", relPosix -> "data/agents.ndjson". Guarded by tests/regression/SES-191-backup-path-portability.js Part 3, which RUNS the real verify-backup.mjs against a foreign-separator fixture — a source grep was rejected as the gate because it passes on a script that imports the helper and forgets to call it at one of two sites, which is the bug found here — with two negative controls: the pre-fix script fails it (exit 1), and a wrong-checksum fixture must still be rejected or an unconditional exit 0 would satisfy the first assertion. WHAT THIS SHIP IS NOT, all three named rather than left to be found: the fix is ON A BRANCH AND NOT MERGED, so a fresh clone of the backups repo mid-outage still gets the broken readers (that merge is John's call — the repo is what the platform falls back to); the second tooling copy at C:/Projects/deepbench-backups is untouched and will diverge; and THE RESTORE DRILL HAS NOT RUN, so charter exit criterion 5 is still unscored and SES-191 stays `partial`, which is the honest status rather than a cautious one. Doc + test here; the three script edits live in the backups repo. No src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.245 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN OFF JOHN'S MACHINE FOR THE FIRST TIME AND THE RECOVERY NET DOES NOT OPEN THERE. Measured 2026-08-25 by cycle c8c2d547 against the offsite copy from a Linux container: `restore-supabase.mjs --verify-only` reported all 52 tables FILE MISSING and exited 1, and the restore path's own guard then aborts with "Refusing to restore from an altered backup." NOTHING IS ALTERED — 52 of 52 files resolve after normalizing one path separator, with 0 checksum mismatches over 50,841 rows, `verify-backup.mjs` PASS over 62 files / 51,718 lines, and a full `--all` dry run planning every table. Root cause is one writer line-pair: dump-supabase.mjs:159/204 build each manifest entry with `path.relative()`, which emits `data\<table>.ndjson` on Windows, and both readers (restore-supabase.mjs:68, verify-backup.mjs:28) `path.join()` it, where on POSIX that is one filename containing a backslash. THE MISLEADING MESSAGE IS THE EXPENSIVE PART, which is why §4 now carries the workaround rather than a ticket reference: mid-outage it points the person restoring at the integrity of their last backup instead of at a separator. WHAT THIS SHIP IS NOT: the tooling fix and the restore into a clean target are NOT here. The scripts live in `roadmapventure/deepbench-backups-offsite`, not this repo, and a scratch target is a second Supabase project on John's org — free ($0/mo, measured) but his last free slot and not deletable by the runner's tools. Both are carded for his decision; SES-191 stays `partial` and charter exit criterion 5 is NOT scored by this cycle. Guarded by tests/regression/SES-191-backup-path-portability.js, whose negative control is the naive join itself (neuter the normalization and it fails). Also deduplicated §7's twice-pasted automated-refresh bullet, found while in the file. Doc + test; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.229 | docs/runbooks/restore-from-backup.md | SES-193 — RESTORE-PROCEDURE.md generalized into git (Selfbuild M4, pulled forward attended 2026-08-24). Canonical copy: this file. The per-snapshot RESTORE-PROCEDURE.md inside each backup set remains as that snapshot's own record; where they disagree, this file wins. -->
 
@@ -78,47 +79,44 @@ node restore-supabase.mjs <backup-set-dir> --verify-only
 Every file is re-hashed against `manifest.json`. Anything altered or missing is named
 and the script exits non-zero. The restore path **refuses to run** from an altered set.
 
-> ### ⚠ On a machine that is not the one the dump was taken on, this step fails — and the message it fails with is wrong
+> ### History: on a machine that is not the one the dump was taken on, this step used to fail — with a misleading message
 >
 > **`SES-191`, `v7.0.245`, measured 2026-08-25** — the first time the recovery net was
 > exercised from somewhere other than John's machine, which is the whole reason the
 > offsite copy (§7) exists.
 >
-> **What you will see.** Every table reported `FILE MISSING`, then
-> `Integrity: 52 problem(s).` and exit 1. Run the restore itself and it aborts on its own
-> guard: **`Refusing to restore from an altered backup.`**
->
-> **The set is not altered, and do not go looking for a fresher one.** Measured on the
-> `selfbuild-step0-2026-08-23` offsite set from a Linux container, both directions:
-> **0 of 52** manifest entries resolved as stored; **52 of 52** resolved after normalizing
-> one path separator, with **0 checksum mismatches** across **50,841 rows**.
-> `verify-backup.mjs` then returned `PASS — snapshot is complete and internally
-> consistent` over 62 files and 51,718 lines, and a full `--all` dry run planned every
-> table. The backup is fine.
+> **What you would have seen.** Every table reported `FILE MISSING`, then
+> `Integrity: 52 problem(s).` and exit 1. Running the restore itself aborted on its own
+> guard: **`Refusing to restore from an altered backup.`** The set was never altered.
 >
 > **Why.** `manifest.json` stores each data file's path with the **dumping machine's**
-> separator: `dump-supabase.mjs` builds it with `path.relative()` (lines 159 and 204),
-> which on Windows yields `data\<table>.ndjson`. Both readers then resolve it with
+> separator: `dump-supabase.mjs` built it with `path.relative()` (lines 159 and 204),
+> which on Windows yields `data\<table>.ndjson`. Both readers then resolved it with
 > `path.join(dir, rec.file)` (`restore-supabase.mjs:68`, `verify-backup.mjs:28`), and on
 > Linux or macOS `data\agents.ndjson` is not a directory and a file — it is one filename
 > containing a literal backslash, which exists nowhere.
 >
-> **Do this first, before §4's command and before anything in §5.** It edits **your local
-> copy** of the set only, needs no re-dump, and invalidates no checksum — nothing hashes
-> `manifest.json` itself. Verbatim, tested as written:
+> **This is fixed — the command above now just works, no manual step.** `SES-191`,
+> `v7.0.249`, measured 2026-08-25, same `selfbuild-step0-2026-08-23` set:
 >
-> ```bash
-> node -e 'const fs=require("fs"),f=process.argv[1],m=JSON.parse(fs.readFileSync(f,"utf8"));let n=0;for(const g of [m.tables,m.views,m.auth_storage])for(const r of Object.values(g||{}))if(r&&r.file&&r.file.includes("\\")){r.file=r.file.split("\\").join("/");n++}fs.writeFileSync(f,JSON.stringify(m,null,2));console.log("normalized "+n+" entries")' <backup-set-dir>/manifest.json
+> ```
+> node verify-backup.mjs
+> -> files 62 | lines 51718 | malformed 0 | bad checksums 0 | PASS, exit 0
+>
+> node restore-supabase.mjs --verify-only
+> -> "Integrity: all 52 files match their checksums", exit 0
+>
+> node restore-supabase.mjs --all   (dry run)
+> -> exit 0, every data file read and planned
 > ```
 >
-> It printed `normalized 62 entries`, after which `--verify-only` returned
-> `Integrity: all 52 files match their checksums.` and exit 0. On Windows it is a no-op —
-> the separators are already native, which is exactly why this went unseen: the one machine
-> that takes the dumps is the one machine that cannot reproduce it.
+> Both readers now resolve either path separator on their own. **The manifest-rewriting
+> workaround that used to be documented here is retired — do not hand-edit
+> `manifest.json`.** It isn't just optional now, it does nothing the readers don't already
+> handle themselves.
 >
-> **Do not commit the rewritten manifest back to the offsite repo.** The real fix is on the
-> writer (`dump-supabase.mjs` must emit POSIX separators) plus a tolerant read on both
-> readers, and it lands in `roadmapventure/deepbench-backups-offsite` — see §9.
+> The fix lives in `roadmapventure/deepbench-backups-offsite`, branch
+> `ses191/backup-path-portability` — not yet merged. See §9 for what that leaves open.
 
 ## 5. The restore, by layer
 
@@ -241,17 +239,26 @@ refresh the offsite copy per §7.
 
 ## 9. Known standing gaps
 
-- **The path separator in `manifest.json` (`SES-191`, `v7.0.245`) — the recovery net does
-  not open on a non-Windows machine without §4's workaround.** Root-caused, reproduced and
-  worked around above; **not fixed**, because the fix is not in this repo. It is two edits in
-  `roadmapventure/deepbench-backups-offsite`: `dump-supabase.mjs` must write POSIX separators
-  (`path.relative(...).split(path.sep).join('/')` at lines 159 and 204), so future sets are
-  clean; and both readers must tolerate either separator
-  (`path.join(dir, ...rec.file.split(/[\\/]/))` at `restore-supabase.mjs:68` and
-  `verify-backup.mjs:28`), which is the half that repairs **sets already taken** — including
-  the one currently standing as the offsite recovery net. A tooling copy also lives at
-  `C:/Projects/deepbench-backups` on John's machine and would diverge if only one is patched.
-  Carded for John; an unattended cycle does not push to the backup repo.
+- **The path separator in `manifest.json` (`SES-191`) — the two-edit fix is written and
+  measured, but it is not merged.** `v7.0.249`, measured 2026-08-25: `dump-supabase.mjs` now
+  writes POSIX separators (new `relPosix()` helper, at the former lines 159 and 204), so
+  future sets come out clean. Both readers now tolerate either separator (new `entryPath()`
+  helper): `restore-supabase.mjs` needed it at **two** sites, its former line 68 *and* its
+  former line 102 — that second site was not named in the original ticket and was found this
+  cycle; fixing only the integrity check at line 68 would have passed `--verify-only` and
+  then failed the actual data read. `verify-backup.mjs` needed it at its former line 28. Same
+  `selfbuild-step0-2026-08-23` set, before/after: `verify-backup.mjs` went from files 0 / bad
+  checksums 62 / FAIL to files 62 / lines 51718 / malformed 0 / bad checksums 0 / PASS, both
+  exit 0; `restore-supabase.mjs --verify-only` went from "Integrity: 52 problem(s)" exit 1 to
+  "Integrity: all 52 files match their checksums" exit 0; `--all` now dry-runs clean, every
+  data file read and planned. **What is still open: the fix lives only on branch
+  `ses191/backup-path-portability` in `roadmapventure/deepbench-backups-offsite` — it is not
+  on that repo's `main`.** Anyone who clones the backups repo fresh during an outage, before
+  someone merges that branch, still gets the broken readers described in §4's history. There
+  is also a second tooling copy at `C:/Projects/deepbench-backups` on John's machine that has
+  not been touched and will diverge from the fixed version until someone updates it too.
+  Neither the merge nor that second copy is done. Merging the branch (and updating the second
+  copy) is the remaining step, and it is John's call, not an unattended one.
 - **The full restore drill** (schema + data into a clean project, end to end) is `SES-191`
   (Selfbuild M3) and is **`partial`, not done — charter exit criterion 5 is not yet scored.**
   What `v7.0.245` did establish, from a machine that is not John's: the offsite copy clones,

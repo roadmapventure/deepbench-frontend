@@ -1,4 +1,4 @@
-// DeepBench v7.0.245 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- the full
+// DeepBench v7.0.249 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- the full
 // restore drill's first finding, guarded: a backup set's manifest records each data file's path,
 // and if that path carries the DUMPING machine's separator it resolves on no other platform.
 //
@@ -15,17 +15,33 @@
 // restoring at the integrity of their last backup rather than at a separator, which is the most
 // expensive possible place to send them.
 //
-// THE ASSERTION THIS FILE GATES ON IS "RESOLVES AFTER NORMALIZATION", NOT "RESOLVES AS STORED" --
-// and that is deliberate, not a softened bar. As-stored resolution is what the tooling fix
-// (SES-191's gated remainder: dump-supabase.mjs:159/204 must write POSIX separators) will make
-// true; gating on it today would paint the suite red over a defect this repo cannot fix, since the
-// tooling lives in `roadmapventure/deepbench-backups-offsite`, not here. What IS gated is the
-// claim the restore runbook now makes to whoever is mid-outage: normalize the separators and the
-// documented procedure works. That goes red if a set is genuinely incomplete or corrupt.
+// THE ASSERTION PARTS 1-2 GATE ON IS "RESOLVES AFTER NORMALIZATION", NOT "RESOLVES AS STORED" --
+// and that is deliberate, not a softened bar. Gating a stored SET on as-stored resolution would
+// paint the suite red over sets that were already taken and cannot be retaken; the reader fix
+// below is what makes those readable, and it is the right place for the repair. What Parts 1-2
+// gate is the claim the restore runbook makes to whoever is mid-outage: the documented procedure
+// works. That goes red if a set is genuinely incomplete or corrupt.
+//
+// UPDATED v7.0.249 (SES-191, 2026-08-25) -- THE TOOLING FIX NOW EXISTS, AND PART 3 GATES IT.
+// dump-supabase.mjs stores POSIX separators (so future sets are clean) and BOTH readers resolve
+// either separator (so sets already taken -- including the live recovery net -- stay readable).
+// A third site was found while fixing it and is the reason Part 3 runs the real script instead of
+// checking source text: restore-supabase.mjs resolved rec.file in TWO places, the integrity check
+// AND the data read. Fixing only the first yields a run that verifies clean and then fails the
+// actual restore, which is a worse failure than the one being fixed.
+//
+// THAT FIX IS NOT IN THIS REPO AND IS NOT MERGED. It lives on branch
+// `ses191/backup-path-portability` of `roadmapventure/deepbench-backups-offsite`. So Part 3 is
+// env-gated on DEEPBENCH_BACKUP_TOOLING rather than skipped or faked: where the tooling is
+// present it is exercised for real, and where it is absent that is DECLARED. Do not "simplify"
+// Part 3 into a grep of the scripts' source -- a source check passes on a script that imports the
+// helper and forgets to call it at one of the two sites, which is precisely the bug that was here.
 
 import fs from "fs";
 import os from "os";
 import path from "path";
+import crypto from "crypto";
+import { execFileSync } from "child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
 
 // The resolve the readers SHOULD do, and the one the runbook's workaround performs by rewriting
@@ -115,10 +131,72 @@ async function run() {
     );
   }
 
-  // The half of SES-191 this repo cannot close. Declared rather than implied by silence.
+  // --- Part 3: the fixed tooling itself, when a checkout of it is on this machine. ------------
+  //
+  // Point DEEPBENCH_BACKUP_TOOLING at a clone of roadmapventure/deepbench-backups-offsite. The
+  // gate is end-to-end: build a set whose manifest records a FOREIGN separator -- the exact shape
+  // that broke the live recovery net -- and require the real verify-backup.mjs to accept it.
+  const tooling = process.env.DEEPBENCH_BACKUP_TOOLING;
+  if (!tooling) {
+    notRun(
+      "the fixed backup tooling reads a foreign-separator manifest",
+      "no DEEPBENCH_BACKUP_TOOLING on this machine; the tooling lives in github.com/roadmapventure/deepbench-backups-offsite (fix on branch ses191/backup-path-portability, not yet merged to its main)"
+    );
+  } else {
+    const verifier = path.join(tooling, "verify-backup.mjs");
+    assert(fs.existsSync(verifier), `DEEPBENCH_BACKUP_TOOLING=${tooling} has no verify-backup.mjs`);
+
+    // A minimal set that is genuinely sound in every respect EXCEPT that its manifest path uses a
+    // backslash. Anything the verifier rejects here, it rejects for the separator alone.
+    const mkSet = (sha) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ses191-set-"));
+      const body = '{"id":1}\n{"id":2}\n';
+      fs.mkdirSync(path.join(dir, "data"));
+      fs.writeFileSync(path.join(dir, "data", "alpha.ndjson"), body);
+      // Both schema artifacts must exist and exceed 1 KB or the verifier fails for that reason
+      // instead, which would make this test pass or fail for something other than the separator.
+      for (const f of ["schema.sql", "migrations.sql"]) fs.writeFileSync(path.join(dir, f), "-- x\n".repeat(400));
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({
+        tables: { alpha: { file: "data\\alpha.ndjson", rows: 2, pk: "id",
+                           sha256: sha ?? crypto.createHash("sha256").update(body).digest("hex") } },
+        views: {}, auth_storage: {},
+      }));
+      return dir;
+    };
+
+    const good = mkSet(null);
+    const corrupt = mkSet("0".repeat(64));   // negative control: same shape, wrong checksum
+    try {
+      const run = (dir) => {
+        try { execFileSync(process.execPath, [verifier, dir], { encoding: "utf8", stdio: "pipe" }); return 0; }
+        catch (e) { return e.status ?? 1; }
+      };
+
+      assert(
+        run(good) === 0,
+        "the backup tooling still cannot read a manifest path written by another platform. This is " +
+          "SES-191's original defect: an unresolvable path is reported as an ALTERED file, which " +
+          "sends whoever is mid-outage to the integrity of their last backup instead of a separator."
+      );
+      // Without this, a verifier that exited 0 unconditionally would satisfy the assertion above.
+      assert(
+        run(corrupt) !== 0,
+        "negative control failed: the verifier accepted a set whose checksum does not match, so its " +
+          "acceptance of the foreign-separator set proves nothing"
+      );
+    } finally {
+      fs.rmSync(good, { recursive: true, force: true });
+      fs.rmSync(corrupt, { recursive: true, force: true });
+    }
+  }
+
+  // The half of SES-191 that is still open. Declared rather than implied by silence.
+  // John granted BOTH authorizations on card a9278eca (2026-08-25, attended architect session):
+  // the $0 scratch slot and rebuilding the offsite archive. So this is no longer waiting on a
+  // decision -- it is waiting on the drill being run.
   notRun(
     "restore into a clean scratch target, platform booted against it",
-    "SES-191's gated remainder -- it needs a second Supabase project on John's org (free tier, $0/mo, but his last free slot and not deletable by the runner's tools); carded for his decision"
+    "authorized by John 2026-08-25 (card a9278eca) and not yet executed; it needs a second Supabase project on his org (free tier, $0/mo, his last free slot, not deletable by the runner's tools) -- charter exit criterion 5 is scored by this drill"
   );
 }
 

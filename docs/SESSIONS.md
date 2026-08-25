@@ -5,6 +5,64 @@
 
 ---
 
+## session/cycle-20260825-0407 (v7.0.249, 2026-08-25, runner cycle `0f44f8da-1731-48b9-8229-c7d4473d807b`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Sonnet 5 doc subagent) — SES-191 (still partial): the backup tooling opens a set taken on any machine
+
+**JOHN'S AUTHORIZATION IS WHAT MADE THIS BUILDABLE, AND IT WAS READ OFF THE CARD, NOT ASSUMED.**
+`SES-191`'s remainder sat as gated card `a9278eca` naming two things only he could authorise. He answered
+both at 03:32Z in an attended architect session — *"BOTH AUTHORIZATIONS GRANTED — the $0 scratch-restore
+slot and rebuilding the offsite archive so it opens machine-free"* — with the standing guard that any step
+turning out to cost real dollars comes back to him first. This cycle took **only the second**: the tooling
+rebuild. The drill itself is a separate cycle's work and is named below rather than implied.
+
+**THE SITE THE TICKET DID NOT NAME, and it is the reason this ship is worth more than the two edits asked
+for.** The card specified three edit sites: `dump-supabase.mjs:159/204` and the readers at
+`restore-supabase.mjs:68` / `verify-backup.mjs:28`. `restore-supabase.mjs` resolves `rec.file` in **two**
+places — the integrity check at 68 **and the data read at 102**. Fixing only 68 yields a run that reports
+`Integrity: all 52 files match their checksums` and then fails on the actual restore: a later failure, with
+more confidence behind it, during an outage. Both sites ship, and the `--all` dry run is what proves the
+second one, because `--verify-only` never touches it.
+
+**WHY BOTH HALVES SHIP AND NEITHER IS REDUNDANT.** The writer fix (`relPosix()`) only helps sets taken
+*after* it. The reader fix (`entryPath()`) is what repairs sets **already taken** — including the one
+standing as the live recovery net, which cannot be retaken retroactively. The readers stay
+separator-agnostic **permanently** rather than narrowing to POSIX once the writer is clean: the whole defect
+was a reader that understood only its own platform, and re-narrowing it would rebuild that.
+
+**MEASURED, AND THE NEGATIVE CONTROL RAN ON THE REAL ARTIFACT RATHER THAN A FIXTURE.** Against the stored
+`selfbuild-step0-2026-08-23` set: `verify-backup.mjs` went from **files 0 / bad checksums 62 / FAIL exit 1**
+to **files 62 / lines 51718 / malformed 0 / bad checksums 0 / PASS exit 0**; `restore-supabase.mjs
+--verify-only` from `52 problem(s)` exit 1 to `all 52 files match` exit 0; `--all` dry run exit 0, every
+data file read and planned. The writer half is a **no-op on Linux**, so it is proven against the Windows
+path flavour and labelled as a proof of the expression, not a Windows run: `path.win32.relative(...)` →
+`data\agents.ndjson`, shipped `relPosix` → `data/agents.ndjson`.
+
+**THE GUARD RUNS THE SCRIPT INSTEAD OF READING IT, deliberately.**
+`tests/regression/SES-191-backup-path-portability.js` gains Part 3, which executes the real
+`verify-backup.mjs` against a fixture set sound in every respect except a foreign separator. Against the
+**pre-fix** script (`git show origin/main:verify-backup.mjs`) it **fails, exit 1**; against the shipped one
+it passes. A second fixture with a deliberately wrong checksum must still be rejected, or a verifier that
+exited 0 unconditionally would satisfy the first assertion. A source grep was rejected as the gate: it
+passes on a script that imports the helper and forgets to call it at one of two sites — the exact bug found
+here. Part 3 is env-gated on `DEEPBENCH_BACKUP_TOOLING` and **declared `notRun`** when absent, since the
+tooling is not in this repo.
+
+**THE VERIFIER BLOCKED, AND THE BLOCK WAS PRE-EXISTING — root-caused, not waved through.** `scripts/verifier.js`
+returned `block` with the regression suite red, while this cycle's own run was 66/66 green. The difference is
+env: with Supabase creds armed, `SES-177-claude-state-renderer.js` fails because the committed
+`CLAUDE-STATE.md` is the **documented one-ship-behind lag** from v7.0.247/248, not anything this diff did.
+Re-rendering it is already step 7's own close-out obligation, and doing so clears it. Recorded as
+`runner_verdicts 40ef8d82`; a block is verdict-only and blocks no push by design.
+
+**NOT DONE, NAMED RATHER THAN LEFT TO BE FOUND — three things.** (1) **The fix is on a branch and is NOT
+merged**: `ses191/backup-path-portability` in `roadmapventure/deepbench-backups-offsite`. Anyone cloning that
+repo fresh mid-outage still gets the broken readers. The merge is John's call, not an unattended one — that
+repo is what the platform falls back to. (2) The second tooling copy at `C:/Projects/deepbench-backups` is
+untouched and will diverge. (3) **The restore drill has not run**; charter exit criterion 5 is still
+unscored. So `SES-191` closes **`partial`, not `done`** — and that is the honest status rather than a
+cautious one: the auto-done bar governs `delivered` vs `done`, and neither is true of a ticket whose
+headline deliverable has not been executed. Doc + test in this repo; the three script edits are in the
+backups repo. No `src/`/`api/`/`lib/` change, no site change.
+
 ## session/cycle-20260825-0340 (v7.0.248, 2026-08-25, runner cycle `68b5b2fb-1cf8-4be2-a7db-668001f6c741`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (22:00 America/Chicago) — model Opus 5, no subagent) — SES-201 batch 1: the four rule statements the drift check flags become rendered blocks, and the checker goes quiet
 
 **THE POPULATION DEFINED ITSELF, WHICH IS THE HALF OF THIS TICKET JOHN ACTUALLY DECIDED.** `SES-201`'s
