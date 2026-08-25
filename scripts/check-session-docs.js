@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.243 | scripts/check-session-docs.js | SES-200 -- CHECKS 12 AND 13, two of the
+// three pieces SES-176 shipped partial and left owned by no ticket. Check 12: a live rule's
+// statement restated outside its canonical home with no {{rule:ID}} marker. Check 13: one
+// procedure with two live homes. Both are documented in full at their definitions below; the two
+// things not to undo from up here are that check 12 is ID-anchored with an overlap test (the
+// registry statement is a paraphrase -- matching it against prose can never fire, which is check
+// 9's own lesson) and reports WARN (the canonical text is intact; this is SES-201's migration
+// backlog, and promoting it to FLAG changes what the v7.0.242 gate refuses). The THIRD piece --
+// findings become backlog rows -- is a different mechanism (atomic id claim, an --apply path,
+// dedup) and is filed as its own ticket rather than left ownerless, which is the exact crack
+// SES-200 exists to close.
+// Guarded by tests/regression/SES-200-rule-copy-and-procedure-homes.js.
 // DeepBench v7.0.242 | scripts/check-session-docs.js | SES-199 -- THE TRIPWIRE CAN NOW GO RED.
 // Until this ship main() ended in process.exit(0) on every path, so the check was a rubber stamp:
 // the interim auto-done bar requires "tripwire green" and nothing could ever make it anything else.
@@ -1027,6 +1039,178 @@ function buildDocCache(rules) {
   return cache;
 }
 
+// ---- Check 12 & 13: SES-200, the SES-176 remainder --------------------------------------------
+// SES-176 shipped partial and named three unshipped pieces; two of them are here. (The third --
+// findings become backlog rows -- is a different mechanism, needs the atomic id claim and an
+// --apply path, and is filed as its own ticket rather than left ownerless, which is the crack this
+// ticket exists to close.)
+//
+// CHECK 12 IS ID-ANCHORED WITH A STATEMENT-OVERLAP TEST, and the first half of that is inherited
+// rather than invented: check 9's header already establishes that the registry `statement` is a
+// PARAPHRASE, so a check matching it against prose can never fire. So the ID finds the candidate
+// and the overlap decides whether the passage is a COPY or a CITATION -- the repo is full of
+// legitimate citations ("register B42", "per B24"), and a check that flagged those would be noise.
+// THE THRESHOLD IS MEASURED, NOT FELT. Live, at this ship: 113 live-rule ID occurrences outside
+// their canonical homes; excluding rendered blocks, the overlap distribution is a continuum with no
+// natural gap, so the line is drawn where the words themselves justify it -- 0.9 means the passage
+// reproduces essentially the whole statement, which is a copy by any reading, where 0.5 only means
+// it discusses the same subject. That yields 4 findings (B34, B12, B18 x2) and 0 at 0.95.
+// WARN, NOT FLAG, and the reason is the same one v7.0.242 used to draw the gating line: the
+// canonical text is intact and correct here -- these are duplications awaiting SES-201's marker
+// migration, which is that ticket's whole job. Promoting check 12 to FLAG is the right move once
+// SES-201 has driven the population to zero, and is deliberately not done in advance of it.
+const RULE_COPY_OVERLAP = 0.9;
+
+// Words this short, or this common, separate nothing -- every governance paragraph contains them.
+const COPY_STOPWORDS = new Set(
+  ("the a an and or of to in on for is are be by with that this it its from as at not never always " +
+   "must should can cannot than then when which who what how any all one two").split(" ")
+);
+
+// Check 12 uses a PARAGRAPH window, not check 9's enclosingBlock(), and the difference is a
+// different question rather than a preference. Check 9 asks "is there a retirement marker NEAR
+// this id?" -- a proximity test, well served by a bounded +/-280-character window. Check 12 asks
+// "does this passage REPRODUCE the statement?", and a governance paragraph routinely runs longer
+// than that window: MEASURED, the 280-char form found 1 of the 4 copies a paragraph window finds
+// (it caught B34 and missed B12 and both B18s, whose restatements sit inside long paragraphs).
+// A checker that reports one quarter of what it can see is the "reports green while looking at
+// nothing" failure in a milder costume.
+function enclosingParagraph(text, index) {
+  const a = text.lastIndexOf("\n\n", index);
+  const b = text.indexOf("\n\n", index);
+  return text.slice(a < 0 ? 0 : a + 2, b < 0 ? text.length : b);
+}
+
+function statementContentWords(statement) {
+  const raw = String(statement ?? "").toLowerCase().match(/[a-z_][a-z0-9_]{4,}/g) || [];
+  return [...new Set(raw)].filter(w => !COPY_STOPWORDS.has(w));
+}
+
+function statementOverlap(blockText, words) {
+  if (!words.length) return 0;
+  const hay = blockText.toLowerCase();
+  return words.filter(w => hay.includes(w)).length / words.length;
+}
+
+function checkRuleTextOutsideHome(findings, rules, docCache) {
+  for (const rule of rules.filter(r => r.status === "live")) {
+    const home = (rule.canonical_doc || "").split("#")[0].trim();
+    const words = statementContentWords(rule.statement);
+    if (!words.length) continue;
+    const sites = [];
+    for (const [rel, raw] of docCache) {
+      if (rel === home) continue;
+      // Occurrences are found in the RAW text and the block is taken from it, because
+      // stripHtmlComments() shifts every index after the first comment -- reading one and slicing
+      // the other silently windows the wrong passage. Check 9 can strip first because it discards
+      // comments wholesale; here the comment matters twice, so the stripping happens per BLOCK:
+      // the marker test needs the raw block (stripping removes the `{{rule:ID}}` comment, which
+      // would flag every rendered block -- the one sanctioned restatement -- at an overlap of 1.0),
+      // and the overlap test needs it stripped (provenance prose is not a restatement of the rule).
+      for (const at of ruleIdOccurrences(raw, rule.id)) {
+        const rawBlock = enclosingParagraph(raw, at);
+        if (rawBlock.includes(`{{rule:${rule.id}}}`)) continue;
+        if (statementOverlap(stripHtmlComments(rawBlock), words) < RULE_COPY_OVERLAP) continue;
+        sites.push(`${rel}:${lineOf(raw, at)}`);
+      }
+    }
+    if (sites.length) {
+      findings.push({
+        check: "12",
+        severity: "WARN",
+        detail: `rule ${rule.id}'s statement is restated outside its canonical home (${home || "unset"}) at ${sites.join(", ")}, with no {{rule:${rule.id}}} marker -- so that copy will not move when the registry row does. Render it instead: add the marker and run node scripts/render-rule-blocks.js --write. This is the population SES-201 migrates; WARN rather than FLAG because the canonical text is intact.`,
+      });
+    }
+  }
+}
+
+// CHECK 13 -- one procedure, two live homes. The ticket names the shape: the failure step 5 and
+// step 7 had before v7.0.114, and the B40 claim SQL that GOVERNANCE-MODES.md carries as a third
+// home today. A procedure is a fenced block, so this one is mechanical and needs no threshold:
+// identical normalised bodies in two different docs is the finding, full stop.
+//
+// IT READS A WIDER SET THAN CHECKS 9-12 AND THAT IS DELIBERATE. Those scan the RULES' docs -- the
+// canonical homes plus the runbooks. A duplicated procedure can live anywhere a procedure is
+// written down, and the live case proves it: GOVERNANCE-MODES.md is nobody's canonical_doc, so the
+// rule-doc set misses the very instance this ticket cites. The set is DERIVED (root *.md, docs/*.md,
+// docs/runbooks/*.md) rather than hand-listed, minus the HISTORY files -- SESSIONS.md and
+// FEATURES-ARCHIVE.md quote procedures as a RECORD of what was done, which is correct and must
+// never be flagged as a second home. Same distinction check 9 makes when it strips provenance
+// comments before reading for live voice.
+// MEASURED at this ship: 63 docs, 181 qualifying blocks, exactly 1 duplicate -- the one the ticket
+// names. FLAG, not WARN: two live copies of an executable procedure drift silently and one of them
+// is then wrong, which is a different and worse thing than a restated sentence.
+const PROCEDURE_MIN_CHARS = 60;
+const PROCEDURE_HISTORY_DOCS = new Set(["docs/SESSIONS.md", "docs/FEATURES-ARCHIVE.md"]);
+
+// Comment lines are stripped before hashing so the same procedure carrying two different
+// explanatory headers still reads as one procedure -- which is the case worth catching.
+function normalizeProcedure(body) {
+  return String(body)
+    .split("\n")
+    .filter(l => !/^\s*(--|\/\/|#)/.test(l))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function collectProcedureBlocks(docs) {
+  const blocks = new Map();
+  for (const [rel, text] of docs) {
+    const re = /```[a-z]*\n([\s\S]*?)```/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const norm = normalizeProcedure(m[1]);
+      if (norm.length < PROCEDURE_MIN_CHARS) continue;   // a one-liner is a fragment, not a procedure
+      if (!blocks.has(norm)) blocks.set(norm, []);
+      blocks.get(norm).push({ rel, line: lineOf(text, m.index) });
+    }
+  }
+  return blocks;
+}
+
+function duplicateProcedureHomes(docs) {
+  const dupes = [];
+  for (const [norm, sites] of collectProcedureBlocks(docs)) {
+    const homes = new Set(sites.map(s => s.rel));
+    if (homes.size > 1) dupes.push({ norm, sites });
+  }
+  return dupes;
+}
+
+function buildProcedureDocs(findings) {
+  const rels = [];
+  const push = rel => { if (!PROCEDURE_HISTORY_DOCS.has(rel)) rels.push(rel); };
+  try {
+    for (const f of fs.readdirSync(WORKTREE)) if (f.endsWith(".md")) push(f);
+    for (const f of fs.readdirSync(path.join(WORKTREE, "docs"))) if (f.endsWith(".md")) push(`docs/${f}`);
+    for (const f of fs.readdirSync(path.join(WORKTREE, "docs", "runbooks"))) if (f.endsWith(".md")) push(`docs/runbooks/${f}`);
+  } catch {
+    // A partial listing still checks what it found; a checkout with no docs/ directory reports
+    // nothing rather than throwing -- but say so, because a check that cannot run must not pass
+    // silently (the same rule check 3 keeps about a missing snapshot).
+    findings.push({ check: "13", severity: "WARN", detail: "could not list the doc tree -- check 13 (duplicate procedure homes) ran against a partial file set or not at all." });
+  }
+  const docs = new Map();
+  for (const rel of rels.sort()) {
+    const text = readIfExists(path.join(WORKTREE, rel));
+    if (text !== null) docs.set(rel, text);
+  }
+  return docs;
+}
+
+function checkProcedureHomes(findings) {
+  for (const d of duplicateProcedureHomes(buildProcedureDocs(findings))) {
+    const where = d.sites.map(s => `${s.rel}:${s.line}`).join(", ");
+    findings.push({
+      check: "13",
+      severity: "FLAG",
+      detail: `one procedure, ${new Set(d.sites.map(s => s.rel)).size} live homes: an identical code block appears at ${where}. Two copies of an executable procedure drift silently and then one of them is wrong -- keep it in ONE doc and have the others cite that home. First 70 chars: "${d.norm.slice(0, 70)}"`,
+    });
+  }
+}
+
 function checkTruthTripwire(findings) {
   const rules = loadRules(findings);
   if (!rules) return;
@@ -1034,6 +1218,8 @@ function checkTruthTripwire(findings) {
   checkRetiredRulesInLiveVoice(findings, rules, docCache);
   checkRulePointers(findings, rules, docCache);
   checkRuleMarkers(findings, rules, docCache);
+  checkRuleTextOutsideHome(findings, rules, docCache);
+  checkProcedureHomes(findings);
 }
 
 function main() {
@@ -1106,6 +1292,17 @@ export {
   GATING_SEVERITY,
   gatingFindings,
   gateModeRequested,
+  // SES-200 -- checks 12 and 13, pure halves only (findings in, findings out; no disk, no exit).
+  enclosingParagraph,
+  statementContentWords,
+  statementOverlap,
+  checkRuleTextOutsideHome,
+  normalizeProcedure,
+  collectProcedureBlocks,
+  duplicateProcedureHomes,
+  RULE_COPY_OVERLAP,
+  PROCEDURE_MIN_CHARS,
+  PROCEDURE_HISTORY_DOCS,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

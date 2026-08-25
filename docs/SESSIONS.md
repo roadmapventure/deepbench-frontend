@@ -5,6 +5,72 @@
 
 ---
 
+## session/cycle-20260825-0140 (v7.0.243, 2026-08-25, runner cycle `ca480d13-3210-4712-a7e9-cb4a60bc7f05`, `trigger = chained (drain continuation)` — model Opus 5, no subagent) — SES-200: two of the three pieces SES-176 left ownerless, and the third one FILED
+
+**The M3 drain's second pick**, in the same session as its first. `SES-176` is `done` and its three
+named pieces are not built — confirmed by reading the shipped script, not the ticket.
+
+**CHECK 12 — a rule statement restated outside its canonical home.** ID-anchored with an overlap
+test, and the first half is **inherited rather than invented**: check 9's own header already
+establishes that the registry `statement` is a *paraphrase*, so matching it against prose "ships a
+check that can never fire". The ID finds the candidate; the overlap decides **copy vs citation** —
+this repo is full of legitimate citations ("register B42", "per B24") and a check that flagged those
+would emit ~113 findings and be switched off within a day. **THE THRESHOLD WAS MEASURED, AND THE
+HONEST PART IS THAT THERE IS NO TROUGH:** 113 live-rule ID occurrences sit outside their canonical
+homes, and once rendered blocks are excluded the overlap distribution is a **continuum with no
+natural gap**. So the line is drawn where the words justify it rather than at a minimum that does
+not exist — 0.9 means the passage reproduces essentially the whole statement, where 0.5 only means
+it discusses the same subject. Yield: **3 findings** (`B34`, `B12`, `B18`), 0 at 0.95. **WARN, not
+FLAG**, on the same reasoning `v7.0.242` used an hour earlier: the canonical text is intact, these
+are duplications awaiting `SES-201`'s marker migration, and promoting them now would make the gate
+that shipped one cycle ago red on arrival. A rendered `{{rule:ID}}` block is exempt — flagging it
+would tell every cycle to undo `SES-175`.
+
+**TWO BUGS FOUND WHILE BUILDING IT, both fixed rather than shipped past, and both are the kind that
+leave a checker looking healthy.** (1) An **index mismatch**: occurrences were found in
+`stripHtmlComments(raw)` and the block was sliced out of `raw`, so every window after the first
+comment landed on the wrong passage. Both now read the raw text and the *block* is stripped for the
+overlap test — which is what holds both properties at once, since the marker lives in a comment
+while provenance prose is not a restatement. (2) The **wrong window**: reusing check 9's
+`enclosingBlock()` found **1 of the 4** copies, because its ±280-character window is sized for a
+proximity question and governance paragraphs run longer. Check 12 asks whether a passage
+*reproduces* a statement, so it takes the paragraph. A checker reporting a quarter of what it can
+see is the "green while looking at nothing" failure in a milder costume.
+
+**CHECK 13 — one procedure, two live homes.** Mechanical, no threshold: identical normalised fenced
+blocks in two different docs, comment lines stripped before hashing so the same SQL under two
+different headers still reads as one procedure. **It reads a wider doc set than checks 9–12 and that
+is the point** — those scan the *rules'* docs, and the live case proves why that is not enough:
+`docs/GOVERNANCE-MODES.md` is nobody's `canonical_doc`, so the rule-doc set misses the very instance
+the ticket cites. The set is **derived** (root `*.md`, `docs/*.md`, `docs/runbooks/*.md`) minus the
+**history** files — `SESSIONS.md` and `FEATURES-ARCHIVE.md` quote procedures as a *record*, and
+flagging them would tell a cycle to delete its own history to satisfy a checker. Measured: 63 docs,
+181 qualifying blocks, **exactly 1 duplicate** — the `B40` claim SQL at `GOVERNANCE-MODES.md:47` and
+`runner-cycle.md:1459`. FLAG, because two copies of an *executable* procedure drift silently and
+then one of them is wrong.
+
+**THE THIRD PIECE IS FILED AS `SES-205`, NOT LEFT IN A SHIP NOTE — and that is the whole point of
+this ticket rather than a nicety.** *"No ticket anywhere owns that remainder"* is the defect
+`SES-200` exists to close; leaving piece 3 in prose would have reproduced it one level down. It is a
+different mechanism (a board write: atomic id claim, a before-image per insert, and a stable finding
+signature so a re-run updates rather than duplicates — built in `heal-engine.js`'s shape), so it did
+not fit the scope caps. `SES-205` is deliberately **not** in the M3 drain scope (`SES-142` — filed
+after naming, so it never joins a standing drain) and claimed no `automation_rank`, which would have
+put it above the 23 members John named.
+
+**`SES-200` ships `delivered` and the reasoning is on the card so John can overrule it:** its job was
+to *own* the remainder; two pieces are built and the third has a real owner with a written spec, so
+the ownership is discharged. If he would rather it stay open until all three land, Reverse is the
+lever.
+
+**QA:** 15 guard cases, every one with a negative control, importing the policy from the shipped
+script rather than restating it. The controls that do the work: a *citation* of `B40` is not a copy
+while a restatement is; a *rendered* block is exempt **and the identical text with the marker
+removed is flagged**, which is what proves the marker is doing the work rather than the text failing
+to match; the same procedure twice in one doc is one home while in two docs it is two; a fragment
+under 60 chars is not a procedure **while a real one in the same two docs does report**. Live:
+`--gate` still exits 0 (12/13 sit outside the gating set, by design). Build green, regression 62/62.
+
 ## session/cycle-20260825-0140 (v7.0.242, 2026-08-25, runner cycle `63a97a74-0822-4776-8345-e44edfce23c1`, `trigger = chained (drain continuation)` of `df5764ed` — model Opus 5, no subagent) — SES-199: the truth tripwire can go red
 
 **The first ticket the Selfbuild M3 drain picked**, minutes after `v7.0.241` declared it — which is
