@@ -5,6 +5,70 @@
 
 ---
 
+## session/cycle-20260825-0511 (v7.0.252, 2026-08-25, runner cycle `860efe52-685c-4a0d-a292-d9dfa009ed38`, `trigger = scheduled` — fired 05:11Z, off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Sonnet 5 regression-test subagent) — SES-196: the drain picker skips the flags step 5 honours, on John's word
+
+**JOHN OVERRULED A WRITTEN PROHIBITION, AND THE PROHIBITION'S REASON WAS KEPT RATHER THAN RETRACTED.**
+`runner-cycle.md` tail (8) has forbidden a `design_status` clause in `drain_epic_next()`'s PICK
+predicate since `SES-197` (`v7.0.238`), on a real ground: that predicate also feeds step 5, where a
+flagged member was *returned* so the cycle could `record_skip()` it onto John's §10. The 04:42Z cycle
+correctly stopped and asked instead of editing it. He answered at 05:09Z from an attended architect
+session, directive `5dc62981`, verbatim: **"i don't want the system to stop"**, and named the change,
+its scope and its three QA arms himself.
+
+**THE COST THE PROHIBITION NEVER WEIGHED, measured live at 05:17Z before a line changed.**
+`drain_epic_next()` on the real M3 drain returned `pick = SES-191` (`needs-desktop`), queue 5,
+`open_now 18` — on *every* cycle — while **13 buildable named members** sat reachable behind it
+(`SES-77` at queue 234 first). A standing drain John declared could not advance at all.
+
+**THE SIGNAL WAS CHECKED, NOT ARGUED AWAY**, and that is the half that made the reversal safe: all
+four flagged M3 members already carried **unresolved** `runner_skips` rows (`SES-191` needs-desktop
+04:45Z, `SES-180` needs-desktop ×8, `SES-181` needs-john 04:46Z, `SES-182` needs-john ×2). A skip row
+is cleared by the ticket going `done`, never by a cycle waiting long enough, so §10 keeps the ask;
+what stops is the *re-skipping of a ticket already on his page* — `SES-154`'s one-ask-one-home
+boundary arriving here.
+
+**THREE EDITS THIS SHIP FORBIDS.** (1) The flags in the **retirement** predicate too — `open_now`
+goes 0 and John's standing directive closes on the runner's own say-so, the `SES-142` authorisation
+defect; `open_now` reads **18 both pre- and post-fix**, which is the proof it did not move.
+(2) The directive's literal *"`design_status` is non-null"* — that also skips `designed`, which step
+5's table calls **explicitly not a skip** and step 6 calls the fast path, so the literal form makes a
+drain step past its *best* picks. His own parenthetical enumerates the three, and the three shipped,
+mirroring `drain_chain_gate`'s `c_flagged` byte-for-byte so the two homes cannot drift.
+(3) Deleting Gate C as redundant — its population should now be zero, and it is what fires if a later
+edit takes the clause back out of the picker.
+
+**NOT INCLUDED, AND SAID SO:** `status = 'removal proposed'`, which `SES-196`'s own description lists
+among the five blocked-prefix flags, stays pickable and remains step 5's procedural skip. John scoped
+the directive to `design_status`; widening it to a status he did not name would be the runner granting
+itself scope. Carried as the declared remainder on the ship card.
+
+**QA — John's own three arms.** (a) live, same board, one variable: `pick` `SES-191` → `SES-77`.
+(b) all-flagged fixture inside a deliberately failing `DO` block (the `SES-147` rolled-back pattern):
+`blocked`, `pick` null, `open_now 18`, `blocked_detail` naming all 17 flagged members with their flags
+plus the 1 delivered — never a silent empty — board re-counted afterwards byte-identical (4 flagged /
+13 unflagged / 1 delivered). (c) the negative control **is** arm (a)'s pre-fix call, taken on the real
+board rather than reconstructed. Widening `RETURNS TABLE` needed `DROP`+`CREATE` (a return type cannot
+be replaced); the argument list is untouched so no overload can survive — asserted anyway at
+`count(*) = 1`, with grants asserted in **both** directions. `drain_chain_gate` reads the call into a
+`record` and was proven end-to-end through Gate B on another rolled-back fixture: `verdict continue`,
+`pick SES-77`, `pick_design_status` null.
+
+**THE REVIEWER LANE BLOCKED, THEN APPROVED, AND BOTH VERDICTS ARE ON THE RECORD.** The first
+`verifier.js` run (`919453dd`) read the regression suite **red** — `SES-177-claude-state-renderer.js`,
+i.e. `CLAUDE-STATE.md` drift from a close-out step this cycle had not yet run, not a defect in the
+change. Root-caused rather than re-run on hope, the close-out completed, and the second run recorded
+the verdict against the shipped tree. Named here so the two rows are not read as a flaky lane.
+
+**Guards.** `tests/regression/SES-196-drain-pick-flags.js` (6 clauses, **6 of 6 fail** on the
+pre-change runbook). `SES-197`'s own `forbids-pick-predicate-edit` clause was **retargeted, not
+deleted** — it now pins the overrule *and* the reason, because deleting a guard when its rule moves
+loses the reason with it; measured, it is the **only** one of that file's 9 clauses that fails on
+`origin/dev`'s pre-`SES-196` copy. Stamp count held at 5 (session-hygiene check 7): `v7.0.230` moved
+verbatim to this file's appendix after all four of its editor warnings were confirmed restated in step
+0b's body by grep. Doc + test + migration; no `src`/`api`/`lib` change, no site change.
+
+---
+
 ## session/cycle-20260825-0441 (v7.0.251, 2026-08-25, runner cycle `b9b1e4a1-bbc7-4203-80d4-19d6a770fecf`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (23:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-71: an account-level failure is UNMEASURED, never FAIL
 
 **THE BUG IS A FALSY `null`, AND THE ONE-LINER AN EDITOR WILL SUBSTITUTE IS THE ONE THAT CAUSED IT.**
@@ -7411,6 +7475,11 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+**Retired by `SES-196` (v7.0.252, 2026-08-25) to hold the stamp count at 5 — its four editor warnings were confirmed restated in step 0b's body first.**
+
+<!-- DeepBench v7.0.230 | runbooks/runner-cycle.md | SES-194 — THE WATCHDOG: step 0b's sweep finally CLOSES the frozen rows it has only ever reported, and the heartbeat gains the resume guard that makes closing them safe. SES-103's tripwire has detected stalls since v7.0.143 and nothing has ever closed one — measured live 2026-08-24T17:45Z, which is why this is a gap and not a mechanism built ahead of need: cycles e4074c97 (frozen 124 min at "step 5 — pick") and 039d1477 (108 min at "step 3/4") were both still open, both stall-notified at 16:25Z, and a claim on SES-141 had been stranded 2,238 minutes. THE NUMBER AN EDITOR WILL BE TEMPTED TO TUNE, and the one thing this ticket forbids: the threshold is 24 HOURS because that is register B37's evidence bar, IMPLEMENTED here and not widened — "a row may be closed failed by someone else only after 24h of no writes attributable to it… and the closing note must say what evidence was used." The 20-minute tripwire NOTIFIES; the 24-hour bar CLOSES; the gap between them is deliberate. A later cycle will find it frustrating — this cycle watched two peers sit visibly frozen for two hours and correctly closed neither — and the reason it must not act on that frustration is ba8f2ce3 and 633fe486, pronounced dead at ~3h and back nine hours later having finished their missions. A shorter bar does not catch stalls sooner; it manufactures duplicate builds. THE TWO HALVES ARE ONE DESIGN and neither is correct alone: a watchdog without the resume guard creates a NEW failure (a returning cycle heartbeats into a closed row and pushes work whose ticket claim was already released), so the heartbeat statement now carries AND ended_at IS NULL … RETURNING id, checked at EVERY step boundary because a resume can land anywhere, with 0 rows meaning abort cleanly — never re-open your own row, which is the mirror image of what B37 forbids a successor doing to you. B37 IS INTACT, stated in the body rather than left to inference: this is the one sanctioned close, at the one bar John's own measurement produced, through a function that writes the evidence for you. 'failed' is bookkeeping (the outcome CHECK admits no unknown value to prefer) and the generated note says WENT SILENT — never that the cycle died, and it avoids the word entirely so the prose rule is machine-checkable rather than merely stated. QA WAS DISCRIMINATING, and the control ran FIRST: on the live board the call returned 0 rows with both genuinely-frozen ~2h peers untouched (a 20-minute threshold would have closed both), then fixtures at 30h and 26h closed with all four arms firing — claims released, lease released, prior notes preserved, empty-claims case clean — a second call returned 0, and the resume guard was proven by a closed row's last_step surviving a "resumed" heartbeat. Both fixtures deleted, claim restored, before-images kept as the audit trail. FOUND WHILE BUILDING IT and fixed rather than shipped past: the first note text carried B37's rule correctly but contained "died" inside its own negation, so the guard could not assert the rule's absence without matching the disclaimer — a prose invariant a test cannot check is one that drifts. Guarded by tests/regression/SES-194-stall-watchdog.js, whose file-level negative control is the pre-change runbook: 13 of 13 clauses fail on it, 13 of 13 pass on this one. The function body ships as migration ses194_stall_watchdog and lives in the database, not this repo — declared notRun rather than faked. Stamp count held at 5 per session-hygiene check 7: v7.0.216 moved VERBATIM to docs/SESSIONS.md's appendix, checked first — its "use WebFetch, it works" warning is already restated in this file's body at step 2 and in briefing-page.md's read-back contract. Doc + test + migration; no src/api/lib change, no site change. -->
+
 
 These are the **45** version-stamp comments that sat at the top of `docs/runbooks/runner-cycle.md`
 until `SES-164`. They are preserved here **verbatim**, newest-first in their original order, and

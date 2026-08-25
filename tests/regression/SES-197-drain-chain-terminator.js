@@ -1,4 +1,5 @@
-// DeepBench v7.0.238 | tests/regression/SES-197-drain-chain-terminator.js | SES-197
+// DeepBench v7.0.252 | tests/regression/SES-197-drain-chain-terminator.js | SES-197 (one clause
+// retargeted by SES-196, v7.0.252 — see THE CLAUSE THIS FILE EXISTS FOR, below)
 //
 // Guards tail step (8) of docs/runbooks/runner-cycle.md — the in-session drain chain's terminator.
 // Before SES-197 the chain ran on two gates and GATE B COULD NOT FAIL ON A DECISION-STARVED BOARD:
@@ -17,15 +18,22 @@
 // shipped a control that changed nothing, and the test only caught it because the control was
 // itself checked.
 //
-// THE CLAUSE THIS FILE EXISTS FOR, above all the others: `forbids-pick-predicate-edit`. The
-// tempting fix for this bug is a one-line design_status clause inside drain_epic_next's PICK
-// predicate, and a later cycle reading only the symptom will reach for it. It is wrong twice, and
-// both reasons must survive in the runbook or it gets "fixed" that way: (1) that predicate also
-// feeds STEP 5, where a flagged member must still be RETURNED so the cycle can record_skip() it and
-// put the ask on John's §10 -- filtering it there deletes the very signal that tells him a decision
-// is owed; (2) SES-154's pick-vs-retirement boundary lives in that same function. The runner-up pin
-// is `null-ceiling-not-zero`: NULL means the ceiling is OFF and is a REAL value, and coercing it to
-// 0 is a ceiling of zero cards, which stops every chain forever (the SES-147 boundary, same shape).
+// THE CLAUSE THIS FILE EXISTS FOR, above all the others: `forbids-pick-predicate-edit` -- AND IT
+// WAS RETARGETED BY SES-196 (v7.0.252), WHICH IS THE MOST IMPORTANT LINE IN THIS HEADER. It used to
+// pin a PROHIBITION: never put a design_status clause in drain_epic_next's PICK predicate, because
+// (1) that predicate also feeds STEP 5, where a flagged member must still be RETURNED so the cycle
+// can record_skip() it and put the ask on John's §10, and (2) SES-154's pick-vs-retirement boundary
+// lives in that same function. John REVERSED (1) on 2026-08-25 (directive 5dc62981, attended
+// architect session, "i don't want the system to stop") after the picker returned a needs-desktop
+// member on every cycle while 13 buildable ones sat behind it, and after SES-196 MEASURED that the
+// §10 ask survives anyway -- every flagged member already carried an unresolved runner_skips row.
+// (2) IS NOT REVERSED AND NEVER WAS: the flags are in the pick predicate only, and putting them in
+// the retirement predicate closes John's standing directive on the runner's own say-so, which is
+// the SES-142 authorisation defect. So the clause now pins the OVERRULE plus the reason, rather
+// than being deleted -- deleting a guard because its rule moved is how the reason gets lost too.
+// The runner-up pin is `null-ceiling-not-zero`: NULL means the ceiling is OFF and is a REAL value,
+// and coercing it to 0 is a ceiling of zero cards, which stops every chain forever (the SES-147
+// boundary, same shape).
 //
 // FILE-LEVEL NEGATIVE CONTROL, and its result is reported honestly rather than rounded up: run
 // against the PRE-CHANGE runbook (git show origin/dev:docs/runbooks/runner-cycle.md), **8 of these
@@ -37,6 +45,13 @@
 // protect load-bearing text it did not author. Recorded here so a later reader does not mistake
 // 8/9 for a defect in the suite, or "re-derive" a contrived discriminator to make the number look
 // better -- which is the SES-158 vacuous-control failure wearing a metric's clothes.
+//
+// A SECOND FILE-LEVEL CONTROL, added by SES-196's retarget and measured rather than reasoned: run
+// against the PRE-SES-196 runbook (git show origin/dev:docs/runbooks/runner-cycle.md as of
+// v7.0.251), **8 of 9 pass and the one that fails is `forbids-pick-predicate-edit`** -- i.e. the
+// retarget has teeth on exactly the sentence this ship changed and moves nothing else. The 8/9
+// figure above is unchanged and still refers to the PRE-SES-197 file, which is a different control;
+// the two numbers coinciding at 8/9 is a coincidence of arithmetic, not the same measurement twice.
 //
 // WHAT THIS FILE DOES NOT COVER, declared rather than implied (SES-180 (b)): the function BODY
 // ships as migration ses197_drain_chain_gate and lives in the database, not this repo, and this
@@ -111,15 +126,25 @@ export const CLAUSES = [
     breaks: s => s.replace(/\*\*never `design_status`\*\*/g, "**also `design_status`**"),
   },
   {
+    // RETARGETED by SES-196 (v7.0.252). This clause used to pin the sentence "THE EDIT THIS STEP
+    // FORBIDS: putting a design_status clause in drain_epic_next()'s pick predicate". John reversed
+    // that prohibition on 2026-08-25 in an attended architect session (directive 5dc62981, "i don't
+    // want the system to stop") after this step's own picker returned a needs-desktop member on
+    // every cycle while 13 buildable ones sat behind it. The clause is NOT deleted -- deleting a
+    // guard because the rule moved is how the reason gets lost with it. It now pins the overrule
+    // AND the reason the prohibition gave, because that reason is not retracted: it is a real cost
+    // that was weighed and paid, and a later cycle that reads only "the clause is in the picker now"
+    // will put the flags in the RETIREMENT predicate too, which is the SES-142 defect.
     id: "forbids-pick-predicate-edit",
     detail:
-      "the block must FORBID adding a design_status clause to drain_epic_next's pick predicate and " +
-      "give the step-5/record_skip reason -- this is the tempting one-liner a later cycle will try",
+      "the block must record that JOHN OVERRULED the pick-predicate prohibition (SES-196), and must " +
+      "still carry the step-5/record_skip reason the prohibition gave -- a reversal that deletes its " +
+      "own reason invites the next cycle to re-derive the prohibition, or to widen it to retirement",
     test: s =>
-      /THE EDIT THIS STEP FORBIDS/.test(s) &&
+      /JOHN OVERRULED/i.test(s) &&
       /record_skip\(\)/.test(s) &&
       /step\s+\*\*5\*\*|step 5/.test(s),
-    breaks: s => s.replace(/THE EDIT THIS STEP FORBIDS/g, "A reasonable edit here"),
+    breaks: s => s.replace(/JOHN OVERRULED/gi, "This step still forbids"),
   },
   {
     id: "streak-default-is-measured",
