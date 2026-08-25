@@ -1,4 +1,4 @@
-// DeepBench v7.0.249 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- the full
+// DeepBench v7.0.250 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- the full
 // restore drill's first finding, guarded: a backup set's manifest records each data file's path,
 // and if that path carries the DUMPING machine's separator it resolves on no other platform.
 //
@@ -188,6 +188,67 @@ async function run() {
       fs.rmSync(good, { recursive: true, force: true });
       fs.rmSync(corrupt, { recursive: true, force: true });
     }
+  }
+
+  // --- Part 4: the SCHEMA artifact must be able to rebuild the database. --------------------
+  //
+  // v7.0.250. Part 2 proves every data file RESOLVES; that says nothing about whether schema.sql
+  // can actually recreate the tables those files load into. Running the drill into a clean
+  // Supabase project found two defects that made it un-restorable, and neither is visible from
+  // reading a manifest:
+  //
+  //   (1) MISSING SEQUENCES. Two tables default to nextval() on sequences the dump created
+  //       nowhere -> "relation ai_activity_log_id_seq does not exist".
+  //   (2) GENERATED COLUMNS EMITTED AS DEFAULTS. The two GENERATED ALWAYS ... STORED columns came
+  //       out as DEFAULT <expr>, which Postgres refuses outright: "cannot use column reference in
+  //       DEFAULT expression". That one kills the whole CREATE TABLE.
+  //
+  // Both were fixed in public._backup_schema_ddl (the view the dumper pulls verbatim), not in the
+  // dumper. This part gates the ARTIFACT rather than the view, because the artifact is what a
+  // person restores from, and a set dumped before the fix is still broken however correct the
+  // view now is.
+  //
+  // WHY THE SEQUENCE ASSERTION CHECKS FOR A START VALUE and not merely a CREATE SEQUENCE line: a
+  // bare CREATE SEQUENCE restores at 1, so the first insert after a restore collides with rows the
+  // restore just loaded. Superficially working and wrong where it costs.
+  if (!setDir) {
+    notRun(
+      "schema.sql can rebuild the database (sequences present, generated columns not DEFAULTs)",
+      "no DEEPBENCH_BACKUP_SET on this machine; backup sets are not in this repo"
+    );
+  } else {
+    const schemaPath = path.join(setDir, "schema.sql");
+    assert(fs.existsSync(schemaPath), `${setDir} has no schema.sql -- a set that cannot rebuild the schema is not a backup`);
+    const schema = fs.readFileSync(schemaPath, "utf8");
+
+    // Every sequence the table DDL depends on must be created by the same file, before use.
+    const needed = [...schema.matchAll(/nextval\('([a-zA-Z0-9_]+)'/g)].map(m => m[1]);
+    const unique = [...new Set(needed)];
+    for (const seq of unique) {
+      const created = new RegExp(`CREATE SEQUENCE[^;]*\\b${seq}\\b`).test(schema);
+      assert(
+        created,
+        `schema.sql defaults a column to nextval('${seq}') and never creates it. Restoring this set ` +
+          `into a clean project fails with 'relation "${seq}" does not exist'. Found live 2026-08-25 ` +
+          `by running the drill; fixed in public._backup_schema_ddl, so a set dumped after v7.0.250 ` +
+          `carries it. A set dumped before that is still broken -- re-dump rather than edit it.`
+      );
+      assert(
+        new RegExp(`CREATE SEQUENCE[^;]*\\b${seq}\\b[^;]*START WITH\\s+\\d+`).test(schema),
+        `schema.sql creates ${seq} without a START WITH. It would restore at 1 and the first insert ` +
+          `would collide with the rows the restore had just loaded.`
+      );
+    }
+
+    // A generated column emitted as a DEFAULT is rejected by Postgres, so it must never appear.
+    // The signature is a DEFAULT whose expression references a column, which in this schema shows
+    // up as a bare CASE opening immediately after DEFAULT.
+    assert(
+      !/DEFAULT\s*\n?\s*CASE\b/i.test(schema),
+      "schema.sql emits a GENERATED ALWAYS column as a DEFAULT expression. Postgres rejects the " +
+        "whole CREATE TABLE with 'cannot use column reference in DEFAULT expression', so this set " +
+        "cannot rebuild those tables at all. Fixed in public._backup_schema_ddl at v7.0.250."
+    );
   }
 
   // The half of SES-191 that is still open. Declared rather than implied by silence.

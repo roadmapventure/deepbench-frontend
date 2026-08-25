@@ -5,6 +5,58 @@
 
 ---
 
+## session/cycle-20260825-0426 (v7.0.250, 2026-08-25, runner cycle `a122842f-f984-4f43-8118-b3c079a22801`, **`trigger = chained (drain continuation)`** of `0f44f8da` — model Opus 5, no subagent) — SES-191 (still partial): the drill ran into a real project, and the recovery net did not rebuild
+
+**THE DRILL FINALLY EXECUTED, AND IT FAILED — WHICH IS THE POINT OF RUNNING ONE.** John granted the
+$0 scratch slot on card `a9278eca`; `get_cost` returned **$0/month** before anything was created, so
+his standing dollar guard never fired. Scratch project `deepbench-restore-drill`
+(`itcimllfniypelrxsuoh`). `schema.sql` **cannot rebuild the database on a clean project**, for two
+independent reasons, either of which is fatal alone: two sequences (`ai_activity_log_id_seq`,
+`tasks_id_seq`) are referenced by the table DDL and **created nowhere** → `relation … does not
+exist`; and the two `GENERATED ALWAYS … STORED` columns are emitted as `DEFAULT` expressions →
+`cannot use column reference in DEFAULT expression`, which kills the whole `CREATE TABLE`. Both were
+confirmed against the live source before being called defects.
+
+**THE ROOT CAUSE IS THE VIEW, NOT THE SCRIPT, and that is what an editor will get wrong.** Schema
+DDL is generated server-side by `public._backup_schema_ddl` and pulled **verbatim** — patching
+`dump-supabase.mjs` would have changed nothing. Its `CASE` handled `a.attidentity` and never
+`a.attgenerated`, and it had no sequences branch at all. Fixed in migration
+`ses191_backup_schema_ddl_sequences_and_generated_cols`, before-image first.
+
+**SEQUENCES CARRY `START WITH last_value + 1`, and the bare form is the trap.** A bare
+`CREATE SEQUENCE` restores at 1 and looks correct until the first insert collides with the rows the
+restore just loaded — wrong exactly where it costs. Proven: the restored sequence handed out
+**38249**, production's next value.
+
+**THE ROUND TRIP DROPPED THE MANUAL STEP FIRST**, so the proof rests on the emitted DDL rather than
+on the workaround: hand-made sequences dropped → the fixed view's DDL applies clean → a row inserts →
+`caller_ip_masked` computes `203.0.113.47` → `xxx.xx.113.47`, so `LOG-124`'s IP-masking control
+**survives a restore**, which was not previously true of any restore because the table could not be
+created at all.
+
+**A FALSE GAP, CHECKED AND EXCLUDED RATHER THAN REPORTED:** live carries 56 tables to the set's 52,
+but all four extras (`briefing_comments`, `governance_rules`, `issued_versions`, `runner_verdicts`)
+postdate the 2026-08-24T02:09Z snapshot. Staleness, not a dumper defect.
+
+**THE NEAR-MISS, AND IT IS THE PART WORTH READING.** A corrected dump was taken and verified — 66
+files, 52,823 lines, 0 bad checksums, all four guard parts green — and **deliberately not
+committed**, for two reasons the repo's own contract states and this cycle was one command from
+walking past. First: a **raw dump carries every live credential in plaintext** —
+`ANTHROPIC_API_KEY`, `VERCEL_TOKEN`, `SUPABASE_SERVICE_KEY` and the Vercel bypass secret are real
+values in `data/runner_secrets.ndjson`, where the committed set has all five `NULL` because §7's
+redaction nulls them. "Just re-dump and push it" would have published the platform's credentials to
+git. Second: **John ruled automated offsite refresh is the M4 gate's open question and a manual step
+until then.** The raw set was deleted; the standing set re-verified untouched (`PASS`). §9 now
+carries both facts with the measurement.
+
+**STILL PARTIAL, and the reason is stated rather than hedged:** the fix helps every future dump and
+does **nothing** for the set already on disk, so the standing recovery net still restores data but
+not structure until John takes a fresh redacted dump. The guard fails against that standing set **on
+purpose** and passes on a post-fix one. Charter exit criterion 5 is closer — the restore path has now
+been executed against a real target and its structural half is proven — but no platform was booted
+against a fully restored copy, so scoring it would be false. Doc + test + migration; no
+`src/`/`api/`/`lib/` change, no site change.
+
 ## session/cycle-20260825-0407 (v7.0.249, 2026-08-25, runner cycle `0f44f8da-1731-48b9-8229-c7d4473d807b`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Sonnet 5 doc subagent) — SES-191 (still partial): the backup tooling opens a set taken on any machine
 
 **JOHN'S AUTHORIZATION IS WHAT MADE THIS BUILDABLE, AND IT WAS READ OFF THE CARD, NOT ASSUMED.**
