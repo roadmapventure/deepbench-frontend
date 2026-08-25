@@ -390,7 +390,13 @@ splice(`+question('9.1',`, '// ===== §9.1 · ANSWERED', questionRows, '§9');
 
 // §10 — skips, derived; "still skipped" comes from the ticket's status, never a maintained flag
 must(`+SKIPS.n+' &middot; '`, `+${liveSkips.length}+' &middot; '`, '§10 n');
-must(`+SKIPS.nnew+' new</span>`, `+${liveSkips.lengthew}+' new</span>`, '§10 nnew');
+// `liveSkips.lengthew` was a typo (undefined), so every rebuild since it shipped published
+// "N · undefined new" in §10's count chip — found live 2026-08-25 by cycle c8c2d547 on the served
+// page while reading it to clear the publish gate. The NEW half is `briefed_at IS NULL`, which is
+// the SES-127 mechanism the migration's property (3) defines; the sibling line above is `.length`,
+// which is what makes the typo invisible to a glance.
+must(`+SKIPS.nnew+' new</span>`,
+  `+${liveSkips.filter(s => s.briefed_at == null).length}+' new</span>`, '§10 nnew');
 splice("+skipRow('39cd8616", `+'</table></div>'\n    +'<div class="listhead"><span class="n">10.2</span>`, skipRows1, '§10.1');
 splice("+skipRow('f32e05ce", `+'</table></div>'\n    +'<p class="strip-def"><b>Unblock buttons:</b>`, skipRows2, '§10.2');
 
