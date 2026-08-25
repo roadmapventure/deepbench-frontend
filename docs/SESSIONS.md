@@ -5,7 +5,51 @@
 
 ---
 
-## session/cycle-20260825-1141 (v7.0.265, 2026-08-25, runner cycle `4a457450-ec88-4a51-b082-51f373c5a9d7`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (06:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-04: §13 rule 14 becomes a runnable audit, and the audit finds a live violation on its first run
+## session/cycle-20260825-1242 (v7.0.266, 2026-08-25, runner cycle `07f000bf-4ed6-483a-84e5-ea9aaea32817`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (07:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-76: the dry-run rule gets a home, and what was missing was never the practice
+
+**`SES-76` — Dry-run kickoff text-slice tests against current source before the kickoff commits** (`P10 - Tooling`, tier `now`, queue 238, no epic) shipped `delivered` at `v7.0.266`. Three files — `docs/STANDARDS.md`, `CLAUDE-DESIGN.md`, and the new `tests/regression/SES-76-kickoff-dryrun-rule.js`. No `src/`/`api/`/`lib/` change, no site change.
+
+### The finding that changed the shape of the ship
+
+The ticket reads as *"adopt a proposed rule."* Premise revalidation found something better and it is worth stating plainly: **the practice was already in use and already measured three separate times — and it had no canonical home.** `grep -niE "dry.?run"` over `docs/STANDARDS.md` and `CLAUDE-DESIGN.md` on a fresh `origin/dev` returned **zero hits**, while `docs/SESSIONS.md` carried four entries of it running and paying off:
+
+- `LAV-36` (v7.0.74): *"8/10 assertions correctly FAILED pre-change"*, and the run exposed that a muted-italic occurrence count was **3**, not the guessed 2.
+- `LAV-38`/`MOB-21`: caught a regex that died on the `}` inside `${T.brass}` — *"the second session running."*
+- `LAV-39`/`LOG-133`: caught a comment-line filter that JSX block comments defeat — *"the third session running."*
+
+Each was fixed pre-commit instead of costing a coding-session round. So this is not a rule being adopted on an argument; it is a rule with three measured saves that lived only in history prose, which is the **rule-text-with-no-canonical-home** shape `SES-200`'s check 12 detects, one level up. Nothing pointed a design session at it.
+
+### What shipped
+
+**The rule has ONE home** — `docs/STANDARDS.md` §4, a new block after the `SES-45` import-not-recreate rule. It states the bar (the kickoff's Section 8 test is RUN against unchanged source before the doc commits, and every content assertion must FAIL there), names the **two failure shapes**, and — the part that keeps it usable — says what a dry-run failure is **not**: a content assertion failing pre-change is the expected result and the whole point; only a *structural* failure (empty slice, unmatchable regex, a throw before asserting) is a defect.
+
+**The empty slice is named as a mechanism, not a ceremony.** `slice(start, end)` with `start > end` returns `""`, so every assertion over it is vacuous — it can neither pass nor fail honestly. That is the `S-MOB-15` defect the ticket was filed from, and a reader who meets only the ceremony cannot recognise it in the wild.
+
+**`CLAUDE-DESIGN.md` Step 4 gains item 12 and POINTS rather than restates**; old item 12 (save) becomes 13. Step 4 is the procedure home, §4 is the rule home, and a second full copy is the duplicate-procedure-home defect. §3's issuing checklist gains one box, because a rule absent from the list a design session ticks before issuing is a rule that gets skipped.
+
+**The insert is AFTER item 11, never at it.** Step 4's own `SES-46` clause cites *"Step 4.11"* by number, so a renumber there silently breaks a live cross-reference — the same class of defect as the empty slice this rule exists to catch: a reference that no longer points where it says it does. All three item numbers are pinned by assertion.
+
+### QA, and the part worth keeping
+
+Six clauses, each carrying **its own negative control** (a `breaks` transform that removes the clause's subject and must make it fail), plus a file-level control run against `origin/dev`'s pre-change copies of both docs: **all 6 fail there**. The guard reads the shipped documents rather than restating them, per §4's own opening rule.
+
+**The guard's first draft was caught by its own vacuous-control assertion** — a `breaks` transform anchored on a `\n` that normalization had already collapsed, so it mutated nothing and proved nothing. That is precisely this ticket's defect (an assertion whose anchor cannot match), found in this ticket's own test, by the discipline this ticket ships. Recorded rather than quietly fixed.
+
+Verifier (`SES-181` lane): **approve**, all three mechanical gates green, `runner_verdicts 8b08dfac`; `auto_done_eligible: no — no epic on the ticket`, so the close-out status is `delivered` per `SES-154` and the ship card awaits John's Accept. Build green. Regression suite **81/82** — the one red was `CLAUDE-STATE.md` drift, cleared by this cycle's own close-out render (`SES-177`'s documented one-ship-behind lag), green afterwards.
+
+### Named rather than hidden
+
+- **`docs/STANDARDS.md` grew 46.6 KB → 49.1 KB.** `check-session-docs` check 6 was **already** flagging that file over its ~34 KB baseline before this change, so the finding is not new — but this ship made it worse by ~2.5 KB and says so.
+- **`CLAUDE-DESIGN.md` now carries 6 header stamps.** Session-hygiene check 7 caps at ~5, but it scopes to `docs/runbooks/` and its own text says *report before trimming*. Reported here and in the stamp; **not trimmed unasked.**
+- **Not widened:** `SES-45`'s adjacent open item (the `check-session-docs.js` lint that would flag a kickoff Section 8 block defining the function it claims to verify) is a *"consider"* in that ticket, and it stays open.
+
+### The board this cycle stepped past
+
+The drain pick was `SES-130` (`status = 'removal proposed'`) — step 5's procedural skip, recorded. The class-sorted board's top **28 positions** were then blocked end to end: two `delivered`, and the rest `needs-john` / `needs-desktop` / removal-proposed / John's own standing holds. Skips recorded for `SES-203`, `SES-156`, `SES-191`, `SES-180`, `SES-181`, `SES-182`, `SES-183`–`SES-186` (the M4–M7 design gates, all sequenced behind M3 retirement and all reserving their budget half for John at the gate), `SES-160`, `LOG-123`, `DAT-15`, `LOG-126`, `DAT-23` and `HAR-38`.
+
+**`DAT-23`'s premise was re-verified live in passing and it holds:** `anon`/`authenticated` hold **table-level SELECT on 37 public tables** while INSERT/UPDATE/DELETE reach only 5/4/3 — writes closed, SELECT wide open, exactly as filed. Its correction lands in `.claude/rules/supabase-column-grants.md`, which an unattended cycle may not write (register B39), so it is recorded as a `permission-gate` skip rather than attempted.
+
+, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (06:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-04: §13 rule 14 becomes a runnable audit, and the audit finds a live violation on its first run
 
 **`SE-04` — Format Skill Exclusivity Data Audit** (`P10 - Tooling`, tier `later`, epic Selfbuild M3) shipped at `v7.0.265`. Two new files — `scripts/check-format-skill-exclusivity.js` and `tests/regression/SE-04-format-skill-exclusivity.js`. No `src/`/`api/`/`lib/` change, and **no Supabase configuration row written** — see the finding below for why that is the whole point rather than an omission.
 

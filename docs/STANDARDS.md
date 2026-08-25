@@ -85,6 +85,7 @@ It does **not** apply to **session-specific facts** — the exact field values, 
 - [ ] Architect Review complete: no layer violations in task specs
 - [ ] AI Pattern Check section present — names pattern + service, or one-line N/A
 - [ ] Node.js test is full code (not described)
+- [ ] Node.js test dry-run against unchanged source, and the kickoff records how many content assertions failed pre-change out of how many (see Section 4)
 - [ ] Category K tests if touching mergedSteps or Supabase JSONB
 - [ ] Category L live API test if touching any api/ endpoint
 - [ ] Category M consistency test if touching any cross-referenced data (see Section 4)
@@ -142,6 +143,38 @@ which `run-all.js` reports. An honest gap is information; a recreation is a fals
 **Not done here, and named rather than implied:** `SES-45` also floats a `check-session-docs.js`
 lint that would flag a kickoff Section 8 block defining the function it claims to verify. That is a
 *"consider"* in the ticket, not a scoped decision, and it is left open.
+
+### The kickoff's own test is dry-run before the kickoff commits (`SES-76`, `v7.0.266`)
+
+**A kickoff's Section 8 test must be RUN against the current, unchanged source before the kickoff
+doc commits, and every content assertion must FAIL there.** A text-slice anchor is a guess until it
+has been executed. Writing the test is not verifying it.
+
+**The two failure shapes, and the first one is invisible from the test's own output:**
+
+- **The empty slice.** `src.slice(start, end)` where the anchor's first occurrence sits *after* the
+  intended one gives `start > end` and returns `""`. Every assertion over that slice is then
+  vacuous — it cannot pass honestly and it cannot fail honestly. **Found live in `S-MOB-15`:** the
+  kickoff's T1 slice anchored on `.lav-medges`, whose first occurrence is a prose mention in a CSS
+  comment *above* the target rule; both assertions could never pass, and the coding session caught
+  it. A slice that comes back empty is a broken anchor, never a passing test — re-anchor on tokens
+  from the rule itself, not on a name that also appears in prose.
+- **The assertion that passes on unchanged source.** This is the same discrimination bar Section 2
+  rule 7 already puts on QA assertions, applied one step earlier: *would this still pass if the
+  change did nothing?* If yes, it is not measuring the change. A content assertion that is green
+  before the coding session starts is green for a reason unrelated to the work.
+
+**Why it is a rule and not a suggestion — three measured saves, none hypothetical** (full entries in
+`docs/SESSIONS.md`): `LAV-36` ran it and found the occurrence count was 3, not the guessed 2, and
+that 8 of 10 assertions correctly failed pre-change; `LAV-38`/`MOB-21` caught a regex that died on
+the `}` inside a `${…}` interpolation; `LAV-39`/`LOG-133` caught a comment-line filter that JSX block
+comments defeat. Each was fixed pre-commit instead of costing a coding-session round.
+
+**What a dry-run failure is NOT.** A content assertion failing on unchanged source is the expected
+result and the whole point — it is what proves the assertion discriminates. Only a **structural**
+failure (an empty slice, a regex that cannot match, a test that throws before asserting) is a defect
+to fix. Report both in the kickoff: say the test was dry-run, and say how many assertions failed
+pre-change out of how many.
 
 ### Test Categories
 
