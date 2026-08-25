@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 84 · **By status:** 81 live · 2 retired · 1 superseded · **Payload sha256:** `ba2c30c7382e9b4601ed90df829b355dc3f07542bbf6dc21b4155fca65931113`
+**Rules:** 84 · **By status:** 81 live · 2 retired · 1 superseded · **Payload sha256:** `0beb4640b5e4a1a9dd7550c98b20cabc8ba5d8699dbb4a5c56cf008aa50ee68f`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -55,8 +55,8 @@ exactly one space per side, and a reader removes one character per side rather t
 | B28 | live | prose | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B28 |  | Track on the briefing how many cards needed John's judgment this week vs last, feeding decided cards into rule-mining so repeated question-shapes stop reaching him. |
 | B29 | live | prose | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B29 |  | Nominate one "help me" ticket per day on the briefing, selected by the automation ordering, carrying John's specific open questions; resolving it re-enters the ticket at queue #1. |
 | B30 | live | script | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B30 |  | Insert John's automation-queue steps as a selection layer between directives and the class-sorted backlog (now data-driven via automation_rank), retiring itself once all automation steps close. |
-| B31 | superseded | script | runner-gov-register | docs/runbooks/runner-cycle.md#B31 | B42 | The original single-runner control — a cycle-level runner_lease enforcing one runner at a time (v7.0.106); retired once coordination moved onto the resources themselves. |
-| B32 | live | script | runner-gov-register | docs/runbooks/runner-cycle.md#B32 |  | An unexpired budget_override directive's max_tokens/max_usd is the cycle's ceiling for that America/Chicago day, overriding the derived allowance but never the weekly rest wall. |
+| B31 | superseded | script | runner-gov-register | docs/runbooks/runner-cycle.md#phase-1--judgment-first | B42 | The original single-runner control — a cycle-level runner_lease enforcing one runner at a time (v7.0.106); retired once coordination moved onto the resources themselves. |
+| B32 | live | script | runner-gov-register | docs/runbooks/runner-cycle.md#phase-1--judgment-first |  | An unexpired budget_override directive's max_tokens/max_usd is the cycle's ceiling for that America/Chicago day, overriding the derived allowance but never the weekly rest wall. |
 | B33 | live | script | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B33 |  | Ship the Heal engine: group failed durable_hops rows by signature, file P9 Bug Fix tickets at ≥3 occurrences in 14 days, dedupe forever, dry-run by default; detection never auto-fixes. |
 | B34 | live | reviewer | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B34 |  | Never count a gated-before-build Accept toward the runner's trust ladder — it authorizes one build, not a rating of unattended judgment. |
 | B35 | live | reviewer | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B35 |  | Apply John's three rulings: a Reverse on a gated card still demotes the ladder; the budget day boundary is midnight America/Chicago; a dead-cycle report must state why it died and what to do next. |

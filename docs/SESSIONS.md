@@ -5,6 +5,60 @@
 
 ---
 
+## session/cycle-20260825-0140 (v7.0.244, 2026-08-25, runner cycle `776d43c9-119a-40a5-873d-bf2ca43130e1`, `trigger = chained (drain continuation)` — model Opus 5, no subagent) — SES-201 carded, SES-202 shipped: the truth registry stops failing its own contract
+
+**Two tickets touched, which is B24 working rather than scope creep:** the drain's third pick,
+`SES-201`, was **carded** — a card is bookkeeping, not a build, and a cycle never ends over one —
+so this cycle dropped to `SES-202` and built that.
+
+**WHY `SES-201` IS A GATE AND NOT A SWEEP.** Its own text says the scope decision — migrate all 83
+hand-copied rule statements, or some — *is part of the work*. This cycle proposed a batching **rule**
+rather than a list: *migrate whatever checks 12 and 13 report, and stop when they go quiet*. Those
+checks shipped 20 minutes earlier (`v7.0.243`) and are the detector this sweep is the cure for, so a
+criterion the checks define cannot drift from the work the way a hand-written batch list can. Batch 1
+under that rule is exactly four sites, measured live: `B34` at `runner-cycle.md:617`, `B12` at
+`:1009`, `B18` at `:1830` and `:1864`, plus the `B40` claim SQL duplicated into
+`GOVERNANCE-MODES.md:47`. **The risk that makes it John's call is not hypothetical:** at all four
+sites the statement is not a standalone line — it is woven into a paragraph that also carries the
+reasoning (`B34`'s is the *"an Accept on a gated card is permission, not a rating"* passage, which
+carries his ruling and the directive it came from). Replacing the paragraph with a one-sentence
+rendered block deletes the reasoning; leaving the paragraph and adding the block gives one fact two
+homes, which is precisely what check 12 flags. And `GOVERNANCE-MODES.md` — the document that
+authorises this runner — is not a thing an unattended cycle edits, however safe the individual edit
+looks. Card filed, `design_status = needs-john`, `record_skip()` logged.
+
+**`SES-202`: HALF THE TICKET'S PREMISE WAS DEAD AND SAYING SO IS THE DELIVERABLE.** Read from
+`governance_rules`, not from the ticket: `B25`/`B26` are `retired`, **not** `superseded`, and the one
+row that genuinely is superseded — `B31` — **already carries `B42`**. So there was no missing
+successor pointer to add. The runbook records what actually happened to `B25`/`B26` in John's own
+terms: they were *"struck by John's explicit removal"*, replaced by **page sections** (§8's queue
+matrix, §11's now-tier census, `SES-126`), not by another rule. **Inventing a successor id to satisfy
+a checker would be manufacturing a fact**, which is the exact failure this milestone exists to end,
+so that half shipped as a finding rather than an edit.
+
+**The real half, fixed:** `B31` and `B32` both claimed `docs/runbooks/runner-cycle.md#B31` / `#B32`,
+and that file declares neither — `anchorResolves()` accepts a heading slug, an explicit anchor, or
+the register form `**B31 —`, and `runner-cycle.md` has none of the three (its only headings are the
+four phase headings). The rows pointed at a home that never existed. Both now read
+`#phase-1--judgment-first`, which is **true**: `B31`'s retired cycle-lease text is in step 0's
+parallel-cycles block, `B32`'s override rung in step 3's budget walls, both inside Phase 1.
+
+**THE FIX AN EDITOR WILL REACH FOR FIRST, AND WHY IT WAS NOT TAKEN — and it turned up a real finding
+on the way.** Adding a `**B31 —** <statement>` register line to `runner-cycle.md` would make the
+anchor resolve *and* hand-copy the statement into a doc that is not its home, which check 12 exists
+to flag. Using the sanctioned `{{rule:ID}}` rendered form instead does not help either: it renders as
+`> **Rule B32** —`, which `anchorResolves()`'s register-entry pattern does not match. **SES-175's
+render format and check 10's anchor forms do not agree**, so a correctly rendered rule block cannot
+serve as its own anchor. Named here rather than fixed — it changes what check 10 accepts, which is
+not registry hygiene.
+
+**QA — the tripwire is the test; a data fix needs no new guard and adding one would give the
+assertion two homes.** Before (measured twice this session, 02:04Z and 02:16Z): check 10 reported
+**2 WARNs**. After: **0**. And the absence of a complaint is not the whole proof, so both directions
+were asserted against the shipped resolver: `anchorResolves()` returns **true** for both new
+anchors, and **false** for the two old ones against the same file — the checker did not become
+permissive, the rows were corrected. `render-rule-blocks.js` still clean, 84 rules.
+
 ## session/cycle-20260825-0140 (v7.0.243, 2026-08-25, runner cycle `ca480d13-3210-4712-a7e9-cb4a60bc7f05`, `trigger = chained (drain continuation)` — model Opus 5, no subagent) — SES-200: two of the three pieces SES-176 left ownerless, and the third one FILED
 
 **The M3 drain's second pick**, in the same session as its first. `SES-176` is `done` and its three
