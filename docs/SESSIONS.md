@@ -5,6 +5,61 @@
 
 ---
 
+## session/cycle-20260825-0740 (v7.0.259, 2026-08-25, runner cycle `80075c2b-fd46-4eeb-bc1d-b10878ac4903`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (02:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-008: the harness's gated-tool set is asserted against its own documentation
+
+**THE DRIFT IS ON RECORD, WHICH IS WHY THIS IS A TEST AND NOT A PROOFREAD.** `ARCHITECTURE.md` §1
+described the harness as having two gated tools while `web_search` (`HAR-05`) was live as a real,
+independently-gated third — and it sat wrong until an unrelated stress test (`SES-001`, 2026-07-20)
+happened to notice. `LOO-008`, the row tracking its own gap, was not updated either. Prose cannot be
+diffed against code, so nothing failed in between. §1's Loop entry now carries the list a second
+time as a comment-anchored table, and `tests/regression/SES-008-harness-tool-doc-drift.js` asserts
+the two against each other.
+
+**THE SUBJECT IS THE REAL `buildCallBody()`, IMPORTED AND CALLED.** That is load-bearing rather than
+ceremony, and it is the rule this platform shipped four hours earlier (`SES-45`, `v7.0.257`,
+`STANDARDS.md` Section 4): a test that rebuilt `canRequestHelp ? [help, delegate] : []` inside the
+test file would agree with itself forever and would have gone green straight through the very
+`HAR-05` drift it claims to catch. The test builds every on/off combination of the gating
+parameters, calls the shipped function with each, and reads the tool names it actually emitted.
+
+**THE GATE BINDING IS READ OUT OF THE DOC, NOT HARDCODED IN THE TEST — the half most likely to be
+"simplified" away.** The table names the `buildCallBody()` **parameter** alongside the Skill Profile
+trait, and the test calls the real function with the parameter it read from `ARCHITECTURE.md`. So
+the trait→parameter correspondence is *asserted* rather than living as a second copy inside the test
+file; a doc row naming a parameter the function does not have fails. Collapsing the table to
+"Tool | Trait" and mapping trait→parameter in the test would restore exactly the second-copy problem
+the whole ticket is about.
+
+**QA WAS RUN AGAINST THE REAL CODE, NOT A FIXTURE, and that is what makes it discriminating.** Three
+mutations of `api/prompt/request-receivable.js`, each reverted: a fourth tool added to the real
+`harnessTools` array (fails, naming it — the `HAR-05` shape exactly); `DELEGATE_TO_AGENT_TOOL`
+removed (fails, naming the now-phantom doc row); `webSearchTool` re-gated behind `canRequestHelp`
+(fails, naming the wrong gate). `git diff` on the subject file empty afterwards. The four doc-side
+negative controls are asserted inside the test itself — a clause that cannot fail proves nothing.
+
+**TWO EXCLUSIONS, STATED SO THEY ARE NOT REDISCOVERED.** The schema tool is derived from the
+caller's own `format_contract` and is not a harness tool — it is excluded *by construction* (every
+probe passes `output_type: 'text'`) rather than by name-matching it away. And
+`enable_parallel_tool_use` (`LOO-28`) is not a row, because §1 says it adds no tool; the test pins
+that claim too, asserting the emitted set is unchanged when it is on.
+
+**FOUND WHILE SHIPPING, MEASURED, AND FILED RATHER THAN ABSORBED — `SES-209`.** This cycle's first
+verifier run came back **block** on a red regression gate that had nothing to do with its diff:
+step 7a runs the verifier *before* the close-out `render-claude-state.js`, and
+`SES-177-claude-state-renderer.js` asserts the committed `CLAUDE-STATE.md` matches the ledger — a
+file that is one ship behind **by design**. Rendering it flipped the gate green with no code change.
+Checked against `runner_verdicts` rather than assumed: four block→approve pairs on the same ticket
+and version today, ~90 seconds apart each (`SES-196`, `SES-58`, `LOG-77`, and this cycle), every one
+with build and hygiene green. Roughly half the block verdicts in the lane's own telemetry are this
+artifact, which understates the charter's keystone catch-rate from verdict one. Both verdicts are
+left in the ledger rather than the block being quietly dropped.
+
+**Verdict `approve`, auto-done eligible** — all three gates green on a `Selfbuild` `P10 - Tooling`
+delivery whose diff touches none of the gate scripts, so the charter's decision-2 interim bar wrote
+`done` rather than `delivered`. Reverse is still one tap. Two files plus ceremony; no `src/`/`api/`
+change, no schema change. `SES-45`'s own remainder was carded, not built — its lint is a *"consider"*
+in the ticket, and a peer had declined it 90 minutes earlier on the same grounds.
+
 ## session/cycle-20260825-0641 (v7.0.258, 2026-08-25, runner cycle `e7f31390-4d2b-45c4-a549-0b51bf3fa07f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (01:00 America/Chicago) — model Opus 5 orchestrator + one Fable 5 revalidation/scoring subagent) — LOG-77 item 2: constrained decoding is captured, and five of the roadmap's other seven items turn out to describe behaviour the platform does not perform
 
 **THE TICKET'S OWN INSTRUCTION WAS FOLLOWED, AND IT IS WHAT DEMOTED THE TICKET.** `LOG-77` says

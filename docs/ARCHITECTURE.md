@@ -263,6 +263,34 @@ Loop calls Harness once per turn and decides, based on what comes back, whether 
 
 **Industry term:** Agent Loop / ReAct (Yao et al., 2022) — reasoning interleaved with a freely-explored action space, repeated until done. DeepBench's is a real, live instance of the pattern — narrower than full ReAct, but not as narrow as this entry previously claimed. **Corrected 2026-07-20 (`SES-001` stress test):** alongside the two delegation tools (`request_help`, `delegate_to_agent`, gated by `can_request_help`), a third, independently-gated general tool exists — Anthropic's native `web_search` (`enable_web_search` trait, same shape) — live today, not dormant: one real Intent Skill Profile, `ws-news-search-intent`, has it turned on. Its per-turn search count is cappable via the opt-in `web_search_max_uses` trait (positive integer, emitted as `max_uses` on the tool definition; absent = unbounded, today's behavior) — same gate and shape as `enable_web_search` (`HAR-27`). Full history and rationale: `LOO-008` (`FEATURES.md`).
 
+**The gated-tool set, in a form a test can read (`SES-008`, `v7.0.259`).** The paragraph above is
+the one that went stale: `web_search`/`HAR-05` shipped as a real third gated tool and this entry
+described two for an unknown stretch, until an unrelated stress test caught it. Prose cannot be
+diffed against code, so the list also lives here as a table, and
+`tests/regression/SES-008-harness-tool-doc-drift.js` **drives the real `buildCallBody()`** through
+every combination of the parameters this table names and asserts the emitted tool set matches it.
+**Adding or removing a harness tool without editing this table fails that test.** The table names
+the `buildCallBody()` parameter as well as the Skill Profile trait deliberately: the test reads the
+parameter from *here* and calls the real function with it, so the trait→parameter binding is
+asserted rather than hardcoded in the test.
+
+<!-- {{harness-tools}} — machine-read by tests/regression/SES-008-harness-tool-doc-drift.js.
+     Do not reformat the table below without running that test. -->
+
+| Tool | Skill Profile trait | `buildCallBody()` parameter | Defined at |
+|---|---|---|---|
+| `request_help` | `can_request_help` | `canRequestHelp` | `REQUEST_HELP_TOOL`, `api/prompt/request-receivable.js` |
+| `delegate_to_agent` | `can_request_help` | `canRequestHelp` | `DELEGATE_TO_AGENT_TOOL`, `api/prompt/request-receivable.js` |
+| `web_search` | `enable_web_search` | `enableWebSearch` | Anthropic native `web_search_20250305`, emitted inline in `buildCallBody()` |
+
+<!-- {{/harness-tools}} -->
+
+**Two things this table is not.** It is not the schema tool — that one is derived from the caller's
+own `format_contract`, is not a harness tool, and is excluded by the test rather than left to
+coincidence. And `enable_parallel_tool_use` (`LOO-28`) is **not** a row here, because it adds no
+tool; it permits several calls to the tools above in one turn. The test pins that claim too — the
+emitted set must be unchanged when that trait is on.
+
 No agent is named in this mechanism by identity — every resolution happens live, by capability, never hardcoded (Rule #1, §19d/§19e).
 
 Full mechanism detail, not repeated here: §19d (Agent Loop, sniff test, single delegation path), §19e (Resource Ownership Brokers — a distinct, orthogonal concern: *who's allowed to touch a resource*, not *who gets asked*), §19h (Live Agent-Orchestration Visibility — the `_onEvent` mechanism firing at Loop's own dispatch points).
