@@ -5,6 +5,67 @@
 
 ---
 
+## session/cycle-20260825-0511 (v7.0.253, 2026-08-25, runner cycle `de31fe1e-8493-42ed-a8c6-399e9c6209e3`, **`trigger = chained (drain continuation)`** of `860efe52` — model Opus 5, no subagent) — SES-61: the suite gate stops going green on halves it never ran
+
+**THE PREVIOUS SHIP PICKED THIS CYCLE'S TICKET, WHICH IS THE POINT.** `v7.0.252` taught
+`drain_epic_next()` to skip members only John can move; its chain gate then returned `continue` with
+`SES-77`, where the pre-fix picker would have handed back `SES-191` and Gate C would have stopped
+the chain.
+
+**`SES-77` WAS UNBUILDABLE HERE TOO, AND THAT IS RECORDED RATHER THAN SMOOTHED OVER.** Its own
+description puts the fix in `C:/Projects/.claude/hooks/` — John's machine, outside this repo — a
+`needs-desktop` surface no unattended cycle may touch (register B39). It carried
+`design_status = NULL`, which is *why* the picker offered it: **the flag had never been written**,
+the `SES-114` gap exactly. This cycle wrote `needs-desktop` from the ticket's own words
+(before-image first), `record_skip()`ed it (the row already existed at `skip_count 1` from the
+04:50Z cycle — so §10 was already carrying the ask — now 2), released its claim, and re-called the
+picker, which advanced to `SES-61`. That second call is `v7.0.252` working live on a member flagged
+thirty seconds earlier.
+
+**THE PREMISE WAS REPRODUCED BY ACCIDENT AN HOUR EARLIER, on a real failure rather than a fixture.**
+`STANDARDS.md` Section 2 rule 5 specced a bare `node tests/regression/run-all.js`. This session's
+first cycle ran exactly that and got **68/68 passed**; the identical tree with credentials exported
+gave **67/68** — `SES-177-claude-state-renderer.js` failing on real `CLAUDE-STATE.md` drift. The
+specced gate could not see it.
+
+**THE TICKET'S OWN PROPOSED ONE-LINER IS WRONG, AND THAT IS THE FINDING.** It asks for
+`node --env-file=.env.local …`. Bare `--env-file` **hard-errors** where the file is absent
+(`node: .env.local: not found`, verified on Node 22.22 alongside its `--env-file-if-exists`
+counterpart, which prints *"not found. Continuing without it."* and proceeds). `.env.local` is
+git-ignored, so it is absent in **every unattended cloud runner cycle** — the environment that runs
+this suite most often. The fix as written would break its own main consumer. Shipped form:
+`node --env-file-if-exists=.env.local tests/regression/run-all.js`.
+
+**THREE THINGS RULE 5 NOW CARRIES that a later editor would otherwise strip:** the measurement
+(68/68 vs 67/68, naming `SES-177`), so it is evidence rather than taste; that `SES-180` (b)'s
+`NOT A FULL RUN:` line is **deliberately not a failure** (gating on it paints CI permanently red
+where credentials are absent — the outcome `SES-180` shipped around, and the "obvious" next step for
+someone reading only this rule); and that **credentials are not spend** — `DAT-12`'s
+`DAT12_LIVE_CHI` stays on its own opt-in flag, so a credentials flag never starts billing.
+
+**ONE CORRECTION TO THE TICKET, made rather than propagated:** it says *"section 5's suite
+invocation"*. Rule 5 lives in **Section 2**; Section 5 is the verification checklist, which also
+restated the bare command in two Category rows. Both homes are fixed, and those rows now **point**
+at rule 5 rather than keeping a second hand-maintained copy — two copies of one invocation is how
+the bare form comes back.
+
+**TWO OF THE GUARD'S CLAUSES ARE NOT DOCUMENT ASSERTIONS.**
+`tests/regression/SES-61-suite-invocation.js` *spawns* both flag forms against a file that does not
+exist: `--env-file-if-exists` must exit 0, and bare `--env-file` must **not**. The second is the
+discriminator — if bare `--env-file` ever started tolerating a missing file, the rule's stated
+reason would be stale and no amount of grepping would notice. Six prose clauses besides, each with a
+control that is itself asserted to have teeth; **6 of 6 fail on `origin/dev`'s pre-change
+`STANDARDS.md`**.
+
+**FILED, NOT SILENTLY INCLUDED:** `SES-207 — Five regression tests tell readers to run the suite
+with a flag that hard-errors in every cloud clone`. Five SKIP hint strings still carry the bare
+form, printed at exactly the moment their reader is trying to run the missing half. Out of scope
+here only because `CLAUDE.md`'s 3-file cap was reached at the spec plus its guard; the ID was
+claimed atomically from `feature_id_counter`, never hand-counted. Doc + test; no `src`/`api`/`lib`
+change, no schema change, no site change.
+
+---
+
 ## session/cycle-20260825-0511 (v7.0.252, 2026-08-25, runner cycle `860efe52-685c-4a0d-a292-d9dfa009ed38`, `trigger = scheduled` — fired 05:11Z, off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Sonnet 5 regression-test subagent) — SES-196: the drain picker skips the flags step 5 honours, on John's word
 
 **JOHN OVERRULED A WRITTEN PROHIBITION, AND THE PROHIBITION'S REASON WAS KEPT RATHER THAN RETRACTED.**

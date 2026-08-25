@@ -43,9 +43,13 @@ predates the 2026-07-07 worktree discipline.)*
 2. Max 3 files modified per session
 3. Max 4 tasks per kickoff doc
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
-5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a). Two rules on invoking it, both from real false results found 2026-07-28 (`SES-28`):
+5. Node.js test must pass before any commit — for any Category K or M session, the suite must also pass (SES-009a). **The specced command is `node --env-file-if-exists=.env.local tests/regression/run-all.js`** (`SES-61`, `v7.0.253`). Three rules on invoking it, the first two from real false results found 2026-07-28 (`SES-28`), the third from one found 2026-07-29 and re-measured 2026-08-25:
    - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. (history: `docs/SESSIONS.md`)
    - **Run it against current dependencies.** A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree, which may predate `package-lock.json` — run `npm install` in the worktree first. (history: `docs/SESSIONS.md`)
+   - **Give it credentials, or it can go green having verified nothing that needs them.** A test half needing `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` declares itself not-run and its file still reports `[PASS]`. **Measured live 2026-08-25 by runner cycle `860efe52`, on a real failure rather than a hypothetical:** the bare command reported **`68/68 passed`** while the credentialed command on the identical tree reported **`67/68`** — `SES-177-claude-state-renderer.js` was failing on real `CLAUDE-STATE.md` drift, and the specced invocation could not see it. `SES-180` (b)'s **`NOT A FULL RUN:`** line announces the gap; it is deliberately **not** a failure (gating on it would paint CI permanently red where credentials are absent), so reading that line is the reader's job and this rule is what makes the credentials available in the first place.
+     - **Use `--env-file-if-exists=`, never bare `--env-file=`.** This is not style. `node --env-file=.env.local` **hard-errors** (`node: .env.local: not found`) wherever the file is absent — which is *every* unattended cloud runner cycle, since `.env.local` is git-ignored and never exists in a fresh clone. So the obvious form of this fix breaks the environment that runs the suite most often. Both arms verified on Node 22.22 rather than assumed: missing file → `not found. Continuing without it.` and the run proceeds; present file → the variables load.
+     - **Credentials are not the same thing as spend.** Halves that cost real money stay gated on their own explicit flag (`DAT-12`'s `DAT12_LIVE_CHI`, two ~60 s LLM journeys) and this rule does not turn them on. A couple of REST reads should always run; a paid journey should not run because someone passed a credentials flag.
+     - Where credentials come from an exported environment instead of a file (a runner cycle reading `runner_secrets`), the flag is a harmless no-op and the halves run anyway. Secrets are read by name and exported; they never go into a committed file.
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
@@ -253,11 +257,11 @@ Complete every item before committing. This is the canonical "standing checklist
 
 ### Category K — Component State Initialization
 - [ ] All mandatory K tests (Section 4) pass — see Section 4 for the full list
-- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
+- [ ] Persisted copy added to `tests/regression/`, the suite passes — **invoked per Section 2 rule 5**, which is where the command and its three invocation rules live (`SES-61`: a bare `node tests/regression/run-all.js` skips every credential-gated half and still reports PASS)
 
 ### Category M — Cross-Reference Consistency
 - [ ] All mandatory M tests (Section 4) pass — see Section 4 for the full list
-- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
+- [ ] Persisted copy added to `tests/regression/`, the suite passes — **invoked per Section 2 rule 5**, which is where the command and its three invocation rules live (`SES-61`: a bare `node tests/regression/run-all.js` skips every credential-gated half and still reports PASS)
 - [ ] `node scripts/check-ai-logging-coverage.js` run and reviewed for any session adding or touching a real LLM/embedding call site — new CRITICAL findings must be resolved before commit; new WARNING findings must at least be looked at and either fixed or explicitly logged as a follow-up ID, not silently ignored
 
 ### Category L — Live API Integration
