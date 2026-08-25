@@ -1463,6 +1463,37 @@ Three things ship together, and the third is not optional:
 
 **That is itself a gap, not just a fact — tracked as `LOG-54`.** "Decide on real evidence" is only executable if the evidence gets collected; today nothing anywhere records that a section came back empty. `LOG-54` must land before question 1 can be answered on data rather than on another single anecdote.
 
+**`LOG-54` SHIPPED (`v7.0.246`, 2026-08-25) — the signal exists, and question 1 is now answerable by query rather than by anecdote.** `ai_activity_log.call_facts.empty_sections` records, per call, which **declared-required** properties of a structured response arrived empty. Derived in `api/prompt/request-receivable.js` (`extractEmptyDeclaredSections()`, wired into the STEP-4 `buildCallFacts()` assembly), generically from `format_contract.schema` — no intent, agent or capability conditional anywhere in it (`.claude/rules/capabilities-are-data.md`).
+
+**The ledger choice was measured, not assumed, and it reverses this section's own 2026-07-23 guess.** The note above reaches for `durable_hops`; that is the wrong ledger and always was. Read live 2026-08-25: `durable_hops` holds **64** completed `hyp-hypothesis-test-display-intent` rows, of which only **3** carry the section keys at all, because rows are written only when a call checkpoints. `ai_activity_log` holds **343** `hyp-hypothesis-test-intent` and **437** display-intent rows, **every one** with non-null `call_facts`. So the honest restatement of the gap is not "four unobserved calls" but *343 content calls that went unobserved*.
+
+**The value is tri-state, and the middle state is load-bearing:**
+
+| What you see | What it means |
+|---|---|
+| key **absent** | the observation does not apply (no declared object schema, no `required`, or a text call) — or the row predates `v7.0.246` |
+| **`[]`** | checked N required properties, **all filled** — the compliant case |
+| `["complicates", …]` | these required properties arrived empty, sorted |
+
+**Do not "tidy" the `[]` into an omission.** It is a deliberate exception to `buildCallFacts()`'s omit-when-empty convention, because question 1 asks whether she complies *reliably* — which needs the denominator (calls actually checked) and the numerator (calls with an empty section) out of the same column. Omitting `[]` collapses "checked, all filled" into "never checked", so a silently broken derivation would read as **perfect compliance** and fail toward *"don't build the reviewer"*, invisibly. Same assert-both-directions lesson as `.claude/rules/supabase-column-grants.md`. Guarded by `tests/regression/LOG-54-empty-section-signal.js`, whose negative control is a *compliant* call: `complicates.text` carrying her own "no complicating factors were found" with empty citations must report `[]`, never `["complicates"]`.
+
+**What counts as empty** is whole-value and type-driven: `null`/absent, whitespace-only strings, empty arrays/objects, and arrays/objects all of whose members are empty. `0` and `false` are **content** (`override_warning: false` is a real answer). **Accepted under-report, stated rather than hidden:** a section carrying citations but no text (`{text: null, citations: ["c1"]}`) counts as *filled*. Rare, and the conservative direction — it misses a possible failure rather than inventing one.
+
+**Deliberately NOT on `SIGNATURE_FIELDS`** (`lib/pattern-vocabulary.js`): this is a diagnostic fact, not pattern vocabulary — the `LOG-109` posture for `http_status`/`extraction_outcome`. Promoting it to a criteria key is Susan's review path plus a §19k amendment, never a silent allowlist edit; the guard asserts it stays off. Cardinality is bounded by construction — the value is a subset of one schema's declared `required` list (k=4 for `hyp-hypothesis-test-intent`, k=7 for `intelligence-review-format`, read live), sorted so identical compliance states collapse to one signature. Never a count, never free text — that is the `LOG-91` blow-up this avoids.
+
+**Question 1 is still open and this does not answer it** — it makes it answerable. The query is:
+
+```sql
+select feature,
+       count(*) filter (where call_facts ? 'empty_sections')                          as observed,
+       count(*) filter (where jsonb_array_length(call_facts->'empty_sections') > 0)   as with_empties
+  from public.ai_activity_log
+ where call_facts ? 'empty_sections'
+ group by feature;
+```
+
+Nothing here changes what any user sees: it writes one bounded key on rows that already carry `call_facts`, authors no content, and touches no rendering path. "The screen holds no content policy" above is untouched.
+
 **Whichever shape (1) takes, it must pass §19d's sniff test.** A deterministic "if `text` is null, push back" is a hardcoded reflex — the same shape as the "always seek backup" trait already rejected there. It only passes if the reviewing agent judges *this particular* output unfit and states why in a logged reason.
 
 ### Fault classification (`HAR-15`, 2026-07-28)

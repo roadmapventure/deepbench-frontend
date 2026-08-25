@@ -5,6 +5,68 @@
 
 ---
 
+## session/cycle-20260825-0236 (v7.0.246, 2026-08-25, runner cycle `af9204f5-0dee-4393-8ab3-c2b48ad9f6d2`, `trigger = scheduled`, verdict `run` on John's 1h clock grid (21:00 America/Chicago) — model Opus 5 orchestrator + one Fable 5 kickoff-design subagent) — SES-203 carded, LOG-54 shipped: the empty-section signal §19j was blocked on
+
+**THE BOARD'S ENTIRE ACTIONABLE PREFIX WAS JOHN'S, AND THAT IS THE CYCLE'S FIRST FINDING.** The M3
+drain returned `SES-199` as its pick — a ticket already `done`, still holding queue 6, because no
+recompute had run since it closed. One `recompute_backlog_queue()` moved **581 rows** and the drain
+then returned `SES-201`, flagged `needs-john`: skipped, recorded. Falling through to the board, queue
+1–21 read `delivered` ×3 (awaiting his verdict), `needs-john` ×6, `needs-desktop` ×1, four M4–M7
+design gates premature *by their own text* (*"members filed at the gate, not before"*), and `SES-160`
+blocked on `SES-159`. Six skip rows written, the drain pick's included.
+
+**`SES-203` CARDED (`e5be0e66`) — AND IT IS THE BOTTLENECK ON EVERYTHING ABOVE.** The Artifact
+publish gate now refuses a republish until the cycle has Read the whole served page. Its remaining
+two candidates trade John's page freshness against the runner's token budget, and the ticket carries
+**no fail-direction** between them once candidate (a) was retired by measurement — so it is his call,
+not a classification the runner may make for him. What this cycle added rather than restating: the
+served page measured **254.5 KB tonight against 198.3 KB on 2026-08-24** — +56 KB in ~23 hours, the
+ceiling moving exactly as `SES-188` predicted — and the arithmetic the ticket lacked: **~105k tokens
+per republish is ~2.5M/day at 24 scheduled fires (6.3% of his 40M standing max), ~5.2M at tonight's
+49-cycle rate (12.9%)**. That turns a "which of two?" into a one-tap decision.
+
+**`LOG-54`: THE TICKET NAMED THE WRONG LEDGER, AND SAYING SO IS HALF THE SHIP.** Its 2026-07-23
+evidence reached for `durable_hops`. Read live: `durable_hops` holds **64** completed
+`hyp-hypothesis-test-display-intent` rows of which only **3** carry the section keys at all (rows are
+written only when a call checkpoints), while `ai_activity_log` holds **343** content-intent and
+**437** display-intent rows, **100%** with non-null `call_facts` and **zero** emptiness facts. So the
+gap is not "four unobserved calls" — it is **343 content calls that went unobserved**. Shipped as
+`call_facts.empty_sections`, derived generically from `format_contract.schema` in
+`request-receivable.js`'s STEP-4 assembly. **One seam covers both write paths** (the precomputed path
+carries the same facts back as `_terminal_log` and merges into the surviving agent-turn row,
+`LOG-91`), so `execute.js` is untouched.
+
+**THE `[]` IS THE DESIGN, AND IT IS THE ONE THING A LATER EDITOR WILL TIDY AWAY.** The value is
+tri-state: key absent = the observation does not apply; **`[]` = checked, all filled**; names = these
+arrived empty. That breaks this file's own omit-when-empty convention *on purpose*, because §19j
+question 1 asks whether she complies **reliably** — which needs the denominator and the numerator out
+of one column. Omit `[]` and "checked, all filled" becomes indistinguishable from "never checked", so
+a silently broken derivation reads as **perfect compliance** and fails toward *"don't build the
+reviewer"*, invisibly. Same assert-both-directions lesson as the column-grants rule.
+
+**WHAT THE FABLE 5 DELEGATION ACTUALLY BOUGHT**, since a subagent that returns a plausible design is
+not the same as one that earns its cost: it flagged **its own unverified premise** — that it could
+not confirm the live schemas declare the sections `required`, and that if they do not, the extractor
+returns `null` for precisely the intent the ticket is about. Opus 5 checked before accepting:
+`hyp-hypothesis-test-intent.required` = `[supports, complicates, consider, confidence]` (k=4),
+`intelligence-review-format` k=7. Premise confirmed, cardinality bounded, design accepted. One
+attempt, one tier.
+
+**QA was mutation-tested rather than asserted.** 62/63 regression (the one failure is pre-existing
+`CLAUDE-STATE.md` drift, generated at close-out, untouched by this diff and re-rendered here). The
+new guard fails on `origin/dev`'s copy; **unwiring the call site** fails the wiring assertion;
+**`Array.isArray` → truthiness** fails the tri-state assertion. Its sharpest case is the *compliant*
+one — her own "no complicating factors were found" with empty citations must report `[]`, never
+`["complicates"]` — which kills a flag-everything detector and a tidy-the-`[]`-away refactor at once.
+**SEAM PROOF (labelled):** the shipped module run against the **live** schema pulled from Supabase —
+compliant → `[]`, dropped text → `["complicates"]`, text call → `null`. No model call, no live write.
+
+**Deliberately not crossed:** no user-visible change (observability only, §19j's "screen holds no
+content policy" untouched); **not** added to `SIGNATURE_FIELDS` (a diagnostic fact, not pattern
+vocabulary — `LOG-109`'s posture, and the guard asserts it stays off); and **question 1 stays open** —
+this makes it answerable, it does not answer it.
+
+---
 ## session/cycle-20260825-0240 (v7.0.245, 2026-08-25, runner cycle `c8c2d547-2697-4693-95ea-b464c7b4b5b4`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (21:00 America/Chicago) — model Opus 5, no subagent) — SES-191 (partial): the drill ran off John's machine for the first time, and the recovery net does not open there
 
 **`SES-201` skipped, `SES-191` picked.** The M3 drain's lowest-queue named member is `SES-201` —

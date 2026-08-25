@@ -1,3 +1,12 @@
+// DeepBench v7.0.246 | api/prompt/request-receivable.js | LOG-54 -- call_facts.empty_sections: the
+// signal §19j's open question 1 was blocked on. Records which DECLARED-REQUIRED sections of a
+// structured response arrived empty, derived generically from format_contract.schema (never an
+// intent/agent/capability conditional -- capabilities-are-data). Tri-state and the middle state is
+// load-bearing: key absent = observation does not apply; `[]` = checked, all filled; names = these
+// arrived empty. `[]` is written on purpose, against this file's own omit-when-empty convention,
+// because question 1 needs the denominator and the numerator from one column -- omitting it would
+// make a broken derivation read as perfect compliance. Observability only: no rendering path, no
+// content authored, no user-visible change (§19j "the screen holds no content policy" untouched).
 // DeepBench v7.0.34 | api/prompt/request-receivable.js | LOG-121 -- handler wrapped in
 // withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
 // site in this file changes
@@ -672,6 +681,59 @@ export function extractDelegationProvenanceFacts(toolInput, taskContext) {
   return { delegationTarget: pick(toolInput), taskProvenance: pick(taskContext) };
 }
 
+// FEATURE: LOG-54 -- ARCHITECTURE.md §19j. Records WHICH declared-required sections of a structured
+// response arrived EMPTY, so "she checked and found nothing" stops being indistinguishable from "the
+// field was dropped". Until this, nothing anywhere recorded it: measured live 2026-08-25, 343
+// hyp-hypothesis-test-intent and 437 display-intent rows in ai_activity_log, every one carrying
+// call_facts, and NOT ONE carrying an emptiness fact -- while durable_hops (the ledger §19j's own
+// 2026-07-23 note reached for) holds 64 completed display rows of which only 3 carry the section keys
+// at all, because rows are written only when a call checkpoints. ai_activity_log is the ledger.
+//
+// GENERIC BY CONSTRUCTION, and it has to be: `.claude/rules/capabilities-are-data.md` forbids an
+// agent/capability/intent conditional in this file, so the SCHEMA is what drives the read. Nothing
+// here names a slug; a Q&A schema, a routing schema and a hypothesis schema all work unchanged.
+//
+// `required` ONLY, deliberately: "arrived empty" is a signal only against an obligation. An optional
+// property the contract lets the model omit is contractual behaviour, not a failure mode. Note this
+// is the ORTHOGONAL half of what parseModelTurn() already enforces -- that checks required keys are
+// PRESENT; this records present-but-hollow, which is exactly the case §19j says nothing can see.
+export function isEmptyDeclaredValue(v) {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  // 0 and false are CONTENT, never emptiness -- override_warning:false is a real answer.
+  if (typeof v === 'number' || typeof v === 'boolean') return false;
+  if (Array.isArray(v)) return v.length === 0 || v.every(isEmptyDeclaredValue);
+  if (typeof v === 'object') {
+    const keys = Object.keys(v);
+    return keys.length === 0 || keys.every((k) => isEmptyDeclaredValue(v[k]));
+  }
+  return false;
+}
+
+// Returns null when the observation DOES NOT APPLY (no object schema, no declared `required`, or a
+// non-object output -- i.e. a text call), and otherwise the SORTED list of required properties that
+// came back empty -- `[]` included.
+//
+// THE `[]` IS DELIBERATE AND IS THE ONE PLACE THIS FILE BREAKS ITS OWN "omit the key when the fact
+// set is empty" CONVENTION. Do not "tidy" it back. For every other key the empty case carries no
+// information ("no tools called" needs no row). Here the empty case IS the deliverable: §19j
+// question 1 asks whether the content specialist complies RELIABLY, which needs the denominator
+// (calls actually checked) and the numerator (calls with an empty section) out of the same column.
+// Omitting `[]` collapses "checked, all filled" into "never checked", so a silently broken
+// derivation would read as perfect compliance -- failing toward "don't build the reviewer",
+// invisibly. That is the supabase-column-grants lesson (assert BOTH directions) in a second costume.
+// The {} -> NULL contract in mergeCallFacts()/logActivity() is untouched.
+export function extractEmptyDeclaredSections(schema, structuredOutput) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return null;
+  if (schema.type !== 'object') return null;
+  const required = schema.required;
+  if (!Array.isArray(required) || required.length === 0) return null;
+  if (!structuredOutput || typeof structuredOutput !== 'object' || Array.isArray(structuredOutput)) return null;
+  return required
+    .filter((name) => typeof name === 'string' && isEmptyDeclaredValue(structuredOutput[name]))
+    .sort();
+}
+
 // FEATURE: LOG-37 -- single source of truth for "which tools did this response actually invoke".
 // `usedWebSearch` (the pre-existing HAR-05 boolean feeding patterns_used) is now derived from this
 // same list rather than re-scanning rawContent with a second, drift-prone predicate. Equivalence
@@ -712,6 +774,10 @@ export function buildCallFacts({
   // fact-half above). Both omitted when empty, same "null not {}" contract as every other key here.
   inputReferencesOtherDeliverable = false,
   selfReportedClaims = null,
+  // FEATURE: LOG-54 -- null means the emptiness observation does not apply to this call (no declared
+  // object schema / no `required` / text output), so the key is omitted. An ARRAY -- including the
+  // empty one -- means the observation was made, and is written. See extractEmptyDeclaredSections().
+  emptySections = null,
 } = {}) {
   const facts = {};
 
@@ -752,6 +818,14 @@ export function buildCallFacts({
   if (inputReferencesOtherDeliverable) facts.input_references_other_deliverable = true;
   // FEATURE: LOG-49 -- fact 3: the model's own declared reference-ids, quarantined in this key.
   if (selfReportedClaims && Object.keys(selfReportedClaims).length > 0) facts.self_reported_claims = selfReportedClaims;
+
+  // FEATURE: LOG-54 -- Array.isArray, never a truthiness test: `[]` is a finding ("checked, all
+  // filled"), not an absent fact, and `emptySections && ...` would silently drop exactly the
+  // denominator §19j question 1 needs. Bounded cardinality by construction -- the value is a subset
+  // of one schema's declared `required` list (k=4 for hyp-hypothesis-test-intent, k=7 for
+  // intelligence-review-format, read live 2026-08-25), sorted so identical compliance states
+  // collapse to one signature. Never a count, never free text -- that is the LOG-91 blow-up.
+  if (Array.isArray(emptySections)) facts.empty_sections = emptySections;
 
   return facts;
 }
@@ -1032,6 +1106,12 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     // (parsedResponse), quarantined into its own key by buildCallFacts().
     inputReferencesOtherDeliverable: input_references_other_deliverable,
     selfReportedClaims: extractSelfReportedClaims(parsedResponse),
+    // FEATURE: LOG-54 -- the declared contract and the terminal parsed output are BOTH in scope only
+    // here, which is why this is the seam. It covers both live write paths with one line: the
+    // non-precomputed branch writes below, and on the precomputed path these same facts ride back to
+    // runLoop() as _terminal_log and merge into the surviving agent-turn row (LOG-91), so execute.js
+    // needs no change. Delegating turns carry no schema output and correctly never get the key.
+    emptySections: extractEmptyDeclaredSections(format_contract?.schema, parsedResponse),
   }), prompt_request?.signature_config ?? null);
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
