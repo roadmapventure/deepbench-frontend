@@ -5,6 +5,69 @@
 
 ---
 
+## session/cycle-20260825-0841 (v7.0.260, 2026-08-25, runner cycle `9c0190b0-2a62-42bb-b4d5-961c369c5fc0`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (03:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-06: the Library boundary becomes a check, and the check finds a live violation on its first run
+
+**THE DRAIN PICKED `SES-130` AND THIS CYCLE COULD NOT BUILD IT — that is where the run starts, and
+it is the fifth cycle in a row to hit it.** `drain_epic_next()` returned `SES-130` (queue 264,
+`open_now` 15) as the M3 pick, and its `status` is `removal proposed`: a removal card is already
+filed and waiting on John, so step 5's blocked-prefix table says step past it and leave its number
+alone. `record_skip()` took `skip_count` to **5**. This is `SES-196`'s repeated-pick loop in its
+other costume, and `SES-196`'s own stamp predicted it in writing — it fixed the picker for the three
+`design_status` flags and said, verbatim, that `status = 'removal proposed'` *"stays pickable here
+and remains step 5's procedural skip… Carried as the declared remainder."* The remainder has now cost
+five cycles a pick. **Named on the ship card rather than fixed here**: widening the picker is an edit
+to John's own drain semantics, which is exactly the scope `SES-196` declined to grant itself.
+Stepping past it reached `SE-06` at queue 572 — the first buildable named member, every one between
+being flagged or `delivered`.
+
+**PREMISE REVALIDATED, AND THE TICKET'S OWN SENTENCE HAD BEEN OVERTAKEN TWICE.** `SE-06` was filed
+2026-07-02 asking that nothing but `lib/librarian.js` be imported. Read live this session rather than
+recalled: `ARCHITECTURE.md` line 1242 **amends this ticket by name** — *"§19c's guarantee ('no other
+file imports the_library's primitives') becomes 'no file but `lib/search-harness.js`'… (extends
+`SE-06`'s planned enforcement grep)"* — and the ticket's own reserved carve-out, *"and Eleanor's own
+capability dispatch path, once it exists"*, has come true as `api/_lib/handlers/{library-write,
+library-lookup,confirmation}.js`. So the check is written against the amended boundary. The gap the
+ticket describes is real: `ls scripts/` shows 21 checks and none of them is this one, and `SE-02`,
+the sibling it says to copy, is itself still `open` at queue 575 — there was no prior art.
+
+**TWO ASSERTIONS, NOT ONE, AND THE SECOND IS THE ONE THAT MATTERED.** A. Only the broker and
+Eleanor's dispatch path may import `lib/librarian.js`. B. Only `lib/librarian.js` and
+`lib/search-harness.js` may reach `the_library` / `match_the_library` directly. Enforcing A alone
+passes a file that skips the broker entirely and talks to the table — the worse violation, and the
+one that exists. **Assertion A is clean:** the four importers are exactly the sanctioned four, and
+`AA-99`'s original violation is gone (`api/prompt/ai-enrichment.js` now carries only a comment).
+**Assertion B found `src/hooks/useAgents.js:234`** — `useDataSources()` (`MI-15`) calling
+`supabase.from('the_library')` from the browser with the anon key.
+
+**WHAT WAS DONE WITH THAT FINDING, AND THE TWO EASIER ANSWERS THAT WERE REFUSED.** Making it fail
+ships a permanently-red gate, which is the outcome `SES-180` shipped `continue-on-error` to avoid.
+Putting it in the allowlist is worse: a sanctioned broker and a known debt in one list is how debt
+becomes architecture, and the finding stops being a finding. So the script keeps **two separate
+sets** — `BROKER_FILES` (what §19c sanctions) and `DECLARED_EXCEPTIONS` (known debt, each carrying
+its reason and its ticket, **printed on every run, pass or fail**) — and the violation is filed as
+its own ticket, **`DAT-24`**, for John to decide. A *new* violation of the same shape still fails.
+The guard asserts the two sets never overlap, because folding one into the other is the single edit
+that would turn this check green by deleting the finding.
+
+**QA WAS DISCRIMINATING RATHER THAN COMPLETE — the bar's own question is "would it still pass if the
+change did nothing?"** Two negative controls, both run on the real shipped file, not a fixture copy:
+gutting `scanText()` to return `[]` (the `SES-199` rubber-stamp shape) fails the guard on its first
+clause; moving the declared exception into `PRIMITIVE_FILES` fails it on the last. The file was
+restored and proven byte-identical afterwards. The guard **imports the real functions** rather than
+re-implementing the regexes — `SES-45`'s lesson, and `SES-45` is an open member of this same epic, so
+writing it the other way would have shipped the defect a sibling ticket is open against. Six
+violation shapes are asserted to fire (static/dynamic/`require` import, PostgREST URL, `.from()`,
+RPC) and four comment shapes plus a `source === 'the_library'` routing label are asserted **not** to
+— 14 files in this repo mention the librarian in prose, and a matcher that flagged those would fire
+on every file documenting the boundary it protects. Build green; suite **76/76**.
+
+**THE HONEST BOUND, on the script itself:** it is a grep, so a computed table name (`.from(tbl)`) or
+a concatenated URL evades it. Not a hole to plug with cleverer patterns — every violation this
+boundary has actually suffered was written plainly, because nobody bypassing a broker is hiding, they
+are unaware. The check is aimed at the mistake, not at an adversary.
+
+Script + test; no `src`/`api`/`lib` change, no schema change, no site change.
+
 ## session/cycle-20260825-0740 (v7.0.259, 2026-08-25, runner cycle `80075c2b-fd46-4eeb-bc1d-b10878ac4903`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (02:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-008: the harness's gated-tool set is asserted against its own documentation
 
 **THE DRIFT IS ON RECORD, WHICH IS WHY THIS IS A TEST AND NOT A PROOFREAD.** `ARCHITECTURE.md` §1
