@@ -5,6 +5,59 @@
 
 ---
 
+## session/cycle-20260825-0040 (v7.0.239, 2026-08-25, runner cycle `46c1d859-d4ec-4657-ae4f-508fdaef9f93`, `trigger = scheduled`, verdict `run` on John's 1h clock grid (19:00 America/Chicago) — model Opus 5, no subagent) — directive `1532666b` item 2: the four M3 tickets the accepted M2 gate review specifies are filed
+
+**John's directive `1532666b` (2026-08-25T00:35Z, attended architect session; his word on the M2
+gate review card `73f71531` was *"accept based on your best practice"*)** sequences four items. Item
+**(1)** — build `SES-197 — The drain chain has no terminator on a decision-starved board` — was
+**claimed by peer cycle `09cf89d3` at 00:42:18Z, thirty seconds before this cycle reached step 5**,
+so this cycle took item **(2)**, which touches no resource that peer holds. Parallel cycles are the
+design (register B42); a contested claim means take the next available work, and here the next
+available work was the next item in John's own sequence rather than a board drop-through.
+
+**FILED — four tickets, one atomic `feature_id_counter` block call (`SES` 198 → 202), never a
+hand-count** (`CLAUDE.md`; `SES-18` is the collision that rule is written from). All four into epic
+`Selfbuild M3 - Independent Verification`, `P10 - Tooling`, tier `next`, and all four given the top
+of John's automation lane per his standing instruction (`q-lane-top`, **yes**, 2026-08-21T20:47Z):
+
+| Ticket | Review proposal | Evidence it was filed from |
+|---|---|---|
+| `SES-199 — Truth tripwire needs a gating mode` | 3 | the tripwire exits 0 by contract, so the interim auto-done bar's *"tripwire green"* is a rubber stamp `SES-181` would inherit |
+| `SES-200 — The SES-176 remainder is owned by no ticket` | 4 | three pieces named STILL OPEN in `SES-176`'s own accepted ship record, owned by nothing today |
+| `SES-201 — Rule-block coverage sweep` | 5 | 2 rendered markers against 84 registry rules — measured again this cycle by `render-rule-blocks.js`: *"84 rules · 2 markers in 755 scanned files"* |
+| `SES-202 — Registry hygiene: B25/B26 `superseded_by`, stale B31/B32 anchors` | 7 | corroborated live this cycle by `check-session-docs.js` check 10, which emitted both stale-anchor WARNs unprompted |
+
+**WHAT THIS CYCLE DID NOT DO, AND WHY EACH IS A DISCLOSURE RATHER THAN AN OMISSION.** Item **(3)**
+(triage/retitle `SE-01`…`SE-06`) and item **(4)** (name the M3 drain scope) were **not** attempted:
+the directive is explicitly *"one item per cycle where the runbook requires"*, and item (4) is
+gated in John's own words on `SES-197` shipping first, which had not happened when this cycle ran.
+Review item **8** (CI secrets, branch protection) is John's alone and was never touched.
+
+**THE ORDERING CONSEQUENCE, NAMED RATHER THAN HIDDEN.** Applying his standing *"new automation
+tickets go top of queue"* rule put all four new tickets **above** `SES-197` in the lane
+(`automation_rank` −31…−28 against `SES-197`'s −27; queue 2, 6, 7, 8 against its 9). Two of John's
+own instructions point opposite ways there — the standing lane rule, and this directive naming
+`SES-197` the precondition. Nothing was adjudicated: pins are his, `SES-197` was already claimed and
+under construction by the peer, so no build order was actually changed. It is on the ship card for
+him to correct if he wants it corrected.
+
+**QA — discriminating, and the round-trip is the part that would fail if the export wrote garbage.**
+`export-backlog-snapshot.js` reported DRIFT before (676 tickets), wrote, then `--check` reported no
+drift against the same `sha256 11e10e15…` — an assertion that would not pass if the four rows or the
+renumber had been written wrong. `render-rule-blocks.js` clean. `check-session-docs.js` exit 0 with
+no new FLAG attributable to this cycle: none of `SES-199`…`SES-202` appears in check 3d's over-cap
+list, which is the check a careless 2,000-char description would have tripped. `render-claude-state.js`
+wrote 3,393 bytes with the standing brief linked. Version claim proven issued to this session, not
+merely ≤ the counter (`check-version-claim.js`: *"v7.0.239 was issued to cycle-20260825-0040"*).
+
+**NOT RUN, AND SAID SO RATHER THAN CLAIMED.** Step 4's and step 8's blocker sweeps could not
+execute: this environment's egress proxy answers **403 to CONNECT** for
+`deepbench.roadmapventure.com` and the dev Vercel host on both arms (`curl` and `WebFetch`), read
+live from `$HTTPS_PROXY/__agentproxy/status`. That is `SES-130 — Unattended cycles cannot reach dev`
+recurring, not a new finding; no deploy-state claim was invented in its place. `npm run build` was
+not run either — this ship changes no `src`/`api`/`lib` file, only two generated documents and this
+log.
+
 ## session/cycle-20260824-2340 (v7.0.237, 2026-08-24, runner cycle `edd2471d-4114-40ad-9bf0-870f031f1980`, `trigger = scheduled`, verdict `run` on John's 1h clock grid — model Opus 5, kickoff design delegated to Fable 5) — LAV-30 (partial): gate 6 stops reporting the platform's own early-credit frames as missing receipts
 
 **`LAV-30` — Receipt copy polish: failing jargon and number-truth gates on agent accounts** —
