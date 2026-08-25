@@ -5,6 +5,42 @@
 
 ---
 
+## session/cycle-20260825-0511 (v7.0.256, 2026-08-25, runner cycle `1fc7dc0b-1830-4f90-b29b-63e18d1d8cbe`, **`trigger = chained (drain continuation)`** — model Opus 5, no subagent) — SES-135 (part 1 of 2): the briefing render test is kept, not thrown away
+
+**JOHN ASKED FOR TWO THINGS AND ONLY ONE OF THEM IS THE RUNNER'S.** He answered **yes** to
+`q-briefing-dom-fixture` and typed *"yes - you should never be throwing away tests. Do we need to
+have a session on when to store tests and when to execute them?"* Part 1 — the permanent render
+test — shipped here. Part 2 — the written rule for which tests earn a permanent home and which run
+every cycle versus on demand — is a governance decision about how much of his budget the suite
+spends every cycle, and the ticket's own text forbids closing on part 1 alone. **Carded for him;
+`SES-135` is `partial` / `needs-john`, not delivered.**
+
+**IT BUILDS THE REAL PAGE, it does not read a snapshot.** The test runs the shipped
+`build-briefing.mjs` against the shipped template and live Supabase, then executes the result in
+jsdom. A render test reading a checked-in snapshot passes forever while the builder rots. Five
+clauses: no swallowed markup (zero `script` elements inside `#page` — the whole `SES-208` class,
+caught structurally rather than by re-checking escaping), section order, the masthead counter
+agreeing with the `data-awaits` elements, the plain-language contract (never an empty `.plain`), and
+§4 rendering John's actual meter readings rather than a placeholder.
+
+**NEGATIVE CONTROL ON THE REAL PRE-FIX PAGE:** `no-swallowed-markup` fails with **1 script element
+holding 51,860 characters**, and `section-order` fails naming **6 missing unconditional sections**
+(10, 11, 12, 13, 14, 15). The test catches the live defect that motivated it.
+
+**A WRONG FIRST DRAFT, FOUND AND REPORTED RATHER THAN QUIETLY FIXED.** The order clause first
+derived its expectation from the template's **source** order and failed against a page that was
+correct — because `orphanThreads()` defines §9.1's marker near the top of the script while
+`render()` emits it after §9. Source position is not render order. The clause now asserts the
+property that actually holds: strict ascent under a key where `2 < 2b < 3` and `9 < 9.1 < 10`, which
+additionally cannot go stale when `SES-178`'s *extend, never renumber* rule appends a section.
+Unit-checked in both directions.
+
+**CREDENTIALED, AND IT SAYS SO.** Without `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` the test declares
+itself **not-run** rather than passing vacuously; both arms were verified. That is `SES-61`
+(`v7.0.253`, two cycles earlier this session) doing its job on its first new consumer. Build green,
+suite green. One file; no `src`/`api`/`lib` change, no schema change.
+
+---
 ## session/cycle-20260825-0540 (v7.0.254, 2026-08-25, runner cycle `90c742fc-da3e-4c53-a263-0747496ca33f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (00:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-58: a build landing mid-regression-run is DETECTED, so 24 cases are never attributed to one commit that did not serve them
 
 **THE GAP, REVALIDATED LIVE AT PICK TIME RATHER THAN RECALLED (register B7).** Read this cycle:
