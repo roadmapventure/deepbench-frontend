@@ -5,6 +5,60 @@
 
 ---
 
+## session/cycle-20260825-0511 (v7.0.255, 2026-08-25, runner cycle `036fa097-2b3e-44ec-8553-a71ffab411a4`, **`trigger = chained (drain continuation)`** of `de31fe1e` — model Opus 5, no subagent) — SES-208: a left angle bracket was deleting the bottom half of the briefing page
+
+**SES-135's TEST EARNED ITS KEEP BEFORE IT SHIPPED.** This cycle's drain pick was `SES-135` — a
+permanent briefing-page render test. Building it meant rendering the page and asserting the locked
+section order, and **the first render found this**. `SES-135` was released unbuilt and returned to
+the drain: a user-blocking failure on John's daily surface preempts everything (step 4), and the
+render test is worth more written against a page that works.
+
+**MEASURED IN A REAL BROWSER, then again in jsdom — not inferred.** Headless Chromium
+`--dump-dom` on the freshly built page: **9 h2 sections** where the source carries **16** section
+markers. §9.1, §10 *waiting on your input*, §11, §12 vision claims, §13 the ladder, §14 and §15
+Selfbuild milestones were **absent** — held inside a **51,860-character** script element in `#page`
+as inert text. After the fix, same build and same binary: **16 sections, 0 script elements, 0
+swallowed characters.**
+
+**ZERO CONSOLE ERRORS, and that is why eight ships walked past it.** No `pageerror`, no visible
+break; the page simply ends on a section boundary, and the missing sections are the ones John
+scrolls to rather than the ones he lands on.
+
+**ROOT CAUSE, one line wide.** `question()` in `docs/runbooks/briefing-template.html` interpolated
+its database prose — `text`, `ctx`, `yesMeans`, `noMeans` — **without `esc()`**, while `esc()` sits
+forty lines above it and is used 55 times elsewhere in the same file. Open question
+`q-artifact-read-path-unreachable` has a `context` quoting a literal script tag while explaining the
+`SES-188` truncation measurement; that opened a real element mid-§9.
+
+**IT IS A CLASS, surveyed rather than assumed and fixed in the same breath:** `plainBlock()`
+(`runner_items.plain_*`, which a cycle writes on **every ship**) and `card()`'s `title` (from
+`backlog_display_title()`) and `tid` had the identical hole. `build-briefing.mjs:201` passes all of
+them through `J()` — JSON-for-JavaScript, **not** HTML escaping — so the render boundary is the only
+place this can be fixed.
+
+**THE RULE, now written next to `esc()` itself: escape what came out of the database; never escape
+what the builder composed.** `techHtml` and `idLine` are markup the builder wrote, and escaping them
+renders the card bodies as visible source — the same defect facing the other way. The guard asserts
+**both** halves, so an escape-everything sweep fails it exactly as the pre-fix file does.
+
+**THE BEHAVIOURAL CLAUSE SLICES THE SHIPPED FUNCTIONS OUT OF THE TEMPLATE AND RUNS THEM** — it does
+not reimplement them (`SES-45`'s rule, that a test recreating its subject passes against the bug it
+guards). It renders hostile prose in jsdom and asserts 0 script elements, the following section
+intact, **and the bracket still visible as text**, so a "fix" that strips the text instead of
+escaping it fails too. File-level negative control on `origin/dev`'s pre-change template: **5 of 7
+clauses fail** and the behavioural one swallows 1,286 characters.
+
+**FOUND WHILE BUILDING IT, and reported rather than quietly repaired:** the guard's own
+vacuous-control assertion failed on this file's first draft — the
+`card-does-NOT-escape-builder-markup` control mutated a string the template does not contain
+(`card()` hands `techHtml` to `techPanel()` rather than interpolating it), so it changed nothing and
+proved nothing. That is `SES-158`'s vacuous-control failure reproducing *inside its own guard*, and
+it was caught only because the controls are themselves checked.
+
+Build green; suite **70/70**. Doc + test; no `src`/`api`/`lib` change, no schema change.
+
+---
+
 ## session/cycle-20260825-0511 (v7.0.253, 2026-08-25, runner cycle `de31fe1e-8493-42ed-a8c6-399e9c6209e3`, **`trigger = chained (drain continuation)`** of `860efe52` — model Opus 5, no subagent) — SES-61: the suite gate stops going green on halves it never ran
 
 **THE PREVIOUS SHIP PICKED THIS CYCLE'S TICKET, WHICH IS THE POINT.** `v7.0.252` taught

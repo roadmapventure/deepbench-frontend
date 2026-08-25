@@ -37,7 +37,36 @@
      comment is matched by scanners that look for the real thing, and it skewed this very cycle's
      first offset measurement before it was caught).
 
-     DeepBench v7.0.232 | runbooks/briefing-template.html | SES-188 (option D) — the state block is
+     DeepBench v7.0.255 | runbooks/briefing-template.html | SES-208 — A LEFT ANGLE BRACKET IN A
+     DATABASE STRING WAS DELETING THE BOTTOM HALF OF THIS PAGE, and nothing said so. MEASURED in
+     headless Chromium and again in jsdom, not inferred: the published page rendered NINE h2
+     sections where the source carries SIXTEEN section markers — 9.1, 10 (waiting on your input),
+     11, 12, 13, 14 and 15 were absent, held instead inside a 51,860-character script element in
+     #page. Root cause one line wide: question() interpolated its DB prose (text, ctx, yesMeans,
+     noMeans) WITHOUT esc(), while esc() sat forty lines above it being used 55 times elsewhere.
+     Open question q-artifact-read-path-unreachable quotes a literal script tag while explaining the
+     SES-188 truncation measurement; that opened a real element mid-section-9 and everything after
+     became its text content. Zero console errors, no visible break — the page still ends on a
+     section boundary, which is why eight ships walked past it. THE SAME CLASS, surveyed rather than
+     assumed and fixed in the same breath: plainBlock() (runner_items.plain_*) and card()'s title
+     (backlog_display_title()) and tid. build-briefing.mjs passes all of these through J(), which is
+     JSON-for-JavaScript and NOT HTML escaping, so this render boundary is the only place it can be
+     fixed. THE EDIT THIS SHIP FORBIDS, and it is the tempting tidy-up: escaping techHtml or idLine
+     as well. Those are markup the BUILDER composed — tags, links, bold — and escaping them renders
+     the card bodies as visible source, the same defect facing the other way. The rule is written
+     next to esc() itself: escape what came out of the database, never what the builder composed,
+     and ask which side a NEW interpolation came from rather than pattern-matching its name.
+     Guarded by tests/regression/SES-208-briefing-escaping.js, which asserts BOTH halves plus a
+     behavioural clause that slices the shipped esc/question/plainBlock out of THIS file (never a
+     copy — SES-45) and renders hostile prose in jsdom: 0 script elements, the following section
+     intact, and the bracket still VISIBLE as text, so a fix that strips the text instead of
+     escaping it fails too. On origin/dev's pre-change copy, 5 of 7 clauses fail and the behavioural
+     one swallows 1,286 characters. Found while building SES-135's render test — the test caught it
+     on its first run, before it shipped, which is the ticket earning its keep early. SES-135 itself
+     was released unbuilt and returns to the drain; this preempted it under step 4's rule that a
+     user-blocking failure comes first. -->
+
+<!-- DeepBench v7.0.232 | runbooks/briefing-template.html | SES-188 (option D) — the state block is
      PINNED ABOVE EVERY GROWTH SURFACE WE CONTROL, which is the whole fix and the thing an editor
      will undo by habit. A cycle harvests John's taps by reading the PUBLISHED page and parsing this
      block, and that read is served head-first under a size budget nobody has documented. Until this
@@ -511,6 +540,21 @@
   function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                     .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+  // SES-208 (v7.0.255) — THE RULE FOR WHERE esc() GOES, and it is the whole of the fix:
+  // ESCAPE WHAT CAME OUT OF THE DATABASE; NEVER ESCAPE WHAT THE BUILDER COMPOSED.
+  // Found live 2026-08-25: question q-artifact-read-path-unreachable has a `context` that quotes a
+  // literal script tag while explaining the SES-188 measurement. question() interpolated it raw, so
+  // it opened a REAL script element mid-section-9 and swallowed 51,860 characters — sections 9.1,
+  // 10, 11, 12, 13, 14 and 15 — as inert text. Measured in headless Chromium and again in jsdom:
+  // 9 h2 elements rendered where the source carries 16 section markers, with NO console error and
+  // no visible break, because the page still ends on a section boundary.
+  // build-briefing.mjs passes these values through J(), which is JSON-for-JavaScript and NOT HTML
+  // escaping, so the render boundary is the only place this can be fixed.
+  // THE HALF THAT MUST NOT BE "TIDIED" INTO A BLANKET SWEEP: techHtml and idLine are markup the
+  // BUILDER wrote (tags, links, <b>), and escaping them renders the card bodies as visible source —
+  // the same defect facing the other way. If you add a new interpolation here, ask which side of
+  // that line the value came from; do not pattern-match on the variable name.
+
   // v7.0.145, directive edab5908 — what each button DOES, in this card's own terms. A cycle may
   // override any of the three; these are the defaults, and they differ by card kind because a
   // gated Accept and a shipped Accept are genuinely different transactions (John's B34 ruling).
@@ -574,9 +618,9 @@
   function plainBlock(more){
     return more
       ? '<div class="plain">'
-        +'<p><span class="lbl">What you can’t do today</span>'+more.cant+'</p>'
-        +'<p><span class="lbl">What you could do after</span>'+more.after+'</p>'
-        +'<p><span class="lbl">Why that’s worth something</span>'+more.worth+'</p></div>'
+        +'<p><span class="lbl">What you can’t do today</span>'+esc(more.cant)+'</p>'
+        +'<p><span class="lbl">What you could do after</span>'+esc(more.after)+'</p>'
+        +'<p><span class="lbl">Why that’s worth something</span>'+esc(more.worth)+'</p></div>'
       : '<div class="plain"><p class="missing">This card was published without its '
         +'plain-language summary. That is a defect in the cycle that wrote it, not something '
         +'you need to decode.</p></div>';
@@ -718,8 +762,8 @@
     return '<div class="item fold" id="'+id+'"'+(dec?' data-decision="'+dec+'"':' data-awaits="1"')+'>'
       +'<div class="head" data-toggle="'+id+'"><span class="cardnum">'+num+'</span>'
       +'<span class="kind '+kindCls+'">'+kindTxt+'</span>'
-      +'<span class="idchip">'+tid+'</span>'
-      +'<span class="ttl">'+title+'</span>'
+      +'<span class="idchip">'+esc(tid)+'</span>'
+      +'<span class="ttl">'+esc(title)+'</span>'
       +'<span class="st'+(dec?' done':'')+'">'+(dec?(dec.toUpperCase()+' ✓'):'undecided')+'</span>'
       +'<span class="chev">&#9656;</span></div>'
       +'<div class="bodyc">'
@@ -768,18 +812,18 @@
                             hint:'Counts the same as the buttons — recorded now, answered here next cycle.',
                             got:'answer appears here next cycle' };
     var means = (yesMeans && noMeans)
-      ? '<div class="ynmean"><span>Yes &rarr; '+yesMeans+'</span><span>No &rarr; '+noMeans+'</span></div>'
+      ? '<div class="ynmean"><span>Yes &rarr; '+esc(yesMeans)+'</span><span>No &rarr; '+esc(noMeans)+'</span></div>'
       : '<div class="ynmean"><span class="missing">This question was published without its '
         +'Yes/No consequences — a defect in the cycle that asked it. Ask me what it means in the '
         +'box below rather than guessing.</span></div>';
     return '<div class="q fold" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':' data-awaits="1"')+'>'
       +'<div class="head" data-toggle="'+qid+'"><span class="cardnum">'+num+'</span>'
       +(opts.chip||'')
-      +'<span class="qtext">'+text+'</span>'
+      +'<span class="qtext">'+esc(text)+'</span>'
       +'<span class="st'+(ans?' done':'')+'">'+(ans?(ans.toUpperCase()+' ✓'):(opts.undecidedTxt||'unanswered'))+'</span>'
       +'<span class="chev">&#9656;</span></div>'
       +'<div class="bodyc">'
-      +(ctx ? '<p class="qctx">'+ctx+'</p>' : '')
+      +(ctx ? '<p class="qctx">'+esc(ctx)+'</p>' : '')
       +'<div class="yn">'
       +'<button class="yes'+(ans==='yes'?' on':'')+'" data-a="yes">Yes</button>'
       +'<button class="no'+(ans==='no'?' on':'')+'" data-a="no">No</button>'
