@@ -5,6 +5,28 @@
 
 ---
 
+## session/cycle-20260825-1040 (v7.0.264, 2026-08-25, runner cycle `b8c5b4f1-bc6c-4eb5-90cb-53ea33d594d9`, **`trigger = chained (drain continuation)`**, third cycle of the chain — model Opus 5, no subagent) — SE-03: STANDARDS.md §11 stops being a table nobody checks
+
+**`SE-03` — Agent Field Enforcement** (`P10 - Tooling`, tier `later`, queue 576, epic Selfbuild M3) shipped at `v7.0.264`. One new file — `tests/regression/SE-03-agent-fields.js`. No `src/`/`api/`/`lib/` change; `src/data/agents.js` deliberately **untouched** (the roster already complies — the ticket asks for enforcement, not a change).
+
+**What it enforces.** `STANDARDS.md` §11 requires every `AGENTS` entry to ship all **23** listed fields plus matching `AVATAR_CFG` and `AGENT_PRONOUNS` entries. The rule was written **reactively** — Victoria Chen shipped without standard fields and crashed `RosterScreen` on `trainableBy.toUpperCase()` — and has had **zero machine enforcement** in the fourteen months since.
+
+**THE PROPERTY: the required-field list is PARSED FROM §11 ITSELF, never hardcoded in the test.** The obvious build copies the 23 names into the test file, which gives one fact two homes — and the moment §11 gains a row the test keeps passing while the standard says otherwise. That is the drift this platform has paid for repeatedly (`SES-86` phase 3, `SES-101`, `SES-111`, `SES-127`…). The document stays authoritative and the test reads it.
+
+**That move has its own failure mode and it is guarded rather than assumed:** a parser matching nothing would assert nothing and pass — `SES-199`'s rubber stamp in a new costume. So the parse is asserted **before any agent is examined** (exactly 23 fields, six named anchors present, a live type column), and the parser carries **its own controls**: a §11 with its table rows stripped must return nothing, and a document with no §11 must **throw** rather than return an empty list.
+
+**TYPES, NOT JUST PRESENCE — because presence would not have caught the crash this ticket exists for.** `trainableBy` present but numeric still dies on `.toUpperCase()`. §11 declares a type per field, so the type is asserted; `color` is checked for **palette membership** (one of `T.brass`/`T.moss`/`T.navy`/`T.muted`), not merely for being a string.
+
+**MEASURED, AND BOTH DIRECTIONS.** Live census before shipping: **22 agents, 22 `AVATAR_CFG`, 22 `AGENT_PRONOUNS`, 0 incomplete** — clean, so this pins a good state. Ten failure shapes are planted on clones of the **real** roster and each is proven detected: dropped field, three wrong-type shapes, an off-palette `color`, a missing avatar entry, a missing avatar key, missing pronouns, a missing pronoun key, and an **orphan** entry whose agent was removed (the reverse direction a one-way check never sees). An agent stripped to just its `id` must report exactly **22** missing fields, proving the loop covers the whole list rather than short-circuiting.
+
+**THE CONTROL THAT PROVES THE BINDING IS REAL**, run on the actual document rather than a fixture: adding a 24th field row to §11 makes the test fail with a precise message (*"§11 parse yielded 24 fields, expected 23"*); `STANDARDS.md` restored and verified byte-identical afterwards.
+
+**DECLARED NOT-RUN:** §11 also requires a Supabase `agents` row per agent. That is a live-data assertion needing credentials the suite does not always carry, and a conditionally-skipped half reads as a pass (`SES-180`/`SES-61`) — named as SE-03's remainder rather than half-built.
+
+**Chain note.** `SES-130` was handed back and skipped a **third** time (`record_skip` count 9). Same cause each cycle: the drain picker screens `design_status` but not `status = 'removal proposed'`.
+
+---
+
 ## session/cycle-20260825-1040 (v7.0.263, 2026-08-25, runner cycle `0e6d8e96-2dbc-472e-b705-ec6c00e156de`, **`trigger = chained (drain continuation)`** of `43310f16` — model Opus 5, no subagent delegated) — SE-02: the Founding Principle becomes a runnable check
 
 **`SE-02` — Shared-Pipeline No-Conditionals Grep** (`P10 - Tooling`, tier `later`, queue 576, epic *Selfbuild M3*) shipped at `v7.0.263`. Two new files — `scripts/check-shared-pipeline.js`, `tests/regression/SE-02-shared-pipeline.js`. No `src/`/`api/`/`lib/` change, no site change.
