@@ -1,3 +1,14 @@
+// DeepBench v7.0.254 | scripts/chi-true-regression.mjs | SES-58 -- A BUILD LANDING MID-RUN IS
+// DETECTED, so 24 cases are never attributed to one commit that did not serve them. The driver
+// samples the dev preview's serving commit EITHER SIDE OF EVERY CASE (two samples, not one: that
+// is what separates "the build moved WHILE case 7 ran" from "it moved between 7 and 8"), records
+// serving_commit_start / serving_commit_end / build_changed_during_case on each case, and reduces
+// the whole run to a THREE-VALUE verdict in REPORT_JSON's build_currency block. `null` is not
+// `false` -- a run that could not resolve the commit is UNVERIFIED and banners as such, because a
+// clean single-commit claim nobody checked is worse than the silence it replaces. Reducer, sampler
+// and the reasoning: scripts/lib/build-currency.mjs. Guarded by
+// tests/regression/SES-58-mid-run-build-detection.js.
+//
 // DeepBench v7.0.251 | scripts/chi-true-regression.mjs | SES-71 -- AN ACCOUNT-LEVEL FAILURE IS
 // UNMEASURED, NEVER FAIL, and the run stops instead of grinding through a dead account. Measured
 // live 2026-08-01 (S-HAR-02b QA): when the Anthropic account exhausted its usage on 2026-07-31
@@ -129,6 +140,11 @@ import { resolveNewsCardContext } from "../src/lib/newsCardContext.js"; // FEATU
 // this file calls loadBypassSecret() at module scope and process.exit(1)s without credentials, so a
 // guard that imported THIS file could never run in CI and would have to re-implement what it guards.
 import { classifyInfraError, summarizeRun, ACCOUNT_DEATH_ABORT_N } from "./lib/regression-outcome.mjs";
+// FEATURE: SES-58 -- nothing detected a build landing mid-run, so all 24 cases were attributed to
+// one commit whether or not one commit served them. Same split as SES-71 and for the same reason:
+// the reducer is pure and importable, the sampler takes an injectable fetch, and the guard drives
+// both without credentials or network.
+import { sampleServingCommit, caseBuildChange, classifyBuildCurrency, buildCurrencyBanner } from "./lib/build-currency.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -868,6 +884,20 @@ async function main() {
 
   const run_start = new Date().toISOString();
   const results = [];
+  // FEATURE: SES-58 -- build currency, sampled AROUND EACH CASE rather than once before case 1.
+  // The token is read here and never printed: only the commit SHA it resolves reaches the report.
+  // Absent token is not fatal and must not be -- the run still produces its findings, it just
+  // cannot certify them as single-commit, and says so.
+  const VERCEL_TOKEN = process.env.VERCEL_TOKEN || null;
+  const buildSamples = [];
+  const sampleFor = async (caseObj, phase) => {
+    const s = await sampleServingCommit({ token: VERCEL_TOKEN });
+    buildSamples.push({ n: caseObj.n, id: caseObj.id, phase, sha: s.sha, reason: s.reason });
+    return s;
+  };
+  if (!VERCEL_TOKEN) {
+    console.log("build currency: VERCEL_TOKEN not set -- this run cannot prove one commit served every case (verdict will be UNVERIFIED, never clean).");
+  }
   // FEATURE: SES-71 -- fail fast once the ACCOUNT is dead. Before this the loop ran all 24 cases
   // into an exhausted account and recorded each as a FAIL; the incident turned 15 unmeasured cases
   // into a 9-fail gate read. The counter resets on any measured case, so a lone transient death
@@ -875,7 +905,20 @@ async function main() {
   let consecutiveAccountDeaths = 0;
   let aborted_after_case = null;
   for (let i = 0; i < selected.length; i++) {
+    // FEATURE: SES-58 -- sample either side of the case, not once at the top of the run. Two
+    // samples per case is what separates "the build moved WHILE case 7 ran" (case 7 is
+    // contaminated) from "it moved between 7 and 8" (7 is still clean), and that distinction is
+    // the difference between throwing away one case and throwing away the run.
+    const beforeSample = await sampleFor(selected[i], "start");
     const record = await runOneCase(selected[i]);
+    const afterSample = await sampleFor(selected[i], "end");
+    record.serving_commit_start = beforeSample.sha;
+    record.serving_commit_end = afterSample.sha;
+    // true | false | null -- null is "not checked", never "did not change" (see build-currency.mjs).
+    record.build_changed_during_case = caseBuildChange(beforeSample.sha, afterSample.sha);
+    if (record.build_changed_during_case === true) {
+      console.log(`  !! build landed DURING case ${selected[i].n} (${selected[i].id}): ${String(beforeSample.sha).slice(0, 7)} -> ${String(afterSample.sha).slice(0, 7)} -- this case is not attributable to either commit`);
+    }
     results.push(record);
     const isAccountDeath = record.terminal === "unmeasured"
       && typeof record.unmeasured_reason === "string"
@@ -884,7 +927,12 @@ async function main() {
     if (consecutiveAccountDeaths >= ACCOUNT_DEATH_ABORT_N) {
       aborted_after_case = selected[i].n;
       console.log(`ABORTING: ${consecutiveAccountDeaths} consecutive account-level failures -- the account or network is down, not the platform. Remaining cases are recorded UNMEASURED, not FAIL.`);
-      for (const c of selected.slice(i + 1)) results.push(notRunRecord(c, aborted_after_case));
+      // FEATURE: SES-58 -- a case that never ran carries the three build-currency keys as null
+      // rather than omitting them. Absent would read as "clean" to anything doing a truthiness
+      // test; explicit null says it was never sampled, which is what happened.
+      for (const c of selected.slice(i + 1)) {
+        results.push({ ...notRunRecord(c, aborted_after_case), serving_commit_start: null, serving_commit_end: null, build_changed_during_case: null });
+      }
       break;
     }
   }
@@ -894,6 +942,14 @@ async function main() {
   // `every(r => r.case_pass)` that reads null as false.
   const summary = summarizeRun(results);
   const run_pass_server_side = summary.run_pass_server_side;
+  // FEATURE: SES-58 -- the run-level verdict over every sample taken, in order.
+  const build_currency = classifyBuildCurrency(buildSamples);
+  const build_currency_banner = buildCurrencyBanner(build_currency);
+  if (build_currency_banner) {
+    console.log("########################################");
+    console.log(`# ${build_currency_banner}`);
+    console.log("########################################");
+  }
   if (summary.unmeasured > 0) {
     console.log("########################################");
     console.log(`# NOT A COMPLETE REGRESSION RUN         #`);
@@ -906,11 +962,21 @@ async function main() {
     run_pass_server_side, // browser leg (runbook §6) is outside this script and outside this field
     // FEATURE: SES-71 -- the case number the abort fired after, or null on a complete run.
     aborted_after_case,
-    banner: SKIP_JUDGE
-      ? "NOT A VALID REGRESSION RUN — --skip-judge active, no content judged"
-      : summary.unmeasured > 0
-        ? `NOT A COMPLETE REGRESSION RUN — ${summary.unmeasured} of ${summary.total} cases unmeasured (account-level failure); run_pass_server_side is null, not false`
-        : null,
+    // FEATURE: SES-58 -- the build-currency banner is APPENDED to the existing precedence rather
+    // than competing with it. The two say different things (nothing was judged / the code moved
+    // underneath the judging) and a run can be both, so dropping one to keep the field a single
+    // string would hide whichever lost.
+    banner: [
+      SKIP_JUDGE
+        ? "NOT A VALID REGRESSION RUN — --skip-judge active, no content judged"
+        : summary.unmeasured > 0
+          ? `NOT A COMPLETE REGRESSION RUN — ${summary.unmeasured} of ${summary.total} cases unmeasured (account-level failure); run_pass_server_side is null, not false`
+          : null,
+      build_currency_banner,
+    ].filter(Boolean).join(" | ") || null,
+    // FEATURE: SES-58 -- `changed` is true | false | null and null is NOT clean. A reader asking
+    // "was this one commit?" gets a third answer -- "nobody checked" -- instead of a false yes.
+    build_currency,
     // FEATURE: DAT-12 -- recorded so a reader of REPORT_JSON can tell a scoped run from an unscoped
     // one. A run whose retrieval_scope is absent read whatever the previous run left behind and is
     // not comparable to a scoped run.

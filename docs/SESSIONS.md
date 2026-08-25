@@ -5,6 +5,113 @@
 
 ---
 
+## session/cycle-20260825-0540 (v7.0.254, 2026-08-25, runner cycle `90c742fc-da3e-4c53-a263-0747496ca33f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (00:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-58: a build landing mid-regression-run is DETECTED, so 24 cases are never attributed to one commit that did not serve them
+
+**THE GAP, REVALIDATED LIVE AT PICK TIME RATHER THAN RECALLED (register B7).** Read this cycle:
+`scripts/chi-true-regression.mjs` (933 lines) records **no commit anywhere** — its `report` object
+carries `run_start`, `run_end`, `cases`, `run_pass_server_side`, `aborted_after_case`, `banner` and
+`totals`, and no build identity in any of them; the per-case records carry none either.
+`scripts/check-deploy-current.js` (`SES-015`) does resolve the serving commit, but it is a separate
+script run **once, by hand, before case 1**, and the driver never calls it. It is deliberately an
+*ancestor* test, so it proves the commit under test is **included** and says nothing about cases 2–24.
+
+**ONE CLAUSE OF THE TICKET'S OWN DESCRIPTION IS WRONG, AND IS CORRECTED RATHER THAN REPEATED.** It
+reads *"the driver already resolves the serving commit at start — record it per case"*. It does not:
+`grep` for `commit|sha|SHA` over the driver returns prose in comments and the Forecast journey's
+*commit* step, nothing else. A build written from that clause would have gone looking for a value
+that is not there, so the sampler had to be built, not merely recorded.
+
+**RE-MEASURED AT THIS SHIP, NOT QUOTED.** The ticket's evidence is 2026-07-29 — a 134-minute run with
+38 commits landing on `dev` inside the window, 3 touching `src`/`api`/`lib`. Read live from the
+Vercel API at 05:45Z today: the dev preview was serving `6ce6465` (deployed 05:42:18Z), with
+`64c5f70` (05:28:54Z) and `30020fd` (05:00:46Z) behind it — **three builds in 42 minutes**. Overlap
+is near-certain, exactly as the ticket says, and still true 27 days later.
+
+**THE PROPERTY THIS SHIP TURNS ON, and the one-liner an editor will write instead: THE VERDICT HAS
+THREE VALUES AND `null` IS NOT `false`.** A bare boolean — or an unresolvable sample defaulted to
+"no change" — produces a run reporting a clean single-commit pass **having never looked**, which is
+worse than the silence it replaces: it manufactures the very evidence the beta gate's bucket 1 is
+defined by. `null` is reachable in normal operation (no `VERCEL_TOKEN`, a Vercel API hiccup) and
+banners as `BUILD CURRENCY UNVERIFIED`. Same shape `SES-71` gave `case_pass` and `SES-181` gave a
+gate's status, for the same reason.
+
+**`true` OUTRANKS `null`, which reads as an inconsistency and is not.** An observed pair of differing
+SHAs is positive evidence the build moved; a later unresolvable sample cannot un-observe it.
+Uncertainty suppresses only the CLEAN verdict, never the dirty one — the fail-closed direction.
+
+**TWO SAMPLES PER CASE, NOT ONE, IS THE LOAD-BEARING CHOICE.** Sampling either side of every case
+separates *"the build moved WHILE case 7 ran"* (case 7 is contaminated) from *"it moved between 7 and
+8"* (7 is still clean) — the difference between throwing away one case and throwing away the run. The
+transition names the case (`during_case_n` / `after_case_n`) rather than leaving a reader to derive it.
+
+**WHAT THIS DOES NOT DO, said rather than left to be found.** It detects and reports; it does not
+abort a run, quarantine a case, or change any case's `case_pass`. Run-verdict semantics are untouched.
+Making a mid-run change *fail* the gate is a separate call and John's to make.
+
+**QA — RUN, NOT PLANNED.** *Negative control on the real file:* the PRE-CHANGE driver
+(`git show origin/dev:scripts/chi-true-regression.mjs`) **fails** this ticket's guard at *"the driver
+samples TWICE per case"*; the post-change file passes; both arms ran and the file was restored in the
+same command. *Live seam proof* (labelled a seam proof) against the real Vercel API:
+`sampleServingCommit()` resolved `6ce6465` twice, 1.2 s apart, `reason: null`. *Discriminating live QA
+over REAL consecutive deployments* read from the API (`64c5f70` 05:28:54Z → `6ce6465` 05:42:18Z), one
+variable moved between arms — during-case → `changed: true`, boundary `during-case`, contaminated
+case **7**; between-cases → `changed: true`, boundary `between-cases`, last clean case **7**,
+`during_case_n: null`; control with one commit throughout → `changed: false`, banner `null`.
+*No-token arm on the real sampler:* `changed: null`, reason *"VERCEL_TOKEN not set…"* — the UNVERIFIED
+path is reachable live, not only in fixtures. Suite **69/69**, `npm run build` green.
+
+**THE VERIFIER BLOCKED THIS SHIP ONCE, AND THE BLOCK WAS REAL — recorded rather than smoothed over.**
+Step 7a's first run (`runner_verdicts e7a8da94`) returned **BLOCK**: regression suite red. The cause
+was **not** this change. Running the suite with credentials exported turns on halves that are skipped
+without them, and `SES-177-claude-state-renderer.js` then fails on *committed `CLAUDE-STATE.md` vs
+what the ledger renders* — the **one-ship-behind lag step 7 names**, opened by the peer cycles that
+shipped `v7.0.252`/`v7.0.253`, not by this diff. Proven rather than argued: `git status --porcelain`
+showed `CLAUDE-STATE.md` **unmodified** by this cycle at the moment of the block. Running the
+close-out render this step already requires cleared it, and the re-run (`runner_verdicts e2ba0397`)
+returned **APPROVE**, all three gates green. Both verdict rows are kept; the first is not a defect in
+the lane, it is the lane doing its job on a stale committed file. **Worth knowing for the next cycle:**
+an uncredentialed suite run is a *partial* run, so "69/69 green" before the verifier and a red gate
+inside it are not a contradiction.
+
+**AUTO-DONE, UNDER THE CHARTER'S NAMED CARVE-OUT AND NOT A REPEAL OF `SES-154`.** The verifier
+reported `auto_done_eligible: YES` — a `Selfbuild` `P10 - Tooling` delivery whose diff touches none of
+`scripts/verifier.js`, `scripts/check-session-docs.js`, `tests/regression/run-all.js` — so the ticket
+closed `done` rather than `delivered` and the recompute (116 rows moved) released its queue number.
+The ship card is filed regardless, so **Reverse stays one tap**.
+
+**ONE DUPLICATION IS NAMED RATHER THAN HIDDEN.** The `/v6/deployments` URL now lives in both
+`check-deploy-current.js` and `build-currency.mjs`, because the former does not export it and
+exporting it would have meant a fourth file against this session's three-file cap. The rule that could
+actually **drift** — *which deployment the preview is really serving* — is imported (`pickServing`),
+so it keeps one home. The new file's header carries the condition for deleting the copy.
+
+**INCIDENTAL AND REVERTED, not shipped:** this container's npm rewrote `package-lock.json` (39
+`libc` field deletions) during the build. Unrelated to the change; `git checkout --` before the commit.
+
+**SHIPPED THROUGH TWO CONCURRENT SHIPS, and the resolution is recorded rather than smoothed over.**
+Peers landed `v7.0.253` (`SES-61` — *the suite gate stops going green on halves it never ran*) and
+`v7.0.255` (`SES-208`) between this cycle's commit and its push, so the rebase conflicted twice on the
+generated / history files. `CLAUDE-STATE.md` and `BACKLOG-SNAPSHOT.md` are **generated** — resolved by
+taking the peer's and **re-running their generators on the merged tree**, never by hand-merging a
+rendered file. `docs/SESSIONS.md` is history: every entry is kept, newest first. **The full QA was
+re-run on the merged tree rather than inherited** — suite **70/70**, build green, verifier **APPROVE**
+(`runner_verdicts 0dce35a3`).
+
+**AND THE FIRST PEER'S SHIP CHANGED THIS TICKET'S OWN TEST, which is the useful part of the collision.**
+`SES-61` tightened the rule that a suite may not go green on halves it never ran. This guard was
+declaring its live-Vercel arm not-run **unconditionally** — reporting a gap that did not exist
+whenever `VERCEL_TOKEN` was present, the mirror of that defect and the one this ticket is least
+entitled to make, since *"unknown is not clean"* is its own headline. The arm is now conditional: it
+**runs** against the real API when the credential is there (asserting SHAPE — a 40-hex SHA, a null
+reason — never a specific commit, since the tip moves by design), and declares not-run only when the
+credential is absent or the API resolved nothing. Both arms were exercised: with the token the
+declaration disappears and the assertions run; without it, the declaration returns.
+
+Files: `scripts/lib/build-currency.mjs` (new), `scripts/chi-true-regression.mjs`,
+`tests/regression/SES-58-mid-run-build-detection.js` (new). Kickoff
+`docs/kickoffs/v7.0.254-SES-58-mid-run-build-detection.md`. Script + test; no `src`/`api` change, no
+site change.
+
 ## session/cycle-20260825-0511 (v7.0.255, 2026-08-25, runner cycle `036fa097-2b3e-44ec-8553-a71ffab411a4`, **`trigger = chained (drain continuation)`** of `de31fe1e` — model Opus 5, no subagent) — SES-208: a left angle bracket was deleting the bottom half of the briefing page
 
 **SES-135's TEST EARNED ITS KEEP BEFORE IT SHIPPED.** This cycle's drain pick was `SES-135` — a
