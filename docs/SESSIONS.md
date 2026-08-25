@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260825-1040 (v7.0.263, 2026-08-25, runner cycle `0e6d8e96-2dbc-472e-b705-ec6c00e156de`, **`trigger = chained (drain continuation)`** of `43310f16` — model Opus 5, no subagent delegated) — SE-02: the Founding Principle becomes a runnable check
+
+**`SE-02` — Shared-Pipeline No-Conditionals Grep** (`P10 - Tooling`, tier `later`, queue 576, epic *Selfbuild M3*) shipped at `v7.0.263`. Two new files — `scripts/check-shared-pipeline.js`, `tests/regression/SE-02-shared-pipeline.js`. No `src/`/`api/`/`lib/` change, no site change.
+
+**What it enforces.** Three `[LOCKED]` statements that all say the same thing about different files and that nothing checked: **§19's Founding Principle (NEVER VIOLATE)** — no `if (agentId === 'x')` / `if (deliverable_type === 'pdf')` inside `db-assembly.js`, `ai-enrichment.js`, `request-receivable.js`; **§19b** — zero capability-specific logic in `execute.js`; **§19d's extension** — the same rule over the Agent Loop's delegate-dispatch and consequential-action-gate primitives.
+
+**THE PROPERTY: a presence check is not a conditional on identity — and here that distinction is the whole ticket.** The naive form (*an `if` mentioning `agent_id` in a governed file*) returns **14 hits on today's clean tree, and all 14 are legitimate**: argument guards (`if (!capability_slug) throw`), presence branches (`if (agent_id) {`), and ids interpolated into **error messages** (`throw new Error(\`…holds capability "${capability_slug}"\`)`). The pipeline *must* branch on whether an id was supplied — that is argument handling, not intelligence about a particular agent. What §19 forbids is branching on **which** one it is. So the matcher keys on comparison against a **literal**, on `switch`-on-id, and on membership in a literal id list.
+
+**MEASURED, NOT REASONED.** Whole-platform survey across `api/` + `lib/` + `shared/`: exactly **one** literal-id conditional exists anywhere — `api/brief.js:90`, `if (agent_id === "pat")`. Negative control on the real file: with the naive matcher the check reports **14 false violations** on the clean tree and the guard fails; restored byte-identical (`diff -q`).
+
+**THE SCOPE CALL, MADE EXPLICITLY RATHER THAN QUIETLY.** `api/brief.js` is a capability route and is named by **none** of the three statements, and its conditional is a deliberate, commented control-case bypass (*"Pat … cold every time, no configs, no RAG, no reflect"*). Widening a LOCKED rule to cover a file it does not name would be the runner granting itself scope — the boundary `SES-196` kept when it left `removal proposed` out of the drain picker. Dropping the finding would be the opposite failure. So it is **reported on every run as an adjacent observation, labelled out-of-scope, and never fails the check**, in the shape `check-library-access.js` prints its declared exceptions. Whether §19 should widen is John's call; the script surfaces the question and does not answer it. **A governed file that has moved is exit 2, never a silent green.**
+
+**THE GUARD CAUGHT ITS OWN AUTHOR, and the correction is recorded rather than smoothed over.** The first draft's anti-vacuity clause asserted `walk() > 50 files`; the real surface of `api/` + `lib/` + `shared/` is **34**, so the clause failed on its first run — a number invented rather than measured, which is the exact habit this codebase writes its rules against. A count is also the wrong shape (stale the moment a file is added), so it was replaced with a semantic assertion: the walk must actually **reach each of the six files the rule names**.
+
+**Verifier:** see the cycle row. Suite 79/79 with credentials; build green.
+
+**CHAIN CONTEXT.** This is the second cycle of an in-session chain (`drain_chain_gate` verdict `continue` after `43310f16` shipped `SE-01`). Its Gate B pick was **`SES-130` again** — the removal-proposed ticket the predecessor had just skipped, handed back because its claim was released after the push. Worth recording because it repeats every cycle: the picker skips `design_status` flags but **not** `status = 'removal proposed'`, which is `SES-196`'s own declared remainder. `record_skip` count is now 8.
+
+---
+
 ## session/cycle-20260825-1040 (v7.0.262, 2026-08-25, runner cycle `43310f16-533a-4af0-9d6d-295c1f5c7abf`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (05:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-01: the §5/§6 service boundaries become a runnable check
 
 **`SE-01` — Boundary Enforcement Grep** (`P10 - Tooling`, tier `later`, queue 576, epic *Selfbuild M3 — Independent Verification*, drain directive `6810599f`) shipped `delivered` at `v7.0.262`. Two new files, no `src/`/`api/`/`lib/` change, no site change: `scripts/check-service-boundaries.js` and `tests/regression/SE-01-service-boundaries.js`.
