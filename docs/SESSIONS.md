@@ -5,6 +5,85 @@
 
 ---
 
+## session/cycle-20260825-0941 (v7.0.261, 2026-08-25, runner cycle `befe50e3-1506-48b8-8485-c2bdc457867c`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (04:00 America/Chicago) — model Opus 5 orchestrator + one Fable 5 kickoff-design subagent) — LOG-73: §19k stops asserting a gold pattern and its own retraction at the same time
+
+**THE SIXTH CONSECUTIVE CYCLE TO HIT `SES-130`, AND THE BOARD BEHIND IT IS ALL JOHN'S.**
+`drain_epic_next()` returned `SES-130` (queue 267, `open_now` 14) as the M3 pick for the sixth time
+since 06:09Z; `status = 'removal proposed'`, its removal card (`06a0b2fe`) is already filed and
+undecided, so this cycle bumped the skip to 6 and dropped to the board per B24. The class-sorted
+board's **entire top 32** is then blocked on John — `delivered` awaiting his Accept, `needs-john`,
+`needs-desktop`, `john-paced`, or `removal proposed` — and **every one of them already carried an
+unresolved `runner_skips` row of the right kind**. No skip was re-recorded for those: `record_skip()`
+overwrites `reason`, and re-calling it would have replaced reasons earlier cycles wrote with worse
+ones while changing nothing about what §10 shows him (§10 derives *still skipped* from the ticket's
+status, not from `last_skipped_at`). First unblocked ticket: `LOG-73` at queue 33.
+
+**THE PREMISE HELD, AND THE HALF THAT COULD HAVE KILLED IT WAS CHECKED FIRST.** `LOG-73` says
+Susan discarded the embedding gold pattern, so §19k needs amending. The cheap way to get this wrong
+is to fix the doc without asking whether the *data* already moved: measured live, `pattern_vocabulary`
+holds 33 rows, **8 assert `model_modality` in their criteria and all 8 assert `generative`** — no
+`Vector Embedding / Retrieval Subroutine` row exists anywhere. So the overturn is already true in the
+gold data and the false-generation guard is live; **only the doc was stale**, which is what made this
+a two-file doc ticket rather than a migration.
+
+**WHAT §19k ACTUALLY SAID, AND WHY IT IS THE DEFECT SHAPE RATHER THAN A TYPO.** The LOG-65 POC 2
+bullet asserted the naming role in its own body (*"It lets one gold row name the retrieval
+subroutines… → 'Vector Embedding / Retrieval Subroutine'"*) with a ⚠️ blockquote **directly beneath
+it** retracting the same claim and pointing at `LOG-73`. A section that carries a claim and its
+retraction three lines apart forces every later reader to adjudicate which half is current. The
+overturn is now folded into the body; the blockquote is **rewritten as a settled historical note,
+not deleted** — Susan's discard reason survives verbatim, because that reason is the thing that stops
+the pattern being re-proposed, and this platform keeps a retraction's *why*.
+
+**THE INVARIANT WAS NOT STALE — IT WAS FALSIFIED BY THE PLATFORM'S OWN LOG, AND THE MEASUREMENT IS
+WHY.** *"Coverage: going-forward unmatchable = 0"* is retired rather than adjusted. Live
+`ai_call_patterns` at 2026-08-25: 34,702 rows — generative 23,075 (15,002 matched / 8,073 unmatched),
+`none` 6,546 (0 matched), embedding **5,081 (0 matched)**; overall 15,002 matched (43.2%) / 19,700
+unmatched (56.8%). The decisive figure is not the total: **3,740 of the 5,081 embedding rows were
+written AFTER the 2026-07-25 lock**, the most recent one day before this cycle. So embedding is a
+**going-forward** unclassified class, not a historical one, and the claim was falsified within the
+month it was written. The ticket's own `~1,352` is 3.8× stale and was dropped from body prose rather
+than refreshed — a frozen count in a body sentence is the same defect one iteration later.
+
+**PART (c) WAS ALREADY ANSWERED AND IS RECORDED, NOT REOPENED.** The ticket's third part asks whether
+embedding rows get a non-pattern label; John's call is in the ticket's own title (*"accept as
+unclassified"*) and Locked constraint 7 already surfaces such rows by `LEFT JOIN`. Putting it back to
+him would have handed him a decision he had made.
+
+**NAMED REMAINDER, DELIBERATELY NOT SCOPED HERE.** "Going-forward unmatchable = 0" looks broken for
+**generative** rows too — 8,073 unmatched live against the POC's ~300 permanent floor. This cycle
+cannot split those into pre/post capture-start, so the bullet retires the invariant **wholesale** and
+re-asserts nothing for that modality. Diagnosing the generative gap is its own measurement session.
+`LOG-69`'s half of part (b) needed no separate ticket: it shipped as a pure Supabase session with
+zero repo files, and its arithmetic lives only in the bullet that was just replaced (§19l's scope-4
+line is a historical record of a completed scope and was left alone).
+
+**THE VERIFIER BLOCKED FIRST, AND THE BLOCK WAS REAL.** `scripts/verifier.js` returned **block** —
+regression red — while a bare `node tests/regression/run-all.js` had just returned 77/77. The
+difference is the environment, not the tree: the verifier runs with `SUPABASE_URL` /
+`SUPABASE_SERVICE_KEY` exported, which un-skips `SES-177`'s drift check, and the committed
+`CLAUDE-STATE.md` had drifted from the ledger. That is the file step 7 requires this cycle to
+regenerate, so the red was this cycle's own unfinished close-out rather than a flake — `render-claude-state.js`,
+re-run, 77/77 with credentials present, verdict **approve**. Recorded as `runner_verdicts`
+`35af885f` (block) then `dbfa8593` (approve); both are kept, because a lane whose blocks vanish once
+they are fixed is a lane with no scoreboard. **Auto-done correctly refused**: `LOG-73` carries no
+epic, and the charter's carve-out is the `Selfbuild` family's `P10 - Tooling` only, so the ticket
+ships `delivered` and waits for John (`SES-154`).
+
+**Worth knowing for a later cycle:** the hygiene-tripwire gate passed while printing
+`fatal: cannot change to 'C:/Projects/deepbench-frontend'` three times — a Windows-path assumption
+inside `check-session-docs.js` that cannot run in a cloud container. It exits 0 regardless, so a gate
+is currently green partly on a probe that never executed. Not this ticket's scope; named on the ship
+card rather than fixed in passing.
+
+Files: `docs/ARCHITECTURE.md`, `tests/regression/LOG-73-embedding-unclassified-recorded.js` (new),
+kickoff `docs/kickoffs/v7.0.261-LOG-73-embedding-unclassified.md`. Guard is discriminating: four
+clauses fail against `origin/dev`'s copy and pass after; the two survival clauses (Susan's reason,
+the guard sentences) get their teeth from a mutation control, which caught two vacuous mutations of
+its own while the file was being written and is the reason they were fixed rather than shipped.
+
+---
+
 ## session/cycle-20260825-0841 (v7.0.260, 2026-08-25, runner cycle `9c0190b0-2a62-42bb-b4d5-961c369c5fc0`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (03:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-06: the Library boundary becomes a check, and the check finds a live violation on its first run
 
 **THE DRAIN PICKED `SES-130` AND THIS CYCLE COULD NOT BUILD IT — that is where the run starts, and

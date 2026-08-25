@@ -1,5 +1,6 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.261 | 2026-08-25 | cycle-20260825-0941 (runner) — §19k LOG-65 POC 2: the embedding gold pattern's overturn is folded into the body and the coverage invariant is retired for a dated measurement (LOG-73). The silent break to watch for is a later editor "tidying" that bullet back into a standing invariant — resurrecting "going-forward unmatchable = 0" or the one-gold-row naming sentence, or dropping Susan's discard reason as stale prose; tests/regression/LOG-73-embedding-unclassified-recorded.js asserts the retired phrases ABSENT and the dated measurement plus the reason PRESENT, because either half alone passes vacuously.
 # Amended v7.0.125 | 2026-08-21 | automation-review (attended) — §19v trust-ladder paragraph: gated-card Accept excluded from the ladder (SES-94, John's Accept 2026-08-21T12:51Z; Reverse-on-gated recorded as settled per B35)
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
@@ -1675,23 +1676,30 @@ is provable from `intent` + config alone (history/backfill), which is why `inten
 Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settled the open
 `criteria`-shape question. Gate **passes**. Full detail: `docs/harvests/LOG-65-poc-anomaly-requirements-0724.md`.
 
-- **One missed requirement found → one new field (`model_modality`, #8).** The intent anchor
+- **One missed requirement found → one new field (`model_modality`, #8) — GUARD ROLE ONLY; the
+  naming role it was introduced with was overturned (historical note below).** The intent anchor
   (`intent` from `feature`) is a real slug **only for the 7,136 `agent-turn` rows**; for router
-  rows the intent is in `call_facts.tool_calls`, and for the 1,346 raw embedding subroutines
+  rows the intent is in `call_facts.tool_calls`, and for the raw embedding subroutines
   (`LOG-59`) there is no intent at all. `model_modality` (source: the existing `ai_activity_log.model`
   column; `text-embedding-* → embedding`, `null → none`, else `generative`) is a **read-time
-  derivation** — no new capture, not stored in `call_facts`. It lets one gold row name the retrieval
-  subroutines (`criteria: {model_modality: embedding}` → "Vector Embedding / Retrieval Subroutine")
-  and structurally forbids any generation pattern from matching a non-generative row (false `rag`
-  dies by assertion, not omission). Guard: `none` assumes null `model` = deterministic — correct only
-  while `model` is logged wherever a model runs.
-  > ⚠️ **Naming role OVERTURNED 2026-07-25 (`S-LOG-66`, John's call → `LOG-73`).** When the embedding
-  > subroutine was actually run through the Pattern Definer (Susan), she **DISCARDED** it — "a
-  > foundational NLP primitive already inside RAG/HyDE, not a distinct behavioral/orchestration
-  > pattern." So there is **no** "Vector Embedding / Retrieval Subroutine" gold pattern; the ~1,352
-  > embedding rows (`LOG-59`) stay **unclassified** (surfaced by `LEFT JOIN`, not dropped). `model_modality`'s
-  > **naming** role is dropped; its **false-generation guard** (the clause above) stands. "Going-forward
-  > unmatchable = 0" (below) no longer holds for embedding rows. §19k amendment + coverage recompute = `LOG-73`.
+  derivation** — no new capture, not stored in `call_facts`. Its one standing role is the
+  **false-generation guard**: it structurally forbids any generation pattern from matching a
+  non-generative row (false `rag` dies by assertion, not omission). Guard: `none` assumes null
+  `model` = deterministic — correct only while `model` is logged wherever a model runs. **The guard
+  is live in the gold data, verified 2026-08-25 (`LOG-73`): of the 33 `pattern_vocabulary` rows, the
+  8 whose `criteria` assert `model_modality` all assert `generative` — none asserts `embedding`.**
+  > **Historical note — the naming role, overturned 2026-07-25 (`S-LOG-66`, John's call); folded
+  > into the body 2026-08-25 (`LOG-73`, `v7.0.261`).** The POC gave `model_modality` a second,
+  > *naming* role: one gold row (`criteria: {model_modality: embedding}`) would have named the
+  > embedding subroutines "Vector Embedding / Retrieval Subroutine". When that subroutine was
+  > actually run through the Pattern Definer, Susan **DISCARDED** it — "a foundational NLP primitive
+  > already inside RAG/HyDE, not a distinct behavioral/orchestration pattern." The reason is kept
+  > verbatim because it is what stops the pattern being re-proposed. **John's call (`LOG-73`):
+  > embedding rows are accepted as unclassified** — Locked constraint 7 below already surfaces them
+  > via `LEFT JOIN` rather than dropping them, and no non-pattern label (subsystem / `feature`) is
+  > invented for them. This is a **standing and growing** honest-unclassified class, not a legacy
+  > one: 5,081 embedding rows at the 2026-08-25 measurement, **3,740 of them written after this
+  > overturn**, the most recent one day before it was taken.
 - **`criteria` uses a BOUNDED three-operator set, not pure `@>`.** Proven live: a real retrieval row
   logs `retrieval_method='mixed'`, so `@>`-equality on `similarity-search` **misses** it; RAG needs
   `retrieved_chunk_ids > 0`. The set is exactly: **`@>`/equality (presence)**, **`in` (enumeration)**,
@@ -1701,10 +1709,20 @@ Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settle
   single-sourcing (name/definition/citation, one-edit rename) now that the operator set exists anyway.
 - **The Displayer returns a SET** (primary + supporting), via the one generic operator matcher — proven
   on a rich row returning {Request Routing, Output Guardrails, RAG}, no per-pattern code.
-- **Coverage: going-forward unmatchable = 0.** The 7,157 unmatchable rows are 100% historical; ~6,850
-  recover via `trace_id` sibling or `ai_type`→capability backfill (`LOG-69`), leaving a **permanent
-  floor of ~300 legacy/test rows (182 already blank today), none ever governed-named** — state it, do
-  not silently drop it.
+- **Coverage — a DATED MEASUREMENT, never a standing invariant. Remeasured live 2026-08-25
+  (`LOG-73`); recompute before citing it.** The POC's *"going-forward unmatchable = 0"* is
+  **retired**: it never covered embedding rows (the overturn above), and the platform's own log
+  falsified it within the month — see the growth figure there. Live `public.ai_call_patterns` at
+  2026-08-25: **34,702 rows** — generative 23,075 (15,002 matched / 8,073 unmatched), `none` 6,546
+  (0 matched), embedding 5,081 (0 matched). Overall **15,002 matched (43.2%) / 19,700 unmatched
+  (56.8%)**. Embedding is a **going-forward** unclassified class rather than a historical one. The
+  POC-era backfill arithmetic (7,157 unmatchable, ~6,850 recoverable via `trace_id` sibling or
+  `ai_type`→capability backfill, a ~300-row permanent floor) was a 2026-07-25 snapshot of the
+  generative/`none` set only; `LOG-69` executed that backfill. **What this bullet deliberately does
+  NOT claim:** that generative rows are matchable going forward. 8,073 of them are unmatched live,
+  far above the retired ~300 floor, and this measurement cannot split them into pre/post
+  capture-start — so the invariant is retired wholesale rather than re-asserted for one modality.
+  Diagnosing that generative gap is its own measurement session, named and not folded in here.
 - **Motivation confirmed live:** legacy naming (`buildPatternsUsed` + per-path literals →
   `ai_activity_log.patterns_used`) is still hardcoded and still writing on every new row (including the
   false `rag`); `patterns_used` is deliberately **not** a signature input. Write-path fix `LOG-63`
