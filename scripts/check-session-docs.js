@@ -1,4 +1,33 @@
 #!/usr/bin/env node
+// DeepBench v7.0.242 | scripts/check-session-docs.js | SES-199 -- THE TRIPWIRE CAN NOW GO RED.
+// Until this ship main() ended in process.exit(0) on every path, so the check was a rubber stamp:
+// the interim auto-done bar requires "tripwire green" and nothing could ever make it anything else.
+// `--gate` is the second invocation the ticket asked for. Default behaviour is UNCHANGED and must
+// stay that way -- no flag, always exit 0, same report -- because CI runs the bare form today.
+//
+// THE GATING SET IS NAMED CLASSES AT FLAG SEVERITY, AND BOTH HALVES OF THAT ARE DELIBERATE:
+//   * CLASSES: checks 9/10/11 only -- the truth-registry checks, the ones that ask "do two files
+//     still tell the same story?". The ticket draws exactly this line: "the over-cap description
+//     flags are plainly advisory, while a rule statement drifted from its registry row plainly is
+//     not." Checks 1-8 are size and shape ratchets; a doc a few KB over baseline is a thing to
+//     tidy, never a reason to refuse a change.
+//   * SEVERITY: FLAG, not FLAG+WARN. The script already spends this distinction carefully --
+//     check 10 itself argues a stale anchor is "a stale anchor rather than a missing home -- WARN,
+//     not FLAG" -- so gating on FLAG reuses a judgement already made per finding instead of
+//     inventing a second axis over the top of it. MEASURED on the live board at this ship, and it
+//     is why the line sits here: classes 9/10/11 hold 0 FLAGs and 2 WARNs (B31/B32's stale anchors,
+//     which are SES-202's own ticket). So the gate ships GREEN. Gating on WARN too would have
+//     shipped a job that is red on arrival for drift another ticket already owns -- which trains
+//     everyone to ignore it, and is the rubber stamp's twin failure rather than its fix.
+//   * FAIL-CLOSED FOR FREE, and this is the property not to lose: loadRules() reports "the truth
+//     checks could not run at all" as a check-9 FLAG, so a missing or unparseable RULES-SNAPSHOT
+//     fails the gate instead of passing it. A gate that goes green when it looked at nothing is
+//     the exact defect this ticket exists to close.
+// NOT DONE HERE, deliberately, and it is the ticket's own boundary: .github/workflows/ci.yml is
+// NOT switched to `--gate`. This ticket makes the CHECK capable of failing; making a FAILURE block
+// a merge needs branch protection and repository secrets, which are John's alone (M2 gate review
+// item 8, never to be carded). Wiring the flag into CI is the follow-up, not this.
+// Guarded by tests/regression/SES-199-tripwire-gating.js.
 // DeepBench v7.0.219 | scripts/check-session-docs.js | SES-011a, SES-009b, SES-23, SES-25a, SES-83 (d) c4, SES-110, SES-112, SES-115, SES-117, SES-120, SES-176
 // FIX v7.0.219 (SES-180's cycle, feature-owns-its-bugs): check 11 flagged its OWN documentation --
 // prose writing `{{rule:ID}}` to explain the syntax was read as a broken marker. `ID` and its
@@ -85,6 +114,23 @@ function arg(name, fallback) {
 }
 
 const WORKTREE = arg("worktree", process.cwd());
+
+// ---- SES-199: the gating set --------------------------------------------------------------
+// Kept next to arg() rather than beside the checks it names, because it is a POLICY statement
+// about them, not part of any one check. See this file's header for why it is these classes at
+// this severity; changing either is a decision, not a tidy-up.
+const GATING_CHECKS = new Set(["9", "10", "11"]);
+const GATING_SEVERITY = "FLAG";
+
+// Pure: findings in, gating subset out. No disk, no network, no exit -- so the guard can drive it
+// against fixtures, the same contract the check helpers below already keep.
+function gatingFindings(findings) {
+  return findings.filter(f => f.severity === GATING_SEVERITY && GATING_CHECKS.has(f.check));
+}
+
+function gateModeRequested(argv = process.argv) {
+  return argv.slice(2).includes("--gate");
+}
 
 function readIfExists(p) {
   try {
@@ -1010,10 +1056,12 @@ function main() {
 
   const flags = findings.filter(f => f.severity === "FLAG");
   const warns = findings.filter(f => f.severity === "WARN");
+  const gating = gateModeRequested() ? gatingFindings(findings) : null;
 
   if (!flags.length && !warns.length) {
     console.log("session-hygiene: all clear.");
-    process.exit(0);
+    reportGate(gating);
+    process.exit(gating && gating.length ? 1 : 0);
   }
 
   console.log(`session-hygiene: ${flags.length} flagged, ${warns.length} warning\n`);
@@ -1021,7 +1069,22 @@ function main() {
     console.log(`  [check ${f.check}, ${f.severity}] ${f.detail}`);
   }
   console.log("\nReport only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs).");
-  process.exit(0);
+  reportGate(gating);
+  process.exit(gating && gating.length ? 1 : 0);
+}
+
+// SES-199. `gating === null` means the bare invocation: say nothing at all, so the reporting-only
+// output CI reads today is byte-identical to what it read before this ship.
+function reportGate(gating) {
+  if (gating === null) return;
+  const set = [...GATING_CHECKS].join("/");
+  if (!gating.length) {
+    console.log(`\nGATE: clear -- no ${GATING_SEVERITY} findings in the gating classes (checks ${set}). Exit 0.`);
+    return;
+  }
+  console.log(`\nGATE: FAILED -- ${gating.length} ${GATING_SEVERITY} finding${gating.length > 1 ? "s" : ""} in the gating classes (checks ${set}). Exit 1.`);
+  for (const f of gating) console.log(`  [check ${f.check}] ${f.detail}`);
+  console.log("These are truth-registry findings: a rule statement and its registry row disagree, or the registry could not be read at all. Fix the drift or the snapshot -- do not widen the gating set to get past it.");
 }
 
 // SES-176: the truth-check helpers are pure (findings array in, findings array out -- no network,
@@ -1038,6 +1101,11 @@ export {
   checkRuleMarkers,
   RETIREMENT_VOCAB,
   RETIREMENT_WINDOW,
+  // SES-199 -- the gating policy, exported so the guard drives the real set rather than a copy.
+  GATING_CHECKS,
+  GATING_SEVERITY,
+  gatingFindings,
+  gateModeRequested,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

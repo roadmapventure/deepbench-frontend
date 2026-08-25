@@ -5,6 +5,71 @@
 
 ---
 
+## session/cycle-20260825-0140 (v7.0.242, 2026-08-25, runner cycle `63a97a74-0822-4776-8345-e44edfce23c1`, `trigger = chained (drain continuation)` of `df5764ed` — model Opus 5, no subagent) — SES-199: the truth tripwire can go red
+
+**The first ticket the Selfbuild M3 drain picked**, minutes after `v7.0.241` declared it — which is
+the drain working rather than a coincidence worth noting: `drain_chain_gate()` returned `continue`
+with all five gates passing, and the chain re-entered the runbook in-session.
+
+**PREMISE REVALIDATED LIVE, READ IN THIS CLONE.** `scripts/check-session-docs.js`'s `main()` ends in
+`process.exit(0)` on **both** paths — the all-clear branch and the findings branch; there is no
+third — and `ci.yml` runs it under a job literally named *"Tripwire + regression (reporting only)"*.
+So the M2 gate review's Chief Architect lens was right by construction: the interim auto-done bar's
+*"tripwire green"* condition was satisfied by a constant, and `SES-181` — Reviewer lane would have
+inherited it as a passing signal that measures nothing.
+
+**WHAT SHIPPED: `--gate`, a second invocation.** Same report, then a verdict — exit 1 when a finding
+falls in the gating set, exit 0 otherwise. **Without the flag nothing changes at all**, no gate line
+and always exit 0, because the bare form is what CI runs today.
+
+**THE GATING SET IS `{9, 10, 11}` AT `FLAG`, AND BOTH HALVES ARE A DECISION RATHER THAN A DEFAULT.**
+*Classes:* the truth-registry checks — the ones asking "do two files still tell the same story?".
+The ticket draws exactly that line in John's own review: *"the over-cap description flags are plainly
+advisory, while a rule statement drifted from its registry row plainly is not."* Checks 1–8 are size
+and shape ratchets and a doc a few KB over baseline is never a reason to refuse a change.
+*Severity:* **FLAG, not FLAG+WARN**, and this half was **measured**. The script already spends the
+severity distinction carefully — check 10 argues about itself that a stale anchor is *"a stale
+anchor rather than a missing home — WARN, not FLAG"* — so gating on FLAG reuses a judgement made per
+finding instead of laying a second axis over it. Live board at this ship: classes 9/10/11 hold **0
+FLAGs and 2 WARNs** (`B31`/`B32`'s stale anchors, which are `SES-202`'s own ticket). **So the gate
+ships green.** Gating on WARN too would have shipped a job red on arrival for drift another ticket
+already owns — which trains everyone to ignore it, and is the rubber stamp's twin failure rather
+than its fix.
+
+**FAIL-CLOSED CAME FOR FREE AND IS THE PROPERTY NOT TO LOSE.** `loadRules()` already reports both
+unreadable-snapshot cases as **check-9 FLAGs**, so a run that could not read the registry at all
+*fails* the gate instead of passing it. A gate that goes green having looked at nothing is the exact
+defect this ticket exists to close, and the guard asserts it directly so a later edit cannot quietly
+reclassify those two findings out of the set.
+
+**NOT DONE, DELIBERATELY, AND IT IS THE TICKET'S OWN BOUNDARY:** `ci.yml` is unchanged. *"This
+ticket makes the CHECK capable of failing; making the FAILURE block a merge is his"* — branch
+protection and repository secrets are John's alone (M2 gate review item 8, never to be carded).
+Switching CI's invocation to `--gate` is the follow-up, named on the ship card.
+
+**QA — every case with its negative control, and the flag as the only variable end-to-end.** The
+guard imports `GATING_CHECKS` / `GATING_SEVERITY` / `gatingFindings` / `gateModeRequested` **from
+the shipped script**, never a copy, so a later widening of the set moves these assertions with it
+and is visible in the diff. Unit: a check-10 FLAG gates while the identical FLAG on check 1 does
+not; 21 advisory findings (18× check 3d plus 3c/3e/6 — the live board's real shape) gate nothing; a
+check-10 **WARN** does not gate while the identical text at FLAG does, which is what proves that
+test is not passing because *nothing* gates; `--gateway` does not switch the mode on. End-to-end
+through the real CLI: a fixture worktree with no `RULES-SNAPSHOT.md` under `--gate` → **exit 1**,
+**the same fixture without `--gate` → exit 0**; that fixture with the snapshot but none of the docs
+its rules point at → `GATE: FAILED — 4 FLAG findings`, exit 1 (the gate firing on real registry
+drift, not only on the missing-file path); the live repo under `--gate` → `GATE: clear`, exit 0.
+`npm install && npm run build` green; regression **61/61** including the new guard.
+
+**FOUND AND FIXED ON THE WAY, and it is worth naming because it looks like a defect and is not:**
+`SES-177-claude-state-renderer.js` failed — *"the committed CLAUDE-STATE.md must match what the
+ledger renders"*. That is this cycle's own predecessor: `df5764ed` closed `shipped` in its tail
+**after** it had rendered the file, so the committed copy was one ship behind. That lag is
+documented (*"the next cycle's render is what carries yours"*); re-rendering here picks up
+`v7.0.241` and clears it. The mechanism working, not the renderer misbehaving. Also worth recording:
+the suite read **40/61 before `npm install`**, all twenty extra failures `Cannot find package` — an
+absent `node_modules`, never a regression. A cycle that reported that number as a test result would
+have been reporting its environment.
+
 ## session/cycle-20260825-0140 (v7.0.241, 2026-08-25, runner cycle `df5764ed-2ae7-481e-8317-01bbf5cfad61`, `trigger = scheduled` — on the :40 cron grid, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — directive `1532666b` item 4: the **Selfbuild M3** drain is declared, and `SES-191` is moved above the ticket that depends on it
 
 **John's directive `1532666b` item (4), verbatim:** *"When — and only when — `SES-197` is shipped
