@@ -5,6 +5,36 @@
 
 ---
 
+## session/cycle-20260825-1141 (v7.0.265, 2026-08-25, runner cycle `4a457450-ec88-4a51-b082-51f373c5a9d7`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (06:00 America/Chicago) — model Opus 5, no subagent delegated) — SE-04: §13 rule 14 becomes a runnable audit, and the audit finds a live violation on its first run
+
+**`SE-04` — Format Skill Exclusivity Data Audit** (`P10 - Tooling`, tier `later`, epic Selfbuild M3) shipped at `v7.0.265`. Two new files — `scripts/check-format-skill-exclusivity.js` and `tests/regression/SE-04-format-skill-exclusivity.js`. No `src/`/`api/`/`lib/` change, and **no Supabase configuration row written** — see the finding below for why that is the whole point rather than an omission.
+
+### What shipped
+`ARCHITECTURE.md` §13 rule 14 is `[LOCKED]` — *"Content specialists (planners, researchers, analysts) never own Format Skills. Format Skill ownership belongs exclusively to display/editor agents (Screen Controls, HTML Display, PDF Assembly)"* — and had **zero machine enforcement**. Ownership is three Supabase tables (`skill_profiles` → `capability_skill_profiles` → `agent_capability_assignments`) and no constraint expresses the rule. The check reads all three, joins format profile → capability → agent, and exits 0 / 1 / 2 in the shape `SE-01` and `SE-06` already ship (exit 2 = could not run, never a pass).
+
+**THE ALLOWLIST IS DERIVED, NEVER HARDCODED, and that is the design rather than a flourish.** The obvious implementation writes `["alex","riley","claire"]` into the script, which gives one fact two homes: the day a fourth display agent is hired the check keeps passing while the architecture says otherwise. So `parseRuleSurfaces()` reads §13's item 14 and takes the parenthetical the rule itself carries, and `resolveDisplayAgents()` maps each surface to the one roster entry whose `role` is `"<surface> Editor"`. Same move `SE-03` made for `STANDARDS.md` §11 one cycle earlier.
+
+**That move has its own failure mode and it is guarded rather than assumed**, because it fails in *both* directions: a parser that returned `[]` makes every Format Skill look like a violation, and one that matched too loosely makes none of them look like one — the `SES-199` rubber stamp wearing two different costumes. Both functions therefore **throw** rather than degrade, and the guard asserts the throw, not merely the happy path.
+
+### The finding — and what this cycle deliberately did not do
+The audit's first real run against live Supabase **failed**, correctly: the `format`-type profile `analysis-report` is attached to capability `data-analyst` (level 1, `is_required`), which is assigned to **`bob` — Bob Whitfield, `PR-04`, Professional Procurement Analyst**, a content specialist. The other three owned format profiles are clean (`screen-controls-format`→`alex`, `html-display-format`→`riley`, `pdf-assembly-format`→`claire`); `execution-plan` is attached to no capability at all and is reported as an observation, never a violation.
+
+**The violation was not fixed, and the reason is a rule and not a shrug.** Repairing it means writing agent configuration data, which §13 rule 11 reserves to John's explicit confirmation — an unattended cycle may not grant itself that. The shape of the fix is a real decision too (drop the format profile off `data-analyst` and shape Bob's output through the format-last path §19b already provides, *or* decide `analysis-report` was never a Format Skill and its `skill_type_slug` is what is wrong). Filed as **`AGT-61`** (`P9 - Bug Fixes`, tier `now`, `design_status = needs-john`) with a `gated_before_build` card carrying both options.
+
+### QA — the negative controls are the part worth reading
+- Build green. Regression suite **81/81**.
+- **The guard was proven to FIRE, not merely to pass.** Three deliberately broken variants of the shipped script each fail it: a join that examines nothing, a parser that degrades to an empty allowlist instead of throwing, and an allowlist widened to the whole roster. The script was restored byte-identical afterwards (`sha256` compared, not eyeballed).
+- **Seam proof against real Supabase rows, one variable.** The live board returns 1 violation; the *same* rows with the `data-analyst` owner swapped `bob`→`alex` return 0, with 4 ownerships examined either way — so neither result is vacuous.
+- No-credentials run exits **2**, not 0.
+- Verifier `b821e2f8`: `approve`, `auto_done_eligible` — so the ticket closed `done` under the charter's `P10 - Tooling` carve-out (`SES-181` step 7a), Reverse still one tap.
+
+### Named rather than left to be found
+- **A pre-existing `SES-177` suite failure was NOT this ship's.** `run-all.js` came back 80/81 before a line of close-out was written; the failing test was the `CLAUDE-STATE.md`-matches-the-ledger check, and it failed identically on a clean `origin/dev` tree with the same credentials (stashed and re-run to prove it, rather than assumed). The close-out's own `render-claude-state.js` cleared it — 81/81.
+- **A mis-citation this session did not fix, and says so rather than quietly widening scope.** `docs/ARCHITECTURE.md:1286` and `SE-04`'s own ticket description both cite this rule as *`STANDARDS.md` §13 rule 14*; it lives in **`ARCHITECTURE.md`** §13. `STANDARDS.md` §13 is the Canonical Test-Engine Vocabulary and has no rule 14. The script anchors on the real home; the two wrong pointers are a doc sweep for their own ticket.
+- **`SES-130` was skipped, not built.** The drain's first pick this cycle was `SES-130 — Unattended cycles cannot reach dev`, which is `status = 'removal proposed'` — a blocked-prefix flag awaiting John's verdict — so it was `record_skip()`ed (`removal-proposed`, `skip_count` now 10) and the cycle dropped to the next named member per B24. Worth noting because this cycle's own step-4 probe is evidence *for* that removal: dev answered HTTP 200 on the first request.
+
+---
+
 ## session/cycle-20260825-1040 (v7.0.264, 2026-08-25, runner cycle `b8c5b4f1-bc6c-4eb5-90cb-53ea33d594d9`, **`trigger = chained (drain continuation)`**, third cycle of the chain — model Opus 5, no subagent) — SE-03: STANDARDS.md §11 stops being a table nobody checks
 
 **`SE-03` — Agent Field Enforcement** (`P10 - Tooling`, tier `later`, queue 576, epic Selfbuild M3) shipped at `v7.0.264`. One new file — `tests/regression/SE-03-agent-fields.js`. No `src/`/`api/`/`lib/` change; `src/data/agents.js` deliberately **untouched** (the roster already complies — the ticket asks for enforcement, not a change).
