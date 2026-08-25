@@ -5,6 +5,86 @@
 
 ---
 
+## session/cycle-20260825-0641 (v7.0.258, 2026-08-25, runner cycle `e7f31390-4d2b-45c4-a549-0b51bf3fa07f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (01:00 America/Chicago) — model Opus 5 orchestrator + one Fable 5 revalidation/scoring subagent) — LOG-77 item 2: constrained decoding is captured, and five of the roadmap's other seven items turn out to describe behaviour the platform does not perform
+
+**THE TICKET'S OWN INSTRUCTION WAS FOLLOWED, AND IT IS WHAT DEMOTED THE TICKET.** `LOG-77` says
+verbatim: *"Each remaining fact is a future Log-Writer capture build… Prioritize by pattern value ×
+capture cost."* Run against live code rather than against the ticket's prose, that prioritization
+found the roadmap substantially stale. Measured, per fact, with the file the claim was read from:
+**3 (HyDE)** — retrieval embeds raw query text only (`lib/rag.js:19-23`), zero hits for
+hypothetical-document generation; **4 (user-personal provenance)** — the only "personal" store is
+per-*agent* (`lib/librarian.js:67`), no user-context memory exists; **5 (adaptive depth)** — depth is
+fixed (`lib/rag.js:10`), no classifier; **8 (streaming)** — every call is a buffered `fetch` +
+`res.json()` (`request-receivable.js:506-507`), and the SSE machinery streams harness events, not
+model tokens. **1 (concurrency)** is *already captured* — `tool_calls` carries N names verbatim and
+`{">" : 1}` is a legal criteria; it is dormant only because no profile sets
+`enable_parallel_tool_use` (`LOO-30` owns that wiring). **6** is partial: the behaviour is live and
+the *consuming* row already records `gated_subroutine_fired: ['synthesis']`. **7** is not
+structurally observable without an examples *mechanism* to declare.
+
+**WHY THAT MATTERS MORE THAN THE BUILD, and it is item 9's own lesson arriving a second time:** a
+captured fact nobody's traffic exhibits matches **zero rows forever** — which is exactly what
+Susan's first `evaluator-optimizer` criteria did. Shipping 3/4/5/8 would have added four dead
+signature fields, the thing `.claude/rules/ai-pattern-signature.md` forbids in as many words
+(*"an entry with no writer and no Displayer derivation is dead"*). So seven of eight were **not**
+built, and the reason is on John's card rather than buried here.
+
+**WHAT SHIPPED — item 2, `call_facts.output_schema_forced`,** the one fact §19l already singled out
+(*"Only 1 pattern needs a genuinely new captured fact (Constrained Decoding — a generic
+`output_schema_forced` at the forced-`tool_choice` site)"*, `ARCHITECTURE.md:1813-1814`). It is read
+off **the body actually sent** — `callBody.tool_choice?.type === 'tool'` — computed in `callModel()`
+after `buildCallBody()`, never re-derived from inputs.
+
+**THE SUBSTITUTION AN EDITOR WILL REACH FOR, AND WHY IT IS WRONG BY CONSTRUCTION:** `traits.schema`
+is already in the signature, so "the schema is declared" looks like the same fact. It is not. A
+`can_request_help` or web-search intent carries the **identical** schema tool with
+`tool_choice: 'auto'` (`needsAutoChoice`, `:215`) — the model is free to answer in text or reach for
+a harness tool. Schema-present ≠ schema-enforced, and a build that stamped the flag from
+schema-presence would be wrong on precisely the rows that distinguish the pattern. That is why the
+guard's negative arm holds the schema fixed and moves only `canRequestHelp`.
+
+**THE FLAG SHIPS OFF THE ALLOWLIST, DELIBERATELY.** `SIGNATURE_FIELDS` stays at 17. Both prior
+additions were John's explicit placement calls (`model_modality`; `delegated_to_provenance` at
+*"position 7 — John's placement call"*, `ARCHITECTURE.md:1752-1757`), and the rules file treats
+allowlist membership as governed — so an unattended cycle promoting its own field would be widening
+its authority on a surface he has ruled on twice. This is the `empty_sections`/`LOG-109` posture:
+**capture first, promote on his word.** Nothing is lost by waiting; the fact is durable and
+forward-only from this ship, so rows accumulate while the card sits. Two further steps stay with the
+Pattern Definer exactly as item 9 established: the key joining Susan's `reviewCandidate` tool-schema
+enumeration, and Susan authoring the criteria. **No pattern name appears in this session's code.**
+
+**NO `execute.js` CHANGE — verified by reading, not assumed.** `runLoop()` takes `callModel()`'s
+whole turn (`execute.js:1161`) and hands it to `sendRequest()` as `precomputed_turn` (`:1403`); the
+facts ride back as `_terminal_log.call_facts` and merge onto the surviving agent-turn row (`LOG-91`).
+Both `sendRequest()` branches are threaded, so the self-call callers (`api/plan.js`,
+`confirmation.js`) are covered too, and `=== true` rather than a truthiness read keeps a
+resumed durable hop carrying an older turn shape at `false` instead of `undefined`. No Supabase
+migration: `log_row_signature()` is `COALESCE(call_facts,'{}') || jsonb_build_object(…)`, so a new
+write-time key reaches the signature wholesale.
+
+**QA — a seam proof, labeled as one,** importing the shipped `buildCallBody`/`buildCallFacts`
+(never a recreation — `SES-45`). Seven arms, and the **file-level negative control ran on
+`origin/dev`'s own pre-change copy**: the guard FAILS there (`forced-call-carries-the-fact`,
+`undefined !== true`) and passes on the shipped file, so it is not vacuous. Arm 6 exists because
+`buildCallBody` has **two** forced returns — a fix applied to only the fallback would leave every
+`HAR-02c` prompt-cached call unstamped, which is most live traffic. Suite 74/74, build green.
+
+**THE REVIEWER LANE BLOCKED THIS SHIP, THEN APPROVED IT — and the first verdict was a real
+ordering finding, not noise.** `scripts/verifier.js` returned **block** at exit 1 with
+`regression suite=red`: the red was `SES-177-claude-state-renderer` (exit 1 = drift), i.e. the
+documented **one-ship-behind lag** — the committed `CLAUDE-STATE.md` was stale against the ledger
+because the previous cycle (`v7.0.257`) had closed its row after rendering. The verifier ran before
+this cycle's own `render-claude-state.js`. After the render the suite went 74/74 and a re-run
+returned **approve**, all three gates green. Worth stating plainly: **on a board where the renderer
+guard is live, a cycle that runs 7a before its close-out render will block itself every time.**
+Auto-done correctly ineligible either way — `LOG-77` carries no epic, and the charter's carve-out
+fails closed on an unknown one.
+
+**NOTED, NOT ACTED ON (out of this ticket's scope, carried to the cycle row):** the hygiene tripwire
+gate reports **green while every one of its git commands fails** in the cloud clone
+(`fatal: cannot change to 'C:/Projects/deepbench-frontend'` ×3, exit 0). That is the `SES-199`
+rubber-stamp shape — a gate whose green may not mean what it says off John's machine.
+
 ## session/cycle-20260825-0511 (v7.0.257, 2026-08-25, runner cycle `952a665d-ac77-4778-92fe-ed83d5d92645`, **`trigger = chained (drain continuation)`** — model Opus 5, no subagent) — SES-45: a test that recreates its subject is not a test
 
 **THE RULE, and it is attributed rather than left as taste.** `STANDARDS.md` Section 4 now opens

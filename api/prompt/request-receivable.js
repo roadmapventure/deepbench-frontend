@@ -1,3 +1,13 @@
+// DeepBench v7.0.258 | api/prompt/request-receivable.js | LOG-77 item 2 -- call_facts.output_schema_forced:
+// the constrained-decoding capture §19l names as the one genuinely-missing fact (ARCHITECTURE.md:1813).
+// Read off the body ACTUALLY SENT (callBody.tool_choice?.type === 'tool'), never re-derived from inputs:
+// traits.schema cannot stand in for it, because a can_request_help or web-search intent carries the same
+// schema tool under `tool_choice: auto`. Threaded on BOTH sendRequest() branches (the precomputed_turn
+// path is the live agent route; the self-call path covers api/plan.js and confirmation.js) and omitted
+// when false, the LOG-49 fact-2 posture -- absent means "not forced / unknowable", never "false".
+// SIGNATURE_FIELDS is deliberately NOT extended here: allowlist membership is governed and both prior
+// additions were John's placement calls, so this ships as capture-only (the empty_sections/LOG-109
+// posture) with the promotion carded for him. Guarded by tests/regression/LOG-77-2-output-schema-forced.js.
 // DeepBench v7.0.246 | api/prompt/request-receivable.js | LOG-54 -- call_facts.empty_sections: the
 // signal §19j's open question 1 was blocked on. Records which DECLARED-REQUIRED sections of a
 // structured response arrived empty, derived generically from format_contract.schema (never an
@@ -609,7 +619,15 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
     }
   }
 
-  return { ...turn, raw_content: llmData.content, usage, retryCount, apiRetryCount };
+  // FEATURE: LOG-77-2 -- `output_schema_forced`, read off the body ACTUALLY SENT rather than
+  // re-derived from the inputs. buildCallBody() emits `tool_choice: { type: 'tool' }` on exactly
+  // the forced branch and `{ type: 'auto' }` whenever harness tools or web search are present
+  // (needsAutoChoice), and omits tool_choice entirely when no tools were offered. So this one
+  // expression is the ground truth for constrained decoding, and `traits.schema` is NOT a
+  // substitute for it: a can_request_help or web-search intent has a schema AND auto choice, so
+  // schema-present would be confidently wrong on exactly the rows that distinguish the pattern.
+  const output_schema_forced = callBody.tool_choice?.type === 'tool';
+  return { ...turn, raw_content: llmData.content, usage, retryCount, apiRetryCount, output_schema_forced };
 }
 
 // FEATURE: AA-44 — patterns_used array built from call shape and guardrails state
@@ -778,6 +796,11 @@ export function buildCallFacts({
   // object schema / no `required` / text output), so the key is omitted. An ARRAY -- including the
   // empty one -- means the observation was made, and is written. See extractEmptyDeclaredSections().
   emptySections = null,
+  // FEATURE: LOG-77-2 -- item 2 of the signature capture roadmap: did this call enforce its output
+  // schema by forcing the tool (`tool_choice: { type: 'tool' }`) rather than leaving the model free
+  // to answer in text or reach for a harness tool? Boolean, omitted when false -- absent means "not
+  // forced / unknowable", never "false", exactly the LOG-49 fact-2 posture below.
+  outputSchemaForced = false,
 } = {}) {
   const facts = {};
 
@@ -826,6 +849,9 @@ export function buildCallFacts({
   // intelligence-review-format, read live 2026-08-25), sorted so identical compliance states
   // collapse to one signature. Never a count, never free text -- that is the LOG-91 blow-up.
   if (Array.isArray(emptySections)) facts.empty_sections = emptySections;
+
+  // FEATURE: LOG-77-2 -- omitted when false, same contract as fact 2 above.
+  if (outputSchemaForced) facts.output_schema_forced = true;
 
   return facts;
 }
@@ -917,12 +943,18 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   // FEATURE: AA-80 — precomputed_turn lets execute.js's loop skip a duplicate model call when
   // it already has the final turn's parsed output. Every existing caller omits this param and
   // gets the exact original single-call, single-attempt-then-retry-once behavior, unchanged.
-  let parsedResponse, usage, retryCount, rawContent;
+  // FEATURE: LOG-77-2 -- outputSchemaForced is threaded on BOTH branches. The precomputed branch
+  // is the live agent path (runLoop() hands callModel()'s whole turn through as precomputed_turn,
+  // execute.js:1161/1403), and the self-call branch covers api/plan.js and confirmation.js. `=== true`
+  // rather than a truthiness read, so a turn object predating this field (a resumed durable hop
+  // carrying an older shape) stays false rather than undefined.
+  let parsedResponse, usage, retryCount, rawContent, outputSchemaForced;
   if (precomputed_turn) {
     parsedResponse = precomputed_turn.tool_input;
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
     rawContent = precomputed_turn.raw_content || [];
+    outputSchemaForced = precomputed_turn.output_schema_forced === true;
   } else {
     // FEATURE: HAR-04 -- deadline passed through unchanged; callModel() applies its own
     // Date.now() + 55000 default when this is null (every non-opted-in caller, unaffected).
@@ -937,6 +969,7 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     usage = turn.usage;
     retryCount = turn.retryCount;
     rawContent = turn.raw_content || [];
+    outputSchemaForced = turn.output_schema_forced === true;
   }
 
   // FEATURE: HAR-05 -- mechanical pattern detection (ARCHITECTURE.md §19i). Only true when the
@@ -1112,6 +1145,8 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     // runLoop() as _terminal_log and merge into the surviving agent-turn row (LOG-91), so execute.js
     // needs no change. Delegating turns carry no schema output and correctly never get the key.
     emptySections: extractEmptyDeclaredSections(format_contract?.schema, parsedResponse),
+    // FEATURE: LOG-77-2 -- threaded from whichever branch above made (or received) the model call.
+    outputSchemaForced,
   }), prompt_request?.signature_config ?? null);
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs
