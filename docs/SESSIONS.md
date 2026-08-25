@@ -5,6 +5,60 @@
 
 ---
 
+## session/cycle-20260825-0340 (v7.0.248, 2026-08-25, runner cycle `68b5b2fb-1cf8-4be2-a7db-668001f6c741`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (22:00 America/Chicago) — model Opus 5, no subagent) — SES-201 batch 1: the four rule statements the drift check flags become rendered blocks, and the checker goes quiet
+
+**THE POPULATION DEFINED ITSELF, WHICH IS THE HALF OF THIS TICKET JOHN ACTUALLY DECIDED.** `SES-201`'s
+own text says the scope call — *migrate all 83, or only some* — is part of the work. His answer on card
+`064604e5` was not a number: *"Ongoing rule: migrate what the drift checks flag, stop when they go
+quiet — no hand-maintained list."* So batch 1 is not a slice someone chose; it is the exact set check 12
+reported when this cycle ran it — **three rules across four sites, all in `docs/runbooks/runner-cycle.md`**
+(`B34:617`, `B12:1009`, `B18:1830`, `B18:1864`). One file, inside HR-SCOPE, with room for the guard. Marker
+coverage across the repo goes **2 → 6**; check 12's warnings go **6 → 3** and its rule-copy findings to zero.
+
+**THE EDIT THAT WOULD HAVE LOOKED LIKE THE FIX AND REMOVED NO DRIFT.** Check 12 exempts a rule-id
+occurrence once the **enclosing paragraph** contains the marker. A cycle that drops a marker *beside* the
+surviving hand-copy therefore turns the check green while the copy still cannot move when the registry row
+does — and now nothing reports it. Migrating means the old sentence **leaves**. That is why this ship's
+guard asserts two things at every site rather than one: the retired sentence is **absent**, and John's
+adjacent reasoning is **present byte-for-byte**. Either assertion alone is vacuous — an absence test passes
+if the string was never what shipped, and a presence test passes with the old copy still sitting beside it.
+
+**THE SITE WORTH READING TWICE, because it is the one that could be mistaken for gaming the checker.**
+B12's restatement sits inside a numbered procedure a cycle executes mid-run, so the words could not simply
+be deleted. What moved was the bare `(B12)` parenthesis: the rendered block now heads step 4b and the list
+item points at it. Deleting a rule id purely to silence a check *would* be gaming, so it is said out loud —
+the id did not leave the document. It left an uncheckable citation and arrived in a checked block seven
+lines above. **Two operative details were also kept as prose rather than lost to the terser registry
+sentences**: B34's *"it does NOT touch `runner_ladder`"* and B18's *"that set is `runner_items` `WHERE
+decision IS NULL`"*. Neither was smuggled *into* a rendered line, which `--write` would silently revert.
+
+**QA WAS DISCRIMINATING AND ITS CONTROL RAN ON THE REAL FILE.** The **pre-change** runbook fails this
+ticket's guard naming all four sites; the post-change file passes; the file was restored and proven
+byte-identical by `sha256` afterwards. A second control isolates the mechanism: stripping only the marker
+comments makes all three rules flag again at overlap **1.000**, which proves the quiet is the marker doing
+the work *and* that the blocks are real renders rather than paraphrases that slipped under the 0.9
+threshold. `render-rule-blocks.js --write` reports **unchanged** — the blocks were byte-exact against
+`public.governance_rules` as committed. Suite **65/65**, build green. Guarded by
+`tests/regression/SES-201-rule-block-batch1.js`.
+
+**NOT DONE, AND NAMED RATHER THAN LEFT TO BE FOUND.** Check 13's FLAG stands: the `B40` claim SQL still
+has two live homes (`docs/GOVERNANCE-MODES.md:47` and this runbook), which is the ticket's own *"known
+third home to fold in"*. It is a different check, a second file, and the HR-SCOPE cap — **batch 2**, not a
+remainder this ship pretended to cover.
+
+**IT SHIPPED THROUGH A CONCURRENT SHIP, recorded rather than smoothed over.** This cycle and its peer
+(`v7.0.247`, `SES-181`) were both in flight against `runner-cycle.md`; both prepended a stamp and both
+independently retired `v7.0.227`, so the rebase conflicted on line 1 and the peer's retirement landed
+first. Both stamps are kept, newest first; `v7.0.227` appears **once** in the appendix, deduplicated
+rather than appended twice; and the count is held at 5 by retiring `v7.0.228` instead — checked first,
+all of its editor warnings (CLAUDE-STATE.md is generated, the renderer's fail-closed refusal, the
+'(no version claimed)' render, the one-ship-behind lag, never writing `outcome='shipped'` before the
+tail) are already restated in step 7's own body, confirmed by `grep` rather than recollection. **The four
+migrated sites rebased cleanly onto the peer's new step 7a, and the whole QA above was re-run on the
+merged tree rather than inherited from the pre-rebase run.** Doc + test; no `src`/`api`/`lib` change,
+no site change.
+
+---
 ## session/cycle-20260825-0335 (v7.0.247, 2026-08-25, runner cycle `d971f3b0-49dd-465c-a44f-886a9bde8ba7`, `trigger = scheduled`, verdict `run` on John's 1h clock grid (22:00 America/Chicago) — model Opus 5 orchestrator, no subagent delegated) — SES-181 (partial): the reviewer lane produces its first verdict, and that verdict blocked this ship
 
 **SELECTION WAS LAYER 1a, AND THE DIRECTIVE HAS TWO ITEMS LEFT.** John's directive `cd278478`
@@ -52,6 +106,8 @@ database); hygiene gate clear. Grants asserted **both** directions per `SES-101`
 check 7: `v7.0.227` moved **verbatim** to this file's retired-stamps appendix, checked first — its
 editor warning (decision 5's two obligations read as one) is already restated in step 2b's own body.
 Script + test + runbook + migration; no `src/`/`api/`/`lib/` change, no site change.
+
+---
 
 ## session/cycle-20260825-0236 (v7.0.246, 2026-08-25, runner cycle `af9204f5-0dee-4393-8ab3-c2b48ad9f6d2`, `trigger = scheduled`, verdict `run` on John's 1h clock grid (21:00 America/Chicago) — model Opus 5 orchestrator + one Fable 5 kickoff-design subagent) — SES-203 carded, LOG-54 shipped: the empty-section signal §19j was blocked on
 
@@ -7306,6 +7362,8 @@ across this change, proven by `sha256` before and after with only that insertion
 <!-- DeepBench v7.0.222 | runbooks/runner-cycle.md | SES-175 — RENDERED RULE BLOCKS, EXPAND-IN-PLACE: step 5’s ticket-claim SQL now sits under a `{{rule:B40}}` marker comment whose quoted text is generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John’s call, typed on gated card `a4e0254a` 2026-08-24T14:31:41Z: **“Accept with C”** — of the three options carded, (C) is the one that changes NOTHING about what a cycle reads. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO UNDO: the expanded text is COMMITTED, not a placeholder resolved at build time. Option (A) — markers in source, a build step emitting rendered runbooks — is the obvious “single source” shape and it would have split every runbook into source+rendered and changed which file a cycle opens mid-run; a cycle that hit an unrendered checkout would read `{{rule:B40}}` where the claim SQL should be. So the marker is a CHECKED COMMENT above real text: cycles read prose, and drift is caught by a script rather than prevented by indirection. Distinct from `SES-176`’s check 11, which the two are easy to conflate: check 11 asserts a marker’s ID RESOLVES to a registry row; this asserts the committed TEXT still EQUALS that row’s `statement`. A doc passes check 11 with a rule statement a month out of date — that gap is this ticket. FOUND LIVE while building it, and fixed rather than worked around: the scanner read the kickoff doc’s own fenced EXAMPLE as a live marker and flagged it as drifted — the `SES-180` self-flagging failure in a second costume, past the marker-at-head-of-comment guard written for the first — so fenced code blocks are excluded, because a doc must be able to SHOW the format without the checker maintaining the illustration. QA was discriminating rather than merely complete, one fixture, one variable: a copy of `session-setup.md` with ONE word changed inside the rendered line (24h→48h) FLAGS, the byte-identical control comes back clean, `--write` restores the registry text byte-exact and a second `--write` reports unchanged. Also proven: unknown-id and missing-block arms both flag, and inline prose writing the marker stays inert. `check-session-docs.js` clean on check 11 — these are the FIRST real markers in the repo, so that run is check 11’s first live exercise rather than another clean pass over zero markers. DISCLOSED RATHER THAN LEFT TO BE FOUND: `docs/GOVERNANCE-MODES.md` is a THIRD live home of the claim SQL and is NOT converted — doing so would be a 4th file against HR-SCOPE’s cap, and John’s card scoped the proof at “the claim SQL’s ~2 homes”; `.claude/skills/session-setup/SKILL.md` carries it too and is untouchable by an unattended cycle (register B39). The snapshot reader is a deliberate second copy of `check-session-docs.js`’s parser for the same cap reason, named here rather than smuggled. Stamp count held at 5 per session-hygiene check 7: the `v7.0.205` stamp moved VERBATIM to `docs/SESSIONS.md`’s appendix, its one unique editor warning already relocated into step 5’s drain property list by `SES-164`. Doc + script; no src/api/lib change, no site change. -->
 
 <!-- DeepBench v7.0.227 | runbooks/runner-cycle.md | SES-158 — NEW STEP 2b: vision comment routing finally has a rule. SES-155 shipped public.briefing_comments at v7.0.225 — forty minutes before this cycle picked this ticket — and shipped it as a table with NO PROCEDURE ATTACHED: measured, not assumed, `grep -rniE "briefing_comments" docs/runbooks/*.md scripts/*.mjs scripts/*.js` returned ZERO hits, and so did every search for routed_to / routing comment / corpus update across this file and briefing-page.md. The column routed_to existed and the CHECK already admitted kind='routing'; nothing anywhere said what to put in either. THE DESIGN DECISION AN EDITOR WILL BE TEMPTED TO COLLAPSE: decision 5 carries TWO obligations that read like one — "routes into corpus update / research ticket / feature ticket" and "EVERY interaction must leave the corpus richer". Read as a single rule, corpus-update is merely one of three routes, and a comment routed to feature-ticket then leaves the corpus no richer, contradicting the second sentence outright. So the ROUTE names the artifact the comment BECAME (exactly one, stored in routed_to) and the CORPUS WRITE is UNCONDITIONAL on all three; corpus-update as a route means "the artifact is the claim itself", never "the one path where the corpus gets written". Written against columns READ LIVE (briefing_comments target_kind/author/kind/harvested_cycle/routed_to; vision_claims claim_ref shape, status, confidence, judgment_class, ck_vision_claim_decided) rather than against a hypothetical shape, which is what stops it needing a rewrite the first time it fires. Fail-direction stated rather than left to taste: uncertain between research and feature -> research (the cheaper error); uncertain whether it is a requirement at all -> it is a question, route nothing. The routing comment is MANDATORY and is named as the half most likely to be skipped, because corpus-update produces no ticket id to report and therefore feels like nothing happened. SHIPPED BEFORE ITS INPUTS DELIBERATELY: the page-side comment box is SES-156, filed this cycle as gated card e9315bb5 (it retires §9.1 from the LOCKED section order), so no vision Requirement can arrive yet — the ninth instance of this file's own lesson that a rule arriving after the first case gets improvised once and the improvisation becomes the precedent. Guarded by tests/regression/SES-158-vision-routing.js. Stamp count held at 5 per session-hygiene check 7: the v7.0.210 stamp moved VERBATIM to docs/SESSIONS.md's appendix, checked first for an editor warning existing nowhere else — it has none, its one such warning (SES-154's pick-vs-retirement predicate) having already been relocated by SES-164 into step 5's drain property list, live at runner-cycle.md:1075. Doc + test; no src/api/lib change, no site change. -->
+
+<!-- DeepBench v7.0.228 | runbooks/runner-cycle.md | SES-177 — step 7's close-out bullet stops telling every cycle to HAND-EDIT a file that is now GENERATED. CLAUDE-STATE.md is rendered by the new scripts/render-claude-state.js from runner_cycles joined to the ship card's plain_after/plain_worth; the standing 'Next session' prose moved VERBATIM to the new docs/runbooks/standing-brief.md and is maintained by hand. John's decision, gated card 37b22393 (Accept, attended decision-drain 2026-08-24): derivable facts generated, judgment prose moved verbatim, 'the renderer must fail rather than regenerate a file that would lose the standing-brief link'. THE FAIL-CLOSED CONDITION IS THE FEATURE, and it is why this ticket was gated before it was built: MEASURED, the standing paragraph was 7,643 of CLAUDE-STATE.md's 14,355 chars — 53.2% — and NO TABLE HOLDS IT, so a renderer built to the ticket's original letter would have regenerated from sources covering the other 47% and destroyed the majority of the file. That is the v7.0.197 briefing wipe in a second costume. The script therefore checks for the standing brief BEFORE it checks credentials and exits 2 writing nothing, and the guard exercises that END-TO-END (moves the brief aside, spawns the real script, asserts exit 2 AND a byte-identical CLAUDE-STATE.md, restores in a finally). THE DISTINCTION AN EDITOR WILL COLLAPSE: the version lines skip cycles that claimed no version, the session bullets do not — taking cycles[0] renders '(no version claimed)' as the current version OF DEV, which is the wrong question answered rather than a gap surfaced honestly; asserted on a fixture whose newest shipped cycle is version-less. FOUND WHILE BUILDING IT, and fixed rather than rendered as fiction: runner_cycles.version is inconsistently populated — three of the six most recent shipped cycles carried NULL, including two of this session's own — so the renderer surfaced real gaps on its first run; this cycle's own rows were corrected and c618136d was backfilled to v7.0.225 on independent attestation (commit d9e5c76 and the pre-split file), before-image first, never an outcome adjudication. Result: 14,355 -> 2,701 chars, standing prose byte-identical by sha256 (eaec16ba…), --check idempotent. SES-177 stays PARTIAL: extracting the board census / drain state / scheduler settings back out of that paragraph and generating them is the remainder, and is deliberately not attempted, because that paragraph interleaves those facts with judgment and a surgical extraction is the same destroy-what-you-cannot-see risk the script exists to refuse. Stamp count held at 5 per session-hygiene check 7: v7.0.215 moved VERBATIM to docs/SESSIONS.md's appendix, checked first — its editor warning ('changes WHEN the next directive is read, never WHO decides') is already restated in step 5's body. -->
 
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
 
