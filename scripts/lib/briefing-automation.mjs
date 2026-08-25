@@ -1,3 +1,4 @@
+// DeepBench v7.0.267 | scripts/lib/briefing-automation.mjs | SES-211 — a CANCELLED drain is never reported as completed (see the block at the closed-drains query)
 // DeepBench v7.0.204 | scripts/lib/briefing-automation.mjs | SES-162
 // FEATURE: §2b's cycle-written half, derived. The briefing builder (scripts/build-briefing.mjs,
 // SES-149, v7.0.200) derives thirteen sections from SQL and had NO anchor for the `AUTOMATION`
@@ -128,8 +129,16 @@ export async function deriveAutomation(sel, rpc, now = new Date()) {
   // would print a completion time that is off by the whole life of the drain. The finish time is
   // the closing cycle's `ended_at`; when `acted_cycle` is null there is no honest time on file and
   // the line simply carries none rather than inventing one.
+  // A CANCELLED DRAIN DID NOT FINISH, AND MUST NEVER BE LABELLED AS ONE (found live 2026-08-25 by
+  // cycle 360eb885, at the moment its own harvest of John's untick made the bug reachable). This
+  // query has always selected BOTH terminal statuses while the label below said "completed"
+  // unconditionally -- latent only because no drain had ever been cancelled. The first untick
+  // rendered "<check> Selfbuild M3 - Independent Verification completed" on John's Automation panel
+  // while TEN of that epic's named members were still open, four of them waiting on him. `status` is
+  // selected here so the label can tell the two apart; the two words are John's own switch states
+  // (a drain "completes" when every named member is done, it is "cancelled" when he unticks it).
   const closed = await sel(
-    'runner_directives?type=eq.drain-epic&status=in.(done,cancelled)&select=epic_id,acted_cycle,created_at&order=created_at.desc&limit=5');
+    'runner_directives?type=eq.drain-epic&status=in.(done,cancelled)&select=epic_id,acted_cycle,created_at,status&order=created_at.desc&limit=5');
   const epicNames = Object.fromEntries((await sel('epics?select=id,name')).map(e => [e.id, e.name]));
   const drainHistory = [];
   for (const d of closed) {
@@ -139,7 +148,8 @@ export async function deriveAutomation(sel, rpc, now = new Date()) {
       const c = (await sel(`runner_cycles?id=eq.${d.acted_cycle}&select=ended_at`))[0];
       if (c?.ended_at) when = `${chicagoClock(new Date(c.ended_at))} CST`;
     }
-    drainHistory.push(when ? `${name} completed — ${when}` : `${name} completed`);
+    const verb = d.status === 'cancelled' ? 'cancelled' : 'completed';
+    drainHistory.push(when ? `${name} ${verb} — ${when}` : `${name} ${verb}`);
   }
 
   // Last run: the most recent CLOSED cycle. SES-119 -- a ticket named anywhere John reads carries
