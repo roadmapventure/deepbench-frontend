@@ -5,6 +5,77 @@
 
 ---
 
+## session/cycle-20260825-0122 (v7.0.240, 2026-08-25, runner cycle `e6ddd53d-dd3d-48af-b77f-061708b6c094`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Fable 5 title-derivation subagent) — directive `1532666b` item 3: the six broken M3 import fragments are triaged, five are retitled, one is dead
+
+**John's directive `1532666b` item (3), verbatim:** *"TRIAGE/RETITLE `SE-01` through `SE-06`
+(broken July import fragments — titles quoted on the card) behind the same deterministic-gate
+pattern `SES-187` used; gate-rejects keep their titles."* Items (1) and (2) shipped in the two
+cycles before this one (`v7.0.238`, `v7.0.239`); item (4) — naming the **M3** drain scope — is
+gated in John's own words on *"`SES-197` shipped **and** the roster clean"*, and the roster only
+became clean at this ship, so it was deliberately not attempted here.
+
+**RETITLED — five rows, every one through the shipped gate, none by hand.**
+`scripts/apply-title-regeneration.js` `--check` → `5 proposed, 5 accepted, 0 rejected`; `--apply
+--cycle-id=e6ddd53d…` → `5/5 written, 0 rejected, 0 failed`, five `runner_before_images` rows
+(§19v). The titles themselves were derived by a **Fable 5** subagent from each row's own
+`description` — register B21, and the script's own header is where that division comes from: a
+purely mechanical extract was measured, before `SES-187` shipped, to produce plausible-but-wrong
+names on roughly half the board, which is *worse* than the visibly-broken state because a wrong
+title hides the defect `backlog_display_title()` exists to keep visible.
+
+| Ticket | Stored title before | Stored title after |
+|---|---|---|
+| `SE-01` | truncated at *"…and §6 (\"no AI calls in "* | Boundary Enforcement Grep — no internal HTTP to /api/rag-query, no AI calls in Railway backend |
+| `SE-02` | ``Extended 2026-07-02 (`S-ARCH-AGENT-LOOP-01-design`…):`` | Shared-Pipeline No-Conditionals Grep — no agent or capability conditionals in the shared pipeline |
+| `SE-04` | truncated at *"…every Format Skill Pr"* | Format Skill Exclusivity Data Audit — content specialists never own Format Skills |
+| `SE-05` | ``Confirmed live 2026-07-18 (`CHI-33`…): the count is now exactly 12/12`` | Serverless Function Count Check Script — automated guard on the Vercel Hobby 12-function ceiling |
+| `SE-06` | `both reads and writes` | Librarian Full-CRUD Enforcement Grep — only lib/librarian.js may touch the Library, reads and writes |
+
+**`SE-03` WAS LEFT ALONE, AND THAT IS THE TRIAGE WORKING RATHER THAN A ROW MISSED.** Its stored
+title, `Agent Field Enforcement`, is terse but real — it is not an import fragment. The directive
+says *triage/retitle*, not *rewrite all six*, and rewriting a working title to make the batch look
+uniform is the same plausible-but-wrong failure the gate exists to refuse. Its premise was
+revalidated (`revalidated_at` set) and nothing else was touched. Read live, not quoted: no test or
+script reads `trainableBy` or `AGENT_PRONOUNS` at all, so nothing machine-checks the 23 required
+`AGENTS` fields today.
+
+**FOUND WHILE TRIAGING, AND IT IS WHY THE STEP IS *TRIAGE*/RETITLE RATHER THAN A BULK RENAME:
+`SE-05`'s PREMISE IS DEAD.** `scripts/check-api-function-count.js` already exists and its own
+header reads `FEATURE: SE-05 -- mechanizes the Vercel Hobby 12-function limit check`. Run this
+cycle rather than read: `api/ Function Count -- 12/12 (Vercel Hobby limit)`, exit `0`, with
+`LIMIT = 12` and a `process.exit(1)` above the ceiling — so the *"fails above the ceiling"* half is
+real and not just a printer. `status = 'removal proposed'` (never `removed` — no unattended
+removal, ever), card `98b23004`, queue recompute run. **The card names the one reason John might
+say no, measured rather than assumed:** the script is **not** wired into CI — `ci.yml` runs
+`check-session-docs.js` and the build and nothing else, and a grep over `scripts/`, `tests/` and
+`.github/workflows/` finds the script with **no caller**. If the CI wiring is what he wants the
+ticket to become, his Reverse says so and it re-enters carrying his line. Per `SES-113` the ticket
+**keeps its queue number** (585) while it waits.
+
+**Why this had to happen before item (4).** A drain scope is a fixed list captured at naming time
+(`SES-142`) — a ticket filed into the epic afterwards never joins it, and a member named into it
+cannot be edited out. The gate review's own sentence: *"Naming a fixed finish line over those rows
+would freeze garbage into the contract."* One of the six was also **already built**, which the
+retitle alone would never have surfaced.
+
+**Measured, and reported rather than absorbed: the board was 577 positions stale.** The first
+`recompute_backlog_queue()` of this cycle moved **577** rows; the immediate second call moved
+**0**, so the function is idempotent and the staleness was real. It is explainable — four tickets
+(`SES-199`…`SES-202`) were filed into the middle of a ~590-row board an hour earlier, which shifts
+every position beneath them — so this is a note, not an anomaly.
+
+**QA, and the one red is inherited.** Suite **59/60**; the failure is
+`SES-177-claude-state-renderer.js` (*the committed `CLAUDE-STATE.md` must match what the ledger
+renders*) and it was **already red on `origin/dev@cfa5f37` before this cycle edited a single repo
+file** — the one-ship-behind lag `SES-177` names in its own close-out bullet, opened by the two
+cycles that shipped after the file was last generated. This ship's close-out re-runs
+`scripts/render-claude-state.js`, which is what closes it. Six suite parts stay declared not-run
+(function bodies that live in the database). `npm run build` clean, 8.63s. Board data + docs only —
+no `src`/`api`/`lib` change, no migration.
+Kickoff: `docs/kickoffs/v7.0.240-SE-01-06-triage-retitle.md`.
+
+---
+
 ## session/cycle-20260825-0040 (v7.0.239, 2026-08-25, runner cycle `46c1d859-d4ec-4657-ae4f-508fdaef9f93`, `trigger = scheduled`, verdict `run` on John's 1h clock grid (19:00 America/Chicago) — model Opus 5, no subagent) — directive `1532666b` item 2: the four M3 tickets the accepted M2 gate review specifies are filed
 
 **John's directive `1532666b` (2026-08-25T00:35Z, attended architect session; his word on the M2
