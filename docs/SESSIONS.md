@@ -5,6 +5,74 @@
 
 ---
 
+## session/cycle-20260825-0140 (v7.0.241, 2026-08-25, runner cycle `df5764ed-2ae7-481e-8317-01bbf5cfad61`, `trigger = scheduled` — on the :40 cron grid, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — directive `1532666b` item 4: the **Selfbuild M3** drain is declared, and `SES-191` is moved above the ticket that depends on it
+
+**John's directive `1532666b` item (4), verbatim:** *"When — and only when — `SES-197` is shipped
+and the roster is clean, name the M3 drain scope with `SES-191` ordered ABOVE `SES-182` (or
+`SES-182` excluded), then declare the M3 drain. Do NOT declare it before the preconditions
+ship."* This is the directive's last item, so it closes here — items (1)–(3) shipped at
+`v7.0.238`, `v7.0.239` and `v7.0.240`, the third of them **one minute** before this cycle opened.
+
+**BOTH PRECONDITIONS WERE READ LIVE, NOT RECALLED — and one of the two checks is the load-bearing
+one.** `SES-197`'s `backlog_items.status = 'done'` is a *claim*; `select count(*) from pg_proc …
+proname = 'drain_chain_gate'` returning **1** is a *fact*, and the terminator living in the
+database is the whole precondition. Roster: `v7.0.240` triaged `SE-01`..`SE-06`, and
+`backlog_display_title()` falls back on none of the five retitled rows.
+
+**THE CHOICE JOHN'S SENTENCE OFFERS, AND WHY THIS CYCLE TOOK THE HARDER HALF.** *Order `SES-191`
+above `SES-182`* **or** *exclude `SES-182`*. `SES-182` — Auto-rollback on red names its dependency
+on `SES-191` — Full restore drill in its own text, and sat at queue **12** against `SES-191`'s
+**334** — the inversion the M2 gate review's Chief Architect lens flagged as one of two disproved
+M3 assumptions. **Excluding `SES-182` removes the inversion by removing the ticket**, and M3 would
+then have been able to retire *without auto-rollback* — the third of the three pillars the charter
+names for this milestone. Reordering fixes the dependency itself and keeps the finish line whole,
+so exclusion was left as what it is: a fallback John offered, not the better answer.
+
+**THE MECHANISM IS THE NARROWEST WRITE THAT SATISFIES THE INSTRUCTION, and the obvious call was
+deliberately not used.** `SES-191` was given `automation_rank = -27`, the lane slot freed when
+`SES-197` went `done`. `claim_automation_lane_top()` — the one sanctioned lane call — assigns
+`min(open lane) − 1`, which would have put `SES-191` at the top of the **whole board**, above
+`SES-203` and above the four tickets the gate review had just filed as M3's own precondition
+cleanup; the directive asks for `SES-191` above `SES-182`, not above everything. No
+`pinned_position` was touched — pins are John's tap. Measured after the recompute (325 rows
+moved): `SES-191` **#10**, `SES-180` #11, `SES-181` #12, `SES-182` #13, with the review's four at
+#6–#9.
+
+**THE SCOPE IS A FIXED LIST OF 23, NOT THE LIVE TIER** (`SES-142`): `SES-199`, `SES-200`,
+`SES-201`, `SES-202`, `SES-191`, `SES-180`, `SES-181`, `SES-182`, `SES-77`, `SES-71`, `SES-61`,
+`SES-58`, `SES-135`, `SES-130`, `SES-51`, `SES-45`, `SES-008`, `SE-06`, `SE-01`, `SE-02`, `SE-03`,
+`SE-04`, `SE-05`. A ticket filed into M3 after this row never joins this drain.
+
+**FOUR OF THE 23 CANNOT BE CLOSED BY ANY CYCLE, and that is written down rather than discovered
+later:** `SES-181` and `SES-182` are `needs-john`, `SES-180` is `needs-desktop`, `SE-05` is
+`removal proposed`. **So M3 cannot retire until John acts on those four.** Before `SES-197` that
+was precisely the infinite loop the gate review predicted; Gate C now stops the chain at the first
+continuation whose only remaining work is a decision he owes, and says so.
+
+**Authority, stated because this is the one write a cycle is otherwise forbidden to make.**
+`drain_epic_next()` property 5 — *nothing creates a drain row but John's own declaration, a
+directive row or a briefing tap* — is satisfied by construction: directive `1532666b` **is** that
+declaration, and this cycle executed it rather than originating it. The standing prohibition on a
+cycle starting a drain of its own initiative is untouched.
+
+**QA, discriminating, with the negative control named.** (1) exactly one `queued` `drain-epic` row,
+epic M3, **23** scope rows — before, `drain_epic_next()` returned `none`; (2) `SES-191.queue` **10**
+< `SES-182.queue` **13** — before, 334 > 12, inverted; (3) `drain_epic_next()` → `pick` `SES-199`
+#6, `open_now = 23`; (4) `SES-182` present in scope, i.e. the fallback was *not* taken. Assertions
+1–3 all fail against the state this cycle started from. Pre-change values are not recalled — they
+are in this cycle's `runner_before_images` row for `SES-191` (`automation_rank` NULL, queue 334).
+Proof type: **live state** through the Supabase connector, not a seam proof and not a fixture.
+
+**Found while shipping it, and named rather than fixed here:** `export-backlog-snapshot.js`
+printed `unchanged` on a board where 325 queue positions moved. The snapshot's body carries ticket
+*content*, not *ordering*, so a pure reordering is invisible to it and to its `sha256` provenance
+— which means the runbook's *"a diff here always means the board actually moved"* holds in one
+direction only. Pre-existing, out of this cycle's scope, filed for a later one rather than patched
+mid-ship.
+
+Ledger-only: one new kickoff doc, `docs/SESSIONS.md`, and the two generated files. No `src/`,
+`api/` or `lib/` change, no site change, no migration.
+
 ## session/cycle-20260825-0122 (v7.0.240, 2026-08-25, runner cycle `e6ddd53d-dd3d-48af-b77f-061708b6c094`, `trigger = scheduled` — fired off the :40 cron grid, so `scheduler_gate` exempted it as a manual fire, verdict `run` — model Opus 5 orchestrator + one Fable 5 title-derivation subagent) — directive `1532666b` item 3: the six broken M3 import fragments are triaged, five are retitled, one is dead
 
 **John's directive `1532666b` item (3), verbatim:** *"TRIAGE/RETITLE `SE-01` through `SE-06`
