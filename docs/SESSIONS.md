@@ -5,6 +5,56 @@
 
 ---
 
+## session/cycle-20260828-1940 (v7.0.291, 2026-08-28, runner cycle `8ab485b8-daf0-40c9-8b51-5334acee7b2e`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — DIR-c98048a5: the offsite recovery net is refreshed, and the set that could not rebuild the database is no longer the one you would restore from
+
+Selection landed on **layer 1a**, not the drain and not the board: `runner_directives` `c98048a5`, John's word from an attended architect session on 2026-08-25 — verbatim **"authorize the refresh"** — had been sitting `queued` for three days.
+
+### Why the older directive above it is not a mission
+
+`58db64ae` (14:09Z, 75 minutes older) is a *standing-decisions* row, not work. Read live off `backlog_items` rather than recalled: five of its six items name builds that have since shipped — `SES-210`, `SES-181`, `SES-135`, `SES-45`, `SES-51` all `done`. Item (6), the `SES-182` hold, is still in force, which is exactly why the row stays `queued` rather than being closed out. There was no build left in it to take.
+
+### The premise was re-verified before a byte moved, and one standing doc claim did not survive
+
+| Claim the directive rests on | Checked how | Result |
+|---|---|---|
+| the POSIX fix is on the backups repo's `main` | read `main`'s three scripts | **holds** — `relPosix()`, `entryPath()` in both readers |
+| a cloud container can dump | dumper header: PostgREST + service key | **holds** |
+| production reachable | `curl .../rest/v1/` | **HTTP 401** (reachable, auth-challenged) |
+| direct Postgres reachable | TCP `:5432`, pooler `:6543` | **blocked — and irrelevant**, the dumper never uses it |
+
+That first row is a **correction, not a confirmation**: `restore-from-backup.md` §4 and §9 both said the fix *"lives only on branch `ses191/backup-path-portability` … not on that repo's `main`"*. True when written, false now. Left alone, it sends whoever is mid-outage hunting for a merge that already happened, so both sites are corrected in this ship.
+
+### What shipped
+
+`refresh-2026-08-28/` on `deepbench-backups-offsite` `main` (`2b0f013..5a99272`) — **56 base tables, 53,609 rows, 155.2 MB, 0 tables with missing rows, POSIX manifest paths**, including the four tables that post-date the standing snapshot (`briefing_comments` 16, `governance_rules` 84, `issued_versions` 59, `runner_verdicts` 47). It sits **alongside** `selfbuild-step0-2026-08-23`, which is untouched — it is §5d's Selfbuild rollback point, and a rollback point you delete is not one.
+
+**The claim this cycle is entitled to make, measured with one variable rather than argued:** `tests/regression/SES-191-backup-path-portability.js`, same command, `DEEPBENCH_BACKUP_SET` pointed at each set — **PASS on the new set, FAIL on the standing set**, on `ai_activity_log_id_seq`, which is precisely the defect §9 said only a re-dump could repair. `v7.0.250` fixed that in `public._backup_schema_ddl`; this is the first time it is confirmed **in the artifact a person restores from**.
+
+### The redaction bar, and the negative control that makes its pass mean something
+
+A raw dump carries `ANTHROPIC_API_KEY`, `VERCEL_TOKEN`, `SUPABASE_SERVICE_KEY` and the Vercel bypass secret as live plaintext. The redaction is the only thing between a refresh and a credential leak, so it was proven **before** the push and in **both** directions:
+
+- **Forward:** a byte-level scan of all **81 files / 155.7 MB**, six credential patterns *plus* an exact-match arm holding the four live values read straight from the running platform — **zero hits**.
+- **Backward:** the same scanner against the un-redacted `runner_secrets.ndjson` a raw dump produces — **6 hits, exit 1**, both arms firing. A one-directional check would have passed on a set nobody had redacted.
+
+**That control found a defect in the scanner itself, and it was fixed before the real run:** a directory the walk could not read scanned **zero files and still printed PASS**. "Nothing matched" and "nothing was looked at" must never render the same; `files == 0` now exits 2.
+
+Then `verify-backup.mjs` — *files 67 | lines 53610 | malformed 0 | bad checksums 0 | duplicate PKs 0 | missing PKs 0 | row-count mismatches 0 | PASS* — and `restore --verify-only`, *all 56 files match their checksums*.
+
+### Two things said out loud rather than papered over
+
+**`machine-local/` is carried forward, not re-captured.** It is John's machine state and a cloud container cannot produce it, so it is copied verbatim from the 2026-08-23 set and **labelled as of 2026-08-23** in the new set's own `RESTORE-PROCEDURE.md`. Included rather than omitted, so the newer set is not a downgrade for anyone restoring the governance hooks; labelled rather than copied silently, so five-day-old machine files are not dated as fresh.
+
+**`SES-214`'s two defects are in this set as in every set dumped today** — `schema.sql` omits the two `_backup_*` views, and emits `VIEWS` before `FUNCTIONS`. They were found on 2026-08-28, *three days after* the directive was written, they live in `public._backup_schema_ddl`, and they change what **every** future dump contains — so they get their own revalidation rather than riding along inside a directive claimed for a refresh. The new set's procedure file carries the two-step workaround.
+
+### The precedent is explicitly not widened
+
+The directive's own words: *"recurring/automated refresh remains the M4 gate's open question — do not schedule, do not repeat without John's word."* §7's manual-step rule and §9's unattended-cycle prohibition stand unchanged for every cycle after this one; §9 now records the one-time exception rather than reading as though it never happened.
+
+Doc only in this repo — `docs/runbooks/restore-from-backup.md`, the kickoff, this entry, plus the two generated files. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+---
+
 ## session/cycle-20260828-1914 (v7.0.290, 2026-08-28, runner cycle `69064827-876a-4bf7-9fca-d6b3aaf99ecb`, `trigger = scheduled` fired manually, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — the served briefing page stops carrying the template's developer commentary, and a decision John made three days ago is finally read
 
 The drain handed this cycle `SES-191` and it was worked first. **John's network fix from 19:12Z is real** — verified here rather than taken from his card: the scratch host resolves and returns **HTTP 401** on `/rest/v1/` and `/auth/v1/health`, where the previous cycle measured **HTTP 403 host-not-in-allowlist**. The drill then stops one step later, on a credential.
@@ -38,6 +88,7 @@ Two file-level controls: the transform stubbed to a no-op **fails Part 1**; the 
 `build-briefing.mjs`, `render-claude-state.js`, `export-backlog-snapshot.js` and `check-version-claim.js` all need `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` in the environment. **This container injects no secret env vars and has no `.env.local`**, so supplying them means writing a production `service_role` key into an agent transcript — which the routine prompt forbids without qualification. This cycle did not, and paid for it precisely: the snapshot is one ship stale, `CLAUDE-STATE.md` two, the verifier reached a verdict it could not record, the version-claim assertion was verified directly against the `issued_versions` ledger (`7.0.290 -> cycle-20260828-1914`) instead of by its script, and **the page was not rebuilt** — recoverable only because register B18 rebuilds cards from the DB, so this cycle's three cards render on the next rebuild with nothing lost. The systemic fix is two environment variables, filed as card `851d9bac`.
 
 **Named remainder:** this moves the ceiling, it does not stop the growth — `SES-188` reached the same conclusion about its own trim. Real minification of the remaining 45.6% would take more, and is a dependency decision, not a rider on this ticket.
+
 
 ## session/cycle-20260828-1740 (v7.0.289, 2026-08-28, runner cycle `124c0e81-c2cb-4352-be2a-712f666b281f`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, two Fable 5 design subagents) — LOG-39 is proposed for removal, and LOG-41 ships the rollup the browser was doing by hand
 
@@ -8850,3 +8901,14 @@ before and after.
 <!-- DeepBench v7.0.118 | runbooks/briefing-page.md | directive fb643367 — the read-back contract's one-line ladder summary said "Accept streak+1, 5 promotes" with no card-kind distinction, which is exactly the sentence John's Q1 ruling retires. It now updates the ladder from `shipped` cards only; a `gated_before_build` Accept is permission, not a rating. The full rule is CITED from runner-cycle.md step 2 rather than restated, because this line drifting out of sync with the runbook is the failure being fixed. -->
 
 <!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
+
+## Appendix — retired `restore-from-backup.md` provenance comments (`DIR-c98048a5`, v7.0.291, 2026-08-28)
+
+Retired from the file's header chain to hold the stamp count at 5 (session-hygiene check 7). Kept
+verbatim; also in git history. Checked before retiring: each stamp's editor warnings are already
+restated in the runbook's own body.
+
+<!-- DeepBench v7.0.229 | docs/runbooks/restore-from-backup.md | SES-193 — RESTORE-PROCEDURE.md generalized into git (Selfbuild M4, pulled forward attended 2026-08-24). Canonical copy: this file. The per-snapshot RESTORE-PROCEDURE.md inside each backup set remains as that snapshot's own record; where they disagree, this file wins. -->
+
+*(Restated in the body at §1's table, the `RESTORE-PROCEDURE.md` row: "That snapshot's own restore
+notes (snapshot-specific; this runbook is the canonical procedure)".)*
