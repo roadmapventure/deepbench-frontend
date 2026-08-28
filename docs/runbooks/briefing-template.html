@@ -37,6 +37,29 @@
      comment is matched by scanners that look for the real thing, and it skewed this very cycle's
      first offset measurement before it was caught).
 
+     DeepBench v7.0.284 | runbooks/briefing-template.html | SES-181 (b) — §16 REVIEWER LANE, appended
+     at the END of the locked order on John's directive 58db64ae item (2) ("locked section extended,
+     never renumbered"), and §15's keystone footnote CORRECTED in the same ship. THE CORRECTION IS
+     HALF THE TICKET, not tidying: §15 told John all three keystone metrics "do not exist yet …
+     all three wait on the verifier lane (SES-181), which is still open", and adding §16 without
+     touching it would have put a rendered catch rate and a claim that no catch rate exists on the
+     same page. It now names the TWO that are still absent and points at §16 for the one that is not.
+     THE CLAIM §16 MUST NEVER MAKE, and the reason its three tnote sentences are mandatory: read off
+     the first two rows alone, "30.0% >= 0.0%" says the charter's keystone bar is met. It is false
+     twice. (1) THE TWO RATES COUNT DIFFERENT POPULATIONS — measured at this ship, the lane had
+     graded 20 tickets since Aug 24 CST against 115 decided ship cards going back much further, and
+     the like-for-like overlap (a delivery carrying BOTH a verdict and a tap of John's) was FIVE, not
+     thirty. (2) A `block` IS A MECHANICAL GATE FAILING (build / regression / hygiene), never
+     necessarily a defect John would have reworked — so verifier >= John is NECESSARY for that bar
+     and never SUFFICIENT. The panel therefore reports the comparison and says the bar is NOT YET
+     ASSERTABLE, which is the same rule as §14's cost showing "—" and a NULL plain_* drawing a red
+     defect line: absent must look absent, and "not yet assertable" must not look like a pass.
+     NO NEW CSS: svRow() is table / td.num / td.dim and the bar is .bar/.dev/.barlbl, all of which
+     §8, §13 and §15 already ship — the size discipline msRow()'s own comment states. Guarded by
+     tests/regression/SES-181b-verifier-scoreboard.js, which asserts BOTH halves (§16 present with
+     its honesty clauses AND §15 no longer claiming the catch rate is absent), because an
+     absence-only test passes vacuously and a presence-only test lets the contradiction ship.
+
      DeepBench v7.0.255 | runbooks/briefing-template.html | SES-208 — A LEFT ANGLE BRACKET IN A
      DATABASE STRING WAS DELETING THE BOTTOM HALF OF THIS PAGE, and nothing said so. MEASURED in
      headless Chromium and again in jsdom, not inferred: the published page rendered NINE h2
@@ -886,6 +909,14 @@
     return '<tr><td>'+esc(name)+'</td><td class="num">'+done+'</td>'
       +'<td class="num dim">'+total+'</td><td class="num">'+pct+'%</td></tr>';
   }
+  // SES-181 (b) — one §16 scoreboard row. Deliberately the same shape as msRow() and the same
+  // three classes, so §16 adds no CSS (the size discipline §15's comment above states).
+  // `of` is the window depth and is dimmed for the same reason msRow dims `total`: the rate is
+  // the number John reads, and the denominator is what stops it being read as a count.
+  function svRow(label, n, of, pct){
+    return '<tr><td>'+esc(label)+'</td><td class="num">'+n+'</td>'
+      +'<td class="num dim">'+of+'</td><td class="num">'+pct+'%</td></tr>';
+  }
   // SES-129 — ONE §7 ROW: what became of one directive, in plain words.
   //   id8      the directive's short id — John's handle on it, and what the ledger calls it
   //   when    'Mon DD, HH12:MI AM' CST, the time the RUNNER RECORDED it (see the render below —
@@ -1619,10 +1650,14 @@
     //
     // THE KEYSTONE METRICS ARE NAMED ABSENT, NEVER RENDERED AS ZERO. The charter's measurement
     // table points verifier-catch-rate, John-minutes/week and drift-findings/week at this panel,
-    // and the ticket says "as they come online". None is online: the verifier lane is SES-181,
-    // still open. A zero here would read as "the verifier caught nothing", which is a claim about
-    // performance rather than about absence — the same rule as §14's cost showing "—" and a NULL
-    // plain_* drawing a red defect line.
+    // and the ticket says "as they come online". A zero here would read as "the verifier caught
+    // nothing", which is a claim about performance rather than about absence — the same rule as
+    // §14's cost showing "—" and a NULL plain_* drawing a red defect line.
+    // UPDATED v7.0.284 (SES-181 (b)): ONE OF THE THREE CAME ONLINE. The catch rate is rendered in
+    // §16 below and this footnote now names the two that remain. This comment and the footnote
+    // were corrected TOGETHER and must stay that way — a comment that still said "none is online"
+    // beside a footnote that says two is the same contradiction one level down, and the next
+    // editor reads the comment first.
     +'<h2><span class="secnum">15</span>Project — Selfbuild milestones</h2>'
     +'<table><tr><th>Milestone</th><th>Done</th><th>Total</th><th>%</th></tr>'
     +msRow('Selfbuild M0 - Backup &amp; Rollback',2,2,'100.0')
@@ -1640,9 +1675,53 @@
     +'<p class="tnote">A retired milestone can sit below 100% here, and that is correct rather '
     +'than a gap: a drain finishes on the members you <b>named</b>, and tickets filed into the '
     +'epic afterwards never join it &mdash; so this column counts work added since. '
-    +'Not shown, because they do not exist yet rather than because they are zero: verifier catch '
-    +'rate vs your Rework rate, John-minutes/week, and drift findings/week &mdash; all three wait '
-    +'on the verifier lane (<b>SES-181</b> &mdash; reviewer lane), which is still open.</p>'
+    +'Verifier catch rate has moved to &sect;16 below, now that the lane produces it. Still not '
+    +'shown, because they do not exist yet rather than because they are zero: John-minutes/week '
+    +'and drift findings/week.</p>'
+    // ===== §16 · REVIEWER LANE — VERIFIER SCOREBOARD (SES-181 (b)) ==========================
+    // John's directive 58db64ae item (2), verbatim: "SES-181 scoreboard build approved — locked
+    // section extended, never renumbered." So this is APPENDED as the next number, exactly as
+    // §15 was (the SES-132 / §2b precedent); renumbering silently invalidates every §-reference
+    // in briefing-page.md, runner-cycle.md and the spec.
+    //
+    // NO NEW CSS — table / td.num / td.dim / .bar / .dev / .barlbl / .tnote, all of which §8, §13
+    // and §15 already ship. Same size discipline §15's msRow() comment states.
+    //
+    // THE CLAIM THIS PANEL MUST NEVER MAKE, and the reason all three tnote sentences are
+    // mandatory rather than commentary. The charter's keystone bar is "over a rolling 30
+    // deliveries, the verifier's catch rate >= John's baseline Rework+Reverse rate". Read off the
+    // first two rows alone that is "30.0% >= 0.0%, the bar is met", and it is false twice:
+    //   (1) THE TWO RATES COUNT DIFFERENT POPULATIONS. The lane began 2026-08-25; John's tap
+    //       history is 115 decided ship cards going back much further. Like-for-like — a delivery
+    //       carrying BOTH a verdict and a tap of his — the overlap was FIVE at this ship, not
+    //       thirty. Five deliveries is not a rolling thirty and the panel says so in his words.
+    //   (2) A `block` IS A MECHANICAL GATE FAILING (build / regression / hygiene), never
+    //       necessarily a defect John would have reworked. So verifier >= John is NECESSARY for
+    //       the charter's bar and never SUFFICIENT.
+    // Hence the panel reports the comparison and states that the bar is NOT YET ASSERTABLE. That
+    // is the same rule as §14's cost showing "—" and a NULL plain_* drawing a red defect line:
+    // absent must look absent, and "not yet assertable" must not look like a pass.
+    //
+    // Figures below are this cycle's real values (v7.0.284) and the builder splices over them; if
+    // it ever cannot find an anchor it dies at exit 2 rather than publishing them.
+    +'<h2><span class="secnum">16</span>Reviewer lane &mdash; verifier scoreboard</h2>'
+    +'<table><tr><th>Signal</th><th>Count</th><th>Of</th><th>Rate</th></tr>'
+    +svRow('Verifier blocked',9,30,'30.0')
+    +svRow('Your Rework or Reverse',0,30,'0.0')
+    +svRow('Auto-done eligible',13,30,'43.3')
+    +'</table>'
+    +'<div class="bar"><div class="dev" style="width:30.0%"></div></div>'
+    +'<p class="barlbl">Verifier catch rate <b>30.0%</b> &mdash; your Rework/Reverse rate '
+    +'<b>0.0%</b> over the same depth (30).</p>'
+    +'<p class="tnote">The charter\'s bar &mdash; the verifier catching at least as much as you '
+    +'do over 30 deliveries &mdash; is <b>not yet assertable</b>, and this panel does not claim '
+    +'it. The two rows above count different populations: the lane started <b>Aug 25</b> and has '
+    +'graded <b>20</b> tickets, of which <b>5</b> also carry a tap of yours &mdash; on those five '
+    +'it blocked at least once on <b>4</b> and you reworked or reversed <b>0</b>. Five deliveries '
+    +'is not a rolling thirty. And a block is a mechanical gate failing (build, regression, '
+    +'hygiene), not necessarily a defect you would have reworked, so &ldquo;verifier &ge; '
+    +'you&rdquo; is necessary for that bar and never sufficient. A block still does not stop a '
+    +'push &mdash; the lane is verdict-only, on your split of card 10de5fb5.</p>'
     // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
     // read-only rule that the savebar already states in place, at the moment it matters, and
     // then closed the page on housekeeping instead of on his board. The read-only signal is

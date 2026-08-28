@@ -1,3 +1,11 @@
+// DeepBench v7.0.284 | tests/regression/SES-178-project-panel.js | SES-181 (b) — two edits, both
+// forced by §16 being APPENDED to the locked order, and both RETARGETING rather than relaxing:
+// (1) appendedNeverRenumbered() asserted `max === 15`, which conflated the rule (§15 is appended
+// and never renumbered) with an incidental fact (§15 was last); it now pins §14 and §15 in place
+// and still fails on a real renumber. (2) extractContract()'s far bound was the NAMED heading
+// "### §2b's data contract", so inserting §16's contract between the two made the slice swallow a
+// second contract — and this file's own vacuity detector caught it, clause `epic-is-not-drain`
+// passing after its control removed the word it checks. The bound is now the next `### ` heading.
 // DeepBench v7.0.231 | tests/regression/SES-178-project-panel.js | SES-178
 //
 // Guards §15, the briefing's Project panel: the locked-order entry in briefing-page.md, the
@@ -32,10 +40,16 @@ const BUILDER = path.join(ROOT, "scripts/build-briefing.mjs");
 // of whitespace makes every clause reflow-proof rather than hostage to the wrap column.
 export const norm = s => s.replace(/\s+/g, " ");
 
+// The end bound is THE NEXT `### ` HEADING, not a named one (SES-181 (b), v7.0.284). It used to
+// name "### §2b's data contract" — correct while §15's contract was immediately above it, and
+// silently wrong the moment §16's contract was inserted between the two: the slice then swallowed
+// a second contract, and this file's own vacuity detector caught it — clause `epic-is-not-drain`
+// began passing after its control removed §15's "mandatory", because §16's prose supplied the
+// word. A named far bound is a dependency on document order that nothing declares.
 export function extractContract(md) {
   const a = md.indexOf("### §15's data contract");
   if (a < 0) return "";
-  const b = md.indexOf("### §2b's data contract", a);
+  const b = md.indexOf("\n### ", a + 1);
   return norm(b < 0 ? md.slice(a) : md.slice(a, b));
 }
 
@@ -154,14 +168,25 @@ function theShippedFilesAreClean() {
 }
 
 // THE CLAUSE THIS FILE EXISTS FOR — appended, never renumbered.
+//
+// RETARGETED, NOT DELETED (SES-181 (b), v7.0.284). This clause used to assert `max === 15`, and
+// that form conflated two different things: the rule (§15 is APPENDED and nothing renumbers it)
+// and an incidental fact (§15 happened to be last). John's directive 58db64ae item (2) appended
+// §16 — "locked section extended, never renumbered" — which is the rule being FOLLOWED, and the
+// old form failed on it. Deleting the clause when its subject moves loses the reason with it
+// (the SES-197 precedent), so what it asserts now is the rule itself: §14 unmoved, §15 unmoved,
+// and §15 still ABOVE whatever was appended after it. A renumber of §15 — the failure this file
+// exists to catch — still fails here; a legitimate append no longer does.
 function appendedNeverRenumbered() {
   const s = sources();
   assert.ok(/\|\s*14\s*\|\s*Who used DeepBench\s*\|/.test(s.page),
     "§14 must still be 'Who used DeepBench' — §15 is APPENDED, and a renumber silently invalidates every §-reference in this file, runner-cycle.md and the spec");
+  assert.ok(/\|\s*15\s*\|\s*\*\*Project — Selfbuild milestones\*\*/.test(s.page),
+    "§15 must still be row 15 and still be the Project panel — that is the renumber this clause exists to catch, per John's placement call on card a8eaee1d");
   const nums = [...s.page.matchAll(/\|\s*(\d+)\s*\|\s*(?:\*\*)?[A-Z]/g)].map(m => Number(m[1]));
   assert.ok(nums.length > 0, "the locked-order table was not parseable");
-  assert.strictEqual(Math.max(...nums), 15,
-    "15 must be the HIGHEST section number in the locked order — appended at the end, per John's placement call on card a8eaee1d");
+  assert.ok(Math.max(...nums) >= 15,
+    "no section above §15 may be REMOVED to make room — the order is extended at the end, never rewritten");
 }
 
 // The panel must add no new CSS rule to the head. Asserted structurally, not by eye: the §15 block

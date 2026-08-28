@@ -5,6 +5,53 @@
 
 ---
 
+## session/cycle-20260828-1540 (v7.0.284, 2026-08-28, runner cycle `224c090f-434b-490e-848d-dff92dce0812`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10:00 America/Chicago) — model Opus 5, one **Sonnet 5** subagent for the mechanical drift sweep per register B21) — SES-181 (b): the verifier scoreboard, which renders the keystone metric without claiming its bar is met
+
+`SES-181`'s named remainder, built on John's directive `58db64ae` item (2): *"SES-181 scoreboard build approved — locked section extended, never renumbered."* New **§16 · Reviewer lane — verifier scoreboard**, appended at the end of the locked order. Four files: `docs/runbooks/briefing-template.html` (panel + `svRow()` + §15's correction), `scripts/build-briefing.mjs` (the derivation and its four anchors), `tests/regression/SES-181b-verifier-scoreboard.js` (new guard), `docs/runbooks/briefing-page.md` (locked-order row 16 + §16's data contract). One further test file was **retargeted** rather than left red — see below. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+### The ship is two halves, and shipping only the first would have been worse than shipping nothing
+
+§15 has told John since `v7.0.231` that all three keystone metrics *"do not exist yet"* and *"all three wait on the verifier lane (SES-181 — reviewer lane), which is still open"*. Adding §16 while leaving that sentence puts a rendered catch rate and a written denial that any catch rate exists **on the same page**. So the footnote, and §15's own comment above it (*"None is online"*), were corrected in the same commit, and the guard asserts **both** halves — presence of §16, absence of the stale denial. An absence-only test passes vacuously; a presence-only test lets the contradiction ship.
+
+**The rule, stated so it outlives this instance:** a sentence that names a metric absent expires the moment that metric ships, and the ship that renders it owns the sentence.
+
+### What the panel refuses to say, and why that is the whole design
+
+Measured live at this ship, not recalled: **9 blocks of the last 30 verdicts (30.0%)** against **0 Rework/Reverse of John's last 30 ship-card taps (0.0%)**. Read off those two rows alone, the charter's keystone bar — *"the verifier's catch rate ≥ John's Rework+Reverse rate over a rolling 30 deliveries"* — looks met. It is false twice, and both sentences are mandatory in the rendered footnote rather than commentary:
+
+1. **The two rates count different populations.** The lane began **Aug 24 CST** and has graded **20** tickets; John's tap history is **115** decided ship cards reaching much further back. Like-for-like — a delivery carrying **both** a verdict and a tap of his — the overlap is **5** (blocked on 4, reworked 0). Five deliveries is not a rolling thirty.
+2. **A `block` is a mechanical gate failing** (build / regression / hygiene), never necessarily a defect John would have reworked. So *verifier ≥ John* is **necessary** for that bar and never **sufficient**.
+
+The panel therefore reports the comparison and says the bar is **not yet assertable**. Same rule as §14's cost showing "—" and a `NULL` `plain_*` drawing a red defect line: absent must look absent, and *not yet assertable* must not look like a pass.
+
+### Two things this ship found by building it, both kept rather than smoothed over
+
+- **The depth sentence is CONDITIONAL, not interpolated.** *"N deliveries is not a rolling thirty"* turns **false** the day the overlap reaches 30 — precisely the day the panel starts mattering. The builder swaps the wording at `>= 30`. It is the same class of silently-expiring sentence this ship had to correct in §15's footnote, caught this time before it shipped.
+- **`must()` and never `splice()` once two panels share a skeleton.** `splice()` resolves its bounds with a bare `indexOf`, and §16 reuses §15's closing shape (`'</table>'` then the bar div) — a §16 `splice` finds **§15's** occurrence first and eats the Project panel.
+
+### The guard that was retargeted, and the one that caught this cycle's own mistake
+
+`tests/regression/SES-178-project-panel.js` asserted `max(section) === 15`, which conflated the **rule** (§15 is appended and never renumbered) with an **incidental fact** (§15 happened to be last). John's directive appended §16, so the rule was being *followed* and the old form failed on it. Retargeted rather than deleted (the `SES-197` precedent — deleting a guard when its subject moves loses the reason with it): §14 unmoved, §15 unmoved and still the Project panel, nothing above §15 removed. Proven still to catch a real renumber.
+
+**And its vacuity detector caught a defect this cycle introduced.** `SES-178`'s `extractContract()` named *"### §2b's data contract"* as its far bound — correct until §16's contract was inserted between the two, at which point the slice swallowed a second contract and clause `epic-is-not-drain` began passing after its own control removed the word it checks. Both extractors now end at **the next `### ` heading**, not a named one: a named far bound is a dependency on document order that nothing declares. §17 will be appended one day.
+
+### Evidence
+
+- Guard: **14 of 15 clauses fail** against `origin/dev`'s pre-change files, 15 of 15 pass on these. The fifteenth (`appended-never-renumbered`) is a companion assertion that is *supposed* to hold on both — it pins §15 against a renumber — and carries its own break-control.
+- The one clause that passed vacuously on `origin/dev` was found and fixed rather than reported as a pass: `panel-adds-no-new-css` was green on a file with **no §16 at all**, because an empty slice contains no `<style>`. It now asserts the table's presence in the same breath.
+- Builder run against live Supabase: `§16 Reviewer lane: verifier blocked 9/30 (30.0%), your Rework+Reverse 0/30 (0.0%), auto-done eligible 13/30; like-for-like overlap 5 (blocked 4, reworked 0); lane since Aug 24`.
+- **Poisoned-template arm:** every §16 sample value replaced with nonsense → the builder dies **exit 2, `ANCHOR MISSING: §16 rows`**, writing no file. It refuses rather than publishing a sample, which is the `SES-162` defect these anchors exist to prevent.
+- **Substitution proven, not assumed:** the template's sample reads `the lane started <b>Aug 25</b>` (the UTC date); the built page reads **`Aug 24`** (CST, the standing display rule). The sample-only artifact appears **0** times in the output.
+- `npm run build` green; regression suite **87/87** credentialed. Verifier lane: **APPROVE**, all three gates green, `auto_done_eligible` **YES** (`runner_verdicts 88031a32`), so the ticket closed `done` under charter decision 2's interim bar rather than `delivered`. The ship card is filed and marked auto-done — Reverse is one tap.
+
+### Named rather than left to be found
+
+- **Four files against `CLAUDE.md`'s ≤3.** Three are the change; the fourth is `briefing-page.md`, the file that *governs* the page — the same shape `SES-178` shipped §15 in. Leaving the locked section order without §16 is exactly the drift `SES-124` wrote that table to prevent. A fifth file, `SES-178`'s guard, was touched only to retarget a clause this ship's own legitimate append had broken.
+- **The two remaining keystone metrics are still absent** — John-minutes/week and drift findings/week — and §15's footnote still says so. Nothing here brings them online.
+- **The overlap population is 5.** The panel is honest about it, but that means the keystone comparison is not yet informative, and it will not be until the lane and John's taps have covered the same thirty deliveries. That is a fact about the data, not a defect in the panel.
+
+---
+
 ## session/cycle-20260828-1516 (v7.0.283, 2026-08-28, runner cycle `7d2fc6fe-2379-4b0c-b5cc-0a8662143105`, `trigger = scheduled`, `scheduler_gate` verdict `run` (fired off the cron grid, so exempt from pacing) — model Opus 5, judgment delegated to a **Fable 5** subagent per register B21) — `DIR-60d35b49`: the Sonnet conservation window is audited, and it turns out never to have run
 
 **Directive `60d35b49` — the Sonnet conservation window** (John, 2026-08-25, *"set it up with sonnet"*) expired 2026-08-28T07:00Z owing its own clause-5 obligation: *"on Friday a full-tank Fable review … audits the entire window before anything graduates."* This cycle discharged it. One new file, `docs/harvests/DIR-60d35b49.md`, plus the regenerated `CLAUDE-STATE.md`. No `src/`/`api/`/`lib/` change, no schema change, no site change. Directive closed `shipped` via `close_directive`.

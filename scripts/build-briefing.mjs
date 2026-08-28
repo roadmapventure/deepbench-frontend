@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.284 | scripts/build-briefing.mjs | SES-181 (b) — §16 REVIEWER LANE is derived here on
+// exactly the SES-178 terms below: four literal-value anchors (rows, bar, barlbl, tnote), every one a
+// must() that dies at exit 2 rather than publishing a sample. THE ANCHORS ARE must() AND NOT splice()
+// AND THAT IS LOAD-BEARING: splice() resolves its bounds with a bare indexOf, and §16 reuses §15's
+// closing shape ('</table>' followed by the bar div), so a §16 splice would find §15's occurrence
+// first and eat the Project panel. Unique literal anchors are the only safe form once two panels
+// share a skeleton. THE ONE SENTENCE THAT IS CONDITIONAL rather than interpolated is the depth line:
+// "N deliveries is not a rolling thirty" turns FALSE the day the overlap reaches 30 — the same class
+// of silently-expiring sentence as §15's "waits on SES-181", which this ship had to correct.
 // DeepBench v7.0.231 | scripts/build-briefing.mjs | SES-178 — §15 Project is DERIVED, never published
 // as the template's sample rows. Three anchors: the milestone rows (splice), the overall bar and the
 // overall count (must). All three are literal-value anchors on purpose — if the template's samples
@@ -98,7 +107,7 @@ import { deriveAutomation, automationLiteral } from './lib/briefing-automation.m
 // module for the same reason briefing-automation.mjs does: a helper only exercisable by running
 // the whole builder against live Supabase is a helper nobody tests.
 import {
-  cstDay, cstStamp, cstDayStartISO, deriveStats, modelRowsHtml, dirRowsJs,
+  cstDay, cstStamp, cstShortDay, cstDayStartISO, deriveStats, modelRowsHtml, dirRowsJs,
   questionRowsJs, skipRowsJs, useRowsJs, droRowsHtml, unregisteredAskTargets,
 } from './lib/briefing-derive.mjs';
 
@@ -462,6 +471,59 @@ must(`+'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'`,
 must(`+'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '\n    +'(<b>20.6%</b>)</p>'`,
   `+'<p class="barlbl">Overall &mdash; <b>${spDone}</b> of <b>${spTotal}</b> Selfbuild tickets done '\n    +'(<b>${spPct}%</b>)</p>'`, '§15 overall');
 
+// §16 — REVIEWER LANE, the verifier scoreboard (SES-181 (b), v7.0.284). John's directive 58db64ae
+// item (2): "SES-181 scoreboard build approved — locked section extended, never renumbered."
+//
+// EVERY FIGURE HERE IS A COUNT OVER TWO FLAT SELECTS, and that is deliberate rather than a
+// limitation worked around: the comparison the charter asks for is between two populations that do
+// not join cleanly (a verdict is per build attempt, a tap is per delivery), so a SQL join would be
+// picking one of several defensible semantics inside the database where nobody could see it. The
+// choice is made here, in the open, and the panel's own tnote states it to John.
+//
+// THE WINDOW IS 30 OF EACH, NEVER "the last 30 days" or "everything". The charter's bar is worded
+// over a rolling 30 DELIVERIES; a time window would make the rate move when nothing shipped.
+const SV_WINDOW = 30;
+const svVerdicts = await sel('runner_verdicts?select=verdict,auto_done_eligible,backlog_id,created_at&order=created_at.desc&limit=500');
+const svTaps = await sel('runner_items?select=backlog_id,decision,decided_at&kind=eq.ship&decision=not.is.null&order=decided_at.desc&limit=500');
+if (!svVerdicts.length) die('§16: runner_verdicts is empty — refusing to publish a scoreboard over the template\'s sample rows');
+const svPct = (n, of) => (of ? (100 * n / of).toFixed(1) : '0.0');
+const sv30 = svVerdicts.slice(0, SV_WINDOW);
+const svBlocks = sv30.filter(v => v.verdict === 'block').length;
+const svAuto = sv30.filter(v => v.auto_done_eligible === true).length;
+const svTaps30 = svTaps.slice(0, SV_WINDOW);
+const svNeg = svTaps30.filter(t => t.decision === 'rework' || t.decision === 'reverse').length;
+// The like-for-like population: a delivery carrying BOTH a verdict and a tap of John's. `blocked`
+// is "the verifier blocked at least once on this ticket" — a ticket can be verdicted more than
+// once (a re-run after a fix), and counting attempts here would inflate it against a tap count
+// that is one-per-delivery by construction.
+const svBlockedTickets = new Set(svVerdicts.filter(v => v.verdict === 'block' && v.backlog_id).map(v => v.backlog_id));
+const svGraded = new Set(svVerdicts.filter(v => v.backlog_id).map(v => v.backlog_id));
+const svOverlap = [...new Map(svTaps.filter(t => t.backlog_id && svGraded.has(t.backlog_id))
+  .map(t => [t.backlog_id, t])).values()];
+const svOverlapBlocked = svOverlap.filter(t => svBlockedTickets.has(t.backlog_id)).length;
+const svOverlapNeg = svOverlap.filter(t => t.decision === 'rework' || t.decision === 'reverse').length;
+const svStart = cstShortDay(new Date(svVerdicts[svVerdicts.length - 1].created_at));
+// The depth sentence is CONDITIONAL, and that is not polish: "N deliveries is not a rolling
+// thirty" becomes a FALSE statement the day the overlap reaches 30, which is exactly the day the
+// panel starts mattering. A sentence that silently expires is the failure this file records
+// itself making elsewhere (SES-178's "waits on SES-181" footnote, corrected by this very ship).
+const svDepthLine = svOverlap.length >= SV_WINDOW
+  ? `That is a full rolling thirty, so the comparison above is like-for-like.`
+  : `${svOverlap.length} deliveries is not a rolling thirty.`;
+
+must(`+svRow('Verifier blocked',9,30,'30.0')\n    +svRow('Your Rework or Reverse',0,30,'0.0')\n    +svRow('Auto-done eligible',13,30,'43.3')`,
+  `+svRow('Verifier blocked',${svBlocks},${sv30.length},'${svPct(svBlocks, sv30.length)}')\n    `
+  + `+svRow('Your Rework or Reverse',${svNeg},${svTaps30.length},'${svPct(svNeg, svTaps30.length)}')\n    `
+  + `+svRow('Auto-done eligible',${svAuto},${sv30.length},'${svPct(svAuto, sv30.length)}')`, '§16 rows');
+must(`+'<div class="bar"><div class="dev" style="width:30.0%"></div></div>'`,
+  `+'<div class="bar"><div class="dev" style="width:${svPct(svBlocks, sv30.length)}%"></div></div>'`, '§16 bar');
+must(`+'<p class="barlbl">Verifier catch rate <b>30.0%</b> &mdash; your Rework/Reverse rate '\n    +'<b>0.0%</b> over the same depth (30).</p>'`,
+  `+'<p class="barlbl">Verifier catch rate <b>${svPct(svBlocks, sv30.length)}%</b> &mdash; your Rework/Reverse rate '\n    `
+  + `+'<b>${svPct(svNeg, svTaps30.length)}%</b> over the same depth (${svTaps30.length}).</p>'`, '§16 barlbl');
+must(`the lane started <b>Aug 25</b> and has '\n    +'graded <b>20</b> tickets, of which <b>5</b> also carry a tap of yours &mdash; on those five '\n    +'it blocked at least once on <b>4</b> and you reworked or reversed <b>0</b>. Five deliveries '\n    +'is not a rolling thirty.`,
+  `the lane started <b>${svStart}</b> and has '\n    +'graded <b>${svGraded.size}</b> tickets, of which <b>${svOverlap.length}</b> also carry a tap of yours &mdash; on those '\n    `
+  + `+'it blocked at least once on <b>${svOverlapBlocked}</b> and you reworked or reversed <b>${svOverlapNeg}</b>. '\n    +'${svDepthLine}`, '§16 tnote');
+
 // §2b — the AUTOMATION object (SES-162, v7.0.204). THIS BUILDER HAD NO ANCHOR FOR IT AT ALL, so
 // every page it built published the template's SAMPLE values: measured on the served artifact
 // 2026-08-23T18:1xZ, John's panel said his last run was "sample value — 12:41 AM CST · SES-143 ·
@@ -480,3 +542,7 @@ console.log(`  seeded ${Object.keys(seed.asks || {}).length} ask targets, ${Obje
 console.log(`  cards: ${ships.length} shipped, ${gates.length} gated, ${retired.length} retired`);
 console.log(`  derived: §8 top ${board.length} of ${total}, §11 ${Object.keys(byClass).length} classes, §13 ${ladder.length} rungs`);
 console.log(`  §15 Project: ${spRows.length} Selfbuild milestones, ${spDone}/${spTotal} done (${spPct}%)`);
+console.log(`  §16 Reviewer lane: verifier blocked ${svBlocks}/${sv30.length} (${svPct(svBlocks, sv30.length)}%), `
+  + `your Rework+Reverse ${svNeg}/${svTaps30.length} (${svPct(svNeg, svTaps30.length)}%), `
+  + `auto-done eligible ${svAuto}/${sv30.length}; like-for-like overlap ${svOverlap.length} `
+  + `(blocked ${svOverlapBlocked}, reworked ${svOverlapNeg}); lane since ${svStart}`);
