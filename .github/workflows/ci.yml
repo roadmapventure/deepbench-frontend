@@ -1,3 +1,60 @@
+# DeepBench v7.0.286 | .github/workflows/ci.yml | SES-180 (c) — THE TWO REPORTING JOBS BECOME REAL
+# GATES. Both halves of the "reporting only" caveat this file shipped with have now been paid for
+# by other tickets, so the caveat was the only thing still making CI a rubber stamp.
+#
+# WHAT CHANGED, AND WHY EACH HALF CAN HONESTLY GATE NOW — measured in a clean clone at this ship,
+# not reasoned about:
+#
+#   regression  The v7.0.219 header's reason for `continue-on-error` was exact and, at the time,
+#               right: "measured 2026-08-24, the suite is 50/50 with credentials and 49/50 without
+#               — CHI-31 fails with SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured. A test
+#               that CANNOT RUN is not a test that FAILED." SES-180 (b) (`v7.0.224`) closed exactly
+#               that gap: `notRun(part, reason)` lets a test DECLARE a part it cannot verify here,
+#               and `run-all.js` exits 1 iff something FAILED, never because a part was declared.
+#               MEASURED THIS SHIP with no credentials in the environment at all:
+#               **87/87 passed, exit 0, 23 parts declared not-run across 18 tests.** The number the
+#               v7.0.219 header said it could not gate on has become a number it can.
+#   tripwire    `scripts/check-session-docs.js` still always exits 0 in its bare form — that is its
+#               contract everywhere it runs and this file must not change it. SES-199 (`v7.0.242`)
+#               added the second invocation instead: `--gate` exits 1 on FLAG findings in the
+#               truth-registry classes (checks 9/10/11) and 0 otherwise, and fails CLOSED when the
+#               registry cannot be read at all. Its own header names wiring that flag in here as
+#               "the follow-up, not this". This is that follow-up. MEASURED THIS SHIP: `--gate`
+#               reports "clear — no FLAG findings in the gating classes (checks 9/10/11). Exit 0",
+#               over a report that still carries 38 FLAGs and 4 WARNs in the NON-gating classes —
+#               which is the point of a named gating set, and the proof this is not a green
+#               achieved by looking at nothing.
+#
+# WHAT THIS STILL DOES NOT DO, and neither is the runner's to do (SES-180's own residue, unchanged):
+#   * Repository secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY). Only John can add them. Until he
+#     does, the credentialed halves stay DECLARED not-run — visible in the log, counted as neither
+#     pass nor fail. That is what makes this gate honest rather than vacuous, and it is also why
+#     adding the secrets later makes the gate stronger with no edit to this file.
+#   * Branch protection. This workflow now makes a failing check turn the RUN red; "red = no merge,
+#     regardless of author" is a repository setting, not a file. Only John can make it binding.
+#
+# THE TWO EDITS THIS SHIP FORBIDS, because each one silently restores the rubber stamp:
+#   1. Putting `continue-on-error: true` back to quiet a red run. A red run here now means a test
+#      FAILED or a rule statement has drifted from its registry row. Fix the finding, or fix the
+#      snapshot — never the job.
+#   2. Dropping `--gate` back to the bare `node scripts/check-session-docs.js`. The bare form always
+#      exits 0 BY CONTRACT (SES-199's own header: "Default behaviour is UNCHANGED and must stay that
+#      way — no flag, always exit 0"). A gating step running the non-gating invocation is a step
+#      that can never fail, which is precisely the defect SES-199 was filed to close.
+#
+# `if: always()` ON THE REGRESSION STEP IS LOAD-BEARING, not tidiness. Steps stop at the first
+# failure, so without it a red tripwire would hide the suite's result entirely and every push after
+# a drift finding would report one problem while concealing however many others. Both checks run,
+# both report, and either one failing fails the job.
+#
+# ONE RISK NAMED RATHER THAN HIDDEN: this job's `name:` changes from "(reporting only)" to
+# "(blocking)", and GitHub matches required status checks by job NAME. `dev` — where every runner
+# push lands — carries no protection at all (read live from the branches API at this ship:
+# `protected: false`), so nothing about the push path can break. `main` IS protected, and whether
+# its required-checks list names this job is not readable from here; if it does, John re-selects the
+# new name in the branch settings. Said out loud because a silently renamed required check is the
+# exact failure this file's headers exist to prevent.
+#
 # DeepBench v7.0.219 | .github/workflows/ci.yml | SES-180 (M2 Truth Infrastructure) — PARTIAL
 #
 # The first check on this repository that does not live on John's machine.
@@ -8,36 +65,8 @@
 # regression suite runs only where credentials happen to exist. So a push from a cloud cycle, a
 # fresh clone, or any other contributor is checked by nothing at all. This workflow is the floor.
 #
-# WHAT GATES AND WHAT DOES NOT — stated here rather than left to be inferred from the YAML,
-# because a check that looks blocking and is not is worse than no check:
-#
 #   BLOCKING   build      `npm ci && npm run build`. Needs no credentials. A src/api/lib change
 #                         that fails the build can no longer reach dev unnoticed.
-#   REPORTING  tripwire   `node scripts/check-session-docs.js` — the hygiene + truth checks
-#                         (SES-176). Deliberately NON-blocking: that script is report-only by
-#                         contract and always exits 0 (its own header: "a report-only tripwire,
-#                         always exit 0"), so making it gate here would mean changing what the
-#                         script promises everywhere else it runs. Its findings are in the log.
-#   REPORTING  regression  The suite, without credentials. Deliberately NON-blocking TODAY, and
-#                         this is the honest half of the ticket: measured 2026-08-24, the suite is
-#                         50/50 with credentials and 49/50 without — CHI-31 fails with
-#                         "SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured (.env.local)".
-#                         A test that CANNOT RUN is not a test that FAILED, and marking this
-#                         blocking before that distinction exists would paint CI permanently red
-#                         and train everyone to ignore it.
-#
-# WHAT SES-180 STILL OWES, and neither half is the runner's to do:
-#   1. The skip-vs-fail distinction (the ticket calls it "the SES-92 skip-vs-fail fix"): a test
-#      declares "I cannot run here" and the harness counts it as skipped, never as passed and
-#      never as failed. It must be DECLARED by the test, never guessed by the harness — a harness
-#      that infers skips will swallow real failures.
-#   2. Repository secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY) so the credentialed tests and the
-#      grants assertions can run here. Only John can add those; a runner must never print a
-#      secret, let alone install one.
-#   3. Branch protection — the ticket's "Red = no merge, regardless of author" is a repository
-#      setting, not a file. This workflow makes the signal; only John can make it binding.
-#
-# Until (1) and (2) land, treat a red `build` as authoritative and the other two as information.
 
 name: CI
 
@@ -75,10 +104,8 @@ jobs:
         run: npm run build
 
   checks:
-    name: Tripwire + regression (reporting only)
+    name: Tripwire + regression (blocking)
     runs-on: ubuntu-latest
-    # Never blocks the ref. See the header: these two cannot honestly gate yet.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -90,11 +117,16 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Hygiene checks 1-8 plus SES-176's truth checks 9/10/11. The truth checks read
-      # docs/governance/RULES-SNAPSHOT.md, which is committed, so they need no credentials here —
-      # that was the whole reason SES-176 exported a snapshot instead of reading Supabase live.
-      - name: Session-docs tripwire
-        run: node scripts/check-session-docs.js
+      # `--gate` (SES-199), never the bare form — see the header. Gates on FLAG findings in checks
+      # 9/10/11 only, the truth-registry classes; the size and shape ratchets stay advisory and are
+      # still printed above the gate line. Reads docs/governance/RULES-SNAPSHOT.md and
+      # docs/backlog/BACKLOG-SNAPSHOT.md, both committed, so it needs no credentials here.
+      - name: Session-docs tripwire (gate)
+        run: node scripts/check-session-docs.js --gate
 
+      # `if: always()` so a red tripwire cannot conceal the suite's result — see the header.
+      # No credentials: the credentialed halves declare themselves not-run (SES-180 (b)) and are
+      # counted as neither pass nor fail.
       - name: Regression suite (no credentials)
+        if: always()
         run: node tests/regression/run-all.js
