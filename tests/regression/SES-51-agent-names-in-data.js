@@ -1,3 +1,7 @@
+// DeepBench v7.0.288 | tests/regression/SES-51-agent-names-in-data.js | SES-51 (b) — the retrieval
+// half's two clauses: the_library's owner is derived from §19c, and the Librarian's own store may
+// name her (with a control proving the exemption is not the check having stopped looking).
+//
 // DeepBench v7.0.287 | tests/regression/SES-51-agent-names-in-data.js | SES-51 (Selfbuild M3)
 //
 // Guards scripts/check-agent-names-in-data.js — the sweep that makes Rule #1 ("no agent is
@@ -36,14 +40,23 @@ import {
   ROUTING_TOKENS,
   ROUTING_WINDOW,
   SWEPT_FIELDS,
+  LIBRARIAN_ROLE,
   assertRuleIntact,
   buildAgentIndex,
+  resolveLibrarian,
   mentionsIn,
   findViolations,
   jsonStringLeaves,
 } from "../../scripts/check-agent-names-in-data.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// The roster is read from the real file, synchronously via a cached dynamic import primed in run().
+let ROSTER_MODULE = null;
+function requireRoster() {
+  assert.ok(ROSTER_MODULE, "the roster module must be loaded before a clause that needs it");
+  return ROSTER_MODULE;
+}
 
 const ROSTER = [
   { id: "eleanor", name: "Eleanor Voss" },
@@ -191,16 +204,63 @@ function nestedTraitLeavesAreReached() {
 // ---------------------------------------------------------------------------
 function theSweptSurfaceIsTheTicketsScope() {
   assert.deepStrictEqual(Object.keys(SWEPT_FIELDS).sort(),
-    ["agent_configs", "capabilities", "skill_profiles"],
-    "SES-51 names skill_profiles, agent_configs.text and capabilities.description as the scope");
+    ["agent_configs", "capabilities", "knowledge_entries", "skill_profiles", "the_library"],
+    "SES-51's scope is BOTH halves: the assembly tables it names first, and the retrieval tables it " +
+    "calls 'also still unswept and in scope'. Dropping either shrinks the ticket rather than the check.");
   for (const f of ["objective", "method"]) {
     assert.ok(SWEPT_FIELDS.skill_profiles.includes(f), `skill_profiles.${f} is named in the ticket and must stay swept`);
   }
   assert.ok(SWEPT_FIELDS.agent_configs.includes("text"));
   assert.ok(SWEPT_FIELDS.capabilities.includes("description"));
+  assert.ok(SWEPT_FIELDS.the_library.includes("content"));
+  assert.ok(SWEPT_FIELDS.knowledge_entries.includes("content"));
 }
 
-function run() {
+// ---------------------------------------------------------------------------
+// THE RETRIEVAL HALF (SES-51 (b)): the_library's owner is DERIVED from §19c
+// ---------------------------------------------------------------------------
+function theLibrarysOwnerIsResolvedNotHardcoded() {
+  assert.strictEqual(
+    resolveLibrarian([{ id: "eleanor", name: "Eleanor Voss", role: LIBRARIAN_ROLE }, { id: "nadia", name: "Nadia Farouk", role: "Data Expert" }]),
+    "eleanor",
+    "the_library has no agent_id column; §19c makes it the Librarian's exclusively owned resource, " +
+    "so the owner comes off the roster's role string"
+  );
+
+  // NEGATIVE CONTROLS, both directions. An owner this check GUESSED at is an owner it cannot
+  // enforce — zero and two are each a real roster/§19c inconsistency and must throw, not default.
+  assert.throws(() => resolveLibrarian([{ id: "nadia", name: "Nadia Farouk", role: "Data Expert" }]),
+    /0 agents with role/);
+  assert.throws(() => resolveLibrarian([
+    { id: "eleanor", name: "Eleanor Voss", role: LIBRARIAN_ROLE },
+    { id: "imposter", name: "Imposter Two", role: LIBRARIAN_ROLE },
+  ]), /2 agents with role/);
+
+  // And it resolves against the REAL roster, not only fixtures — the check's live path depends on it.
+  const { AGENTS } = requireRoster();
+  assert.strictEqual(resolveLibrarian(AGENTS), "eleanor",
+    "src/data/agents.js must still carry exactly one agent whose role is The Librarian");
+}
+
+function theLibrariansOwnStoreMayNameHer() {
+  // Measured live at this ship: all three agent mentions in 143 the_library rows are "Eleanor Voss"
+  // in S-LIBRARIAN-04 write-capability test rows. Owned by eleanor, so exempt by the SAME derivation
+  // the assembly half uses — no second rule, no allowlist entry.
+  const rows = [{
+    table: "the_library", key: "S-LIBRARIAN-04 Write Capability Test", field: "content",
+    value: "Written by Eleanor Voss during the write capability test.", reaches: ["eleanor"],
+  }];
+  assert.deepStrictEqual(findViolations(rows, ROSTER).violations, [],
+    "the Librarian named in the Librarian's own store is a self-reference, not a violation");
+
+  // NEGATIVE CONTROL: the same row naming somebody else IS a violation — otherwise the exemption
+  // above would be satisfied by a check that has stopped looking at the_library at all.
+  const other = [{ ...rows[0], value: "Escalate to Nadia Farouk." }];
+  assert.strictEqual(findViolations(other, ROSTER).violations.length, 1);
+}
+
+async function run() {
+  ROSTER_MODULE = await import("../../src/data/agents.js");
   ruleIsStillThere();
   rosterDrivesTheSweep();
   aFullNameMatchesAnywhere();
@@ -210,6 +270,8 @@ function run() {
   aRowNobodyHoldsIsAnObservationNotAViolation();
   nestedTraitLeavesAreReached();
   theSweptSurfaceIsTheTicketsScope();
+  theLibrarysOwnerIsResolvedNotHardcoded();
+  theLibrariansOwnStoreMayNameHer();
 }
 
 selfRun(import.meta.url, run);

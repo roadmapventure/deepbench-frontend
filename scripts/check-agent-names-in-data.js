@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// DeepBench v7.0.288 | scripts/check-agent-names-in-data.js | SES-51 (b) -- the RETRIEVAL half:
+// the_library and knowledge_entries are swept too, so both halves of the ticket's scope are covered.
+//
 // DeepBench v7.0.287 | scripts/check-agent-names-in-data.js | SES-51 -- Rule #1 stops being a rule
 // that is enforced on code and on nothing else.
 //
@@ -63,11 +66,27 @@
 //     reason check-service-boundaries.js prints its declared exceptions: an unowned row is how an
 //     unnoticed one later gets attached to the wrong agent.
 //
-// THE HONEST BOUND. This sweeps skill_profiles, agent_configs and capabilities -- the three the
-// ticket names. It does NOT sweep the_library / knowledge_entries, which also reach prompts at
-// retrieval time and which the ticket lists as "also still unswept and in scope". That is a
-// different read path (retrieval, not assembly), a different table shape, and a much larger
-// corpus; it is named as the declared remainder rather than half-swept here.
+// THE RETRIEVAL HALF (v7.0.288, SES-51 part b) -- the_library and knowledge_entries reach prompts
+// at RETRIEVAL time rather than at assembly, and SES-51 lists them as "also still unswept and in
+// scope". They are swept now, and the only thing they needed was two more DERIVED owners, which is
+// the same derivation (1) makes for the assembly half:
+//   - knowledge_entries carries its own `agent_id` column, so ownership is direct -- the personal
+//     training store, one row, one agent.
+//   - the_library carries NO agent_id, and that is not a gap: §19c makes it a resource owned
+//     exclusively by The Librarian, reached by every other agent only through her broker. So its
+//     owner is the roster agent whose role IS "The Librarian" -- resolved, never hardcoded, and
+//     thrown on if the roster stops having exactly one.
+//
+// MEASURED BEFORE THE EXTENSION SHIPPED, and it is why this is worth saying rather than assuming:
+// across 143 the_library rows there are exactly THREE agent mentions, all "Eleanor Voss", all in
+// S-LIBRARIAN-04 write-capability test rows -- i.e. the Librarian named in the Librarian's own
+// store, which derivation (1) exempts by itself. knowledge_entries holds 36 rows with 8 mentions
+// of an agent other than the row's owner, and ALL EIGHT sit in one row owned by michelle, listing
+// the roster. That is not incidental: §19e names Michelle Manning as the broker who "resolves the
+// executing agent herself". Whether a broker's own knowledge may therefore name the roster is a
+// real question about where Rule #1's boundary falls, and it is NOT settled here -- the check
+// reports the eight and the card asks John. Inventing a Project-Manager exemption would be the
+// runner widening a rule on its own say-so, which is the one thing this file must never do.
 //
 // Usage:
 //   SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/check-agent-names-in-data.js [--json]
@@ -130,7 +149,30 @@ export const SWEPT_FIELDS = Object.freeze({
   skill_profiles: ["name", "description", "objective", "method", "output_desc", "tone", "notes"],
   agent_configs: ["name", "text"],
   capabilities: ["name", "description", "display_phrase"],
+  // The retrieval half. Narrower on purpose: these two are CONTENT stores, and their prose fields
+  // are the ones that reach a prompt. `category`/`source`/`jurisdiction` are labels, not prose.
+  the_library: ["title", "content", "teaching_note"],
+  knowledge_entries: ["title", "content", "teaching_note"],
 });
+
+// §19c makes the_library a resource owned exclusively by The Librarian. Resolved off the roster's
+// role string rather than hardcoded, and thrown on at zero or two, for the same reason SE-04's
+// resolveDisplayAgents throws: an owner this check GUESSED at is an owner it cannot enforce.
+export const LIBRARIAN_ROLE = "The Librarian";
+
+export function resolveLibrarian(agents) {
+  const hits = (agents || []).filter(
+    a => String(a && a.role ? a.role : "").trim().toLowerCase() === LIBRARIAN_ROLE.toLowerCase()
+  );
+  if (hits.length !== 1) {
+    throw new Error(
+      `src/data/agents.js has ${hits.length} agents with role "${LIBRARIAN_ROLE}". ARCHITECTURE.md §19c ` +
+        `makes the_library that agent's exclusively owned resource, so a sweep of it cannot resolve an ` +
+        `owner -- that is a real inconsistency between the roster and §19c, not something to default past.`
+    );
+  }
+  return hits[0].id;
+}
 
 // -- Derivation step 1: the rule still says what this check enforces ---------------------------
 
@@ -341,10 +383,12 @@ async function main() {
   const asJson = process.argv.includes("--json");
 
   let agentIndex;
+  let librarianId;
   try {
     assertRuleIntact(fs.readFileSync(path.join(root, RULE_DOC), "utf8"));
     const { AGENTS } = await import(pathToFileURL(path.join(root, "src/data/agents.js")).href);
     agentIndex = buildAgentIndex(AGENTS);
+    librarianId = resolveLibrarian(AGENTS);
   } catch (e) {
     return fail(
       2,
@@ -369,12 +413,14 @@ async function main() {
     restSelect(supabaseUrl, supabaseKey, "capabilities?select=slug,name,description,display_phrase"),
     restSelect(supabaseUrl, supabaseKey, "capability_skill_profiles?select=capability_slug,skill_profile_slug"),
     restSelect(supabaseUrl, supabaseKey, "agent_capability_assignments?select=agent_id,capability_slug"),
+    restSelect(supabaseUrl, supabaseKey, "the_library?select=id,title,content,teaching_note"),
+    restSelect(supabaseUrl, supabaseKey, "knowledge_entries?select=id,agent_id,title,content,teaching_note"),
   ]);
   const bad = reads.find(r => r.error);
   if (bad) {
     return fail(2, `check-agent-names-in-data: ${bad.error}\nExiting 2 (cannot run) -- this is NOT a pass.`);
   }
-  const [profiles, configs, capabilities, links, assignments] = reads.map(r => r.rows);
+  const [profiles, configs, capabilities, links, assignments, library, knowledge] = reads.map(r => r.rows);
 
   // -- Ownership, derived (header design call (1)) ------------------------------------------------
   const agentsByCapability = new Map();
@@ -414,6 +460,19 @@ async function main() {
       if (c[f]) rows.push({ table: "capabilities", key: c.slug, field: f, value: String(c[f]), reaches });
     }
   }
+  // The retrieval half. librarianId was resolved above and throws rather than defaulting, so a
+  // the_library row always has exactly one owner.
+  for (const r of library) {
+    for (const f of SWEPT_FIELDS.the_library) {
+      if (r[f]) rows.push({ table: "the_library", key: String(r.title || r.id).slice(0, 60), field: f, value: String(r[f]), reaches: [librarianId] });
+    }
+  }
+  for (const r of knowledge) {
+    const reaches = r.agent_id ? [r.agent_id] : [];
+    for (const f of SWEPT_FIELDS.knowledge_entries) {
+      if (r[f]) rows.push({ table: "knowledge_entries", key: `${r.agent_id || "?"}/${String(r.title || r.id).slice(0, 40)}`, field: f, value: String(r[f]), reaches });
+    }
+  }
 
   const result = findViolations(rows, agentIndex);
 
@@ -422,7 +481,8 @@ async function main() {
   } else {
     console.log(
       `check-agent-names-in-data: swept ${result.fieldsExamined} prompt-reaching fields across ` +
-        `${profiles.length} skill profiles, ${configs.length} agent configs and ${capabilities.length} capabilities ` +
+        `${profiles.length} skill profiles, ${configs.length} agent configs, ${capabilities.length} capabilities, ` +
+        `${library.length} the_library rows (owned by ${librarianId} per §19c) and ${knowledge.length} knowledge entries ` +
         `for ${agentIndex.length} rostered agents.`
     );
     for (const u of result.unowned) {
@@ -443,8 +503,9 @@ async function main() {
         : `\nNo violation: every agent named in prompt-reaching data is the agent that data belongs to.`
     );
     console.log(
-      "NOT SWEPT (declared, not a pass): the_library / knowledge_entries RAG content, which reaches " +
-        "prompts at retrieval time. SES-51 names it as in scope and it is the declared remainder."
+      "SCOPE: both halves of SES-51 are swept — assembly (skill_profiles, agent_configs, capabilities) " +
+        "and retrieval (the_library, knowledge_entries). The bound that remains is the one in the header: " +
+        "a bare id sitting in prose with no routing word within " + ROUTING_WINDOW + " characters is not reported."
     );
   }
 
