@@ -13,7 +13,7 @@ identified, where the table had no point-in-time recovery path independent of Su
 backups. Every runner ship point regenerates this file and commits it if changed, so
 `git log` on this path is a durable history of the table's state across sessions.
 
-**Tickets:** 689 · **Payload sha256:** `fc09d8e9cb75e494e7316a8da3e2f8079eb2e4f790c93c98094920fc7df434ba`
+**Tickets:** 689 · **Payload sha256:** `cc22b7cd1bea7dd16a8081325656de60901ed445e7b4a9128c94f829be9f67d6`
 
 Cell escaping (applied in this order so it is mechanically invertible): a literal backslash
 `\` becomes `\\`, a literal pipe `|` becomes `\|`, and a literal newline becomes the
@@ -601,7 +601,7 @@ nearly every run and destroy the byte-identical guarantee above.
 
 | # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff | History residue |
 |---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|-----------------|
-| 1 | SES-191 | Tooling | P10 - Tooling | Full restore drill: restore-from-backup executed end-to-end and evidenced | partial | attended-decision-drain-0824 |  | **P10 - Tooling** — Filed by John's Accept on the Selfbuild M0 milestone gate-review card a458c50a (2026-08-24, attended decision-drain, cycle 528bd734), per the charter's gate-review path (Closure discipline item 3). M0 claimed "prove restorable" but demonstrated restore only on one 6-row table (runner_ladder). This ticket executes a FULL restore drill — checkout tag + restore complete dump + hooks — into a scratch target, verifies the platform boots into the restored state, and links the evidence. Assigned to Selfbuild M3 - Independent Verification on John's split (Chief Architect lens): SES-182's auto-rollback must not drain against a restore primitive never proven. Charter exit criterion 5 is scored by THIS drill, never by pointing back at M0's miniature. | Selfbuild M3 - Independent Verification |  |  |  |
+| 1 | SES-191 | Tooling | P10 - Tooling | Full restore drill: restore-from-backup executed end-to-end and evidenced | partial | attended-decision-drain-0824 |  | **P10 - Tooling** — Filed by John's Accept on the Selfbuild M0 milestone gate-review card a458c50a (2026-08-24, attended decision-drain, cycle 528bd734), per the charter's gate-review path (Closure discipline item 3). M0 claimed "prove restorable" but demonstrated restore only on one 6-row table (runner_ladder). This ticket executes a FULL restore drill — checkout tag + restore complete dump + hooks — into a scratch target, verifies the platform boots into the restored state, and links the evidence. Assigned to Selfbuild M3 - Independent Verification on John's split (Chief Architect lens): SES-182's auto-rollback must not drain against a restore primitive never proven. Charter exit criterion 5 is scored by THIS drill, never by pointing back at M0's miniature. | Selfbuild M3 - Independent Verification | needs-john |  |  |
 
 ## tier `next` — `docs/FEATURES-NEXT.md` (23 tickets)
 
