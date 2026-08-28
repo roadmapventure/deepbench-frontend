@@ -5,6 +5,45 @@
 
 ---
 
+## session/cycle-20260828-1740 (v7.0.289, 2026-08-28, runner cycle `124c0e81-c2cb-4352-be2a-712f666b281f`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, two Fable 5 design subagents) — LOG-39 is proposed for removal, and LOG-41 ships the rollup the browser was doing by hand
+
+The M3 drain returned **`blocked`** — 5 named members open, 4 waiting on John, 1 `delivered` awaiting his Accept — the clean stop directive `9feb7018` predicted when it was re-declared an hour earlier. Selection fell through to the class-sorted board, and the cycle then spent its build on the *second* ticket it picked, because the first one turned out to have nothing left to build.
+
+### The dead premise, and the four measurements that established it rather than argued it
+
+`LOG-39` (queue 40) asked for a Layer A fact and a Layer B rule so Routing's underlying call would be tagged, *"derived, never hardcoded"*. **Everything it asks for already exists**, delivered piecemeal by the tasks either side of it: `LOG-37b` captured the real tool names, Susan promoted the `request-routing` term, `LOG-38` shipped the read-time view. Nobody ever closed the row that asked for it.
+
+The design subagent reported this; **the orchestrating cycle re-ran its three load-bearing measurements rather than taking its word**, which is the half that makes the verdict safe:
+
+- the gold rule is real and is **not** one of `LOG-134`'s null-criteria rows — `criteria = {"intent": {"in": ["agent-selection-intent","ci-routing-intent"]}}`, `stable`, not superseded;
+- it matches **3,564** rows = 2,723 + 841, against a log population of exactly 2,723 and 841 — 100% coverage with **zero** over-match, the discriminating pair rather than either half alone;
+- **the negative control:** the slug appears in the write-time `patterns_used` column on **0** rows. Had anyone "fixed" this the hardcoded way the ticket warns against, it would appear on all 3,564.
+
+Set `removal proposed` with a card, before-image first. **Not removed** — no unattended removal, ever; it keeps its queue number while John decides (`SES-113`).
+
+### `LOG-41`: 190,808 bytes of raw ids, replaced by 122 rows
+
+`ai_pattern_classification_rollup` is the platform-wide cut and returns `log_ids` — `array_agg` of every matching row id — so the AI Audit downloads **32,441 ids = 190,808 bytes** across 13 patterns on every load, purely so JavaScript can re-bucket them by agent. New view `public.ai_pattern_agent_hop_rollup` answers both the by-agent and by-hop questions in **122 rows**.
+
+**"By-hop" was the one genuinely ambiguous word, and it was settled from the codebase rather than from taste.** The platform's dominant sense of *hop* is a single capability execution keyed by `span_id` (§19p). That sense was **considered and rejected for two reasons, not one**: it is already served by the per-hop drawer's point lookups (`LOG-79`/`LOG-131`), *and* it is not aggregable — every span is unique, so a rollup over it is 32k groups of one. `by-hop` = hop depth, the bounded key `useAIActivity.js` already buckets on.
+
+### The timing gate did not pass cleanly, and that is in the record rather than smoothed over
+
+**The first `anon` run under the 3-second cap returned `57014`, statement timeout.** Re-measured: the new view 2,353 ms as `anon`, 2,326 ms as owner — and **the existing, already-shipped, page-load platform rollup 2,194 ms**. So the new view costs **+159 ms (+7%)** over a query the page already makes: not a new class of cost, which is what made it shippable. But the observed timeout is real evidence that this whole view family sits ~0.6 s from the cap against a log growing ~3k rows/month. **That finding belongs to `LOG-132`**, and it binds the remainder: the cutover must *replace* the `log_ids` payload, never add this query alongside it — two ~2.3 s queries per load would be strictly worse than today.
+
+### Two things deliberately not done, both named rather than left to be found
+
+- **The frontend cutover is `LOG-145`**, filed this cycle with an atomically claimed id. `log_ids` serves three distinct client-side jobs — countable-call gating (`LOG-81`), dedup-consistent cost re-derivation (`LOG-97`), and per-agent **latency** joins (`LOG-112`) — and the rollup replaces the bucketing but not the row-level latency join. That decision is per-surface and needs its own QA.
+- **`.claude/rules/ai-pattern-signature.md` still says "the two rollup views"; it is now three.** An unattended cloud cycle does not enter the `.claude/` permission gate (register B39) — it cannot see the prompt and cannot answer it — so the exact replacement text goes to John on a card for a session he attends, rather than being attempted here.
+
+### The eighteenth identical block, and the order followed anyway
+
+Verifier, first run: **BLOCK**, `build=green / hygiene=green / regression=red`, cause confirmed the same way as the seventeen before it — the `CLAUDE-STATE.md` one-ship-behind lag, which the close-out render mandated by this same step then cleared (`SES-177`'s guard re-run alone: PASS). Second run, after the render: **APPROVE**, all three gates green, `auto_done_eligible: no — no epic on the ticket`, so the charter's carve-out fails closed and the ticket ships `delivered` exactly as `SES-154` requires. Both verdict rows are in `runner_verdicts`; neither was suppressed. `SES-213` holds the fix for the lag itself. The sequence was followed rather than quietly reordered to make the verdict look better, for the same reason as every prior time: a cycle that reorders the procedure so its own verdict improves is the self-certifying move the charter forbids.
+
+**The QA's own negative control was run, not reasoned about:** a deliberately broken fixture view (agent cut only, NULL-agent bucket filtered) was created, the new guard was pointed at it and **FAILED** — *"produced no hop-dimension rows"* — then passed against the real view. The fixture was dropped in the same cycle.
+
+---
+
 ## session/cycle-20260828-1730 (v7.0.288, 2026-08-28, runner cycle `0702682f-0434-4f89-9e43-c46713802fea`, `trigger = chained (drain continuation)` — the session's third cycle and its second in-session chain — model Opus 5, no subagent) — SES-51 (b): the retrieval half, and the one finding the runner refused to adjudicate
 
 `drain_chain_gate` returned `continue` and handed back **SES-51** — correctly, because `v7.0.287` had left it `partial` with its own named remainder unbuilt. Two files, both edited rather than added: `scripts/check-agent-names-in-data.js` and `tests/regression/SES-51-agent-names-in-data.js`. No `src/`/`api/`/`lib/` change, no schema change, no site change. **The ticket is now `delivered`** — both halves of its scope are swept and nothing remaining is the runner's.
