@@ -5,6 +5,44 @@
 
 ---
 
+## session/cycle-20260828-0441 (v7.0.280, 2026-08-28, runner cycle `5d3551d7-7756-4592-91fb-c9851cf7bd8f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (23:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-135 (part 2): the keep-tests rule stops being decided per cycle
+
+**`SES-135` — A permanent briefing-page render test, and a decision on which tests get kept** (`P10 - Tooling`, tier `now`, queue 265, Selfbuild epic) shipped at `v7.0.280`, `done` under step 7a's interim auto-done bar. Three files — `docs/STANDARDS.md`, `tests/regression/SES-135-briefing-render.js`, and the new `tests/regression/SES-135b-keep-tests-rule.js`. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+### What was actually missing
+
+Part 1 — the permanent render test — shipped at `v7.0.256` on 2026-08-25T06:06Z. Part 2 was John's call and its own file said so, verbatim: *"It is his call, carded for him, and the ticket stays open until he rules."* **He ruled eight hours later** — card `1abe473a`, accepted 2026-08-25T14:08Z — and the decision then sat unwritten for three days while every cycle in between closed `did not run` on a scheduler-off gate. So the gap this cycle closed was not a missing decision; it was a decision with no home, which is the same shape `SES-76` shipped against two ships earlier.
+
+The rule of record, his three clauses: a regression guard gets a permanent home and is never discarded; the full suite runs every cycle; credential-gated halves skip loudly.
+
+### Why it is a rule and not a preference — measured, not argued
+
+Before this, keep-or-discard was a per-cycle judgement call, and the judgement went the same way every time **without anyone choosing it**: the last several render harnesses were each written to a scratchpad and thrown away, noted in the ships as *"harness scratchpad-only"*, **six tickets deep** by the time `SES-135` was filed. That is what an unwritten rule decides for you.
+
+### The two clauses that carry the ship
+
+**`throwaway-home-survives`.** Section 4 opens by requiring the session's own `test-[session-id].mjs` to be *deleted before committing*. The keep rule sits directly above it, and an editor reconciling the two by softening the delete would turn every session's scratch test into committed noise. Both are correct — they describe **different artifacts** — and the guard pins both.
+
+**`forbids-removing-a-guard`.** Without an explicit prohibition, clause 1 is a preference and the cheapest route to a green suite is deleting the test that went red. Same boundary `SES-197`'s retargeted guard keeps: when a rule moves, the guard is retargeted, never deleted, because deleting a guard loses the reason with it.
+
+Clauses 2 and 3 **cite** their mechanics (Section 2 rule 5; `_lib/self-run.js`'s `notRun()` and `run-all.js`'s `NOT A FULL RUN:` line) instead of restating them, so the two homes cannot drift — and the guard asserts those targets still exist, because a citation whose target was tidied away is a dangling pointer wearing a compliance badge.
+
+### The credentialed-suite lesson, paid a second time
+
+The verifier's **first verdict was `block`** (`runner_verdicts 38290da2`), and it is kept in the ledger rather than smoothed over. The cycle's own bare `run-all.js` reported **84/84**; the verifier's credentialed run reported **83/84**, red on `SES-177-claude-state-renderer.js`. That is Section 2 rule 5's own measurement — *"give it credentials, or it can go green having verified nothing that needs them"* — recurring on the exact same test that produced it on 2026-08-25.
+
+**The drift was pre-existing and generated, not this diff's.** `CLAUDE-STATE.md` is rendered from `runner_cycles` and was one ship stale because the previous ten cycles all closed `did not run`. Running `scripts/render-claude-state.js` — which step 7 mandates in the same commit set — moved it from `v7.0.266` to `v7.0.267` and the test went green. The **second verdict was `approve`** with `auto_done_eligible: yes` (`runner_verdicts cc9efd29`). Both rows stand; the block was fixed at its cause, not retried until green.
+
+### QA
+
+Guard passes. **Both file-level negative controls FAIL on `origin/dev`'s own copies** — pre-change `STANDARDS.md` gives *section absent*, pre-change part-1 file gives *stale "stays open until he rules"* — and every clause carries a control plus the `SES-158` meta-assertion that a no-op control is itself a failure. Credentialed suite **84/84**, with 17 parts declared not-run across 13 tests (the loud skip clause 3 describes). `npm run build` green. `check-session-docs.js --gate` exit 0. `check-version-claim.js` verified `v7.0.280` issued to this cycle.
+
+### Declared remainder
+
+`check 6` flags `docs/STANDARDS.md` at **52.0 KB** against a ~34 KB baseline. It was already over at **48.0 KB** before this edit, which added ~3 KB; no open ticket tracked it, so this cycle filed **`SES-212`** rather than leaving a tripwire flagging into nobody's inbox.
+
+---
+
 ## session/cycle-20260825-1242 (v7.0.266, 2026-08-25, runner cycle `07f000bf-4ed6-483a-84e5-ea9aaea32817`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (07:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-76: the dry-run rule gets a home, and what was missing was never the practice
 
 **`SES-76` — Dry-run kickoff text-slice tests against current source before the kickoff commits** (`P10 - Tooling`, tier `now`, queue 238, no epic) shipped `delivered` at `v7.0.266`. Three files — `docs/STANDARDS.md`, `CLAUDE-DESIGN.md`, and the new `tests/regression/SES-76-kickoff-dryrun-rule.js`. No `src/`/`api/`/`lib/` change, no site change.
