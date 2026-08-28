@@ -5,6 +5,43 @@
 
 ---
 
+## session/cycle-20260828-1717 (v7.0.287, 2026-08-28, runner cycle `b70a8c5f-4977-480c-b2e9-e412ca2e6acf`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — a chained cycle is exempt from pacing by design — model Opus 5, no subagent) — SES-51: Rule #1 becomes a check on Skill data, and it finds seven live violations
+
+The in-session continuation of the M3 drain after `v7.0.286`. `drain_chain_gate` returned `continue` naming `SES-51 — Nothing enforces the no-agent-names rule on Skill data; add a mechanical sweep`. Two files: `scripts/check-agent-names-in-data.js` and `tests/regression/SES-51-agent-names-in-data.js`, both new. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+### The asymmetry the ticket was filed about, verified rather than quoted
+
+Rule #1 — *"no agent is dependent on another, ever, in its own data"* (`ARCHITECTURE.md` §19e) — is enforced hard on **code**: a `PreToolUse` hook, `.claude/rules/capabilities-are-data.md`, Architect Review, `npm run build`. On **data** it was enforced by nothing at all. Skill Profiles live in Supabase with no git, no diff, no review and no build step, which is how `LOO-013`'s hardcoded `agent_id "alex"` sat in production for weeks. Surveyed before writing a line: of the 13 `scripts/check-*.js`, exactly one reads `skill_profiles` (`check-format-skill-exclusivity.js`, SE-04) and it asks a different question.
+
+### The two calls the ticket reserved — and which one is derived, which is a judgment
+
+The ticket's own text says it *"needs a design pass to pin the assertion shape and where the allowlist of legitimate self-references lives."* John approved the build (directive `58db64ae` item 5), which cleared the gate. They are settled differently on purpose, and the difference is stated rather than blurred:
+
+- **The allowlist is DERIVED and there is no list in the file.** A mention of agent X is legitimate exactly when the row it sits in reaches X *and nobody else* — that is Eleanor's Identity Skill saying "Eleanor". Ownership comes from `capability_skill_profiles` → `agent_capability_assignments`, the same §19b data path SE-04 walks, so hiring, renaming or reassigning an agent changes the answer by itself. Same move SE-03 and SE-04 already made, for the same measured reason.
+- **The assertion shape is a JUDGMENT and says so in the header.** A full name matches anywhere; a **bare id counts only inside a routing context**. This roster's ids include `pat`, `sam`, `dan`, `mike` and `bob` — ordinary English words a Skill's prose legitimately contains. Matching them everywhere would fire constantly and the check would be deleted within a week (SE-04's own recorded lesson); matching them nowhere would miss `agent_id 'riley'`, which is exactly what `LOO-013` shipped. The deliberate false-negative — an id in prose with no routing word within 60 characters — is named in the header rather than left to be discovered, and two of the routing tokens (`executing_agent_id`, `critique_agent`) are the field names §19e itself calls known-wrong.
+
+### It found seven on its first run, and one of them is the case a flat field list misses
+
+**1,306 prompt-reaching fields, 65 skill profiles, 22 agent configs, 17 capabilities, 22 rostered agents, 7 violations, 0 unowned rows.** The seventh sits at `qg-review-intent.traits.schema.properties.triage.description` — **four levels deep inside `traits`** — which is why the sweep walks JSON string leaves at any depth rather than reading a flat field list. Filed as `AGT-62 — Seven Skill Profile fields name a different agent than the one they belong to`; **no data was touched**, because §13 rule 11 reserves Skill Profile content to John's confirmation. Same posture SE-04 took with `AGT-61`.
+
+**The honest half, on the card and in the ticket:** the seven are not obviously one kind of thing. Five sit next to `delegate` / `request_help` vocabulary and read as real hardcoded dependencies; one explains where `task_context` came from and one is an identity sentence. Rule #1's text does not draw that boundary, so a cycle deciding it alone would be inventing the rule's edge. That is Trainer-path judgment, at John's pacing.
+
+### The guard, and the four mutations that prove it has teeth
+
+`tests/regression/SES-51-agent-names-in-data.js` imports the real exported functions (SES-45 — never a copy). Four mutations of the **shipped script** each fail their own clause with a distinct message, and the file was proven byte-identical by `sha256` afterwards: bare ids matching everywhere → the innocent-prose control fails; bare ids matching nowhere → the routing-context arm fails; the self-reference exemption widened to everything → the second-agent arm fails; the JSON walk flattened → the nested-trait arm fails. The self-reference pair moves exactly **one variable** — the second agent in `reaches` — because a test that only ever showed the exemption working would pass just as happily over a check that exempts everything.
+
+It declares **no** not-run part and needs no credentials: every exported function is pure and the network lives behind the entry-point guard. So it genuinely gates in the CI that `v7.0.286` made blocking an hour earlier — the two ships of this chain fit together rather than merely following each other.
+
+### SES-213 replicated, one cycle later, on a different ticket
+
+The reviewer lane blocked again at step 7a: `build=green / hygiene=green / regression=red`, the sixteenth block in the ledger carrying that identical triple. Cause confirmed rather than assumed — the credentialed suite reports **88/89, sole failure `SES-177-claude-state-renderer.js`**, the `CLAUDE-STATE.md` one-ship-behind lag, cleared by the close-out render this same step mandates. **The runbook's stated order was followed rather than quietly improved**: a cycle that reorders the procedure to make its own verdict look better is the self-certifying move the charter exists to stop. `SES-213`, filed by `v7.0.286`, is where that ordering gets designed; this is a second independent measurement of it.
+
+### Ticket left `partial`, unflagged
+
+`the_library` / `knowledge_entries` RAG content reaches prompts at retrieval time and is named in SES-51's own scope as still unswept. Different read path, different table shape, much larger corpus — so it is the declared remainder, printed by the check on every run so a clean result cannot imply coverage it does not have. No `design_status` flag: it is buildable by a cycle, and the drain can come back for it.
+
+---
+
 ## session/cycle-20260828-1640 (v7.0.286, 2026-08-28, runner cycle `b9f90b84-94eb-45bd-af4a-9d551b41ced8`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11:00 America/Chicago) — model Opus 5, no subagent: `P10 - Tooling`, so register B21's Fable-5 delegation for `P1`–`P5` judgment work does not apply) — SES-180 (c): CI's two reporting jobs become real gates
 
 Picked off the M3 drain John re-declared 14 minutes before this cycle fired (directive `9feb7018`, *"Redeclare it now"*). `drain_epic_next` returned `SES-180 — Portable CI: build + regression + tripwire on every push, off John's machine` at queue 5, `open_now` 5. Two files ship the change — `.github/workflows/ci.yml` and the new `tests/regression/SES-180c-ci-gates.js` — plus `docs/harvests/SES-180.md`, which is where the ticket's ship detail now lives. No `src/`/`api/`/`lib/` change, no schema change, no site change.
