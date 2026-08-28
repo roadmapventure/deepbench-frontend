@@ -5,6 +5,117 @@
 
 ---
 
+## session/cycle-20260828-2119 (v7.0.294, 2026-08-28, runner cycle `2ba3622c-2332-441b-a9b9-e07a9a5b27b8`, `trigger = scheduled`, `scheduler_gate` verdict `run`)
+
+Selection stopped at **layer 1a**. John's directive `07dea95e`, written **six minutes before this
+cycle opened** (21:15:14Z, attended architect session, verbatim *"run it"*), names two builds in
+order, one per cycle, ahead of all board work — **`SES-216` first**. The other queued directive
+`58db64ae` was read first and left alone for the reason the previous cycle recorded: it is a
+standing-decisions row, and its five approvals (`SES-210`, `SES-181`, `SES-135`, `SES-45`,
+`SES-51`) are all `done` while its item (6) is an explicit hold. **`07dea95e` is left `queued`
+rather than marked `in_progress`** — its own text says *"ONE PER CYCLE … Close this directive when
+both have shipped"*, so consuming it here would hide `SES-218` from the next cycle and break the
+ordering John wrote it for.
+
+### The premise, revalidated from the catalog rather than the ticket
+
+`SES-216` says `schema.sql` records relation ACLs as comments and emits no executable grants. Read
+live from `pg_get_viewdef('public._backup_schema_ddl')`: the `acl-raw` section emits
+`'-- relacl for public.X: …'` at `sort_key` 11, and the view contains no `GRANT` derived from live
+ACL state anywhere, with no `pg_attribute.attacl` section at all. Premise holds. Census: 68
+`acl-raw` rows, **0** of them `(default)`; 34 columns carrying `attacl` — 27 on `ai_activity_log`,
+7 on `ip_org_cache`, exactly the ticket's figures.
+
+**The fix location is the VIEW, not the script.** `v7.0.250` already paid for this: schema DDL is
+generated server-side and pulled verbatim, so patching `dump-supabase.mjs` — which lives in the
+offsite repo, not this one — would have changed nothing. The directive's phrasing (*"make
+dump-supabase.mjs emit executable grants"*) names the outcome, and the outcome is reached in
+`_backup_schema_ddl`.
+
+### What shipped, and the two findings the ticket did not name
+
+Migration `ses216_backup_schema_ddl_executable_grants`. **224 executable statements where 0 were**
+— 220 relation-level, 4 column-level — and `acl-raw` widened 68 → 70. Both extras were measured,
+not inferred, and both were kept because the ticket's own success condition fails without them:
+
+- **The 2 sequences were captured in no form either.** `acl-raw`'s relkind filter was
+  `('r','p','v','m')`, yet `ai_activity_log_id_seq` carries `anon=rwU` — without it `anon`'s
+  `INSERT` fails on a restored platform *with the table grants already correct*.
+- **PG17's `MAINTAIN` is invisible to `information_schema.role_table_grants`** (`DAT-20`), so the
+  emission is derived by `aclexplode()`. A repair built on the information_schema views would have
+  silently dropped a privilege the live ACL holds.
+
+### The QA that is worth reading: a rolled-back round trip with one variable
+
+Capture the emitted statements from the healthy view, strip `anon`/`authenticated`/`service_role`
+off five relations, replay, compare — all inside a deliberately-failing `DO` block (the
+`SES-147`/`SES-196` pattern), so production is never mutated.
+
+```
+baseline           2848348fbcb76545fc3c3f643e51dcb9
+stripped           3762ac49ee9722fa5f52380880ae7489   differs: t
+after_empty_replay 3762ac49ee9722fa5f52380880ae7489   still stripped: t   <-- negative control
+restored           2848348fbcb76545fc3c3f643e51dcb9   equals baseline: t
+anon table-level SELECT on ai_activity_log = f | column SELECTs = 27 | raw caller_ip = f
+```
+
+The fingerprint is an **exploded**-ACL digest (`aclexplode` over `relacl` *and* `attacl`, sorted),
+never the ACL text, so a faithful restore cannot pass on `aclitem[]` ordering luck. **The negative
+control is the emission this replaced** — replaying what it produced, nothing, leaves the stripped
+fingerprint unmoved, which is the defect stated as a measurement rather than argued. Before-image
+`38cf2914` independently records `grant_rows` **0** and a pre-change viewdef with no `GRANT` in it.
+Production re-read afterwards: fingerprint unchanged.
+
+The `LOG-124` boundary is the half that could have gone wrong quietly. `ai_activity_log`'s relation
+grant to `anon` emits as `GRANT INSERT, MAINTAIN … TO anon;` with **no `SELECT`**; the `SELECT`
+arrives as a 27-column list with raw `caller_ip` absent. The tempting repair for a dark AI Audit
+screen on a restored platform — `GRANT SELECT ON ai_activity_log TO anon` — republishes every
+visitor's IP, and that trap is asserted against on the live emission, not reasoned about.
+
+### The edit this ship forbids, and why the workaround is kept
+
+Deleting §5b's and §9's grant-reconstruction path because the defect is "fixed". **The emission is
+fixed; sets are not.** Both sets stored offsite today (`selfbuild-step0-2026-08-23`,
+`refresh-2026-08-28`) predate this ship and still `403` on every table, so §5b is now
+**conditional on when the set was dumped** — one operator command, `grep -c '^GRANT ' schema.sql`
+— rather than a flat *"works now"*, which would be true for a set nobody is holding and false for
+both that exist. `tests/regression/SES-216-schema-grants.js` pins it with `manualPathSurvives`
+over three independent traces of the path.
+
+The property carrying the most weight in the migration is that **a grant is emitted only for an
+object some other section creates**; the `_backup%` exclusion mirrors the `views` section
+byte-for-byte because this view never defines the two `_backup_*` views (`SES-214`, carded,
+deliberately not fixed here). A grant on a relation the set never creates does not degrade — it
+**aborts** the restore on *"relation does not exist"*, strictly worse than the missing grant. The
+guard asserts the invariant (grants ⊆ created; measured 68 / 68 / **0 orphans**) rather than the
+literal filter, so it survives `SES-214` moving it.
+
+### The verifier blocked, and the red is inherited rather than caused
+
+Build green. Suite **91/93** with this ticket's guard passing both halves. Verifier verdict
+**block** (`runner_verdicts 25a080d2`) on the red suite — and the same two tests fail identically
+at `origin/dev` with this cycle's diff stashed (**90/92**): `LOG-41`, already carded **twice** as
+`SES-215` and `SES-217` (a placeholder anon key leaking between in-process tests — it **passes
+standalone** on the same env), and `SES-177`'s CLAUDE-STATE drift, the close-out artifact this
+cycle regenerates. Neither was re-carded: one ask, one home. Per step 7a a block is not a wall, so
+the ticket ships `delivered` and John gets the card.
+
+### Not done, named rather than left to be found
+
+`SES-216` defects **(3) and (4) are untouched** — generated columns dumped and unrestorable
+(34,909 rows) and a JSON scalar `null` in a `jsonb NOT NULL` column (312 rows lost to 2) — so
+5 tables and 67% of the rows still will not load, and this ship must not be read as *"the restore
+works now."* No set is re-dumped: John's standing rule is that offsite refresh is a manual step and
+the `M4` gate's open question (*"do not schedule, do not repeat without John's word"*). The
+`restore-supabase.mjs` diagnostic hole the ticket also names lives in the offsite repo.
+
+Stamp count on `restore-from-backup.md` held at 5: `v7.0.249` moved **verbatim** to this file's
+retired-stamps appendix, checked first by grep rather than recollection — all four of its editor
+warnings are already restated in that file's own body.
+
+---
+
+
 ## session/cycle-20260828-2041 (v7.0.293, 2026-08-28, runner cycle `f20fcfa6-9b0b-4c1e-8149-c8bb8b9db429`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, kickoff design delegated to a Fable 5 subagent per register B21) — LOG-145: the log_ids "cutover" turns out to be structurally impossible, so the cycle says so, ships the one reduction that is real, and pins the constraint in a test
 
 Selection reached **layer 3**, the class-sorted board. Layer 1a left `58db64ae` queued for the reason the previous cycle recorded — it is a standing-decisions row, not a mission, and consuming it would end the standing-ness. Layer 1b's `drain_epic_next()` returned **`blocked`**: *"3 named member(s) still open and none is claimable now; 2 waiting on you (SES-180 (needs-john), SES-182 (needs-john)); 1 held by a live peer claim"* — the peer being cycle `6080ef8d`, which had claimed `SES-191` eight minutes earlier. Per B24 that is a fall-through, never a build-less cycle.
@@ -9047,3 +9158,13 @@ restated in the runbook's own body.
 notes (snapshot-specific; this runbook is the canonical procedure)".)*
 
 <!-- DeepBench v7.0.245 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN OFF JOHN'S MACHINE FOR THE FIRST TIME AND THE RECOVERY NET DOES NOT OPEN THERE. Measured 2026-08-25 by cycle c8c2d547 against the offsite copy from a Linux container: `restore-supabase.mjs --verify-only` reported all 52 tables FILE MISSING and exited 1, and the restore path's own guard then aborts with "Refusing to restore from an altered backup." NOTHING IS ALTERED — 52 of 52 files resolve after normalizing one path separator, with 0 checksum mismatches over 50,841 rows, `verify-backup.mjs` PASS over 62 files / 51,718 lines, and a full `--all` dry run planning every table. Root cause is one writer line-pair: dump-supabase.mjs:159/204 build each manifest entry with `path.relative()`, which emits `data\<table>.ndjson` on Windows, and both readers (restore-supabase.mjs:68, verify-backup.mjs:28) `path.join()` it, where on POSIX that is one filename containing a backslash. THE MISLEADING MESSAGE IS THE EXPENSIVE PART, which is why §4 now carries the workaround rather than a ticket reference: mid-outage it points the person restoring at the integrity of their last backup instead of at a separator. WHAT THIS SHIP IS NOT: the tooling fix and the restore into a clean target are NOT here. The scripts live in `roadmapventure/deepbench-backups-offsite`, not this repo, and a scratch target is a second Supabase project on John's org — free ($0/mo, measured) but his last free slot and not deletable by the runner's tools. Both are carded for his decision; SES-191 stays `partial` and charter exit criterion 5 is NOT scored by this cycle. Guarded by tests/regression/SES-191-backup-path-portability.js, whose negative control is the naive join itself (neuter the normalization and it fails). Also deduplicated §7's twice-pasted automated-refresh bullet, found while in the file. Doc + test; no src/api/lib change, no site change. -->
+
+*(Retired from `docs/runbooks/restore-from-backup.md` by `v7.0.294` (`SES-216`) to hold the
+stamp count at 5. All four of its editor warnings were confirmed restated in that file's own
+body first, by grep rather than recollection: the branch-not-merged claim is explicitly
+corrected there by `v7.0.291`; the second tooling copy at `C:/Projects/deepbench-backups` is
+named there; the two `restore-supabase.mjs` reader sites — former lines 68 and 102, the second
+insufficient alone — are spelled out there; and the unscored exit criterion 5 is superseded by
+`v7.0.292`.)*
+
+<!-- DeepBench v7.0.249 | docs/runbooks/restore-from-backup.md | SES-191 — THE SEPARATOR DEFECT IS FIXED IN THE TOOLING, AND §4'S MANUAL WORKAROUND IS RETIRED. John granted both authorizations on card a9278eca (2026-08-25, attended architect session, verbatim: "BOTH AUTHORIZATIONS GRANTED — the $0 scratch-restore slot and rebuilding the offsite archive so it opens machine-free"); this ship takes only the second. Three files on branch `ses191/backup-path-portability` of roadmapventure/deepbench-backups-offsite: dump-supabase.mjs gains relPosix() so manifests store POSIX separators always (future sets clean), and BOTH readers gain entryPath() so either separator resolves (the half that repairs sets ALREADY TAKEN — including the one standing as the live recovery net, which cannot be retaken retroactively). THE SITE THE TICKET DID NOT NAME, and the reason a source-level fix list was not enough: restore-supabase.mjs resolves rec.file at TWO sites, the integrity check (was :68) and the data read (was :102). Fixing only the first produces a run that reports "Integrity: all 52 files match their checksums" and then fails the actual restore — a later failure with more confidence behind it, mid-outage. MEASURED against the real stored set, both directions: verify-backup.mjs files 0 / bad checksums 62 / FAIL exit 1 -> files 62 / lines 51718 / bad checksums 0 / PASS exit 0; --verify-only "52 problem(s)" exit 1 -> "all 52 files match" exit 0; --all dry run exit 0 with every data file read and planned (that last is what exercises the :102 site — --verify-only never touches it). The writer half is a NO-OP ON LINUX, so it is proven against the Windows path flavour and labelled as a proof of the expression rather than a Windows run: path.win32.relative(...) -> "data\agents.ndjson", relPosix -> "data/agents.ndjson". Guarded by tests/regression/SES-191-backup-path-portability.js Part 3, which RUNS the real verify-backup.mjs against a foreign-separator fixture — a source grep was rejected as the gate because it passes on a script that imports the helper and forgets to call it at one of two sites, which is the bug found here — with two negative controls: the pre-fix script fails it (exit 1), and a wrong-checksum fixture must still be rejected or an unconditional exit 0 would satisfy the first assertion. WHAT THIS SHIP IS NOT, all three named rather than left to be found: the fix is ON A BRANCH AND NOT MERGED, so a fresh clone of the backups repo mid-outage still gets the broken readers (that merge is John's call — the repo is what the platform falls back to); the second tooling copy at C:/Projects/deepbench-backups is untouched and will diverge; and THE RESTORE DRILL HAS NOT RUN, so charter exit criterion 5 is still unscored and SES-191 stays `partial`, which is the honest status rather than a cautious one. Doc + test here; the three script edits live in the backups repo. No src/api/lib change, no site change. -->
