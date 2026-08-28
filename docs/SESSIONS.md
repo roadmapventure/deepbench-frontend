@@ -5,6 +5,43 @@
 
 ---
 
+## session/cycle-20260828-0541 (v7.0.281, 2026-08-28, runner cycle `657d059e-832e-4ac9-bdb4-ac4b9b6a07cc`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (00:00 America/Chicago) — model Opus 5, implementation delegated to a Sonnet 5 subagent per register B21) — SES-45 (part 2): the recreated-logic rule stops being prose and becomes a check
+
+**`SES-45` — A test that recreates the logic under test instead of importing it passes against the bug it guards** (`P10 - Tooling`, tier `now`, queue 279, Selfbuild epic) shipped at `v7.0.281`, `delivered`. Two files — `scripts/check-session-docs.js` (new check 14) and the new `tests/regression/SES-45-recreated-logic-lint.js`. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+### What was actually missing
+
+Part 1 shipped the rule as prose in `STANDARDS.md` Section 4 — *"A test must assert against the REAL implementation. Logic recreated inside the test file is not a test — it is a second implementation agreeing with itself."* — and left the lint as a *"consider"*. John then approved the lint explicitly (gated card `85aa462a`, accepted 2026-08-25T07:47Z; restated as item (4) of standing directive `58db64ae`). So the gap was a stated rule with nothing mechanical behind it: the defect it describes was caught once, by hand, in diff review.
+
+### The predicate, and why it has four parts rather than three
+
+The ticket named three: a Section 8 block that defines a function it claims to verify and imports nothing. Built that way it fires on **ordinary local test helpers** — a fixture builder, a stub — which a Section 8 test is entitled to define for itself and which never claimed to be the shipped implementation. Two discriminators were added, and both were measured rather than reasoned about:
+
+- **The doc's own prose must name the function as the subject** — a backticked `` `N()` `` outside any fenced code. This is what separates "recreated the thing under test" from "declared a helper".
+- **The name must be a real top-level symbol in `src/`/`api/`/`lib/`.** This is what turns the finding from a heuristic into a fact.
+
+Measured live on this clone: **261 of 642** kickoffs carry a Section 8 code block; the raw three-part predicate returns 23; the shipped four-part one returns **20**. Every one of ten sampled names (`describeDelegationEvent`, `groupEventsIntoHops`, `resolveCapabilityHolder`, `percentile`, …) resolves to a real shipped function. **Quote the 20, never the 23** — the 23 is the count before the discriminator the check actually ships with.
+
+### WARN, not FLAG — and not in the gating set
+
+20 pre-existing hits is a **historical migration backlog, not new drift**. Shipping FLAG would make the report red on arrival for work nobody has started draining, which is precisely the failure `v7.0.242` drew the gating line to avoid and which check 12's header already names: a report red on arrival is a report nobody reads. Check 14 is therefore **not** in `GATING_CHECKS` (9/10/11 only), and `--gate` still exits 0 — asserted, not assumed.
+
+### A bug in this cycle's own design, caught by the subagent
+
+The orchestrator's probe treated `## Section 8b — LIVE API TEST` as a **continuation** of Section 8, so it leaked 8b's live-API blocks into the region — contradicting the spec's own exclusion of 8b. The shipped check drops the special case entirely: the region ends at the next `##`-level heading, and 8b *is* one, so it terminates the region by construction rather than by a rule someone has to remember. Recorded because the correction came from the delegate, not the delegator.
+
+### QA — the negative controls are the evidence
+
+Suite **85/85** with credentials (84 before this ship + this guard), build green, `--gate` exit 0. The guard **imports the real predicate** from `check-session-docs.js` rather than recreating it — a guard built the other way would fail its own ticket's rule. Two behavioural mutations of the shipped file were run and each was caught by the assertion that owns it: removing the repo-symbol discriminator fails `aNameNotInTheRepoSourceIsNotReported`; restoring the 8b-as-continuation bug fails `aSection8bBlockIsNotReported`. The file was then restored and proven byte-identical.
+
+### The credentialed-suite lesson, paid a third time
+
+First verifier run = **block**, regression red on `SES-177-claude-state-renderer.js` — the bare run reported 85/85 and the credentialed run 84/85. Root-caused, not re-run on hope: `CLAUDE-STATE.md` is generated from `runner_cycles` and was stale until this cycle ran `scripts/render-claude-state.js`, which step 7's close-out requires anyway. Identical to the previous cycle's first block, on the identical test.
+
+**This delivery could not take the auto-done bar, by rule rather than by verdict.** Its diff touches `scripts/check-session-docs.js`, which is in the verifier's `SELF_CERTIFYING_PATHS` — the charter's *"no change certifies itself"* premise refusing the bar to a change that edits one of the three gates it is graded by. So the close-out wrote `delivered` and John gets the tap.
+
+---
+
 ## session/cycle-20260828-0441 (v7.0.280, 2026-08-28, runner cycle `5d3551d7-7756-4592-91fb-c9851cf7bd8f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (23:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-135 (part 2): the keep-tests rule stops being decided per cycle
 
 **`SES-135` — A permanent briefing-page render test, and a decision on which tests get kept** (`P10 - Tooling`, tier `now`, queue 265, Selfbuild epic) shipped at `v7.0.280`, `done` under step 7a's interim auto-done bar. Three files — `docs/STANDARDS.md`, `tests/regression/SES-135-briefing-render.js`, and the new `tests/regression/SES-135b-keep-tests-rule.js`. No `src/`/`api/`/`lib/` change, no schema change, no site change.
