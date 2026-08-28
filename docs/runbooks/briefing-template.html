@@ -37,6 +37,37 @@
      comment is matched by scanners that look for the real thing, and it skewed this very cycle's
      first offset measurement before it was caught).
 
+     DeepBench v7.0.297 | runbooks/briefing-template.html | directive db84b784 — §15 GAINS ITS
+     BURN-DOWN BLOCK, and the two numbers John has twice been shown as one are finally rendered as
+     two. His word, attended architect session 2026-08-28, verbatim: "yes, build the burn-down with
+     the size stamps". THE NAMED DEVIATION, disclosed rather than buried (the SES-196 convention):
+     his directive names three contents and the FIRST of them — per-milestone closed/total M0-M7 —
+     has shipped since v7.0.231, twenty lines above this block. So it is built INTO §15 rather than
+     appended as a new §17: a new section would render that table a SECOND time, and one fact with
+     two homes is the defect this platform has already paid for at SES-116, SES-113 and SES-86 phase
+     3. Nothing is renumbered because nothing is added to the locked order, which is what his
+     "extend, never renumber" rule protects in the first place — read that before "re-homing" this
+     block into a section of its own. THE MEASUREMENT THAT MADE IT WORTH A CYCLE, taken live before
+     a line changed: the M3 drain's named scope held 3 open members against the epic's 8 open
+     tickets. Neither number was on the page and §2b showed only the first, as "N of M tickets left
+     in <epic>" — which is why briefing-automation.mjs's own header records the panel telling John
+     his standing drain had 17 tickets left against a live 11. The drain count is over
+     runner_drain_scope and is FIXED at naming time (SES-142); it is the set that retires his
+     standing order. The bucket count is LIVE and includes everything filed since. A single number
+     cannot be both, and the rendered footnote says so in his register rather than only in this
+     comment. NO NEW CSS — bdRow() is the third member of the msRow()/svRow() family and reuses
+     table / td.num / td.dim, asserted structurally rather than promised. THE ZERO THAT IS A REAL
+     ZERO: `Remaining, unstamped` renders at 0 and must keep doing so — every remaining ticket
+     carries a stamp today, and that zero is the signal db84b784's own filing rule is holding; it
+     goes non-zero the moment a cycle files without one, which is the point of showing it. Not the
+     "absent must look absent" rule being broken — the count exists and is genuinely zero.
+     NOT READ, AND SAID SO RATHER THAN IMPLIED: John's reference snapshot (artifact a1aa518d) was
+     not opened. Its body is reachable only through the permission-gated tool-results path, which an
+     unattended cycle may not enter (register B39) — so the two-number presentation is built from
+     the directive's own words, which specify it. Guarded by
+     tests/regression/db84b784-selfbuild-burndown.js, whose cross-file clause fails if this block
+     moves without its builder anchor.
+
      DeepBench v7.0.284 | runbooks/briefing-template.html | SES-181 (b) — §16 REVIEWER LANE, appended
      at the END of the locked order on John's directive 58db64ae item (2) ("locked section extended,
      never renumbered"), and §15's keystone footnote CORRECTED in the same ship. THE CORRECTION IS
@@ -917,6 +948,17 @@
     return '<tr><td>'+esc(label)+'</td><td class="num">'+n+'</td>'
       +'<td class="num dim">'+of+'</td><td class="num">'+pct+'%</td></tr>';
   }
+  // directive db84b784 — one §15 burn-down row. Third member of the msRow()/svRow() family and the
+  // same three classes, so the block adds no CSS. `note` is dimmed rather than numeric: it carries
+  // the denominator IN WORDS, because the two counts above it have DIFFERENT denominators (a fixed
+  // named scope and a live epic bucket) and a bare `td.num.dim` column would line them up as though
+  // they were the same measurement — which is exactly the confusion the block exists to remove.
+  // BOTH ARGUMENTS ARE esc()'d: the epic name reaches this row from the database, so it is on the
+  // escape side of SES-208's rule, and the builder passes it RAW rather than pre-escaping it.
+  function bdRow(label, n, note){
+    return '<tr><td>'+esc(label)+'</td><td class="num">'+n+'</td>'
+      +'<td class="dim">'+esc(note)+'</td></tr>';
+  }
   // SES-129 — ONE §7 ROW: what became of one directive, in plain words.
   //   id8      the directive's short id — John's handle on it, and what the ledger calls it
   //   when    'Mon DD, HH12:MI AM' CST, the time the RUNNER RECORDED it (see the render below —
@@ -1678,6 +1720,50 @@
     +'Verifier catch rate has moved to &sect;16 below, now that the lane produces it. Still not '
     +'shown, because they do not exist yet rather than because they are zero: John-minutes/week '
     +'and drift findings/week.</p>'
+    // ----- §15's BURN-DOWN BLOCK (directive db84b784, John 2026-08-28) ----------------------
+    // His words, verbatim: "yes, build the burn-down with the size stamps". The directive names
+    // three contents: per-milestone closed/total M0-M7, the active drain's open-members count
+    // SEPARATE from the epic bucket count, and remaining-work totals by size_stamp.
+    //
+    // NAMED DEVIATION, disclosed rather than buried (the SES-196 convention): this is built INTO
+    // §15 rather than appended as a new §17. The first of his three contents is the table twenty
+    // lines above — §15 has rendered per-milestone closed/total since v7.0.231 — so a new section
+    // would render it a SECOND time, and one fact with two homes is the defect this platform has
+    // already paid for at SES-116, SES-113 and SES-86 phase 3. Nothing is renumbered because
+    // nothing is added to the locked order, which is what John's "extend, never renumber" rule
+    // protects in the first place.
+    //
+    // THE TWO COUNTS ARE SEPARATE BECAUSE THEY ANSWER DIFFERENT QUESTIONS, and collapsing them is
+    // the failure this block exists to end. The drain count is over `runner_drain_scope` — the
+    // members John NAMED, FIXED at naming time (SES-142) — and is the set that actually retires
+    // the drain. The bucket count is the epic's LIVE open tickets and includes everything filed
+    // since he named it. They are 3 and 8 as this ships, and §2b's own comment records the last
+    // time one was shown as the other: the panel told him his standing drain had 17 tickets left
+    // against a live 11. A single "tickets left in the epic" number cannot be both.
+    //
+    // THE ZERO THAT IS A REAL ZERO. `Unstamped` is rendered even at 0, and that is NOT the
+    // "absent must look absent" rule being broken: every remaining ticket genuinely carries a
+    // stamp today, and the count existing-and-being-zero is the signal that db84b784's filing
+    // rule is holding. It goes non-zero the moment a cycle files without one, which is the whole
+    // point of showing it.
+    //
+    // NO NEW CSS — table / td.num / td.dim, exactly as msRow() and svRow(). Same size discipline
+    // msRow()'s comment states. Sample values are this cycle's real ones; the builder splices
+    // over them and dies at exit 2 rather than publishing them if it cannot find the anchor.
+    +'<table><tr><th>Burn-down</th><th>Now</th><th></th></tr>'
+    +bdRow('Drain members still open',3,'of 23 you named for Selfbuild M3 - Independent Verification')
+    +bdRow('Open in that epic right now',8,'of 36 — a different number, and not what retires the drain')
+    +bdRow('Remaining, size S',15,'one cycle each, known fix shape')
+    +bdRow('Remaining, size M',14,'1-2 cycles, or one design choice inside')
+    +bdRow('Remaining, size L',6,'multi-cycle, design-heavy, or discovery risk')
+    +bdRow('Remaining, unstamped',0,'no size stamp recorded at filing')
+    +'</table>'
+    +'<p class="tnote">The first two rows are deliberately different numbers. The drain finishes '
+    +'on the members you <b>named</b> &mdash; that set is fixed, and it is the one that retires '
+    +'your standing order &mdash; while the epic keeps taking new tickets, which never join it. '
+    +'So the drain can reach zero with the epic still holding work, and that is correct. '
+    +'Sizes count every Selfbuild ticket not yet <b>done</b>: S is one cycle, M is one or two, '
+    +'L is multi-cycle or design-heavy.</p>'
     // ===== §16 · REVIEWER LANE — VERIFIER SCOREBOARD (SES-181 (b)) ==========================
     // John's directive 58db64ae item (2), verbatim: "SES-181 scoreboard build approved — locked
     // section extended, never renumbered." So this is APPENDED as the next number, exactly as

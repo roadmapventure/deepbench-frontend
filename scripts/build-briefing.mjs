@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.297 | scripts/build-briefing.mjs | directive db84b784 — §15's burn-down block is
+// DERIVED, never pasted forward: the drain's named-scope count, the epic's live bucket count, and
+// remaining Selfbuild work by size_stamp. The two counts are read from two different sources on
+// purpose (runner_drain_scope for the fixed named set, the epic's own rows for the live bucket) and
+// a later edit that reconciles them into one query rebuilds the defect this block was built to end
+// — briefing-automation.mjs's header has the measurement. `done` stays `status = 'done'` and nothing
+// else, byte-comparable to §15's predicate below and to SELFBUILD-CHARTER.md's own query. Guarded by
+// tests/regression/db84b784-selfbuild-burndown.js.
+//
 // DeepBench v7.0.290 | scripts/build-briefing.mjs | SES-203 — the served page drops the template's
 // DEVELOPER COMMENTARY at the write seam. John's decision 2026-08-25 (card e5be0e66): "SHRINK the
 // page so reading it is cheap, rather than paying the ~200K toll on a schedule" — the ticket's
@@ -472,7 +481,7 @@ splice("+useRow('Aug 18, 1:02 PM'", `+'</table></div>'\n    +'<p class="tnote">C
 // `status = 'done'` and NOTHING else — `delivered` is deliberately not counted, for the same reason
 // §2's "Shipped today" keys on John's Accept rather than on a push (SES-154).
 const spEpics = await sel('epics?select=id,name&name=like.Selfbuild*');
-const spItems = await sel('backlog_items?select=epic_id,status&epic_id=not.is.null');
+const spItems = await sel('backlog_items?select=id,epic_id,status,size_stamp&epic_id=not.is.null');
 const spBy = new Map(spEpics.map(e => [e.id, { name: e.name, done: 0, total: 0 }]));
 for (const it of spItems) {
   const row = spBy.get(it.epic_id);
@@ -491,6 +500,57 @@ must(`+'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'`,
   `+'<div class="bar"><div class="dev" style="width:${spPct}%"></div></div>'`, '§15 bar');
 must(`+'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '\n    +'(<b>20.6%</b>)</p>'`,
   `+'<p class="barlbl">Overall &mdash; <b>${spDone}</b> of <b>${spTotal}</b> Selfbuild tickets done '\n    +'(<b>${spPct}%</b>)</p>'`, '§15 overall');
+
+// §15's BURN-DOWN BLOCK — directive db84b784, John 2026-08-28: "yes, build the burn-down with the
+// size stamps". Six rows, one table, spliced as a unit.
+//
+// THE DENOMINATORS ARE DIFFERENT ON PURPOSE and this is the whole reason the block exists. Row 1
+// counts the members John NAMED (runner_drain_scope, FIXED at naming time — SES-142) that are
+// still open; row 2 counts the epic's LIVE open tickets. §2b already shows the first as
+// "N of M tickets left in <epic>", and briefing-automation.mjs's own header records what happens
+// when the two are confused: the panel told John his standing drain had 17 tickets left against a
+// live 11. Rendering both, labelled, is the fix — never one number reconciled into the other.
+//
+// `done` STAYS `status = 'done'` AND NOTHING ELSE, byte-comparable to the §15 predicate fifteen
+// lines above and to the charter's own query. `removed` is excluded from remaining (it is not
+// work), and `delivered` is remaining until John accepts it — the same reason §15 does not count
+// it as done and §2's "Shipped today" keys on his Accept rather than on a push (SES-154).
+const spEpicIds = new Set(spBy.keys());
+const bdRemaining = spItems.filter(i => spEpicIds.has(i.epic_id) && !['done', 'removed'].includes(i.status));
+const bdBy = s => bdRemaining.filter(i => i.size_stamp === s).length;
+const bdS = bdBy('S'), bdM = bdBy('M'), bdL = bdBy('L');
+// Unstamped is the REMAINDER, never a fourth equality test: a stamp value outside S/M/L would
+// otherwise vanish from every column and the six rows would stop summing to the population.
+const bdUn = bdRemaining.length - bdS - bdM - bdL;
+
+const bdDrains = await sel('runner_directives?type=eq.drain-epic&status=eq.queued&select=id,epic_id&order=created_at.asc&limit=1');
+const bdDrain = bdDrains[0] || null;
+let bdNamed = 0, bdOpen = 0, bdEpicName = '', bdBucketOpen = 0, bdBucketTotal = 0;
+if (bdDrain) {
+  bdEpicName = (await sel(`epics?id=eq.${bdDrain.epic_id}&select=name`))[0]?.name || '';
+  const bdScope = await sel(`runner_drain_scope?directive_id=eq.${bdDrain.id}&select=item_id`);
+  bdNamed = bdScope.length;
+  const bdScopeIds = new Set(bdScope.map(s => s.item_id));
+  bdOpen = spItems.filter(i => bdScopeIds.has(i.id) && !['done', 'removed'].includes(i.status)).length;
+  const bdBucket = spItems.filter(i => i.epic_id === bdDrain.epic_id);
+  bdBucketTotal = bdBucket.length;
+  bdBucketOpen = bdBucket.filter(i => !['done', 'removed'].includes(i.status)).length;
+}
+// NO STANDING DRAIN IS A REAL STATE, NOT AN EMPTY ROW. John unticks the drain box and there is
+// genuinely nothing to count — so the two rows say so in words rather than rendering 0 of 0, which
+// would read as "your drain is stuck at zero progress" (the same rule as §14's cost showing "—").
+const bdDrainRows = bdDrain
+  ? `+bdRow('Drain members still open',${bdOpen},${J('of ' + bdNamed + ' you named for ' + bdEpicName)})\n    `
+    + `+bdRow('Open in that epic right now',${bdBucketOpen},${J('of ' + bdBucketTotal + ' - a different number, and not what retires the drain')})\n    `
+  : `+bdRow('Drain members still open','-','no standing drain - nothing is named right now')\n    `
+    + `+bdRow('Open in that epic right now','-','no standing drain - untick means no scope to count')\n    `;
+
+splice("+bdRow('Drain members still open'", `+'</table>'\n    +'<p class="tnote">The first two rows are deliberately different numbers.`,
+  bdDrainRows
+  + `+bdRow('Remaining, size S',${bdS},'one cycle each, known fix shape')\n    `
+  + `+bdRow('Remaining, size M',${bdM},'1-2 cycles, or one design choice inside')\n    `
+  + `+bdRow('Remaining, size L',${bdL},'multi-cycle, design-heavy, or discovery risk')\n    `
+  + `+bdRow('Remaining, unstamped',${bdUn},'no size stamp recorded at filing')\n    `, '§15 burn-down');
 
 // §16 — REVIEWER LANE, the verifier scoreboard (SES-181 (b), v7.0.284). John's directive 58db64ae
 // item (2): "SES-181 scoreboard build approved — locked section extended, never renumbered."
@@ -578,6 +638,9 @@ console.log(`  seeded ${Object.keys(seed.asks || {}).length} ask targets, ${Obje
 console.log(`  cards: ${ships.length} shipped, ${gates.length} gated, ${retired.length} retired`);
 console.log(`  derived: §8 top ${board.length} of ${total}, §11 ${Object.keys(byClass).length} classes, §13 ${ladder.length} rungs`);
 console.log(`  §15 Project: ${spRows.length} Selfbuild milestones, ${spDone}/${spTotal} done (${spPct}%)`);
+console.log(`  §15 burn-down: drain ${bdDrain ? `${bdOpen} of ${bdNamed} named open (${bdEpicName})` : 'none standing'}, `
+  + `epic bucket ${bdDrain ? `${bdBucketOpen} of ${bdBucketTotal} open` : 'n/a'}; `
+  + `remaining by size S ${bdS} / M ${bdM} / L ${bdL} / unstamped ${bdUn} (${bdRemaining.length} total)`);
 console.log(`  §16 Reviewer lane: verifier blocked ${svBlocks}/${sv30.length} (${svPct(svBlocks, sv30.length)}%), `
   + `your Rework+Reverse ${svNeg}/${svTaps30.length} (${svPct(svNeg, svTaps30.length)}%), `
   + `auto-done eligible ${svAuto}/${sv30.length}; like-for-like overlap ${svOverlap.length} `
