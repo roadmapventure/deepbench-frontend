@@ -5,6 +5,31 @@
 
 ---
 
+## session/cycle-20260828-1730 (v7.0.288, 2026-08-28, runner cycle `0702682f-0434-4f89-9e43-c46713802fea`, `trigger = chained (drain continuation)` — the session's third cycle and its second in-session chain — model Opus 5, no subagent) — SES-51 (b): the retrieval half, and the one finding the runner refused to adjudicate
+
+`drain_chain_gate` returned `continue` and handed back **SES-51** — correctly, because `v7.0.287` had left it `partial` with its own named remainder unbuilt. Two files, both edited rather than added: `scripts/check-agent-names-in-data.js` and `tests/regression/SES-51-agent-names-in-data.js`. No `src/`/`api/`/`lib/` change, no schema change, no site change. **The ticket is now `delivered`** — both halves of its scope are swept and nothing remaining is the runner's.
+
+### The scope was decided by measurement, not by estimate
+
+The remainder — `the_library` / `knowledge_entries` — was the half the ticket called *"also still unswept and in scope"*, and the previous cycle left it open partly because a RAG corpus sounded large enough to need its own design pass. **Measured before designing anything: 143 library rows and 36 knowledge entries.** Small, and structurally simpler than expected: `knowledge_entries` carries its own `agent_id`, so ownership is direct; `the_library` carries none, and that is not a gap — §19c makes it the Librarian's exclusively owned resource. So the extension needed **no new rule at all**, only two more derived owners in exactly the shape the assembly half already used.
+
+### What the measurement found, and why one half of it is on John's page rather than in the diff
+
+- **`the_library`: three mentions in 143 rows, all "Eleanor Voss", all in `S-LIBRARIAN-04` write-capability test rows.** The Librarian named in the Librarian's own store — exempt by the *existing* self-reference derivation, with no second rule and no allowlist entry. That the extension needed no special case here is itself the evidence the derivation was built right.
+- **`knowledge_entries`: 8 non-owner mentions, all eight in ONE row** — `DeepBench Agent Roster`, owned by `michelle`, naming eight agents by full name.
+
+That second one is **a different question from the seven Skill Profile findings**, and it was not merged into them. §19e names Michelle Manning as the broker who *"resolves the executing agent herself, as her own reasoning output, not a static field"* — so a roster in her knowledge store is either exactly that role working, in which case Rule #1 needs a stated Project-Manager exemption the sweep should then derive, or it is the static field §19e warns against. **The runner did not pick.** Inventing a broker exemption would be widening Rule #1 on its own say-so, which is the single move this whole ticket exists to make impossible. Both questions are on `AGT-62`, stated as two.
+
+### The guard grew with it
+
+Two more clauses, each with its own negative control: the Librarian resolution must **throw** at zero or two matching roles rather than defaulting (an owner the check guessed at is an owner it cannot enforce), and the retrieval tables must stay in the swept surface (dropping them shrinks the ticket, not the check). Both proven by mutating the **shipped** script — `if (hits.length !== 1)` neutered, and the two table entries deleted — with the file restored byte-identical by `sha256` afterwards. The Librarian clause also resolves against the **real** roster, not only fixtures, because the live path depends on it.
+
+### The third identical block, and the third time the order was followed anyway
+
+Verifier: **BLOCK**, `build=green / hygiene=green / regression=red` — the seventeenth in the ledger carrying that triple, and the third this session. Cause confirmed the same way each time: the `CLAUDE-STATE.md` lag, cleared by the close-out render the same step mandates. `SES-213` holds the fix. The order was followed rather than quietly improved, for the third time, for the same reason: a cycle that reorders the procedure so its own verdict looks better is the self-certifying move the charter forbids.
+
+---
+
 ## session/cycle-20260828-1717 (v7.0.287, 2026-08-28, runner cycle `b70a8c5f-4977-480c-b2e9-e412ca2e6acf`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — a chained cycle is exempt from pacing by design — model Opus 5, no subagent) — SES-51: Rule #1 becomes a check on Skill data, and it finds seven live violations
 
 The in-session continuation of the M3 drain after `v7.0.286`. `drain_chain_gate` returned `continue` naming `SES-51 — Nothing enforces the no-agent-names rule on Skill data; add a mechanical sweep`. Two files: `scripts/check-agent-names-in-data.js` and `tests/regression/SES-51-agent-names-in-data.js`, both new. No `src/`/`api/`/`lib/` change, no schema change, no site change.
