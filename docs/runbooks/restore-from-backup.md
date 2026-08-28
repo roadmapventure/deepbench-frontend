@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.292 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN END TO END FOR THE FIRST TIME AND THE ANSWER IS 32.8%. John cleared the last blocker himself at 20:27Z (runner_secrets row SCRATCH_SUPABASE_SERVICE_KEY, card 528ab5ba, his own words: "read the key by that NAME, load the data half, score exit criterion 5"). It was read by name, the data half ran, and CHARTER EXIT CRITERION 5 IS STILL NOT SCORED — because "executed successfully" is not true and writing it would be the same falsehood as scoring it on the structural half. WHAT ACTUALLY HAPPENED, every number from a command run this cycle against itcimllfniypelrxsuoh with refresh-2026-08-28: the documented §5b command failed on ALL 56 tables with 403 / 42501, because schema.sql emits ZERO executable GRANT statements — it records all 68 relation ACLs as COMMENTS. THE REPAIR IS DERIVABLE FROM THE SET ITSELF (148 GRANTs reconstructed from those 68 comment lines), which is what let the drill continue and is why this is an emission-form defect and not lost data. After the repair: 51 of 56 tables loaded, 17,177 rows, EVERY loadable table matching its manifest count EXACTLY, zero mismatches — the arithmetic closes (52,403 manifest − 35,226 unrestorable = 17,177 restored), which is the proof that nothing partially loaded. FOUR DEFECTS, all new, all filed as SES-216: no executable grants; no column-level grants in any form (production's ai_activity_log column ACL is the LOG-124 privacy fix and the set does not carry it); generated columns dumped and therefore unrestorable (34,761 + 24 rows, plus 124 cascading); and a jsonb NOT NULL column holding the JSON scalar null, which cannot survive the NDJSON round trip (312 rows lost to 2). THE ONE AN EDITOR MUST READ BEFORE FIXING ANY OTHER: the obvious repair for the dark AI Audit screen is GRANT SELECT ON ai_activity_log TO anon, and that REBUILDS THE LOG-124 LEAK. The correct restore is the column list. QA IS THE DRILL, with two negative controls rather than one: the same eight app projections through the app's OWN client, production vs restored, agreeing on 6 including a 42501 that production also returns (backlog_active — a denial faithfully reproduced is evidence, not a failure); and the pre-repair 403 against the post-repair load, one variable. Doc only; no src/api/lib change, no migration, no schema change to PRODUCTION, no site change. Stamp count held at 5 per session-hygiene check 7: v7.0.245 moved VERBATIM to docs/SESSIONS.md's appendix, checked first by grep rather than recollection — all four of its editor warnings (the misleading message is the expensive part; the tooling lives in the backups repo not this one; the scratch project is John's last free slot and is not deletable by the runner; the two reader sites, line 68 being insufficient alone) are already restated in this file's own body. -->
 <!-- DeepBench v7.0.291 | docs/runbooks/restore-from-backup.md | DIR-c98048a5 — THE STANDING RECOVERY NET IS NO LONGER THE ONE THAT CANNOT REBUILD THE DATABASE. John's directive c98048a5 (2026-08-25, attended architect session, verbatim: "authorize the refresh") executed end to end from an unattended cloud container: fresh set refresh-2026-08-28 dumped from live production (56 base tables / 53,609 rows / 155.2 MB / 0 tables with missing rows / POSIX manifest paths), redacted, proven, and pushed to deepbench-backups-offsite main at 5a99272 ALONGSIDE — never replacing — selfbuild-step0-2026-08-23. THE CLAIM THIS SHIP IS ENTITLED TO MAKE, and it is measured with ONE VARIABLE rather than argued: tests/regression/SES-191-backup-path-portability.js Part 4, same command, DEEPBENCH_BACKUP_SET pointed at each set — PASS on the new one, FAIL on the standing one, on ai_activity_log_id_seq, which is the exact defect §9's first bullet said only a re-dump could repair. So v7.0.250's fix is now confirmed IN THE ARTIFACT a person restores from, not merely in the view that generates it. THE BAR THAT ACTUALLY GUARDS THIS, and the half a later cycle will be tempted to shorten: a raw dump carries ANTHROPIC_API_KEY, VERCEL_TOKEN, SUPABASE_SERVICE_KEY and the Vercel bypass secret as live plaintext, so the redaction is the only thing between a refresh and a credential leak. It was proven BEFORE the push, in both directions — a byte-level scan of all 81 files / 155.7 MB across six credential patterns AND an exact-match arm holding the four live values read straight from the running platform returned ZERO hits, while its NEGATIVE CONTROL (the same scanner against the un-redacted runner_secrets.ndjson a raw dump produces) returned 6 hits and exit 1. A one-directional scan would have passed on a set nobody had redacted. THE DEFECT THAT CONTROL FOUND IN THE SCANNER ITSELF, fixed before the real run: a directory it could not walk scanned ZERO files and still printed PASS — "nothing matched" and "nothing was looked at" must never render the same, so files==0 now exits 2. TWO STALE CLAIMS IN THIS FILE ARE CORRECTED RATHER THAN WORKED AROUND, both read live at refs/heads/main and not recalled: §4's and §9's "the fix lives only on branch ses191/backup-path-portability, not on main" is FALSE — main carries relPosix() and both readers' entryPath(), and this very set was dumped with that main tooling. Leaving it would send someone mid-outage hunting a merge that already happened. WHAT IS CARRIED FORWARD AND SAID SO: machine-local/ is John's machine state and a cloud container cannot capture it, so it is copied verbatim from the 2026-08-23 set and LABELLED as of 2026-08-23 in the new set's own RESTORE-PROCEDURE.md — included rather than omitted so the newer set is not a downgrade for hooks, labelled rather than copied silently so five-day-old machine files are not dated as fresh. NOT FIXED HERE, named rather than left to be found: SES-214's two schema.sql defects (the two _backup_* views undefined; VIEWS emitted before FUNCTIONS) are in this set as in every set dumped today — they live in public._backup_schema_ddl, they change what EVERY future dump contains, and they deserve their own revalidation rather than riding along inside a directive claimed for a refresh. The new set's procedure file carries the two-step workaround. AND THE PRECEDENT IS EXPLICITLY NOT WIDENED: the directive's own words are "recurring/automated refresh remains the M4 gate's open question — do not schedule, do not repeat without John's word", so §7's manual-step rule and §9's unattended-cycle prohibition stand unchanged for every cycle after this one. Stamp count held at 5 per session-hygiene check 7: v7.0.229 moved VERBATIM to docs/SESSIONS.md's appendix, checked first by grep rather than recollection — its one editor warning (the per-snapshot RESTORE-PROCEDURE.md is that snapshot's own record and this runbook wins where they disagree) is already restated in §1's table at the RESTORE-PROCEDURE.md row. Doc only; no src/api/lib change, no schema change, no site change. -->
 <!-- DeepBench v7.0.285 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL'S STRUCTURAL HALF IS EXECUTED AND EVIDENCED; ITS DATA HALF IS STOPPED BY A NETWORK EGRESS ALLOWLIST, WHICH IS A DIFFERENT KIND OF BLOCKER FROM THE ONE §9 CARRIED. Executed this cycle, every number from a command run: a dump taken from LIVE PRODUCTION today (64 files, 53,379 rows, 154.9 MB, 0 tables with missing rows, 0 failures, one known-harmless ai_call_patterns view warning), redacted FIRST (5 of 5 runner_secrets values nulled, names+notes kept, manifest re-hashed) and leak-scanned across all 70 files for sb_secret_/sk-ant-/eyJhbGciOiJ/the Vercel bypass secret — ZERO hits — then verified: 66 files | 53,380 lines | malformed 0 | bad checksums 0 | duplicate PKs 0 | missing PKs 0 | row-count mismatches 0 | PASS, with all 56 of 56 manifest entries POSIX, which is the v7.0.249 writer fix confirmed on a set dumped TODAY rather than argued from the diff. The scratch project's public schema was DROPPED and asserted empty (0 relations / 0 functions / 0 sequences) before schema.sql was applied, so §5c's "new/empty project only" precondition is met by measurement and not by assumption. Restored vs live production: 56/56 base tables name-for-name, 628/628 base-table columns, 101/101 indexes, both sequences present with START WITH 38339 / 34 (production's next values), and both caller_ip_masked columns GENERATED ALWAYS with no DEFAULT — i.e. v7.0.250's two fatal defects confirmed fixed on the artifact a person would actually restore from. THE BLOCKER, AND IT IS NOT A DECISION JOHN OWES: restore-supabase.mjs cannot reach the scratch project from the runner's container at all — "HTTP 403: Host not in allowlist: itcimllfniypelrxsuoh.supabase.co" — measured with a SAME-SECOND NEGATIVE CONTROL, production's host returning HTTP 200 on the identical request shape. So it is the environment's network egress settings, not a credential, a script, or a set defect. The Supabase MCP connector does reach the scratch project (that is how the schema above was applied) and can NEVER close the data half: 155 MB of row data cannot travel through tool calls. He already granted both authorizations on card a9278eca; what remains is one line of environment configuration. THE EDIT THIS SHIP FORBIDS: scoring charter exit criterion 5 on the structural half. The half that is missing is the half a real outage needs — data in the target and a platform booted against it — and this drill still has neither. SES-191 stays partial. Guarded by tests/regression/SES-191-backup-path-portability.js Part 5, NEW and aimed at the claim §9 already made with nothing behind it — that the redaction "is the only thing standing between a refresh and a credential leak" — asserting on a real set that every runner_secrets value is null, that the rows keep their NAMES (a set that nulled whole rows passes a leak check and loses the inventory of which credentials to re-enter), and that the manifest sha256 MATCHES the redacted file, because a redaction without a re-hash leaves a set that fails its own --verify-only as "file altered since backup" and the restore path then refuses to run mid-outage on the one copy that was safe to publish. Four QA arms, the decisive one being file-level: the PRE-CHANGE guard from origin/dev passes, exit 0, on a set carrying a live credential. Doc + test; no src/api/lib change, no schema change to production, no site change. -->
 <!-- DeepBench v7.0.250 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN INTO A REAL SCRATCH PROJECT AND THE RECOVERY NET DID NOT REBUILD. John granted the $0 scratch slot on card a9278eca; project deepbench-restore-drill (itcimllfniypelrxsuoh) created after get_cost confirmed $0/month, so his standing dollar guard never fired. TWO INDEPENDENT FATAL DEFECTS IN schema.sql, each found by EXECUTING rather than reading: (1) ai_activity_log.id and tasks.id default to nextval() on sequences the set creates nowhere -> 'relation "ai_activity_log_id_seq" does not exist'; (2) the two GENERATED ALWAYS ... STORED columns were emitted as DEFAULT expressions -> 'cannot use column reference in DEFAULT expression', which kills the entire CREATE TABLE. Either alone makes the net un-restorable. ROOT CAUSE IS THE VIEW, NOT THE SCRIPT, and that is the thing an editor will get wrong: schema DDL is generated server-side by public._backup_schema_ddl and pulled verbatim, so patching dump-supabase.mjs would have changed nothing. The view's CASE handled a.attidentity and never a.attgenerated, and it had no sequences branch at all. Fixed in migration ses191_backup_schema_ddl_sequences_and_generated_cols, before-image first. ROUND-TRIP PROVEN, and the hand-made sequences were DROPPED first so the proof rests on the emitted DDL rather than the manual step: the new DDL applies to the clean project, a row inserts, caller_ip_masked computes 203.0.113.47 -> xxx.xx.113.47 (the LOG-124 masking control survives a restore), and id comes out 38249 — production's next value, because sequences are emitted with START WITH last_value+1; a bare CREATE SEQUENCE restores at 1 and collides with the rows the restore just loaded. THE FALSE GAP THAT WAS CHECKED AND EXCLUDED: live has 56 tables to the set's 52, but all four (briefing_comments, governance_rules, issued_versions, runner_verdicts) postdate the 2026-08-24T02:09Z snapshot — staleness, not a dumper defect, so it is not reported as one. A corrected dump was produced and verified (66 files, 52,823 lines, 0 bad checksums, all four guard parts green) and DELIBERATELY NOT COMMITTED, for two reasons the repo's own contract states and this cycle nearly walked past: John ruled automated offsite refresh is the M4 gate's open question and a manual step until then, and a RAW dump carries ANTHROPIC_API_KEY, VERCEL_TOKEN, SUPABASE_SERVICE_KEY and the Vercel bypass secret as live plaintext in data/runner_secrets.ndjson, where the committed set has all five NULL. Pushing it would have leaked every platform credential to git; §7's redaction step is the only thing preventing that, and §9 now says so with the measurement. The raw set was deleted from the container and the standing set re-verified untouched (PASS). Guarded by tests/regression/SES-191-backup-path-portability.js Part 4, whose negative control is the STANDING set — it fails there, on purpose, and passes on a post-fix set. Doc + test + migration; no src/api/lib change, no site change. -->
 <!-- DeepBench v7.0.249 | docs/runbooks/restore-from-backup.md | SES-191 — THE SEPARATOR DEFECT IS FIXED IN THE TOOLING, AND §4'S MANUAL WORKAROUND IS RETIRED. John granted both authorizations on card a9278eca (2026-08-25, attended architect session, verbatim: "BOTH AUTHORIZATIONS GRANTED — the $0 scratch-restore slot and rebuilding the offsite archive so it opens machine-free"); this ship takes only the second. Three files on branch `ses191/backup-path-portability` of roadmapventure/deepbench-backups-offsite: dump-supabase.mjs gains relPosix() so manifests store POSIX separators always (future sets clean), and BOTH readers gain entryPath() so either separator resolves (the half that repairs sets ALREADY TAKEN — including the one standing as the live recovery net, which cannot be retaken retroactively). THE SITE THE TICKET DID NOT NAME, and the reason a source-level fix list was not enough: restore-supabase.mjs resolves rec.file at TWO sites, the integrity check (was :68) and the data read (was :102). Fixing only the first produces a run that reports "Integrity: all 52 files match their checksums" and then fails the actual restore — a later failure with more confidence behind it, mid-outage. MEASURED against the real stored set, both directions: verify-backup.mjs files 0 / bad checksums 62 / FAIL exit 1 -> files 62 / lines 51718 / bad checksums 0 / PASS exit 0; --verify-only "52 problem(s)" exit 1 -> "all 52 files match" exit 0; --all dry run exit 0 with every data file read and planned (that last is what exercises the :102 site — --verify-only never touches it). The writer half is a NO-OP ON LINUX, so it is proven against the Windows path flavour and labelled as a proof of the expression rather than a Windows run: path.win32.relative(...) -> "data\agents.ndjson", relPosix -> "data/agents.ndjson". Guarded by tests/regression/SES-191-backup-path-portability.js Part 3, which RUNS the real verify-backup.mjs against a foreign-separator fixture — a source grep was rejected as the gate because it passes on a script that imports the helper and forgets to call it at one of two sites, which is the bug found here — with two negative controls: the pre-fix script fails it (exit 1), and a wrong-checksum fixture must still be rejected or an unconditional exit 0 would satisfy the first assertion. WHAT THIS SHIP IS NOT, all three named rather than left to be found: the fix is ON A BRANCH AND NOT MERGED, so a fresh clone of the backups repo mid-outage still gets the broken readers (that merge is John's call — the repo is what the platform falls back to); the second tooling copy at C:/Projects/deepbench-backups is untouched and will diverge; and THE RESTORE DRILL HAS NOT RUN, so charter exit criterion 5 is still unscored and SES-191 stays `partial`, which is the honest status rather than a cautious one. Doc + test here; the three script edits live in the backups repo. No src/api/lib change, no site change. -->
-<!-- DeepBench v7.0.245 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN OFF JOHN'S MACHINE FOR THE FIRST TIME AND THE RECOVERY NET DOES NOT OPEN THERE. Measured 2026-08-25 by cycle c8c2d547 against the offsite copy from a Linux container: `restore-supabase.mjs --verify-only` reported all 52 tables FILE MISSING and exited 1, and the restore path's own guard then aborts with "Refusing to restore from an altered backup." NOTHING IS ALTERED — 52 of 52 files resolve after normalizing one path separator, with 0 checksum mismatches over 50,841 rows, `verify-backup.mjs` PASS over 62 files / 51,718 lines, and a full `--all` dry run planning every table. Root cause is one writer line-pair: dump-supabase.mjs:159/204 build each manifest entry with `path.relative()`, which emits `data\<table>.ndjson` on Windows, and both readers (restore-supabase.mjs:68, verify-backup.mjs:28) `path.join()` it, where on POSIX that is one filename containing a backslash. THE MISLEADING MESSAGE IS THE EXPENSIVE PART, which is why §4 now carries the workaround rather than a ticket reference: mid-outage it points the person restoring at the integrity of their last backup instead of at a separator. WHAT THIS SHIP IS NOT: the tooling fix and the restore into a clean target are NOT here. The scripts live in `roadmapventure/deepbench-backups-offsite`, not this repo, and a scratch target is a second Supabase project on John's org — free ($0/mo, measured) but his last free slot and not deletable by the runner's tools. Both are carded for his decision; SES-191 stays `partial` and charter exit criterion 5 is NOT scored by this cycle. Guarded by tests/regression/SES-191-backup-path-portability.js, whose negative control is the naive join itself (neuter the normalization and it fails). Also deduplicated §7's twice-pasted automated-refresh bullet, found while in the file. Doc + test; no src/api/lib change, no site change. -->
 
 # Platform Restore — from a backup set
 
@@ -148,6 +148,12 @@ node restore-supabase.mjs <backup-set-dir> --all --confirm
 
 Foreign-key ordering is handled by multi-pass retry; a genuinely stuck table (parent
 not in the restore set) is named at the end and exits non-zero.
+
+> **This command does NOT currently work on a freshly-restored schema, and the message it gives
+> you when it fails is wrong.** `schema.sql` grants nothing, so every table comes back
+> `403 / 42501` and the script blames a foreign key. Do §9's grant reconstruction first. And know
+> before you start that even then, 5 tables and 67% of the rows will not load —
+> §9's `SES-216` bullet has the numbers and the causes.
 
 ### 5c. Schema — new/empty project only
 
@@ -321,9 +327,48 @@ refresh the offsite copy per §7.
   updates it — a machine-local step, not an unattended one.
 - **The full restore drill** (schema + data into a clean project, end to end) is `SES-191`
   (Selfbuild M3) and is **`partial`, not done — charter exit criterion 5 is not yet scored.**
-  **The STRUCTURAL half is now executed and evidenced (`v7.0.285`, 2026-08-28); the DATA half is
-  blocked by a network egress allowlist, and that is a different kind of blocker from the one
-  this bullet used to carry.** Read both halves before planning the next attempt.
+  **BOTH HALVES HAVE NOW RUN (`v7.0.292`, 2026-08-28), and the answer is 32.8%.** The structural
+  half was executed at `v7.0.285`; the data half ran this cycle, after John supplied the scratch
+  project's `service_role` key by name (`runner_secrets.SCRATCH_SUPABASE_SERVICE_KEY`, card
+  `528ab5ba`). **The egress blocker this bullet used to carry is CLEARED** — John added
+  `itcimllfniypelrxsuoh.supabase.co` to the environment's allowed domains at `19:12Z`, and
+  `restore-supabase.mjs` reached the target on the first attempt afterwards.
+
+  **What a documented full restore actually restores, measured not estimated:**
+
+  | | |
+  |---|---|
+  | tables in the set | 56 |
+  | tables restored | **51** |
+  | tables that could not load at all | **5** |
+  | rows in the set | 52,403 |
+  | rows restored | **17,177 (32.8%)** |
+  | rows unrestorable | **35,226 (67.2%)** |
+  | loadable tables whose count did **not** match the manifest | **0** |
+
+  That last row is the good news and it is worth reading twice: **every table that loaded, loaded
+  completely.** The arithmetic closes exactly (52,403 − 35,226 = 17,177), which is what proves
+  nothing loaded halfway and left a plausible-looking partial table behind.
+
+  **Why exit criterion 5 is still NOT scored.** The criterion's own words are *"executed
+  **successfully**"*. A restore that returns a third of the rows and a platform whose largest audit
+  table is empty has not succeeded; writing the criterion green here would be the same falsehood as
+  scoring it on the structural half was. The five stoppers are `SES-216` and are the bullet below.
+
+  **What the restored platform can and cannot do**, measured with the app's **own** Supabase client
+  and each project's publishable key, the same eight projections against production and against the
+  restored copy:
+
+  | projection | production | restored | |
+  |---|---|---|---|
+  | `agents`, `capabilities`, `the_library`, `platform_stats`, `skill_profiles` | ok | **ok, same counts** | ✓ |
+  | `backlog_active` | `42501` denied | **`42501` denied** | ✓ *faithful* |
+  | `ai_call_patterns` | 1 row | 0 rows | ✗ *its source table is empty* |
+  | `ai_activity_log` | 1 row | **`42501` denied** | ✗ *the column grant is missing* |
+
+  The `backlog_active` row is a **denial faithfully reproduced**, which is evidence the grant
+  restore is right, not a failure — production denies `anon` there too. The `ai_activity_log` row
+  is the real divergence and is defect (2) below.
 
   **What was executed.** A dump taken from live production **this cycle** was redacted, verified
   (`66 files | 53,380 lines | malformed 0 | bad checksums 0 | duplicate PKs 0 | missing PKs 0 |
@@ -344,21 +389,12 @@ refresh the offsite copy per §7.
   rather than inferred from the view's diff — which is the only form of that claim worth having,
   since the artifact is what a person restores from.
 
-  **What stopped it, and it is not a decision.** `restore-supabase.mjs` cannot reach the scratch
-  project from the runner's cloud container at all: `HTTP 403: Host not in allowlist:
-  itcimllfniypelrxsuoh.supabase.co`. Measured with a same-second negative control —
-  `rallojeqnkgtxgsdsnqm.supabase.co` (production) returns **HTTP 200** on the identical request
-  shape, `itcimllfniypelrxsuoh.supabase.co` returns nothing. So the environment's **network egress
-  settings** admit the production Supabase host and not the scratch one. The Supabase MCP
-  connector *does* reach the scratch project — that is how the schema above was applied — but
-  **155 MB of row data cannot travel through tool calls**, so that channel closes the structural
-  half and can never close the data half.
-
-  **Therefore the remaining step is one line of environment configuration, not an authorization.**
-  John already granted both authorizations (card `a9278eca`, 2026-08-25) and the $0 scratch slot
-  is live and now holds the restored schema. Adding the scratch project's host to the
-  environment's network egress allowlist is what unblocks the data restore and the platform boot;
-  until then no unattended cycle can score exit criterion 5, however much budget it has.
+  **The two blockers that used to sit here are both CLEARED, by John, on 2026-08-28** — the
+  network egress allowlist at `19:12Z` (card `599e76bb`) and the scratch `service_role` key at
+  `20:27Z` (card `528ab5ba`, entered straight into the Supabase dashboard so the value never
+  transited a transcript). Neither is an open ask any more, and a later cycle finding this bullet
+  must not re-card either one. **What remains is not an authorization and not an environment
+  setting — it is four defects in the backup set itself**, below.
 
   **Still true and unchanged:** the scratch project consumes John's remaining free slot, holds a
   second full copy of platform data, and is **not deletable by the runner's own tooling**
@@ -398,5 +434,65 @@ refresh the offsite copy per §7.
   own backup views. **Until it lands, a restore is a two-step job:** run `schema.sql`, then re-run its
   `VIEWS` section a second time (idempotent — every statement is `CREATE OR REPLACE`) and restore the
   two `_backup_*` views from `migrations.sql`.
+- **`schema.sql` CARRIES NO EXECUTABLE GRANTS, SO A RESTORED PLATFORM CAN NEITHER BE WRITTEN TO NOR
+  READ BY THE BROWSER — plus three more stoppers (`SES-216`, found live 2026-08-28 by the
+  `v7.0.292` drill).** Four defects, each fatal on its own, none of them visible from a manifest, a
+  checksum, or `--verify-only`. All four were found the same way `SES-214`'s pair was: by running
+  the documented restore and reading what came back.
+
+  1. **No table grants.** `schema.sql` records all 68 relation ACLs as **comments**
+     (`-- relacl for public.X: {…}`) and emits **zero** `GRANT` statements — `grep -c GRANT
+     schema.sql` is `0`. On the restored project only the owner `postgres` holds any privilege;
+     `service_role`, `anon` and `authenticated` hold none. So §5b's own command fails on **every**
+     table with `HTTP 403` / `42501 permission denied for table agents`, and the browser cannot
+     read anything either. **The good news, and the reason this is an emission-form bug and not
+     lost data: the information is all there.** This cycle reconstructed **148 `GRANT` statements
+     from those 68 comment lines** — nothing external — applied them, and the restore then ran.
+     That reconstruction is the manual repair below.
+  2. **No column grants, in any form.** Production carries **column-level** ACLs on exactly the two
+     tables `.claude/rules/supabase-column-grants.md` governs — `ai_activity_log` (27 columns
+     granted to `anon`, `caller_ip` deliberately excluded: the `LOG-124` privacy fix) and
+     `ip_org_cache` (7 columns). `schema.sql` reads `pg_class.relacl` only and never
+     `pg_attribute.attacl`, so **no set contains them at all** and the restored platform serves the
+     AI Audit screen a `42501`. **READ THIS BEFORE YOU FIX ANYTHING ELSE HERE.** The obvious repair
+     for that dark screen is `GRANT SELECT ON ai_activity_log TO anon` — and that **rebuilds the
+     `LOG-124` leak**, making every visitor's IP publicly readable again. The correct restore is the
+     column list, and defect (1) must be fixed in a form that carries column ACLs or it will be
+     "fixed" that way by whoever is mid-outage.
+  3. **Generated columns are dumped and therefore cannot be restored.** `dump-supabase.mjs` writes
+     `caller_ip_masked` into the `.ndjson` for `ai_activity_log` and `ip_org_cache`; both are
+     `GENERATED ALWAYS AS (…) STORED`, so PostgREST refuses the insert —
+     `428C9 cannot insert a non-DEFAULT value into column "caller_ip_masked"`. **This is the direct
+     cost of `v7.0.250`'s fix** that made those columns correctly generated: the two halves of the
+     recovery net now contradict each other. It loses `ai_activity_log` (**34,761 rows**, the
+     platform's largest table), `ip_org_cache` (24), and `pattern_candidates` (124) cascading on its
+     FK — **34,909 of the 35,226 lost rows.**
+  4. **A JSON `null` in a `jsonb NOT NULL` column cannot survive the NDJSON round trip.**
+     `pending_confirmations.proposed_action` is `jsonb NOT NULL`, and 2 of its 312 rows hold the
+     **JSON scalar `null`** (`pg_typeof` `jsonb`, `length(…::text)` = 4) — a perfectly legal value
+     that satisfies `NOT NULL`. The dump serialises it as `"proposed_action": null`; the restore
+     reads that back as **SQL `NULL`** and dies with
+     `23502 null value in column "proposed_action" violates not-null constraint`. The whole table is
+     lost to two rows. Production has **zero** SQL `NULL`s there, so nothing in the manifest, the
+     checksums, or `--verify-only` can see this — **only a real restore can.**
+
+  **AND THE DIAGNOSTIC HOLE THAT HID ALL FOUR, which is not a defect in the set but cost this drill
+  the most time.** `restore-supabase.mjs` prints the underlying HTTP error only on **pass 6**, while
+  its stall guard `break`s at the first pass that makes no progress. So a total failure reports one
+  sentence — *"likely a foreign key whose parent is not in this restore set"* — and never shows the
+  `403` that actually happened. That sentence was wrong about all five tables. Every root cause above
+  had to be re-derived by hand, outside the tool, by replaying its own batching. **Print the error on
+  the stall too**; mid-outage that sentence sends the person restoring after a phantom FK.
+
+  **UNTIL `SES-216` LANDS, A FULL RESTORE IS A FOUR-STEP JOB** (on top of `SES-214`'s two):
+  run `schema.sql`; re-run its `VIEWS` section and restore the two `_backup_*` views from
+  `migrations.sql` (`SES-214`); **reconstruct the grants from `schema.sql`'s own `relacl` comment
+  lines and apply them, then re-add the two column-grant lockdowns by hand from
+  `.claude/rules/supabase-column-grants.md`**; then `--all --confirm`, and expect the five tables
+  above to fail. **Restore `runner_secrets` from a set only if the set is not the redacted offsite
+  copy** — §6 already says never to, and `--all` does not honour that: the redacted values are
+  `NULL` against a `NOT NULL` column, so the documented full-restore command exits non-zero on the
+  offsite copy **by construction**, every time.
+
 - View data can fail to dump (e.g. `ai_call_patterns`, server-side timeout) —
   harmless; views are derived and rebuild from `schema.sql`.

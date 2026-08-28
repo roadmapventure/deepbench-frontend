@@ -5,6 +5,88 @@
 
 ---
 
+## session/cycle-20260828-2029 (v7.0.292, 2026-08-28, runner cycle `6080ef8d-89e9-4bb6-b10f-46c7045d8d28`, `trigger = scheduled`, `scheduler_gate` verdict `run`)
+
+**`SES-191` — the restore drill's data half finally ran, and the recovery net returns 32.8%.**
+
+John cleared the last blocker himself at `20:27Z`, eight minutes before this cycle opened: card
+`528ab5ba` accepted, `runner_secrets.SCRATCH_SUPABASE_SERVICE_KEY` entered straight into the
+Supabase dashboard so the value never transited a transcript, with his instruction on the card —
+*"read the key by that NAME, load the data half, score exit criterion 5. If the key 401s (wrong key
+pasted), re-card rather than guess."* The key did not `401`. It `403`'d on **privileges**, which is
+neither outcome his card anticipated.
+
+### The documented restore fails on every table, and the message it gives you is wrong
+
+`restore-supabase.mjs --all --confirm` stalled on pass 1 with all 56 tables listed under *"likely a
+foreign key whose parent is not in this restore set."* Replaying one table's push by hand gave the
+real error: `403` / `42501 permission denied for table agents`. **`schema.sql` emits zero `GRANT`
+statements** — it records all 68 relation ACLs as comments. On the restored project only the owner
+held any privilege.
+
+That diagnostic hole is worth naming on its own: the script prints the underlying HTTP error only on
+pass 6, while its stall guard `break`s at the first pass that makes no progress. Every one of this
+cycle's five root causes had to be re-derived outside the tool.
+
+### The repair came out of the set itself, which is what let the drill continue
+
+148 `GRANT` statements reconstructed from those 68 comment lines — nothing external — then the
+documented command again:
+
+| | |
+|---|---|
+| tables restored | **51 of 56** |
+| rows restored | **17,177 of 52,403 (32.8%)** |
+| loadable tables whose count did **not** match the manifest | **0** |
+
+`52,403 − 35,226 = 17,177` closes exactly, which is the proof that every table that could load
+loaded *completely* rather than several loading halfway and looking plausible.
+
+### Five tables cannot load, each root-caused
+
+`ai_activity_log` (34,761 rows) and `ip_org_cache` (24) fail `428C9` — the dump writes
+`caller_ip_masked`, which `v7.0.250` correctly made `GENERATED ALWAYS`, so the two halves of the
+recovery net now contradict each other. `pattern_candidates` (124) cascades on its FK to the first.
+`runner_secrets` dies because the offsite copy's redacted values are `NULL` against a `NOT NULL`
+column — so §5b's own command exits non-zero on the offsite set **by construction**, which §6's
+*"never restore `runner_secrets` from the offsite copy"* never said out loud.
+
+`pending_confirmations` (312 rows, lost to 2) is the subtle one: `proposed_action` is
+`jsonb NOT NULL` and two rows hold the **JSON scalar `null`** (`pg_typeof` `jsonb`, length 4), which
+satisfies `NOT NULL`. NDJSON cannot distinguish that from SQL `NULL`, so the value is legal going out
+and illegal coming back. Production has zero SQL `NULL`s there — **no manifest, checksum or
+`--verify-only` can see this; only a real restore can.**
+
+### Does it boot? Measured against production with one variable
+
+The same eight app projections, through the app's own Supabase client and each project's publishable
+key. Six agree, including `backlog_active` returning `42501` on **both** — a denial faithfully
+reproduced is evidence the grant restore is right, not a failure.
+
+The one real divergence: `ai_activity_log` returns a row on production and `42501` on the restored
+copy, because production carries **column-level** ACLs (27 columns, `caller_ip` excluded — the
+`LOG-124` privacy fix) and `schema.sql` reads `pg_class.relacl` only, never `pg_attribute.attacl`.
+**No set contains them in any form.** The trap that sets, written into the runbook rather than left
+to be found: the obvious fix for the dark Audit screen is `GRANT SELECT ON ai_activity_log TO anon`,
+and that rebuilds the `LOG-124` leak.
+
+### Exit criterion 5 is still NOT scored
+
+The criterion says *"executed **successfully**."* A restore needing a hand-built grant repair to
+start, returning a third of the rows, and rebuilding a platform with an empty audit table has not
+succeeded — scoring it green would be the same falsehood as scoring it on the structural half was.
+`SES-191` stays `partial`. What changed is that the remaining unknown is now measured rather than
+unknown, and the four defects are `SES-216` (`P10 - Tooling`, tier `now`, Selfbuild M3), filed
+rather than fixed — three of them live in `public._backup_schema_ddl` alongside `SES-214`'s pair,
+where one fix and one re-dump should close all five.
+
+**What was deliberately not done:** `anon` was never granted anything it does not hold in
+production. The `v7.0.290` cycle's refusal to force the load through a temporary `anon` write grant
+is upheld, not quietly reversed — the grant repair reconstructs the set's *recorded* ACLs and
+nothing else, which is exactly why the `ai_activity_log` read is denied.
+
+---
+
 ## session/cycle-20260828-1940 (v7.0.291, 2026-08-28, runner cycle `8ab485b8-daf0-40c9-8b51-5334acee7b2e`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — DIR-c98048a5: the offsite recovery net is refreshed, and the set that could not rebuild the database is no longer the one you would restore from
 
 Selection landed on **layer 1a**, not the drain and not the board: `runner_directives` `c98048a5`, John's word from an attended architect session on 2026-08-25 — verbatim **"authorize the refresh"** — had been sitting `queued` for three days.
@@ -8912,3 +8994,5 @@ restated in the runbook's own body.
 
 *(Restated in the body at §1's table, the `RESTORE-PROCEDURE.md` row: "That snapshot's own restore
 notes (snapshot-specific; this runbook is the canonical procedure)".)*
+
+<!-- DeepBench v7.0.245 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL RAN OFF JOHN'S MACHINE FOR THE FIRST TIME AND THE RECOVERY NET DOES NOT OPEN THERE. Measured 2026-08-25 by cycle c8c2d547 against the offsite copy from a Linux container: `restore-supabase.mjs --verify-only` reported all 52 tables FILE MISSING and exited 1, and the restore path's own guard then aborts with "Refusing to restore from an altered backup." NOTHING IS ALTERED — 52 of 52 files resolve after normalizing one path separator, with 0 checksum mismatches over 50,841 rows, `verify-backup.mjs` PASS over 62 files / 51,718 lines, and a full `--all` dry run planning every table. Root cause is one writer line-pair: dump-supabase.mjs:159/204 build each manifest entry with `path.relative()`, which emits `data\<table>.ndjson` on Windows, and both readers (restore-supabase.mjs:68, verify-backup.mjs:28) `path.join()` it, where on POSIX that is one filename containing a backslash. THE MISLEADING MESSAGE IS THE EXPENSIVE PART, which is why §4 now carries the workaround rather than a ticket reference: mid-outage it points the person restoring at the integrity of their last backup instead of at a separator. WHAT THIS SHIP IS NOT: the tooling fix and the restore into a clean target are NOT here. The scripts live in `roadmapventure/deepbench-backups-offsite`, not this repo, and a scratch target is a second Supabase project on John's org — free ($0/mo, measured) but his last free slot and not deletable by the runner's tools. Both are carded for his decision; SES-191 stays `partial` and charter exit criterion 5 is NOT scored by this cycle. Guarded by tests/regression/SES-191-backup-path-portability.js, whose negative control is the naive join itself (neuter the normalization and it fails). Also deduplicated §7's twice-pasted automated-refresh bullet, found while in the file. Doc + test; no src/api/lib change, no site change. -->
