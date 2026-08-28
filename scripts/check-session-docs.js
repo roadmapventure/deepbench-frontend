@@ -1,4 +1,61 @@
 #!/usr/bin/env node
+// DeepBench v7.0.281 | scripts/check-session-docs.js | SES-45 -- CHECK 14, the remaining half of
+// the ticket. STANDARDS.md's SES-45 rule (Section 4, "A test must assert against the REAL
+// implementation. Logic recreated inside the test file is not a test -- it is a second
+// implementation agreeing with itself.") already shipped as prose (v7.0.257) and named this lint
+// as a "consider" left open. This ship mechanizes it as a check over docs/kickoffs.
+//
+// THE PREDICATE, all three parts required on one fenced block before it is reported:
+//   1. The block sits in the kickoff's SECTION 8 region (heading forms seen live: `## 8. NODE.JS
+//      TEST`, `## Section 8 -- NODE.JS TEST`). The region is bounded by nothing more than "the next
+//      ##-level heading" -- which is why Section 8b (LIVE API TEST) needs no special case to be
+//      excluded: it carries its own `## Section 8b -- ...` heading, so it simply IS the next
+//      ##-level heading and ends the Section 8 region rather than extending it. (A first draft
+//      special-cased "8b" as a continuation of Section 8 instead of a terminator and leaked its
+//      LIVE API TEST blocks into the region -- caught by hand-checking v5.2.22-AA-57 against this
+//      rule before shipping. A live-API-only block says nothing about whether the Node test
+//      recreated logic; do not resurrect that special case.)
+//   2. The block DEFINES a function (`function N(`, `async function N(`, `const N = (...) => `,
+//      `const N = function`) whose name N is ALSO named, elsewhere in the same kickoff and outside
+//      any fenced code, as a backticked `N()` -- i.e. the doc's own prose calls N the subject under
+//      test, not just a helper the block happens to declare.
+//   3. The block imports nothing real: no `import ... from`, `import(`, `require(`, or
+//      `await import(`.
+//   4. (THE DISCRIMINATOR, added beyond the ticket's original three-part predicate.) N must ALSO be
+//      a real symbol defined in this repo's own `src/`, `api/`, or `lib/` -- built once per run by
+//      walking those three directories for `.js`/`.jsx`/`.mjs` files (skipping `node_modules`) and
+//      matching `/(?:function|const|let|var)\s+N\b/`. WITHOUT THIS, the check fires on ordinary
+//      local test helpers a Section 8 block is entitled to define for itself (a fixture builder, a
+//      stub, a small comparison function) -- those are not the shipped implementation and never
+//      claimed to be, and flagging them is noise dressed as a finding. If none of the three source
+//      dirs exist, the check reports nothing rather than firing on an unverifiable name -- a check
+//      that cannot confirm the symbol is real must not guess.
+//
+// SEVERITY IS WARN, NOT FLAG, and the reason is the one v7.0.242 already used to draw the gating
+// line and check 12's header already names for the identical shape: measured live on this clone,
+// 20 hits across the 261 kickoffs (of 642) that carry a Section 8 code block at all -- the raw
+// three-part predicate returns 23, and discriminator #4 is what removes the other 3 (names the
+// prose cites and a block defines, but which are not top-level declarations in src/ | api/ | lib/,
+// so they are not verifiably production logic). Quote the 20, never the 23: the 23 is the count
+// BEFORE the discriminator this check actually ships with.
+// Shipping FLAG makes the report red on arrival for a HISTORICAL migration
+// backlog nobody has started draining yet, which is exactly the failure the gating-severity
+// discipline exists to avoid -- a report red on arrival is a report nobody reads. Check 14 is
+// therefore NOT added to GATING_CHECKS (9/10/11 only); it reports the same way check 12 does.
+//
+// AGGREGATED to ONE WARN finding, not one per hit -- the same convention checks 3c/3e already use,
+// for the same reason stated there: reported as one line so it cannot bury the actionable flags
+// above it. The detail names the count, up to 5 example `file -> recreatedName` pairs, and cites
+// docs/STANDARDS.md Section 4's SES-45 rule by name.
+//
+// TWO EDITS THIS TICKET FORBIDS, both of which would look like a tidy-up to a later editor:
+//   - Adding "14" to GATING_CHECKS. The 23-kickoff backlog is not new drift; see the severity note
+//     above. Promoting it to gating is SES-45's own follow-up ticket's call to make once the
+//     backlog is actually drained, not a default this file reaches for on its own.
+//   - Dropping discriminator #4 (the repo-symbol check) "to simplify". Without it this check stops
+//     being a fact about recreated PRODUCTION logic and starts firing on any local helper a test
+//     legitimately defines for itself -- see the discriminator's own note above.
+// Guarded by tests/regression/SES-45-recreated-logic-lint.js.
 // DeepBench v7.0.243 | scripts/check-session-docs.js | SES-200 -- CHECKS 12 AND 13, two of the
 // three pieces SES-176 shipped partial and left owned by no ticket. Check 12: a live rule's
 // statement restated outside its canonical home with no {{rule:ID}} marker. Check 13: one
@@ -1222,6 +1279,178 @@ function checkTruthTripwire(findings) {
   checkProcedureHomes(findings);
 }
 
+// ===========================================================================
+// Check 14 (SES-45): a kickoff's Section 8 test RECREATES the logic under test
+// ===========================================================================
+// See this file's header for the full predicate, the WARN-not-FLAG reasoning, and the two edits
+// this check forbids. Summary: Section-8-region fenced block, defines a function the doc's own
+// prose names (backticked `N()`) as the subject under test, imports nothing real, AND that name is
+// a real symbol in this repo's own src/ | api/ | lib/ -- all four required.
+
+// Entry heading only. Deliberately `\b8\b` via the trailing word-boundary rather than a bare "8" --
+// "8" followed immediately by a word character ("8b") fails the boundary and is correctly refused
+// entry, so "## Section 8b -- LIVE API TEST" can never be mistaken for the start of Section 8 even
+// before the "next ##-heading" rule below gets a chance to end an already-open region at it.
+const SECTION_8_START_RE = /^##\s*(?:Section\s*)?8\b/i;
+
+// Pure. The region is bounded by nothing more than "the next ##-level heading" -- see the header
+// note on why that alone is what excludes Section 8b, with no special case for it needed here.
+function section8Region(text) {
+  const lines = text.split("\n");
+  const out = [];
+  let inSec = false;
+  for (const line of lines) {
+    if (!inSec && SECTION_8_START_RE.test(line)) {
+      inSec = true;
+      out.push(line);
+      continue;
+    }
+    if (inSec && /^##\s/.test(line)) {
+      inSec = false; // any next ##-level heading ends the region, Section 8b included
+      continue;
+    }
+    if (inSec) out.push(line);
+  }
+  return out.join("\n");
+}
+
+// Pure. Fenced blocks in the region, restricted to JS-ish fences (an untagged fence defaults to
+// being read, same as the probe this was measured with -- a Section 8 Node test is JS far more
+// often than it is tagged, and an untagged real hit is worse to miss than a false read of a JSON
+// fixture block, which defines no function and so cannot itself trip the predicate anyway).
+const JS_FENCE_LANGS = new Set(["", "js", "javascript", "mjs", "node", "ts"]);
+function codeFencesInRegion(region) {
+  const out = [];
+  const re = /```(\w*)\n([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(region))) {
+    const lang = (m[1] || "").toLowerCase();
+    if (!JS_FENCE_LANGS.has(lang)) continue;
+    out.push(m[2]);
+  }
+  return out;
+}
+
+// Pure. Function-definition names inside one fenced block.
+const DEFINED_NAME_RE = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(|(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>|(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\b/g;
+function definedFunctionNames(code) {
+  const names = new Set();
+  let m;
+  DEFINED_NAME_RE.lastIndex = 0;
+  while ((m = DEFINED_NAME_RE.exec(code))) names.add(m[1] || m[2] || m[3]);
+  return names;
+}
+
+// Pure. True when the block imports a real implementation by any of the four forms.
+const REAL_IMPORT_RE = /(?:^|\n)\s*import\s[\s\S]*?from\s*['"]|(?:^|\n)\s*import\s*\(|require\s*\(\s*['"]|await\s+import\s*\(/;
+function importsRealImplementation(code) {
+  return REAL_IMPORT_RE.test(code);
+}
+
+// Pure. Names the doc's own prose calls out as the subject under test: a backticked `name()`
+// ANYWHERE in the doc, outside any fenced code -- deliberately not scoped to the Section 8 region,
+// since a kickoff typically introduces its test subject in prose (Section 5 tasks, Section 7 scope)
+// before Section 8 ever defines it.
+function backtickedSubjectNames(text) {
+  const stripped = text.replace(/```[\s\S]*?```/g, "");
+  const names = new Set();
+  const re = /`([A-Za-z_$][\w$]*)\(\)`/g;
+  let m;
+  while ((m = re.exec(stripped))) names.add(m[1]);
+  return names;
+}
+
+// Pure: findings in, findings out, no disk/network -- same contract as checkRuleTextOutsideHome.
+// kickoffDocs: Map<relPath, text>. repoSymbols: Set<name> of real symbols found in src/ | api/ |
+// lib/ (discriminator #4 in the header). An empty repoSymbols means the discriminator could not be
+// built at all (no source dirs found) -- report nothing rather than fire on an unverifiable name.
+function checkRecreatedLogicInKickoffs(findings, kickoffDocs, repoSymbols) {
+  if (!repoSymbols || repoSymbols.size === 0) return;
+  const hits = [];
+  for (const [rel, text] of kickoffDocs) {
+    const region = section8Region(text);
+    if (!region.trim()) continue;
+    const blocks = codeFencesInRegion(region);
+    if (!blocks.length) continue;
+    const subjects = backtickedSubjectNames(text);
+    if (!subjects.size) continue;
+    for (const code of blocks) {
+      if (importsRealImplementation(code)) continue;
+      const defs = definedFunctionNames(code);
+      const recreated = [...defs].filter(n => subjects.has(n) && repoSymbols.has(n));
+      if (recreated.length) hits.push({ file: rel, recreated });
+    }
+  }
+  if (!hits.length) return;
+  const examples = hits.slice(0, 5).map(h => `${h.file} -> ${h.recreated.join(", ")}`).join("; ");
+  findings.push({
+    check: "14",
+    severity: "WARN",
+    detail: `${hits.length} kickoff Section 8 test block${hits.length > 1 ? "s" : ""} define a function the kickoff's own prose names as the subject under test (a backticked \`N()\` mention outside any fenced code), import nothing real, and that name is a real symbol in this repo's src/, api/, or lib/ -- e.g. ${examples}. docs/STANDARDS.md Section 4's SES-45 rule: "A test must assert against the REAL implementation. Logic recreated inside the test file is not a test -- it is a second implementation agreeing with itself." These are HISTORICAL kickoffs predating this lint -- a migration backlog, not new drift -- which is why this is WARN, not FLAG. Reported as one line rather than ${hits.length} findings so it cannot bury the actionable flags above.`,
+  });
+}
+
+// ---- Impure edges: disk reads only, no policy. Kept thin so the guard drives the pure function
+// above directly against fixtures instead of these.
+const REPO_SYMBOL_DIRS = ["src", "api", "lib"];
+const REPO_SYMBOL_EXTENSIONS = [".js", ".jsx", ".mjs"];
+const REPO_SYMBOL_DEF_RE = /\b(?:function|const|let|var)\s+([A-Za-z_$][\w$]*)\b/g;
+
+function collectRepoSymbols(worktree) {
+  const symbols = new Set();
+  const roots = REPO_SYMBOL_DIRS.map(d => path.join(worktree, d)).filter(d => {
+    try { return fs.statSync(d).isDirectory(); } catch { return false; }
+  });
+  const stack = [...roots];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.name === "node_modules") continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (!REPO_SYMBOL_EXTENSIONS.some(ext => entry.name.endsWith(ext))) continue;
+      const text = readIfExists(full);
+      if (text === null) continue;
+      REPO_SYMBOL_DEF_RE.lastIndex = 0;
+      let m;
+      while ((m = REPO_SYMBOL_DEF_RE.exec(text))) symbols.add(m[1]);
+    }
+  }
+  return symbols;
+}
+
+function collectKickoffDocs(worktree) {
+  const dir = path.join(worktree, "docs", "kickoffs");
+  let files;
+  try {
+    files = fs.readdirSync(dir).filter(f => f.endsWith(".md"));
+  } catch {
+    return new Map(); // docs/kickoffs missing -- degrade to reporting nothing, never throw
+  }
+  const docs = new Map();
+  for (const f of files) {
+    const text = readIfExists(path.join(dir, f));
+    if (text !== null) docs.set(f, text);
+  }
+  return docs;
+}
+
+function checkRecreatedLogicLint(findings) {
+  const kickoffDocs = collectKickoffDocs(WORKTREE);
+  if (!kickoffDocs.size) return;
+  const repoSymbols = collectRepoSymbols(WORKTREE);
+  checkRecreatedLogicInKickoffs(findings, kickoffDocs, repoSymbols);
+}
+
 function main() {
   const findings = [];
   const stateText = checkClaudeState(findings);
@@ -1231,6 +1460,7 @@ function main() {
   checkStandardsDrift(findings);
   checkSessionsLogSize(findings);
   checkTruthTripwire(findings);
+  checkRecreatedLogicLint(findings);
 
   // Worktree cross-reference checks need the freshest possible CLAUDE-STATE.md/
   // FEATURES-ARCHIVE.md -- see freshDevText()'s comment for why the local
@@ -1303,6 +1533,13 @@ export {
   RULE_COPY_OVERLAP,
   PROCEDURE_MIN_CHARS,
   PROCEDURE_HISTORY_DOCS,
+  // SES-45 -- check 14, pure pieces only (findings in, findings out; no disk, no exit).
+  section8Region,
+  codeFencesInRegion,
+  definedFunctionNames,
+  importsRealImplementation,
+  backtickedSubjectNames,
+  checkRecreatedLogicInKickoffs,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
