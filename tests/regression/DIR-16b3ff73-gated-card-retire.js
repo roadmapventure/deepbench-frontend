@@ -62,10 +62,24 @@ export async function run() {
   // John's Accept writes `done`, so a rating-in-waiting now sits on a `delivered` ticket, never
   // a `done` one — and a ship card on a `done` ticket is one whose verdict already happened.
   // The file keeps its directive id because that id is history; the contract it guards evolved.
+  // RETARGETED AGAIN v7.0.282 (SES-210), and the reason is KEPT rather than replaced — deleting a
+  // guard when its rule moves loses the reason with it (the SES-196/SES-197 precedent). SES-165's
+  // kind-blind boundary rested on "only John's Accept writes `done`", which SES-181's interim
+  // auto-done bar (v7.0.247) ended: the runner can now write `done` itself, and eight ship cards
+  // were measured hidden from John on 2026-08-28 because of it. So the boundary is SPLIT, not
+  // abandoned: §6 permission cards keep the terminal predicate exactly as this assertion demanded,
+  // §5 verdict cards retire on their own `decision`. The clause below pins BOTH halves, so neither
+  // a return to the kind-blind rule nor a blanket render can pass it.
   const seg = c.slice(c.indexOf(FN));
-  assert.ok(/TERMINAL[\s\S]{0,80}whatever its kind/i.test(seg),
-    "the contract must state that a card retires when its ticket is TERMINAL (done/removed) " +
-    "WHATEVER ITS KIND — a boundary that still names one kind is the pre-SES-154 rule");
+  assert.ok(/PERMISSION card retires when its ticket is TERMINAL/i.test(seg),
+    "the contract must still retire a PERMISSION card (gated_before_build) when its ticket is " +
+    "TERMINAL (done/removed) — SES-165's rule, unchanged for §6: permission for work that already " +
+    "exists is not a question, and a blanket render puts dead asks back on John's page");
+  assert.ok(/VERDICT card is\s*\n?\s*retired by its own `decision`/i.test(seg),
+    "the contract must state that a VERDICT card (§5 ship/test) retires on its own `decision` and " +
+    "not on ticket status (SES-210) — since the auto-done bar the runner can close the ticket " +
+    "itself, and a delivery that is both self-marked done and invisible to the reviewer has " +
+    "certified itself (SELFBUILD-CHARTER.md premise 3)");
   assert.ok(/`delivered`\s+ALWAYS\s+renders/i.test(seg),
     "the contract must state that `delivered` ALWAYS renders — since SES-154 that card IS the " +
     "Accept mechanism, so a predicate reaching into `delivered` reopens the acceptance-gating " +
