@@ -5,6 +5,40 @@
 
 ---
 
+## session/cycle-20260828-1914 (v7.0.290, 2026-08-28, runner cycle `69064827-876a-4bf7-9fca-d6b3aaf99ecb`, `trigger = scheduled` fired manually, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — the served briefing page stops carrying the template's developer commentary, and a decision John made three days ago is finally read
+
+The drain handed this cycle `SES-191` and it was worked first. **John's network fix from 19:12Z is real** — verified here rather than taken from his card: the scratch host resolves and returns **HTTP 401** on `/rest/v1/` and `/auth/v1/health`, where the previous cycle measured **HTTP 403 host-not-in-allowlist**. The drill then stops one step later, on a credential.
+
+### The blocker moved, and the cheaper path was ruled out by measuring it
+
+Loading rows into the restore target needs that project's `service_role` key. It is in neither place the runner can look: `runner_secrets` holds five entries and its `SUPABASE_SERVICE_KEY` is **production's**, a different project; the Supabase connector exposes no service-key call. **The workaround was excluded rather than merely not found:** on the restored target `anon`/`authenticated` hold **zero grants of any kind** — 0 write *and* 0 SELECT — so no publishable-key load exists in either direction. Target state read directly: 56 base tables present, `backlog_items`/`runner_cycles`/`ai_activity_log`/`agents` all **0 rows**.
+
+**What was deliberately not done:** granting the scratch project temporary `anon` write access to force the data through. It would have worked, and it would have proven a restore path that is not the documented one and not the one a real outage uses — scoring exit criterion 5 on it is the same defect as scoring it on the structural half. `SES-191` stays `partial`, criterion 5 unscored, card `528ab5ba` carries the one-line ask, skip `00efba10` filed, claim released.
+
+### A flag that outlived the decision it was waiting for
+
+Dropping to the board per B24 landed on `SES-203` at queue 2, carrying `design_status = 'needs-john'`. **John decided it on 2026-08-25 at 03:33:04Z**, on gated card `e5be0e66`: *"SHRINK the page so reading it is cheap, rather than paying the ~200K toll on a schedule."* Read the sentence rather than its "OPTION B" label — it names the shrink and rejects the schedule, which is candidate **(c)**. The flag was never cleared by that tap, so every cycle for three days stepped past the top of the buildable board while the page it is about kept growing. Filed as its own card (`ff14c6b9`): **an Accept on a gated card is permission to build and must clear the flag it was filed against.**
+
+### The measurement that chose the approach
+
+Off the served copy: 358,950 bytes total, 18,827 of them the platform's injected frame-runtime, **338,032 ours**. Of ours — one renderer `<script>` at 287,826 (85.1%), inside it **670 whole-line `//` comments at 57,350 bytes (17.0%)** plus 9,718 of indentation; card bodies 89,434 (26.5%); CSS 30,144; HTML comments 17,596; `briefing-state` 8,032.
+
+**The dominant term is not John's content.** What every cycle re-reads identically on every fire is the renderer, and a fifth of the page is commentary addressed to whoever edits the *template* next. So the fix is a build-output transform: the **template in git keeps every comment byte-for-byte**; the **served artifact** drops them. Nothing is deleted from the repository — one build step declines to copy something forward. **The edit this ship forbids** is the obvious one: stripping the comments out of `briefing-template.html` itself, which deletes the warnings from their only home to shrink a file that is regenerated anyway.
+
+Measured: **64,450 bytes (41.1%)** off the template, **65,035 (18.2%)** off the last served copy. HTML comments are left alone on purpose — the title guard and the seed sentinel are load-bearing, and taking them buys 5.2% while quietly weakening a guard.
+
+### QA, and the control worth reading twice
+
+Six guard parts, every shrink assertion paired with a preservation assertion. **Part 6 is the decisive one:** template and slimmed form both rendered in jsdom with `runScripts: "dangerously"`, script *sources* removed, DOM compared — **byte-identical at 38,807 chars, 16 sections, zero errors both ways**. Credential-free on purpose, because `SES-135` renders the real built page but skips wherever credentials are absent, i.e. every CI run and every cloud cycle; a change guarded only by a permanently-skipped check is unguarded.
+
+Two file-level controls: the transform stubbed to a no-op **fails Part 1**; the scanner replaced with the naive `replace(/\/\/.*$/gm, '')` one-liner an editor would reach for **fails at the fail-closed gate** — *"stripped script did not parse: Invalid or unexpected token"*. The tempting shortcut was run and demonstrated breaking the real page, rather than argued about. Suite **91/91**, build green, hygiene gate exit 0, verifier `--dry-run` **APPROVE** on all three gates (`auto_done_eligible` no — no epic, fails closed — so the ticket is `delivered`, not `done`).
+
+### What this cycle could not do, named rather than left to be found
+
+`build-briefing.mjs`, `render-claude-state.js`, `export-backlog-snapshot.js` and `check-version-claim.js` all need `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` in the environment. **This container injects no secret env vars and has no `.env.local`**, so supplying them means writing a production `service_role` key into an agent transcript — which the routine prompt forbids without qualification. This cycle did not, and paid for it precisely: the snapshot is one ship stale, `CLAUDE-STATE.md` two, the verifier reached a verdict it could not record, the version-claim assertion was verified directly against the `issued_versions` ledger (`7.0.290 -> cycle-20260828-1914`) instead of by its script, and **the page was not rebuilt** — recoverable only because register B18 rebuilds cards from the DB, so this cycle's three cards render on the next rebuild with nothing lost. The systemic fix is two environment variables, filed as card `851d9bac`.
+
+**Named remainder:** this moves the ceiling, it does not stop the growth — `SES-188` reached the same conclusion about its own trim. Real minification of the remaining 45.6% would take more, and is a dependency decision, not a rider on this ticket.
+
 ## session/cycle-20260828-1740 (v7.0.289, 2026-08-28, runner cycle `124c0e81-c2cb-4352-be2a-712f666b281f`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, two Fable 5 design subagents) — LOG-39 is proposed for removal, and LOG-41 ships the rollup the browser was doing by hand
 
 The M3 drain returned **`blocked`** — 5 named members open, 4 waiting on John, 1 `delivered` awaiting his Accept — the clean stop directive `9feb7018` predicted when it was re-declared an hour earlier. Selection fell through to the class-sorted board, and the cycle then spent its build on the *second* ticket it picked, because the first one turned out to have nothing left to build.

@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+// DeepBench v7.0.290 | scripts/build-briefing.mjs | SES-203 — the served page drops the template's
+// DEVELOPER COMMENTARY at the write seam. John's decision 2026-08-25 (card e5be0e66): "SHRINK the
+// page so reading it is cheap, rather than paying the ~200K toll on a schedule" — the ticket's
+// candidate (c); (b), one republish per N cycles, is rejected in that same sentence. Measured on the
+// served copy before a line changed: 338,032 bytes are ours, 287,826 of them one renderer <script>,
+// and 57,350 of THAT is 670 whole-line // comments — a fifth of what every cycle must read in full
+// before the platform will let it republish, re-sent identically every fire, none of it rendered and
+// none of it John's. THE SPLIT: the TEMPLATE in git keeps every comment byte-for-byte (source of
+// truth; its editor warnings are load-bearing), the SERVED ARTIFACT does not. Nothing is deleted
+// from the repo — this step declines to COPY something forward. THE EDIT THIS FORBIDS is the obvious
+// one: stripping the comments out of briefing-template.html itself, which deletes the warnings from
+// their only home to shrink a file that is regenerated anyway (SES-188's trim is not a precedent —
+// it moved DUPLICATED provenance and archived the originals first). HTML comments are deliberately
+// untouched: the title guard and the seed sentinel are load-bearing, and taking them buys 5.2% while
+// quietly weakening a guard. FAIL-CLOSED IN TWO GATES (per-cut assertion, then vm.Script parse) —
+// a page that republishes fat costs tokens, one that republishes broken is John's only interface
+// gone, so an unrecognised or unparseable strip returns the ORIGINAL. Guarded by
+// tests/regression/SES-203-slim-served-page.js, whose Part 6 renders both forms in a DOM and asserts
+// the result byte-identical, credential-free — SES-135 renders the real built page but skips wherever
+// SUPABASE_* is absent, i.e. every CI run and every cloud cycle.
 // DeepBench v7.0.284 | scripts/build-briefing.mjs | SES-181 (b) — §16 REVIEWER LANE is derived here on
 // exactly the SES-178 terms below: four literal-value anchors (rows, bar, barlbl, tnote), every one a
 // must() that dies at exit 2 rather than publishing a sample. THE ANCHORS ARE must() AND NOT splice()
@@ -103,6 +123,7 @@ import fs from 'fs';
 // SES-162 (v7.0.204) — §2b's cycle-written half. Pure helpers live in their own module so the
 // grid arithmetic can be tested without running this builder against live Supabase.
 import { deriveAutomation, automationLiteral } from './lib/briefing-automation.mjs';
+import { slimServedPage } from './lib/slim-served-page.mjs';
 // SES-163 (v7.0.207) — everything mechanically derivable. Pure string builders live in their own
 // module for the same reason briefing-automation.mjs does: a helper only exercisable by running
 // the whole builder against live Supabase is a helper nobody tests.
@@ -536,8 +557,23 @@ must(`the lane started <b>Aug 25</b> and has '\n    +'graded <b>20</b> tickets, 
 splice('var AUTOMATION = {', '// v7.0.172, directive 603f44ea',
   automationLiteral(await deriveAutomation(sel, rpc)), '§2b AUTOMATION');
 
-fs.writeFileSync(OUT, t);
-console.log(`build-briefing: wrote ${OUT} (${t.length} bytes)`);
+// SES-203 — the served page drops the template's developer commentary. The publish gate makes a
+// cycle read this whole file before it may republish, and the comments are notes to whoever edits
+// the TEMPLATE next, which keeps every one of them. Fail-closed by construction: an unparseable or
+// unrecognised strip returns the original, so the worst case is a fat page, never a broken one.
+// `--no-slim` writes the unslimmed page, which is what the guard's negative control uses.
+const slim = argv.includes('--no-slim')
+  ? { html: t, removed: 0, applied: false, reason: 'disabled by --no-slim' }
+  : slimServedPage(t);
+if (!slim.applied && slim.reason && !argv.includes('--no-slim')) {
+  console.warn(`build-briefing: slim SKIPPED (page written unslimmed) — ${slim.reason}`);
+}
+fs.writeFileSync(OUT, slim.html);
+console.log(`build-briefing: wrote ${OUT} (${slim.html.length} bytes)`);
+if (slim.applied) {
+  console.log(`  slim: -${slim.removed} bytes of comments/indent from ${slim.blocks} script block(s) `
+    + `(${(100 * slim.removed / t.length).toFixed(1)}% of the built page); template unchanged on disk`);
+}
 console.log(`  seeded ${Object.keys(seed.asks || {}).length} ask targets, ${Object.keys(seed.reading || {}).length} reading slots`);
 console.log(`  cards: ${ships.length} shipped, ${gates.length} gated, ${retired.length} retired`);
 console.log(`  derived: §8 top ${board.length} of ${total}, §11 ${Object.keys(byClass).length} classes, §13 ${ladder.length} rungs`);
