@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260828-1516 (v7.0.283, 2026-08-28, runner cycle `7d2fc6fe-2379-4b0c-b5cc-0a8662143105`, `trigger = scheduled`, `scheduler_gate` verdict `run` (fired off the cron grid, so exempt from pacing) — model Opus 5, judgment delegated to a **Fable 5** subagent per register B21) — `DIR-60d35b49`: the Sonnet conservation window is audited, and it turns out never to have run
+
+**Directive `60d35b49` — the Sonnet conservation window** (John, 2026-08-25, *"set it up with sonnet"*) expired 2026-08-28T07:00Z owing its own clause-5 obligation: *"on Friday a full-tank Fable review … audits the entire window before anything graduates."* This cycle discharged it. One new file, `docs/harvests/DIR-60d35b49.md`, plus the regenerated `CLAUDE-STATE.md`. No `src/`/`api/`/`lib/` change, no schema change, no site change. Directive closed `shipped` via `close_directive`.
+
+### Why this cycle and not an earlier one
+
+Clause 5 names **Friday** and a **full tank**, and both were true for the first time this week only at 15:10Z, when John typed a fresh meter reading (all-models **2%** after the weekly reset). The eight cycles before this one, 07:42Z→14:42Z, all closed *"did not run — token wall"* — see the E4 finding below. This was the first cycle since 07:45Z to clear step 3.
+
+### What the window actually did — measured, not recalled
+
+27 cycles in the window; **24 did not run and every one of them closed on the same gate, `scheduler_on = false`**. The before-image ledger puts the scheduler going off at `14:01:25Z` on 08-25 — ~24 minutes **before** the directive was even filed — and staying off for **~61.7 of the window's ~64.6 hours**. **Zero Sonnet-served cycles ever reached step 5.** All three ships (`SES-135`, `SES-45`, `SES-210`) were **Opus-served**, in the window's final 2.5 hours, after John's own 02:45Z tap turned the scheduler back on. So *"run the runner on a cheaper model to conserve"* has a **sample size of nought** — the lever that conserved was the scheduler switch, and the model switch is neither vindicated nor refuted.
+
+### The clause-3 adjudication, and it is a genuine tension rather than a formality
+
+Clause 3 forbids authority-surface work and consequential migrations in the window; directive `58db64ae`, filed **16 minutes earlier**, approves `SES-210`, `SES-45` and `SES-135` **by name** and orders `SES-210` *"build this FIRST"*. Resolved **no violation** — specificity governs over recency between two directives from one sitting, clause 3's Sonnet-served premise was never engaged, and carding instead would itself have disobeyed `58db64ae`'s *"do not re-flag these needs-john"*. **The concession is recorded rather than smoothed over:** `SES-210`'s migration landed 11 minutes before expiry and shaved the clause as thin as it can be shaved; if John reads clause 3 as overriding his own named approvals, that one is a violation of the letter, and nothing in the record settles it in words.
+
+### The finding that outlives the window
+
+Clause 5 required every cycle row and ship card to be tagged `model:sonnet-window`. **0 of 27 carry it** — and the only two rows carrying the substring are the two **Opus** ships, so a tag-driven backward pass would have returned *the inverse of the truth* rather than an empty set. This audit ran instead on `started_at` and `runner_cycles.model`, two columns nobody has to remember to write. That is this platform's oldest lesson (`verifier.js`'s header records it "eight times over") with a 27-cycle controlled demonstration now attached: the repair is a window **row** plus an insert **trigger**, and window constraints fed to `verifier.js` — never a restated instruction.
+
+### The verifier lane earned its keep, and the block was not retried away
+
+Ran without `--ticket` (a directive-driven delivery has no board ticket, so eligibility fails closed — correct). Verdict **block** `b2c26c1a`: build green, hygiene green, **regression red**. Root-caused rather than re-run: the suite is 86/86 green *without* credentials and 85/86 *with* them, and the single failure is `SES-177-claude-state-renderer.js` — the committed `CLAUDE-STATE.md` had drifted from what the ledger renders. That is the same staleness this lane caught on `SES-135`, it was fixed at its cause via the specified `render-claude-state.js` close-out step, and the block stands in the ledger as recorded.
+
+### Named rather than left to be found
+
+The one-time offsite backup refresh (`c98048a5`) was **again** not started — a fourth cycle running. It is now a standing finding on John's page, not a per-cycle judgement. Two `P10 - Tooling` tickets are proposed in the harvest and **not filed** (a cycle does not file its own successors): a migration-aware `SELF_CERTIFYING_PATHS`, and the window-row mechanism above.
+
 ## session/cycle-20260828-0641 (v7.0.282, 2026-08-28, runner cycle `338c87c7-7a23-47f4-a937-4daa40da419b`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1:00 America/Chicago) — model Opus 5, no subagent delegated) — SES-210: a verdict card is retired by its own verdict, never by the runner closing the ticket
 
 **`SES-210 — Auto-done hides its own ship card, so the Reverse tap you were promised does not exist`** (`P10 - Tooling`, tier `now`, queue 256, Selfbuild epic) shipped at `v7.0.282`, **`done`** under step 7a's interim auto-done bar (verdict `192be3f9`, approve + `auto_done_eligible`). Two repo files — `docs/runbooks/briefing-page.md` (step 1c) and the new `tests/regression/SES-210-verdict-card-retire.js` — plus the retarget of `tests/regression/DIR-16b3ff73-gated-card-retire.js` and migration `ses210_ship_card_retire_on_decision`, which lives in the database and not in this repo. No `src/`/`api/`/`lib/` change, no site change.
