@@ -105,6 +105,66 @@ Every session must include a Node.js test file:
 - Deleted before committing
 - Must show `ALL TESTS PASS` to proceed
 
+### Which tests are KEPT, and which run every cycle (`SES-135` part 2, `v7.0.280`)
+
+**John's decision, card `1abe473a`, accepted 2026-08-25T14:08Z. It has three clauses and they are the
+policy of record:**
+
+1. **A regression guard gets a permanent home and is never discarded.** Its home is
+   `tests/regression/`, committed, named for the ticket it guards.
+2. **The full suite runs every cycle** — every runner cycle and every session that commits, not
+   "when the change looks risky."
+3. **A credential-gated half skips LOUDLY**, never silently.
+
+**This answers the question John asked himself** on the `q-briefing-dom-fixture` thread
+2026-08-23T00:33Z: *"yes - you should never be throwing away tests. Do we need to have a session on
+when to store tests and when to execute them?"* — and it is written down here because the answer
+being obvious is exactly what let it go unwritten.
+
+**The measurement that makes it a rule rather than a preference.** Before this shipped, the
+keep-or-discard call was a per-cycle judgement, and the judgement went the same way every time
+without anyone choosing it: the last several render harnesses were each written to a scratchpad and
+thrown away, noted in the ships as *"harness scratchpad-only"* — **six tickets deep** by the time
+`SES-135` was filed. Nobody decided to discard them. That is what an unwritten rule decides for you.
+`tests/regression/SES-135-briefing-render.js` (`v7.0.256`) is the first of that family to be kept.
+
+**Section 4's opening bullet — *"Deleted before committing"* — is NOT weakened by this, and reading
+it as weakened is the error to avoid.** The two homes are different artifacts and both are correct:
+
+| Artifact | Home | Lifetime |
+|---|---|---|
+| The session's own `test-[session-id].mjs` | worktree root, never committed | deleted before the commit |
+| A **regression guard** — a test that would notice if this defect came back | `tests/regression/` | permanent |
+
+**The question that sorts one from the other, and it is one sentence:** *would this test still be
+worth running a month from now, against a defect that could return?* Yes → it is a guard, it is
+committed, clause 1 binds. No → it verified this session's own edit and it goes with the session.
+A test does not become disposable because it was awkward to write, and **"scratchpad-only" is not a
+disposition a session may choose** — it is the failure this rule ends.
+
+**What clause 1 forbids, stated so it cannot be reasoned around:** deleting, skipping, quarantining
+or `.skip`-ing a regression guard to get a suite green. A guard that fails is reporting something.
+Fix the code, or fix the guard's assertion and say in the ship what changed and why — never remove
+the guard and never leave it passing vacuously. (This is the same boundary `SES-197`'s retargeted
+guard clause keeps: when a rule moves, the guard is retargeted, not deleted, because deleting a
+guard loses the reason with it.)
+
+**Clauses 2 and 3 are CITED here, not restated, so these rules cannot drift from their mechanics.**
+The suite's specced invocation, the `npm install` requirement and the credentials rule are Section 2
+rule 5 above — including why the form is `--env-file-if-exists=` and why a credentials flag is not a
+spend flag. The loud skip is `notRun(part, reason)` in `tests/regression/_lib/self-run.js` and the
+`NOT A FULL RUN:` line `tests/regression/run-all.js` prints from it (`SES-180` (b)). Clause 3 means
+that line is **mandatory output a reader must read**, not an optional courtesy — and it is
+deliberately not a failure, because gating on it would paint CI permanently red wherever credentials
+are absent.
+
+**The cost is real and is named rather than hidden.** Clause 2 spends budget: the suite is 85 files
+and grows with every guard clause 1 keeps. That cost was John's to accept and he accepted it — the
+card put it to him in those words (*"this half is a rule about how much of your budget the suite
+spends, so it is your call, not the runner's"*). A later session that finds the suite expensive does
+**not** get to thin it on its own judgement; that is a fresh case to put to John, exactly as the
+ladder-asymmetry rule requires.
+
 ### The rule that outranks every category below (`SES-45`, `v7.0.257`)
 
 **A test must assert against the REAL implementation. Logic recreated inside the test file is not a

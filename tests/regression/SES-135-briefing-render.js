@@ -33,9 +33,14 @@
 // rule 5 (SES-61, v7.0.253), which is the invocation that supplies them.
 //
 // WHAT THIS FILE IS NOT: part 2 of SES-135 -- John's written rule for which tests earn a permanent
-// home and which run every cycle versus on demand -- is NOT here. It is his call, carded for him,
-// and the ticket stays open until he rules. Closing SES-135 on this file alone is the thing its own
-// description forbids.
+// home and which run every cycle versus on demand -- is not here, and it no longer waits on him.
+// HE RULED on card 1abe473a, 2026-08-25T14:08Z: regression guards get a permanent home and are never
+// discarded, the full suite runs every cycle, and credential-gated halves skip loudly. That rule is
+// written in docs/STANDARDS.md Section 4, "Which tests are KEPT, and which run every cycle"
+// (SES-135 part 2, v7.0.280), and is guarded by SES-135b-keep-tests-rule.js. This paragraph is kept
+// rather than deleted because the pointer is the half that stops the next reader re-asking a settled
+// question -- and clause 1 above is why THIS file exists at all: it is the first render harness in
+// six not thrown away.
 
 import assert from "assert";
 import fs from "fs";
