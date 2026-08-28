@@ -5,6 +5,57 @@
 
 ---
 
+## session/cycle-20260828-2041 (v7.0.293, 2026-08-28, runner cycle `f20fcfa6-9b0b-4c1e-8149-c8bb8b9db429`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, kickoff design delegated to a Fable 5 subagent per register B21) — LOG-145: the log_ids "cutover" turns out to be structurally impossible, so the cycle says so, ships the one reduction that is real, and pins the constraint in a test
+
+Selection reached **layer 3**, the class-sorted board. Layer 1a left `58db64ae` queued for the reason the previous cycle recorded — it is a standing-decisions row, not a mission, and consuming it would end the standing-ness. Layer 1b's `drain_epic_next()` returned **`blocked`**: *"3 named member(s) still open and none is claimable now; 2 waiting on you (SES-180 (needs-john), SES-182 (needs-john)); 1 held by a live peer claim"* — the peer being cycle `6080ef8d`, which had claimed `SES-191` eight minutes earlier. Per B24 that is a fall-through, never a build-less cycle.
+
+### Walking the blocked prefix, and the one ticket that was stepped past in silence on John's own instruction
+
+Fourteen `record_skip()` calls, all idempotent bumps on rows that already existed. Four `delivered` tickets (`SES-155`, `SES-203`, `SES-165`, `SES-131`) and one `john-paced` (`SES-84`) were stepped past with no skip row, per the table's own carve-outs; `SES-191` is a contested claim, which is explicitly not a skip. **`SES-182` was also stepped past silently, and that is a deviation from the table, taken deliberately:** directive `58db64ae` item (6) says the `SES-182` hold *"is John's standing sequencing, restated so no cycle re-asks; do not flag it, do not pick it."* A `record_skip()` bump is a re-ask. His word outranks the procedure.
+
+The first claimable, unflagged ticket with no standing blocker was **`LOG-145`** at queue 26.
+
+### The finding: the ticket's own premise about itself does not hold
+
+`LOG-145` asked for a cutover — replace `ai_pattern_classification_rollup.log_ids` (32,441 ids, **190,808 bytes**, re-measured live this cycle, exact) with `LOG-41`'s `ai_pattern_agent_hop_rollup` (122 rows, read by nothing in `src/`, `api/`, `lib/`, `scripts/`). It named three client-side jobs that might not move. **The answer is that none of them moves, and neither does the fourth:**
+
+| Consumer | Moves? | Why not |
+|---|---|---|
+| `costBySlug` (`LOG-97`) | no | needs `computeCallCost()` + AI-51 duplicate-zeroing per row; the view's `cost_sum` is the naive SQL sum whose ~$26-vs-$10 misreport `LOG-97` exists to correct |
+| `classified[].total` (`LOG-81`) | no | countability is a JS-only legacy-window heuristic; both views' `call_count` include the duplicate halves |
+| `reclassificationCount` (`LOG-81`) | no | a set **union** over overlapping per-pattern id sets — inexpressible from per-pattern aggregates |
+| `buildAgentPatternRows` (`LOG-112`) | no | no per-row latency in the view **and** the drawer joins a scoped/windowed row set (`MI_LOOP_SCOPE`, 30-day recency, tenant), so substituting all-time counts resurrects the "sub-row exceeds its agent's CALLS headline" defect `LOG-112` shipped to kill |
+
+All four join server-side classification against client-only facts, and that join **is** row identity. The 190,808 bytes are the price of every By Pattern number reconciling with Total Cost, riding a query that already happens at zero extra round trips. The deferred half of `LOG-41` was not deferred; it was empty.
+
+### What shipped instead, and it is a real reduction rather than a consolation
+
+`fetchPatternClassification()` was the **only** per-mount Supabase read in `useAIActivity.js` with no module-level cache — its four siblings (`fetchPatternVocabulary`, the service, capability and caller directories) all have one. It has two mount sites (`AIActivityPanel.jsx:403`, `MarketIntelligenceScreen.jsx:3110`), so every SPA navigation between AI Audit and the MI Agents drawer re-paid a ~2,194 ms anon query and re-shipped the whole payload. The refetch bought no freshness: the log it is re-derived against hydrates **once** per page load, so re-reading classification per mount could only drift from the log it joins. It now has the siblings' exact shape — cache success, never cache a failure, share the in-flight promise. Zero queries added anywhere; first load is byte-identical.
+
+**Stated plainly rather than buried: the first-load 190,808 B payload is NOT reduced.** That is the finding, not an omission.
+
+### The guard is discriminating, and it was proven that way on the real files
+
+`tests/regression/LOG-145-classification-fetch-cache.js` exercises the **real exported function** against a stubbed fetch (a seam proof, labeled as one). Its concurrency assertion — two mounts, one in-flight query — **fails on unchanged source with `2 !== 1`** and passes after, measured by stashing the hook change and re-running rather than by fixture. The failure-never-cached arm and both source pins pass before and after, as controls.
+
+**One thing the guard had to be corrected on before it was honest.** Part 4 pins that no `src/` file *reads* the hop view. Written as a substring scan it flagged `useAIActivity.js` — for the comment that documents *why* the view stays unread. A check that makes the explanation of a constraint into a violation of it invites deleting the explanation, so it matches an actual read (`.from('…')` or the PostgREST path) instead.
+
+### Found at the baseline, before a line changed: the suite has been reporting a false failure
+
+The step-7 **baseline** run on unmodified `origin/dev` was 89/91, and one of the two failures is not real. `run-all.js` imports every test into one process; seven files plant `process.env.VITE_SUPABASE_ANON_KEY = "regression-placeholder"` and never restore it, so the value outlives its own test. `LOG-41-agent-hop-rollup.js` sorts after `LOG-36`, sees a truthy key, sends the placeholder to PostgREST, gets **401**, and reports it as *"the GRANT SELECT is missing."*
+
+Measured both directions, because a grants claim asserted one way is worthless: `has_table_privilege('anon', 'public.ai_pattern_agent_hop_rollup', 'SELECT')` = **true** with no `security_invoker`; the **real** publishable key against that view returns **HTTP 200** in 2.876 s; the literal string `regression-placeholder` returns **401**, byte-identical to the reported failure; and the test **passes when run alone**, declaring its anon half honestly not-run. The variable is the shared process and nothing else. Filed as **`SES-217`** — its worst property is not the red line but that the same leak can make a "the call was rejected" assertion pass vacuously somewhere else. This ship does not fix it (it is not this ticket), but its own guard takes the placeholder and **puts it back**, so it adds no eighth planter.
+
+### The verdict, and what it does and does not mean
+
+`scripts/verifier.js` returned **block** — build green, hygiene green, regression suite red. The red is entirely the two pre-existing failures above, neither caused by this change; `SES-177`'s `CLAUDE-STATE.md` drift is closed by this ship's own render. A block is not a wall by design, and `LOG-145` is `P5 - Enhancements`, outside the Selfbuild auto-done carve-out either way: the ticket ships `delivered` and John gets the card.
+
+### What went to John rather than being decided here
+
+Two questions an unattended cycle should not answer, both on the gated card: whether `LOG-145` closes as done-by-narrowing or is re-filed as an architecture ticket moving countability, AI-51 pairing and pricing into SQL (which forks `LOG-21`'s single-shared-math rule and re-opens `LOG-132`'s anon-timeout headroom), and whether `ai_pattern_agent_hop_rollup` — zero readers, +159 ms beside a ~2.2 s sibling — stays as infrastructure for a future by-hop surface or is dropped.
+
+---
+
 ## session/cycle-20260828-2029 (v7.0.292, 2026-08-28, runner cycle `6080ef8d-89e9-4bb6-b10f-46c7045d8d28`, `trigger = scheduled`, `scheduler_gate` verdict `run`)
 
 **`SES-191` — the restore drill's data half finally ran, and the recovery net returns 32.8%.**

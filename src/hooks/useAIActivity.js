@@ -1,3 +1,4 @@
+// DeepBench v7.0.293 | useAIActivity.js | LOG-145 -- fetchPatternClassification() gains the module-level cache its four sibling reads already have (success cached, failure never, in-flight promise shared), so the two mount sites stop re-paying a ~2,194ms anon rollup read and re-shipping 190,808 bytes of log_ids on every SPA navigation between AI Audit and the MI Agents drawer. The log_ids payload itself STAYS and is now pinned as un-removable: all four consumers join server-side classification to client-only facts (pricing, AI-51 pairing, countability, scope/window/latency) and that join is row identity -- the "cutover" to ai_pattern_agent_hop_rollup the ticket imagined is structurally impossible, not deferred (kickoff §2)
 // DeepBench v7.0.152 | useAIActivity.js | LOG-128 -- By Caller stops merging automated traffic into a named org's row: identityForRow()/buildByCaller() take an opts arg, and behind the default-off `log-128-automated-caller-split` flag a no-visitor-id row whose call_source is regression/script/session-test gets its own `ip:<addr>|automated` bucket. NULL and 'ui' sources keep their existing key byte-for-byte; buildBySource() is untouched (it calls identityForRow with two args, and only for 'ui' rows)
 // DeepBench v7.0.45 | useAIActivity.js | LOG-129 -- buildByDevice(): a third cut of the SAME By Platform User row set (Desktop/Mobile/Unknown), a pure aggregate across every caller and source rather than something nested inside them, returned from the hook as `byDevice` beside bySource/byCaller and reconciling with both by construction
 // DeepBench v7.0.43 | useAIActivity.js | LOG-127 -- By Platform User stops over-merging callers: the fourth, host-derived bucket is gone (exactly three -- a known caller's name, Public, Unattributed) and the hardcoded production-host constant with it; identity donation now folds a cookie-less `ui` row only into the ONE visitor seen at its address+host, never regression/script traffic and never a row carrying its own different visitor id
@@ -1234,31 +1235,58 @@ export function usePatternVocabulary() {
 // (patterns whose pattern_vocabulary.criteria matched real logged signatures); Section 2 =
 // ai_pattern_reclassification_count (single total of everything unmatched). The pattern NAME is
 // derived in the view at read time (ARCHITECTURE.md §19k) -- this hook never classifies client-side.
-export async function fetchPatternClassification() {
-  try {
-    const [rollup, recl] = await Promise.all([
+// FEATURE: LOG-145 -- module-level cache, the same shape as fetchPatternVocabulary() above and as
+// the service/capability/caller directories: cache success only, never cache a failure (a later
+// mount may retry), share the in-flight promise so the AI Audit panel and the MI Agents drawer can
+// never run the ~2.2s rollup read twice concurrently. This read had the two mount sites
+// (AIActivityPanel.jsx, MarketIntelligenceScreen.jsx) and was the only per-mount Supabase read in
+// this file with no cache, so every SPA navigation between those two screens re-paid a ~2,194ms
+// anon query and re-shipped the 190,808-byte log_ids array (32,441 ids across 13 patterns,
+// measured 2026-08-28). The refetch bought no freshness: the log this result is re-derived against
+// hydrates ONCE per page load (_log/_hydrated), so re-reading classification per mount could only
+// drift from the cached log it joins.
+//
+// LOG-145's premise was that log_ids could be REPLACED by ai_pattern_agent_hop_rollup (LOG-41).
+// It cannot -- all four consumers join server-side classification to client-only facts, and that
+// join IS row identity: costBySlug needs computeCallCost() + AI-51 duplicate-zeroing (the view's
+// cost_sum is the naive SQL sum LOG-97 exists to correct), the countable total and the
+// reclassification UNION need isCountableCall() per row, and buildAgentPatternRows() needs
+// per-row latency over a scoped/windowed row set the all-time view cannot express. See
+// docs/kickoffs/v7.0.293-LOG-145-ai-audit-log-ids-cutover.md §2; pinned by
+// tests/regression/LOG-145-classification-fetch-cache.js part 4.
+let _pclassCache = null;
+let _pclassPromise = null;
+
+export function fetchPatternClassification() {
+  if (_pclassCache) return Promise.resolve(_pclassCache);
+  if (!_pclassPromise) {
+    _pclassPromise = Promise.all([
       // FEATURE: LOG-97 -- log_ids rides along on this read that already happens (+~1%, no new
       // round trip). It is NOT a second query against ai_call_patterns -- that was the first
       // attempt, and it blew the anon role's 3s statement_timeout.
       supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum, log_ids'),
       supabase.from('ai_pattern_reclassification_count').select('reclassification_count').single(),
-    ]);
-    if (rollup.error) throw rollup.error;
-    if (recl.error) throw recl.error;
-    const classified = (rollup.data || []).map(r => ({
-      slug: r.pattern_slug,
-      name: r.pattern_name,
-      desc: r.pattern_description,
-      total: r.call_count,
-      cost: Number(r.cost_sum) || 0,
-      logIds: r.log_ids || [],
-      active: true,
-    }));
-    return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
-  } catch (e) {
-    console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
-    return { classified: [], reclassificationCount: 0 };
+    ]).then(([rollup, recl]) => {
+      if (rollup.error) throw rollup.error;
+      if (recl.error) throw recl.error;
+      const classified = (rollup.data || []).map(r => ({
+        slug: r.pattern_slug,
+        name: r.pattern_name,
+        desc: r.pattern_description,
+        total: r.call_count,
+        cost: Number(r.cost_sum) || 0,
+        logIds: r.log_ids || [],
+        active: true,
+      }));
+      _pclassCache = { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
+      return _pclassCache;
+    }).catch(e => {
+      console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
+      _pclassPromise = null; // allow a later mount to retry; never cache a failure
+      return { classified: [], reclassificationCount: 0 };
+    });
   }
+  return _pclassPromise;
 }
 
 export function usePatternClassification(log = []) {
