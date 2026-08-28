@@ -1,3 +1,11 @@
+// DeepBench v7.0.285 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- Part 5
+// added: a set's SECRET VALUES must be redacted AND the manifest re-hashed after. restore-from-
+// backup.md §9 called that redaction "the only thing standing between a refresh and a credential
+// leak" and nothing checked it -- the pre-change file passes, exit 0, on a set carrying a live
+// credential. The trailing notRun is restated: the drill's remaining half is blocked by this
+// environment's network egress allowlist (scratch host unreachable, production host 200 on the
+// same request shape), not by a decision John owes.
+//
 // DeepBench v7.0.250 | tests/regression/SES-191-backup-path-portability.js | SES-191 -- the full
 // restore drill's first finding, guarded: a backup set's manifest records each data file's path,
 // and if that path carries the DUMPING machine's separator it resolves on no other platform.
@@ -251,13 +259,85 @@ async function run() {
     );
   }
 
-  // The half of SES-191 that is still open. Declared rather than implied by silence.
-  // John granted BOTH authorizations on card a9278eca (2026-08-25, attended architect session):
-  // the $0 scratch slot and rebuilding the offsite archive. So this is no longer waiting on a
-  // decision -- it is waiting on the drill being run.
+  // --- Part 5: a set's SECRET VALUES must be redacted, and the manifest re-hashed after. -----
+  //
+  // v7.0.285. restore-from-backup.md §9 says the redaction "is the only thing standing between a
+  // refresh and a credential leak" -- and until this part, nothing checked it. A raw dump carries
+  // ANTHROPIC_API_KEY, VERCEL_TOKEN, SUPABASE_SERVICE_KEY and the Vercel bypass secret as live
+  // plaintext in data/runner_secrets.ndjson; §7's redaction nulls all five before the set is
+  // pushed. So the check that matters is on the ARTIFACT, not on anyone's intent to redact.
+  //
+  // BOTH HALVES ARE ASSERTED, and the second is the one an editor will drop as pedantry. Nulling
+  // the values changes the file's bytes, so a redaction that does not re-hash the manifest leaves
+  // a set that fails its own --verify-only with "file altered since backup" -- and the restore
+  // path then refuses to run, mid-outage, on the one copy that was safe to publish. A redacted set
+  // whose manifest is stale is not a usable backup, so it is not a passing set here either.
+  if (!setDir) {
+    notRun(
+      "secret values are redacted and the manifest was re-hashed after",
+      "no DEEPBENCH_BACKUP_SET on this machine; backup sets are not in this repo"
+    );
+  } else {
+    const manifest = JSON.parse(fs.readFileSync(path.join(setDir, "manifest.json"), "utf8"));
+    const rec = manifest.tables && manifest.tables.runner_secrets;
+    assert(rec && rec.file, `${setDir}'s manifest has no runner_secrets entry -- a set that never dumped the secrets table cannot be checked for leaking it`);
+
+    const secretsPath = resolveEntry(setDir, rec.file);
+    assert(fs.existsSync(secretsPath), `manifest names ${rec.file} for runner_secrets and it does not resolve`);
+    const rows = fs.readFileSync(secretsPath, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l));
+
+    // Guard against the vacuous pass: an empty file satisfies "no row has a value" trivially.
+    assert(rows.length > 0, `${rec.file} is empty; "no row carries a value" would pass vacuously`);
+
+    // The predicate under test, named so the negative control below can exercise the same code.
+    const leaking = list => list.filter(r => r.value !== null && r.value !== undefined);
+
+    assert(
+      leaking(rows).length === 0,
+      `${rec.file} carries ${leaking(rows).length} live secret value(s) of ${rows.length} rows. This set ` +
+        `must never be pushed anywhere: a raw dump holds the platform's real credentials in plaintext. ` +
+        `Redact per restore-from-backup.md §7 (null the values, keep names and notes) and re-hash the manifest.`
+    );
+    // Redaction keeps names and notes -- a set that nulled the whole row would pass the check above
+    // and lose the inventory of WHICH secrets have to be re-entered after a restore (§6).
+    assert(
+      rows.every(r => typeof r.name === "string" && r.name.length > 0),
+      `${rec.file} lost its secret NAMES. Redaction nulls values only; the names are what tells whoever ` +
+        `is restoring which five credentials to re-enter by hand.`
+    );
+
+    const got = crypto.createHash("sha256").update(fs.readFileSync(secretsPath)).digest("hex");
+    assert(
+      got === rec.sha256,
+      `${rec.file} was redacted but the manifest was not re-hashed (manifest ${String(rec.sha256).slice(0, 12)}…, ` +
+        `file ${got.slice(0, 12)}…). --verify-only reports this as "file altered since backup" and the restore ` +
+        `path then refuses to run. Re-hash the redacted file into manifest.json, per §7.`
+    );
+
+    // Negative control, on the same predicate: a set carrying one live-looking value must be
+    // rejected. Without this, an assertion that never fires would still report green.
+    const control = [{ name: "VERCEL_TOKEN", value: "a-live-looking-value", note: null }, ...rows];
+    assert(
+      leaking(control).length === 1,
+      "negative control failed: the redaction predicate did not flag a row carrying a value, so its " +
+        "green verdict above proves nothing"
+    );
+  }
+
+  // The half of SES-191 that is still open, and WHY it is open changed at v7.0.285 -- so this is
+  // restated rather than left as it was. The decision half is settled: John granted both
+  // authorizations on card a9278eca (2026-08-25, attended architect session), and v7.0.285
+  // executed the structural half of the drill into the scratch project he approved. What stops
+  // the rest is now an environment fact, not a judgment call: the runner's cloud container can
+  // reach the PRODUCTION Supabase host and not the scratch one (measured 2026-08-28, same second,
+  // production /rest/v1/ HTTP 200 vs scratch HTTP 000 / "Host not in allowlist"), so the 155 MB
+  // data restore and the platform boot cannot be driven from here at all.
   notRun(
-    "restore into a clean scratch target, platform booted against it",
-    "authorized by John 2026-08-25 (card a9278eca) and not yet executed; it needs a second Supabase project on his org (free tier, $0/mo, his last free slot, not deletable by the runner's tools) -- charter exit criterion 5 is scored by this drill"
+    "full data restore into the scratch target, platform booted against it",
+    "the scratch project's host is not in this environment's network egress allowlist, so no restore " +
+      "client in the runner's container can write to it (production's host is, which is the negative " +
+      "control) -- charter exit criterion 5 stays unscored until that host is reachable from wherever " +
+      "the drill runs"
   );
 }
 

@@ -5,6 +5,36 @@
 
 ---
 
+## session/cycle-20260828-1628 (v7.0.285, 2026-08-28, runner cycle `76de8d1d-e8c5-49ed-b7d7-4eb322ca9234`, `trigger = scheduled`, `scheduler_gate` verdict `run` (fired off the cron grid, so exempt from pacing) — model Opus 5, one **Sonnet 5** subagent for the mechanical schema apply per register B21) — SES-191: the restore drill's structural half is executed and evidenced; its data half is stopped by a network egress allowlist
+
+**`SES-191 — Full restore drill: restore-from-backup executed end-to-end and evidenced`** (`P10 - Tooling`, epic *Selfbuild M3 — Independent Verification*, drain pick at queue 4) stays **`partial`**. Three repo files — `docs/runbooks/restore-from-backup.md` (§9 rewritten, new stamp), `tests/regression/SES-191-backup-path-portability.js` (new Part 5, trailing `notRun` restated), and the new kickoff — plus the generated `CLAUDE-STATE.md` and `docs/backlog/BACKLOG-SNAPSHOT.md`. No `src/`/`api/`/`lib/` change, no migration, no schema change to production, no site change.
+
+### Why the drill could finally run, and what it reached
+
+John re-declared the M3 drain at `16:26Z` (directive `9feb7018`, attended architect session: *"Redeclare it now"*) and `drain_epic_next()` returned `SES-191` as the pick. Both authorizations this ticket was waiting on were granted 2026-08-25 (card `a9278eca`), and this was the first cycle since with budget to spend: `resolve_day_token_cap` returned `40,000,000` on `daily-max-box` against 14.7M already spent, after nine consecutive cycles earlier today wall-stopped on the 3M stale floor.
+
+Executed, in order, every number from a command run: a dump of **live production taken this cycle** (64 files, 53,379 rows, 154.9 MB, 0 tables with missing rows, 0 failures); redaction **before anything else touched it** (5 of 5 `runner_secrets` values nulled, names and notes kept, manifest re-hashed) and a byte-level leak scan across all 70 files — **0 hits**; verification (`66 files | 53,380 lines | malformed 0 | bad checksums 0 | duplicate PKs 0 | missing PKs 0 | row-count mismatches 0 | PASS`) with **56 of 56** manifest entries POSIX, which is `v7.0.249`'s writer fix confirmed on a set dumped *today* rather than argued from the diff; the scratch project's `public` schema dropped and **asserted empty** (0 relations / 0 functions / 0 sequences) so §5c's *"new/empty project only"* precondition was met by measurement; then `schema.sql` applied.
+
+### The blocker, and it is a different kind from the one §9 carried
+
+`restore-supabase.mjs` cannot reach the scratch project from the runner's container at all — `HTTP 403: Host not in allowlist: itcimllfniypelrxsuoh.supabase.co`. Measured with a **same-second negative control**: production's host returns **HTTP 200** on the identical request shape. So it is the environment's own **network egress settings**, not a credential, a script, or a defect in the set. The Supabase MCP connector *does* reach the scratch project — that is how the schema was applied — and can never close the data half, because 155 MB of row data cannot travel through tool calls.
+
+That matters for how the remainder is described from here on. It used to be *"waiting on John's authorization"*; he granted that three days ago. It is now **one line of environment configuration**, and no amount of budget substitutes for it.
+
+### What was NOT done, and the reason is on the card rather than in a punt
+
+Directive `c98048a5` (John, *"authorize the refresh"*) has gone un-started for five cycles, each recording the same reason: a second repo, and a mid-pipeline failure mode that is a half-built secret-bearing set. **The first half of that reason is now measured false** — this cycle cloned `roadmapventure/deepbench-backups-offsite` from the container and produced exactly the artifact that directive asks for, redacted, leak-scanned and verified. It is still not this cycle's item (one item per cycle, and `SES-191` is the claimed one), so the measurement rather than another punt is what the next cycle inherits.
+
+**Charter exit criterion 5 is NOT scored**, and scoring it on the structural half would be false: the half that is missing is the half a real outage needs.
+
+### The guard, and the arm that makes it worth having
+
+§9 has said since `v7.0.250` that the redaction *"is the only thing standing between a refresh and a credential leak."* **Nothing checked it.** New Part 5 asserts, on a real set, that every `runner_secrets` value is null, that the rows keep their `name` (a set that nulled whole rows passes a leak check and loses the inventory of which credentials to re-enter after a restore), and that the manifest's `sha256` matches the redacted file — that last one because a redaction without a re-hash leaves a set failing its own `--verify-only` as *"file altered since backup"*, mid-outage, on the one copy that was safe to publish.
+
+Four arms: the fresh redacted set **passes**; a set with one live-looking value **fails** on the leak assertion (re-hashed on purpose, so a single fixture cannot satisfy both assertions and let one ride along untested); a correctly-redacted set with a stale manifest hash **fails** on the re-hash assertion; and — the decisive one — the **pre-change guard from `origin/dev` passes, exit 0, on a set carrying a live credential**.
+
+Build green, regression suite 87/87.
+
 ## session/cycle-20260828-1540 (v7.0.284, 2026-08-28, runner cycle `224c090f-434b-490e-848d-dff92dce0812`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10:00 America/Chicago) — model Opus 5, one **Sonnet 5** subagent for the mechanical drift sweep per register B21) — SES-181 (b): the verifier scoreboard, which renders the keystone metric without claiming its bar is met
 
 `SES-181`'s named remainder, built on John's directive `58db64ae` item (2): *"SES-181 scoreboard build approved — locked section extended, never renumbered."* New **§16 · Reviewer lane — verifier scoreboard**, appended at the end of the locked order. Four files: `docs/runbooks/briefing-template.html` (panel + `svRow()` + §15's correction), `scripts/build-briefing.mjs` (the derivation and its four anchors), `tests/regression/SES-181b-verifier-scoreboard.js` (new guard), `docs/runbooks/briefing-page.md` (locked-order row 16 + §16's data contract). One further test file was **retargeted** rather than left red — see below. No `src/`/`api/`/`lib/` change, no schema change, no site change.
