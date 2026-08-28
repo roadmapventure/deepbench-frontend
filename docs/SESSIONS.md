@@ -5,6 +5,51 @@
 
 ---
 
+## session/cycle-20260828-1640 (v7.0.286, 2026-08-28, runner cycle `b9f90b84-94eb-45bd-af4a-9d551b41ced8`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11:00 America/Chicago) — model Opus 5, no subagent: `P10 - Tooling`, so register B21's Fable-5 delegation for `P1`–`P5` judgment work does not apply) — SES-180 (c): CI's two reporting jobs become real gates
+
+Picked off the M3 drain John re-declared 14 minutes before this cycle fired (directive `9feb7018`, *"Redeclare it now"*). `drain_epic_next` returned `SES-180 — Portable CI: build + regression + tripwire on every push, off John's machine` at queue 5, `open_now` 5. Two files ship the change — `.github/workflows/ci.yml` and the new `tests/regression/SES-180c-ci-gates.js` — plus `docs/harvests/SES-180.md`, which is where the ticket's ship detail now lives. No `src/`/`api/`/`lib/` change, no schema change, no site change.
+
+### The caveat was the only thing still making CI a rubber stamp
+
+`ci.yml` shipped in `v7.0.219` with two jobs marked `continue-on-error`, and **each carried a stated, correct reason**. The tripwire is report-only *by contract* and always exits 0, so gating on it there would have changed what that script promises everywhere else it runs. The suite measured **50/50 with credentials and 49/50 without**, and *a test that cannot run is not a test that failed*; gating before that distinction existed would have painted CI permanently red.
+
+Both reasons have since been paid off by other tickets — and neither ticket wired the result in:
+
+- **`SES-180` (b), `v7.0.224`** shipped `notRun(part, reason)`. A test **declares** a part it cannot verify here, and `run-all.js` exits 1 **iff** something FAILED.
+- **`SES-199`, `v7.0.242`** shipped `--gate`, which exits 1 on `FLAG` findings in the truth-registry classes (checks 9/10/11) and fails **closed** when the registry cannot be read at all. Its own header names wiring the flag into CI as *"the follow-up, not this."*
+
+This is that follow-up. Measured in a clean clone rather than argued: **regression, no credentials — 87/87 passed, exit 0, 23 parts declared not-run across 18 tests**; **tripwire `--gate` — exit 0, "clear — no FLAG findings in the gating classes", over a report still carrying 38 FLAGs and 4 WARNs in the non-gating classes.** That second number is the point: the green is a *named gating set*, not a green achieved by looking at nothing.
+
+`if: always()` on the regression step is load-bearing, not tidiness. Steps stop at the first failure, so without it a red tripwire hides the suite entirely and every push after one drift finding reports one problem while concealing however many others.
+
+### The honest half — the gate is green *because* CI has no credentials
+
+Found while building it, reproduced with one variable, and named rather than left to be discovered: with `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` present the suite ran **87/88, exit 1**, the sole failure `SES-177-claude-state-renderer.js` — *"the committed `CLAUDE-STATE.md` must match what the ledger renders."* That is the runbook's own documented **one-ship-behind lag**, not a defect. After this cycle's mandated `render-claude-state.js`: **88/88, exit 0.**
+
+So residue item (2), the repository secrets, does **not** simply strengthen this gate — it would turn the now-blocking job red for most of the interval between cycles. That is on the ticket, in the harvest, and on John's card, because it will bite exactly once.
+
+### The same lag is contaminating the keystone metric — filed as `SES-213`
+
+The verifier ran at step 7a, **before** the close-out render the same step mandates, and blocked on exactly that failure. Checked against the ledger rather than assumed: **all 15 blocks in `runner_verdicts` carry the identical triple `build=green / hygiene=green / regression=red`.** `SES-181` (b) put the block rate on the briefing as the charter's keystone metric — *9 of the last 30, 30%* — and if the blocks are an ordering artifact, that number is measuring the runbook rather than the reviewer. A second defect in the same place: `runner_verdicts.reasoning` stores only the **tail** of the gate command's output, so all 15 rows record an unrelated `GATE_BYPASS_SECRET` warning and not the failing test — which is why this needed a live reproduction rather than a query.
+
+**Not fixed here, deliberately.** The fix is a runbook ordering change plus a change to `scripts/verifier.js`, and that path is in the verifier's own `SELF_CERTIFYING_PATHS`: the charter's *"no change certifies itself"* makes the cycle editing it ineligible for the bar it grades by. Filed as `SES-213 — The verifier takes its verdict before the close-out render, so every block to date is the CLAUDE-STATE lag` (`P10 - Tooling`, `next`, epic Selfbuild M3), which needs a design pass on which of the two orderings is right.
+
+**The verdict was NOT re-run to flip it.** The block stands in the ledger exactly as recorded; the cycle ships `partial` and cards John, which is what a block means at verdict one. Re-running a gate until it goes green is how a scoreboard stops being worth reading.
+
+### The guard, and why it is in two halves
+
+`tests/regression/SES-180c-ci-gates.js`. Three clauses parsed off the real `ci.yml` — no `continue-on-error`, `--gate` present *and recognised by the imported `gateModeRequested()`*, `if: always()` present — each with its own negative control run against the real file (drop `--gate` → fails; remove `if: always()` → fails; re-add `continue-on-error` → fails; the pre-change `ci.yml` fails on all three). Alone that is a string test over YAML and proves nothing about behaviour. So three behavioural arms drive the **real** `run-all.js` over fixtures through its own `--dir` flag: a declared not-run part exits 0, a throw exits 1, and a test that declares *and then* throws still exits 1 — so a `notRun()` call can never launder a real failure past the gate.
+
+### One risk named rather than hidden
+
+The job's `name:` changes from *"(reporting only)"* to *"(blocking)"*, and GitHub matches required status checks by job **name**. `dev` — where every runner push lands — carries no protection at all (read live from the branches API at this ship: `protected: false`). `main` **is** protected and whether its required-checks list names this job is not readable from the runner's tools; if it does, John re-selects the new name in the branch settings.
+
+### Ticket left `partial`, flagged `needs-john`
+
+Not `delivered`: the ticket's own acceptance criteria include *"the regression suite with credentials"* and *"red = no merge"*, and both are John's alone — a repository secret a runner must never install, and a branch setting that is not a file. `needs-john` is what makes the drain step past it instead of handing it back every cycle. `SES-51` remains unflagged in the M3 scope, so the chain still has somewhere to go.
+
+---
+
 ## session/cycle-20260828-1628 (v7.0.285, 2026-08-28, runner cycle `76de8d1d-e8c5-49ed-b7d7-4eb322ca9234`, `trigger = scheduled`, `scheduler_gate` verdict `run` (fired off the cron grid, so exempt from pacing) — model Opus 5, one **Sonnet 5** subagent for the mechanical schema apply per register B21) — SES-191: the restore drill's structural half is executed and evidenced; its data half is stopped by a network egress allowlist
 
 **`SES-191 — Full restore drill: restore-from-backup executed end-to-end and evidenced`** (`P10 - Tooling`, epic *Selfbuild M3 — Independent Verification*, drain pick at queue 4) stays **`partial`**. Three repo files — `docs/runbooks/restore-from-backup.md` (§9 rewritten, new stamp), `tests/regression/SES-191-backup-path-portability.js` (new Part 5, trailing `notRun` restated), and the new kickoff — plus the generated `CLAUDE-STATE.md` and `docs/backlog/BACKLOG-SNAPSHOT.md`. No `src/`/`api/`/`lib/` change, no migration, no schema change to production, no site change.
