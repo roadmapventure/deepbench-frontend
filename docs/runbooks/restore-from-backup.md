@@ -344,5 +344,40 @@ refresh the offsite copy per §7.
   **Still true and unchanged:** the scratch project consumes John's remaining free slot, holds a
   second full copy of platform data, and is **not deletable by the runner's own tooling**
   (`pause_project` exists; delete does not).
+
+- **THE RESTORED PLATFORM CANNOT TAKE ANOTHER BACKUP, AND FIVE VIEWS DO NOT SURVIVE AN IN-ORDER
+  RESTORE (`SES-214`, found live 2026-08-28 by the `v7.0.285` drill).** Two more defects in
+  `schema.sql`, found the same way the `v7.0.250` pair was — by applying it and reading what came
+  back, not by reading the file. Neither is visible from a manifest, a checksum, or a `--verify-only`.
+
+  1. **`schema.sql` never defines `public._backup_inventory` or `public._backup_schema_ddl`.** It
+     carries only their two `relacl` comment lines (`schema.sql:3743` and `:3745`). `dump-supabase.mjs`
+     hard-depends on both — the table/view list comes from `_backup_inventory` (its line 46) and the
+     schema DDL is pulled verbatim from `_backup_schema_ddl` (line 235) — and it exits
+     **`FATAL: _backup_inventory returned no tables`** (line 265) without the first. So a platform
+     rebuilt from a set can be restored **once** and can then never back itself up again. The root
+     cause is one clause in the inventory view's own predicate, read from `pg_get_viewdef`:
+     `AND c.relname !~~ '\_backup%'` — it excludes every relation named `_backup%`, which is exactly
+     itself and its sibling. **Both definitions do survive in `migrations.sql`**, so this is
+     recoverable by hand; but §5c tells you to run `schema.sql`, and nothing tells you to then go
+     and hand-restore two views out of the migration history. Do that, or your next dump dies.
+  2. **`schema.sql` emits VIEWS before FUNCTIONS**, so five views cannot be created at all on a
+     clean in-order apply. Measured: the `VIEWS` section opens at line 1258 and `FUNCTIONS` at line
+     1404, while `ai_call_patterns` (1261), `ai_pattern_classification_rollup` (1272),
+     `ai_pattern_reclassification_count` (1300), `backlog_active` (1319) and `ip_spend_report` (1348)
+     call `log_row_signature` (2642), `backlog_mode` (1510) and `get_ip_stats` (2287). All five failed
+     live with `function … does not exist`; **all five then applied cleanly when re-run after the
+     functions existed**, which is what proves the definitions are sound and the *ordering* is the
+     defect. A clean in-order restore therefore yields **6 of 11 views**, with `backlog_active` —
+     which the board reads — among the missing.
+
+  **Both are fixed in the same place and neither was fixed by the drill**, deliberately: they live in
+  `public._backup_schema_ddl`, the view the dumper pulls verbatim, so the fix changes what **every**
+  future dump contains and deserves its own revalidation rather than riding along inside a ticket
+  claimed for the drill. `SES-214` carries them, including the design question the second one raises —
+  what the correct dependency-respecting emission order is, and whether a backup should back up its
+  own backup views. **Until it lands, a restore is a two-step job:** run `schema.sql`, then re-run its
+  `VIEWS` section a second time (idempotent — every statement is `CREATE OR REPLACE`) and restore the
+  two `_backup_*` views from `migrations.sql`.
 - View data can fail to dump (e.g. `ai_call_patterns`, server-side timeout) —
   harmless; views are derived and rebuild from `schema.sql`.
