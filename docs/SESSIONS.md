@@ -5,6 +5,95 @@
 
 ---
 
+## session/cycle-20260829-1502 (v7.0.312, 2026-08-29, runner cycle `38e17277-d3ce-46e6-8900-e67c180468ba`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-230` — a failed batch is retried row by row, so two unloadable rows stop costing the 310 they travelled with
+
+**Mission, not a board pick.** Layer 1a: John's directive `23d5fbae` (attended architect session
+2026-08-29, his word `"1"` on card `c2470d0b`), verbatim: *"BUILD SES-230 AS ROUTE 1, next mission
+ahead of board work"* — chosen after option B was measured unimplementable. Its own sentence is the
+spec: *"when a batch POST fails, retry the batch row-by-row, load every loadable row, and emit a
+named report of each row that could not load (table, pk, SQLSTATE, reason); exit non-zero only per
+the runbook's existing contract, never silently drop."*
+
+**Premise revalidated live, both halves, before a line changed.** Over
+`refresh-2026-08-28/data/pending_confirmations.ndjson`: **312 rows, exactly 2** serialise
+`proposed_action` to JSON `null` (`ab097416-…`, `f98c74f1-…`) — the ticket's figure, re-measured
+rather than trusted, unmoved. And `restore-supabase.mjs`'s `push()` still threw on any non-2xx with
+no row-level path anywhere in the file, so those 2 cost all 312.
+
+**The design decision this ship owns, and it is a deliberate departure from the directive's literal
+wording.** *"When a batch POST fails"* read literally means split on the FIRST batch failure. That
+fights the multi-pass loop, which exists because a table can fail on pass 1 and load on pass 3 with
+nothing wrong with any row (foreign-key ordering) — the literal form issues one doomed request per
+row for a table whose only problem is order. **The split therefore runs after all six passes, over
+exactly the tables no pass could load**, on both exit paths (the stall break and pass-6 exhaustion).
+Named here rather than buried, per the `SES-196` convention.
+
+**The second decision is what makes the fallback usable rather than theoretical.** `ai_activity_log`
+is 34,761 rows and fails **table-wide** (`SES-220`'s generated columns, `428C9`), so splitting it is
+34,761 doomed requests. `PROBE_LIMIT = 25`: if the first 25 individually-retried rows all fail with
+one SQLSTATE and none loads, the failure is declared table-wide and the split stops — reported as
+`TABLE-WIDE, N rows` with its SQLSTATE and the server's own reason. A bound on wasted requests,
+never a silent drop: it prints strictly more than the pre-change output did.
+
+**Exit code — unchanged in meaning, finer in grain.** `restore-from-backup.md` §5b's contract is
+*"a genuinely stuck table … is named at the end and exits non-zero."* Non-zero if anything could not
+load; **zero when the fallback rescued every row**, because a table the batch loop called stuck is
+not stuck when all of its rows load one at a time. No new failure condition was invented.
+
+**Live behaviour, run against a stub target (the report is the deliverable, so it is quoted):**
+
+```
+Stalled on pass 1 -- no table made progress. The server's own error for each: …
+Row-level fallback: 2 table(s) no batch pass could load. Retrying row by row.
+  pending_confirmations: 310 of 312 rows loaded, 2 could not load
+  ai_activity_log: 0 of 200 rows loaded -- the failure is table-wide, not row-level
+
+Could not load the following. Nothing was dropped silently:
+  pending_confirmations  id="ab097416-…"  HTTP 400 / 23502  null value in column "proposed_action" …
+  pending_confirmations  id="f98c74f1-…"  HTTP 400 / 23502  null value in column "proposed_action" …
+  ai_activity_log  TABLE-WIDE, 200 rows (first 25 retried individually all failed identically)  HTTP 400 / 428C9 …
+EXIT CODE: 1
+```
+
+**QA — the negative control is the pre-change behaviour running inside the same run.** The shipped
+batch loop IS the old behaviour: it still fails on the fixture and still prints *"Stalled on pass 1"*,
+and only then does the fallback load 310. That is the real implementation failing, one variable —
+never a reimplementation of the old code agreeing with itself (`SES-45`) nor a grep of source text
+(`SES-191` Part 3's own warning: a source check passes on a script that imports a helper and forgets
+to call it). Every assertion is keyed on the batch/single split the stub records — **batch successes
+0 AND single-row successes 310** — so a no-op change reads 0 and fails. **File-level control:** the
+guard run against `origin/main`'s own `restore-supabase.mjs` **FAILS** (*"the stub recorded 0"*);
+against the shipped one it **PASSES**. Arm 2 pins the rescue-everything case at exit 0 with **one**
+batch request and **zero** single-row requests, so the fallback cannot turn a healthy restore into
+one request per row. Found while building the guard and worth recording: `execFileSync` **deadlocks**
+a stub server living in the test's own process — the child waits on a reply the blocked event loop
+cannot send — so the runner is an async `spawn`.
+
+**Gates.** `npm run build` green. Suite **105/106** before the `CLAUDE-STATE.md` render, the one red
+being `SES-177`'s known render drift (`SES-213`'s defect, fixed by step 7a's first line); green
+after. Dev root HTTP **200** with the bypass header. Verifier **APPROVE**
+(`runner_verdicts 0610fbfe-d690-43a5-b7a7-3be232f7c308`, build/regression/hygiene all green);
+**auto-done ineligible — no epic on the ticket**, so the ticket ships `delivered` and John gets the
+card.
+
+**Not done, named rather than left to be found.** No wire format is chosen for the jsonb scalar
+`null` — `SES-230`'s A/B/C question is still open and still John's, and the 2 rows are **reported,
+not represented**. `SES-220`'s generated-column defect is untouched. Nothing was re-dumped
+(directive `c98048a5`: an offsite refresh needs John's word each time).
+
+**Stamp discipline.** Held at 5 per session-hygiene check 7: `v7.0.285` moved **verbatim** to this
+file's `restore-from-backup.md` appendix, checked FIRST by grep rather than recollection — all four
+of its editor warnings survive in that file's own body (scoring charter exit criterion 5 on the
+structural half; the scratch-host egress allowlist as an environment fact rather than a decision
+John owes; the redaction bar with NAMES kept and the manifest re-hashed, §7; §5c's
+new/empty-project precondition).
+
+**Files:** `restore-supabase.mjs` (in `roadmapventure/deepbench-backups-offsite`, the one tooling
+push John's directive sanctions), `tests/regression/SES-230-row-level-fallback.js`,
+`docs/runbooks/restore-from-backup.md`, plus the kickoff and the close-out artifacts. No
+`src`/`api`/`lib` change, no site change, no schema change.
+
+---
 ## session/cycle-20260829-1440 (v7.0.311, 2026-08-29, runner cycle `58416fef-9ca2-492b-b34c-cb01cc4a6f63`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, one Fable 5 subagent for the board-buildability classification) — shipped: `LOG-132` — the two rollup views stop paying 34,840 opaque signature calls, and John's By Pattern panel comes back off `anon`'s 3 s cap
 
 **The board moved under this cycle while it was reading it, and that is worth recording before
@@ -4258,7 +4347,6 @@ Cycle `747b7239`: walls clear (API $0/$5 day, $0/$100 month; token cap 45M/day `
 CST day; rest wall 60% < 85%). Invention pass ran — egress OK (C3), invention ladder rung 0 → 0 proposals.
 Version v7.0.217 claimed atomically (re-assertion gate held). Standing M2 drain is **not** consumed; it stays
 queued for its next member.
-
 
 
 **`SES-188` set `partial`** (`P9 - Bug Fixes`, tier `now`, queue 7 at pick) — *not* `delivered`,
@@ -9908,6 +9996,18 @@ zero times in the body as that phrase, but is carried verbatim by the surviving 
 and is restated as a measured finding in §9's new `SES-220` block, which corrects it for the DATA
 path: the view is right, and the remaining seam is the offsite loader.)*
 
+<!-- DeepBench v7.0.285 | docs/runbooks/restore-from-backup.md | SES-191 — THE DRILL'S STRUCTURAL HALF IS EXECUTED AND EVIDENCED; ITS DATA HALF IS STOPPED BY A NETWORK EGRESS ALLOWLIST, WHICH IS A DIFFERENT KIND OF BLOCKER FROM THE ONE §9 CARRIED. Executed this cycle, every number from a command run: a dump taken from LIVE PRODUCTION today (64 files, 53,379 rows, 154.9 MB, 0 tables with missing rows, 0 failures, one known-harmless ai_call_patterns view warning), redacted FIRST (5 of 5 runner_secrets values nulled, names+notes kept, manifest re-hashed) and leak-scanned across all 70 files for sb_secret_/sk-ant-/eyJhbGciOiJ/the Vercel bypass secret — ZERO hits — then verified: 66 files | 53,380 lines | malformed 0 | bad checksums 0 | duplicate PKs 0 | missing PKs 0 | row-count mismatches 0 | PASS, with all 56 of 56 manifest entries POSIX, which is the v7.0.249 writer fix confirmed on a set dumped TODAY rather than argued from the diff. The scratch project's public schema was DROPPED and asserted empty (0 relations / 0 functions / 0 sequences) before schema.sql was applied, so §5c's "new/empty project only" precondition is met by measurement and not by assumption. Restored vs live production: 56/56 base tables name-for-name, 628/628 base-table columns, 101/101 indexes, both sequences present with START WITH 38339 / 34 (production's next values), and both caller_ip_masked columns GENERATED ALWAYS with no DEFAULT — i.e. v7.0.250's two fatal defects confirmed fixed on the artifact a person would actually restore from. THE BLOCKER, AND IT IS NOT A DECISION JOHN OWES: restore-supabase.mjs cannot reach the scratch project from the runner's container at all — "HTTP 403: Host not in allowlist: itcimllfniypelrxsuoh.supabase.co" — measured with a SAME-SECOND NEGATIVE CONTROL, production's host returning HTTP 200 on the identical request shape. So it is the environment's network egress settings, not a credential, a script, or a set defect. The Supabase MCP connector does reach the scratch project (that is how the schema above was applied) and can NEVER close the data half: 155 MB of row data cannot travel through tool calls. He already granted both authorizations on card a9278eca; what remains is one line of environment configuration. THE EDIT THIS SHIP FORBIDS: scoring charter exit criterion 5 on the structural half. The half that is missing is the half a real outage needs — data in the target and a platform booted against it — and this drill still has neither. SES-191 stays partial. Guarded by tests/regression/SES-191-backup-path-portability.js Part 5, NEW and aimed at the claim §9 already made with nothing behind it — that the redaction "is the only thing standing between a refresh and a credential leak" — asserting on a real set that every runner_secrets value is null, that the rows keep their NAMES (a set that nulled whole rows passes a leak check and loses the inventory of which credentials to re-enter), and that the manifest sha256 MATCHES the redacted file, because a redaction without a re-hash leaves a set that fails its own --verify-only as "file altered since backup" and the restore path then refuses to run mid-outage on the one copy that was safe to publish. Four QA arms, the decisive one being file-level: the PRE-CHANGE guard from origin/dev passes, exit 0, on a set carrying a live credential. Doc + test; no src/api/lib change, no schema change to production, no site change. -->
+
+*(Retired from `docs/runbooks/restore-from-backup.md` by `v7.0.312` (`SES-230`) to hold the
+stamp count at 5. All four of its editor warnings were confirmed restated in that file's own
+body first, by grep rather than recollection: the prohibition on scoring charter exit criterion 5
+on the structural half is restated at the *"Why exit criterion 5 is still NOT scored"* block; the
+scratch-host egress allowlist as the blocker — an environment fact, not a decision John owes — at
+the same block bullet; the redaction bar (values nulled, NAMES kept, manifest re-hashed) in §7;
+and §5c's own *"new/empty project only"* precondition with the measured 0 relations / 0 functions /
+0 sequences that met it.)*
+
 <!-- DeepBench v7.0.303 | docs/SESSIONS.md | SES-223 — THE OFFSITE DUMP NOW ASKS FOR THE COLUMNS A LOADER MAY SUPPLY, and the thing to read twice is that the fix is in the OTHER repo: two files in roadmapventure/deepbench-backups-offsite, zero src/api/lib change here. Cycle 91dcd06a, layer 1a directive f365aed4 (John, attended architect session 2026-08-29, verbatim "accept all" — a one-time scoped push authorization to that repo's main, ahead of board work). Two of John's directives carried a build mission; layer 1a takes the OLDEST, so 82403dad (SES-180's CI credentials, 03:23Z) is left queued and untouched. PREMISE REVALIDATED LIVE, three reads, none quoted: _backup_inventory publishes loadable_cols / jsonb_notnull_cols as comma-separated TEXT (not arrays — established by an array_length() call that errored); dump-supabase.mjs at 5a99272 still asked ?select=* in BOTH pagination branches; and exactly TWO tables differ from "all columns" — ai_activity_log (28 vs 27) and ip_org_cache (14 vs 13), the difference in both being the single GENERATED ALWAYS column caller_ip_masked, behind 34,785 rows. THE QA IS A LIVE END-TO-END DRILL DUMP WHOSE NEGATIVE CONTROL WAS ALREADY ON DISK: the shipped script against the real database wrote ai_activity_log at 27 keys per row with caller_ip_masked on 0 of 34,761 rows, against refresh-2026-08-28 — produced by the UNMODIFIED script — at 28 keys and 34,761 of 34,761. Same table, same database, one variable; a change that did nothing scores 34,761. Full set: exit 0, 65 files, 53,918 rows, 0 tables with missing rows, 0 failures. Drill evidence under directive 1c9609de, kept on the container and NOT pushed offsite — f365aed4 sanctions one push of the SCRIPTS and says in its own words it "does NOT authorize taking or pushing a dump". WHAT THIS SHIP DELIBERATELY DOES NOT DO, all three named rather than left to be found: the jsonb-scalar-null defect is UNTOUCHED on John's explicit scope guard ("do not pick a representation unattended") and is carried to him as SES-230 with the population counted live — 2 rows of 312 in pending_confirmations.proposed_action, 0 across the other seven NOT NULL jsonb columns, and those 2 cost all 312 because the loader posts in batches; it repairs NO SET THAT ALREADY EXISTS, which is why scoring charter exit criterion 5 needs a fresh dump and why the restore-side filter is metadata-driven and therefore inert on both stored sets BY DESIGN; and views keep select=* on purpose, since a restore recreates them from schema.sql and never loads their rows. SES-220.blocked_by was cleared, before-image first, on John's explicit instruction in the same directive. THE VERDICT IS A BLOCK AND IT IS HONEST: runner_verdicts 65c14415, build=red and regression=red, both tracing to ONE cause that is not this change — npm install fails E403 Forbidden on zod-4.1.11.tgz (reproducible, two runs), so there is no node_modules, npm run build exits 127 "vite: not found", and 27 of 99 regression tests fail with "Cannot find package". The two NON-dependency failures were each re-run in isolation rather than assumed: SES-177 PASSES after step 7a's render (SES-213's mechanism working as designed) and LOG-41 PASSES alone, re-confirming the known SES-221 cross-test env leak rather than taking the predecessor's word for it. A block is not a wall, so the ticket ships `delivered` and cards John. THE CROSS-CUTTING FINDING, filed as SES-229: this container's SUPABASE_SERVICE_KEY env var holds the SCRATCH project's key — proven by md5 fingerprint rather than by reading a secret, 6a05c8dc… identical to runner_secrets.SCRATCH_SUPABASE_SERVICE_KEY against production's 83f68290… — so every credentialed close-out script exits 2 "cannot run", which the runbook is explicit is never a pass; and both briefing-page read paths are blocked by this environment's network allowlist, so under briefing-page.md's read-back contract this cycle harvested no taps and DECLINED the republish. Doc + two offsite scripts; no src/api/lib change here, no site change, no schema change. -->
 
 <!-- DeepBench v7.0.308 | docs/SESSIONS.md | SES-222 — TWO SPLICES ESCAPED DATABASE TEXT THAT THE TEMPLATE ESCAPES AGAIN, and the thing to read twice is that the ticket predicted ONE site and the sweep it asked for found TWO. Cycle 08346174, scheduled. esc() is not idempotent, so a builder that pre-escapes an argument a template row helper will escape again renders the escape sequence to John. (1) THE FILED DEFECT, §15 msRow: build-briefing.mjs:498 spliced J(H(r.name)) while briefing-template.html:939 calls esc(name). public.epics holds exactly one name with an ampersand — "Selfbuild M0 - Backup & Rollback", read live, not recalled — so the chain was & -> &amp; -> &amp;amp; and M0's row read a literal "&amp;" every morning. Only M0 is affected, which is why eight ships walked past it. (2) FOUND BY THE SWEEP, §8 queueRow's priority_class: J(H(cls).replace(/'/g,'&rsquo;')) against esc(cls) — and it is NOT the ampersand. H() never touches an apostrophe; the substitution after it did, and esc() then made it &amp;rsquo;, so "P1 - Improves John's Skills" renders as "P1 - Improves John&rsquo;s Skills". STATED AS LATENT RATHER THAN CLAIMED AS A VISIBLE FIX: §8 shows the top 12 and no P1 ticket is in it today; it goes live the moment one reaches the head of the board — the class named after John. THE EDIT THIS SHIP FORBIDS, and it is the tempting consistency pass: dropping H() from classRow (§11) or from cut() on §8's title as well. Those are the MIRROR IMAGE — their template sides splice RAW, so the builder is the only escaper and removing it renders class names and ticket prose as live markup, SES-208's defect facing the other way; build-briefing.mjs:218-219 already says the asymmetry is deliberate and "a sweeper must not fix it". THE INTERNAL CONTROL that decides which side any new splice is on: §8 passes the SAME epic name RAW and has always rendered it correctly, while §15 pre-escaped it and did not. Dropping the &rsquo; substitution was CHECKED rather than assumed — J() already escapes a backslash then an apostrophe, so the literal stays well-formed. QA: npm install clean, npm run build exit 0, full suite 103/103 exit 0. Guarded by tests/regression/SES-222-double-escape.js — six source clauses each with its own breaks() mutation plus the SES-158 vacuity meta-check, and a BEHAVIOURAL half that slices the shipped esc() out of the template and the shipped H()/J() out of the builder (never a copy — SES-45) and renders both real strings through the real seam in jsdom. THE NEGATIVE CONTROL IS THE RETIRED FORM on the SAME fixture, asserted to LOSE: J(H(name)) renders the literal "&amp;" and the retired priority_class form renders "&rsquo;", so the guard proves a DIFFERENCE rather than a property both implementations share. File-level control against origin/dev's pre-change copy: 3 of 6 clauses fail there, 0 of 6 on the shipped one — the third is escape-rule-is-written-down, correctly failing because the pre-change header did not carry SES-208's rule; the three passing on both are the mirror-image clauses, which MUST pass on both because this ship deliberately did not change them. VERDICT APPROVE (runner_verdicts 0610e9c1, build/regression/hygiene all green) — auto-done ineligible, no epic on the ticket, so the ticket ships `delivered` and cards John. THE PICK BEFORE THIS ONE: SES-221's premise died under pick-time revalidation. Its whole ask — snapshot process.env around each test import — shipped as SES-215 (v7.0.305, f7f3cd0), and the suite measured 102/102 on an unedited tree with LOG-41 PASSING in-suite and declaring its anon arm NOT RUN, which is exactly the standalone behaviour SES-221 says is unreachable there; all seven tests it names as leaky ran and passed in the same process. Filed `removal proposed` with that evidence, queue number intact, no unattended removal. ONE FIGURE STATED SO IT CANNOT MISLEAD: this container's FIRST suite run read 75/102 with 27 "Cannot find package" failures — a fresh clone with no node_modules, not a defect on dev. TWO FURTHER FILINGS, both from measurements this cycle made rather than from the board: LOG-58 carded (canonical terminology, §19v gated lane, "needs John live" in its own words) because one answer from him unblocks LOG-44/45/47/48 sitting at queue 37-40 — which is also why this cycle built at queue 133; and SES-233 filed after the tripwire sweep printed `fatal: cannot change to 'C:/Projects/deepbench-frontend'` five times — check-session-docs.js's hardcoded SHARED_CHECKOUT means freshDevDirEntries() returns [] in the cloud, which is indistinguishable from "no inflight files on origin/dev", i.e. a FALSE ALL-CLEAR of the exact kind that file's own comment condemns, now quoted inside this cycle's own verdict row. NAMED DEVIATION (the SES-196 convention): no subagent was used. Register B21 routes mechanical sweeps to Sonnet 5, but this ticket arrived pre-diagnosed, size S, one file, and its sibling sweep is seven grep hits read on both sides — a hand-off would have added failure surface to a two-minute read, against "never grind". Doc + script + test; no src/api/lib change, no site change, no schema change. -->
+
