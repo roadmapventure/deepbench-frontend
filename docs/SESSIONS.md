@@ -5,6 +5,78 @@
 
 ---
 
+## session/cycle-20260829-1611 (v7.0.315, 2026-08-29, runner cycle `4559cfe7-05b4-4e7d-93d2-e3c742cf667e`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-134` — the trust ladder stops being arithmetic every cycle does by hand
+
+**The first in-session continuation under Prime Directive §2e**, opened because `drain_chain_gate`
+returned `continue` — and that verdict came out of the function its own predecessor had just
+extracted, which is an end-to-end confirmation of `v7.0.314`'s refactor rather than a separate claim.
+
+**Selection walked three tickets before it found a build, and each step is recorded because the
+walk is the procedure, not a detour.** §2(a): five directives queued, **all five standing policy**
+(`58db64ae`, `1c9609de`, `5598ffdd`, `0970abad`, `a0ef9525`) — no mission. §2(b): drain `blocked`.
+§2(c) handed over `SES-183`.
+
+**`SES-183` AND ITS THREE SIBLINGS ARE BLOCKED BY A TICKET, NOT BY JOHN — and that distinction is
+the whole of what this step got right.** `SES-183` is the M4 design gate; its own text says *"Design
+session at M3 retirement"* and *"members filed at the gate, not before"*, and M3 cannot retire while
+`SES-191` (partial) and `SES-182` (John's standing hold) are open. The tempting move is
+`design_status = 'needs-john'`, and this runbook **forbids exactly that**: it puts an ask on §10 he
+cannot act on, because the blocker is another ticket. `blocked_by` is the column that says the true
+thing, and `SES-184`/`SES-185`/`SES-186` are the same shape one milestone along, so the four were
+chained `SES-186 → SES-185 → SES-184 → SES-183 → SES-182`. **It self-clears with no write anyone
+must remember**, and the discriminating check is that the live picker's `selfbuild` lane returned
+`SES-183` at position 6 before and `SES-54` after.
+
+**`SES-54` was carded, not built, and the card carries the whole edit.** Its only blocker is that
+the fix lands in `.claude/rules/capability-logging.md`, where register B39 measured unattended parks
+of ~8h, ~9h and one that never returned. So the cycle wrote the **complete replacement file** onto a
+`gated_before_build` card rather than entering the gate. **Premise revalidated live and it has got
+worse:** the ticket says 6 rows carry `ai_type = 'deterministic'`; today it is **9**, still matching
+**0** `platform_services` keys — so the stale rule is still being followed. Two corrections to the
+ticket's own text, made rather than repeated: the convention sits at `api/extract.js:119`/`:187`
+(the ticket says `:116`/`:184` — line drift), and the `paths:` gap is wider than filed, because
+**both** real logging sites (`api/extract.js`, `api/fetch-article.js`) are at `api/` root and outside
+its globs.
+
+**THE SHIP: the ladder rule gets ONE executable home.** John answered **yes** to
+`q-ladder-executable` 2026-08-23T00:35Z, so this was authorised work. Migration
+`ses134_ladder_executable` ships `public.apply_ladder_decision(cycle_id, item_id)`; step 2 now points
+at the call instead of restating the arithmetic, because prose plus function is two homes for one
+rule — the defect being fixed. **The edit it forbids is `streak >= 5`**: `SES-107` records that a
+streak parked at 5 then promotes on *every* later Accept, a rung per tap forever.
+
+**QA was seven fixture arms in a deliberately failing `DO` block, one variable each, all rolled
+back** — accept `1/2→1/3` unpromoted; the 5th accept `1/4→2/5` promoted **with the streak not
+reset**; reverse `3/7→2/0`; a gated card leaving the ladder at `1/2` (B34); rework unchanged; a
+second call *"already counted"*; **and the negative control is the retired threshold on the same
+fixture, asserted to lose** — at a streak of 5 the shipped form returns `promoted=false` and `>= 5`
+returns `true`. Ladder re-read afterwards and byte-identical (`tooling 13/42` both ways), 0 fixture
+rows, 0 stray before-images. `pg_proc` count 1; grants both directions (anon false, authenticated
+false, service_role true).
+
+**THREE DEFECTS THE GUARDS CAUGHT BEFORE THE SHIP RATHER THAN AFTER, all reported rather than
+smoothed over.** (1) Arm (a) raised `42702 column reference "work_class" is ambiguous` — it is both
+an OUT parameter and a column, and only the `UPDATE` was unqualified. (2) The `SES-158` vacuity
+meta-check rejected two clauses that survived their own mutation (`/not reset/` and `/both only
+read/` both matched this ship's own stamp); both were re-anchored on one canonical line. (3) A clause
+written as a bare absence test failed because this ship deliberately **quotes** the retired sentence
+— rewritten to require the quotation rather than forbid the words.
+
+**AND THE ONE THAT MATTERS MOST, because it is a defect this platform has already paid for once:
+a file-level control anchored on `origin/dev` self-destructs the moment its ship lands on
+`origin/dev`.** The first verdict came back **BLOCK** with all 11 of `SES-236`'s clauses reported as
+passing on the "pre-change" tree — minutes after `v7.0.314` was pushed to that very branch. That is
+`SES-215`'s defect exactly (`v7.0.307`: *"the guard's negative control read run-all.js from
+origin/dev, which on CI IS the commit under test"*). **Both guards now pin an immutable SHA** and
+declare themselves not-run on a shallow clone. Fixed at the cause under §19v's feature-owns-its-bugs
+rule, never re-run on hope; both verdicts stay in the ledger (`9d9bc96d` block, `763cfc75` approve).
+
+Verifier **APPROVE**, all three gates green, `auto_done_eligible` YES — so `SES-134` closes **done**
+under Prime Directive §2f with a Reverse-capable card. Doc + test + migration; no `src`/`api`/`lib`
+change, no site change.
+
+---
+
 ## session/cycle-20260829-1611 (v7.0.314, 2026-08-29, runner cycle `5b3992dc-cc28-4231-badf-a0f0aca59128`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-236` — the briefing renders the Prime Directive verbatim, and §8 stops showing a queue the picker does not follow
 
 **Selection was `runner_directives` `5fdc72b1`, filed 16:09:49Z — 75 seconds before this cycle

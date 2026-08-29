@@ -24,7 +24,7 @@
 // EVERY CLAUSE CARRIES ITS OWN NEGATIVE CONTROL (`breaks`), driven by the SES-158 vacuity
 // meta-check: a clause that still passes after its own mutation is asserting nothing and fails the
 // suite. On top of that there is a FILE-LEVEL negative control -- every clause is run against
-// origin/dev's own pre-change builder and template, where they must FAIL. A clause that passes on
+// the pinned pre-change builder and template, where they must FAIL. A clause that passes on
 // both trees is not pinning this ship.
 //
 // Credential-free and network-free by construction: every clause reads source text. The file-level
@@ -37,7 +37,18 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 
+// THE PRE-CHANGE TREE IS PINNED BY SHA, NEVER BY THE `origin/dev` BRANCH NAME, and that is this
+// guard's most important line. A file-level control that resolves "before" as a moving branch
+// SELF-DESTRUCTS THE MOMENT THE SHIP LANDS ON THAT BRANCH: origin/dev then CONTAINS the change, so
+// every clause passes on "both" trees and the control reports the ship as un-pinning. That is not a
+// hypothetical -- it is exactly the SES-215 defect (v7.0.307: "the guard's negative control read
+// run-all.js from origin/dev, which on CI IS the commit under test, so the 'retired' control was
+// the shipped fix"), and this file reproduced it live: the verdict on the NEXT ticket came back
+// BLOCK with all 11 clauses reported as passing on the pre-change tree, minutes after the push.
+// A SHA is immutable, so it cannot rot the same way. If the SHA is unreachable (a shallow clone),
+// the control declares itself not-run rather than passing vacuously.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const PRE_CHANGE_SHA = "076f022ca493a1d469b3635e5d7aeefb2786f713";   // origin/dev immediately before SES-236 (v7.0.314) landed
 const BUILDER = path.join(ROOT, "scripts/build-briefing.mjs");
 const TEMPLATE = path.join(ROOT, "docs/runbooks/briefing-template.html");
 
@@ -268,7 +279,7 @@ export default async function run() {
   // both trees is describing the repo in general, not pinning this ship.
   let before;
   try {
-    const show = f => execFileSync("git", ["show", `origin/dev:${f}`], {
+    const show = f => execFileSync("git", ["show", `${PRE_CHANGE_SHA}:${f}`], {
       cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"],
     });
     before = {
@@ -278,8 +289,8 @@ export default async function run() {
   } catch {
     notRun(
       "file-level negative control",
-      "origin/dev is not fetched in this checkout, so the pre-change tree could not be read. " +
-      "Run `git fetch origin dev` and re-run to exercise it."
+      `commit ${PRE_CHANGE_SHA} is not reachable in this checkout (a shallow clone), so the ` +
+      "pre-change tree could not be read. Deepen the clone and re-run to exercise it."
     );
   }
 
@@ -287,7 +298,7 @@ export default async function run() {
     const passedOnOldTree = CLAUSES.filter(c => c.test(before)).map(c => c.id);
     assert.deepStrictEqual(
       passedOnOldTree, [],
-      `these clauses ALSO pass against origin/dev's pre-change tree, so they do not pin this ` +
+      `these clauses ALSO pass against the pinned pre-change tree, so they do not pin this ` +
       `ship: ${passedOnOldTree.join(", ")}`
     );
   }
