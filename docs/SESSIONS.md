@@ -5,6 +5,90 @@
 
 ---
 
+## session/cycle-20260829-1640 (v7.0.316, 2026-08-29, runner cycle `c38d63dc-07a7-47b0-b51c-28f2774cddc4`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, roster sweep delegated to a Sonnet 5 subagent per register B21) — delivered: `SES-53` — agent name/role drift in the session history, swept rather than spot-fixed
+
+**Selected under the Prime Directive (`a0ef9525`) §2(c).** No open mission directive at §2(a);
+`drain_epic_next()` returned `blocked` at §2(b) with `blocked_detail` naming both holds (`SES-182`
+needs-john, `SES-191` blocked by `SES-220`). §2(c) is the oldest buildable Selfbuild-epic ticket,
+and `SES-53` is the first one that is actually buildable unattended — see the two cards below.
+Invention pass: **suspended by Prime Directive §4**, not skipped silently.
+
+**THE PREMISE HELD BUT THE TICKET'S FILE NAME HAD DECAYED, and that distinction is the whole
+build.** `SES-53` names one worked example: the 2026-07-29 `S-AGT-37` entry calling Nadia Farouk by
+a retired surname and the wrong role, against `src/data/agents.js:211`. Read live rather than taken
+from the ticket: **`grep "Rahman" docs/SESSIONS.md` returns nothing** — the entry had been
+**archived, not fixed**, by `SES-172`'s rotation, taking the drift into
+`docs/SESSIONS-ARCHIVE-2026-0607.md` with it. A spot-fix of the file the ticket names would have
+found nothing and closed a live defect as dead. The ticket's own instruction is what saved it —
+*"sweep `SESSIONS.md` for other roster drift rather than fixing this one mention"* — so the sweep
+was taken over the session-history corpus as a whole, both halves of one document split by size.
+
+**Ten sites corrected, names and roles only** (the exact before/after list has ONE home: the
+archive's own provenance header, added in the same commit because that file's masthead claims its
+contents were moved *"VERBATIM, nothing edited"* and this ship is the first exception to that
+claim). Five sites misnamed Nadia Farouk — Data Expert by surname, role, or both; one gave Owen
+Marsh — The Proofreader an entirely different name and role; two mispunctuated Marcus Webb — GEO
+CSO Expert; two shortened Bob Whitfield — Professional Procurement Analyst.
+
+**The Bob Whitfield case is the one that sets the rule, and it is why the exclusion is AMBIGUITY
+rather than length.** Nine `Susan Smith — Trainer's` sites and one `Owen Marsh — Proofreader's`
+site were deliberately **left alone**: they contract the right role and misidentify nobody, because
+no second agent answers to "Trainer" or "Proofreader". The shortened Procurement Analyst form is
+not a contraction by that test — the roster also carries Chloe Okafor (Junior) and Mike Alvarez
+(Senior), so it names a role three people could answer to. `tests/regression/SES-53-roster-drift.js`
+encodes exactly that test and pins the boundary case with its own assertion.
+
+**One site is deliberately left wrong: `SES-53`'s own filing inside the archive.** A sentence about
+a wrong string has to contain it; correcting it would delete the record of the bug. The guard
+exempts it **by content, never by line number**, so a re-flow of a 7,000-line file cannot silently
+turn the exemption into a hole — and it asserts the exempt text still EXISTS, so a dead exemption
+gets noticed instead of quietly guarding nothing.
+
+**QA — the discriminating pair, one variable.** The guard reports **10 drift sites against
+`origin/dev`'s own copy of the archive and 0 against the shipped one**, same script, same corpus;
+its retired-forms control names the five retired strings directly, so a revert of the doc fix fails
+it even if the general sweep were weakened. Re-run after the provenance header landed, to prove the
+new header exemption opened no hole: still 10 / 0. The detector's own two false starts are recorded
+in the test header because the second is instructive — **matching the role slot against the
+roster's list of roles reports ZERO findings on a corpus that demonstrably contains the drift**,
+since a drifted role is by definition not in the roster. Build green; suite 109/111.
+
+**The Sonnet 5 sweep is reported as what it is: a POST-change confirmation, not an independent
+pre-change baseline.** It was launched before the edit and returned after it, so its "0 drift, 22 of
+22 agents clean" reading is of the corrected corpus. It independently reached the same two
+judgments this cycle made — that the possessive contractions are elision rather than substitution,
+and that the filing quote must not be touched — and it correctly ruled out a `Susan Onufer` string
+in `SESSIONS.md` as a database `user_label`, not a roster reference. The pre-change baseline is the
+`git show origin/dev` control above, not the subagent.
+
+**VERDICT WAS `block`, AND IT IS NOT THIS SHIP'S — filed as `SES-240`.** `runner_verdicts`
+`c7223db9`: build green, hygiene green, **regression red on
+`tests/regression/SES-236-prime-directive-briefing.js`**, which shipped 40 minutes earlier in
+`v7.0.314`. Its `SES-158` vacuity meta-check reads its baseline with `git show origin/dev:<file>`
+and requires every clause to fail there — but `origin/dev` is a **moving ref**, so the moment
+`v7.0.314` landed on `dev` the baseline began carrying the very change the clauses assert, and all
+11 pass against it. **The test can only pass in the window between being written and being pushed.**
+Proven rather than argued: `git stash` of this cycle's one tracked edit reproduced the identical
+failure on the resulting unedited tree, which also proves the red is not this ship's. The cost is
+not one red test — `verifier.js` spawns the suite as its regression gate, so **every** cycle now
+blocks by construction, exactly the failure `SES-213` measured and closed for `CLAUDE-STATE.md`
+(26 of 26 blocks, identical green/red/green triple), rebuilt one ticket later through a different
+column; under Prime Directive §2f it also defeats the Selfbuild auto-done widening, which requires
+a green verdict. The fix shape is on the ticket and comes from the siblings: `SES-213` and
+`SES-104` both **run and report** their file-level control in header prose rather than asserting it
+at runtime, naming the version it was taken at. **Deleting the meta-check is not the fix** — the
+moving baseline is the defect, not the idea.
+
+**Two tickets carded rather than built, both first identified as blocked by this cycle.**
+`SES-54` — capability-logging.md documents a dead `ai_type` convention → `needs-desktop`: the fix
+is two lines under `.claude/`, which an unattended cycle may not write (register B39), so the card
+carries the **exact replacement text** for a session John attends. Premise verified live first:
+`api/extract.js:119`/`:187` and `api/fetch-article.js:56` all use the `SERVICE_SLUG` form, and that
+last file sits outside the rule's own `paths:` scope, which is the widening half.
+`SES-47` — Vercel's 100-deploys/day cap → `needs-john`: the ticket contains no build, only John's
+choice. Measured live for the card rather than quoted from the ticket — user and team both still
+`hobby` plan, **16 of 100 deployments used today** — so it is scheduled insurance, not an incident.
+Both `record_skip()`'d and flagged so the next cycle reads the block instead of re-deriving it.
 ## session/cycle-20260829-1611 (v7.0.315, 2026-08-29, runner cycle `4559cfe7-05b4-4e7d-93d2-e3c742cf667e`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-134` — the trust ladder stops being arithmetic every cycle does by hand
 
 **The first in-session continuation under Prime Directive §2e**, opened because `drain_chain_gate`
