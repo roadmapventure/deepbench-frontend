@@ -5,6 +5,93 @@
 
 ---
 
+## session/cycle-20260829-0240 (v7.0.302, 2026-08-29, runner cycle `5b58c153-f1ea-452c-8d59-67855d5bdbd2`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, Fable 5 subagent for the LOO-24 diagnosis and design) — gated before build: LOO-24's design is done and lands as a proposal, because the board below it is gated lane all the way down
+
+**Outcome `gated_before_build`, and the reason is a blocker rather than a shortage of effort.** Four
+cards filed, one design written and pushed, nothing built. The runbook's B24 forbids ending a cycle
+build-less over a *card*; it permits it for a *blocker*, and this cycle hit a real one — every
+ticket reachable below the drain is in §19v's gated lane.
+
+**Selection.** Layer 1a held no one-off build directive. Layer 1b: `drain_epic_next()` returned
+**`blocked`** — M3's 3 open named members are `SES-180` and `SES-182` (both waiting on John) and
+`SES-191` (blocked on `SES-220`). That last one was **checked rather than trusted**, because a
+`blocked_by` pointing at a ticket that has since shipped is exactly the stale-wedge shape `SES-218`
+was written from: `SES-220` is `partial` and itself `blocked_by` `SES-223` (open), so the chain is
+genuine and no repair was owed. Fell through to the class-sorted board.
+
+**The board walk, and what it cost to establish.** Queue 1–32 yielded: 6 `delivered` (stepped past
+silently — their ship cards already carry the ask, `SES-154`), 2 `removal proposed`, 13 flagged
+`needs-john` / `needs-desktop`, 1 `john-paced` (silent, `SES-166`), and `SES-191` blocked. **15
+`record_skip()` rows written.** Four milestone design gates (`SES-183`–`SES-186`) sit at queue 7–10
+on `automation_rank` while their own text says *"Design session at M3 retirement"* and *"Members
+filed at the gate, not before"* — M3 has not retired, so they were stepped past. `SES-160` declares
+*"Depends on SES-159"* in **prose only**, and `SES-159` is `needs-john`; its `blocked_by` is NULL, so
+the picker will keep offering it. That was deliberately **not** repaired here — `SES-218` shipped
+that column with nothing backfilled as a safety property, and widening a picker predicate on a
+cycle's own judgment is the widening this runbook keeps forbidding. It is named so the next reader
+sees a measurement.
+
+**Three gated cards filed on the way past**, each a decision only John can make and none previously
+represented anywhere on his page: `LOG-126` (identity model beyond the `db_visitor` cookie),
+`LOG-123` (no consent gating on that cookie — his own text says *"decide before EU launch"*),
+`DAT-15` (does accumulated opinion content need a baseline concept at all). Filing them is what
+stops the next cycle re-deriving the same three answers from prose — `SES-114`'s lesson.
+
+**LOO-24 was claimed, designed, and then refused a ship — on three independent gate triggers, each
+singly sufficient, each re-verified by the orchestrator against the live files rather than taken
+from the subagent.** (1) The wiring touches `api/prompt/request-receivable.js`, one of the four
+harness files (`ARCHITECTURE.md:2608`), and `:2615-2617` puts them in *"the gated lane (never
+unattended, **no trust rung ever unlocks it**)"*. `.claude/rules/capabilities-are-data.md` states the
+mirror for this exact case: determinism removal in those four files *"lands as a proposal for John,
+never an unattended ship."* (2) The data half retires an **active** agent's capability assignment —
+`agents.is_active` read live: `true` for both `nadia` and `eleanor`. (3) It supersedes a LOCKED §19f
+sentence at `ARCHITECTURE.md:1248`. The same paragraph closes anything borderline: *"Uncertain
+classification → gated, always."*
+
+**The premise was revalidated live and is ALIVE, which is why the design was worth writing.**
+Insert-vs-supersede is still decided by a Sonnet model following prose in
+`traits.analysis_instructions`; `chunk_id` is **present-and-null on all 8** most recent
+`data-patch-intent` confirmations, so the null-chunk case the ticket calls an occasional misfire is
+the **dominant** case. A drift the ticket did not know about was also found: the execute intent still
+commands the deprecated two-step insert + `update_status` while Eleanor's live `library-write-intent`
+schema (DAT-11) says *"use `supersede` — never `insert` followed by `update_status`"*, so the two
+half-write hazards DAT-11 closed are still open on this path.
+
+**Why the design was pushed rather than left on the card.** ~150k tokens of file:line verification
+would otherwise have died with the container and been re-derived by the next cycle — the waste
+`SES-114` is written from. `docs/design/LOO-24-deterministic-promote-design.md` carries the
+revalidation, the full call chain (Accept click → PostgREST), the 3-file design riding the
+**existing** zero-model seam (`precomputed_turn`, `confirmation.js:103-123`), a QA plan with a
+negative control per test, and the two questions a build cycle needs John to answer: the disposition
+of ~8 stale pending confirmations whose frozen `format_contract` would misroute after the flip, and
+the §19f amendment. `docs/design/` is not gated lane; the diff §19v permits an Automated cycle to
+*"diagnose, write… and prove"* is exactly this.
+
+**Baselines were taken before anything moved, which is what made the two reds attributable.**
+Unmodified tree: `npm run build` exit 0; regression **97/99**. Both reds pre-existing and
+root-caused rather than assumed — `LOG-41` HTTP 401 is `SES-221`'s cross-test env leak, **proven by
+running it alone, where it passes and declares its anon arm not-run**; `SES-177` was
+`CLAUDE-STATE.md` drift from the predecessor's ship, i.e. `SES-213`'s exact case. After step 7a's
+render the suite is **98/99** and `SES-177` is green — the prediction and the result matched, which
+is the only reason the remaining red can be called someone else's.
+
+**No verifier verdict this cycle, said plainly rather than left as a gap.** `scripts/verifier.js`
+grades a *delivery*, and nothing was delivered — `LOO-24` stays `status = 'open'`, never
+`delivered`, because a design is not a build. Running the gate to manufacture a row would have been
+a verdict on a diff that does not exist.
+
+**John's budget override `e3007b1c` is still inert, and this cycle did NOT re-ask.** Measured at
+step 3: `day_cap` 100,000,000 / `cap_source` `daily-max-box` / `override_id` NULL, against **87.87M**
+already spent — so his *"raise TODAY'S day token cap to 150,000,000"* has no effect because the row's
+`max_tokens` is NULL. The previous cycle already filed `q-override-max-tokens-null` and declined to
+repair it (writing a token allowance onto a budget row is the runner widening its own budget). One
+ask, one home — `SES-154`. Recorded here as a second measurement, not a second question.
+
+**Chain.** Gate B fails by construction — `drain_epic_next()` returns `blocked`, not `pick` — so no
+continuation cycle was opened and the cron remains the engine. Doc-only push (design doc,
+`CLAUDE-STATE.md`, `BACKLOG-SNAPSHOT.md`, this entry); no `src`/`api`/`lib` change, no site change,
+no schema change.
+
 ## session/cycle-20260829-0140 (v7.0.301, 2026-08-29, runner cycle `345e5a2d-e2ff-4c06-ba8c-1c0a1131c8a8`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — SES-205: tripwire findings become backlog rows
 
 **Selection.** Layer 1a, directive `a7be7fd6` (John's *"run it"* on the 16-hour unattended plan). Read live: item (1) `SES-213` **delivered**, (2) `SES-209` **removal proposed** — a removal card is already undecided on his page, so it was stepped past with a `record_skip()` row (`removal-proposed`) and deliberately **not** re-carded, (3) `SES-207` **delivered**. Item (4) `SES-205` is this cycle's build. `a7be7fd6` left `queued` for the same reason the previous cycle left it queued: it is a four-item directive and layer 1a filters `status='queued'`.
