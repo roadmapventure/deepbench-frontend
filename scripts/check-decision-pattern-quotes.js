@@ -65,8 +65,25 @@ if (!repoRoot) {
 const DOC = path.join(repoRoot, 'docs', 'JOHN-DECISION-PATTERNS.md');
 const CORPORA = [
   path.join(repoRoot, 'docs', 'SESSIONS.md'),
+  // docs/SESSIONS.md's OWN ARCHIVED HALF, and leaving it out is what made this gate red for
+  // 60 quotes (SES-246, v7.0.328). Commit 0de0ea57 (v7.0.213, "SESSIONS.md rotated") moved the
+  // pre-2026-06-07 history out of docs/SESSIONS.md into this file -- AFTER SES-79 and SES-90 had
+  // cited those passages against docs/SESSIONS.md. The quotes did not become fabricated; the
+  // corpus moved out from under them, and the list here was never updated with it. Measured on
+  // an unedited origin/dev@3864a154: 60 failures, 55 of them resolved by this one line, ZERO
+  // ungroundable anywhere in the repo.
+  // THIS IS THE ROTATION-SHAPED HOLE, NOT A ONE-OFF: the next rotation will do it again unless
+  // the archives are picked up by pattern. Hence the glob below rather than a second literal.
   path.join(repoRoot, 'docs', 'FEATURES-ARCHIVE.md'),
 ];
+// Any further docs/SESSIONS-ARCHIVE-*.md rotations join automatically. Deliberately a prefix
+// match on SESSIONS-ARCHIVE rather than "every .md in docs/": widening the corpus to the whole
+// tree would let a quote ground against a kickoff doc, a vision file -- or against
+// JOHN-DECISION-PATTERNS.md ITSELF, which would make every quote trivially self-grounding and
+// the gate vacuous. The corpus is session HISTORY plus harvests, and nothing else.
+for (const f of fs.readdirSync(path.join(repoRoot, 'docs'))) {
+  if (/^SESSIONS-ARCHIVE-.*\.md$/.test(f)) CORPORA.push(path.join(repoRoot, 'docs', f));
+}
 // docs/harvests/*.md are in-repo session harvests — the seed set's quotes live there.
 const harvestsDir = path.join(repoRoot, 'docs', 'harvests');
 if (fs.existsSync(harvestsDir)) {

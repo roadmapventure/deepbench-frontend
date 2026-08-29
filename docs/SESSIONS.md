@@ -5,6 +5,49 @@
 
 ---
 
+## session/cycle-20260829-2040 (v7.0.328, 2026-08-29, runner cycle `fa1e306d-a2b6-45c0-b0d5-4fb19704ae4a`, `trigger = chained (drain continuation)` of `475c76cb`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — `SES-246` — the decision-pattern ship gate reads `SESSIONS.md`'s own archived half
+
+**A SHIP GATE THAT FAILS IS NOT A GATE; ONE THAT FAILS AND IS NEVER RUN IS A DECORATION.**
+`docs/JOHN-DECISION-PATTERNS.md`'s own footer calls `scripts/check-decision-pattern-quotes.js`
+*"the ship gate; run it after any edit here"*. Measured on an unedited `origin/dev@3864a154`:
+**exit 1, 60 ungrounded quotes across criteria 6–137**. Nothing in `tests/regression/` ran it and
+it is not in CI, so a human remembering was the only thing between that red and a silent pass.
+Found by this session's own predecessor while shipping `SES-004`, filed rather than absorbed.
+
+**THE ROOT CAUSE IS A CORPUS THAT MOVED, AND IT HAS A COMMIT.** `0de0ea57` (`v7.0.213`,
+*"SESSIONS.md rotated"*) moved the pre-2026-06-07 history out of `docs/SESSIONS.md` into
+`docs/SESSIONS-ARCHIVE-2026-0607.md` — **after** `SES-79` and `SES-90` cited those passages
+against `docs/SESSIONS.md`. The quotes did not become false; the file they pointed at was split in
+two and `CORPORA` never followed. **55 of the 60 live in that archive**, two more resolve through
+the gate's existing inner-kernel fallback once it is readable: **60 → 3**, and **not one of the 60
+was a fabrication.** Picked up **by pattern** (`SESSIONS-ARCHIVE-*.md`), never a second literal —
+the next rotation would reopen the identical hole.
+
+**THE CORRECTION THIS CYCLE MADE TO ITS OWN FIRST ANSWER, recorded because it changed the
+conclusion.** The first diagnostic reported *"all 60 findable in the repo, 0 ungroundable"*. It was
+counting `docs/JOHN-DECISION-PATTERNS.md` itself as a hit — a quote is trivially present in the
+entry that cites it. The real number is **57**. That near-miss is the reason the guard carries a
+**planted-fabrication clause with a decoy `docs/` file** instead of trusting the reasoning: had the
+fix widened the corpus to *"every `.md` under `docs/`"* — the obvious next step — the doc would
+have grounded every quote in itself and the gate would exit 0 forever while checking nothing.
+
+**THE RESIDUE STAYS RED ON PURPOSE, AND NO HARVEST WAS INVENTED FOR IT.** Three quotes on
+criterion 137 (`p1p3-now-review`, `v7.0.136`) exist nowhere in this repository outside the entry
+citing them. They read exactly like John and are almost certainly real — a live conversation never
+written to a file. `SES-246`'s own text says an ungroundable quote is repaired or the criterion
+honestly demoted, **never deleted to make the gate green**; manufacturing evidence to make it green
+is that same offence facing the other way. Asked instead as
+`runner_questions.q-criterion-137-provenance`.
+
+**QA.** Build green. Suite **119/120**, up from **118/119**; the one red is
+`SES-177-claude-state-renderer.js` on both, closed by step 7a's render. Verifier **APPROVE**
+(`runner_verdicts 82dbae49`), all three gates green, `auto_done_eligible` YES — **not taken**, for
+the same reason as its predecessor: the ticket's remainder is real. Ships `partial`.
+
+**OUT OF SCOPE AND NAMED:** wiring the gate into `run-all.js` / CI was `SES-246`'s half (a) and is
+blocked on the residue by construction — a red gate in the suite blocks every ship. It is a
+one-line change the moment the three quotes are settled.
+
 ## session/cycle-20260829-2040 (v7.0.327, 2026-08-29, runner cycle `475c76cb-e2d3-49a0-b05b-9d9d21e764f6`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, distillation delegated to a Fable 5 subagent per register B21) — `SES-004` — the RUNNER-ERA half of the decision-pattern mining pass
 
 **THE ORIGINAL PREMISE WAS DEAD AND THE RE-SCOPED ONE WAS ALIVE — both checked live, neither
