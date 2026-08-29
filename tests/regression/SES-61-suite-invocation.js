@@ -1,3 +1,11 @@
+// DeepBench v7.0.300 | tests/regression/SES-61-suite-invocation.js | SES-207 -- this guard now
+// covers the RENDERED hint as well as the rule. Rule 5 has been right since SES-61; what it could
+// not reach is the bare --env-file= string seven credential-gated tests write into their own
+// notRun() reasons, which is what a reader actually sees. Extended here rather than given a second
+// guard file, per this file's own "point rather than restate" clause. The seven SOURCE strings are
+// deliberately NOT asserted clean -- see the declared remainder in
+// docs/kickoffs/v7.0.300-SES-207-skip-hint-invocation.md.
+//
 // DeepBench v7.0.253 | tests/regression/SES-61-suite-invocation.js | SES-61
 //
 // Guards STANDARDS.md Section 2 rule 5 -- the command this repo specs for its own regression gate.
@@ -36,7 +44,10 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { selfRun } from "./_lib/self-run.js";
+import {
+  selfRun, renderNotRun, repairInvocation, installHintRepair, resetHintRepairNotice,
+  BARE_ENV_FILE, SAFE_ENV_FILE, INVOCATION_SPEC,
+} from "./_lib/self-run.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const STANDARDS = path.join(ROOT, "docs/STANDARDS.md");
@@ -142,6 +153,35 @@ export function bareFlagRejectsMissingFile() {
   return { status: r.status, stderr: (r.stderr || "").trim() };
 }
 
+// --- SES-207 (v7.0.300): the RENDERED hint, not just the rule --------------------------------
+//
+// Rule 5 has said the right thing since SES-61. What it could not reach is the string a
+// credential-gated test writes into its own notRun() reason, which is what a reader actually sees
+// at the moment they go looking for the missing half -- eight printed occurrences of the bare form
+// on an uncredentialed run, measured before the change. renderNotRun() repairs them; these clauses
+// pin that behaviour AND pin that it is a real difference from what shipped before.
+//
+// The pre-change template, kept verbatim as the negative control. A clause that only asserts the
+// new output is a property BOTH implementations could share -- this is what makes the difference
+// measurable (the SES-213 lesson: assert against the retired expression, not just the new one).
+export function retiredRenderNotRun(entries, indent = "       ") {
+  return entries.map(e => `${indent}[NOT RUN] ${e.part} -- ${e.reason}`).join("\n");
+}
+
+// The hostile fixture is the real shape, copied from the live sites rather than invented.
+export const HOSTILE_ENTRIES = [{
+  part: "a credential-gated half",
+  reason: "no Supabase credentials in env -- run with " +
+          "`node --env-file=.env.local tests/regression/run-all.js` to include it.",
+}];
+
+// A declaration that never wrote the bad form. The quiet case must stay byte-identical, or the
+// notice becomes noise on every run and stops being read.
+export const CLEAN_ENTRIES = [{
+  part: "a half that points at the spec instead",
+  reason: `no Supabase credentials in env -- see ${INVOCATION_SPEC} for the suite command.`,
+}];
+
 export default async function run() {
   const md = fs.readFileSync(STANDARDS, "utf8");
   const block = norm(extractRule5(md));
@@ -174,6 +214,103 @@ export default async function run() {
   assert.notStrictEqual(bare.status, 0,
     "bare --env-file tolerated a MISSING file on this Node -- rule 5 forbids that form because it " +
     "hard-errors, and if that stopped being true the stated reason is stale and must be re-checked");
+
+  // --- SES-207: the rendered hint --------------------------------------------------------------
+
+  // Vacuity meta-check FIRST (the SES-158 lesson). Every clause below is about removing the bare
+  // form; if the fixture never contained it, they all pass having proven nothing.
+  assert.ok(HOSTILE_ENTRIES[0].reason.includes(BARE_ENV_FILE),
+    "SES-207 fixture is VACUOUS -- the hostile reason does not contain the bare form, so every " +
+    "clause below would pass without the repair doing anything");
+
+  const repaired = repairInvocation(HOSTILE_ENTRIES[0].reason);
+  assert.ok(!repaired.includes(BARE_ENV_FILE),
+    "repairInvocation() left the bare --env-file= form in place -- that string is the whole defect");
+  assert.ok(repaired.includes(SAFE_ENV_FILE),
+    "repairInvocation() removed the bare form without producing the --env-file-if-exists= form");
+
+  // Idempotence is what makes it safe to apply to EVERY reason, correct ones included. It holds
+  // because "--env-file-if-exists=" does not contain "--env-file=".
+  assert.strictEqual(repairInvocation(repaired), repaired,
+    "repairInvocation() is not idempotent -- re-repairing a corrected reason changed it, which " +
+    "means the token swap is eating its own output");
+  assert.strictEqual(repairInvocation(CLEAN_ENTRIES[0].reason), CLEAN_ENTRIES[0].reason,
+    "repairInvocation() rewrote a reason that was already correct -- it must be a no-op there");
+
+  const rendered = renderNotRun(HOSTILE_ENTRIES);
+  assert.ok(!rendered.includes(BARE_ENV_FILE),
+    "renderNotRun() printed the bare --env-file= form -- a reader following it gets " +
+    "`node: .env.local: not found`, which is the defect SES-207 was filed on");
+  assert.ok(rendered.includes(SAFE_ENV_FILE),
+    "renderNotRun() did not print the --env-file-if-exists= form the reader needs");
+  assert.ok(/hint repaired/.test(rendered) && rendered.includes(INVOCATION_SPEC),
+    "renderNotRun() repaired the hint SILENTLY -- the notice must say a repair happened and name " +
+    `${INVOCATION_SPEC}, or the source rot is hidden rather than fixed`);
+
+  // THE NEGATIVE CONTROL, and it is the clause that gives the three above their teeth: the retired
+  // template on the SAME fixture must still carry the bare form. This proves a DIFFERENCE from
+  // what shipped before rather than a property both implementations happen to share.
+  const control = retiredRenderNotRun(HOSTILE_ENTRIES);
+  assert.ok(control.includes(BARE_ENV_FILE),
+    "SES-207 control is VACUOUS -- the pre-change template did not print the bare form on this " +
+    "fixture, so the clauses above prove nothing about what changed");
+  assert.notStrictEqual(rendered, control,
+    "renderNotRun() produced the pre-change output byte-for-byte -- the repair did nothing");
+
+  // And the quiet case: a clean declaration must render EXACTLY as it always did. A notice on
+  // every run is noise, and noise is how a real signal stops being read.
+  assert.strictEqual(renderNotRun(CLEAN_ENTRIES), retiredRenderNotRun(CLEAN_ENTRIES),
+    "renderNotRun() changed the output for a declaration that never wrote the bare form -- the " +
+    "repair notice must fire only when a repair actually happened");
+
+  // --- SES-207, the SECOND announcement path -----------------------------------------------
+  //
+  // Repairing renderNotRun() alone took the suite's printed occurrences 8 -> 4, and the four
+  // survivors were AGT-44, DAT-003, DAT-11 and DAT-12 -- four of the five files the ticket names.
+  // They announce through a plain console.log that never reaches renderNotRun(). These clauses
+  // pin the sink repair, without which this ticket ships half done.
+  resetHintRepairNotice();
+  const captured = [];
+  const fake = { log: (...a) => captured.push(a.join(" ")) };
+  const restore = installHintRepair(fake);
+  try {
+    fake.log(`[AGT-44] live half SKIPPED (run with \`node ${BARE_ENV_FILE}.env.local ` +
+             "tests/regression/run-all.js` to include it).");
+    fake.log("[SOMETHING] a line that never mentioned the flag at all.");
+  } finally {
+    restore();
+  }
+
+  assert.ok(!captured[0].includes(BARE_ENV_FILE),
+    "installHintRepair() let a console.log print the bare --env-file= form -- that is the path " +
+    "four of SES-207's five named files actually use");
+  assert.ok(captured[0].includes(SAFE_ENV_FILE),
+    "installHintRepair() removed the bare form without leaving the working one in its place");
+  assert.ok(captured.some(l => /hint repaired/.test(l) && l.includes(INVOCATION_SPEC)),
+    `the console repair is SILENT -- it must say so once and name ${INVOCATION_SPEC}`);
+  assert.strictEqual(captured.filter(l => /hint repaired/.test(l)).length, 1,
+    "the console repair announced itself more than once -- it is said once per run, or a long " +
+    "suite drowns in its own bookkeeping and the notice stops being read");
+  assert.ok(captured.includes("[SOMETHING] a line that never mentioned the flag at all."),
+    "installHintRepair() altered a line that had nothing to do with the flag -- it must be a " +
+    "no-op on everything but the bare form");
+  // The restore must actually restore, or a guard that installs the wrapper leaks it into every
+  // later test in the same process.
+  const marker = () => {};
+  const target2 = { log: marker };
+  installHintRepair(target2)();
+  assert.strictEqual(target2.log, marker,
+    "installHintRepair()'s restore did not put the original console.log back");
+
+  // Idempotence: installing twice must not double-wrap, or one line gets repaired-and-announced
+  // twice and the once-per-run contract above quietly breaks.
+  const target3 = { log: () => {} };
+  installHintRepair(target3);
+  const afterFirst = target3.log;
+  installHintRepair(target3);
+  assert.strictEqual(target3.log, afterFirst,
+    "installHintRepair() double-wrapped an already-wrapped console -- it must detect its own " +
+    "wrapper and stand down");
 
   return true;
 }

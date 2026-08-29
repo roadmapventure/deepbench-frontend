@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.300 | tests/regression/run-all.js | SES-207 -- installHintRepair() at the top of
+// main(), so a skip hint announced through a plain console.log gets the same repair renderNotRun()
+// gives a notRun() declaration. Rationale and the 8 -> 4 -> 0 measurement: _lib/self-run.js and
+// docs/kickoffs/v7.0.300-SES-207-skip-hint-invocation.md.
+//
 // DeepBench v7.0.224 | tests/regression/run-all.js | SES-180 (b) -- the suite reports parts it
 // could not run, instead of counting them as passes. SES-180's own ship notes name this as the
 // first of three things still owed and the only one that is the runner's to do.
@@ -37,7 +42,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { takeNotRun, renderNotRun } from "./_lib/self-run.js";
+import { takeNotRun, renderNotRun, installHintRepair } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +55,13 @@ function arg(name, fallback) {
 const DIR = arg("dir", __dirname);
 
 async function main() {
+  // SES-207 (v7.0.300): tests that predate notRun() announce a skipped half with a plain
+  // console.log carrying `--env-file=` -- the form that hard-errors wherever .env.local is absent,
+  // which is every unattended cloud cycle. Those lines never reach renderNotRun(), so the repair
+  // is installed at the sink too. Installed once, for the whole run, and never restored: the
+  // process exits at the end of main(), and a restore point would only be a thing to forget.
+  installHintRepair();
+
   const files = fs.readdirSync(DIR)
     .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
     .sort();
