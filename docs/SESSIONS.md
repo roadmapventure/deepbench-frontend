@@ -5,6 +5,67 @@
 
 ---
 
+## session/cycle-20260829-1741 (v7.0.321, 2026-08-29, runner cycle `3fa83582-7950-4bbd-8384-0f4bc60c955c`, `trigger = chained (drain continuation)` of `6a84c2dd`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-241` — a restore's real errors stop hiding behind 114 expected ones
+
+**Chained in-session from this session's own `SES-50` ship** under Prime Directive §2e:
+`drain_chain_gate` returned `continue` with `drain_outcome = blocked` — M3's drain has no claimable
+member (`SES-182` on John's hold, `SES-191` shipped by a peer) — and named `SES-241`, filed 25
+minutes earlier by the `SES-191` re-drill itself. Walls re-checked in full, which is what bounds the
+chain: $0/$0, 31.4M of the 200M day cap, meter 29% against the 85% rest wall.
+
+**The defect, measured from the catalog rather than recalled.** The `functions` branch of
+`public._backup_schema_ddl` filtered on schema and `prokind` alone, with **no ownership test**, so
+every dump emitted pgvector's own C functions as `CREATE OR REPLACE FUNCTION` statements. They are
+already created by `CREATE EXTENSION vector` at `sort_key 0` of the same file, and no Supabase role
+may create a `LANGUAGE c` function, so each fails `42501`.
+
+| | count | of which `LANGUAGE c` |
+|---|---|---|
+| public functions | **146** | — |
+| extension-owned (`pg_depend` deptype `e`) | **114** | **114** |
+| ours | **32** | **0** |
+
+The ticket's "~114" is exactly 114. **Nothing is lost to this** — the extension supplies the
+functions — so it is a SIGNAL defect: a clean restore prints ~114 expected errors and a real one
+among them is invisible, which is precisely what `SES-223 (c)` exists to prevent.
+
+**THE DESIGN CHOICE: ownership, never language.** `prolang <> 'c'` is the tempting shortcut and is
+wrong twice — it would silently start dropping OUR functions if one were ever written in C, and it
+would still emit a future extension's plpgsql/SQL functions, which fail for a different reason. The
+two forms are **indistinguishable on today's catalog**, which is exactly why the choice had to be
+made on the rule rather than on the numbers. `ours_and_c = 0` is what makes the shipped exclusion
+provably lossless: the two sets are disjoint by measurement, not by assumption.
+
+**The migration is written out explicitly, not derived.** `CREATE OR REPLACE VIEW` needs the whole
+body, and the tempting form — a `DO` block doing string surgery on `pg_get_viewdef()` — is not
+reproducible on a fresh database, where the base view is whatever the earlier migrations built.
+
+**QA asserted BOTH directions and never the migration's success flag** (`supabase-column-grants.md`'s
+lesson generalised): functions 146 → **32**, pgvector leftovers **0**, `LANGUAGE c` **0**,
+`$libdir`/`internal` **0**, all ten named load-bearing platform functions still present, every other
+section byte-identical (`migrations` 149→150 is this migration recording itself). Build green, suite
+**114/114**. NEGATIVE CONTROL — the retired predicate over the same catalog fails clause (a) on 114,
+(b) on 60, (d) on 114. **Said plainly rather than overclaimed: the losslessness clause passes on
+BOTH forms**, because it guards the other direction — a careless exclusion taking the wrong rows —
+which a count-only test cannot see.
+
+**DELIVERED, NOT AUTO-DONE, AND THE GAP IS NOW A TICKET.** Verdict `approve`, three gates green
+(`runner_verdicts c163fc4f`), but `auto_done_eligible: no` — the verifier reads charter decision 2,
+which covers `P10 - Tooling` only, and this is `P9 - Bug Fixes`. Prime Directive §2f widened that to
+*"ANY Selfbuild-epic ship the verifier lane passes GREEN"*, and `SES-241` **is** a Selfbuild M3
+member, so John's directive and the enforcement script disagree. This cycle took the fail-closed
+side — §2f's own instruction (*"uncertain -> deliver and card, never auto-done"*) — because a cycle
+must not widen its own autonomy on its own reading of that disagreement. Filed as **`SES-243`** so
+the boundary moves in a cycle that owns it rather than being re-decided ad hoc every ship.
+
+**Not claimed:** the end-to-end proof that a restore now prints a clean log belongs to the next
+drill — the restore tooling lives in `deepbench-backups-offsite` and is not in this clone. `SES-214`
+is the same view and the same class, a different defect, and stays its own ticket. Guarded by
+`tests/regression/SES-241-extension-functions-excluded.js`. Migration + test; no `src`/`api`/`lib`
+change, no site change.
+
+---
+
 ## session/cycle-20260829-1654 (v7.0.320, 2026-08-29, runner cycle `b68bf88a-8244-4ca8-864c-de6be36e857e`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-191` — the re-drill ran and the recovery net restores 99.996%, up from 32.8%
 
 **Chained in-session from `807bddb3`'s `SES-220` ship**, which cleared this ticket's blocker.
