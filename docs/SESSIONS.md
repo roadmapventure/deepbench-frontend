@@ -5,6 +5,83 @@
 
 ---
 
+## session/cycle-20260829-1141 (v7.0.310, 2026-08-29, runner cycle `bb02611d-934c-4c67-a568-2f29125380f1`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-104` — the stall tripwire's "minutes frozen" was fabricated by a migration backfill, and a never-reporting cycle was invisible to it entirely
+
+**Selection walked the same gated head as the previous cycle and reached further down.** Layer 1a's
+two queued `directive` rows (`58db64ae`, `1c9609de`) are standing context, not missions — consuming
+either would retire an authorisation John wants persistent. Layer 1b returned **`blocked`**: 3 named
+M3 members open, none claimable — `SES-182` (needs-john, and under his explicit standing hold *"do
+not flag it, do not pick it"*), one `delivered` awaiting his Accept, and `SES-191` blocked by
+`SES-220`. That chain was walked to its end rather than assumed: `SES-191` ← `SES-220` (`partial`) ←
+`SES-230` (`needs-john` — the jsonb-scalar-null wire-format decision, already carded). Nothing
+buildable there. Queue positions 8–11 (`SES-183`–`SES-186`) are the M4–M7 milestone **design gates**,
+each explicitly *"Design session at M<n> retirement"* with *"members filed at the gate, not before"*
+and budget reviewed with John **at** the gate — M3 has not retired, so their own precondition is
+unmet. `LOG-126` sits under John's standing hold until accounts/billing matter; `LOG-44`/`45`/`47`
+are vocabulary decisions John scoped to their own sessions. First genuinely buildable ticket:
+`SES-104`, queue 141, `P9 - Bug Fixes`, size `S`, gate_count 0.
+
+**The premise was re-measured, not quoted — and the ticket's own figures had not moved in eight
+days.** Live at 11:4xZ on an unedited tree: `runner_cycles` held 269 rows, **43** still carrying the
+`ses103` backfill constant `2026-08-21 18:19:19.001555+00`, **0** carrying NULL, 45 with no
+`last_step`. Two facts the ticket did not carry, and both changed the design: **all 43 are closed**,
+and **all 43 carry a heartbeat later than their own `started_at`** — which is exactly what makes the
+value dangerous rather than obviously wrong. It is indistinguishable from a real heartbeat, so no
+reader can repair it.
+
+**The ticket's own fix sentence is wrong on one word, and that is the whole design.** It offers
+*"backfill `heartbeat_at` to NULL for rows that never wrote one (**or** exclude `heartbeat_at IS
+NULL` from (d))"*. The two are **not** alternatives — each repairs a defect the other cannot touch.
+`coalesce()` is powerless against a non-NULL *wrong* value, so the data had to move; and NULLing
+alone leaves the detector broken, because `heartbeat_at < now() - INTERVAL '20 minutes'` evaluates to
+**NULL — not true** — for a NULL heartbeat, so such a row silently leaves the tripwire and John gets
+no push. Meanwhile `stall_watchdog()` has coalesced since `SES-194` (read from `pg_get_functiondef`,
+not assumed) and remains free to close that same row `failed` at the 24-hour bar. **A cycle could be
+closed for going silent having never produced the 20-minute alert the tripwire exists to send.** Two
+detectors over one column disagreeing about what a missing value means is the drift this repo keeps
+paying for; probe (d) now uses `stall_watchdog()`'s own expression, so the two cannot drift apart.
+
+**What shipped.** Probe (d) filters and measures on `coalesce(heartbeat_at, started_at)` and projects
+`never_reported`. Migration `ses104_null_never_reported_heartbeats` writes before-images for all 43
+rows (§19v) and NULLs them; its predicate is **two-part on purpose** — the heartbeat statement writes
+`heartbeat_at` **and** `last_step` in one `UPDATE`, so `last_step IS NULL` proves no cycle ever ran
+it, and the pair correctly **spares** the 2 further rows carrying `last_step IS NULL` beside their own
+`DEFAULT`-now() start-time heartbeat, whose basis is already honest. It raises rather than guessing if
+the count is not 43. Verified after: 0 constant, 43 NULL, 43 images, 2 spared.
+
+**The edit this ship forbids:** moving `never_reported` out of the projection into the `WHERE`. A
+never-reporting open peer is *more* worth pushing, not less — it has not reached its first step
+boundary — and the flag changes only the push's wording; filtering on it rebuilds the exact
+invisibility this fixed.
+
+**Not claimed, and named rather than left to be found.** The column's `DEFAULT now()` is deliberately
+**kept** — it is what makes a fresh row's basis equal its own `started_at`, the correct basis, and
+dropping it changes every future `INSERT` for no observable gain under the coalesce. Honest
+consequence: **on today's schema a live row cannot carry NULL**, so the NULL arm guards the 43
+historical rows and any future explicit NULL. This ship removes a divergence; it does not patch a hot
+path, and saying otherwise would overstate what the measurement supports.
+
+**QA was discriminating rather than a grep.** `isStale()` reproduces three-valued logic on **both**
+bases over the same fixture and **the negative control *is* the retired basis** — the never-reported
+row is caught by the coalesced form and **missed** by the bare one — plus the fix is asserted not to
+manufacture an alert on a peer that heartbeat 5 minutes ago. File-level negative control against
+`origin/dev`'s own pre-change runbook: **4 of 4 clauses fail there, 4 of 4 pass here**. The `SES-158`
+vacuity meta-check **earned its place during the build** rather than passing decoratively: it caught
+clause 3's alternation matching this ship's own rationale prose, and the clause was tightened instead
+of shipped. Build green; suite **104/105** with the one red being `SES-177` — the `SES-213` staleness
+case, cleared by step 7a's render as designed, then green. Tripwire totals unchanged by this edit,
+measured both ways: 53 flagged / 4 warning before and after. Verifier: **approve**, all three gates
+green, `runner_verdicts e8e4645b`; auto-done correctly **unavailable** (`P9 - Bug Fixes` is not
+`P10 - Tooling`), so the ticket ships `delivered` for John's Accept.
+
+**Model discipline, stated rather than skipped:** this environment's standing instruction withholds
+the `Agent` tool absent an explicit request, so the cycle ran wholly on Opus 5 — the runbook's own
+provision for that case. No delegation was owed regardless: `SES-104` is `P9 - Bug Fixes` (the rule
+scopes kickoff-design delegation to `P1`–`P5`) and its root cause was already established and
+re-measured here rather than re-diagnosed.
+
+---
+
 ## session/cycle-20260829-1040 (v7.0.309, 2026-08-29, runner cycle `8c2c6a59-8e26-4d4e-b92e-81f368b4eb6a`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `LOG-141` — the org resolver short-circuited on a row it had never resolved, so every IP first seen since `HAR-33` kept `org`/`city`/`region` NULL forever
 
 **Selection walked a board whose whole head is gated, and this entry names the band rather than
@@ -9405,6 +9482,8 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.252 | runbooks/runner-cycle.md | SES-196 — JOHN OVERRULED THIS FILE'S OWN PROHIBITION, AND THE PROHIBITION'S REASON IS KEPT RATHER THAN RETRACTED. Tail (8) has forbidden a design_status clause in drain_epic_next()'s PICK predicate since v7.0.238, on a real ground: that predicate also feeds step 5, where a flagged member was RETURNED so the cycle could record_skip() it onto John's section 10. The previous cycle correctly stopped and asked instead of editing it. John answered 2026-08-25T05:09Z from an attended architect session, directive 5dc62981, verbatim: "i don't want the system to stop". THE COST THE PROHIBITION NEVER WEIGHED, measured live at 05:17Z on the M3 drain before a line changed: drain_epic_next() returned SES-191 (needs-desktop) as the pick, queue 5, open_now 18 — on EVERY cycle — while THIRTEEN buildable named members sat reachable behind it (SES-77 at queue 234 first). A standing drain John declared could not advance at all. THE SIGNAL WAS CHECKED, NOT ARGUED AWAY, which is the half that made the reversal safe: all four flagged M3 members ALREADY carried unresolved runner_skips rows (SES-191 needs-desktop 04:45Z, SES-180 needs-desktop x8, SES-181 needs-john 04:46Z, SES-182 needs-john x2), and a skip row is cleared by the ticket going done, never by a cycle waiting long enough — so section 10 keeps the ask and what stops is only the RE-skipping of a ticket already on his page (SES-154's one-ask-one-home boundary). THE THREE EDITS THIS SHIP FORBIDS, each a way the next cycle widens it: (1) putting the flags in the RETIREMENT predicate too — open_now goes 0 and John's standing directive closes on the runner's own say-so, the SES-142 authorisation defect; open_now reads 18 pre- and post-fix, which is the proof it did not move. (2) Reading the directive's literal "design_status is non-null" — that also skips 'designed', which step 5's table calls EXPLICITLY NOT A SKIP and step 6 calls the fast path, so the literal form makes a drain step past its BEST picks; his own parenthetical enumerates needs-john / needs-desktop / john-paced and those three are what shipped, mirroring drain_chain_gate's c_flagged byte-for-byte so the two homes cannot drift. (3) Deleting Gate C as redundant — its population should now be zero, and it is the thing that fires if a later edit takes the clause back out of the picker. NOT INCLUDED AND SAID SO: status = 'removal proposed', which SES-196's own description lists among the five blocked-prefix flags, stays pickable here and remains step 5's procedural skip — John scoped the directive to design_status, and widening it to a status he did not name is the runner granting itself scope. Carried as the declared remainder. QA IS JOHN'S OWN THREE ARMS: (a) live, same board, one variable — pick SES-191 pre-fix, SES-77 post-fix; (b) all-flagged fixture inside a deliberately failing DO block (the SES-147 rolled-back pattern) returns blocked, pick null, open_now 18, blocked_detail naming all 17 flagged members with their flags plus the 1 delivered — never a silent empty — and the board was re-counted afterwards byte-identical (4 flagged / 13 unflagged / 1 delivered); (c) the negative control IS arm (a)'s pre-fix call, taken on the real board rather than reconstructed. The widened RETURNS TABLE needed a DROP+CREATE (a return type cannot be replaced); the ARGUMENT list is untouched so no overload can survive, asserted anyway at count(*)=1 per .claude/rules/supabase-function-signature.md, with grants asserted in BOTH directions (SES-101's REVOKE FROM PUBLIC lesson). drain_chain_gate reads the call into a record and was proven end-to-end through Gate B on a rolled-back fixture: verdict continue, pick SES-77, pick_design_status null. Guarded by tests/regression/SES-196-drain-pick-flags.js (6 clauses, 6 of 6 failing on the pre-change file); SES-197's own guard clause forbids-pick-predicate-edit is RETARGETED rather than deleted — it now pins the overrule AND the reason, because deleting a guard when its rule moves loses the reason with it. Stamp count held at 5 per session-hygiene check 7: v7.0.230 moved VERBATIM to docs/SESSIONS.md's appendix, checked first — all four of its editor warnings (the 24h bar is not to be tuned toward the 20-minute tripwire, the AND ended_at IS NULL resume guard, one row closed per cycle, and WENT SILENT never "died") are already restated in step 0b's own body, confirmed by grep rather than recollection. Doc + test + migration; no src/api/lib change, no site change. -->
 
 **Retired by `SES-219` (v7.0.296, 2026-08-28) to hold the stamp count at 5 — all four of its
 editor warnings were confirmed by grep, not recollection, to be restated in the tail's own
