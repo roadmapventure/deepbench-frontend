@@ -78,6 +78,76 @@ rows) was **excluded from the load** rather than writing live credentials into a
 is excluded from the 53,213 denominator — stated rather than quietly netted out. **No push to
 `deepbench-backups-offsite`:** a drill dump is authorised, a push is not.
 
+---
+
+## session/cycle-20260829-1741 (v7.0.319, 2026-08-29, runner cycle `6a84c2dd-2e2c-4058-922b-996d9720e18b`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, one-pass ARCHITECTURE.md sweep delegated to a Sonnet 5 subagent per register B21) — auto-done: `SES-50` — a LOCKED section stops advertising a question that was already answered
+
+**The pick, worked down the Prime Directive's §2 and nothing else.** §2(a): John's newest mission
+directive `6acd590e` names `SES-220` (read live at `done`, 17:21Z) and `SES-191` — the latter
+**claimed by peer cycle `b68bf88a` at 17:34:46Z**, eight minutes before this pick, so B42's
+contested-claim rule sent this cycle onward rather than into a duplicate build. §2(b):
+`drain_epic_next()` returned `blocked` in its own words — *"1 waiting on you (SES-182
+(needs-john)); 1 held by a live peer claim"*. §2(c) with the §2c critical-path amendment: M3 has
+nothing buildable, M1's members are all `john-paced`/`delivered`, and M2's first buildable member
+is `SES-50` at queue 279. Invention pass **suspended by §4**. No park was reached.
+
+**The defect, both halves read live rather than recalled.** `ARCHITECTURE.md:1361` still said
+`LOG-28`'s question *"is the first concrete case this audit must resolve"*; `FEATURES-ARCHIVE.md`
+carries `LOG-28` at `✅ Done`, resolved 2026-07-22 by `AI-35` `2b`. **38 days.** The cost is the
+ticket's own: a session read `§19i`, named `LOG-28` to John as open beta work, and only the archive
+caught it.
+
+**THE DESIGN CHOICE, AND THE OBVIOUS FIX IS THE WRONG ONE.** The sentence welds a dead citation to
+a **live requirement** — *"all current entries must be re-verified … before the model is considered
+complete"* — and `AI-35` is still `partial` (read from `backlog_items` at this ship). Deleting the
+sentence passes every "the stale phrase is gone" check and **silently retires a requirement nobody
+voted to retire**. So the clause records the resolution *and* states the audit is unfinished, and
+guard clause `the-live-requirement-survives` exists to fail the deletion build. `[LOCKED]` was not
+treated as a bar: locked governs the *decision*, and no decision moved — only the currency of a
+citation, which is the thing a locked section is worst at holding because readers trust it most.
+
+**The upstream half is what stops the recurrence**, and without it this ship would be a one-time
+tidy: `CLAUDE-DESIGN.md` Step 5c now makes a close-out that resolves an ID grep `ARCHITECTURE.md`
+for it and amend any open-presenting section **in the same commit** — with three boundaries so the
+rule stays usable: `[LOCKED]` is not an exemption, a bare citation is not a defect, and the
+amendment must not quote the retired wording inline.
+
+**The sweep found three more, and every one was re-verified here rather than trusted.** Editor-agent
+names *"TBD"* (they are live in `src/data/agents.js`); `LOG-95` still *"discovery only"* after
+`S-LOG-95`/`S-LOG-95b` shipped it; and a broker row blocked on *"screen doesn't exist yet"* when
+`MarketIntelligenceScreen.jsx` is 360 KB on disk. **That third one is where a careless sweep does
+damage:** the row's `❌ Not built` is CORRECT — the broker is `AA-90`, live status `open` — so only
+the dead blocking premise moved and a clause asserts the `❌` survives. Three further ids that look
+stale (`CHI-15`, `AA-92`, `HAR-14`) were checked and **left alone because they are genuinely open**.
+
+**THE GUARD EARNED ITS KEEP FOUR TIMES BEFORE THE SHIP, not after.** (1) Anchoring on the id
+selected this ship's own `# Amended` header — which names `LOG-28` — so the test would have graded
+the provenance note instead of `§19i`. (2) The Step 5c clause was **vacuous**: it keyed on "same
+commit", which the pre-existing `SES-32` bullet already contains, so its own mutation hit the wrong
+sentence — caught by the `SES-158` meta-check and re-anchored on the grep command. (3) A
+160-character detector window straddled sentence boundaries; replaced with sentence scoping, which
+is what the written rule tells a human to do. (4) **Three of the corrections quoted the phrase they
+were retiring**, leaving the dead sentence searchable in the live paragraph — that is the lesson
+that became the third boundary in Step 5c, and clause 7 pins it.
+
+**Named deviation (`SES-196` convention):** the sweep clauses assert absence in the governed
+line/paragraph rather than across the whole file. That is *required* by the rule this ship writes —
+retired wording belongs in the `# Amended` header — and the whole-file form failed on a correctly
+amended file, live, on this cycle.
+
+**QA.** Build green. Suite **112/113**, the one red being `SES-177` before step 7a's
+`render-claude-state.js` and green after it — `SES-213`'s documented ordering, reproduced exactly.
+Verifier lane **`approve`**, three gates green, `auto_done_eligible: YES`, row `6046ceb9`; auto-done
+under charter decision 2 and Prime Directive §2f, with a Reverse-capable ship card still filed.
+File-level control: all 11 clauses **fail** against the pinned pre-change SHA, and `presentsAsOpen()`
+returns true on the pre-change paragraph and false on the shipped one — a proven *difference*, not a
+shared property. **Not claimed:** one pass over one file; the 216-id scan's excluded borderline
+phrasings were not individually re-read. Guarded by
+`tests/regression/SES-50-resolved-id-citations.js`. Doc + doc + test; no `src`/`api`/`lib` change.
+
+---
+
+
 ## session/cycle-20260829-1640 (v7.0.318, 2026-08-29, runner cycle `4e076c15-ba39-466b-854a-cd282566f36f`, `trigger = chained (drain continuation)` of `c38d63dc`, `scheduler_gate` verdict `run` — model Opus 5) — auto-done: `SES-133` — John's three ratifications reach the corpus, in the home it actually has now
 
 **The first continuation this session, opened under Prime Directive §2e.** `drain_chain_gate` returned
