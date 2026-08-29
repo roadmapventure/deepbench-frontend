@@ -5,6 +5,67 @@
 
 ---
 
+## session/cycle-20260829-1840 (v7.0.324, 2026-08-29, runner cycle `bee1bd76-5dae-49b5-ba6d-786689efcc2a`, `trigger = chained (drain continuation)` of `2a231a7f`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, design delegated to a **Fable 5** subagent per register B21) — **gated before build**: `SES-182` — auto-rollback on red, designed
+
+**A DESIGN PASS, NOT A BUILD, and that is John's own instruction rather than this cycle's caution.**
+His conditional hold-lift (`5598ffdd`) reads: *"the design pass starts unattended, and only a genuine
+design question comes back to me… build only after the design stands."* The design is written
+(`docs/kickoffs/v7.0.324-SES-182-auto-rollback-design.md`), two genuine questions came out of it, and
+they are on his card.
+
+**AUTHORISATION WAS RE-VERIFIED RATHER THAN INHERITED.** `SES-182` sat under his explicit standing
+hold (`58db64ae` item 6, *"do not flag it, do not pick it"*), and a peer session cleared the flag at
+19:11:24Z. Building on that clearance without checking it would be the `SES-142` authorisation defect
+— a cycle acting on a permission it did not confirm. Both of `5598ffdd`'s conditions were checked
+here: (a) the re-drill executed and its result is recorded on `SES-191` (99.996%, misses named);
+(b) `SES-220` is `done` and `SES-191`'s remainders were re-carded as `SES-241`/`SES-242` — the second
+branch of his "done **or** their remainders explicitly re-carded" is what carries it.
+
+**THE DESIGN'S LOAD-BEARING DECISION: last green is a POINTER, not a snapshot.** A row per observed
+green — commit sha, CI run, migration watermark, version — captured by the blocker sweeps that
+already run, so no daemon is added. A per-green Supabase dump was rejected **on measurement, not
+taste**: a set is 156 MB, a raw dump carries live credentials and needs the §7 redaction ceremony,
+offsite pushes need John's word each time, and §5c forbids restoring `schema.sql` into a live
+populated project — so a rolling dump could not even be *used* as a production rollback.
+
+**THE MIGRATION GAP — the M0 gate review's named finding, answered.** The population is bounded
+first: §19v already forbids schema-destructive migrations unattended at every rung, so an *auto*
+rollback can only ever meet the additive/replace family. Every unattended migration records a down
+captured from the **live object before the up applies** (§19v's before-image discipline extended from
+rows to DDL), and a `CREATE OR REPLACE` down carries the stale-overload drop and the `count(*) = 1`
+assertion — a down that recreates the old signature beside the new one is the `DAT-12` outage rebuilt
+in reverse. **The design names what it CANNOT roll back rather than claiming everything:**
+data-transforming ups are refused to the gated lane, destructive DDL was never in scope, and the two
+`pending_confirmations` jsonb-null rows are never restorable. A red range containing any unmatched
+migration gets **no automatic schema action at all** — an un-rolled-back migration plus a loud card is
+recoverable; a wrong down applied to production is not.
+
+**WHAT THE DRILL EVIDENCE ACTUALLY CHANGES, which is why John required it be consumed:** 99.996% is a
+ceiling on a *current-vintage* set and is not 100%; both offsite sets still restore at 32.8%. So the
+automatic path uses only the **lossless** rungs — revert-forward, before-image restore, captured-DDL
+downs — and **the actuator may never fire the parachute**. A rollback primitive that assumed a perfect
+restore would be unsound.
+
+**THE VERIFIER STAYS VERDICT-ONLY, and the collision is named rather than smoothed over.** The ticket
+text names the reviewer lane going red as a trigger; John's card `10de5fb5` says that lane "blocks
+nothing" and no caller may use its exit 1 to abort a ship. Both cannot hold, and superseding his card
+is his call — filed as question `q-ses182-verifier-trigger`, defaulting to NO (fail-closed) if
+unanswered. The actuator is a separate script; a design that had the verifier perform the rollback
+would launder the invariant the runbook already refused to launder once, for a mere file render.
+
+**THE DELEGATED DESIGN WAS CHECKED, NOT PASTED — and one check was a real correction.** The Fable 5
+subagent named its own unverified assumptions; its proposed outcome value `reverted_by_sweep` would
+have **failed** `runner_cycles_outcome_check`, read from `pg_get_constraintdef`: only
+`shipped`/`gated_before_build`/`reverted`/`did_not_run`/`failed` exist. The kickoff records that as a
+decision the build cycle must make deliberately rather than a working name it inherits.
+
+**Premise revalidated by measurement:** `grep -rln "auto-rollback|last green state"` over
+`scripts/ api/ lib/ tests/` returns nothing, and `verifier.js` is verdict-only by its own header — the
+gap is real and unbuilt. Two questions filed to `runner_questions`; ticket set `needs-john` with its
+`kickoff_link`. Doc only; no `src`/`api`/`lib` change, no migration, no site change.
+
+---
+
 ## session/cycle-20260829-1840 (v7.0.323, 2026-08-29, runner cycle `2a231a7f-537e-4e34-ab6b-629dc593a8fd`, `trigger = chained (drain continuation)` of `cfbfe1be`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-242` — a self-referential foreign key needs the restore run twice
 
 **Chained in-session from this session's own `SES-243` ship** under Prime Directive §2e:

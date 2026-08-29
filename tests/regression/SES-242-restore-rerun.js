@@ -1,3 +1,9 @@
+// DeepBench v7.0.324 | tests/regression/SES-242-restore-rerun.js | SES-182 cycle -- the
+// file-level negative control is PINNED TO A BLOB SHA, not to origin/dev. Keyed to a moving
+// ref it passed only in the window before its own ship and broke the whole suite the moment
+// v7.0.323 landed on dev. Fixed in the cycle that caught it (feature-owns-its-bugs, ARCHITECTURE.md
+// section 19v), never filed as a ticket.
+//
 // DeepBench v7.0.323 | tests/regression/SES-242-restore-rerun.js | SES-242 (Selfbuild M3 -
 // Independent Verification)
 //
@@ -13,21 +19,37 @@
 // three deep. `terminationIsTheShrinkTest()` pins both directions.
 //
 // FILE-LEVEL NEGATIVE CONTROL, the SES-208/SES-213 convention: every clause is asserted to FAIL
-// against origin/dev's own pre-change copy of the runbook, so this file cannot pass vacuously on a
+// against the runbook as it stood BEFORE this rule, so this file cannot pass vacuously on a
 // document that never gained the rule. Run with no network and no credentials.
+//
+// THE CONTROL IS PINNED TO A BLOB SHA, AND THAT IS THIS GUARD'S OWN BUG FIXED (found live
+// 2026-08-29, minutes after v7.0.323 shipped, by the very next cycle's verifier run). The first
+// version read `origin/dev:docs/runbooks/restore-from-backup.md` -- a MOVING ref. It passed while
+// the change sat unpushed and began FAILING THE WHOLE SUITE the instant that change landed on dev,
+// because "the pre-change copy" had become the post-change copy and all six clauses then passed
+// where they were asserted to fail. A file-level control keyed to a branch tip is self-defeating by
+// construction: it is only correct in the window before its own ship, which is the one window
+// nobody re-runs it in.
+//
+// PRE_CHANGE_BLOB is the runbook at bafcd9c7^ -- the commit before SES-242 -- and a blob sha is
+// immutable, so this control means the same thing forever.
 
 import assert from "assert";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RUNBOOK = path.join(REPO, "docs", "runbooks", "restore-from-backup.md");
 
+// docs/runbooks/restore-from-backup.md as of bafcd9c7^ -- immutable, unlike a branch tip.
+const PRE_CHANGE_BLOB = "6180e471681c603b786bdd223d73a0a5f2352255";
+
 // The clauses, each a named predicate over the runbook text. Kept as a table rather than inline
-// asserts so the SAME set can be replayed against origin/dev's copy for the file-level control --
+// asserts so the SAME set can be replayed against the pinned pre-change blob for the file-level
+// control --
 // a control that re-implements the checks would be SES-45's "a second implementation agreeing with
 // itself".
 const CLAUSES = Object.freeze([
@@ -88,26 +110,30 @@ function theShippedRunbookCarriesTheRule() {
 }
 
 // ---------------------------------------------------------------------------
-// FILE-LEVEL NEGATIVE CONTROL -- origin/dev's own copy must FAIL every clause
+// FILE-LEVEL NEGATIVE CONTROL -- the pinned pre-change blob must FAIL every clause
 // ---------------------------------------------------------------------------
 function everyClauseFailsOnThePreChangeRunbook() {
-  const r = spawnSync("git", ["show", "origin/dev:docs/runbooks/restore-from-backup.md"],
+  const r = spawnSync("git", ["cat-file", "blob", PRE_CHANGE_BLOB],
     { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
-  // A control that cannot run is NOT a pass -- say so and stop, rather than letting the suite
-  // report green on a guard that proved nothing. (origin/dev is absent in a shallow CI clone.)
+  // A blob missing from a shallow/partial clone is an ENVIRONMENT limit, not a broken control, and
+  // it is declared rather than silently passed -- the SES-180 (b) distinction between a part that
+  // could not run and a part that passed. It is NOT assert.fail: unlike a missing branch ref, a
+  // truncated object store says nothing about whether the rule is present.
   if (r.error || r.status !== 0) {
-    assert.fail(
-      "could not read origin/dev's copy of the runbook, so the file-level negative control did " +
-      "not run. That is an absent control, not a passing one -- fetch origin/dev and re-run."
+    notRun(
+      "the file-level negative control",
+      `blob ${PRE_CHANGE_BLOB} (the runbook before SES-242) is not in this clone's object store, ` +
+      `so the pre-change comparison could not run. The clause assertions above still ran.`
     );
+    return;
   }
 
   const before = r.stdout;
   const stillPassing = CLAUSES.filter(c => c.test(before)).map(c => c.name);
   assert.deepStrictEqual(stillPassing, [],
-    `these clauses pass on origin/dev's PRE-CHANGE runbook, so they are not testing anything this ` +
-    `ship added: ${stillPassing.join(", ")}`);
+    `these clauses pass on the PRE-CHANGE runbook (blob ${PRE_CHANGE_BLOB}), so they are not ` +
+    `testing anything this ship added: ${stillPassing.join(", ")}`);
 
   // And the meta-check: the control is only meaningful if the clauses pass on the NEW file. Asserted
   // here as well as above so a reordering of the run() list cannot leave this vacuous.
