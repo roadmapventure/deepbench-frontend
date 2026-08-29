@@ -6,7 +6,7 @@
 
 **Mechanized 2026-07-21 (`SES-010`, extended same day).** Checks 1, 1b, 2, 3, 3c, 5, 5b, 5c, 5d, 6, 6b, and 6c below are now a single script: `node scripts/check-session-docs.js [--worktree=<path>]` (defaults to `process.cwd()`). Run that instead of re-deriving each grep by hand — it's the same logic, verified against this exact list. Checks 4 (kickoff doc boilerplate) and 3b (now/next/later misclassification) stay manual/judgment calls, not mechanized. On John's own machine this also runs automatically via a `PostToolUse:Bash` hook right after any `git worktree add` call (`C:/Projects/.claude/hooks/run-hygiene-after-worktree-add.js`) — but that hook lives in local, non-git-tracked `C:/Projects/.claude/settings.json`, not this repo, so it's machine-specific and not guaranteed present in every environment. Still run the script (or the full checklist below) explicitly at Step 1 rather than assuming the hook already covered it.
 
-**(Corrected 2026-08-21 — the retargeted script emits more checks than this list names; see `SES-83` (d), `v7.0.124`.)** The mechanized set is 1, 1b, 2, 3, 3c, 3d, 3e, 3f, 3s, 5, 5b, 5c, 5d, 6, 6b, and 6c — this skill's own header had fallen behind `scripts/check-session-docs.js` after the backlog-snapshot retarget (`v7.0.115`) added 3s/3d/3e/3f and 5e. **Known discrepancy, not fixed here:** the script's own header comment (line 6 of `scripts/check-session-docs.js`) lists "1, 1b, 2, 3, 3c, 3d, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c" — it names 3d and 5e but still omits 3s, 3e, and 3f, so even the script's self-description is slightly stale relative to what it actually runs. Flagging it here rather than editing the script, which is out of scope for this pass.
+**(Corrected 2026-08-21 — the retargeted script emits more checks than this list names; see `SES-83` (d), `v7.0.124`.)** The mechanized set is **all 23 ids the script emits** — 1, 1b, 2, 3, 3c, 3d, 3e, 3f, 3s, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c, 9, 10, 11, 12, 13, 14 — and **every one of them now has a write-up below** (`SES-245`, 2026-08-29; 13 and 14 were the last two without one). Do not hand-maintain this list against the script: `tests/regression/SES-24-hygiene-inflight-retarget.js` reads the ids out of the script's own `findings.push` calls and fails if any lacks a section here. The older count in this sentence said 16 — this skill's own header had fallen behind `scripts/check-session-docs.js` after the backlog-snapshot retarget (`v7.0.115`) added 3s/3d/3e/3f and 5e. **Known discrepancy, not fixed here:** the script's own header comment (line 6 of `scripts/check-session-docs.js`) lists "1, 1b, 2, 3, 3c, 3d, 5, 5b, 5c, 5d, 5e, 6, 6b, 6c" — it names 3d and 5e but still omits 3s, 3e, and 3f, so even the script's self-description is slightly stale relative to what it actually runs. Flagging it here rather than editing the script, which is out of scope for this pass.
 
 A tripwire, not an audit. The 2026-07-01 cleanup fixed the root causes of doc bloat by making two files self-maintaining (a rolling window on `CLAUDE-STATE.md`, an archive split for `FEATURES.md`) and eliminating a third problem entirely (deleted the hardcoded agent-roster tables instead of trying to keep them in sync). This skill exists to catch it if those rules stop being followed — not to redo the full audit every time. Keep every check here cheap: sizes and greps, never a full read of a file that's supposed to stay small. If this skill itself starts taking meaningful time or tokens, that's a sign it's grown past its job — trim it back to checks, not fixes.
 
@@ -182,6 +182,45 @@ The trim is check 7's shape with one addition, and **the addition is not optiona
 the ceiling**. The page still grows on every rebuild. The durable fix John chose is a Supabase-side
 buffer the page writes taps into directly, designed jointly with `SES-155`/`SES-156` — this check
 is what keeps the harvest working until that lands.
+
+**13. Duplicate procedure homes (added 2026-08-25, `SES-176`; written up here 2026-08-29 by
+`SES-245`).** Part of the truth tripwire, but a different question from checks 9–11: those ask
+whether a *rule's* text and pointers still resolve, this asks whether an *executable procedure* has
+grown a second copy. It walks every `.md` at the repo root, in `docs/` and in `docs/runbooks/`
+(history files are excluded — `PROCEDURE_HISTORY_DOCS`), normalises every fenced code block, and
+**flags any identical block that appears in more than one file**, naming each `file:line` and the
+block's first 70 characters. One finding per duplicated procedure, not per site.
+
+Why it earns its place rather than being style policing: this platform's most expensive recurring
+defect is one fact with two homes — `SES-116` (a display string in a join key), `SES-113`
+(`removal proposed` in two columns), `SES-86` phase 3 (John's queue order in prose *and* a column).
+A copied SQL block is that same defect in its most literal form: **both copies are correct on the
+day they are written, and then one is edited.** The fix is never to reconcile the two — it is to
+keep the procedure in ONE doc and have the others cite that home, which is the convention
+`runner-cycle.md` already states as *"cited here, not restated, so these two files cannot drift."*
+
+**It reports a WARN when it could not read the doc tree at all** (no `docs/` directory, a partial
+checkout) rather than silently finding nothing — the same rule check 3 keeps about a missing
+snapshot: **a check that cannot run must not pass quietly.**
+
+**14. Recreated logic in kickoff test blocks (WARN — a migration backlog, not new drift; written up
+here 2026-08-29 by `SES-245`).** Reads each kickoff doc's **Section 8** region, and flags a fenced
+code block that (a) **imports nothing real**, (b) **defines** a function whose name the kickoff's
+own prose names as the subject under test (a backticked `` `name()` `` mention outside any fence),
+and (c) that name is a **real symbol** in this repo's `src/`, `api/` or `lib/`. That conjunction is
+the point: any one of the three alone is ordinary pseudocode.
+
+This is `docs/STANDARDS.md` Section 4's `SES-45` rule mechanised — *"A test must assert against the
+REAL implementation. Logic recreated inside the test file is not a test — it is a second
+implementation agreeing with itself."*
+
+Three boundaries worth knowing before you act on a hit. It is **WARN, not FLAG**, and deliberately:
+the population is **historical kickoffs that predate the lint**, so treating it as actionable drift
+would bury the real flags above it. It reports **one aggregated line** with up to five examples,
+for the same reason. And it **reports nothing at all** when the repo-symbol set comes back empty
+(no source directories found) — an unverifiable name is not a finding, the same fail-quiet-loudly
+boundary check 13 keeps one paragraph up.
+
 
 ## Reporting the result
 

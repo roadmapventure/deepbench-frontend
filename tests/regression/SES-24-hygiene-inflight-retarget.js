@@ -56,10 +56,25 @@ export const norm = s => s.replace(/\s+/g, " ");
 // Pure: one check's section, from its bold heading to the next one. "" when absent -- a finding
 // the caller reports, never a throw.
 export function extractCheck(md, id) {
-  const start = md.indexOf(`**${id}. `);
-  if (start < 0) return "";
-  const next = md.slice(start + 3).search(/\n\*\*[0-9]+[a-z]?\. /);
-  return next < 0 ? md.slice(start) : md.slice(start, start + 3 + next);
+  // TWO HEADING FORMS, and missing the second is a false "undocumented" (SES-245, v7.0.329).
+  // Most checks open `**N. `, but 10 and 11 are written as `**Check 10 -- ` bullets inside check
+  // 9's section, because the truth tripwire documents its three members together. A coverage
+  // clause that knew only the first form reported both as having no write-up when they do.
+  const e = id.replace(".", "\\.");
+  let start = md.indexOf(`**${id}. `);
+  const skip = 3;
+  if (start < 0) {
+    // THREE HEADING SHAPES EXIST IN THIS RUNBOOK and a matcher that knows one reports the other
+    // two as undocumented. `**N. ` is the common one; `**Check N -- ` is how the truth tripwire
+    // writes 10 and 11 inside check 9; `**N (label).**` is how the backlog-snapshot sub-checks
+    // 3d/3e/3f are written as bullets under check 3. All three are real write-ups a human reads.
+    const alt = new RegExp(`\\*\\*Check ${e}[ .\\u2014-]|\\*\\*${e} \\(`);
+    const m = alt.exec(md);
+    if (!m) return "";
+    start = m.index;
+  }
+  const next = md.slice(start + skip).search(/\n\*\*[0-9]+[a-z]?\. /);
+  return next < 0 ? md.slice(start) : md.slice(start, start + skip + next);
 }
 
 // Pure: every check id the SHIPPED script actually emits, read from its real findings.push calls.
@@ -162,17 +177,25 @@ function thePreChangeProseFailsEveryClause() {
 }
 
 // THE CROSS-FILE CLAUSE, and the reason this file is not just a grep. The script is the mechanized
-// truth; the runbook is what a human follows. Every 5-family check the SCRIPT emits must have a
-// write-up here. Scoped to the 5-family on purpose -- see the header's SCOPE note.
-function everyFiveFamilyScriptCheckIsWrittenUp() {
-  const ids = fiveFamily(scriptCheckIds(fs.readFileSync(SCRIPT, "utf8")));
-  assert.ok(ids.length >= 5,
-    `expected the script to emit at least 5 checks in the 5-family, saw ${ids.length} (${ids}) -- ` +
+// truth; the runbook is what a human follows. EVERY check the SCRIPT emits must have a write-up
+// here -- widened from the 5-family to all 23 ids by SES-245 (v7.0.329), which is the ticket's
+// option (b): a derived list cannot drift, a hand-kept one already had.
+//
+// WHAT THE WIDENING MEASURED, recorded because the ticket's own figure was wrong: SES-245 was
+// filed saying ELEVEN checks fire with no write-up (3d, 3e, 3f, 6b, 6c, 9, 10, 11, 12, 13, 14).
+// Counted against the real file, nine of those DO have one -- 3d/3e/3f as sub-bullets under
+// check 3, 6b/6c under check 6, 9 and 12 as their own sections, and 10/11 as `**Check N --`
+// bullets inside check 9. The true gap was TWO: 13 and 14. The ticket counted headings; the
+// checks were documented in three different shapes.
+function everyScriptCheckIsWrittenUp() {
+  const ids = scriptCheckIds(fs.readFileSync(SCRIPT, "utf8")).sort();
+  assert.ok(ids.length >= 20,
+    `expected the script to emit at least 20 checks, saw ${ids.length} (${ids}) -- ` +
       "if the script stopped emitting them this clause is passing vacuously");
   const md = fs.readFileSync(RUNBOOK, "utf8");
   const undocumented = ids.filter(id => !extractCheck(md, id));
   assert.deepStrictEqual(undocumented, [],
-    `the script emits 5-family check(s) with no write-up in docs/runbooks/session-hygiene.md: ` +
+    `the script emits check(s) with no write-up in docs/runbooks/session-hygiene.md: ` +
       `${undocumented.join(", ")}. That is SES-24's defect returning -- a check that fires in CI ` +
       "and that nobody running the list by hand knows exists.");
 
@@ -204,7 +227,7 @@ async function run() {
   everyClauseHasTeeth();
   aVacuousMutationFailsItsOwnControl();
   thePreChangeProseFailsEveryClause();
-  everyFiveFamilyScriptCheckIsWrittenUp();
+  everyScriptCheckIsWrittenUp();
   theRetiredBulletListIsReallyGone();
 }
 

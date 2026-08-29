@@ -5,6 +5,51 @@
 
 ---
 
+## session/cycle-20260829-2040 (v7.0.329, 2026-08-29, runner cycle `f477c1f2-7ba3-4ada-b34f-466e7468a5ac`, `trigger = chained (drain continuation)` of `fa1e306d`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — `SES-245` — every hygiene check the script emits now has a write-up, and the list is derived
+
+**THE PREMISE HELD; ITS NUMBER DID NOT, AND THAT IS THE FINDING.** `SES-245` was filed saying
+**eleven** check ids fire in CI with no write-up in `docs/runbooks/session-hygiene.md` — `3d, 3e,
+3f, 6b, 6c, 9, 10, 11, 12, 13, 14`. Measured against the real file rather than recounted from the
+ticket: **nine of the eleven are documented.** They are written in **three shapes** — `**N. ` for
+most, `**Check N — ` for 10 and 11 (bullets inside check 9's truth-tripwire section), and
+`**N (label).**` for the backlog-snapshot sub-checks 3d/3e/3f under check 3. The ticket counted
+headings. **The true gap was TWO: 13 and 14**, and that is what shipped.
+
+**THE UNDERLYING CLAIM IS UNTOUCHED AND CORRECT:** a check with no write-up is invisible to every
+reader who is not reading the script, and an unattended cloud cycle has only the runbook, because
+the script's git calls target the Windows shared checkout and print `fatal: cannot change to …` on
+every cloud run.
+
+**OPTION (b) SHIPPED ALONGSIDE (a), WHICH IS WHAT STOPS THE RECURRENCE.**
+`tests/regression/SES-24-hygiene-inflight-retarget.js`'s cross-file clause was scoped to the
+5-family; it now reads **all 23 ids out of the script's own `findings.push` calls** and fails if any
+lacks a section. A hand-kept list is the exact drift being fixed — `SES-24` closed one instance of
+it a month after the script started flagging. **The matcher had to learn all three heading shapes
+first:** on its first run the widened clause reported five *documented* checks as missing, which
+would have been a guard that cannot tell a real write-up from an absent one.
+
+**(c) WAS CONSIDERED AND REJECTED ON EVIDENCE.** The ticket offered that some of the eleven might
+be script-internal and not "checks" a human runs — naming `3s`, `13` and `14` as candidates. Both
+13 and 14 produce findings a human acts on (a duplicated executable procedure; a kickoff test that
+recreates its subject instead of importing it), so neither is internal.
+
+**FOUR TICKETS WERE WALKED PAST TO GET HERE, each recorded as state rather than rediscovered from
+prose next cycle** (`SES-114`'s point): `SES-004`'s remainder — gated card filed asking John the
+three exit-shape questions, `needs-john`; `DAT-21` — `needs-desktop`, its fix lives in the separate
+`deepbench-backups` repo this clone cannot reach; `HAR-34` — `needs-john`, no outbound email/SMS
+service exists anywhere in the stack and the provider choice and its credentials are his;
+`SES-122` — `needs-john`, it asks what a higher trust rung should BUY the runner, which is the
+runner widening its own autonomy and never its call. Each carries a `record_skip` row.
+
+**QA.** Coverage 4 undocumented → 0. Build green; suite **119/120**, the one red `SES-177` on both
+sides and closed by step 7a's render. The widened guard's **negative control** removes check 13's
+write-up and requires the clause to name exactly `13`; it does.
+
+**DECLARED REMAINDER, named rather than folded in:** check `1b` is **vacuous** — it flags
+`"In flight now"` bullets in a `CLAUDE-STATE.md` that has been generated since `SES-177` and
+contains zero. That is a different defect from a missing write-up, the ticket raises it separately,
+and widening a claimed ticket mid-build is what this runbook forbids.
+
 ## session/cycle-20260829-2040 (v7.0.328, 2026-08-29, runner cycle `fa1e306d-a2b6-45c0-b0d5-4fb19704ae4a`, `trigger = chained (drain continuation)` of `475c76cb`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — `SES-246` — the decision-pattern ship gate reads `SESSIONS.md`'s own archived half
 
 **A SHIP GATE THAT FAILS IS NOT A GATE; ONE THAT FAILS AND IS NEVER RUN IS A DECORATION.**
