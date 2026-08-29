@@ -5,6 +5,74 @@
 
 ---
 
+## session/cycle-20260829-0540 (v7.0.306, 2026-08-29, runner cycle `04714449-cdbb-48dd-ac30-93fb088c907d`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, two Fable 5 subagents for candidate classification) — shipped: `LOG-104` — both paged log readers now sort on a unique key, so a page boundary can no longer skip or duplicate a row
+
+**Selection, and it is most of this cycle's story.** The drain returned `blocked` (three named M3
+members: `SES-182` waiting on John, one `delivered` awaiting his Accept, `SES-191` blocked behind
+`SES-220`, which is itself `partial` and blocked), so selection fell through to the board — and the
+board's top is almost entirely gated. Walking queue 1–62 in order produced **32 `record_skip()`
+rows** and not one buildable ticket: 19 waiting on John's decision, 6 `delivered` awaiting his
+Accept, 7 gated lane (the four harness files, active-agent instruction edits, terminology), 2
+`removal proposed`, 2 blocked on another open ticket, 4 milestone design gates that have not
+arrived, 1 needing a session he attends.
+
+**Two Fable 5 passes, and the first one's honest zero is the useful half.** Pass 1 over queue 43–51
+rejected all seven with per-ticket evidence, corroborated independently by this repo's own
+`docs/AUTONOMY-SORT-2026-07-31.md`. Pass 2 over queue 64–159 rejected six more and returned
+`LOG-106` as its survivor. **That survivor was overruled here rather than taken on trust**, which is
+the point of the orchestrator reading the result instead of executing it: `LOG-106` is
+`P9 - Bug Fixes · FLAGGED`, and `FEATURES.md`:100 routes a pixel-moving bug fix to a default-off
+flag while §19v says in the same paragraph that *"a flag governs exposure, never correctness — a bug
+fix behind an off flag is a fix that did nothing"* (the `LOO-013` shape). Both rules are John's and
+they point opposite ways on that one ticket. §19v's own words for the case are *"flagged or gated"*;
+flagging is barred by its correctness clause, so `LOG-106` was **gated before build** with the full
+design on the card and the tension stated in his register, and the walk continued to `LOG-104` —
+which is `P9 - Bug Fixes` with **no** `FLAGGED` suffix, moves zero pixels, and therefore ships live.
+
+**Premise revalidated by measurement, and it had grown.** The ticket was filed 2026-07-28 citing
+*"74 rows currently share a `created_at` with another row."* Measured live at this ship: **320 of
+34,812 rows**, a 4.3× increase — exactly the drift the ticket predicted, since the platform logs
+continuously. `id` is an `integer` primary key, so `(created_at, id)` is a total order.
+
+**Both sites, and they were broken differently.** `useAIActivity.js`'s `hydrateFromSupabase()`
+ordered by `created_at` **DESC alone** (non-unique key). `useAgents.js`'s `fetchAll()` had **no
+`.order()` at all** across ~17 `.range()` pages — the worse of the two, feeding the whole CHI Agents
+drawer. A skipped row is simply absent from Total Calls, Total Cost, By LLM, By Agent and By Service
+alike, with no error and nothing on screen to notice.
+
+**The test this ship deliberately did NOT write.** The tempting guard is *"page the live table twice
+and diff."* It would be theatre: the reordering is **permitted, not guaranteed** — the ticket itself
+records that on the day it was QA'd every agent's rows matched SQL exactly, *"but that is the planner
+happening to be stable, not a guarantee."* A green from that test says the planner was stable this
+minute. `tests/regression/LOG-104-deterministic-paging.js` instead asserts every `.range()` in both
+files sits in a chain that also orders by the primary key, and its **negative control is this
+branch's own pre-change source**: run against `origin/dev@f7f3cd0d` the guard FAILS
+(`1 !== 0`, naming `useAIActivity.js`), and passes on the fix. A first draft also carried a
+credentialed half asserting the uniqueness pair live; it had to declare itself `[NOT RUN]` on every
+invocation, because PostgREST cannot express `group by … having count(*) > 1` and this repo exposes
+no `exec_sql` RPC — a half that can never run prints a gap notice forever, so it was **removed and
+the removal reasoned in the file** rather than shipped as a permanent wart. The uniqueness
+measurement lives on the ship card and in the kickoff, where a one-time measurement belongs.
+
+**QA.** `npm run build` green. Suite **101/102**. The one red is `SES-215-env-isolation.js`, and it
+is **not this cycle's**: proven by running it on a stashed, pristine `origin/dev@f7f3cd0d` where it
+fails identically with none of this cycle's changes present. It is the immediately preceding ship's
+own guard (`v7.0.305`, `SES-215`) failing — `retired-run-all.mjs does not export a default async
+function` — filed here as a new ticket rather than absorbed, per §19v's feature-owns-its-bugs
+boundary (a pre-existing signature is legitimately a ticket; only *this* cycle's own breakage would
+be revert territory). Note also that `SES-177` failed on the first suite run and cleared the moment
+`render-claude-state.js` ran — `SES-213`'s ordering fix working exactly as its stamp describes.
+
+**Verdict: `block`**, on that same pre-existing red, so the ticket ships `delivered` and cards John
+rather than auto-done. A block is not a wall (John's split on card `10de5fb5`), and the auto-done bar
+would not have applied regardless — that carve-out is scoped to the `Selfbuild` family's
+`P10 - Tooling` deliveries, and this is `P9 - Bug Fixes`.
+
+**Not claimed:** no row is proven to have been lost. The defect is that the window was *undefined*,
+not that a specific total is wrong today; whether any historical figure was ever short is unknowable
+after the fact and is not asserted. Other `.range()` call sites elsewhere in the tree were not
+surveyed — this ticket names exactly two.
+
 ## session/cycle-20260829-0524 (v7.0.305, 2026-08-29, runner cycle `a6f0cac9-212a-4c70-a2d4-32c2ad6c7234`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, no subagent delegated) — shipped: `SES-215` — the suite restores `process.env` around every test, so one test's placeholder can never be another test's answer
 
 **Mission, layer 1a.** `runner_directives` `52c41c2d` — John, attended architect session

@@ -1,3 +1,13 @@
+// DeepBench v7.0.306 | useAgents.js | LOG-104 — useAgentActivitySummary()'s fetchAll() pages with a
+// defined order. It had NO .order() at all across ~17 .range() pages over ~16.4k rows, so the order
+// was whatever the planner chose and could differ between pages: rows silently skipped or
+// duplicated, feeding the whole CHI Agents drawer (Calls, Avg Cost, byKind, pattern rows). This is
+// the worse of LOG-104's two sites — the other, useAIActivity.js, at least had a non-unique key.
+// .order('id') is a total order because id is the integer primary key. buildActivitySummary()
+// aggregates and is order-independent, so this changes WHICH rows arrive, never how they read.
+// Not manifesting on the load QA'd 2026-07-29 — every agent's rows matched SQL exactly — but that
+// was the planner happening to be stable, which is not a guarantee and is why this is a fix rather
+// than a cleanup. Guarded by tests/regression/LOG-104-deterministic-paging.js.
 // DeepBench v7.0.154 | useAgents.js | LOG-70 — useAgentActivitySummary() stops selecting the frozen
 // legacy `patterns_used` column. LOG-112 (v6.3.218) removed the only read of it on this path
 // (buildActivitySummary()'s byPattern bucket); this hook is that function's other caller, so the
@@ -180,6 +190,13 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global', re
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))
+          // FEATURE: LOG-104 -- this paged fetch had NO .order() at all, so the order across its
+          // ~17 .range() pages was whatever the planner chose, and could differ between pages:
+          // rows silently skipped or duplicated, feeding the whole CHI Agents drawer (Calls,
+          // Avg Cost, byKind, pattern rows). `id` is the integer primary key, so ordering by it
+          // is a total order and the window is deterministic. buildActivitySummary() aggregates
+          // and is order-independent, so this changes which rows arrive, never how they read.
+          .order('id', { ascending: false })
           .range(from, from + PAGE_SIZE - 1);
         if (error || !data) return null;
         rows.push(...data);

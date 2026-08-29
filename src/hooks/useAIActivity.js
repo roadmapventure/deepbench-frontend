@@ -1,3 +1,4 @@
+// DeepBench v7.0.306 | useAIActivity.js | LOG-104 -- hydrateFromSupabase() pages with a UNIQUE sort key. It ordered by created_at DESC alone, and created_at is not unique (320 of 34,812 rows share one with another row, measured live 2026-08-29), so Postgres was free to order a tie group differently between two .range() calls and a row straddling a page boundary could be served twice or never -- silently, with the shortfall landing in Total Calls, Total Cost, By LLM, By Agent and By Service alike. Appending .order('id') makes (created_at, id) a total order, so the window is deterministic. created_at stays FIRST: the row set is consumed newest-first and this only decides ties that previously had no defined answer. The obvious "page it twice and diff" test is deliberately NOT the guard -- the reordering is permitted, not guaranteed, so that test passes while the bug is fully present; tests/regression/LOG-104-deterministic-paging.js asserts the code pairs every .range() with the primary key instead, and its negative control is this file's own pre-change chain
 // DeepBench v7.0.293 | useAIActivity.js | LOG-145 -- fetchPatternClassification() gains the module-level cache its four sibling reads already have (success cached, failure never, in-flight promise shared), so the two mount sites stop re-paying a ~2,194ms anon rollup read and re-shipping 190,808 bytes of log_ids on every SPA navigation between AI Audit and the MI Agents drawer. The log_ids payload itself STAYS and is now pinned as un-removable: all four consumers join server-side classification to client-only facts (pricing, AI-51 pairing, countability, scope/window/latency) and that join is row identity -- the "cutover" to ai_pattern_agent_hop_rollup the ticket imagined is structurally impossible, not deferred (kickoff §2)
 // DeepBench v7.0.152 | useAIActivity.js | LOG-128 -- By Caller stops merging automated traffic into a named org's row: identityForRow()/buildByCaller() take an opts arg, and behind the default-off `log-128-automated-caller-split` flag a no-visitor-id row whose call_source is regression/script/session-test gets its own `ip:<addr>|automated` bucket. NULL and 'ui' sources keep their existing key byte-for-byte; buildBySource() is untouched (it calls identityForRow with two args, and only for 'ui' rows)
 // DeepBench v7.0.45 | useAIActivity.js | LOG-129 -- buildByDevice(): a third cut of the SAME By Platform User row set (Desktop/Mobile/Unknown), a pure aggregate across every caller and source rather than something nested inside them, returned from the hook as `byDevice` beside bySource/byCaller and reconciling with both by construction
@@ -1127,7 +1128,15 @@ export async function hydrateFromSupabase(tenantId = null) {
       let q = supabase
         .from('ai_activity_log')
         .select('id,ai_type,feature,model,agent_id,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,latency_ms,knowledge_tier,cost_usd,patterns_used,created_at,call_source,caller_ip_masked,device_type,visitor_id,request_host')
+        // FEATURE: LOG-104 -- `created_at` is NOT unique (320 rows share one with another row,
+        // measured live 2026-08-29 across 34,812 rows), so ordering by it alone leaves the page
+        // window UNDEFINED: Postgres may order a tie group differently between two .range() calls,
+        // and a row straddling a boundary can then be served twice or never. `id` is the integer
+        // primary key, so (created_at, id) is a total order and the window is deterministic.
+        // Keep created_at FIRST -- the row set is consumed newest-first; this only decides ties
+        // that previously had no defined answer. Do not drop it back to a single .order().
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
       if (tenantId) q = q.eq('tenant_id', tenantId);
       const { data, error } = await q;
