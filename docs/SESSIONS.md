@@ -5,6 +5,61 @@
 
 ---
 
+## session/cycle-20260829-1840 (v7.0.323, 2026-08-29, runner cycle `2a231a7f-537e-4e34-ab6b-629dc593a8fd`, `trigger = chained (drain continuation)` of `cfbfe1be`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-242` — a self-referential foreign key needs the restore run twice
+
+**Chained in-session from this session's own `SES-243` ship** under Prime Directive §2e:
+`drain_chain_gate` returned `continue` with `drain_outcome = blocked` (M3's two named members are
+both waiting on John — `SES-182` on his hold, `SES-191` on his Accept) and named `SES-242`. Gates:
+A passed (predecessor `shipped`), C passed (`design_status` NULL), D passed (no-ship streak 0 of 2),
+E off.
+
+**THE DEFECT, revalidated against the live file rather than taken from the ticket.** §5b of
+`restore-from-backup.md` documents the multi-pass loop, `SES-230`'s row-level fallback, how to read
+its output and its exit code — and says **nothing** about running the command a second time. The
+multi-pass loop retries whole **tables**, never row **order** within a table, and the fallback then
+loads each row once, individually, in that same file order. So a row whose own parent sorts *later
+in the file* misses on every batch pass **and** on its single-row retry, identically — and is
+reported as a named miss on a table that is completely restorable.
+
+**MEASURED, first pass vs second, same command and set** (the `SES-191` re-drill, cycle `b68bf88a`):
+`backlog_items` **714 of 719 → 719** (`backlog_items_blocked_by_fkey`), `runner_drain_scope`
+**103 of 104 → 104**; `pending_confirmations` stayed 310 of 312, correctly — that is the jsonb
+scalar `null`, which no re-run can move. The honest recovery score went **99.985% → 99.996%** on
+nothing but a second invocation, and nothing in the runbook said to make it.
+
+**THE CLAUSE THAT CARRIES THE TICKET — the termination test is "the named-miss list stopped
+shrinking", explicitly NOT a pass count.** Two independent reasons, both in the shipped text: a
+literal *"run it twice"* stops early on a dependency chain three deep; and, worse, it teaches an
+operator mid-outage to expect movement that cannot come, because a `TABLE-WIDE` report never shrinks
+on a re-run (`SES-220`'s generated-column `428C9`, `SES-230`'s jsonb `null`). The shipped text says
+that in its own paragraph, so step 3 cannot send anyone into an unbounded loop on `ai_activity_log`.
+
+**WHICH FIX SHAPE, and the reason is disclosed rather than dressed as pure preference.** The ticket
+offered (a) doc-only and (b) ordering each table's rows by self-referential dependency in the
+loader, and said outright that the choice *is* the ticket. **(b) is the better fix and is carried as
+the declared remainder** — it removes the operator step instead of documenting it. It is not taken
+because `restore-supabase.mjs` is **not in this repository**: it lives in
+`deepbench-backups-offsite`, where a push needs John's word each time (`c98048a5` as narrowed by
+`1c9609de` — drill *dumps* are pre-authorised, *pushes* are not), so an unattended cycle cannot land
+it. (a) also stands on merit: since `SES-230` the loader already names every missed row with pk and
+SQLSTATE, so the procedure consumes information the tool already prints.
+
+**QA.** Build green, full suite green. New guard `tests/regression/SES-242-restore-rerun.js`:
+6 named clauses plus a placement assertion (the rule must sit inside §5b, after the command it
+qualifies and before §5c — a rule an operator reads *after* concluding rows were lost is worth
+nothing). **File-level negative control: all 6 of 6 clauses are asserted to FAIL against
+`origin/dev`'s own copy of the runbook**, replayed from the same clause table rather than
+re-implemented (`SES-45`). A control that cannot run — no `origin/dev` in a shallow clone — calls
+`assert.fail` rather than passing, because an absent control is not a passing one. The neighbouring
+§5b guards `SES-220-loadable-columns.js` and `SES-230-row-level-fallback.js` both still pass
+unchanged.
+
+**Briefing note carried forward from the predecessor cycle:** the page could not be republished
+(`SES-244`), so this ship's card is filed but not yet visible to John. Doc + test; no
+`src`/`api`/`lib` change, no migration, no site change.
+
+---
+
 ## session/cycle-20260829-1840 (v7.0.322, 2026-08-29, runner cycle `cfbfe1be-2462-4187-b548-84d451c98a54`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-243` — the auto-done bar learns Prime Directive §2f
 
 **Selection ran the Prime Directive's §2, not the P1–P10 board.** §2(a)'s mission directive
