@@ -5,6 +5,71 @@
 
 ---
 
+## session/cycle-20260829-0524 (v7.0.305, 2026-08-29, runner cycle `a6f0cac9-212a-4c70-a2d4-32c2ad6c7234`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, no subagent delegated) — shipped: `SES-215` — the suite restores `process.env` around every test, so one test's placeholder can never be another test's answer
+
+**Mission, layer 1a.** `runner_directives` `52c41c2d` — John, attended architect session
+2026-08-29, verbatim **"accept and run it"**, filed 05:23Z, one minute before this fire:
+*"BUILD SES-215 AS THE NEXT MISSION ahead of board work."* The two older queued `directive` rows
+(`58db64ae`, `1c9609de`) are standing decision/authorization channels rather than missions and were
+left queued, exactly as the four preceding days of cycles left them.
+
+**Premise revalidated by measurement, not by reading the ticket.** Both arms on this tree before a
+line changed: `run-all.js` → **98/100** with
+`[FAIL] LOG-41-agent-hop-rollup.js -- anon cannot SELECT ai_pattern_agent_hop_rollup (HTTP 401)`,
+and the same test standalone → **[PASS]** with that arm declared `[NOT RUN]`. Red in the suite,
+green alone, same commit. That difference *is* the defect and it is also the acceptance bar.
+
+**None of the ticket's three fix shapes shipped, and the deviation is named rather than buried (the
+`SES-196` convention).** (a) a reader that recognises the sentinel fixes one reader for one variable
+and gives `"regression-placeholder"` a second home. (b) dropping `LOG-41`'s `VITE_` fallback
+converts a real assertion into a permanent NOT RUN, which is the weakening the ticket's own BOUNDARY
+forbids. (c) one process per test does generalise, and its cost is **not** the startup time the
+ticket worried about: `run-all.js` reads each test's declarations out of a **module-level buffer**
+(`takeNotRun()`, `SES-180 (b)`), which is unreachable across a process boundary — so (c) forces the
+runner to re-read its own output by parsing stdout, `SES-45`'s *"a second implementation agreeing
+with itself"*, and pulls `SES-28` and `SES-61` back into scope. That is an `L`; this ticket is `S`.
+
+**What shipped is (c)'s generality without its cost, in one file:** `run-all.js` snapshots
+`process.env` before each test and restores it after the test settles. This is John's own words read
+literally — *"isolate **or restore** the env var around the offending tests"* — with the restore
+placed once in the runner rather than seven times in the writers. **The property that makes it
+correct rather than merely tidy:** every test here must already pass under a direct `node <file>`
+run (`SES-28`'s self-run guard makes that run real), so a per-test restore does not invent a
+contract — it enforces the one the suite already claims.
+
+**Three properties are load-bearing and each is pinned with its own negative control.** The snapshot
+is taken **before** the import (several tests write env as an import-time side effect, so a later
+snapshot has already lost). Added keys are **deleted**, not merely reassigned — this is the live
+defect's shape, because `VITE_SUPABASE_ANON_KEY` is *absent* from an unattended cloud env and is
+*created* by the setter, so a reassign-only restore is a no-op against it. The restore runs on
+**both** arms, since a test that threw still owns what it wrote first.
+
+**QA, and it is discriminating in the required direction.** After: **100/101**, `LOG-41` moved out of
+the failures and into the declared not-run list — i.e. in-suite behaviour now equals standalone
+behaviour. Would it still pass if the change did nothing? No: the `LOG-41` FAIL was present on this
+same tree twenty minutes earlier. The guard `tests/regression/SES-215-env-isolation.js` carries three
+source clauses each with its own `breaks()` mutation, the `SES-158` vacuity meta-check, a two-arm
+behavioural fixture (one key **added**, one key **modified**, so a restore missing either half
+fails), and a **file-level negative control that runs `origin/dev`'s own `run-all.js` against the
+same fixture and asserts it LOSES** — with the only rewrite to that control (its relative
+`_lib/self-run.js` specifier, so the copy resolves from a temp dir) asserted to have touched
+precisely that and nothing else.
+
+**The edit this ship forbids:** exporting `snapshotEnv` / `restoreEnv`. `run-all.js` calls `main()`
+at the bottom with no import guard, so a test importing those helpers to unit-test them would re-run
+the entire suite inside itself. They are deliberately module-private and the guard reads the file as
+source and spawns it as a subprocess instead.
+
+**Reported honestly rather than absorbed:** the run that reproduced the defect also showed
+`[FAIL] SES-177-claude-state-renderer.js`. That is `SES-213`'s staleness pattern — the predecessor's
+ship was not yet in the committed `CLAUDE-STATE.md` — it cleared the moment step 7a rendered, and it
+is not this ticket's. Verdict `runner_verdicts` `dfc0224b`: **approve**, build/regression/hygiene all
+green; `auto_done_eligible` **false** (no epic on the ticket — charter decision 2 scopes auto-done to
+the `Selfbuild` family and an unknown epic fails closed), so the ticket ships `delivered` and cards
+John, per `SES-154`.
+
+Two tests; no `src`/`api`/`lib` change, no schema change, no site change.
+
 ## session/cycle-20260829-0240 (v7.0.302, 2026-08-29, runner cycle `5b58c153-f1ea-452c-8d59-67855d5bdbd2`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, Fable 5 subagent for the LOO-24 diagnosis and design) — gated before build: LOO-24's design is done and lands as a proposal, because the board below it is gated lane all the way down
 
 **Outcome `gated_before_build`, and the reason is a blocker rather than a shortage of effort.** Four
