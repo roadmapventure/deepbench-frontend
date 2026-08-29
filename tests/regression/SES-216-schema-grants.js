@@ -1,3 +1,22 @@
+// DeepBench v7.0.317 | tests/regression/SES-216-schema-grants.js | SES-220
+//
+// v7.0.317 — TWO CLAUSES REAIMED, and the reason belongs at the top because it is a property of
+// doc guards in general and not a detail of this one. `doesNotOversellTheFix` required the runbook
+// to keep the literal sentences "Defects (3) and (4) are untouched." and "5 tables and 67% of the
+// rows still will not load"; `stillConditionalOnSetAge` required a case-exact "depends on WHEN your
+// set was dumped". All three were true when written. SES-223 (v7.0.303) and SES-230 (v7.0.312) then
+// fixed those defects for future sets, and SES-220 (v7.0.317) proved it by running the real loader
+// against a real Postgres — at which point this guard was REQUIRING a falsehood in the one document
+// somebody reads mid-outage, and the case-exact match broke on prose that had been strengthened.
+//
+// A DOC GUARD MUST FAIL WHEN THE PROPERTY GOES, NEVER WHEN THE SENTENCE CARRYING IT IS REWORDED
+// UPWARD, AND NEVER TO DEFEND A FACT THAT HAS EXPIRED. Both clauses are now aimed at the half that
+// cannot expire — no repair reaches a set already on disk — so telling the truth about the fix no
+// longer costs a red suite. Its twin in SES-220-loadable-columns.js had the identical defect and
+// was split the same way; one expired fact with two guards holding it in place is harder to correct
+// than one with none.
+//
+// v7.0.294 header follows.
 // DeepBench v7.0.294 | tests/regression/SES-216-schema-grants.js | SES-216
 //
 // Guards the fix that made schema.sql carry EXECUTABLE grants, and -- with equal weight -- the
@@ -71,8 +90,16 @@ export function manualPathSurvives(md) {
 
 // §5b must stay CONDITIONAL on when the set was dumped. A rewrite to a flat "this now works" is
 // the failure: it is true for a set nobody is holding and false for both sets that exist.
+//
+// v7.0.317: matched case-INSENSITIVELY, and the reason is worth a line rather than a shrug. The
+// property this clause protects is "the verdict depends on the set's vintage", and SES-220 made
+// §5b MORE conditional, not less -- it added a SECOND vintage test (loadable_cols) beside the
+// grants one, because the two repairs landed independently and a set can be on either side of
+// each. That rewrite promoted the sentence to a heading and broke a case-sensitive match on
+// prose it had strengthened. A doc guard must fail when the PROPERTY goes, never when the
+// sentence carrying it is reworded upward.
 export function stillConditionalOnSetAge(md) {
-  return md.includes("depends on WHEN your set was dumped")
+  return /depends (?:entirely )?on when your set was dumped/i.test(md)
     && md.includes("This includes BOTH sets stored offsite");
 }
 
@@ -83,9 +110,23 @@ export function keepsTheLog124Trap(md) {
 }
 
 // Defects (3) and (4) are NOT fixed, and the file must not imply otherwise by omission.
+//
+// v7.0.317 REAIMED, and this is the SECOND guard that was found pinning an expired sentence -- the
+// finding, not a footnote. This clause required the literals "Defects (3) and (4) are untouched."
+// and "5 tables and 67% of the rows still will not load". Both were true at v7.0.294 and both went
+// false when SES-223 (v7.0.303) and SES-230 (v7.0.312) landed, so from then on this clause was
+// REQUIRING the runbook to keep a falsehood in the one document somebody reads mid-outage. Its
+// twin in tests/regression/SES-220-loadable-columns.js had the identical defect. One expired fact
+// with two guards holding it in place is harder to correct than one with none, because the first
+// cycle to tell the truth gets a red suite for doing it.
+//
+// What is pinned now is the half that did NOT expire and cannot: neither repair reaches a set
+// already on disk, so a restore from either stored set still loses those rows. That is the
+// statement this clause has always been FOR -- a reader who plans an outage around 100% recovery
+// and gets 32.8% -- and it is now stated in a form that survives the emissions being fixed.
 export function doesNotOversellTheFix(md) {
-  return md.includes("Defects (3) and (4) are untouched.")
-    && md.includes("5 tables and 67% of the rows still will not load");
+  return md.includes("both defects remain live in every set that already exists")
+    && md.includes("must not be quoted for a current one");
 }
 
 async function run() {
@@ -116,8 +157,12 @@ async function run() {
   assert.ok(stillConditionalOnSetAge(md),
     `${RUNBOOK} §5b no longer makes the restore command's behaviour depend on when the set was ` +
     `dumped. A flat "this works now" is false for both sets stored offsite today.`);
-  assert.ok(!stillConditionalOnSetAge(md.split("depends on WHEN your set was dumped").join("works")),
+  assert.ok(!stillConditionalOnSetAge(md.replace(/depends (?:entirely )?on when your set was dumped/gi, "works")),
     "negative control failed: stillConditionalOnSetAge() passes with the conditional removed.");
+  assert.ok(!stillConditionalOnSetAge(md.split("This includes BOTH sets stored offsite").join("")),
+    "negative control failed: stillConditionalOnSetAge() passes without the two standing sets " +
+    "being named on the pre-fix side of the condition — which is the half that makes the " +
+    "condition actionable rather than decorative.");
 
   // A4 -- the privacy trap stays named.
   assert.ok(keepsTheLog124Trap(md),
@@ -126,13 +171,21 @@ async function run() {
   assert.ok(!keepsTheLog124Trap(md.split("GRANT SELECT ON ai_activity_log TO anon").join("some repair")),
     "negative control failed: keepsTheLog124Trap() passes with the trap statement removed.");
 
-  // A5 -- the fix is not oversold. (3) and (4) still lose 5 tables and 67% of the rows.
+  // A5 -- the fix is not oversold. Reaimed at v7.0.317 from "(3) and (4) are unfixed" (which
+  //       expired when SES-223/SES-230 landed) to the half that cannot expire: no repair reaches
+  //       a set already on disk.
   assert.ok(doesNotOversellTheFix(md),
-    `${RUNBOOK} has dropped the statement that SES-216 defects (3) and (4) are unfixed. A reader ` +
-    `who takes the grants fix as "the restore works now" plans an outage around 100% recovery ` +
+    `${RUNBOOK} has dropped the statement that SES-216/SES-220's defects are still live IN THE ` +
+    `SETS THAT EXIST. The emissions are fixed and neither fix reaches a set already on disk, so ` +
+    `a reader who takes them as "the restore works now" plans an outage around 100% recovery ` +
     `and gets 32.8%.`);
-  assert.ok(!doesNotOversellTheFix(md.split("Defects (3) and (4) are untouched.").join("")),
-    "negative control failed: doesNotOversellTheFix() passes with the caveat removed.");
+  for (const [label, token] of [
+    ["sets-on-disk caveat", "both defects remain live in every set that already exists"],
+    ["do-not-quote-67%-for-a-current-set rule", "must not be quoted for a current one"],
+  ]) {
+    assert.ok(!doesNotOversellTheFix(md.split(token).join("")),
+      `negative control failed: doesNotOversellTheFix() still passes with the ${label} removed.`);
+  }
 
   // --- Part B: the live emission -----------------------------------------------------------
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;

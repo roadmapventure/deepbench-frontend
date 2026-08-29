@@ -5,6 +5,104 @@
 
 ---
 
+## session/cycle-20260829-1654 (v7.0.317, 2026-08-29, runner cycle `807bddb3-6481-45df-9182-6d7c5bc4bde1`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-220` — the loader-side halves are run against a real database for the first time, and two doc guards stop pinning a sentence that expired
+
+**Selection was Prime Directive §2(a) — John's mission directive `6acd590e`, filed 16:50:37Z, four
+minutes before this cycle opened.** His words: *"(1) SES-220 — finish its remainder (the loader-side
+verification its ship notes left open; SES-230/Route-1 is done, blocked_by cleared) and take it to
+its done bar; clear SES-191.blocked_by when it lands."* §4 honoured: the invention pass is suspended
+by the Prime Directive.
+
+**WHAT WAS ACTUALLY UNVERIFIED, and it took reading the guards rather than the tickets to see it.**
+`SES-223` (`v7.0.303`) and `SES-230` (`v7.0.312`) shipped both loader-side halves and both are
+`done`. What nobody had done is **run the real loader against a real database**. `SES-230`'s guard
+drives `restore-supabase.mjs` against an **HTTP stub that hardcodes the strings `428C9` and
+`23502`** — it proves the script's control flow, and cannot prove that Postgres emits those codes on
+those column shapes or that dropping the generated column makes the real `INSERT` succeed.
+`SES-223`'s loader arm was a **dry run** over an invented `computed_x` column, and there is no
+`tests/regression/SES-223-*.js` at all. So both halves were asserted and never executed.
+
+**THE MEASUREMENT.** Drill project `itcimllfniypelrxsuoh`, two fixture tables reproducing the real
+shapes (a `GENERATED ALWAYS … STORED` masking column; a `jsonb NOT NULL` column with 2 of 30 rows
+holding the JSON scalar `null`), and two backup sets whose `.ndjson` is **byte-identical**
+(`diff -r` clean) and whose manifests differ in `loadable_cols` **alone**. One variable, and the
+negative control is the **pre-`SES-223` set** rather than a reimplementation agreeing with itself:
+
+| | manifest **has** `loadable_cols` | manifest **lacks** it |
+|---|---|---|
+| generated-column table | **40 of 40 restored** | **0 of 40**, `TABLE-WIDE … HTTP 400 / 428C9` |
+| the generated column after | recomputed on all 40, `attgenerated='s'`, 0 NULL | — |
+| `jsonb NOT NULL` table | 28 of 30, 2 **named** with pk + `23502` | 28 of 30, 2 named — identical |
+
+Three findings, each of which changes what the runbook may say. Defect (3) is **fixed for a current
+set and unfixable for an old one** — the discriminator is one manifest key, so the only thing that
+recovers those 34,909 rows is a fresh dump. The generated column comes back **generated, not
+frozen**, which is the `LOG-124` trap facing the other way and the assertion that makes this more
+than a row count. And `SES-230`'s fallback is **vintage-independent** — it needs no manifest key, so
+both vintages lose exactly the 2 poisoned rows; a `jsonb` scalar `null` is still **reported, never
+restored**.
+
+**THE DEFECT THAT MADE THIS WORTH A CYCLE RATHER THAN A NOTE.** `docs/runbooks/restore-from-backup.md`
+still told whoever is mid-outage, unconditionally, that *"5 tables and 67% of the rows still will not
+load"* and that *"Defects (3) and (4) are untouched"* — and **two** regression guards were pinning
+those sentences with negative controls (`SES-220-loadable-columns.js`'s `doesNotClaimTheFix`,
+`SES-216-schema-grants.js`'s `doesNotOversellTheFix`). Both were correct when written and both went
+false when `SES-223`/`SES-230` landed. **A doc guard that outlives its fact does not fail safe; it
+enforces the stale reading**, and one expired fact with two guards holding it in place is harder to
+correct than one with none — the first cycle to tell the truth gets a red suite for doing it. That
+is why `SES-216`'s guard is the third file: correcting the runbook broke it, and leaving the suite
+red was not an option.
+
+Both clauses are **split, not deleted**, along the line the facts actually fall on: what changed (a
+current set loads its generated columns) and what did not (**no repair reaches a set already on
+disk**, and the jsonb scalar null is still never restored). Both halves are load-bearing in opposite
+directions — quoting `67%` for a current set mis-sizes its recovery; quoting *"the restore works
+now"* for an old one mis-sizes the outage. §5b therefore carries **two** one-line vintage tests now,
+`grep -c '^GRANT ' schema.sql` and `grep -c '"loadable_cols"' manifest.json`, because the two repairs
+landed independently and a set can be on either side of each.
+
+**A THIRD DEFECT, found by this cycle's own vacuity check and fixed.** `keepsTheGeneratedColumnTrap`
+was matching the phrase *"converts a computed privacy control into frozen data"* **only in a header
+stamp** — the body's copy is split across a line break — so the clause protecting the `LOG-124`
+warning would have gone vacuous the moment a later cycle trimmed that stamp. The body prose is
+reflowed; every pinned token is now asserted present in the **body**, not just a stamp.
+
+**Also recorded rather than left to be rediscovered:** `_backup_inventory.jsonb_notnull_cols` is
+populated on 5 tables and has **no reader**. §9's published contract says a loader *"coerces a
+null"* using it; `SES-230` put five arms through the real PostgREST and **no request body produces a
+jsonb scalar null**, which is why John took route 1. Half a contract shipped and the other half is
+unimplementable over this transport. And §9's standing imperative *"print the error on the stall
+too"* is **done** (`SES-223` (c)) — watched live printing both real causes on pass 1.
+
+**QA.** Build green. Suite **108/109 before the rebase, 111/111 on the tree that actually ships** —
+and the difference is reported rather than smoothed over. The one pre-rebase red was
+`SES-236-prime-directive-briefing.js`, which failed **identically on an unedited tree** (measured by
+stashing this cycle's diff, not assumed) and was already carded as `SES-240` by peer cycle
+`c38d63dc`. That peer's `v7.0.316` landed during this cycle's rebase and cleared it, so the
+verifier was **re-run against the rebased tree** and the second verdict is the honest one.
+Both edited guards were run against `origin/dev`'s own runbook as a **file-level negative control**
+and both **FAIL** there and **PASS** on the shipped one; all four new `SES-220` clauses were checked
+individually and every one is `false` on `origin/dev` and `true` here, so they pin this ship rather
+than a property both trees share. Verifier: **BLOCK** (`runner_verdicts d41cf301`) on the inherited red before the rebase, then
+**APPROVE** (`runner_verdicts 062741b8`) on the rebased tree — all three gates green and
+`auto_done_eligible` **YES**: a Selfbuild `P10 - Tooling` delivery whose diff touches none of the
+three gate scripts, so step 7a's interim auto-done bar (charter decision 2) applies and the ticket
+closes **`done`** rather than `delivered` — which is John’s own *"take it to its done bar"*. The
+ship card is filed either way, so Reverse stays one tap. Fixtures dropped from the drill project (0 left), before-images written for both.
+
+**`SES-191.blocked_by` cleared, on John's explicit instruction and with the tradeoff named rather
+than buried.** `SES-218`'s mechanism is a `NOT EXISTS` over the blocker's live status and
+`delivered` already unblocks a dependent, so the clear is a no-op today; it matters only if John
+Reverses this ship, in which case `SES-191`'s remainder would read buildable while `SES-220` was
+open again. `SES-230`'s cycle declined the same literal write on that reasoning and John repeated
+the instruction, so it is made here and he can overrule it on the card.
+
+**No push to `deepbench-backups-offsite`** — the repo was cloned read-only for the verification;
+directive `c98048a5` as narrowed by `1c9609de` pre-authorises drill *dumps*, never pushes, and this
+cycle has no such word. One cosmetic remainder named and deliberately not fixed there: the stall
+heading still reads *"no table made progress"* when the last table standing fails on a pass where
+others loaded (`failed.length === pending.length`, `pending` having already shrunk) — misleading
+wording, never a wrong outcome.
 ## session/cycle-20260829-1640 (v7.0.316, 2026-08-29, runner cycle `c38d63dc-07a7-47b0-b51c-28f2774cddc4`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, roster sweep delegated to a Sonnet 5 subagent per register B21) — delivered: `SES-53` — agent name/role drift in the session history, swept rather than spot-fixed
 
 **Selected under the Prime Directive (`a0ef9525`) §2(c).** No open mission directive at §2(a);
@@ -10293,6 +10391,17 @@ before and after.
 <!-- DeepBench v7.0.99 | runbooks/briefing-page.md | S-SES-78b — the Morning Briefing page: URL, regeneration contract, decision read-back. -->
 
 ## Appendix — retired `restore-from-backup.md` provenance comments (`DIR-c98048a5`, v7.0.291, 2026-08-28)
+
+<!-- DeepBench v7.0.291 | docs/runbooks/restore-from-backup.md | DIR-c98048a5 — THE STANDING RECOVERY NET IS NO LONGER THE ONE THAT CANNOT REBUILD THE DATABASE. John's directive c98048a5 (2026-08-25, attended architect session, verbatim: "authorize the refresh") executed end to end from an unattended cloud container: fresh set refresh-2026-08-28 dumped from live production (56 base tables / 53,609 rows / 155.2 MB / 0 tables with missing rows / POSIX manifest paths), redacted, proven, and pushed to deepbench-backups-offsite main at 5a99272 ALONGSIDE — never replacing — selfbuild-step0-2026-08-23. THE CLAIM THIS SHIP IS ENTITLED TO MAKE, and it is measured with ONE VARIABLE rather than argued: tests/regression/SES-191-backup-path-portability.js Part 4, same command, DEEPBENCH_BACKUP_SET pointed at each set — PASS on the new one, FAIL on the standing one, on ai_activity_log_id_seq, which is the exact defect §9's first bullet said only a re-dump could repair. So v7.0.250's fix is now confirmed IN THE ARTIFACT a person restores from, not merely in the view that generates it. THE BAR THAT ACTUALLY GUARDS THIS, and the half a later cycle will be tempted to shorten: a raw dump carries ANTHROPIC_API_KEY, VERCEL_TOKEN, SUPABASE_SERVICE_KEY and the Vercel bypass secret as live plaintext, so the redaction is the only thing between a refresh and a credential leak. It was proven BEFORE the push, in both directions — a byte-level scan of all 81 files / 155.7 MB across six credential patterns AND an exact-match arm holding the four live values read straight from the running platform returned ZERO hits, while its NEGATIVE CONTROL (the same scanner against the un-redacted runner_secrets.ndjson a raw dump produces) returned 6 hits and exit 1. A one-directional scan would have passed on a set nobody had redacted. THE DEFECT THAT CONTROL FOUND IN THE SCANNER ITSELF, fixed before the real run: a directory it could not walk scanned ZERO files and still printed PASS — "nothing matched" and "nothing was looked at" must never render the same, so files==0 now exits 2. TWO STALE CLAIMS IN THIS FILE ARE CORRECTED RATHER THAN WORKED AROUND, both read live at refs/heads/main and not recalled: §4's and §9's "the fix lives only on branch ses191/backup-path-portability, not on main" is FALSE — main carries relPosix() and both readers' entryPath(), and this very set was dumped with that main tooling. Leaving it would send someone mid-outage hunting a merge that already happened. WHAT IS CARRIED FORWARD AND SAID SO: machine-local/ is John's machine state and a cloud container cannot capture it, so it is copied verbatim from the 2026-08-23 set and LABELLED as of 2026-08-23 in the new set's own RESTORE-PROCEDURE.md — included rather than omitted so the newer set is not a downgrade for hooks, labelled rather than copied silently so five-day-old machine files are not dated as fresh. NOT FIXED HERE, named rather than left to be found: SES-214's two schema.sql defects (the two _backup_* views undefined; VIEWS emitted before FUNCTIONS) are in this set as in every set dumped today — they live in public._backup_schema_ddl, they change what EVERY future dump contains, and they deserve their own revalidation rather than riding along inside a directive claimed for a refresh. The new set's procedure file carries the two-step workaround. AND THE PRECEDENT IS EXPLICITLY NOT WIDENED: the directive's own words are "recurring/automated refresh remains the M4 gate's open question — do not schedule, do not repeat without John's word", so §7's manual-step rule and §9's unattended-cycle prohibition stand unchanged for every cycle after this one. Stamp count held at 5 per session-hygiene check 7: v7.0.229 moved VERBATIM to docs/SESSIONS.md's appendix, checked first by grep rather than recollection — its one editor warning (the per-snapshot RESTORE-PROCEDURE.md is that snapshot's own record and this runbook wins where they disagree) is already restated in §1's table at the RESTORE-PROCEDURE.md row. Doc only; no src/api/lib change, no schema change, no site change. -->
+
+*(Retired by `SES-220`, v7.0.317, to hold the stamp count at 5. Its editor warnings were
+grepped against the body FIRST, not recalled: the redaction rule / "do not schedule, do not repeat
+without John's word" (§7 and §9), `machine-local/` being dated as of its own snapshot (§1's table,
+§5e), and `SES-214's` two schema.sql defects (§9's four-step job) are all already restated there.
+Its ONE warning with no copy anywhere in the body — that a redaction scan which walked zero files
+must not print PASS, and that the scan has to run in both directions — was RELOCATED into §7's
+offsite-copy bullet next to the redaction it protects, rather than archived: the `SES-164` step
+that makes a trim safe.)*
 
 Retired from the file's header chain to hold the stamp count at 5 (session-hygiene check 7). Kept
 verbatim; also in git history. Checked before retiring: each stamp's editor warnings are already

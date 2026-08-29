@@ -1,3 +1,11 @@
+// DeepBench v7.0.317 | tests/regression/SES-220-loadable-columns.js | SES-220
+//
+// v7.0.317 UPDATE — THE LOADER-SIDE HALVES WERE RUN, and this file's central clause was REAIMED
+// because the fact it pinned expired. See the block above doesNotClaimTheFixForSetsOnDisk() for
+// why, and read the rest of this header as the v7.0.298 statement it was: accurate then, and the
+// reason the metadata exists at all.
+//
+// v7.0.298 header follows.
 // DeepBench v7.0.298 | tests/regression/SES-220-loadable-columns.js | SES-220
 //
 // Guards the metadata that lets a restore loader avoid the two row-loss defects the v7.0.292
@@ -25,6 +33,10 @@
 // to record the defects as closed. They are not. No set has been re-dumped, the offsite scripts
 // still select `*`, and every set that exists still loses 5 tables. A file that stops saying so
 // sends whoever is mid-outage into an outage plan built on 100% recovery.
+//   [v7.0.317: the middle sentence expired -- the offsite scripts NO LONGER select `*` (SES-223,
+//    v7.0.303) and a stuck table is now retried row by row (SES-230, v7.0.312). The FIRST and LAST
+//    sentences did not expire and are why the clause was split rather than dropped: no repair
+//    reaches a set already on disk, so every set that exists still loses those 5 tables.]
 //
 // THE TRAP, and it is a privacy one (.claude/rules/supabase-column-grants.md, LOG-124). The fastest
 // way to make today's sets load is to emit caller_ip_masked as a plain column instead of a
@@ -80,11 +92,57 @@ export function statesTheLoaderContract(md) {
     && md.includes("SQL `NULL` could never have been dumped");
 }
 
-// THE CLAUSE THIS FILE EXISTS FOR. Publishing metadata is not fixing the defect.
-export function doesNotClaimTheFix(md) {
-  return md.includes("Defects (3) and (4) are untouched.")
-    && md.includes("5 tables and 67% of the rows still will not load")
-    && md.includes("both defects remain live in every set that exists");
+// THE CLAUSE THIS FILE EXISTS FOR, REAIMED AT v7.0.317 -- and read the reason, because the retired
+// version of it is now the thing that would be wrong.
+//
+// Until v7.0.317 this clause was `doesNotClaimTheFix`, and it pinned three literal sentences:
+// "Defects (3) and (4) are untouched.", "5 tables and 67% of the rows still will not load", and
+// "both defects remain live in every set that exists". It was correct at v7.0.298, when the offsite
+// scripts still selected `*`. SES-223 (v7.0.303) and SES-230 (v7.0.312) then landed, and the guard
+// went on REQUIRING the runbook to say the defects were untouched -- pinning a falsehood in the one
+// document somebody reads mid-outage. A doc guard that outlives its fact does not fail safe; it
+// enforces the stale reading.
+//
+// So the clause is not deleted, it is SPLIT along the line the facts actually fall on:
+//   * what changed  -- a set dumped after v7.0.303 loads its generated columns (measured, not
+//                      argued: 40/40 through the real loader against a real Postgres);
+//   * what did NOT  -- neither repair reaches a set already on disk, and the jsonb scalar null is
+//                      still never restored, only reported.
+// Both halves are load-bearing in OPPOSITE directions, which is why each gets its own clause below.
+// Quoting either one alone is a way to be wrong: "67%" mis-sizes a current set's recovery, and "the
+// restore works now" mis-sizes an old set's. The runbook must therefore carry BOTH, plus the two
+// one-line commands that tell an operator which set they are holding.
+
+// (a) The operator can tell which vintage they hold WITHOUT knowing this project's ship history.
+//     Two independent tests, because the two repairs landed independently and a set can be on
+//     either side of each.
+export function saysWhichVintageYouHold(md) {
+  return md.includes("grep -c '^GRANT ' schema.sql")
+    && md.includes("grep -c '\"loadable_cols\"' manifest.json");
+}
+
+// (b) The measured recovery is stated, INCLUDING the assertion that makes it more than a row count:
+//     the generated column comes back generated, not frozen. A restore that loaded it as plain data
+//     would land a NULL mask on every later insert -- the LOG-124 leak from the other side.
+export function carriesTheMeasuredRecovery(md) {
+  return md.includes("40 of 40 rows restored")
+    && md.includes("recomputed on all 40");
+}
+
+// (c) THE PERMANENT HALF. Neither repair reaches a set already on disk, and the jsonb scalar null is
+//     reported rather than represented. This is what stops a reader planning an outage around 100%
+//     recovery off a set that recovers 32.8%.
+export function doesNotClaimTheFixForSetsOnDisk(md) {
+  return md.includes("both defects remain live in every set that already exists")
+    && md.includes("still never restored")
+    && md.includes("must not be quoted for a current one");
+}
+
+// (d) jsonb_notnull_cols is populated and has NO READER. Without this said out loud, the next cycle
+//     reads the published contract, assumes the loader coerces, and "wires it up" -- into a
+//     transport SES-230 measured five ways and proved cannot carry the value.
+export function namesTheUnimplementableCoercion(md) {
+  return md.includes("no reader today");
 }
 
 // The forbidden edit stays named. It is the one that makes today's sets load.
@@ -126,20 +184,60 @@ async function run() {
       `negative control failed: statesTheLoaderContract() still passes with the ${label} removed.`);
   }
 
-  // A3 -- THE CLAUSE THIS FILE EXISTS FOR. Metadata published is not a defect fixed.
-  assert.ok(doesNotClaimTheFix(md),
-    `${RUNBOOK} has stopped saying that SES-220 defects (3) and (4) are still live. Publishing ` +
-    `loadable_cols does not load a single row: the offsite dumper and loader still select "*" ` +
-    `and insert every key, and no set has been re-dumped. A reader who takes this ship as "the ` +
-    `restore works now" plans an outage around 100% recovery and gets 32.8%.`);
+  // A3 -- THE CLAUSE THIS FILE EXISTS FOR, in its four post-v7.0.317 halves.
+
+  // A3a -- the operator can date their own set, from the set alone.
+  assert.ok(saysWhichVintageYouHold(md),
+    `${RUNBOOK} no longer gives both one-line vintage tests. Two repairs landed independently ` +
+    `(SES-216 grants, v7.0.294; SES-223 loadable_cols, v7.0.303) and NEITHER reaches a set already ` +
+    `on disk, so how much a restore recovers is a property of the SET, not of this project's ship ` +
+    `history. Without both commands the person mid-outage has to know which ship landed when.`);
   for (const [label, token] of [
-    ["SES-216 (3)/(4) caveat", "Defects (3) and (4) are untouched."],
-    ["5-tables/67% figure", "5 tables and 67% of the rows still will not load"],
-    ["sets-still-broken statement", "both defects remain live in every set that exists"],
+    ["grants test", "grep -c '^GRANT ' schema.sql"],
+    ["loadable_cols test", "grep -c '\"loadable_cols\"' manifest.json"],
   ]) {
-    assert.ok(!doesNotClaimTheFix(md.split(token).join("")),
-      `negative control failed: doesNotClaimTheFix() still passes with the ${label} removed.`);
+    assert.ok(!saysWhichVintageYouHold(md.split(token).join("")),
+      `negative control failed: saysWhichVintageYouHold() still passes with the ${label} removed.`);
   }
+
+  // A3b -- the measurement, and the privacy assertion inside it.
+  assert.ok(carriesTheMeasuredRecovery(md),
+    `${RUNBOOK} has dropped the measured loader-side result (v7.0.317: the real ` +
+    `restore-supabase.mjs against a real Postgres, two sets whose .ndjson is byte-identical and ` +
+    `whose manifests differ in loadable_cols alone). Without the numbers the vintage tests above ` +
+    `tell an operator which case they are in and nothing about what it costs them.`);
+  for (const [label, token] of [
+    ["generated-column row count", "40 of 40 rows restored"],
+    ["mask-recomputation assertion", "recomputed on all 40"],
+  ]) {
+    assert.ok(!carriesTheMeasuredRecovery(md.split(token).join("")),
+      `negative control failed: carriesTheMeasuredRecovery() still passes with the ${label} removed.`);
+  }
+
+  // A3c -- THE PERMANENT HALF, and the one a later "tidy-up" is most likely to delete as obsolete.
+  assert.ok(doesNotClaimTheFixForSetsOnDisk(md),
+    `${RUNBOOK} has stopped saying that SES-220 defects (3) and (4) are still live IN THE SETS ` +
+    `THAT EXIST. The emissions are fixed; no repair reaches a set already on disk, and a jsonb ` +
+    `scalar null is still reported rather than restored. A reader who takes v7.0.303/v7.0.312 as ` +
+    `"the restore works now" plans an outage around 100% recovery off a set that gives 32.8%.`);
+  for (const [label, token] of [
+    ["sets-on-disk caveat", "both defects remain live in every set that already exists"],
+    ["jsonb-null caveat", "still never restored"],
+    ["do-not-quote-67%-for-a-current-set rule", "must not be quoted for a current one"],
+  ]) {
+    assert.ok(!doesNotClaimTheFixForSetsOnDisk(md.split(token).join("")),
+      `negative control failed: doesNotClaimTheFixForSetsOnDisk() still passes with the ` +
+      `${label} removed.`);
+  }
+
+  // A3d -- the published-but-unread metadata is named as such.
+  assert.ok(namesTheUnimplementableCoercion(md),
+    `${RUNBOOK} no longer says that jsonb_notnull_cols has no reader. It is populated on 5 tables ` +
+    `and the stated contract says a loader "coerces a null" using it -- so a later cycle reads the ` +
+    `contract, assumes the coercion exists, and wires it into restore-supabase.mjs. SES-230 put ` +
+    `five arms through the real PostgREST and no request body produces a jsonb scalar null.`);
+  assert.ok(!namesTheUnimplementableCoercion(md.split("no reader today").join("a reader")),
+    "negative control failed: namesTheUnimplementableCoercion() passes with the warning removed.");
 
   // A4 -- the forbidden edit stays named.
   assert.ok(keepsTheGeneratedColumnTrap(md),
