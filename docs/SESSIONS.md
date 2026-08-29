@@ -5,6 +5,98 @@
 
 ---
 
+## session/cycle-20260829-1440 (v7.0.311, 2026-08-29, runner cycle `58416fef-9ca2-492b-b34c-cb01cc4a6f63`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, one Fable 5 subagent for the board-buildability classification) — shipped: `LOG-132` — the two rollup views stop paying 34,840 opaque signature calls, and John's By Pattern panel comes back off `anon`'s 3 s cap
+
+**The board moved under this cycle while it was reading it, and that is worth recording before
+anything else.** John was in an attended architect session throughout: `SES-230`'s `needs-john`
+cleared at `14:46:58Z`, `SES-215` and `SES-180` went `done` at `14:48:30Z`, and he typed a fresh
+**morning** meter reading at `14:47Z` — all inside this cycle's first fifteen minutes. The first
+board read (14:44Z) was therefore stale by the time the pick was made; it was re-read after a
+recompute that moved **579** rows rather than being trusted. A cycle that had not re-read would have
+walked a queue that no longer existed.
+
+**Selection.** Layer 1a's two queued `directive` rows (`58db64ae`, `1c9609de`) are standing
+decision/authorisation channels, not missions, and were left queued. Layer 1b's `drain_epic_next()`
+returned **`blocked`** (`open_now = 2`: `SES-182` needs-john under John's standing hold, `SES-191`
+blocked by `SES-220`), so the cycle fell through to the class-sorted board — B24's rule that a
+blocked drain never ends a cycle build-less. Queue 1–85 is a blocked prefix: `delivered` /
+`removal proposed` / `needs-john` / `john-paced` / `blocked_by`, plus `SES-183`–`SES-186`, the
+M4–M7 design gates whose own text says *"members filed at the gate, not before"* against an M3 that
+has not retired. **28 `record_skip()` rows written** (each preserving its existing reason rather than
+overwriting it; two new — `LOG-17`, `LOO-005`). `SES-182` was stepped past **silently** on John's
+explicit instruction (directive `58db64ae` item 6: *"do not flag it, do not pick it"*).
+
+**The one candidate that outranked the pick on authority and lost on reachability — named rather
+than quietly dropped.** `SES-230` carries John's build authorisation from **eight minutes before the
+pick** (card `c2470d0b`, `14:46:58Z`, his word *"1"*, recorded as *"Build authorized"*). It was
+rejected on two independent grounds, both checked: it sits at queue 260 against `LOG-132`'s 86 (the
+B23 re-entry at #1 was never applied, and a pin is John's to set, not a cycle's to invent); and
+**route 1 is a change to the loader, which lives in the offsite repo** — `restore-from-backup.md`'s
+own `v7.0.294` stamp says so — outside this session's repository scope. **A cycle with
+`deepbench-backups-offsite` attached should take it next: it is the last thing between the platform
+and a scored charter exit criterion 5.**
+
+**The premise was measured, not quoted, and the gap had closed further while the ticket waited.**
+`anon` carries `statement_timeout=3s` (`pg_roles.rolconfig`; `authenticated` 8 s).
+`ai_pattern_classification_rollup` ran **2,871.986 ms warm** — 96% of the cap, one view alone,
+against a mount that issues a concurrent pair — with **1,879.275 ms** of it in the `sig` CTE's Seq
+Scan over 34,840 rows. The ticket's own 2026-08-11 re-measurement said 2,202 ms warm; warm is now
+2,872 ms, i.e. ~670 ms worse while it sat.
+
+**Root cause, from `pg_get_functiondef` rather than the plan alone.** `log_row_signature()` is a
+`STABLE SQL` function whose `sub_calls_chained` and `integration_followed` branches each contain an
+`EXISTS (SELECT 1 FROM public.ai_activity_log ...)` sublink, and Postgres's `inline_function()`
+refuses a body containing subplans. The function therefore stays opaque and is invoked once per row.
+Saying *"it does not inline"* is not enough — that sentence invites an index, and an index changes
+nothing here.
+
+**The fix is the ticket's directions (a) AND (b), which it words as alternatives and which actually
+compose:** (b) precomputes the two span-derived facts once per query, and that is what makes (a)'s
+inlinable config half legal to write in the view. `parents` is a `DISTINCT parent_span_id` LEFT JOIN;
+`base` is one `WindowAgg` whose `DESC`-ordered preceding frame is exactly the set the `EXISTS`
+scanned — `ai_activity_log.id` is `integer` and the primary key, so that ordering is **total** and
+the `ROWS` frame has no ties to mis-handle, which was checked rather than assumed.
+
+**THE EDIT THIS SHIP FORBIDS, and it is the tempting tidy-up:** moving the two precomputed facts back
+*inside* `log_row_signature()` for "one home". The function is called **per row** from
+`ai_call_patterns` with a single row in hand; a set-level precompute there would scan the whole log
+to answer a point lookup — this defect inverted. **A FUNCTION answers about one row, these VIEWS
+answer about all of them.** `ai_call_patterns` deliberately keeps calling the whole function
+unchanged, which also keeps a live caller so the two forms cannot diverge unobserved.
+
+**QA was the equivalence gate itself, run before the views were replaced** — not a proxy: old form
+and new expression computed side by side over the whole table and compared with `IS DISTINCT FROM`.
+**34,840 rows compared, 0 mismatches, 2,372 distinct signatures both ways.** The distinct count is
+what `uniq`/`matched` key on, so it being unmoved is the guarantee the grouping cannot shift.
+Asserted again after the swap on **output**: all 13 rollup rows identical to the retired form on
+`pattern_slug`, `call_count`, `cost_sum` and a sorted `log_ids` fingerprint (0 mismatches);
+`reclassification_count` **19,838** both ways; exactly **one** overload of `log_row_signature` and
+`pattern_criteria_matches` (`.claude/rules/supabase-function-signature.md`); column lists
+byte-identical; grants asserted **both directions** — `anon`, `authenticated`, `service_role` all
+still hold `SELECT` on both views (`SES-101`'s rule).
+
+**Result: 2,871.986 ms → 1,312.851 ms**, the signature CTE 1,879 → 385 ms, 96% of `anon`'s cap →
+**43%**, and no `log_row_signature` node in the plan at all. Output byte-identical, so nothing sits
+behind a flag — `P9 - Bug Fixes` ships live.
+
+**Named rather than absorbed:** after the fix the dominant node is the `pattern_criteria_matches()`
+nested loop (~640 ms of the 1,313). That is real and will need its own ticket as the pattern count
+grows; it is not `LOG-132`'s premise, and chasing it here would have put a second unmeasured change
+behind one equivalence gate.
+
+Build exit 0. Regression **106/106** (the baseline on the unedited tree was 105/105 — the +1 is this
+ship's own guard). Verifier verdict **APPROVE**, all three mechanical gates green
+(`runner_verdicts 28f64299`); `auto_done_eligible` **false** — no epic on the ticket, and charter
+decision 2 scopes the auto-done bar to the Selfbuild family, so this ships **`delivered`** and John
+gets the card. Guarded by `tests/regression/LOG-132-rollup-signature-split.js`, whose file-level
+negative control was run for real: **FAILS** against `origin/dev`'s own copy of the evidence file,
+passes on this one, tree restored byte-identical afterwards. Its anon arm ran with a real anon key
+and passed — the browser's actual 3 s-capped surface returns rows. Two arms are declared **NOT RUN**
+rather than faked: the plan-shape proof and the row-level equivalence gate, because this suite
+reaches Supabase only over PostgREST, which can run neither `EXPLAIN` nor `pg_get_viewdef`. Both ran
+live at the ship and their results are in `docs/LOG-131-migration-log.md`. Doc + test + migration; no
+`src`/`api`/`lib` change, no site change, no table or data change.
+
 ## session/cycle-20260829-1141 (v7.0.310, 2026-08-29, runner cycle `bb02611d-934c-4c67-a568-2f29125380f1`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-104` — the stall tripwire's "minutes frozen" was fabricated by a migration backfill, and a never-reporting cycle was invisible to it entirely
 
 **Selection walked the same gated head as the previous cycle and reached further down.** Layer 1a's
