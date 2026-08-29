@@ -936,6 +936,29 @@ proposing it again. `ck_vision_claim_decided` enforces the discipline structural
 `proposed` **must** carry a `provenance`, so no cycle can record a verdict without saying what decided
 it. `docs/vision/rejected-paths.md` is retired to a pointer stub in the same ship; do not append to it.
 
+**A CLAIM SEEDED FROM A DOC THAT ALREADY RECORDS A TAP IS SEEDED `ratified`, NEVER `proposed`
+(`SES-133`, `v7.0.318`).** This is the one rule the table's arrival broke, and it broke silently
+because the seed *looked* complete. `ses157_vision_claims` imported every claim out of
+`docs/vision/*.md` and stamped the whole set `proposed` — but three of those markdown lines already
+carried John's verdict, written there by `SES-133`'s own first half at `v7.0.171`:
+`C-mission-6` and `C-CUST-20` marked `(ratified 2026-08-23)`, and `C-thesis-30` carrying his typed
+replacement sentence. **Measured at this ship, before anything changed: exactly 3 rows sat
+`status='proposed'` while their own `claim_text` began `(ratified …)` or `(John's words, …)`.** So
+§12 was queued to serve John a card asking him to ratify a claim whose text says he ratified it six
+days earlier — and, for `VC-THESIS-030`, to ratify **his own sentence back to him**, which is the
+`SES-166` failure (an ask he cannot usefully act on) wearing a corpus card's clothes.
+
+Two boundaries, because this is the rule an importer gets wrong twice:
+
+- **Restoring a recorded verdict is TRANSCRIPTION, not a decision the runner may make.** The three
+  rows were restored only because the tap is independently evidenced — the committed markdown at
+  `v7.0.171`, with his timestamp, plus `SES-133`'s filing. `provenance` on each says exactly that,
+  as `ck_vision_claim_decided` requires. A claim with **no** such record stays `proposed`; a cycle
+  never promotes one on inference, and this clause is not a licence to.
+- **A ratification marker in `claim_text` is the SYMPTOM, not the state.** The status column is the
+  home (*"ratification is a state, and it now has one home"*, the table above). Do not "fix" this by
+  parsing prose on every read — the seed is what must carry the state across, once, at import.
+
 Every write is `runner_before_images`-first like any other Supabase write (§19v); an INSERT writes
 `row_data = NULL`, the `SES-142` precedent. Decisions ride the same `briefing-state` harvest as every
 other card. On-demand bursts ("I have X minutes") serve claims rapid-fire in chat, same bookkeeping.

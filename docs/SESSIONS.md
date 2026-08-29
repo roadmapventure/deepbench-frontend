@@ -5,6 +5,75 @@
 
 ---
 
+## session/cycle-20260829-1640 (v7.0.318, 2026-08-29, runner cycle `4e076c15-ba39-466b-854a-cd282566f36f`, `trigger = chained (drain continuation)` of `c38d63dc`, `scheduler_gate` verdict `run` — model Opus 5) — auto-done: `SES-133` — John's three ratifications reach the corpus, in the home it actually has now
+
+**The first continuation this session, opened under Prime Directive §2e.** `drain_chain_gate` returned
+`continue` with `drain_outcome = blocked`: the M3 drain has no claimable member, but §2(c) yields
+buildable Selfbuild work, and §2e widens Gate B to that test while the Prime Directive stands. Gates
+A/C/D passed, E is off (`NULL` = off, never coerced to 0).
+
+**THE PREMISE WAS NEITHER "HOLDS" NOR "DEAD", AND THAT IS THE WHOLE BUILD.** `SES-133`'s owed list —
+`C-mission-6` → HIGH, `C-CUST-20` → HIGH, `C-thesis-30` replaced with John's typed line — shipped at
+`v7.0.171`; all three are in the committed markdown. And the structural half it asks for is **moot as
+written**: `briefing-page.md` §12 now says in its own words *"Every tap is a row write; none of them
+edits a markdown file"*, so there is no corpus markdown edit left to give a moment to. The obvious
+verdict is `removal proposed` — and it would have been wrong, because the ticket's harm is not *"a
+file is stale"* but *"John taps and the corpus does not learn"*, and **that was live again in the new
+home**.
+
+**Measured before a line changed: exactly 3 rows** in `public.vision_claims` sat `status='proposed'`
+while their own `claim_text` began `(ratified 2026-08-23)` or `(John's words, 2026-08-23)` —
+`VC-MISSION-006`, `VC-CUST-020`, `VC-THESIS-030`. The same three claims, the same three taps. Root
+cause located rather than guessed: migration `ses157_vision_claims` (2026-08-23T20:47Z) ran **after**
+`v7.0.171` and imported the corpus with every row stamped `proposed`, so it read his verdicts as prose
+and discarded them as state. §12 serves `proposed` rows, so it was queued to ask him to ratify a claim
+whose text says he ratified it six days earlier — and for `VC-THESIS-030`, **to ratify his own sentence
+back to him**, which is `SES-166`'s "an ask he cannot act on" in a corpus card's clothes. Same shape as
+this session's previous ticket, `SES-53`, whose defect had also moved house rather than died; a premise
+check that stops at *"is the named artifact still wrong?"* closes both as dead.
+
+**Restoring a recorded verdict is TRANSCRIPTION, never a decision the runner makes** — each of the
+three is independently evidenced (the committed markdown at `v7.0.171` with his timestamp, plus the
+ticket's own filing), and `provenance` on each row says exactly that, which is what
+`ck_vision_claim_decided` exists to force. **A claim with no such record stays `proposed`; this build
+promotes none.** No markdown was touched: the status column is the home, and editing the files to
+"match" would give one fact two homes.
+
+**QA.** The query that measured the defect **is** the guard's live arm — 3 rows before, 0 after, one
+variable. Four doc clauses each with a negative control; file-level control against `origin/dev`'s copy
+of `briefing-page.md`: **4 of 4 fail there, 4 of 4 pass here.** Two controls were caught **having no
+teeth during the build** and tightened rather than shipped (one replaced only the first of two
+occurrences of the migration name; the other was line-sensitive against a sentence that wraps) — both
+recorded in the file, because a control that removes nothing is the vacuity the meta-assertion exists
+to catch. Before-images: 3, one per row, asserted after the fact. Verdict `approve` on all three gates,
+`auto_done_eligible` yes → **auto-done under Prime Directive §2f and charter decision 2, with a
+Reverse-capable ship card**.
+
+**`SES-240` IS WITHDRAWN BY THE SAME CYCLE THAT FILED IT — REMOVAL PROPOSED, and this is the honest
+correction rather than a quiet delete.** The predecessor `c38d63dc` filed `SES-240` an hour ago
+against a real, measured failure: `SES-236`'s vacuity control read the **moving** `origin/dev` ref, so
+it began failing the instant its own ship landed, and the verifier's suite gate turned that into a
+`block` on sound work. **The diagnosis was correct and both versions were read to confirm it** — at
+`c452f781` (v7.0.314) line 271 really is `git show origin/dev:<file>`; at `80283770` (v7.0.315,
+`SES-134`) it is pinned to `PRE_CHANGE_SHA`, and that file's own header names the same defect:
+*"SELF-DESTRUCTS THE MOMENT THE SHIP LANDS ON THAT BRANCH"*. **The peer cycle `4559cfe7` fixed it
+concurrently, inside the same half hour, as a rider on an unrelated ticket**; this cycle only stopped
+seeing the failure because its own rebase pulled `v7.0.315` in. Re-measured after that: `SES-236`
+passes three consecutive runs, the suite is green, and this cycle's verdict is `approve` where its
+predecessor's was `block` on exactly that test. Nothing is left to build, so the close is removal —
+**proposed, not taken**: no unattended removal, ever (step 8c), and a Reverse reopens it with the
+history intact.
+
+**Named deviation (the `SES-196` convention).** `VC-THESIS-030` is ratified in place rather than through
+§12's typed-line INSERT-and-supersede. The import had already collapsed the pair: the row's
+`claim_text` **is** John's sentence, and no row for the superseded wording ever existed in this table.
+Manufacturing a `rewritten` predecessor would be inventing history to satisfy the shape of a rule whose
+purpose is already met — the old text is readable in `thesis.md` and in git.
+
+**Not claimed, and named on the ship card rather than absorbed:** `docs/vision/*.md` and
+`public.vision_claims` now hold the same claims in two places, seeded once and free to diverge from
+here. Which of them is the corpus is John's call, and it is not this ticket's.
+
 ## session/cycle-20260829-1654 (v7.0.317, 2026-08-29, runner cycle `807bddb3-6481-45df-9182-6d7c5bc4bde1`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-220` — the loader-side halves are run against a real database for the first time, and two doc guards stop pinning a sentence that expired
 
 **Selection was Prime Directive §2(a) — John's mission directive `6acd590e`, filed 16:50:37Z, four
