@@ -5,6 +5,68 @@
 
 ---
 
+## session/cycle-20260829-0640 (v7.0.307, 2026-08-29, runner cycle `59cf253f-858a-44f8-a3b1-b08e157e8668`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-215` follow-up — the env-isolation guard's negative control was the shipped fix grading itself, so CI could never go green
+
+**Selection was John's word, not the board.** Directive `1715bf08` (attended-session audit,
+2026-08-29 06:14Z) enforces the bar he set on `SES-215`'s own directive `52c41c2d` — *"the push's
+own CI run goes green"* — and names this the **next mission ahead of board work**. Its successor
+`bcd0076e` (06:32Z) sequences `SES-230` explicitly *after* it. The `SES-215` fix itself is sound and
+was verified here rather than assumed: run `33236634108` shows `LOG-41` declaring its anon arm
+**not-run** instead of failing 401, which is the whole of what the ticket was filed for. What was
+red is `SES-215`'s **own guard**.
+
+**The directive's hypothesis is corrected rather than carried forward, because it was measured.**
+It named *"Node 24 on the runners vs the repo's Node 22 assumption; or a fixture file shape/path
+difference"*. Reproduced on **Node v22.22.2 in this clone, byte-identical output** — so it is not a
+Node-version difference at all and it reproduces on every machine. The second half of the guess is
+right, and there is a second defect under it that no environment can dodge.
+
+**Defect 1 — the control runner was written INTO the fixture directory it was about to scan.**
+`run-all.js` discovers tests by `.js`/`.mjs` extension minus `run-all.js` and `_`-prefixed files, so
+`retired-run-all.mjs` sitting in the fixture matched, was imported *as* a test, and failed with
+*"does not export a default async function"*. The suite reported `2/3` and exit 1 — so the
+`status === 1` assertion above it **passed, for entirely the wrong reason**. A control that looks
+like it is working while measuring nothing is worse than an absent one, which is why the fixture's
+contents and the control's `1/2` count are both asserted now.
+
+**Defect 2 — the control's SOURCE was `origin/dev`, which on CI is the commit under test.** It was
+the retired file exactly once: locally, before `v7.0.305` was pushed. After that push `origin/dev`'s
+copy **is** the fixed runner, so the control restores the environment, `b-reads.js` passes, and the
+leak the assertion looks for can never appear. On CI it is structural rather than stale —
+`actions/checkout@v4` at its default depth creates `refs/remotes/origin/dev` pointing at the very
+commit being tested, on every run, forever. **The guard was grading its own change**, the class
+`SELFBUILD-CHARTER.md` item 3 and `verifier.js`'s `SELF_CERTIFYING_PATHS` exist to refuse. Verified,
+not argued: `origin/dev`'s copy carries `delete process.env[key]`; `f7f3cd0^` carries neither that
+nor `snapshotEnv`.
+
+**Why there are now TWO controls, and the second is not a downgrade of the first.** The git control
+is resolved **by content** — the newest commit of `run-all.js` whose copy lacks the restore
+(`992b1833` here) — and declares itself not-run when history is unreachable, which on a shallow CI
+clone it always is. A guard whose only control declares not-run in the one environment that gates
+the push measures nothing there, so an **always-run** control was added: the shipped runner with the
+`added-keys-are-deleted` mutation applied — the same `breaks()` part 2 already proves non-vacuous —
+asserted to lose on the same fixture with the same leak message. The directive's words are *"fix the
+test or its fixture WITHOUT weakening the assertion"*: the real-file control is **kept**, never
+replaced. Where both can run, both run.
+
+**QA was two mutations on the shipped guard, one variable each, tree restored afterwards.** Control
+moved back inside the fixture → fails on the `1/2` clause naming the cause. Control source pointed
+at `origin/dev` → fails on the *"already carries the restore — that is the shipped fix grading
+itself"* clause. Neither would pass if the change did nothing. Full credentialed suite 102/102 after
+the `CLAUDE-STATE.md` render (`SES-213`'s ordering), build green, verifier verdict **approve**
+(`runner_verdicts 969885ab`), auto-done **not** eligible (no epic on the ticket — fails closed), so
+the ticket stays `delivered` awaiting John's Accept.
+
+**The edit this ship forbids:** re-pointing the git control at `origin/dev` (or any branch the fix
+lands on) to "keep it simple", and moving a control runner back inside the fixture directory. The
+first agrees with the shipped file the day after it ships — `SES-213`'s lesson applied to the *ref*
+rather than to the code; the second presents as a **pass**.
+
+Test-only change: `tests/regression/SES-215-env-isolation.js`. No `src`/`api`/`lib` change, no site
+change, no schema change.
+
+---
+
 ## session/cycle-20260829-0540 (v7.0.306, 2026-08-29, runner cycle `04714449-cdbb-48dd-ac30-93fb088c907d`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrator, two Fable 5 subagents for candidate classification) — shipped: `LOG-104` — both paged log readers now sort on a unique key, so a page boundary can no longer skip or duplicate a row
 
 **Selection, and it is most of this cycle's story.** The drain returned `blocked` (three named M3

@@ -1,4 +1,4 @@
-// DeepBench v7.0.305 | tests/regression/SES-215-env-isolation.js | SES-215 -- the suite restores
+// DeepBench v7.0.307 | tests/regression/SES-215-env-isolation.js | SES-215 -- the suite restores
 // process.env around every test, so one test's placeholder can never be another test's answer.
 //
 // WHAT IS BEING PINNED. Seven tests set `VITE_SUPABASE_ANON_KEY = "regression-placeholder"` at the
@@ -12,11 +12,44 @@
 // reads the file as source and spawns it as a subprocess instead -- which also happens to be the
 // stronger proof, because it exercises the runner rather than a function lifted out of it.
 //
-// THE NEGATIVE CONTROL IS origin/dev's OWN run-all.js applied to the SAME fixture and asserted to
-// LOSE (the SES-213 lesson: assert a DIFFERENCE from the retired behaviour, not a property both
+// THE NEGATIVE CONTROL IS A PRE-FIX run-all.js applied to the SAME fixture and asserted to LOSE
+// (the SES-213 lesson: assert a DIFFERENCE from the retired behaviour, not a property both
 // implementations share). Only one byte-range of that control is rewritten -- its relative
 // `./_lib/self-run.js` specifier, so it resolves from a temp directory -- and the rewrite is
 // asserted to have touched exactly that and nothing else.
+//
+// v7.0.307 (SES-215 follow-up, directive 1715bf08): TWO DEFECTS in that control made CI red, and
+// both are named here because each presents as something other than what it is.
+//
+//   (1) THE CONTROL RUNNER WAS WRITTEN INTO THE FIXTURE DIRECTORY IT WAS ABOUT TO SCAN.
+//       run-all.js discovers tests with `.endsWith(".js") || .endsWith(".mjs")`, minus `run-all.js`
+//       and `_`-prefixed files -- so `retired-run-all.mjs` sitting in the fixture matched, was
+//       imported AS a test, and failed with "does not export a default async function". The suite
+//       reported 2/3 and exit 1, so the `status === 1` assertion above it PASSED -- for entirely
+//       the wrong reason. A control that appears to be working while measuring nothing is worse
+//       than an absent one, which is why the fixture's contents are now asserted explicitly.
+//       Control runners live in their OWN temp directory; the fixture holds exactly its two files.
+//
+//   (2) THE CONTROL'S SOURCE WAS `origin/dev`, WHICH ON CI IS THE COMMIT UNDER TEST. It was the
+//       retired file exactly once -- locally, before v7.0.305 was pushed. After that push
+//       origin/dev's copy IS the fixed runner, so the control restores the environment, b-reads.js
+//       PASSES, and the leak the assertion looks for can never appear. On CI it is structural, not
+//       stale: actions/checkout@v4 at its default depth creates refs/remotes/origin/dev pointing at
+//       the very commit being tested, on every run, forever. The guard was grading its own change.
+//       The git control is now resolved BY CONTENT -- the newest commit of run-all.js whose copy
+//       does not carry the restore -- and declares itself not-run when unreachable, which on a
+//       shallow CI clone it always is.
+//
+// THAT LAST POINT IS WHY THERE ARE NOW TWO CONTROLS, and the second is not a downgrade of the
+// first. A guard whose only control declares not-run in the one environment that gates the push is
+// measuring nothing there. The always-run control is the SHIPPED runner with the
+// `added-keys-are-deleted` mutation applied -- the same breaks() part 2 already proves non-vacuous
+// -- asserted to lose on the same fixture with the same leak message. The real-file control is
+// KEPT, never replaced: where both can run, both run.
+//
+// THE EDIT THIS FORBIDS: re-pointing the git control at `origin/dev` (or any branch the fix lands
+// on) to "keep it simple", and moving a control runner back inside the fixture directory. The
+// first agrees with the shipped file the day after it ships; the second presents as a PASS.
 
 import assert from "assert";
 import fs from "fs";
@@ -134,15 +167,60 @@ function runSuite(runnerPath, fixtureDir) {
   });
 }
 
-// The retired implementation, taken from origin/dev rather than reconstructed. Returns null when
-// the ref is unreachable (a shallow clone, a detached checkout) so the clause declares itself
-// not-run instead of inventing a control.
+// The marker of the shipped fix. Used to IDENTIFY a pre-fix commit by content rather than trusting
+// a branch name to still point at one -- see defect (2) in the header.
+const RESTORE_MARK = "delete process.env[key]";
+
+// The retired implementation, taken from history rather than reconstructed: the NEWEST commit of
+// run-all.js whose copy does not carry the restore. Returns null when history is unreachable (a
+// shallow clone -- which is what CI checks out) so the clause declares itself not-run instead of
+// inventing a control, or worse, using the fixed file as one.
 function retiredRunnerSource() {
-  const r = spawnSync("git", ["show", "origin/dev:tests/regression/run-all.js"], {
+  const log = spawnSync("git", ["log", "--format=%H", "--", "tests/regression/run-all.js"], {
     encoding: "utf8",
     cwd: ROOT,
   });
-  return r.status === 0 && r.stdout ? r.stdout : null;
+  if (log.status !== 0 || !log.stdout) return null;
+  for (const sha of log.stdout.split("\n").filter(Boolean)) {
+    const r = spawnSync("git", ["show", `${sha}:tests/regression/run-all.js`], {
+      encoding: "utf8",
+      cwd: ROOT,
+    });
+    if (r.status !== 0 || !r.stdout) continue;
+    if (!r.stdout.includes(RESTORE_MARK)) return { sha, src: r.stdout };
+  }
+  return null;
+}
+
+// A control runner never lives in the directory it is about to scan -- defect (1) in the header.
+function writeControlRunner(name, src) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ses215-control-"));
+  const p = path.join(dir, name);
+  fs.writeFileSync(p, src);
+  return p;
+}
+
+// The shared shape of every negative control: same fixture, asserted to LOSE, and to lose on the
+// LEAK rather than on anything else that happens to exit non-zero.
+function assertControlLoses(runnerPath, fixture, label) {
+  const run = runSuite(runnerPath, fixture);
+  assert.strictEqual(
+    run.status, 1,
+    `${label} PASSED the leak fixture, so this guard is not measuring a difference -- either the ` +
+    `fix already shipped upstream or the fixture stopped reproducing the leak:\n` +
+    (run.stdout || "") + (run.stderr || "")
+  );
+  assert.ok(
+    /1\/2 passed/.test(run.stdout || ""),
+    `${label} must run EXACTLY the fixture's two tests and fail one of them -- a count other than ` +
+    `1/2 means the control picked up a file the fixture does not declare (the v7.0.307 defect, ` +
+    `which presents as a passing exit 1) -- got:\n` + (run.stdout || "")
+  );
+  assert.ok(
+    /SES215_ADDED leaked from a-leaks\.js/.test(run.stdout || ""),
+    `${label} failed the fixture for some OTHER reason than the env leak -- got:\n` +
+    (run.stdout || "")
+  );
 }
 
 // The ONLY rewrite the control gets: its relative self-run.js specifier, so the copy resolves from
@@ -188,45 +266,68 @@ export default async function run() {
       "the fixture suite must report 2/2 -- got:\n" + (shippedRun.stdout || "")
     );
 
-    // ---- part 4: the file-level negative control ----------------------------------------------
-    // origin/dev's OWN runner, same fixture, asserted to LOSE. Without this the clauses above are a
-    // description of the shipped file rather than a measured difference from what it replaced.
+    // The fixture holds EXACTLY what it declares. This is the structural half of defect (1): a
+    // control runner dropped in here is discovered as a third test, and the resulting exit 1 reads
+    // as a passing control. Asserted before any control runs, so the failure names the cause.
+    assert.deepStrictEqual(
+      fs.readdirSync(fixture).sort(),
+      Object.keys(FIXTURE_FILES).sort(),
+      "the fixture directory holds a file it does not declare -- a control runner written in here " +
+      "is scanned as a test by run-all.js, and the exit 1 that produces looks like a working control"
+    );
+
+    // ---- part 4a: the ALWAYS-RUN negative control ------------------------------------------
+    // The shipped runner with the `added-keys-are-deleted` mutation applied -- the same breaks()
+    // part 2 has just proven non-vacuous. This one needs no git history, so it is the control that
+    // actually runs on CI, where the file-level control below is unreachable by construction.
+    const mutated = CLAUSES.find(c => c.id === "added-keys-are-deleted").breaks(shipped);
+    assert.notStrictEqual(
+      mutated, shipped,
+      "the mutation control changed nothing -- it would be the shipped runner wearing a control's name"
+    );
+    assertControlLoses(
+      writeControlRunner("mutated-run-all.mjs", relocate(mutated)),
+      fixture,
+      "the shipped run-all.js with its restore's delete-half removed"
+    );
+
+    // ---- part 4b: the file-level negative control ----------------------------------------------
+    // A real pre-fix runner out of history, same fixture, asserted to LOSE. Without this the
+    // clauses above are a description of the shipped file rather than a measured difference from
+    // what it replaced -- and 4a alone would only ever compare the shipped file to itself-minus-a-line.
     const retired = retiredRunnerSource();
     if (!retired) {
       notRun(
         "SES-215 file-level negative control",
-        "origin/dev:tests/regression/run-all.js is unreachable from this checkout (shallow clone or " +
-        "missing remote ref), so the retired runner could not be run against the fixture. The three " +
-        "source clauses and the behavioural fixture above DID run."
+        "no commit of tests/regression/run-all.js predating the restore is reachable from this " +
+        "checkout (a shallow clone -- which is what actions/checkout@v4 gives CI at its default " +
+        "depth), so the real retired runner could not be run against the fixture. The three source " +
+        "clauses, the behavioural fixture and the ALWAYS-RUN mutation control above DID run."
       );
       return;
     }
 
-    const relocated = relocate(retired);
+    const relocated = relocate(retired.src);
     assert.notStrictEqual(
-      relocated, retired,
+      relocated, retired.src,
       "the control's self-run.js specifier was not rewritten -- the copy would not resolve from a " +
       "temp directory, and a control that cannot start is not a control"
     );
     assert.strictEqual(
       relocated.replace(JSON.stringify(pathToFileURL(SELF_RUN_LIB).href), '"./_lib/self-run.js"'),
-      retired,
+      retired.src,
       "the control rewrite touched more than the self-run.js import specifier"
     );
-
-    const controlPath = path.join(fixture, "retired-run-all.mjs");
-    fs.writeFileSync(controlPath, relocated);
-    const retiredRun = runSuite(controlPath, fixture);
-    assert.strictEqual(
-      retiredRun.status, 1,
-      "origin/dev's run-all.js PASSED the leak fixture, so this guard is not measuring a difference " +
-      "-- either the fix already shipped upstream or the fixture stopped reproducing the leak:\n" +
-      (retiredRun.stdout || "") + (retiredRun.stderr || "")
-    );
     assert.ok(
-      /SES215_ADDED leaked from a-leaks\.js/.test(retiredRun.stdout || ""),
-      "the retired runner failed the fixture for some OTHER reason than the env leak -- got:\n" +
-      (retiredRun.stdout || "")
+      !retired.src.includes(RESTORE_MARK),
+      `the file-level control resolved to ${retired.sha}, whose run-all.js already carries the ` +
+      `restore -- that is the shipped fix grading itself, not a control`
+    );
+
+    assertControlLoses(
+      writeControlRunner("retired-run-all.mjs", relocated),
+      fixture,
+      `the retired run-all.js from ${retired.sha}`
     );
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
