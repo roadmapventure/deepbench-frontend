@@ -5,6 +5,64 @@
 
 ---
 
+## session/cycle-20260829-1940 (v7.0.325, 2026-08-29, runner cycle `cb06c7e1-9a7e-4270-901c-825556a66530`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, the 679-file sweep delegated to a **Sonnet 5** subagent per register B21) — delivered: `SES-32` — `MI-41` is a reused number, and the folds-in sweep is finished
+
+**A YEAR-OLD QUESTION ANSWERED BY READING, NOT BY DECIDING — AND THE ANSWER WAS ALREADY IN THE REPO.**
+`SES-32` asked whether `MI-41` was *"a mis-cited ID or two things sharing one number"* and left the
+branch open: *"resolve which, then either close `MI-41` or restate it."* It is **number reuse**, and
+`docs/FEATURES-ARCHIVE.md`'s own `MI-42` row has said so verbatim since 2026-07-09 — *"`MI-41`
+(original, unrelated to `S-MI-34`'s Column 3 growth finding of the same name)"*. Two more artifacts
+agree (`v6.2.24-MI-55`'s kickoff, the archive's `MI-54` row), and `docs/BETA-TRIAGE.md:267` describes
+the surviving one. The `MI-41` folded into `MI-42` was the **original** chat-timer/Agent-Routing-drawer
+sync idea; it was discharged there and **has no surviving row anywhere** — measured, not assumed:
+`FEATURES.md` / `-NEXT` / `-LATER` / `-ARCHIVE` carry no `MI-41` row at all, and the only two hits in
+`BACKLOG-SNAPSHOT.md` are the open Column 3 row and `SES-32` itself.
+
+**SO THE FACT NEEDED NO NEW HOME — IT NEEDED TO REACH THE ONE FILE THAT CONTRADICTED IT.** The
+correction is a dated sub-bullet on `v6.1.43-S-MI-42`'s Feature ID line, and it **cites** the archive
+rather than re-deriving the claim. A second and third home for one fact is the drift this repo keeps
+paying for; the kickoff was the only artifact still carrying the un-disambiguated sentence.
+
+**THE EDIT THIS SHIP FORBIDS, and it is the branch the ticket's own text invites: closing `MI-41`.**
+That would close a **live** bug. Re-measured here rather than recalled — `AuditColumn`'s wrapper
+(`MarketIntelligenceScreen.jsx:3300`) is `display:flex, flexDirection:column, gap:14,
+position:relative` and carries **none** of `flex:1` / `minHeight:0` / `overflowY:auto`, while
+`InteractColumn`'s carries all three. The guard asserts **both** directions, so the "still broken"
+half cannot pass because the detector is broken.
+
+**THE SWEEP: 679 files, 12 real folds, ZERO ORPHANS** — the residue `SES-32` recorded as *"the other
+~15 matching kickoffs were not individually confirmed."* Eleven fold phrases, **368 raw matches in
+144 files, 352 lines discarded** (a `supersedes_id` column name; explicit negations — *"NOT folded
+in"*; doc-section supersession; a session superseding a prior kickoff; prose naming no ticket).
+Nine of the twelve secondary IDs are archived `Done` — including `LOG-60`, closed *"per `SES-32`'s
+secondary-ID discharge rule"*, i.e. the rule this very ticket shipped, working. The other three are
+**tracked, not orphaned**, which is the distinction: `MI-41` (the collision above), `CHI-91`
+(`partial`, its Manual QA gate named, half-discharged, blocked on `SES-47`'s Vercel cap) and `AI-46`
+(`partial`, split a/b/c, residual spun to `LOG-22`). **No secondary ID named in a kickoff fold has
+outlived the work that resolved it** — so nothing was filed and no id was claimed.
+
+**QA.** Build exit 0; suite **117/117** (28 credential-gated parts declared not-run, `SES-180`'s
+mechanism); verifier **APPROVE** on all three gates, `auto_done_eligible` **YES**
+(`runner_verdicts ed12e556`), so the ticket auto-doned under Prime Directive **§2f** with a
+Reverse-capable ship card. The guard is seven parts: four clauses **read out of** the shipped
+kickoff (never restated) each with its own negative control, the `SES-158` vacuity meta-check, a
+file-level control that reconstructs the pre-change file in-process — **4 of 4 clauses fail there,
+4 of 4 pass on the shipped one** — and the discriminating semantic check, whose negative control
+**is the retired reading**: the naive *"folds in means closed"* rule on the same fixture, asserted
+to reach the **opposite** verdict. The file-level control is reconstructed rather than read from
+`origin/dev` **deliberately** — `SES-240` is the open finding that asserting against that moving ref
+fails for reasons unrelated to the subject.
+
+**NAMED AND LEFT ALONE rather than opportunistically flagged:** `SES-24` — the other buildable M2
+leftover — is a `needs-desktop` ticket whose flag has never been written; its fix shape edits
+`.claude/skills/session-hygiene/SKILL.md`, a path register B39 bars an unattended cycle from
+entering. This cycle did not pick it, so it did not flag it.
+
+Doc + doc + test; no `src`/`api`/`lib` change, no site change, no schema change.
+Kickoff: `docs/kickoffs/v7.0.325-SES-32-mi41-number-reuse.md`.
+
+---
+
 ## session/cycle-20260829-1840 (v7.0.324, 2026-08-29, runner cycle `bee1bd76-5dae-49b5-ba6d-786689efcc2a`, `trigger = chained (drain continuation)` of `2a231a7f`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, design delegated to a **Fable 5** subagent per register B21) — **gated before build**: `SES-182` — auto-rollback on red, designed
 
 **A DESIGN PASS, NOT A BUILD, and that is John's own instruction rather than this cycle's caution.**
