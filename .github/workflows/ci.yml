@@ -1,3 +1,45 @@
+# DeepBench v7.0.304 | .github/workflows/ci.yml | SES-180 (d) — THE REGRESSION STEP IS ACTUALLY
+# CREDENTIALED, and the thing to read twice is that this ship exists because the header below was
+# WRONG. John, attended architect session 2026-08-29, directive 82403dad, after reading this file at
+# e8432f3 with the secrets already added: the v7.0.286 caveat's closing sentence — "adding the
+# secrets later makes the gate stronger with no edit to this file" — is FALSE, and it is corrected
+# in place below rather than left standing as a lie above true code.
+#
+# WHY IT WAS FALSE, and it is a property of GitHub Actions rather than a slip of wording: a
+# repository secret is NEVER auto-exposed to a step. `secrets.*` resolves only where it is written,
+# and the step that runs the suite carried no `env:` block at all. So both repository secrets could
+# be present and correct — and John confirmed live on 2026-08-29 that SUPABASE_URL and
+# SUPABASE_SERVICE_KEY both are — while `node tests/regression/run-all.js` still saw an environment
+# with neither, and the credentialed halves went on declaring themselves not-run forever. The gate
+# would have sat one `env:` block short of the strength this file claimed it already had, and
+# nothing in the run would have said so: a not-run declaration looks identical whether the secret
+# is missing or merely unexposed. THAT is why the sentence had to be corrected and not just
+# out-grown — it described a future that could not arrive on its own.
+#
+# WHAT CHANGED: two keys under a new `env:` on the suite step, and the step's name. Nothing else.
+#
+# THE STEP'S NAME IS PART OF THE FIX, not tidiness. It read "Regression suite (no credentials)",
+# which after this edit would be false in the log of every run on dev and main — and a step whose
+# name misreports its own environment is the same defect as the header sentence, one line further
+# down. NAMED CAVEAT rather than hidden: on a pull_request from a FORK, GitHub resolves both
+# secrets to the empty string by design (that is the safe behaviour and this file must not try to
+# defeat it), so on that one path the name over-promises. The run itself still reports the truth —
+# the credentialed halves declare themselves not-run, loudly and countably, exactly as they did
+# before this ship — so the log is self-correcting where the name cannot be.
+#
+# THE EDIT THIS SHIP FORBIDS, in addition to the two the v7.0.286 header already forbids and which
+# remain in force: reaching for `continue-on-error` when a credentialed half now FAILS. Those halves
+# have never once run in CI, so the first credentialed run is the first time they are graded here,
+# and a genuine failure is the single most valuable thing this ticket can produce. A red run means
+# the platform is broken, not that the gate is. Fix the finding.
+#
+# HOW THIS IS TESTED, and it is deliberately not a claim made from the diff: the CI run on the
+# commit that carries this edit IS the test. The pass is the regression step showing FEWER declared
+# not-run parts than the 23 the v7.0.286 header measured with no credentials at all, and green.
+# A run that still reports 23 means the secrets did not reach the step and this edit did nothing.
+# Guarded by tests/regression/SES-180d-ci-credentialed-regression.js, which reads the shipped
+# workflow rather than restating it.
+#
 # DeepBench v7.0.286 | .github/workflows/ci.yml | SES-180 (c) — THE TWO REPORTING JOBS BECOME REAL
 # GATES. Both halves of the "reporting only" caveat this file shipped with have now been paid for
 # by other tickets, so the caveat was the only thing still making CI a rubber stamp.
@@ -28,8 +70,13 @@
 # WHAT THIS STILL DOES NOT DO, and neither is the runner's to do (SES-180's own residue, unchanged):
 #   * Repository secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY). Only John can add them. Until he
 #     does, the credentialed halves stay DECLARED not-run — visible in the log, counted as neither
-#     pass nor fail. That is what makes this gate honest rather than vacuous, and it is also why
-#     adding the secrets later makes the gate stronger with no edit to this file.
+#     pass nor fail. That is what makes this gate honest rather than vacuous.
+#     [CORRECTED v7.0.304, SES-180 (d).] This bullet used to end: "and it is also why adding the
+#     secrets later makes the gate stronger with no edit to this file." That was FALSE. A secret
+#     reaches a step only through an `env:` block naming it, and this step had none — so John adding
+#     both secrets (done and verified 2026-08-29) would have changed nothing at all. The sentence is
+#     struck rather than deleted, because a header that quietly drops its own wrong claim teaches
+#     the next reader nothing. The `env:` block that makes it true now lives on the suite step below.
 #   * Branch protection. This workflow now makes a failing check turn the RUN red; "red = no merge,
 #     regardless of author" is a repository setting, not a file. Only John can make it binding.
 #
@@ -125,8 +172,18 @@ jobs:
         run: node scripts/check-session-docs.js --gate
 
       # `if: always()` so a red tripwire cannot conceal the suite's result — see the header.
-      # No credentials: the credentialed halves declare themselves not-run (SES-180 (b)) and are
-      # counted as neither pass nor fail.
-      - name: Regression suite (no credentials)
+      #
+      # SES-180 (d), v7.0.304: the `env:` block is the whole of this ticket. `secrets.*` resolves
+      # ONLY where it is written — GitHub never auto-exposes a repository secret to a step — so
+      # without these two lines the credentialed halves declare themselves not-run (SES-180 (b))
+      # however correctly the secrets are configured. Do not remove them to "simplify" the step.
+      #
+      # On a pull_request from a fork both resolve to the empty string by GitHub's own design; the
+      # halves then declare not-run exactly as they did before this ship, which is the correct and
+      # safe degradation, not a failure. Named in the header rather than papered over here.
+      - name: Regression suite (credentialed)
         if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node tests/regression/run-all.js
