@@ -5,6 +5,79 @@
 
 ---
 
+## session/cycle-20260829-1654 (v7.0.320, 2026-08-29, runner cycle `b68bf88a-8244-4ca8-864c-de6be36e857e`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-191` — the re-drill ran and the recovery net restores 99.996%, up from 32.8%
+
+**Chained in-session from `807bddb3`'s `SES-220` ship**, which cleared this ticket's blocker.
+`drain_chain_gate` returned `continue` naming `SES-191`; selection is Prime Directive §2(a) —
+mission (2) of John's directive `6acd590e`, executed under his standing drill-dump authorisation
+`1c9609de`.
+
+**THE NUMBER, scored table by table against the set's own manifest rather than spot-checked:
+53,211 of 53,213 rows, 48 of 49 tables exact — 99.996%.** The first drill, eight days ago, scored
+32.8%. **`ai_activity_log` restored 34,879 of 34,879**, where that drill lost every one of them to
+`428C9`: `SES-223`'s dump-side column list and `SES-220`'s loader-side verification working end to
+end, at scale, for the first time. Structural: 56/56 tables, 632/632 columns, 101/101 indexes, 2/2
+sequences, 2/2 generated columns.
+
+**The 2 rows that did not load are the 2 that cannot** — the `jsonb` scalar `null`s in
+`pending_confirmations`, named by the loader with their pk, HTTP status, SQLSTATE and the server's
+own message. That is `SES-230`'s Route 1 doing exactly what it was built to do: reported, never
+silently dropped, and never represented.
+
+**THE FINDING THAT MOVED THE NUMBER, and it is the reason the first score was 99.985%.** The first
+restore pass left **8** rows unloaded, not 2. Six were a **self-referential foreign key ordering**
+problem — `backlog_items` 714/719 and `runner_drain_scope` 103/104 — and **a second run of the same
+command recovered every one** (719 and 104). The multi-pass loop retries whole *tables*, never
+intra-table row order, so a self-referential FK is invisible to it and the row-level fallback then
+retries each row in that same losing order. Nothing is lost; **the operator simply has to run the
+restore twice, and nothing in the runbook says so.** Filed as `SES-242`.
+
+**Two views are missing and they are exactly the two `SES-214` names** — `_backup_inventory` and
+`_backup_schema_ddl`, because the inventory view's own predicate excludes `_backup%`. Reproduced
+rather than rediscovered, and this drill confirms the *consequence* that ticket asserts: a platform
+rebuilt from this set restores once and then cannot back itself up.
+
+**A second, previously unrecorded apply defect: `schema.sql` emits the pgvector extension's own C
+functions** (`halfvec_*`, `array_to_vector`, `cosine_distance`, …) as user functions. No Supabase
+role may create a `LANGUAGE c` function, so **~114 of the 657 statements fail on every restore,
+forever**. Harmless to the outcome — the extension supplies them — but it buries a real error under
+a hundred lines of expected noise, which is the opposite of what `SES-223` (c) fixed. Filed as
+`SES-241`. Both new tickets took their ids from **one** `feature_id_counter` block call.
+
+**The `LOG-124` boundary held at scale**, which is the assertion that makes this more than a row
+count: on the restored 34,879-row table, **0** rows carry a NULL mask where `caller_ip` is present,
+**5,280** carry the recomputed `xxx.xx.` form, and the column is still `GENERATED ALWAYS … STORED`
+with no `DEFAULT`. A restore that had loaded it as frozen data would have rebuilt the leak.
+
+**`SES-191` ships `delivered`, NOT `done`, and the verifier's auto-done bar was deliberately
+declined.** The verdict is APPROVE with `auto_done_eligible` YES (`runner_verdicts 64768456`), so
+§2f would permit `done` — but this ticket's own definition of finished is that charter exit
+criterion 5 is *scored* by this drill, and directive `6acd590e` reserves that scoring to the M3 gate
+review in its own words: *"never auto-scored"*. Writing `done` here would confer the criterion by
+the back door. The evidence is on the ticket (`docs/harvests/SES-191-redrill-2026-08-29.md`) and the
+review does the scoring — the fail-closed direction §2f itself preserves.
+
+**A REAL VERSION COLLISION WAS CAUGHT BY THE CLAIM GATE, and it is reported rather than quietly
+fixed.** This cycle ran its first verdict labelled `v7.0.318` before claiming a number.
+`check-version-claim.js` then reported that `v7.0.318` was **issued to `runner-cycle-4e076c15`**, a
+peer, at 17:13:22Z — the exact `SES-153` collision that gate exists to catch. The counter was
+claimed atomically (returning **320**, peers having taken 318 and 319 during the drill), the harvest
+doc's stamp corrected, and the verdict re-run against `v7.0.320`. **The stale verdict row
+`18ca0d7c` is left in the ledger carrying a version this cycle never held**, rather than deleted:
+it is the record of the mistake, and the gate's own evidence that it works.
+
+**QA.** Build green. Regression suite **112/112**. Verifier APPROVE, all three gates green. The
+drill itself is the QA — a live end-to-end run, not a seam proof — with its negative control being
+the *previous* drill on the *previous* vintage of set: same command, same target, 32.8% then and
+99.996% now, the variable being the tooling the intervening tickets shipped.
+
+**Cleanup:** the `_drill_exec` helper created on the drill project to apply 657 statements without
+retyping 192 KB of SQL by hand was **dropped** (0 left), its grants asserted both directions while
+it existed (service_role true, anon false). The 157 MB drill set was deleted. `runner_secrets` (6
+rows) was **excluded from the load** rather than writing live credentials into a second project, and
+is excluded from the 53,213 denominator — stated rather than quietly netted out. **No push to
+`deepbench-backups-offsite`:** a drill dump is authorised, a push is not.
+
 ## session/cycle-20260829-1640 (v7.0.318, 2026-08-29, runner cycle `4e076c15-ba39-466b-854a-cd282566f36f`, `trigger = chained (drain continuation)` of `c38d63dc`, `scheduler_gate` verdict `run` — model Opus 5) — auto-done: `SES-133` — John's three ratifications reach the corpus, in the home it actually has now
 
 **The first continuation this session, opened under Prime Directive §2e.** `drain_chain_gate` returned
