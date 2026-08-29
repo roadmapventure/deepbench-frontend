@@ -5,6 +5,80 @@
 
 ---
 
+## session/cycle-20260829-1040 (v7.0.309, 2026-08-29, runner cycle `8c2c6a59-8e26-4d4e-b92e-81f368b4eb6a`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `LOG-141` — the org resolver short-circuited on a row it had never resolved, so every IP first seen since `HAR-33` kept `org`/`city`/`region` NULL forever
+
+**Selection walked a board whose whole head is gated, and this entry names the band rather than
+stepping past it in silence.** Layer 1a's two queued `directive` rows (`58db64ae`, `1c9609de`) are
+explicitly **standing** context — *"standing decisions in the channel cycles read first"*,
+*"STANDING AUTHORIZATION"* — so consuming either with `in_progress` would retire an authorisation
+John wants persistent. Layer 1b returned **`blocked`**: 3 named M3 members open, none claimable
+(`SES-182` needs-john and under his explicit hold, one `delivered`, `SES-191` blocked by
+`SES-220`). Fell through to layer 3 per B24. Queue 8–82 is then, ticket by ticket, either §19v
+**gated lane** — terminology (`LOG-44`/`45`/`47`/`48`), active-agent Skill/Capability edits
+(`LOO-18`, `AGT-024`, and the whole `P6 - Agent Enhancement` and `P8 - Determinism Removal` bands)
+— or carries an open design question in its own words (`LOO-21`, `CHI-47`, `CHI-20`, `CHI-16`).
+`LOG-141` at queue **83** is the first ticket outside all of it.
+
+**Named deviation, disclosed rather than buried (the `SES-196` convention).** B24 says a gated
+ticket becomes a `gated_before_build` card. Filing ~20 would bury John's page, which is the failure
+`SES-127` names in its own text — *"filling it with rows he cannot action is how an actionable
+section stops being read."* The band is recorded in the cycle row and the kickoff instead; the four
+topmost members already carry unresolved `runner_skips` rows, so nothing is newly hidden.
+
+**The defect, measured on both sides rather than recalled.** `middleware.js:320-325` writes a
+minimal first-sighting row (`caller_ip`, at most `country`) with `ignore-duplicates`.
+`lib/ip-org-resolver.js`'s Rule 1 then asked `select=caller_ip` and returned on **any** row — so
+that bare row read as a cache hit and the ipinfo lookup never happened. Live census at this ship:
+`ip_org_cache` holds **24** rows, **22** resolved, **2** with `org IS NULL` — and
+`attempted_but_unresolved` = **0**, i.e. every NULL-org row also has `resolver IS NULL`. *Never
+attempted*, which is this bug's signature and not a failed lookup's. Both are public US IPv4 on
+`trial`, so neither is a row `isPlausiblePublicIp()` would legitimately decline.
+
+**The short-circuit was right; its TEST was wrong.** It asked *does a row exist* where it must ask
+*was a resolution ever attempted*. The marker already existed and needed no new column: Rule 2's
+write sets `resolver = 'ipinfo.io'` on **both** the success and the failure path. **Not
+`resolved_at`** — both live NULL-org rows carry a non-NULL `resolved_at` with a NULL `resolver`, so
+keying on it would read them as attempted and rebuild the bug; that trap is pinned by its own guard
+clause.
+
+**The second edit is the one without which the first is INERT, and it is the half a later reader
+will be tempted to drop.** By the time the resolver runs, the gate's row already exists — so
+PostgREST's `ignore-duplicates` (`ON CONFLICT DO NOTHING`) silently discarded the lookup that had
+just been paid for. The write is now `merge-duplicates`, which updates **only the payload's**
+columns; `permission`, `spend_limit_usd`, `block_reason`, `blocked_at` and `blocked_attempts` are
+absent from it and are asserted absent, so `HAR-33`'s spend gate can never lose state to a
+background org lookup.
+
+**The invariant that must not break, asserted end-to-end rather than assumed from the diff.** The
+module's header calls the permanent negative-cache entry load-bearing — *"without it, one
+rate-limited or unroutable address would be re-queried on every single call forever."*
+`aFailedLookupIsStillNeverRetried()` drives two sightings: the failed lookup still writes its row
+carrying `resolver = 'ipinfo.io'` and `org = null`, and the next sighting constructs **zero**
+outbound requests. One attempt per address, forever — unchanged. Only the set of rows counting as
+*attempted* narrowed.
+
+**No backfill, and that is the fix earning its keep rather than a gap.** Both live NULL-org rows
+have `resolver IS NULL`, so under the new Rule 1 the next sighting of either address resolves it
+through the code path under test. A hand-written `UPDATE` would have stood in for exactly what is
+being verified.
+
+**QA was ten behavioural arms against the real shipped module through a stubbed `fetch`, asserting
+on the calls it actually made** — the URL, the `Prefer` header, the payload — never on source text.
+The file-level negative control is the pre-change module from `origin/dev` run against the same
+guard: it **fails** with the defect's own signature (`0 !== 1` lookups on a never-resolved row) and
+passes on the shipped one. Plus a labelled **seam proof** against real Supabase: the module's own
+new URL shape returns `{"resolver":null}` for the defect population, `{"resolver":"ipinfo.io"}` for
+a resolved row, `[]` + HTTP 200 for a genuine miss — and the retired `select=caller_ip` projection,
+run on the *same* never-attempted address, returns a row, which is the bug proven against the live
+table. Build green; full suite **104/104**; verifier verdict **approve** (all three gates green),
+`auto_done_eligible` **false** — `LOG-141` carries no epic and the charter scopes auto-done to the
+`Selfbuild` family, so it fails closed and the ticket ships `delivered` with a ship card.
+
+Code + test + kickoff; no schema change, no migration, no site change, `middleware.js` deliberately
+untouched.
+
+---
+
 ## session/cycle-20260829-0640 (v7.0.307, 2026-08-29, runner cycle `59cf253f-858a-44f8-a3b1-b08e157e8668`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-215` follow-up — the env-isolation guard's negative control was the shipped fix grading itself, so CI could never go green
 
 **Selection was John's word, not the board.** Directive `1715bf08` (attended-session audit,
