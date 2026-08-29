@@ -5,6 +5,95 @@
 
 ---
 
+## session/cycle-20260829-1540 (v7.0.313, 2026-08-29, runner cycle `04ddd470-199b-4f16-b6de-38b202ce1fe7`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-66` — the account-wide Anthropic usage cap gets the pre-flight check the Vercel quota has had since `SES-015`
+
+**THE FIRST CYCLE TO RUN UNDER THE SELFBUILD PRIME DIRECTIVE** (`runner_directives` `a0ef9525`,
+filed 15:19:59Z — 22 minutes before this cycle opened), and the selection is worth recording because
+§2 replaces the class-sorted board entirely. **§2(a)** — six directives sit `queued` and **every one
+is a standing policy row**, not a build mission (`58db64ae` standing decisions, `1c9609de` drill-dump
+authorisation, `5598ffdd` the `SES-182` conditional lift, `0970abad` drain succession, `a0ef9525`
+itself) plus one `drain-epic`. **§2(b)** — `drain_epic_next()` returned **`blocked`**, its
+`blocked_detail` naming both: *"1 waiting on you (SES-182 (needs-john)); 1 blocked on another ticket
+(SES-191 (blocked by SES-220))"*. **§2(c)** — this ticket. **§4 honoured:** the invention pass is
+suspended by the directive (and had already run today — 12 cycles in the CST day carry
+`INVENTION PASS`).
+
+**The §2(c) tie-break is named rather than buried (the `SES-196` convention).** Ten buildable
+candidates share one `created_at` (`2026-08-20 17:14:55.567199+00`, an import batch), so *"oldest
+first"* does not order them; `queue` — the platform's own canonical ordering — breaks the tie, and
+`SES-66` is the lowest at **246**. The two next-lowest were checked and are correctly not builds
+here: `SES-54` (250) targets `.claude/rules/capability-logging.md`, which an unattended cycle may not
+write (register B39), and `SES-47` (251) says in its own text *"John's call, no session needed"*.
+
+**Premise revalidation separated the dead half from the live one.** The *incident* is long resolved
+— John raised the account limit on 2026-07-30, no code changed. The *gap* is a different claim and it
+is live, verified by listing `scripts/` on an unedited tree: `check-deploy-current.js` is there, no
+Anthropic equivalent is, and `grep -rln anthropic scripts/` returns only `check-model-ids.js`,
+`check-ai-logging-coverage.js` and `heal-engine.js`, none of which probes the cap. `revalidated_at`
+was `NULL` — this ticket had never been revalidated in its 9 days on the board.
+
+**TWO DESIGN DECISIONS CARRY THE TICKET, and both are stated in the shipped file's own header so the
+next reader decides by the rule rather than by shortening the code.** (1) **The probe is an inference
+call, not `GET /v1/models`** — the obvious cheaper move is the wrong one, because a spend cap gates
+*inference*, not metadata, so `/v1/models` returns 200 for a fully-capped account and the check would
+report "clear" on exactly the state it exists to catch. A pre-flight that cannot fail is worse than
+none, because a session then trusts it. (2) **The classification keys on the MESSAGE, never on the
+status alone.** The incident's entire symptom was the string `Anthropic call failed: 400`, and 400 is
+equally the API's status for a malformed request or a bad model id — so `status === 400 -> capped`
+passes the incident's own fixture **and is still wrong**: it reports every ordinary request bug as an
+account cap and sends a cycle to wait out a limit it is not under.
+
+**The ticket's second ask is satisfied rather than deferred.** `SES-66` asks that the cap's reset
+behaviour be *"recorded … once observed again"*; `parseResetsAt()` extracts the instant the live
+message carries (*"regain access on 2026-08-01 at 00:00 UTC"* → `2026-08-01T00:00:00Z`), so the check
+records it instead of a human noticing. **Not claimed:** it does not settle the rolling-vs-fixed-window
+question the ticket flags as unconfirmed — an absent reset is `null`, never an invented date.
+
+**QA was live end-to-end AND discriminating, which are two different obligations.** The shipped
+`probe()` made a **real call to `api.anthropic.com/v1/messages`** with the key read from
+`runner_secrets` in-process — `{"verdict":"clear","exitCode":0}` — proving the auth header, the
+`anthropic-version` header, the canonical model id and the body shape are accepted by the real API,
+which no stub can. The key was held in memory only: never printed, never in argv, never written to a
+file. The **discriminating** half is separate and is proven as a **difference** rather than a property
+both implementations share (the `SES-213` lesson): the retired `status === 400 -> capped` form is kept
+in the guard as `retiredStatusOnlyClassify`, run against the **same** ordinary-400 fixture, and
+asserted to **lose**. Arm 7 additionally asserts the two forms **agree** on the real cap fixture — what
+makes the control fair rather than rigged: the difference is the ordinary 400, not the cap.
+**FILE-LEVEL NEGATIVE CONTROL, executed rather than described:** the shipped classifier's message-keyed
+branch was mutated in place to `if (status === 400)` and the guard **FAILED** (`+ 'capped' - 'unknown'`,
+exit 1); the tree was restored and it passes again. Opposite-direction pair: 429 is a cap with no
+message needed, 401 is **not** — reporting a bad key as a cap tells a session to wait for a reset that
+never comes, so a "simplification" collapsing the two fails one of them. Fail-closed arm run live:
+`env -u ANTHROPIC_API_KEY node scripts/check-anthropic-quota.js` → exit **2**, never 0.
+
+**`SES-213`'S FIX WATCHED ITSELF WORK, one variable, and it is worth recording as a second live
+confirmation.** The suite came back **107/108** with `SES-177-claude-state-renderer.js` failing
+`1 !== 0` — the committed `CLAUDE-STATE.md` drifted the moment predecessor `38e17277` reached
+`shipped`. Running step 7a's first line (`node scripts/render-claude-state.js`, 3 lines changed) and
+re-running the same test flipped it to **PASS** with nothing else touched.
+
+**Verdict `approve`** (`runner_verdicts fcb98f52`), all three mechanical gates green, and
+`auto_done_eligible` **YES** — a Selfbuild `P10 - Tooling` delivery whose diff touches none of
+`scripts/verifier.js`, `scripts/check-session-docs.js`, `tests/regression/run-all.js` — so the ticket
+closed **`done`** under step 7a's interim bar (charter decision 2), not `delivered`. Reverse stays one
+tap.
+
+**Declared remainder, named rather than left to be found:** the check is wired into step 3 but called
+by no script. That is deliberate — step 3's sibling pre-flight (`check-deploy-current.js`) is invoked
+the same way, by the cycle when its plan warrants it, and auto-invoking a billable call on every cycle
+(including the doc-and-SQL cycles that are most of them) would spend money to answer a question those
+cycles never ask. Making it unconditional is a decision about cost and belongs to John.
+
+**Observed in passing, not this ticket's:** the verifier's regression and hygiene gate output carries
+`fatal: cannot change to 'C:/Projects/deepbench-frontend'` — a script assuming John's Windows path.
+Both gates still exit 0. Pre-existing, unrelated to this diff, recorded here rather than silently
+absorbed.
+
+Guarded by `tests/regression/SES-66-anthropic-quota-preflight.js`. Doc + script + test; no
+`src`/`api`/`lib` change, no site change, no schema change, no migration.
+
+---
+
 ## session/cycle-20260829-1502 (v7.0.312, 2026-08-29, runner cycle `38e17277-d3ce-46e6-8900-e67c180468ba`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-230` — a failed batch is retried row by row, so two unloadable rows stop costing the 310 they travelled with
 
 **Mission, not a board pick.** Layer 1a: John's directive `23d5fbae` (attended architect session

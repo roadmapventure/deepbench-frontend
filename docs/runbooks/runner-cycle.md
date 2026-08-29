@@ -1087,6 +1087,36 @@ John for the real reset day; when he answers, that divisor becomes real and the 
 
 - **Deploy quota:** yield to John — if his manual sessions are pushing heavily today, prefer a
   gated-before-build item over a push. Use `VERCEL_TOKEN` from `runner_secrets` if present (export as env for `scripts/check-deploy-current.js`); if absent, note the skip in the cycle row — never invent a deploy-state claim.
+- **Anthropic account cap — a pre-flight, and it is NOT a wall (`SES-66`, `v7.0.313`).** Run it only
+  when this cycle's plan includes a **live** Anthropic call (a `tests/regression` arm that calls the
+  API, an agent-run probe); a doc-or-SQL cycle needs no key and skips it silently:
+
+```
+ANTHROPIC_API_KEY=… node scripts/check-anthropic-quota.js --json
+```
+
+  Exit **0** clear → proceed. Exit **1** capped → the account is over a usage limit, so **every**
+  live call this cycle would fail regardless of the change under test: do not spend the cycle
+  proving that. Record the verdict and the `resets_at` the message carried in the cycle row, and
+  prefer work that needs no live call (or a `gated_before_build` card) — this is the *"yield"*
+  posture the deploy-quota bullet above already takes, **never** a `did_not_run`. Exit **2** is
+  *could not run* (no key in `runner_secrets`, the API unreachable) and is **not a pass**: note it
+  exactly as a failed export is noted, and never record a cap you did not observe.
+
+  **Why this exists, and it is the gap `SES-33` closed on the other side.** The 2026-07-30 incident
+  (`design-dat-16`) had every live regression call fail instantly with `Anthropic call failed: 400`
+  — an account-wide cap, not a code or deploy defect, proven cross-cutting when an untouched,
+  unrelated case failed identically. Vercel's quota had `check-deploy-current.js`; this had nothing,
+  so a session only discovered it mid-run, after spending the wall-clock.
+
+  **THE EDIT THIS FORBIDS: shortening the check to `status === 400`.** That is the incident's own
+  symptom, and 400 is equally the API's status for a malformed request or a bad model id — so the
+  short form reports an ordinary request bug as an account cap and sends a cycle to wait out a limit
+  it is not under. The classifier keys on the **message**; `tests/regression/SES-66-anthropic-quota-preflight.js`
+  pins that with the retired form applied to the same fixture and asserted to lose. For the same
+  reason the probe is a one-token `POST /v1/messages` and **not** `GET /v1/models`: a metadata read
+  is not gated by a spend cap, so it returns 200 for a fully-capped account and the check would
+  report "clear" on exactly the state it exists to catch.
 
 ## Phase 2 — the work
 
