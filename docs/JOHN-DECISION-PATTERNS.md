@@ -1,3 +1,17 @@
+<!-- DeepBench v7.0.327 | docs/JOHN-DECISION-PATTERNS.md | SES-004 — the RUNNER-ERA half of the mining
+     pass: criteria 138–161, mined from the 2026-08-15 → 2026-08-29 corpus (197 decided cards carrying
+     John's typed reason, 77 directives, 23 answered questions, 11 card asks, 8 comments). That corpus
+     lives in Supabase, which a ship gate must not reach out to, so every cited passage is copied
+     verbatim into docs/harvests/SES-004.md — the corpus check-decision-pattern-quotes.js already reads.
+     NEW SECTION "Supervising autonomous work" (158–161): the runner era created a decision class the
+     nine existing headings do not hold — John ruling on an autonomous system's authority, budget and
+     trust mechanics rather than on a session's work product. THE APPEND IS APPEND-ONLY: criteria are
+     cited by number, so 1–137 keep theirs and nothing is renumbered. Twelve seed patterns came with
+     the ticket and were treated as hypotheses, not findings — 8 confirmed, 3 left out as ungroundable
+     in John's own words (simple-contained-beats-perfect-heavy, measured-beats-reasoned, and the
+     accountability→trust half), 1 dropped as a duplicate of existing #82. Guarded by
+     tests/regression/SES-004-runner-era-criteria.js, whose negative control removes the harvest and
+     requires the gate to FAIL on a runner-era criterion. -->
 <!-- DeepBench v7.0.136 | docs/JOHN-DECISION-PATTERNS.md | p1p3-now-review — criterion 137 (P1–P4 pull tests, John 2026-08-21): P2 needs hard-to-replicate uniqueness, P4 needs "I have to buy this" pull, administrative expectations classify by function; FAANG-showcase promotes to P1. Live reclass: ADM-1 → P10, LOG-126 → P5, AGT-015 → P1. -->
 <!-- DeepBench v7.0.126 | docs/JOHN-DECISION-PATTERNS.md | SES-90 — the local-archive mining pass: criteria 101–136, mined from John's own typed messages across all 186 local Claude Code sessions (2026-07-08 → 2026-08-21; 2,303 messages read in full, no sampling). Local-archive citations are quote+date durable, file-path best-effort (the archive is not in git); scripts/check-decision-pattern-quotes.js skips them by design and verifies everything in-repo. Coverage/privacy record: docs/harvests/SES-90.md. -->
 <!-- DeepBench v7.0.110 | docs/JOHN-DECISION-PATTERNS.md | SES-79 — the full mining pass: the seed set of 5 criteria (one session, `design-log-38-0724`) grows to 100, mined from ~3 months of docs/SESSIONS.md + docs/FEATURES-ARCHIVE.md. Every "Seen in" is a real recorded exchange; every one was grepped back against its source before landing. -->
@@ -11,7 +25,11 @@
 > decided another, or where he stated a standing rule in his own words. Criteria 101–136 were mined
 > 2026-08-21 (`SES-90`, `v7.0.126`) from the LOCAL Claude Code session archive — every message John
 > personally typed across all 186 sessions (2026-07-08 → 2026-08-21), read in full — appended at the
-> end of each themed section; their `Seen in:` cites the local archive (quote + date durable).
+> end of each themed section; their `Seen in:` cites the local archive (quote + date durable). Criterion 137 was added
+> 2026-08-21 (`p1p3-now-review`, `v7.0.136`). Criteria 138–161 were mined 2026-08-29 (`SES-004`,
+> `v7.0.327`) from the **runner-era** corpus — John’s taps, directives, answered questions, card asks
+> and comments between 2026-08-15 and 2026-08-29, which live in Supabase rather than in a repo file.
+> Their quotes are copied verbatim into `docs/harvests/SES-004.md` so the ship gate can check them.
 >
 > **`ARCHITECTURE.md` §19v makes this file the criteria source for every autonomous choice, and
 > anything it does not cover fails closed to the gated lane.** That is why density matters here:
@@ -184,6 +202,20 @@ system continues and does its best logging anyways? i don't want the platform to
 `52a3da2a-35bc-4c1d-a97c-34248300fcec.jsonl`, 2026-08-01)*
 
 ---
+
+**138. Never trade away multi-session parallelism to fix a coordination bug — fix races with
+claims, not one-run locks.** Concurrency is a capability John is deliberately keeping; a design
+that serializes the platform to make coordination easy is a Reverse, not a simplification. *Seen
+in:* Reversing the SES-98 proposal to retire the one-run lock's replacement in a way that would
+have limited runs — "i want to keep the ability to run multi routine sessions."
+
+**139. No credentials or connector channels inside a published page, ever — capture stays
+page-native and secrets move only through server-held config or dashboards John operates
+himself.** When a design needs privileged reads or writes, restructure the mechanism rather than
+embedding an authenticated channel in anything served to a browser. *Seen in:* rejecting the
+briefing-harvest fix that put his database connector inside the page — "no credentials or
+connector channel in the page, ever" — and redirecting the ticket to a structural read-back fix
+instead.
 
 ## Diagnosing and fixing
 
@@ -490,6 +522,23 @@ archive `027e7f3c-54eb-4ad7-b796-f5aa808332d0.jsonl`, 2026-07-25)*
 
 ---
 
+**140. Every time shown to John, and every day boundary applied to his words, is his local time
+(CST/CDT) — never UTC.** "Today", "for the day", morning/evening readings and override expiries
+all resolve on his clock; converting his local intent into UTC mechanics is the platform's job,
+silently. *Seen in:* his standing instruction on the budget-governor card — "all times displayed
+and used with me are converted to csd" — and his day-boundary ruling "Midnight cst."
+
+**141. Any surface that changes asynchronously stamps the time of its last action where John can
+see it, so staleness is judgeable at a glance.** He must always be able to tell whether the page
+has picked up his latest input or is showing an older state. *Seen in:* his briefing directive —
+"I can't tell what time my last action was compared to if the page has refreshed yet."
+
+**142. An interaction thread lives permanently on its own card — question, his entries, the
+system's answers, and the IDs of any tickets it spawned — and answering must never make it
+disappear.** Resolution collapses a thread, never deletes it; John re-reads threads across page
+refreshes to verify he was heard. *Seen in:* his acceptance test for the ask-thread fixes — "the
+thread and any tickets must stay within their cards along with ticket id's it creates."
+
 ## Scope, sequencing, and the backlog
 
 **64. One session works exactly one issue; everything else surfaced becomes its own backlog row.** *Seen
@@ -590,6 +639,51 @@ in new customers. Again administrative… I am looking for functionality that wo
 say 'I have to buy this'" (P4 → P5 - Enhancements); "I think AGT-015 would showcase me for FAANG"
 (P2 → P1 - Improves John's Skills).
 
+**143. Automation and tooling that removes John's manual load outranks the classified product
+backlog while the automation is incomplete — and a newly discovered automation need files
+straight to queue #1.** When selection is ambiguous, the machine that builds the machine wins
+over feature work. *Seen in:* "keep closing automation tooling tickets first before getting to
+the classified backlog" — and, on placement of new ones, "anytime you come up with automation
+needs it goes to #1 in queue."
+
+**144. A mission John declares runs continuously to completion — the scheduler cadence is a
+fallback heartbeat, never the pace of the work.** If the system ships one item per fire while
+claimable mission work waits, that is a defect in the selection design, not thrift. *Seen in:*
+his Prime Directive amendment — "the directive should not be an hourly crohn - the whole thing
+should be a drain" — after a week of "back to back until automation is complete" asks.
+
+**145. A completion target John names resolves to a fixed list captured at naming time, never to
+a live predicate that keeps moving.** "Until they are done" means the members enumerated when he
+said it; later filings wait for their own declaration rather than silently extending his
+finish line. *Seen in:* the Automation drain's scope ruling — "the user must name when the drain
+is done" — with the 18 members frozen at that moment.
+
+**146. Inside a declared mission, order work by the blocking chain — the active milestone's
+critical path and everything it is blocked_by, transitively — never by queue age or class
+number.** An "oldest first" default that leaves the critical path idle is a bug even though it is
+working as written. *Seen in:* John's own catch on the M3 ordering — "you didn't read that
+ses-183 is blocked - all of m3" — which rewrote the pick order to milestone critical path first.
+
+**147. Skipping a blocked item never reorders the queue — go past it, and it keeps its slot so
+its position is correct the moment it unblocks.** Blockage is marked on the row so no run
+re-derives it, but rank is never the thing that changes. *Seen in:* his card answer on
+desktop-only remainders — "you should be able to go past, but they keep their queue order so when
+they are completed their queue is correct."
+
+**148. Losing or hiding John's own typed input is an emergency that outranks every queued item —
+fix the capture path before building anything else.** His answers are the platform's steering
+signal; a surface that drops them invalidates all other work in flight. *Seen in:* "ses-132 and
+133 are emergencies and need to be ran before anything else - you can't be loosing my answers in
+shipped, gated, questions, vision."
+
+**149. Source showcase functionality from fresh research into live industry trends and FAANG job
+requirements — a capability that reads as a standard skill never counts as showcase, however well
+built.** Classification as showcase is earned against the current market, researched this
+session, not asserted from the platform's own sense of impressiveness. *Seen in:* his correction
+on the briefing-as-showcase claim — "research the web and find out the hottest trends in AI and
+multi-agent software that is functionality that is relevant to put into deepbench" — paired with
+researching FAANG AI job openings for the skillsets to turn into functionality.
+
 ## Testing, QA, and ship gates
 
 **73. A regression run passes only when every case delivers its final business outcome end-to-end.**
@@ -657,6 +751,19 @@ extending the 23-question suite the moment it was defined — "the 24th, choose 
 run it through end to end." *(local archive `10aedc75-8ce6-4240-82b8-cb3914650508.jsonl`, 2026-07-28)*
 
 ---
+
+**150. Tests are permanent assets — a test written to verify a fix gets a home in the suite,
+never written, run once, and discarded.** Regression guards persist and run every cycle;
+credential-gated halves skip loudly rather than vanish. *Seen in:* his answer on the briefing
+render test — "you should never be throwing away tests."
+
+**151. A shipped behavior claim is not done until John observes it running live, exactly as the
+rules displayed on his surface describe — expect his acceptance test to be watching it, not
+reading the report.** When his surface states a rule, the observed behavior matching that
+statement is the bar; repeated "still not seeing it" reworks mean the ship is open no matter how
+green the internal evidence. *Seen in:* three same-morning reworks on the drain — "still have not
+seen drain run according to the rules that are displayed" and "drain must work no matter what -
+according to the screen display and is not interupted."
 
 ## Working with John
 
@@ -753,6 +860,42 @@ a type 'intent'? Why not 'format'?" *(local archive `027e7f3c-54eb-4ad7-b796-f5a
 
 ---
 
+**152. Put decisions to John as tappable options — radio yes/no or lettered choices — and reserve
+typed answers for genuinely open questions.** A paragraph that forces him to compose a reply is a
+defect in the ask, and each control needs a plain statement of what choosing it does. *Seen in:*
+"create a question list for the briefing with a radio yes/no, instead of listing a full paragraph
+and i have to type out the answer."
+
+**153. Every decision surface carries a More-Info escape hatch — John must be able to question
+the issue and resolve it in place, without leaving the surface or guessing which button is
+right.** Confusion about what a control means is grounds to redesign the ask, and the resulting
+exchange is kept as part of the record. *Seen in:* "I need to be able to ask questions about the
+issue. But would like to be able to solve them in the brief."
+
+**154. Every proposal leads with a three-part business-value statement: what can't the user do
+today, what could they do after, and how it makes the platform more valuable.** Technical
+mechanism comes only after those three land; a pitch that opens in jargon gets reworked unread.
+*Seen in:* his Rework on the A2A invention card — "I need a business value statement - what can't
+the user do today? What would they be able to do after? How does this make the platform more
+valuable?"
+
+**155. When a run dies, the notification names why it died and what to do next — a status line
+saying it stopped is not a report.** Cause plus recommended action, pushed to him, every time.
+*Seen in:* his answer on failed-run handling — "need to know why it died and what to do next."
+
+**156. When John says he cannot answer a question, ownership transfers — pick a cautious default,
+record it, and stop putting the question to him.** Re-asking what he has declined to decide is
+the fatigue bug, not diligence. *Seen in:* his answer to the token-calibration question — "I
+don't know how to answer" — after which the runner kept the conservative figure and owned the
+reconciliation itself.
+
+**157. A remediation John words for named dates stays scoped to those dates — never generalize a
+one-time backfill into a standing rule without his separate assent.** He will answer "no" to the
+standing version and "yes" to the dated one in the same breath; implementing the standing version
+anyway reverses his decision. *Seen in:* declining the automatic morning-reading rule while
+directing the backfill — "only calculate the earliest as morning and the latest as evening cst
+for 8/19-8/21."
+
 ## The record itself
 
 **92. Persist every finding and decision where a cold future session will find it — real backlog IDs and
@@ -816,6 +959,41 @@ other issues will be worked in a seperate session" (`516e6549-2d62-4771-9916-20c
 2026-07-17); **#50** — 'i mean "question completed" - so perhaps the satus is "Question Answered"'
 (`7d32a87d-04c9-4996-a5fe-68bbf419cd0d.jsonl`, 2026-08-01); **#21** — "Do the structural fix, but let's
 heavily test in a POC of concept first" (`196574a9-e824-4618-8c65-96d0d18650b6.jsonl`, 2026-07-20).
+
+## Supervising autonomous work
+
+*Added by the `SES-004` runner-era pass (`v7.0.327`). The runner era created a decision class the
+existing headings do not hold: John supervising an autonomous system's authority, budget and trust
+mechanics, rather than reviewing a session's work product. The four criteria below are all rulings on
+how the machine runs when he is not watching.*
+
+**158. A permission prompt firing inside an authorized unattended run is a platform defect to
+root-cause, never a safety feature to tolerate.** Standing pre-approval is the contract for
+autonomous work; a run stalled on a prompt is a broken run, and the appearance of new prompts is
+itself a regression to investigate. *Seen in:* "Why are subroutines asking for permission? It
+should have full access and not asking" — raised unprompted, then traced by him to the previous
+day's changes.
+
+**159. Surface an approaching budget wall to John before it binds — he raises caps for the day
+freely rather than let the system sit idle, but the override is his word alone, never the
+system's.** The alert is the system's duty and the raise is his; both halves matter, and every
+raise he grants is day-scoped with the standing box unchanged. *Seen in:* his standing answer on
+the token wall — "let me know if i need to overide - but don't without my permission" — and a
+week of same-day raises whenever work was waiting.
+
+**160. Trust counters and streaks run forward only — no reset at a milestone, and no retroactive
+rewind of history after a rule changes.** A rule ruling applies from its harvest onward; going
+back to re-score old events under the new rule is invented work he does not want. *Seen in:* his
+answer on the promotion streak — "which one just keeps the count going? no need to reset - why
+would i do that?" — alongside his "no" to rewinding the ladder for the two pre-ruling gated taps.
+
+**161. When a John action is purely mechanical follow-through of a decision he already made,
+automate it or take a standing pre-authorization — recurring manual chores for him are bugs.**
+His Accept should discharge everything the decision implies; leaving him a repeated hand-step
+after each decision is unfinished work. *Seen in:* "accept the flag-clearing fix now so I stop
+doing this manually" — filed and ordered next in the same atomic call.
+
+---
 
 *Format for new entries: a one-line **criterion** (imperative), then a concrete **Seen in:** instance so it
 stays grounded, not abstract. Only add a criterion that would change a *future* decision — not a one-off.

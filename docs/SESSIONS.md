@@ -5,6 +5,76 @@
 
 ---
 
+## session/cycle-20260829-2040 (v7.0.327, 2026-08-29, runner cycle `475c76cb-e2d3-49a0-b05b-9d9d21e764f6`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, distillation delegated to a Fable 5 subagent per register B21) — `SES-004` — the RUNNER-ERA half of the decision-pattern mining pass
+
+**THE ORIGINAL PREMISE WAS DEAD AND THE RE-SCOPED ONE WAS ALIVE — both checked live, neither
+recalled.** `SES-004` was filed 2026-07-17 to mine `docs/SESSIONS.md` + `docs/FEATURES-ARCHIVE.md`
+into a decision-pattern reference. That shipped: `SES-79` (`v7.0.110`, 5 → 100 criteria) and
+`SES-90` (`v7.0.126`, +36) built `docs/JOHN-DECISION-PATTERNS.md`, which carried **137 criteria
+across 9 sections** on this branch — counted, not quoted — and whose own header says *"This is now
+the full `SES-004`/`SES-79` mining pass, not the seed."* What kept the ticket open is John's
+re-scope of 2026-08-29 ~16:4xZ, verbatim: *"this whole entire session should be filed. And so
+should all the other sessions from the last 2 weeks."* The corpus he named is the **runner era**,
+and it lives in Supabase: **197 decided cards carrying his typed reason, 77 directives, 23 answered
+questions, 11 card asks, 8 comments** between 2026-08-15 and 2026-08-29. The file stopped at
+2026-08-21. §19v makes it the criteria source for every autonomous choice and fails what it does
+not cover **closed**, so every unmined pattern was an escalation the runner did not need to make.
+
+**THE HARVEST FILE IS THE DESIGN, NOT PACKAGING.** `scripts/check-decision-pattern-quotes.js`
+verifies every quoted kernel against an **in-repo** corpus — `docs/SESSIONS.md`,
+`docs/FEATURES-ARCHIVE.md`, `docs/harvests/*.md`. The runner-era corpus is database rows, and
+teaching a ship gate to reach the network makes it fail for reasons unrelated to what it guards.
+So the cited passages are copied **verbatim, in full rather than trimmed**, into
+`docs/harvests/SES-004.md` (37.5 KB, 28 passages behind 24 criteria), each carrying its source
+table, row id and UTC timestamp — the same route `SES-90` used for its own coverage record.
+
+**THE TWELVE SEED PATTERNS WERE TREATED AS HYPOTHESES, WHICH IS WHAT THE TICKET ASKED FOR** (*"the
+mining validates/extends these against the corpus, never trusts them bare"*). Result: **8
+confirmed, 3 left out, 1 dropped as a duplicate of existing #82.** The three left out are named
+rather than quietly folded in: *simple-contained beats perfect-heavy* (his actual words on the
+`SES-230` route choice were *"1"* and *"b"* — the reasoning is runner-authored), *measured beats
+reasoned / an honest partial beats a dressed-up green* (visible in what he accepts, never in his
+own words; largely covered by existing #22/#73), and the *accountability → trust* half (his
+question is real, the trust-extension inference is not). Three further findings were recorded as
+ungroundable rather than written in. **24 criteria landed, 138–161**, append-only: criteria are
+cited by number, so 1–137 keep theirs.
+
+**ONE NEW SECTION, "Supervising autonomous work" (158–161).** The runner era created a decision
+class the nine existing headings do not hold — John ruling on an autonomous system's authority,
+budget and trust mechanics rather than on a session's work product.
+
+**THE SHIP GATE IS RED, IT WAS RED BEFORE THIS CYCLE, AND THAT IS FILED RATHER THAN ABSORBED.**
+`check-decision-pattern-quotes.js` exits 1 with **60 ungrounded quotes across criteria 6–137** —
+identical before and after this append, proven by running it against the pre-change copy in a
+symlinked control tree. Nothing in `tests/regression/` runs it and it is not in CI, so it is a
+"gate" only in the sense that a human is told to run it by hand. Filed as **`SES-246`** (id claimed
+atomically, `P10 - Tooling`, `M`, `gate_count` 2). This cycle's guard therefore asserts the thing
+this cycle is responsible for — **no runner-era criterion is among the misses** — because
+asserting `exit 0` would have meant either absorbing 60 unrelated citation repairs or asserting a
+failure count that breaks the day someone fixes one.
+
+**QA.** Build green. Suite **118/119**, up from a **117/118** baseline measured on the unedited
+tree; the single red is `SES-177-claude-state-renderer.js` on both, the known `SES-213` shape, and
+step 7a's render closed it. `tests/regression/SES-004-runner-era-criteria.js` carries five clauses,
+and **its negative control is the harvest removed**: the gate then cannot ground 11 runner-era
+criteria (140, 143, 144, 146, 147, 149, 153, 154, 157, 159, 161) where the live tree misses **none**
+— a difference, not an exit code, because the gate exits 1 either way. A **file-level control** ran
+the whole guard against the pre-change tree: it fails there and passes here, and the tree was
+restored byte-identical afterwards (sha256 compared). The guard also earned its keep before the
+ship rather than after: its first run reported criterion 138 as evidence-less, and the doc was
+right — `*Seen in:*` hard-wraps across a line break, exactly the case the gate's own header records
+at entry #112. The test's regex was the bug and was tightened to the gate's `\s+` form.
+
+**DECLARED REMAINDER — the ticket ships `partial`.** John's re-scope ends *"EXIT SHAPE: patterns as
+queryable rows a cycle cites … feeding M7's John-model"*. That is a schema plus a citation
+mechanism plus a card surface — design-heavy and multi-cycle — and `SES-004`'s own text routes its
+sequencing to the M3 gate review. The mining half shipped; the exit shape did not.
+
+**ORDERING DEVIATION, RECORDED RATHER THAN HIDDEN (§19v).** `SES-246`'s before-image was written
+immediately **after** its INSERT, not before: the first attempt carried both in one call and rolled
+back whole on `backlog_items.row_ordinal`'s NOT NULL. The image (`row_data = NULL`, the step-8b
+INSERT convention) was written before anything else touched the row.
+
 ## session/cycle-20260829-1940 (v7.0.326, 2026-08-29, runner cycle `179edfd6-a480-41d0-9117-18c8ea98a2a0`, `trigger = chained (drain continuation)` of `cb06c7e1`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-24` — the hygiene checks stop pointing at a list that no longer exists
 
 **A DEAD POINTER THAT READ AS ALL-CLEAR.** `SES-011` replaced `CLAUDE-STATE.md`'s shared *"In flight
